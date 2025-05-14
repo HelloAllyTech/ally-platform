@@ -1,4 +1,177 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Ally Mobile App
+
+A React Native mobile application designed to facilitate communication between medical counsellors and their clients.
+
+## Tech Stack
+
+- **Framework:** React Native 0.79.1
+- **Language:** TypeScript 5.0.4
+- **State Management:** Redux Toolkit
+- **Navigation:** React Navigation v7
+- **Styling:** React Native Size Matters
+- **Animations:** React Native Reanimated, Lottie
+- **Storage:** AsyncStorage
+- **Network:** Socket.IO Client
+- **Code Quality:**
+  - ESLint
+  - Prettier
+  - Husky
+  - Commitlint
+  - TypeScript
+  - Lint-staged
+
+## Project Structure
+
+```
+src/
+├── assets/         # Static assets and resources
+├── components/     # Reusable UI components
+├── config/         # App configuration files
+├── constants/      # Global constants and enums
+├── hooks/          # Custom React hooks
+├── navigation/     # Navigation configuration
+├── screens/        # Screen components
+├── services/       # API and service integrations
+├── store/          # Redux store and slices
+├── theme/          # Styling and theming
+├── types/          # TypeScript type definitions
+└── utils/          # Utility functions
+```
+
+## Design System
+
+### Theme Configuration
+
+The app uses a robust theming system located in `src/theme/`:
+
+- `colors.ts`: Color palette definitions
+- `typography.ts`: Text styles and font configurations
+- `fonts.ts`: Font family definitions
+- `helpers.ts`: Theme utility functions
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18
+- Ruby (for iOS development)
+- Xcode (for iOS development)
+- Android Studio (for Android development)
+- CocoaPods (for iOS dependencies)
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. iOS specific setup:
+   ```bash
+   bundle install
+   bundle exec pod install
+   ```
+
+### Running the App
+
+#### iOS
+
+```bash
+npm run ios
+```
+
+#### Android
+
+```bash
+npm run android
+```
+
+#### Start Metro Server
+
+```bash
+npm start
+```
+
+## Development
+
+### Code Quality
+
+The project uses several tools to maintain code quality:
+
+- **ESLint & Prettier**: Code style and formatting
+
+  ```bash
+  npm run lint
+  ```
+
+- **Import Organization**: The project enforces a strict import grouping order:
+
+  1. Built-in Node.js modules
+  2. External dependencies (npm packages, with React first)
+  3. Internal modules (using @ alias)
+  4. Parent/sibling imports (relative)
+  5. Index files
+  6. Type imports
+
+  Imports are separated by newlines and alphabetically sorted within their groups.
+
+  Example:
+
+  ```typescript
+  import {useEffect} from 'react';
+  import {View} from 'react-native';
+  import AsyncStorage from '@react-native-async-storage/async-storage';
+
+  import {useAppTheme} from '@/hooks';
+
+  import {styles} from './styles';
+  import {ComponentProps} from './types';
+  ```
+
+- **TypeScript**: Static type checking
+- **Husky**: Git hooks for pre-commit checks
+- **Lint-staged**: Run linters on staged files
+
+### Commit Convention
+
+The project follows the Conventional Commits specification with the following types:
+
+- `feat`: New features
+- `fix`: Bug fixes
+- `docs`: Documentation changes
+- `chore`: Maintenance tasks
+- `style`: Code style changes
+- `refactor`: Code refactoring
+- `ci`: CI/CD changes
+- `test`: Test updates
+- `revert`: Revert changes
+- `perf`: Performance improvements
+- `build`: Build system changes
+
+Commit messages should be in sentence-case and should not end with a period.
+
+## Architecture Patterns
+
+- **Component-Based Architecture**: Reusable UI components in `src/components`
+- **Redux Pattern**: Centralized state management using Redux Toolkit
+- **Navigation Pattern**: Stack-based navigation using React Navigation
+- **Theme Provider Pattern**: Global theming system
+- **Custom Hooks Pattern**: Reusable logic in custom hooks
+
+## Scripts
+
+- `npm start`: Start the Metro bundler
+- `npm run ios`: Build and run iOS app
+- `npm run android`: Build and run Android app
+- `npm run lint`: Run ESLint
+- `npm test`: Run tests
+- `npm run lint-staged`: Run linters on staged files
+
+## Node Version
+
+This project requires Node.js version 18 or higher.
 
 # Getting Started
 
@@ -62,21 +235,6 @@ If everything is set up correctly, you should see your new app running in the An
 
 This is one way to run your app — you can also build it directly from Android Studio or Xcode.
 
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
 ### Now what?
 
 - If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
@@ -98,11 +256,6 @@ To learn more about React Native, take a look at the following resources:
 
 ## Environment Setup
 
-1. Copy `env/.env.example` to create environment files:
-   ```bash
-   cp env/.env.example env/.env.development
-   cp env/.env.example env/.env.staging
-   cp env/.env.example env/.env.production
-   ```
+### Environment Variables
 
-2. Update the values in each environment file
+The app uses environment variables for configuration. You'll need to create a `.env` file in the root directory based on the template provided in `env/.env.example`. Copy the example file and fill in the appropriate values:

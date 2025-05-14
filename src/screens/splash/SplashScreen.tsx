@@ -1,0 +1,202 @@
+import LottieView from 'lottie-react-native';
+import React, {useEffect, useState, useRef} from 'react';
+import {
+  View,
+  Dimensions,
+  Text,
+  TouchableWithoutFeedback,
+  Keyboard,
+  TouchableOpacity,
+  StatusBar,
+  KeyboardAvoidingView,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+
+import {LeftArrowIcon} from '@/assets/icons';
+import {isIOS} from '@/constants/general';
+import {useCounselorChat} from '@/hooks/useCounselorChat';
+import {useUser} from '@/hooks/useUser';
+import {RootStackScreenProps} from '@/navigation/types';
+
+import {OtpVerification, PhoneLogin} from './components';
+import {styles} from './styles';
+import {AuthStep} from './types';
+
+const {height} = Dimensions.get('screen');
+
+export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
+  const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
+  const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const lottieRef = useRef<LottieView>(null);
+  const {checkAuth, isAuthenticated, isUserLoading} = useUser();
+  const {checkCounselorChat} = useCounselorChat();
+
+  const animationTranslateY = useSharedValue(0);
+
+  const [currentStep, setCurrentStep] = useState<AuthStep>('PHONE_NUMBER');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  useEffect(() => {
+    StatusBar.setHidden(true); // Hide status bar
+    // Play lottie animation from frame 0 to 200 and freeze at the end frame
+    lottieRef.current?.play(0, 200);
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isAnimationEnded) {
+      if (!isUserLoading && !isAuthenticated) {
+        setIsBottomSheetVisible(true);
+        animationTranslateY.value = withTiming(-height * 0.6, {
+          duration: 1000,
+        });
+      } else if (isAuthenticated) {
+        // Check for counselor chat after authentication
+        checkCounselorChat();
+      }
+    }
+  }, [
+    isAnimationEnded,
+    isAuthenticated,
+    isUserLoading,
+    animationTranslateY,
+    checkCounselorChat,
+  ]);
+
+  const handleOtpGenerationSuccess = async (phone: string) => {
+    setPhoneNumber(phone);
+    setCurrentStep('OTP');
+  };
+
+  const handleOtpVerificationSuccess = () => {
+    checkAuth();
+  };
+
+  const handleBackPress = () => {
+    setCurrentStep('PHONE_NUMBER');
+  };
+
+  const renderAuthContent = () => {
+    switch (currentStep) {
+      case 'PHONE_NUMBER':
+        return (
+          <PhoneLogin onOtpGenerationSuccess={handleOtpGenerationSuccess} />
+        );
+      case 'OTP':
+        return (
+          <OtpVerification
+            phoneNumber={phoneNumber}
+            onOtpVerificationSuccess={handleOtpVerificationSuccess}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const animationStyle = useAnimatedStyle(() => ({
+    transform: [{translateY: animationTranslateY.value}],
+  }));
+
+  const authContentStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(
+      animationTranslateY.value,
+      [0, -height * 0.65], // From 0 to -65% of screen height
+      [height, height * 0.35], // Start at 100% of screen height, end at 35%
+      {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      },
+    );
+
+    return {
+      transform: [{translateY}],
+      opacity: interpolate(
+        animationTranslateY.value,
+        [0, -height * 0.3],
+        [0, 1],
+        {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        },
+      ),
+    };
+  });
+
+  const textStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      animationTranslateY.value,
+      [0, -height * 0.65],
+      [0, 1],
+      {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      },
+    );
+
+    const translateY = interpolate(progress, [0, 1], [height, height * 0.2], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+
+    return {
+      transform: [{translateY}],
+      opacity: interpolate(progress, [0, 0.3], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      }),
+    };
+  });
+
+  return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.flex1}>
+        {currentStep === 'OTP' && (
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <LeftArrowIcon width={44} height={44} color="black" />
+          </TouchableOpacity>
+        )}
+        <Animated.View style={[styles.animationContainer, animationStyle]}>
+          <LottieView
+            ref={lottieRef}
+            source={require('@/assets/animations/splashAnimation.json')}
+            style={styles.animation}
+            resizeMode="cover"
+            autoPlay
+            loop={false}
+            speed={1}
+            onAnimationFinish={() => setIsAnimationEnded(true)}
+          />
+        </Animated.View>
+        <Animated.View style={[styles.titleContainer, textStyle]}>
+          {currentStep === 'PHONE_NUMBER' ? (
+            <>
+              <Text style={styles.title}>Hey,</Text>
+              <Text style={styles.title}>
+                Welcome to <Text style={styles.allyText}>Ally</Text>
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.title}>Verify your phone Number</Text>
+          )}
+        </Animated.View>
+
+        {isBottomSheetVisible && (
+          <KeyboardAvoidingView
+            behavior={isIOS ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}>
+            <Animated.View style={[styles.authContainer, authContentStyle]}>
+              {renderAuthContent()}
+            </Animated.View>
+          </KeyboardAvoidingView>
+        )}
+      </View>
+    </TouchableWithoutFeedback>
+  );
+};

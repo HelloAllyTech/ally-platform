@@ -3,29 +3,22 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
 
 import type {RootStackParamList} from '@/navigation/types';
-import {Login} from '@/screens/auth/Login';
-import {Home} from '@/screens/home/Home';
+import {HomeScreen, ListeningScreen, SplashScreen} from '@/screens';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export function RootNavigator() {
+export const RootNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName="Splash"
         screenOptions={{
-          headerShown: true,
-          headerShadowVisible: false,
-          headerStyle: {
-            backgroundColor: '#F5FCFF',
-          },
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerShown: false,
         }}>
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Listening" component={ListeningScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+};
