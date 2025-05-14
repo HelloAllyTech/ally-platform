@@ -1,3 +1,4 @@
 export enum AsyncStorageKeys {
-  AUTH_TOKEN = 'AUTH_TOKEN',
+  ACCESS_TOKEN = 'ACCESS_TOKEN',
+  REFRESH_TOKEN = 'REFRESH_TOKEN',
 }

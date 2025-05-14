@@ -1,19 +1,23 @@
 import React from 'react';
-import {StatusBar, SafeAreaView} from 'react-native';
+import {StatusBar} from 'react-native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {Provider} from 'react-redux';
 
-import {RootNavigator} from '@/navigation/RootNavigator';
-import {store} from '@/store';
+import {RootNavigator} from './navigation/RootNavigator';
+import {store} from './store/store';
 
-export const App = (): React.JSX.Element => {
+export const App = () => {
   return (
-    <Provider store={store}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F5FCFF" />
-        <RootNavigator />
-      </SafeAreaView>
-    </Provider>
+    <GestureHandlerRootView style={styles.container}>
+      <Provider store={store}>
+        <SafeAreaProvider style={styles.container}>
+          <StatusBar translucent backgroundColor="transparent" />
+          <RootNavigator />
+        </SafeAreaProvider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 };
 
@@ -22,5 +26,3 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
 });
-
-export default App;

@@ -1,8 +1,9 @@
 import Config from 'react-native-config';
 
 export interface Env {
-  API_URL: string;
   ENVIRONMENT: 'development' | 'staging' | 'production';
+  API_BASE_URL: string;
+  API_VERSION: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -13,9 +14,10 @@ function assertEnvVar(value: string | undefined, name: string): string {
 }
 
 export const env: Env = {
-  API_URL: assertEnvVar(Config.API_URL, 'API_URL'),
   ENVIRONMENT: assertEnvVar(
     Config.ENVIRONMENT,
     'ENVIRONMENT',
   ) as Env['ENVIRONMENT'],
+  API_BASE_URL: assertEnvVar(Config.API_BASE_URL, 'API_BASE_URL'),
+  API_VERSION: assertEnvVar(Config.API_VERSION, 'API_VERSION'),
 };
