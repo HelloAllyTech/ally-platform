@@ -3,7 +3,7 @@ import {Socket, io} from 'socket.io-client';
 
 import {env} from '@/config/env';
 import {SocketEvent} from '@/types/message';
-
+import {logger} from '@/utils/logger';
 interface UseSocketOptions {
   userId: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
@@ -18,7 +18,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   const connect = useCallback(
     (chatId?: number) => {
       if (connectionAttemptsRef.current >= maxAttempts) {
-        console.error('Max connection attempts reached');
+        logger.error('Max connection attempts reached');
         return;
       }
 
@@ -62,15 +62,15 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     });
 
     socketRef.current.on('connect_error', error => {
-      console.error('connect_error: Socket connection error:', error);
+      logger.error(`connect_error: Socket connection error: ${error}`);
     });
 
     socketRef.current.on('disconnect', reason => {
-      console.error('disconnect: Socket disconnected:', reason);
+      logger.error(`disconnect: Socket disconnected: ${reason}`);
     });
 
     socketRef.current.on('error', error => {
-      console.error('error: Socket error:', error);
+      logger.error(`error: Socket error: ${error}`);
     });
 
     const callbacks = eventCallbacks || {};
@@ -88,7 +88,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
 
   const sendMessage = useCallback((message: string) => {
     if (!socketRef.current) {
-      console.error('Socket not connected');
+      logger.error('Socket not connected');
       return;
     }
     socketRef.current.emit(SocketEvent.SEND_MESSAGE, message);
@@ -97,7 +97,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   const emitSocketEvent = useCallback(
     (socketEvent: SocketEvent, message: Record<string, any>) => {
       if (!socketRef.current) {
-        console.error('Socket not connected');
+        logger.error('Socket not connected');
         return;
       }
       socketRef.current.emit(socketEvent, message);
@@ -112,7 +112,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   const setListenerForEvent = useCallback(
     (socketEvent: SocketEvent, callback: (data: any) => void) => {
       if (!socketRef.current) {
-        console.error('Socket not connected');
+        logger.error('Socket not connected');
         return;
       }
       socketRef.current.on(socketEvent, callback);
@@ -122,7 +122,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
 
   const removeIfListenerPresent = useCallback((socketEvent: SocketEvent) => {
     if (!socketRef.current) {
-      console.error('Socket not connected');
+      logger.error('Socket not connected');
       return;
     }
     socketRef.current.off(socketEvent);

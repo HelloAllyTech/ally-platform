@@ -10,3 +10,7 @@ export const DEFAULT_HIT_SLOP = {
 export const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const isIOS = Platform.OS === 'ios';
+
+export enum LanguageCode {
+  EN = 'en',
+}

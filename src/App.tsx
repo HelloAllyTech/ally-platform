@@ -7,6 +7,7 @@ import {Provider} from 'react-redux';
 
 import {RootNavigator} from './navigation/RootNavigator';
 import {store} from './store/store';
+import './localization/i18n';
 
 export const App = () => {
   return (

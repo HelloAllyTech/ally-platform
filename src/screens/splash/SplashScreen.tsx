@@ -20,6 +20,7 @@ import Animated, {
 import {LeftArrowIcon} from '@/assets/icons';
 import {isIOS} from '@/constants/general';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
+import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {RootStackScreenProps} from '@/navigation/types';
 
@@ -35,6 +36,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
   const lottieRef = useRef<LottieView>(null);
   const {checkAuth, isAuthenticated, isUserLoading} = useUser();
   const {checkCounselorChat} = useCounselorChat();
+  const {t} = useTranslate();
 
   const animationTranslateY = useSharedValue(0);
 
@@ -177,13 +179,16 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
         <Animated.View style={[styles.titleContainer, textStyle]}>
           {currentStep === 'PHONE_NUMBER' ? (
             <>
-              <Text style={styles.title}>Hey,</Text>
+              <Text style={styles.title}>{t('SplashScreen.hey')}</Text>
               <Text style={styles.title}>
-                Welcome to <Text style={styles.allyText}>Ally</Text>
+                {t('SplashScreen.welcome')}{' '}
+                <Text style={styles.allyText}>{t('SplashScreen.ally')}</Text>
               </Text>
             </>
           ) : (
-            <Text style={styles.title}>Verify your phone Number</Text>
+            <Text style={styles.title}>
+              {t('SplashScreen.verifyYourPhoneNumber')}
+            </Text>
           )}
         </Animated.View>
 

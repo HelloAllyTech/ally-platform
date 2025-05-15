@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useSocket} from '@/hooks/useSocket';
+import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
@@ -32,6 +33,7 @@ interface AudioData {
 }
 
 export const ListeningScreen = () => {
+  const {t} = useTranslate();
   const navigation = useAppNavigation();
   const [isNudgeVisible, setIsNudgeVisible] = useState(true);
   const chat = useAppSelector(state => state.chat.currentChat);
@@ -150,7 +152,9 @@ export const ListeningScreen = () => {
         end={{x: 0.6, y: 1}}>
         <StatusBar backgroundColor="transparent" translucent />
         <View style={styles.header}>
-          <Text style={styles.headerText}>Taking notes</Text>
+          <Text style={styles.headerText}>
+            {t('ListeningScreen.takingNotes')}
+          </Text>
           <Timer startTime={startTime} />
         </View>
 

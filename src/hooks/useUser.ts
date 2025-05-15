@@ -11,6 +11,7 @@ import {
 } from '@/store/slices/userSlice';
 import {RootState, store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
+import {logger} from '@/utils/logger';
 
 export const useUser = () => {
   const isAuthenticated = useSelector(
@@ -41,7 +42,7 @@ export const useUser = () => {
         return null;
       }
     } catch (error) {
-      console.error('Error authenticating - ', error);
+      logger.error(`Error authenticating - ${error}`);
       store.dispatch(clearTokens());
       return null;
     } finally {

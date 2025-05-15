@@ -14,6 +14,7 @@ import {
 
 import {PrimaryButton} from '@/components';
 import {isIOS} from '@/constants/general';
+import useTranslate from '@/hooks/useTranslate';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme/colors';
 import {getErrorMessage} from '@/utils/error';
@@ -30,6 +31,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const [generateOtp, {isLoading, isSuccess, isError, error, data}] =
     useGenerateOtpMutation();
+  const {t} = useTranslate();
 
   const handleOtpError = useCallback(
     (err: FetchBaseQueryError | SerializedError) => {
@@ -88,7 +90,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
         <View style={styles.container}>
           <View style={styles.contentContainer}>
             <Text style={styles.headerText}>
-              Enter your phone number to continue
+              {t('SplashScreen.enterYourPhoneNumber')}
             </Text>
             <View style={styles.inputContainer}>
               <View style={styles.countryCode}>
@@ -116,26 +118,26 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
           <View style={styles.bottomContainer}>
             <View style={styles.termsContainer}>
               <Text style={styles.termsText}>
-                By tapping next, you agree to Ally's{' '}
+                {t('SplashScreen.byTappingNext')}{' '}
                 <Text
                   style={styles.termsLink}
                   onPress={() => Linking.openURL('https://example.com/terms')}>
-                  Terms & Conditions
+                  {t('SplashScreen.termsAndConditions')}
                 </Text>{' '}
-                and acknowledge{' '}
+                {t('SplashScreen.andAcknowledge')}{' '}
                 <Text
                   style={styles.termsLink}
                   onPress={() =>
                     Linking.openURL('https://example.com/privacy')
                   }>
-                  Privacy Policy
+                  {t('SplashScreen.privacyPolicy')}
                 </Text>
                 .
               </Text>
             </View>
 
             <PrimaryButton
-              label="Next"
+              label={t('SplashScreen.next')}
               onPress={handleSubmit}
               isDisabled={phoneNumber.length !== 10}
               isLoading={isLoading}

@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {ThumbIcon} from '@/assets/icons';
+import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 
 import {styles} from './styles';
@@ -38,6 +39,8 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
   isLoading,
   onFeedback,
 }) => {
+  const {t} = useTranslate();
+
   const animatedStyle = useAnimatedStyle(() => {
     const translateX = withSpring(isVisible ? 0 : width * 0.2, {
       damping: 15,
@@ -77,7 +80,9 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
         </ScrollView>
         {!nudge.hasFeedback && (
           <View style={styles.feedbackContainer}>
-            <Text style={styles.feedbackText}>Is this helpful</Text>
+            <Text style={styles.feedbackText}>
+              {t('ListeningScreen.isThisHelpful')}
+            </Text>
             <View style={styles.feedbackButtons}>
               <TouchableOpacity
                 style={styles.thumbContainer}

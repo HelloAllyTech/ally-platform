@@ -2,6 +2,7 @@ import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {View, Text, TouchableOpacity, Alert} from 'react-native';
 
 import {PrimaryButton} from '@/components';
+import useTranslate from '@/hooks/useTranslate';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services/authApi';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
@@ -31,6 +32,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     {isLoading: isVerifying, isSuccess, isError, error: apiError, data},
   ] = useVerifyOtpMutation();
   const [generateOtp, {isLoading: isResending}] = useGenerateOtpMutation();
+  const {t} = useTranslate();
 
   const isOtpComplete = otpValue.every(v => v !== '');
   const otp = otpValue.join('');
@@ -94,7 +96,8 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     <View style={styles.container}>
       <View style={styles.contentContainer}>
         <Text style={styles.headerText}>
-          Enter the code sent to{'\n'}
+          {t('SplashScreen.enterTheCodeSentTo')}
+          {'\n'}
           <Text style={styles.phoneNumberText}>
             {formatPhoneNumberForDisplay(phoneNumber)}
           </Text>
@@ -117,7 +120,9 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         ) : null}
 
         <View style={styles.resendContainer}>
-          <Text style={styles.helperText}>Didn't receive the code?</Text>
+          <Text style={styles.helperText}>
+            {t('SplashScreen.didNotReceiveTheCode')}
+          </Text>
           <TouchableOpacity
             style={styles.resendButton}
             onPress={handleResendOtp}
@@ -128,14 +133,15 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
                 (isResendDisabled || isResending) &&
                   styles.resendButtonDisabled,
               ]}>
-              Resend {countdown > 0 ? `(${countdown}s)` : ''}
+              {t('SplashScreen.resend')}{' '}
+              {countdown > 0 ? `(${countdown}s)` : ''}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <PrimaryButton
-        label="Verify OTP"
+        label={t('SplashScreen.verifyOtp')}
         onPress={handleSubmit}
         isDisabled={!isOtpComplete}
         isLoading={isVerifying}

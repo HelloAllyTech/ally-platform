@@ -7,12 +7,17 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
+import useTranslate from '@/hooks/useTranslate';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 
-export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
+export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = ({
+  navigation,
+}) => {
+  const {t} = useTranslate();
+
   useCounselorChat();
 
   useEffect(() => {
@@ -28,8 +33,8 @@ export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
   }, []);
 
   const handleListeningPress = useCallback(() => {
-    // TODO: Implement listening screen
-  }, []);
+    navigation.navigate('Listening');
+  }, [navigation]);
 
   return (
     <LinearGradient
@@ -40,8 +45,8 @@ export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
       end={{x: 0.6, y: 1}}>
       <View style={styles.content}>
         <Text style={styles.titleContainer}>
-          <Text style={styles.startText}>Start </Text>
-          <Text style={styles.listeningText}>listening</Text>
+          <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+          <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
         </Text>
 
         <TouchableOpacity
@@ -63,7 +68,7 @@ export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
           style={styles.footer}
           hitSlop={DEFAULT_HIT_SLOP}
           activeOpacity={0.8}>
-          <Text style={styles.tapText}>Tap to begin</Text>
+          <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
           <InfoIcon width={20} height={20} />
         </TouchableOpacity>
       </View>
@@ -93,6 +98,7 @@ const styles = ScaledSheet.create({
   },
   listeningText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: 'italic',
     color: colors.white,
     fontSize: '32@ms',
     lineHeight: '40@ms',
