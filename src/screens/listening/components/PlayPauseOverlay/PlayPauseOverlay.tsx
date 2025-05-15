@@ -1,9 +1,9 @@
 import React from 'react';
 import {TouchableOpacity} from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 

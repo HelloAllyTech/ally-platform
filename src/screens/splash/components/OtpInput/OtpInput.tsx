@@ -1,10 +1,9 @@
-import React, {useRef, forwardRef, useImperativeHandle, useState} from 'react';
-import {View, TextInput} from 'react-native';
+import {forwardRef, useImperativeHandle, useRef, useState} from 'react';
+import {TextInput, View} from 'react-native';
 
 import {isNumeric} from '@/utils/validation';
 
 import {styles} from './styles';
-
 import type {OtpInputProps} from './types';
 
 export interface OtpInputRef {

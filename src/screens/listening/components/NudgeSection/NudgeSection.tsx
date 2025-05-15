@@ -1,28 +1,27 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
   Dimensions,
+  ScrollView,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
   Easing,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import {ThumbIcon} from '@/assets/icons';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 
-import {styles} from './styles';
+import type {Nudge} from '../../ListeningScreen';
 import {CustomMarkdown} from '../CustomMarkdown/';
 import {SkeletonLoader} from '../SkeletonLoader';
-
-import type {Nudge} from '../../ListeningScreen';
+import {styles} from './styles';
 
 const {width, height} = Dimensions.get('window');
 

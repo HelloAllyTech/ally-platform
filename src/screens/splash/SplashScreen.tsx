@@ -1,20 +1,20 @@
+import React, {useEffect, useRef, useState} from 'react';
 import LottieView from 'lottie-react-native';
-import React, {useEffect, useState, useRef} from 'react';
 import {
-  View,
   Dimensions,
-  Text,
-  TouchableWithoutFeedback,
   Keyboard,
-  TouchableOpacity,
-  StatusBar,
   KeyboardAvoidingView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
   interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 import {LeftArrowIcon} from '@/assets/icons';

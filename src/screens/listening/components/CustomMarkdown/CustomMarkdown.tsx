@@ -1,5 +1,5 @@
 import React, {FunctionComponent} from 'react';
-import {Text, View, StyleSheet} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 
 export const CustomMarkdown: FunctionComponent<{
   content: string;

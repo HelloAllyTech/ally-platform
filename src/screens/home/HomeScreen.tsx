@@ -1,5 +1,5 @@
-import LottieView from 'lottie-react-native';
 import React, {useCallback, useEffect} from 'react';
+import LottieView from 'lottie-react-native';
 import {BackHandler, Text, TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
