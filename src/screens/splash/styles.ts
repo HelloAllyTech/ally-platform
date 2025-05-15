@@ -41,6 +41,7 @@ export const styles = ScaledSheet.create({
   },
   allyText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: 'italic',
   },
   sheetContent: {
     padding: '20@ms',

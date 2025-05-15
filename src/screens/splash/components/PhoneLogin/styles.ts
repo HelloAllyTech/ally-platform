@@ -59,6 +59,7 @@ export const styles = ScaledSheet.create({
   termsText: {
     ...typography.body.small,
     color: colors.mediumGray,
+    textAlign: 'center',
   },
   termsLink: {
     color: colors.brightBlue,

@@ -10,6 +10,7 @@ import {env} from '@/config/env';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {storeTokens, clearTokens} from '@/store/slices/userSlice';
 import {getItem} from '@/utils/asyncStorage';
+import {logger} from '@/utils/logger';
 
 import {AuthResponse} from './authApi';
 
@@ -77,7 +78,7 @@ const baseQueryWithReauth: BaseQueryFn<
           store.dispatch(clearTokens());
         }
       } catch (error) {
-        console.error('Error refreshing token:', error);
+        logger.error(`Error refreshing token: ${error}`);
         store.dispatch(clearTokens());
         return result;
       }
@@ -85,7 +86,7 @@ const baseQueryWithReauth: BaseQueryFn<
 
     return result;
   } catch (err) {
-    console.error('Error in baseQueryWithReauth', err);
+    logger.error(`Error in baseQueryWithReauth: ${err}`);
     return {error: {status: 401, data: {message: 'Unauthorized'}}};
   }
 };

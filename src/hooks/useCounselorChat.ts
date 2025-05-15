@@ -5,6 +5,7 @@ import {AppState, AppStateStatus} from 'react-native';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setCurrentChat} from '@/store/slices/chatSlice';
+import {logger} from '@/utils/logger';
 
 import {useAppNavigation} from './useAppNavigation';
 
@@ -43,7 +44,7 @@ export const useCounselorChat = () => {
         }
       }
     } catch (error) {
-      console.error('Error checking counselor chat:', error);
+      logger.error(`Error checking counselor chat: ${error}`);
     } finally {
       isCheckingRef.current = false;
     }
