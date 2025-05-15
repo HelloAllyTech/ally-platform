@@ -1,7 +1,7 @@
 module.exports = {
   root: true,
   extends: ['@react-native', 'prettier'],
-  plugins: ['prettier', 'import'],
+  plugins: ['prettier', 'import', 'unused-imports'],
 
   rules: {
     'prettier/prettier': 'error',
@@ -11,8 +11,9 @@ module.exports = {
       'warn',
       {argsIgnorePattern: '^_', varsIgnorePattern: '^_'},
     ],
-    '@typescript-eslint/explicit-function-return-type': 'off', // enable if you want strict return types
-    '@typescript-eslint/no-explicit-any': 'warn', // warn when using 'any'
+    'unused-imports/no-unused-imports': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-explicit-any': 'warn',
 
     // General best practices
     'no-console': ['warn', {allow: ['warn', 'error']}],
@@ -37,8 +38,6 @@ module.exports = {
           'external', // Third-party libraries (npm)
           'internal', // App-specific modules using @ alias
           ['parent', 'sibling'], // Relative imports
-          'index', // Index files
-          'type', // Type imports
         ],
         pathGroups: [
           {
@@ -53,7 +52,6 @@ module.exports = {
         ],
         'newlines-between': 'always',
         alphabetize: {
-          order: 'asc',
           caseInsensitive: true,
         },
       },

@@ -1,5 +1,5 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {View, Text, StatusBar, SafeAreaView, BackHandler} from 'react-native';
+import {useEffect, useMemo, useState} from 'react';
+import {BackHandler, SafeAreaView, StatusBar, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 

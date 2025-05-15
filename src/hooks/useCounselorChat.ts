@@ -1,5 +1,5 @@
-import {useRoute} from '@react-navigation/native';
 import {useCallback, useEffect, useRef} from 'react';
+import {useRoute} from '@react-navigation/native';
 import {AppState, AppStateStatus} from 'react-native';
 
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';

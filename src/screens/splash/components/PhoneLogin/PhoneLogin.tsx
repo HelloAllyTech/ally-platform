@@ -1,6 +1,6 @@
+import React, {useCallback, useEffect, useState} from 'react';
 import {SerializedError} from '@reduxjs/toolkit';
 import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
-import React, {useCallback, useState, useEffect} from 'react';
 import {
   Alert,
   Keyboard,
@@ -21,7 +21,6 @@ import {getErrorMessage} from '@/utils/error';
 import {formatPhoneNumberForInput} from '@/utils/phone';
 
 import {styles} from './styles';
-
 import type {PhoneLoginProps} from './types';
 
 export const PhoneLogin: React.FC<PhoneLoginProps> = ({

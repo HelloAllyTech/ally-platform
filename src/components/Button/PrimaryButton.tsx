@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {ActivityIndicator, Text, TouchableOpacity} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';

@@ -1,5 +1,5 @@
-import React, {useRef, useEffect} from 'react';
-import {View, StyleSheet, Animated} from 'react-native';
+import {useEffect, useRef} from 'react';
+import {Animated, StyleSheet, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 

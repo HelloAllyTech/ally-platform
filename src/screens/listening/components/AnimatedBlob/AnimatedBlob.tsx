@@ -1,13 +1,13 @@
-import LottieView, {AnimationObject} from 'lottie-react-native';
 import React from 'react';
+import LottieView, {AnimationObject} from 'lottie-react-native';
 import {View} from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
   withSpring,
   withTiming,
-  Easing,
-  useSharedValue,
-  useDerivedValue,
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 

@@ -1,5 +1,5 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {View, Text, TouchableOpacity, Alert} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Alert, Text, TouchableOpacity, View} from 'react-native';
 
 import {PrimaryButton} from '@/components';
 import useTranslate from '@/hooks/useTranslate';
@@ -9,9 +9,8 @@ import {storeTokens} from '@/store/slices/userSlice';
 import {getErrorMessage} from '@/utils/error';
 import {formatPhoneNumberForDisplay} from '@/utils/phone';
 
-import {styles} from './styles';
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
-
+import {styles} from './styles';
 import type {OtpVerificationProps} from './types';
 
 const DEFAULT_OTP = ['', '', '', ''];

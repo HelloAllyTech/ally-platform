@@ -8,7 +8,7 @@ import {
 
 import {env} from '@/config/env';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {storeTokens, clearTokens} from '@/store/slices/userSlice';
+import {clearTokens, storeTokens} from '@/store/slices/userSlice';
 import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
