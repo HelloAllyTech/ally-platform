@@ -26,4 +26,5 @@ export const colors = {
   navyGray: '#07131C',
   oceanBlue: '#12365E',
   paleGray: '#E1E9EE',
+  lightCyan: '#DAFFFF',
 };

@@ -1,28 +1,28 @@
 {
-    "HomeScreen": {
-      "start": "Start",
-      "listening": "listening",
-      "tapToBegin": "Tap to begin"
-    },
-    "ListeningScreen": {
-      "takingNotes": "Taking Notes",
-      "isThisHelpful": "Is this helpful"
-    },
-    "SplashScreen": {
-      "hey": "Hey,",
-      "welcome": "Welcome to",
-      "ally": "Ally",
-      "verifyYourPhoneNumber": "Verify your phone Number",
-      "enterYourPhoneNumber": "Enter your phone number to continue",
-      "byTappingNext": "By tapping next, you agree to Ally's ",
-      "termsAndConditions": "Terms and Conditions",
-      "and": "and",
-      "privacyPolicy": "Privacy Policy",
-      "next": "Next",
-      "andAcknowledge": "and acknowledge",
-      "enterTheCodeSentTo": "Enter the code sent to",
-      "didNotReceiveTheCode": "Did not receive the code?",
-      "resend": "Resend",
-      "verifyOtp": "Verify OTP"
+  "HomeScreen": {
+    "start": "Start",
+    "listening": "listening",
+    "tapToBegin": "Tap to begin"
+  },
+  "ListeningScreen": {
+    "takingNotes": "Taking notes",
+    "isThisHelpful": "Is this helpful"
+  },
+  "SplashScreen": {
+    "hey": "Hey,",
+    "welcome": "Welcome to",
+    "ally": "Ally",
+    "verifyYourPhoneNumber": "Verify your phone Number",
+    "enterYourPhoneNumber": "Enter your phone number to continue",
+    "byTappingNext": "By tapping next, you agree to Ally's ",
+    "termsAndConditions": "Terms and Conditions",
+    "and": "and",
+    "privacyPolicy": "Privacy Policy",
+    "next": "Next",
+    "andAcknowledge": "and acknowledge",
+    "enterTheCodeSentTo": "Enter the code sent to",
+    "didNotReceiveTheCode": "Did not receive the code?",
+    "resend": "Resend",
+    "verifyOtp": "Verify OTP"
   }
 }

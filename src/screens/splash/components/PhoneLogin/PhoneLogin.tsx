@@ -4,7 +4,6 @@ import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
 import {
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Linking,
   Text,
   TextInput,
@@ -13,7 +12,6 @@ import {
 } from 'react-native';
 
 import {PrimaryButton} from '@/components';
-import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme/colors';
@@ -82,68 +80,62 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   }, []);
 
   return (
-    <KeyboardAvoidingView
-      behavior={isIOS ? 'padding' : 'height'}
-      style={styles.container}>
-      <TouchableWithoutFeedback onPress={dismissKeyboard}>
-        <View style={styles.container}>
-          <View style={styles.contentContainer}>
-            <Text style={styles.headerText}>
-              {t('SplashScreen.enterYourPhoneNumber')}
-            </Text>
-            <View style={styles.inputContainer}>
-              <View style={styles.countryCode}>
-                <Text style={styles.countryCodeText}>+91</Text>
-              </View>
-              <TextInput
-                style={[
-                  styles.input,
-                  isFocused && styles.inputFocused,
-                  !isLoading && styles.inputEnabled,
-                ]}
-                value={formattedPhoneNumberForInput}
-                onChangeText={handlePhoneChange}
-                keyboardType="numeric"
-                maxLength={11} // 10 digits + 1 space
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="Enter phone number"
-                editable={!isLoading}
-                placeholderTextColor={colors.mediumGray}
-              />
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <View style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Text style={styles.headerText}>
+            {t('SplashScreen.enterYourPhoneNumber')}
+          </Text>
+          <View style={styles.inputContainer}>
+            <View style={styles.countryCode}>
+              <Text style={styles.countryCodeText}>+91</Text>
             </View>
-          </View>
-
-          <View style={styles.bottomContainer}>
-            <View style={styles.termsContainer}>
-              <Text style={styles.termsText}>
-                {t('SplashScreen.byTappingNext')}{' '}
-                <Text
-                  style={styles.termsLink}
-                  onPress={() => Linking.openURL('https://example.com/terms')}>
-                  {t('SplashScreen.termsAndConditions')}
-                </Text>{' '}
-                {t('SplashScreen.andAcknowledge')}{' '}
-                <Text
-                  style={styles.termsLink}
-                  onPress={() =>
-                    Linking.openURL('https://example.com/privacy')
-                  }>
-                  {t('SplashScreen.privacyPolicy')}
-                </Text>
-                .
-              </Text>
-            </View>
-
-            <PrimaryButton
-              label={t('SplashScreen.next')}
-              onPress={handleSubmit}
-              isDisabled={phoneNumber.length !== 10}
-              isLoading={isLoading}
+            <TextInput
+              style={[
+                styles.input,
+                isFocused && styles.inputFocused,
+                !isLoading && styles.inputEnabled,
+              ]}
+              value={formattedPhoneNumberForInput}
+              onChangeText={handlePhoneChange}
+              keyboardType="numeric"
+              maxLength={11} // 10 digits + 1 space
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="Enter phone number"
+              editable={!isLoading}
+              placeholderTextColor={colors.mediumGray}
             />
           </View>
         </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+
+        <View style={styles.bottomContainer}>
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              {t('SplashScreen.byTappingNext')}{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL('https://example.com/terms')}>
+                {t('SplashScreen.termsAndConditions')}
+              </Text>{' '}
+              {t('SplashScreen.andAcknowledge')}{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL('https://example.com/privacy')}>
+                {t('SplashScreen.privacyPolicy')}
+              </Text>
+              .
+            </Text>
+          </View>
+
+          <PrimaryButton
+            label={t('SplashScreen.next')}
+            onPress={handleSubmit}
+            isDisabled={phoneNumber.length !== 10}
+            isLoading={isLoading}
+          />
+        </View>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };

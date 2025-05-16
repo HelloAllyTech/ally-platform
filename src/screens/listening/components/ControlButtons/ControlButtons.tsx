@@ -1,22 +1,41 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CallEndIcon, MicIcon, MicWithGradientIcon} from '@/assets/icons';
+import {useEndCallMutation} from '@/services/chatApi';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 
 interface ControlButtonsProps {
   onFocusModeButtonPress: () => void;
   isNudgeVisible: boolean;
   showFocusModeButton?: boolean;
+  onEndCallSuccess: () => void;
 }
 
 export const ControlButtons: React.FC<ControlButtonsProps> = ({
   onFocusModeButtonPress,
   isNudgeVisible,
   showFocusModeButton = true,
+  onEndCallSuccess,
 }) => {
+  const chat = useAppSelector(state => state.chat.currentChat);
+  const [endCall, {isSuccess}] = useEndCallMutation();
+
+  useEffect(() => {
+    if (isSuccess) {
+      onEndCallSuccess();
+    }
+  }, [isSuccess, onEndCallSuccess]);
+
+  const handleEndCall = () => {
+    if (chat?.chatId) {
+      endCall({chatId: chat.chatId});
+    }
+  };
+
   return (
     <View style={styles.container}>
       {showFocusModeButton && (
@@ -37,7 +56,9 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
           </TouchableOpacity>
         </View>
       )}
-      <TouchableOpacity style={[styles.buttonContainer, styles.rightButton]}>
+      <TouchableOpacity
+        style={[styles.buttonContainer, styles.rightButton]}
+        onPress={handleEndCall}>
         <CallEndIcon width={35} height={35} color={colors.darkBlue} />
       </TouchableOpacity>
     </View>
