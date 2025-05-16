@@ -3,6 +3,7 @@ import {Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
 
 interface TimerProps {
   startTime: number; // timestamp in milliseconds
@@ -41,6 +42,7 @@ export const Timer: React.FC<TimerProps> = ({startTime}) => {
 
 const styles = ScaledSheet.create({
   timer: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '22@ms',
     lineHeight: '28@ms',
     letterSpacing: 0,

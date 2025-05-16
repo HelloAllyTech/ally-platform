@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
 import {BackHandler, Text, TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -6,35 +6,69 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
+import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
+import {useUser} from '@/hooks/useUser';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
+import {useAppDispatch} from '@/store/hooks';
+import {setCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
+import {SocketEvent, SocketMessage} from '@/types/message';
+import {logger} from '@/utils/logger';
 
-export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = ({
-  navigation,
-}) => {
+export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
   const {t} = useTranslate();
+  const navigation = useAppNavigation();
+  const dispatch = useAppDispatch();
+  const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
 
+  // Declare hook to check for counselor chat every time the screen is focused
   useCounselorChat();
 
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        BackHandler.exitApp();
-        return true;
-      },
-    );
-
-    return () => backHandler.remove();
-  }, []);
+  // Use the custom hook for back press handling
+  useHardwareBackPressHandler(() => {
+    BackHandler.exitApp();
+    return true;
+  });
 
   const handleListeningPress = useCallback(() => {
     navigation.navigate('Listening');
   }, [navigation]);
+
+  const socketEventCallbacks = useMemo(
+    () => ({
+      [SocketEvent.CHAT_ACCEPTED]: (data: SocketMessage) => {
+        // TO DO: Need to handle
+      },
+      [SocketEvent.USER_JOINED]: async () => {
+        try {
+          const {data, error} = await getCounsellorChat();
+          if (data) {
+            dispatch(setCurrentChat(data));
+            navigation.navigate('Listening');
+          } else if (error) {
+            logger.error(`Error fetching counselor chat: ${error}`);
+          }
+        } catch (error) {
+          logger.error(`Error in USER_JOINED handler: ${error}`);
+        }
+      },
+    }),
+    [dispatch, getCounsellorChat, navigation],
+  );
+
+  const {userData} = useUser();
+  // Automatically manages socket connection based on screen focus and app state
+  useSocketConnection({
+    userId: userData?.id || 0,
+    eventCallbacks: socketEventCallbacks,
+  });
 
   return (
     <LinearGradient

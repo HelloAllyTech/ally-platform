@@ -93,14 +93,11 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    top: '10@vs',
   },
   blobContainer: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -35,6 +35,16 @@ export enum QueueStatus {
   MATCHED = 'MATCHED',
 }
 
+export interface FeedbackResponse {
+  rating: number;
+  messageId: number;
+  userId: number;
+  modifiedContent: string | null;
+  createdAt: string;
+  updatedAt: string;
+  feedbackId: number;
+}
+
 export type SocketMessage = {
   type: SocketEvent | string;
   payload?: {
@@ -47,6 +57,8 @@ export type SocketMessage = {
       source: string;
     };
     createdAt: string;
+    updatedAt: string;
+    feedback?: FeedbackResponse;
   };
   content?: string;
   context?: {
@@ -78,8 +90,8 @@ export enum SocketEvent {
   USER_JOINED = 'USER_JOINED',
   USER_DISCONNECTED = 'USER_DISCONNECTED',
   AUDIO_STREAM = 'AUDIO_STREAM',
-  PAUSE_AUDIO_CHAT = 'PAUSE_AUDIO_CHAT',
-  RESUME_AUDIO_CHAT = 'RESUME_AUDIO_CHAT',
+  AUDIO_CHAT_NUDGE_PAUSED = 'AUDIO_CHAT_NUDGE_PAUSED',
+  AUDIO_CHAT_NUDGE_RESUMED = 'AUDIO_CHAT_NUDGE_RESUMED',
 }
 
 export interface WaitingClientChat {

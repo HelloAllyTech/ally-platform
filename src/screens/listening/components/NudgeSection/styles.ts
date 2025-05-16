@@ -6,10 +6,7 @@ import {typography} from '@/theme/typography';
 
 export const styles = ScaledSheet.create({
   container: {
-    position: 'absolute',
-    bottom: '0@ms',
-    width: '85%',
-    maxHeight: '300@vs',
+    minHeight: '120@vs',
     borderRadius: '16@ms',
     borderWidth: 0.5,
     borderColor: colors.gray99,
@@ -22,26 +19,20 @@ export const styles = ScaledSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 5,
+    marginHorizontal: '27@s',
   },
-  gradient: {
-    flex: 1,
+  content: {
     padding: '16@ms',
   },
   scrollView: {
-    flex: 1,
     marginBottom: '12@vs',
+    maxHeight: '160@vs',
   },
   title: {
     ...fontFamily.REPLAY_PRO.BOLD,
     fontSize: '16@ms',
     lineHeight: '41@ms',
     color: colors.white,
-  },
-  description: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.paleBlue,
-    lineHeight: '22@ms',
   },
   feedbackContainer: {
     flexDirection: 'row',
@@ -61,9 +52,6 @@ export const styles = ScaledSheet.create({
     gap: '9@s',
     marginLeft: '9@s',
   },
-  feedbackIcon: {
-    fontSize: '16@ms',
-  },
   thumbContainer: {
     width: '16@ms',
     height: '16@ms',
@@ -72,23 +60,5 @@ export const styles = ScaledSheet.create({
   },
   thumbDown: {
     transform: [{rotate: '180deg'}],
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 100,
-  },
-  listeningContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 100,
-  },
-  listeningText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    ...typography.body.medium,
-    color: colors.white,
-    opacity: 0.7,
   },
 });
