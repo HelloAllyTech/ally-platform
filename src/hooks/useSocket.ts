@@ -4,6 +4,7 @@ import {io, Socket} from 'socket.io-client';
 import {env} from '@/config/env';
 import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
+
 interface UseSocketOptions {
   userId: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;

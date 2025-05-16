@@ -57,7 +57,7 @@ export const styles = ScaledSheet.create({
     borderTopRightRadius: '24@ms',
     paddingTop: '50@ms',
     paddingHorizontal: '32@ms',
-    paddingBottom: '44@ms',
+    paddingBottom: '54@vs',
     height: '65%',
     zIndex: 50,
     marginTop: '-18@vs',

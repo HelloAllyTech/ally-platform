@@ -16,7 +16,7 @@ import type {OtpVerificationProps} from './types';
 const DEFAULT_OTP = ['', '', '', ''];
 
 export const OtpVerification: React.FC<OtpVerificationProps> = ({
-  phoneNumber = '+916235093219',
+  phoneNumber,
   onOtpVerificationSuccess,
 }) => {
   const [otpValue, setOtpValue] = useState(DEFAULT_OTP);
