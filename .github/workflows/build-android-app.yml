@@ -88,8 +88,26 @@ jobs:
 
       - name: Send Slack notification
         if: success()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: '{"blocks":[{"type":"divider"},{"type":"header","text":{"type":"plain_text","text":":tada: *Android Build Successful!*","emoji":true}},{"type":"section","text":{"type":"mrkdwn","text":"*What'\''s New:*\n${{ github.event.head_commit.message }}"}},{"type":"divider"},{"type":"section","text":{"type":"mrkdwn","text":"*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"}}]}'
+        uses: tokorom/action-slack-incoming-webhook@main
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: Android Build Successful!
+          attachments: |
+            [
+              {
+                "color": "good",
+                "author_name": "${{ github.actor }}",
+                "author_icon": "${{ github.event.sender.avatar_url }}",
+                "fields": [
+                  {
+                    "title": "What's New",
+                    "value": "${{ github.event.head_commit.message }}"
+                  },
+                  {
+                    "title": "Download APK",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+                  }
+                ]
+              }
+            ]
