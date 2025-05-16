@@ -92,27 +92,34 @@ jobs:
         with:
           payload: |
             {
-              "text": ":tada: *Android Build Successful!*",
               "blocks": [
                 {
-                  "type": "section",
+                  "type": "divider"
+                },
+                {
+                  "type": "header",
                   "text": {
-                    "type": "mrkdwn",
-                    "text": ":white_check_mark: *Android Build Successful!*"
+                    "type": "plain_text",
+                    "text": ":tada: *Android Build Successful!*",
+                    "emoji": true
                   }
                 },
                 {
                   "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n${{ github.event.head_commit.message }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"
-                    }
-                  ]
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*What's new:*\n${{ github.event.head_commit.message }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"
+                  }
                 }
               ]
             }
