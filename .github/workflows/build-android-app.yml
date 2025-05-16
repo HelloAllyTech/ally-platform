@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: "Environment to deploy to"
         required: true
-        default: 'dev'
+        default: "dev"
         type: choice
         options:
           - development
@@ -17,8 +17,8 @@ on:
           - production
 
 permissions:
-      id-token: write 
-      contents: read 
+  id-token: write
+  contents: read
 
 jobs:
   build:
@@ -32,14 +32,14 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
-          distribution: 'temurin'
+          distribution: "temurin"
           cache: gradle
 
-      - name: Setup Node  
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
 
       - name: Install dependencies
         run: |
@@ -67,7 +67,7 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "${{ secrets.ENV_VALUES }}" > .env 
+          echo "${{ secrets.ENV_VALUES }}" > .env
 
       - name: Build with Gradle
         env:
@@ -87,41 +87,9 @@ jobs:
           retention-days: 7
 
       - name: Send Slack notification
-        if: success()  # Only run if the previous steps succeeded
+        if: success()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":tada: *Android Build Successful!*",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*What's new:*\n${{ github.event.head_commit.message }}"
-                  }
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"
-                  }
-                }
-              ]
-            }
+          payload: '{"blocks":[{"type":"divider"},{"type":"header","text":{"type":"plain_text","text":":tada: *Android Build Successful!*","emoji":true}},{"type":"section","text":{"type":"mrkdwn","text":"*What'\''s New:*\n${{ github.event.head_commit.message }}"}},{"type":"divider"},{"type":"section","text":{"type":"mrkdwn","text":"*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"}}]}'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
