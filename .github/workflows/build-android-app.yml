@@ -85,3 +85,36 @@ jobs:
           name: app-release
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
+
+      - name: Send Slack notification
+        if: success()  # Only run if the previous steps succeeded
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": ":tada: *Android Build Successful!*",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Android Build Successful!*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ github.event.head_commit.message }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Download:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click to download APK>"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
