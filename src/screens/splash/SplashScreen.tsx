@@ -3,7 +3,6 @@ import LottieView from 'lottie-react-native';
 import {
   Dimensions,
   Keyboard,
-  KeyboardAvoidingView,
   StatusBar,
   Text,
   TouchableOpacity,
@@ -18,7 +17,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {isIOS} from '@/constants/general';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
@@ -193,13 +191,9 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
         </Animated.View>
 
         {isBottomSheetVisible && (
-          <KeyboardAvoidingView
-            behavior={isIOS ? 'padding' : 'height'}
-            style={styles.keyboardAvoidingView}>
-            <Animated.View style={[styles.authContainer, authContentStyle]}>
-              {renderAuthContent()}
-            </Animated.View>
-          </KeyboardAvoidingView>
+          <Animated.View style={[styles.authContainer, authContentStyle]}>
+            {renderAuthContent()}
+          </Animated.View>
         )}
       </View>
     </TouchableWithoutFeedback>

@@ -31,6 +31,20 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
     };
 
     const handleInputChange = (text: string, index: number) => {
+      // Handle pasted content
+      if (index === 0 && text.length > 1) {
+        // If text length is greater than 1, it's likely a paste operation
+        const digits = text.slice(0, inputCount).split('');
+        if (digits.every(digit => isNumeric(digit))) {
+          // Fill all inputs with the pasted digits
+          onChange(digits.concat(Array(inputCount - digits.length).fill('')));
+          // Focus the last filled input
+          inputRefs.current[digits.length - 1]?.focus();
+          return;
+        }
+      }
+
+      // Handle single digit input
       if (!isNumeric(text)) return;
 
       const newValue = [...value];
@@ -74,7 +88,7 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
                 styles.input,
                 value[index] ? styles.inputFilled : styles.inputEmpty,
               ]}
-              maxLength={1}
+              maxLength={index === 0 ? inputCount : 1}
               keyboardType="number-pad"
               value={value[index]}
               onChangeText={text => handleInputChange(text, index)}

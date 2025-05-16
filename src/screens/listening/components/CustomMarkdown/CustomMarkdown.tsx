@@ -1,5 +1,10 @@
 import React, {FunctionComponent} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+import {typography} from '@/theme/typography';
 
 export const CustomMarkdown: FunctionComponent<{
   content: string;
@@ -21,39 +26,23 @@ export const CustomMarkdown: FunctionComponent<{
       const parts: React.ReactNode[] = [];
       let remainingText = line;
 
-      // Continue until all bold (**text**) matches are processed
-      while (remainingText.includes('**')) {
-        const boldMatch = remainingText.match(/(.?)\*\*(.*?)\*\*(.*)$/);
-        if (boldMatch) {
-          // Text before bold part
-          if (boldMatch[1]) {
-            parts.push(
-              <Text key={`text-${parts.length}`}>{boldMatch[1]}</Text>,
-            );
-          }
+      const boldRegex = /\*\*(.*?)\*\*/;
+      const segments = remainingText.split(/(\*\*.*?\*\*)/);
 
-          // Bold part
+      segments.forEach((segment, index) => {
+        const boldMatch = segment.match(boldRegex);
+        if (boldMatch) {
+          // This is a bold segment
           parts.push(
-            <Text key={`bold-${parts.length}`} style={styles.bold}>
-              {boldMatch[2]}
+            <Text key={`bold-${index}`} style={styles.bold}>
+              {boldMatch[1]}
             </Text>,
           );
-
-          // Remaining part of the line
-          remainingText = boldMatch[3];
-        } else {
-          // No more matches; add remaining text
-          parts.push(
-            <Text key={`plain-${parts.length}`}>{remainingText}</Text>,
-          );
-          break;
+        } else if (segment) {
+          // This is regular text
+          parts.push(<Text key={`text-${index}`}>{segment}</Text>);
         }
-      }
-
-      // Add any leftover text
-      if (remainingText) {
-        parts.push(<Text key={`remain-${parts.length}`}>{remainingText}</Text>);
-      }
+      });
 
       return parts.length > 0 ? parts : [<Text key="line">{line}</Text>];
     };
@@ -74,14 +63,18 @@ export const CustomMarkdown: FunctionComponent<{
             {currentSection.content.map((item, idx) => (
               <View key={idx} style={styles.listItem}>
                 <Text style={styles.bullet}>•</Text>
-                <Text style={styles.listText}>{parseBoldAndText(item)}</Text>
+                <Text style={[styles.description, styles.listText]}>
+                  {parseBoldAndText(item)}
+                </Text>
               </View>
             ))}
           </View>,
         );
       } else if (currentSection.type === 'text') {
         parsedContent.push(
-          <Text key={`text-${parsedContent.length}`} style={styles.paragraph}>
+          <Text
+            key={`text-${parsedContent.length}`}
+            style={[styles.description, styles.paragraph]}>
             {currentSection.content.map((line, i) => (
               <Text key={i}>{parseBoldAndText(line)}</Text>
             ))}
@@ -94,12 +87,12 @@ export const CustomMarkdown: FunctionComponent<{
 
     // Iterate over each line and classify it as a title, list item, or paragraph
     lines.forEach((line, index) => {
-      const titleMatch = line.match(/^(#+)\s*(.+)/); // Heading (e.g. # Title)
+      const titleMatch = line.match(/^(#{1,6})\s+(.+)/); // Match 1-6 # characters for different heading levels
       const listItemMatch = line.match(/^-\s*(.+)/); // List item (e.g. - Item)
 
       if (titleMatch) {
         flushCurrentSection();
-        currentSection = {type: 'title', content: [titleMatch[2]]};
+        currentSection = {type: 'title', content: [titleMatch[2].trim()]};
       } else if (listItemMatch) {
         // Start a new list if needed
         if (!currentSection || currentSection.type !== 'list') {
@@ -131,40 +124,43 @@ export const CustomMarkdown: FunctionComponent<{
   return <View style={styles.container}>{parseMarkdown(content)}</View>;
 };
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
   container: {
-    paddingVertical: 4,
+    paddingBottom: '4@s',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#FFFFFF',
+    ...fontFamily.REPLAY_PRO.BOLD,
+    color: colors.lightCyan,
+    lineHeight: '41@ms',
+    fontSize: '16@ms',
+    marginBottom: '4@s',
+  },
+  description: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: '300',
+    color: colors.paleBlue,
   },
   paragraph: {
-    fontSize: 14,
-    marginBottom: 8,
-    color: '#FFFFFF',
+    marginBottom: '8@s',
   },
   bold: {
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   list: {
-    marginBottom: 8,
-    paddingLeft: 12,
+    marginBottom: '8@s',
+    paddingLeft: '12@s',
   },
   listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 4,
+    marginBottom: '4@s',
   },
   bullet: {
-    marginRight: 6,
+    marginRight: '6@s',
     color: '#FFFFFF',
   },
   listText: {
     flex: 1,
-    color: '#FFFFFF',
   },
 });
