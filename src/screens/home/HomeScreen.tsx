@@ -1,6 +1,6 @@
 import React, {useCallback, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
-import {BackHandler, Text, TouchableOpacity, View} from 'react-native';
+import {Alert, BackHandler, Text, TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -38,8 +38,12 @@ export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
   });
 
   const handleListeningPress = useCallback(() => {
-    navigation.navigate('Listening');
-  }, [navigation]);
+    Alert.alert(
+      t('Common.comingSoon'),
+      t('Home.callConnectionNotImplemented'),
+      [{text: t('Common.ok')}],
+    );
+  }, [t]);
 
   const socketEventCallbacks = useMemo(
     () => ({
