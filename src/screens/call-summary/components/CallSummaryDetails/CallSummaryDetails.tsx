@@ -18,8 +18,8 @@ import {colors} from '@/theme/colors';
 
 import {CallDetailsSection} from '../CallDetails/CallDetailsSection';
 import {CallHighlightsSection} from '../CallHighlights/CallHighlightsSection';
-import {DemogsSection} from '../Demogs/DemogsSection';
-import {FlowSection} from '../Flow/FlowSection';
+import {DemogsSection} from '../DemogsSection/DemogsSection';
+import {FlowSection} from '../FlowSection/FlowSection';
 import {KeyConcernSection} from '../KeyConcern/KeyConcernSection';
 import {NotesSection} from './NotesSection';
 import {SectionHeader} from './SectionHeader';
