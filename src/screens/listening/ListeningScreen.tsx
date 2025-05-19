@@ -51,7 +51,7 @@ export const ListeningScreen = () => {
 
   const handleCallEnd = useCallback(() => {
     dispatch(clearCurrentChat());
-    navigation.navigate('Home');
+    navigation.navigate('CallSummary');
   }, [dispatch, navigation]);
 
   useHardwareBackPressHandler(() => {
