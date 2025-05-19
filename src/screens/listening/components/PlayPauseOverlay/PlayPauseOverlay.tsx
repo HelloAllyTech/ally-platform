@@ -8,6 +8,7 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PauseIcon, PlayIcon} from '@/assets/icons';
+import {colors} from '@/theme/colors';
 
 interface PlayPauseOverlayProps {
   isPlaying: boolean;
@@ -48,6 +49,6 @@ const styles = ScaledSheet.create({
     width: '60@ms',
     height: '60@ms',
     borderRadius: '30@ms',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.blackTransparent50,
   },
 });

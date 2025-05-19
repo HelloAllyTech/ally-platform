@@ -1,47 +1,54 @@
 {
-    "HomeScreen": {
-      "start": "Start",
-      "listening": "listening",
-      "tapToBegin": "Tap to begin"
-    },
-    "ListeningScreen": {
-      "takingNotes": "Taking Notes",
-      "isThisHelpful": "Is this helpful"
-    },
-    "SplashScreen": {
-      "hey": "Hey,",
-      "welcome": "Welcome to",
-      "ally": "Ally",
-      "verifyYourPhoneNumber": "Verify your phone Number",
-      "enterYourPhoneNumber": "Enter your phone number to continue",
-      "byTappingNext": "By tapping next, you agree to Ally's ",
-      "termsAndConditions": "Terms and Conditions",
-      "and": "and",
-      "privacyPolicy": "Privacy Policy",
-      "next": "Next",
-      "andAcknowledge": "and acknowledge",
-      "enterTheCodeSentTo": "Enter the code sent to",
-      "didNotReceiveTheCode": "Did not receive the code?",
-      "resend": "Resend",
-      "verifyOtp": "Verify OTP"
+  "Common": {
+    "comingSoon": "Coming Soon",
+    "ok": "OK"
+  },
+  "Home": {
+    "callConnectionNotImplemented": "Call connection feature is not yet implemented"
+  },
+  "HomeScreen": {
+    "start": "Start",
+    "listening": "listening",
+    "tapToBegin": "Tap to begin"
+  },
+  "ListeningScreen": {
+    "takingNotes": "Taking Notes",
+    "isThisHelpful": "Is this helpful"
+  },
+  "SplashScreen": {
+    "hey": "Hey,",
+    "welcome": "Welcome to",
+    "ally": "Ally",
+    "verifyYourPhoneNumber": "Verify your phone Number",
+    "enterYourPhoneNumber": "Enter your phone number to continue",
+    "byTappingNext": "By tapping next, you agree to Ally's ",
+    "termsAndConditions": "Terms and Conditions",
+    "and": "and",
+    "privacyPolicy": "Privacy Policy",
+    "next": "Next",
+    "andAcknowledge": "and acknowledge",
+    "enterTheCodeSentTo": "Enter the code sent to",
+    "didNotReceiveTheCode": "Did not receive the code?",
+    "resend": "Resend",
+    "verifyOtp": "Verify OTP"
   },
   "CallSummaryProgress": {
-      "generatingSummary": "Generating summary",
-      "steps": {
-        "understandingContext": "Understanding context...",
-        "analysingConversation": "Analysing conversation...",
-        "identifyingKeyPoints": "Identifying key points...",
-        "extractingInsights": "Extracting insights...",
-        "generatingSummary": "Generating summary...."
-      }
-    },
-    "CallSummary": {
-      "header": {
-        "title": "Call",
-        "subtitle": "Summary"
-      },
-      "progress": {
-        "complete": "Summary Progress Complete"
-      }
+    "generatingSummary": "Generating summary",
+    "steps": {
+      "understandingContext": "Understanding context...",
+      "analysingConversation": "Analysing conversation...",
+      "identifyingKeyPoints": "Identifying key points...",
+      "extractingInsights": "Extracting insights...",
+      "generatingSummary": "Generating summary...."
     }
+  },
+  "CallSummary": {
+    "header": {
+      "title": "Call",
+      "subtitle": "Summary"
+    },
+    "progress": {
+      "complete": "Summary Progress Complete"
+    }
+  }
 }
