@@ -1,12 +1,9 @@
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import LottieView, {AnimationObject} from 'lottie-react-native';
 import {View} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -17,41 +14,46 @@ import {PlayPauseOverlay} from '../PlayPauseOverlay';
 
 interface AnimatedBlobProps {
   isExpanded: boolean;
-  intensity: number;
   isCallPaused: boolean;
+  isAudioActive: boolean;
   onPlayPauseCallPress: () => void;
 }
-
-const SMOOTHING_FACTOR = 0.3;
 
 const AnimatedLottieView = Animated.createAnimatedComponent(LottieView);
 
 export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
   isExpanded,
-  intensity,
   isCallPaused,
+  isAudioActive,
   onPlayPauseCallPress,
 }) => {
-  // Use shared value for smooth animations
-  const currentIntensity = useSharedValue(0);
+  const lottieRef = useRef<LottieView>(null);
 
-  // Smooth out intensity changes
-  const smoothProgress = useDerivedValue(() => {
-    const smoothedValue =
-      currentIntensity.value * (1 - SMOOTHING_FACTOR) +
-      intensity * SMOOTHING_FACTOR;
-    currentIntensity.value = smoothedValue;
-    return smoothedValue;
-  }, [intensity]);
+  // Handle audio streaming state changes
+  useEffect(() => {
+    if (isAudioActive) {
+      lottieRef.current?.play();
+    } else {
+      // When stopping, play a tiny segment at the end to ensure we stop at progress 1
+      lottieRef.current?.play(0.99, 1);
+    }
+  }, [isAudioActive]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    const animation = lottieRef.current;
+    return () => {
+      animation?.pause();
+    };
+  }, []);
 
   const blobAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         {
-          scale: withSpring(isExpanded ? 1.5 : 1, {
-            damping: 15,
-            stiffness: 100,
-            mass: 1,
+          scale: withTiming(isExpanded ? 1.5 : 1, {
+            duration: 500,
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
           }),
         },
       ],
@@ -75,10 +77,11 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
     <View style={styles.container}>
       <View style={styles.blobContainer}>
         <AnimatedLottieView
+          ref={lottieRef}
           source={blobAnimation as AnimationObject}
           style={[styles.blob, blobAnimatedStyle]}
-          autoPlay
           loop
+          autoPlay={false}
         />
         <Animated.View style={[styles.overlayContainer, overlayAnimatedStyle]}>
           <PlayPauseOverlay
@@ -115,5 +118,8 @@ const styles = ScaledSheet.create({
     width: '100%',
     height: '100%',
     zIndex: 1,
+    // TO DO: Remove this once animated blob lottie is finalized
+    marginBottom: '-20@ms',
+    marginLeft: '15@ms',
   },
 });
