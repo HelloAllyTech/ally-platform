@@ -4,6 +4,7 @@ export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Listening: undefined;
+  CallSummary: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
