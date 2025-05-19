@@ -5,6 +5,7 @@ export const colors = {
   mediumGray: '#8C8C8C',
   brightBlue: '#0473F2',
   black: '#000000',
+  blackTransparent50: 'rgba(0, 0, 0, 0.5)',
   lightGray: '#F5F5F5',
   deepTeal: '#1b424f',
   lightGray2: '#E5E7EB',
