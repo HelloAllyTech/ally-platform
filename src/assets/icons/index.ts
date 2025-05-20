@@ -1,6 +1,8 @@
 import CallDetailsIcon from './callDetails.svg';
 import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
+import CallLogInactiveIcon from './callLog.svg';
+import CallLogActiveIcon from './callLogActive.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
@@ -8,6 +10,8 @@ import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
 import HeadphoneIcon from './headphone.svg';
+import HomeInactiveIcon from './home.svg';
+import HomeActiveIcon from './homeActive.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrowIcon from './leftArrow.svg';
@@ -38,6 +42,10 @@ export {
   SearchIcon,
   FilterIcon,
   EyeIcon,
+  CallLogActiveIcon,
+  CallLogInactiveIcon,
+  HomeActiveIcon,
+  HomeInactiveIcon,
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
 };

@@ -5,10 +5,11 @@ import type {RootStackParamList} from '@/navigation/types';
 import {
   CallLogScreen,
   CallSummaryScreen,
-  HomeScreen,
   ListeningScreen,
   SplashScreen,
 } from '@/screens';
+
+import {BottomTabs} from './tabNavigator';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -21,7 +22,7 @@ export const RootNavigator = () => {
           headerShown: false,
         }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Home" component={BottomTabs} />
         <Stack.Screen name="Listening" component={ListeningScreen} />
         <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
         <Stack.Screen name="CallLog" component={CallLogScreen} />
