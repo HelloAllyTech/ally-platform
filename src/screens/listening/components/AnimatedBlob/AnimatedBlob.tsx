@@ -51,7 +51,7 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
     return {
       transform: [
         {
-          scale: withTiming(isExpanded ? 1.5 : 1, {
+          scale: withTiming(isExpanded ? 1.4 : 1, {
             duration: 500,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1),
           }),
@@ -83,7 +83,12 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
           loop
           autoPlay={false}
         />
-        <Animated.View style={[styles.overlayContainer, overlayAnimatedStyle]}>
+        <Animated.View
+          style={[
+            styles.overlayContainer,
+            !isExpanded && styles.marginB,
+            overlayAnimatedStyle,
+          ]}>
           <PlayPauseOverlay
             isPlaying={!isCallPaused}
             onPress={onPlayPauseCallPress}
@@ -108,8 +113,8 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
   },
   blob: {
-    width: '250@ms',
-    height: '250@ms',
+    width: '280@ms',
+    height: '280@ms',
   },
   overlayContainer: {
     position: 'absolute',
@@ -119,7 +124,10 @@ const styles = ScaledSheet.create({
     height: '100%',
     zIndex: 1,
     // TO DO: Remove this once animated blob lottie is finalized
-    marginBottom: '-20@ms',
-    marginLeft: '15@ms',
+    marginLeft: '20@ms',
+  },
+  // TO DO: Remove this once animated blob lottie is finalized
+  marginB: {
+    marginBottom: '10@ms',
   },
 });
