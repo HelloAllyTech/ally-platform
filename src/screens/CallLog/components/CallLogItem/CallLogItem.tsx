@@ -108,6 +108,7 @@ const styles = ScaledSheet.create({
     borderRadius: '12@ms',
     padding: '8@ms',
     marginTop: '-2@ms',
+    marginBottom: '2@ms',
   },
   expandedLogHeader: {
     backgroundColor: colors.lightGray,

@@ -128,7 +128,7 @@ export const CallLogScreen: React.FC = () => {
 
       <FlatList
         data={allLogs}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         contentContainerStyle={styles.listContent}
         renderItem={renderItem}
         style={styles.list}

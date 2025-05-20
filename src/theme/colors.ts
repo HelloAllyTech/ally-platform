@@ -30,4 +30,5 @@ export const colors = {
   lightCyan: '#DAFFFF',
   lightGray3: '#676767',
   lightGray4: '#D5D5D5',
+  darkBlue2: '#0E1724',
 };

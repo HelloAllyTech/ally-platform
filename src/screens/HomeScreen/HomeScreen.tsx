@@ -12,7 +12,6 @@ import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
-import type {RootStackScreenProps} from '@/navigation/types';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setCurrentChat} from '@/store/slices/chatSlice';
@@ -22,7 +21,7 @@ import {typography} from '@/theme/typography';
 import {SocketEvent, SocketMessage} from '@/types/message';
 import {logger} from '@/utils/logger';
 
-export const HomeScreen: React.FC<RootStackScreenProps<'Home'>> = () => {
+export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
