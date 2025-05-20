@@ -26,7 +26,7 @@ import {FeedbackResponse} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 import type {Nudge} from '../../ListeningScreen';
-import {CustomMarkdown} from '../CustomMarkdown/';
+import {CustomMarkdown} from '../CustomMarkdown';
 import {SkeletonLoader} from '../SkeletonLoader';
 import {styles} from './styles';
 
@@ -97,9 +97,6 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
         easing: Easing.bezier(0.4, 0, 0.2, 1),
       }),
       transform: [{translateX}, {translateY}],
-      display: withTiming(isVisible ? 'flex' : 'none', {
-        duration: 200,
-      }),
     };
   });
 
