@@ -50,5 +50,14 @@
     "progress": {
       "complete": "Summary Progress Complete"
     }
+  },
+  "CallLogs": {
+    "header": {
+      "title": "Call",
+      "subtitle": "Logs"
+    },
+    "search": {
+      "placeholder": "Search"
+    }
   }
 }

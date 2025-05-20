@@ -3,6 +3,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import type {RootStackParamList} from '@/navigation/types';
 import {
+  CallLogScreen,
   CallSummaryScreen,
   HomeScreen,
   ListeningScreen,
@@ -23,6 +24,7 @@ export const RootNavigator = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Listening" component={ListeningScreen} />
         <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
+        <Stack.Screen name="CallLog" component={CallLogScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

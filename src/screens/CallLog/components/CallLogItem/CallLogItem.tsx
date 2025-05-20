@@ -1,0 +1,163 @@
+import {Text, TouchableOpacity, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {
+  DoubleBottomArrowIcon,
+  DoubleRightArrowIcon,
+  EyeIcon,
+} from '@/assets/icons';
+import {TAG_COLORS} from '@/constants/general';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+import {calculateDuration, formatDate, formatTime} from '@/utils/date';
+
+import {CallLog} from '../../types';
+import Badge from '../Badge/Badge';
+import Tag from '../Tag/Tag';
+
+/**
+ * Props interface for the CallLogItem component
+ * @interface CallLogItemProps
+ * @property {CallLog} item - The call log data to display
+ * @property {boolean} expanded - Whether the item is expanded or collapsed
+ * @property {() => void} onToggle - Callback function to toggle expanded state
+ */
+interface CallLogItemProps {
+  item: CallLog;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+/**
+ * CallLogItem Component
+ *
+ * Renders a single call log entry that can be expanded to show additional details.
+ * The component displays client information, call quality score, and when expanded,
+ * shows the call duration and associated tags with color-coded positivity ratings.
+ */
+const CallLogItem = ({item, expanded, onToggle}: CallLogItemProps) => {
+  return (
+    <View style={styles.logItemContainer}>
+      {/* Header section with client info and call quality score */}
+      <TouchableOpacity
+        style={[styles.logHeader, expanded && styles.expandedLogHeader]}
+        onPress={onToggle}
+        activeOpacity={0.7}>
+        <View>
+          <View style={styles.logHeaderContent}>
+            <View style={styles.arrowContainer}>
+              {expanded ? (
+                <DoubleBottomArrowIcon width={16} height={16} />
+              ) : (
+                <DoubleRightArrowIcon width={16} height={16} />
+              )}
+            </View>
+            <View style={styles.logItemContent}>
+              <Text style={styles.logId}>{item.client.name}</Text>
+            </View>
+            <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
+            <EyeIcon width={16} height={16} style={styles.eyeIcon} />
+          </View>
+          <Text style={styles.logDate}>
+            {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Expanded details section */}
+      {expanded && (
+        <View style={styles.logDetails}>
+          <Text style={styles.duration}>
+            Duration: {calculateDuration(item.startedAt, item.endedAt)}
+          </Text>
+          {/* Render tags if they exist */}
+          {(item.details?.summary?.tags?.length ?? 0) > 0 && (
+            <View style={styles.tagsRow}>
+              {item.details?.summary?.tags?.map((tagItem, idx) => {
+                const rating = tagItem.positivity_rating ?? 5;
+                const tagColor = TAG_COLORS[rating as keyof typeof TAG_COLORS];
+                return (
+                  <Tag
+                    key={idx}
+                    label={tagItem.tag || ''}
+                    color={tagColor.bg}
+                    textColor={tagColor.text}
+                  />
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Styles for the component
+const styles = ScaledSheet.create({
+  logItemContainer: {
+    backgroundColor: colors.white,
+    borderRadius: '12@ms',
+    marginHorizontal: '14@ms',
+    paddingHorizontal: '10@ms',
+    paddingVertical: '10@ms',
+    borderBottomWidth: 1,
+    borderColor: colors.lightGray2,
+  },
+  logHeader: {
+    borderRadius: '12@ms',
+    padding: '8@ms',
+    marginTop: '-2@ms',
+  },
+  expandedLogHeader: {
+    backgroundColor: colors.lightGray,
+  },
+  logHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logItemContent: {
+    flex: 1,
+  },
+  arrowContainer: {
+    width: '24@ms',
+    height: '24@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: '4@ms',
+  },
+  logId: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    fontSize: '14@ms',
+    color: colors.darkSlate,
+    fontWeight: '500',
+  },
+  logDate: {
+    fontSize: '12@ms',
+    color: colors.lightGray3,
+    marginLeft: '30@ms',
+    marginTop: '-4@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+  },
+  logDetails: {
+    marginTop: '6@ms',
+    marginLeft: '4@ms',
+  },
+  duration: {
+    color: colors.lightGray3,
+    fontSize: '12@ms',
+    marginBottom: '8@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: '8@ms',
+  },
+  eyeIcon: {
+    marginLeft: '10@ms',
+  },
+});
+
+export default CallLogItem;
