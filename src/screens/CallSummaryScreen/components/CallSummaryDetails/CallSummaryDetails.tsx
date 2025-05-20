@@ -151,6 +151,6 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
   },
   sectionContent: {
-    paddingHorizontal: '20@ms',
+    paddingLeft: '30@ms',
   },
 });
