@@ -29,4 +29,5 @@ export const colors = {
   paleGray: '#E1E9EE',
   lightCyan: '#DAFFFF',
   lightGray3: '#676767',
+  lightGray4: '#D5D5D5',
 };
