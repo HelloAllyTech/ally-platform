@@ -124,14 +124,27 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
               onPress={() => handleFeedback(false)}
               disabled={isUpdateFeedbackLoading}
               activeOpacity={0.7}>
-              <ThumbIcon width={18} height={18} style={styles.thumbDown} />
+              <ThumbIcon
+                width={18}
+                height={18}
+                style={styles.thumbDown}
+                color={
+                  nudge.feedback?.rating === 0 ? colors.white : colors.teal
+                }
+              />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.thumbContainer}
               onPress={() => handleFeedback(true)}
               disabled={isUpdateFeedbackLoading}
               activeOpacity={0.7}>
-              <ThumbIcon width={18} height={18} />
+              <ThumbIcon
+                width={18}
+                height={18}
+                color={
+                  nudge.feedback?.rating === 1 ? colors.white : colors.teal
+                }
+              />
             </TouchableOpacity>
           </View>
         </View>
