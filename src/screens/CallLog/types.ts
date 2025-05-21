@@ -8,6 +8,7 @@ export interface CallLog {
       tags?: {tag?: string; positivity_rating?: number}[];
       callQuality?: number;
     };
+    chatId?: number;
   };
   client: {
     name: string;
