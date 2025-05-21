@@ -5,7 +5,7 @@ export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Listening: undefined;
-  CallSummary: undefined;
+  CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
 };
 

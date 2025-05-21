@@ -6,7 +6,7 @@ import {fontFamily} from '@/theme/fonts';
 export const styles = ScaledSheet.create({
   flex1: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.darkGreen,
   },
   keyboardAvoidingView: {
     flex: 1,

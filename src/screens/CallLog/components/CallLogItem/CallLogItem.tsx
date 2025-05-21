@@ -26,6 +26,7 @@ interface CallLogItemProps {
   item: CallLog;
   expanded: boolean;
   onToggle: () => void;
+  onItemPress: () => void;
 }
 
 /**
@@ -35,23 +36,28 @@ interface CallLogItemProps {
  * The component displays client information, call quality score, and when expanded,
  * shows the call duration and associated tags with color-coded positivity ratings.
  */
-const CallLogItem = ({item, expanded, onToggle}: CallLogItemProps) => {
+const CallLogItem = ({
+  item,
+  expanded,
+  onToggle,
+  onItemPress,
+}: CallLogItemProps) => {
   return (
-    <View style={styles.logItemContainer}>
+    <TouchableOpacity onPress={onItemPress} style={styles.logItemContainer}>
       {/* Header section with client info and call quality score */}
-      <TouchableOpacity
-        style={[styles.logHeader, expanded && styles.expandedLogHeader]}
-        onPress={onToggle}
-        activeOpacity={0.7}>
+      <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
         <View>
           <View style={styles.logHeaderContent}>
-            <View style={styles.arrowContainer}>
+            <TouchableOpacity
+              onPress={onToggle}
+              activeOpacity={0.7}
+              style={styles.arrowContainer}>
               {expanded ? (
                 <DoubleBottomArrowIcon width={16} height={16} />
               ) : (
                 <DoubleRightArrowIcon width={16} height={16} />
               )}
-            </View>
+            </TouchableOpacity>
             <View style={styles.logItemContent}>
               <Text style={styles.logId}>{item.client.name}</Text>
             </View>
@@ -62,7 +68,7 @@ const CallLogItem = ({item, expanded, onToggle}: CallLogItemProps) => {
             {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
           </Text>
         </View>
-      </TouchableOpacity>
+      </View>
 
       {/* Expanded details section */}
       {expanded && (
@@ -89,7 +95,7 @@ const CallLogItem = ({item, expanded, onToggle}: CallLogItemProps) => {
           )}
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 

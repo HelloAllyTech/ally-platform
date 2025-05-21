@@ -15,6 +15,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
@@ -31,7 +32,11 @@ const {height} = Dimensions.get('screen');
 export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const [animationProgress, setAnimationProgress] = useState<
+    number | undefined
+  >(undefined);
   const lottieRef = useRef<LottieView>(null);
+  const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading} = useUser();
   const {checkCounselorChat} = useCounselorChat();
   const {t} = useTranslate();
@@ -51,6 +56,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
 
   useEffect(() => {
     if (isAnimationEnded) {
+      setAnimationProgress(0.9);
       if (!isUserLoading && !isAuthenticated) {
         setIsBottomSheetVisible(true);
         animationTranslateY.value = withTiming(-height * 0.6, {
@@ -155,7 +161,9 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
   });
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback
+      style={{paddingBottom: insets.bottom}}
+      onPress={Keyboard.dismiss}>
       <View style={styles.flex1}>
         {currentStep === 'OTP' && (
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
@@ -170,6 +178,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
             resizeMode="cover"
             autoPlay
             loop={false}
+            progress={animationProgress}
             speed={1}
             onAnimationFinish={() => setIsAnimationEnded(true)}
           />

@@ -1,7 +1,7 @@
 // CallSummaryDetails.tsx
 
 import React, {useEffect, useState} from 'react';
-import {Text, View} from 'react-native';
+import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -148,7 +148,7 @@ export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color={colors.darkSlate} />
       </View>
     );
   }
