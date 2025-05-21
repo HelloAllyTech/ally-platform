@@ -7,11 +7,11 @@ import {fontFamily} from '@/theme/fonts';
 
 interface CallHighlightsSectionProps {
   highlights: {
-    duration: string;
-    questions: number;
-    copilot: number;
-    listeningRatio: number;
-    moodImproved: number;
+    duration?: number;
+    questions?: number;
+    copilot?: number;
+    listeningRatio?: number;
+    moodImproved?: number;
   };
 }
 
@@ -22,23 +22,33 @@ export const CallHighlightsSection: React.FC<CallHighlightsSectionProps> = ({
     <View style={styles.container}>
       <Text style={styles.detailText}>
         Call lasted over:{' '}
-        <Text style={styles.detailValue}>{highlights.duration}</Text>
+        <Text style={styles.detailValue}>
+          {highlights.duration ? `${highlights.duration} min` : '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         You asked:{' '}
-        <Text style={styles.detailValue}>{highlights.questions} Questions</Text>
+        <Text style={styles.detailValue}>
+          {highlights.questions ? `${highlights.questions} Questions` : '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         Used Copilot:{' '}
-        <Text style={styles.detailValue}>{highlights.copilot} nudges</Text>
+        <Text style={styles.detailValue}>
+          {highlights.copilot ? `${highlights.copilot} nudges` : '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         Listening ratio:{' '}
-        <Text style={styles.detailValue}>{highlights.listeningRatio}</Text>
+        <Text style={styles.detailValue}>
+          {highlights.listeningRatio ? `${highlights.listeningRatio}` : '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         Mood improved by:{' '}
-        <Text style={styles.detailValue}>{highlights.moodImproved} points</Text>
+        <Text style={styles.detailValue}>
+          {highlights.moodImproved ? `${highlights.moodImproved} points` : '--'}
+        </Text>
       </Text>
     </View>
   );

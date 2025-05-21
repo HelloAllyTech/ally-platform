@@ -19,6 +19,7 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -39,6 +40,7 @@ export const CallSummaryScreen: React.FC<
   const cardHeight = useSharedValue(0);
   const [summaryProgressComplete, setSummaryProgressComplete] = useState(false);
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
+  const currentChat = useAppSelector(state => state.chat.currentChat);
 
   /**
    * Handles the scroll event and updates the scroll position value
@@ -131,8 +133,9 @@ export const CallSummaryScreen: React.FC<
           scrollEventThrottle={8}
           onLayout={handleLayout}
           contentContainerStyle={styles.stepList}>
-          {summaryProgressComplete ? (
-            <CallSummaryDetails />
+          {summaryProgressComplete && currentChat?.chatId ? (
+            // TO DO: Remove hardcoded chatId once future API is implemented
+            <CallSummaryDetails chatId={currentChat?.chatId} />
           ) : (
             <CallSummaryProgress
               onProgressComplete={() => {
