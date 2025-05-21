@@ -5,39 +5,48 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-interface DemogsSectionProps {
-  demogs: {
-    callerId: string;
-    age: number;
-    gender: string;
-    profession: string;
-    concernCode: string;
-    diagnosis: string;
+interface DemographicsSectionProps {
+  demographics: {
+    callerId?: string;
+    age?: number;
+    gender?: string;
+    profession?: string;
+    concernCode?: string;
+    diagnosis?: string;
   };
 }
 
-export const DemogsSection: React.FC<DemogsSectionProps> = ({demogs}) => {
+export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
+  demographics,
+}) => {
   return (
     <View style={styles.container}>
       <Text style={styles.detailText}>
-        Caller ID: <Text style={styles.detailValue}>{demogs.callerId}</Text>
+        Caller ID:{' '}
+        <Text style={styles.detailValue}>{demographics.callerId || '--'}</Text>
       </Text>
       <Text style={styles.detailText}>
-        Age: <Text style={styles.detailValue}>{demogs.age}</Text>
+        Age: <Text style={styles.detailValue}>{demographics.age || '--'}</Text>
       </Text>
       <Text style={styles.detailText}>
-        Gender: <Text style={styles.detailValue}>{demogs.gender}</Text>
+        Gender:{' '}
+        <Text style={styles.detailValue}>{demographics.gender || '--'}</Text>
       </Text>
       <Text style={styles.detailText}>
-        Profession: <Text style={styles.detailValue}>{demogs.profession}</Text>
+        Profession:{' '}
+        <Text style={styles.detailValue}>
+          {demographics.profession || '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         Concern code:{' '}
-        <Text style={styles.detailValue}>{demogs.concernCode}</Text>
+        <Text style={styles.detailValue}>
+          {demographics.concernCode || '--'}
+        </Text>
       </Text>
       <Text style={styles.detailText}>
         Formal diagnosis:{' '}
-        <Text style={styles.detailValue}>{demogs.diagnosis}</Text>
+        <Text style={styles.detailValue}>{demographics.diagnosis || '--'}</Text>
       </Text>
     </View>
   );
