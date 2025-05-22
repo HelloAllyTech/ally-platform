@@ -1,7 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, FlatList, SafeAreaView} from 'react-native';
+import {ActivityIndicator, FlatList, View} from 'react-native';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {colors} from '@/theme/colors';
 
@@ -24,6 +26,9 @@ export const CallLogScreen: React.FC = () => {
   const [offset, setOffset] = useState(0);
   const [allLogs, setAllLogs] = useState<CallLog[]>([]);
   const [hasMore, setHasMore] = useState(true);
+
+  const navigation = useAppNavigation();
+  const insets = useSafeAreaInsets();
 
   // RTK Query hook for fetching call logs
   const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
@@ -77,6 +82,12 @@ export const CallLogScreen: React.FC = () => {
     await fetchInitialData();
   };
 
+  const handleItemPress = (item: CallLog) => {
+    navigation.navigate('CallSummary', {
+      callId: item?.details?.chatId,
+    });
+  };
+
   /**
    * Toggles the expanded state of a call log item
    * @param idx - Index of the item to toggle
@@ -104,6 +115,7 @@ export const CallLogScreen: React.FC = () => {
       item={item}
       expanded={expandedIdx === index}
       onToggle={() => handleToggle(index)}
+      onItemPress={() => handleItemPress(item)}
     />
   );
 
@@ -123,7 +135,7 @@ export const CallLogScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader search={search} onSearchChange={setSearch} />
 
       <FlatList
@@ -138,7 +150,7 @@ export const CallLogScreen: React.FC = () => {
         refreshing={isLoading && allLogs.length === 0}
         onRefresh={handleRefresh}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -149,7 +161,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   listContent: {
-    paddingBottom: '40@ms',
+    paddingBottom: '100@ms',
   },
   list: {
     flex: 1,

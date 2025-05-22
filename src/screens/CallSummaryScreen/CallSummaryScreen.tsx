@@ -2,7 +2,6 @@ import React, {useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -13,12 +12,15 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -31,15 +33,18 @@ import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryP
  */
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
-> = ({navigation}) => {
+> = ({navigation, route}) => {
   const {t} = useTranslate();
   const windowHeight = WINDOW_HEIGHT;
   const maxBorderRadius = 30;
+  const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const cardHeight = useSharedValue(0);
   const [summaryProgressComplete, setSummaryProgressComplete] = useState(false);
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
-
+  const currentChat = useAppSelector(state => state.chat.currentChat);
+  const callId = route.params?.callId;
+  const dispatch = useAppDispatch();
   /**
    * Handles the scroll event and updates the scroll position value
    */
@@ -60,7 +65,12 @@ export const CallSummaryScreen: React.FC<
    * Handles the back button press to navigate back
    */
   const handleBackPress = () => {
-    navigation.goBack();
+    if (currentChat) {
+      dispatch(clearCurrentChat());
+      navigation.navigate('Home');
+    } else {
+      navigation.goBack();
+    }
   };
 
   const animatedCardStyle = useAnimatedStyle(() => {
@@ -121,18 +131,30 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  const isShowCallSummary = Boolean(
+    callId || (summaryProgressComplete && currentChat?.chatId),
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {renderSummeryTitle()}
-      <Animated.View style={[styles.card, animatedCardStyle]}>
+      <Animated.View
+        style={[
+          styles.card,
+          animatedCardStyle,
+          {maxHeight: WINDOW_HEIGHT - insets.top - 60},
+        ]}>
         <ScrollView
-          scrollEnabled={summaryProgressComplete}
+          scrollEnabled={isShowCallSummary}
           onScroll={handleScroll}
           scrollEventThrottle={8}
           onLayout={handleLayout}
           contentContainerStyle={styles.stepList}>
-          {summaryProgressComplete ? (
-            <CallSummaryDetails />
+          {isShowCallSummary ? (
+            // TO DO: Remove hardcoded chatId once future API is implemented
+            <CallSummaryDetails
+              chatId={Number(callId || currentChat?.chatId)}
+            />
           ) : (
             <CallSummaryProgress
               onProgressComplete={() => {
@@ -187,7 +209,6 @@ const styles = ScaledSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: WINDOW_HEIGHT - 60,
   },
   stepList: {
     paddingBottom: '20@ms',

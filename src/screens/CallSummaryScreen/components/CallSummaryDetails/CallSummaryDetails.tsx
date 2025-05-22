@@ -1,7 +1,7 @@
 // CallSummaryDetails.tsx
 
-import React, {useState} from 'react';
-import {View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -14,70 +14,94 @@ import {
 } from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
 import {colors} from '@/theme/colors';
+import {SectionKey, summaryFields, visibleFields} from '@/types/callSummary';
+import {getFormattedCallSummary} from '@/utils/callSummary';
 
 import {CallDetailsSection} from '../CallDetails/CallDetailsSection';
 import {CallHighlightsSection} from '../CallHighlights/CallHighlightsSection';
-import {DemogsSection} from '../DemogsSection/DemogsSection';
+import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
 import {FlowSection} from '../FlowSection/FlowSection';
 import {KeyConcernSection} from '../KeyConcern/KeyConcernSection';
 import {NotesSection} from './NotesSection';
 import {SectionHeader} from './SectionHeader';
 
-// Dummy data as per the screenshot
-const CALL_SUMMARY_DATA = {
-  callDetails: {
-    date: '11th February 2025',
-    time: '11:03 – 11:32',
-    type: 'Repeat caller, 3rd call',
-    counsellor: 'Shruti Bhatia',
-  },
-  keyConcern:
-    "-> Made space for the client to share thoughts and experiences. \n -> Validated their experiences and acknowledged the difficulty of caregiving. \n Reframed self-care and taking time off as not selfish. \n -> Encouraged a small behavioural experiment for letting go of. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict.",
-  callHighlights: {
-    duration: '30 minutes',
-    questions: 6,
-    copilot: 4,
-    listeningRatio: 0.67,
-    moodImproved: 28,
-  },
-  demogs: {
-    callerId: '134567',
-    age: 28,
-    gender: 'Male',
-    profession: 'Engineer',
-    concernCode: 'Seeking information',
-    diagnosis: 'Depression',
-  },
-  flow: "-> Made space for the client to share thoughts and experiences. \n -> Validated their experiences and acknowledged the difficulty of caregiving. \n Reframed self-care and taking time off as not selfish. \n -> Encouraged a small behavioural experiment for letting go of. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict.",
-};
+interface Props {
+  chatId: number;
+}
 
 const SECTION_LIST = [
-  {key: 'callDetails', label: 'Call Details', icon: <CallDetailsIcon />},
-  {key: 'keyConcern', label: 'Key concern', icon: <KeyConcernIcon />},
   {
-    key: 'callHighlights',
+    key: SectionKey.CallDetails,
+    label: 'Call Details',
+    icon: <CallDetailsIcon />,
+  },
+  {key: SectionKey.KeyConcern, label: 'Key concern', icon: <KeyConcernIcon />},
+  {
+    key: SectionKey.CallHighlights,
     label: 'Call highlights',
     icon: <CallHighlightsIcon />,
   },
-  {key: 'demogs', label: 'Demogs', icon: <DemogsIcon />},
-  {key: 'flow', label: 'Flow', icon: <FlowIcon />},
+  {key: SectionKey.Demographics, label: 'Demographics', icon: <DemogsIcon />},
+  {key: SectionKey.Flow, label: 'Flow', icon: <FlowIcon />},
 ];
 
-export const CallSummaryDetails: React.FC = () => {
+export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
   const navigation = useAppNavigation();
+  const [fetchCallSummary, {data: summaryData, isLoading}] =
+    useLazyGetCallSummaryQuery();
+  // TO DO: This will be replaced with actual hook when future API is implemented
+  const futureData = undefined;
+
+  useEffect(() => {
+    if (chatId) {
+      fetchCallSummary(chatId);
+    }
+  }, [chatId, fetchCallSummary]);
 
   const [expanded, setExpanded] = useState({
-    callDetails: true,
-    keyConcern: true,
-    callHighlights: true,
-    demogs: true,
-    flow: true,
+    [SectionKey.CallDetails]: true,
+    [SectionKey.KeyConcern]: true,
+    [SectionKey.CallHighlights]: true,
+    [SectionKey.Demographics]: true,
+    [SectionKey.Flow]: true,
   });
   const [notes, setNotes] = useState('');
 
-  const toggleSection = (key: string) => {
-    setExpanded(prev => ({...prev, [key]: !prev[key as keyof typeof prev]}));
+  // Convert API responses to our flat structure with priority fallback
+  const formattedSummary = getFormattedCallSummary(summaryData, futureData);
+
+  // Use the flat data structure but fall back to dummy data when needed
+  const formattedData = {
+    [SectionKey.CallDetails]: {
+      date: formattedSummary.callDate || '--',
+      time: formattedSummary.callTime || '--',
+      type: formattedSummary.callerType || '--',
+      counsellor: formattedSummary.counsellorName || '--',
+    },
+    [SectionKey.KeyConcern]: formattedSummary.keyConcerns || '--',
+    [SectionKey.CallHighlights]: {
+      duration: formattedSummary.callLastedOver,
+      questions: formattedSummary.youAsked,
+      copilot: formattedSummary.usedCopilot,
+      listeningRatio: formattedSummary.listeningRatio,
+      moodImproved: formattedSummary.moodImprovedBy,
+    },
+    [SectionKey.Demographics]: {
+      callerId: formattedSummary.callerId,
+      age: formattedSummary.age,
+      gender: formattedSummary.gender,
+      profession: formattedSummary.profession,
+      concernCode: formattedSummary.concernCode,
+      diagnosis: formattedSummary.formalDiagnosis,
+      location: formattedSummary.location,
+    },
+    [SectionKey.Flow]: formattedSummary.flow || '',
+  };
+
+  const toggleSection = (key: SectionKey) => {
+    setExpanded(prev => ({...prev, [key]: !prev[key]}));
   };
 
   const handleSubmit = () => {
@@ -85,45 +109,82 @@ export const CallSummaryDetails: React.FC = () => {
     navigation.navigate('Home');
   };
 
-  const renderSection = (section: (typeof SECTION_LIST)[number]) => {
+  const renderSection = (section: {
+    key: SectionKey;
+    label: string;
+    icon: React.ReactNode;
+  }) => {
+    // Only render sections that have visible fields
+    const sectionFields = summaryFields.filter(
+      field => field.sectionKey === section.key,
+    );
+    const hasVisibleFields = sectionFields.some(
+      field => visibleFields[field.key],
+    );
+
+    if (!hasVisibleFields) {
+      return null;
+    }
+
     switch (section.key) {
-      case 'callDetails':
+      case SectionKey.CallDetails:
+        return <CallDetailsSection callDetails={formattedData[section.key]} />;
+      case SectionKey.KeyConcern:
+        return <KeyConcernSection concerns={formattedData[section.key]} />;
+      case SectionKey.CallHighlights:
         return (
-          <CallDetailsSection callDetails={CALL_SUMMARY_DATA.callDetails} />
+          <CallHighlightsSection highlights={formattedData[section.key]} />
         );
-      case 'keyConcern':
-        return <KeyConcernSection concerns={CALL_SUMMARY_DATA.keyConcern} />;
-      case 'callHighlights':
+      case SectionKey.Demographics:
         return (
-          <CallHighlightsSection
-            highlights={CALL_SUMMARY_DATA.callHighlights}
-          />
+          <DemographicsSection demographics={formattedData[section.key]} />
         );
-      case 'demogs':
-        return <DemogsSection demogs={CALL_SUMMARY_DATA.demogs} />;
-      case 'flow':
-        return <FlowSection flow={CALL_SUMMARY_DATA.flow} />;
+      case SectionKey.Flow:
+        return <FlowSection flow={formattedData[section.key]} />;
     }
   };
+
+  // TO DO: Add loading state
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.darkSlate} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAwareScrollView style={styles.container}>
       <View style={styles.card}>
-        {SECTION_LIST.map(section => (
-          <View key={section.key} style={styles.sectionBox}>
-            <SectionHeader
-              label={section.label}
-              isExpanded={expanded[section.key as keyof typeof expanded]}
-              onToggle={() => toggleSection(section.key)}
-              icon={section.icon}
-            />
-            {expanded[section.key as keyof typeof expanded] && (
-              <View style={styles.sectionContent}>
-                {renderSection(section)}
-              </View>
-            )}
-          </View>
-        ))}
+        {SECTION_LIST.map(section => {
+          // Only render sections that have visible fields
+          const sectionFields = summaryFields.filter(
+            field => field.sectionKey === section.key,
+          );
+          const hasVisibleFields = sectionFields.some(
+            field => visibleFields[field.key],
+          );
+
+          if (!hasVisibleFields) {
+            return null;
+          }
+
+          return (
+            <View key={section.key} style={styles.sectionBox}>
+              <SectionHeader
+                label={section.label}
+                isExpanded={expanded[section.key]}
+                onToggle={() => toggleSection(section.key)}
+                icon={section.icon}
+              />
+              {expanded[section.key] && (
+                <View style={styles.sectionContent}>
+                  {renderSection(section)}
+                </View>
+              )}
+            </View>
+          );
+        })}
         <NotesSection
           notes={notes}
           onNotesChange={setNotes}

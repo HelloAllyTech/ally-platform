@@ -44,6 +44,7 @@ const styles = ScaledSheet.create({
   notesBox: {
     marginTop: '10@ms',
     marginBottom: '18@ms',
+    marginLeft: '30@ms',
     width: '100%',
   },
   notesLabel: {
@@ -55,9 +56,6 @@ const styles = ScaledSheet.create({
   },
   notesInput: {
     borderWidth: 0,
-    borderBottomWidth: 1,
-    borderColor: colors.lightGray2,
-    borderRadius: '8@ms',
     minHeight: '40@ms',
     padding: '8@ms',
     fontSize: '15@ms',

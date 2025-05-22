@@ -1,18 +1,22 @@
 import {useCallback, useEffect, useRef} from 'react';
-import {useRoute} from '@react-navigation/native';
 import {AppState, AppStateStatus} from 'react-native';
 
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setCurrentChat} from '@/store/slices/chatSlice';
-import {logger} from '@/utils/logger';
+import {Chat} from '@/types/message';
 
-import {useAppNavigation} from './useAppNavigation';
+interface UseCounselorChatProps {
+  onActiveChatFound?: (data: Chat) => void;
+  onNoActiveChatFound?: (error: unknown) => void;
+  shouldSubscribeToAppState?: boolean;
+}
 
-export const useCounselorChat = () => {
-  const navigation = useAppNavigation();
-  const route = useRoute();
-
+export const useCounselorChat = ({
+  onActiveChatFound,
+  onNoActiveChatFound,
+  shouldSubscribeToAppState = false,
+}: UseCounselorChatProps = {}) => {
   const dispatch = useAppDispatch();
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const appState = useRef(AppState.currentState);
@@ -25,30 +29,18 @@ export const useCounselorChat = () => {
     try {
       isCheckingRef.current = true;
       const {data, error} = await getCounsellorChat();
-      if (data) {
+      if (error && 'status' in error && error.status === 404) {
+        onNoActiveChatFound?.(error);
+      } else if (data) {
         dispatch(setCurrentChat(data));
-        if (route.name === 'Splash') {
-          // Reset the navigation stack to have Home and Listening screens
-          navigation.reset({
-            index: 1,
-            routes: [{name: 'Home'}, {name: 'Listening'}],
-          });
-        } else {
-          // From other screens, just navigate to Listening
-          navigation.navigate('Listening');
-        }
-      } else if (error && 'status' in error && error.status === 404) {
-        // Only navigate to Home if we're on the Splash screen
-        if (route.name === 'Splash') {
-          navigation.replace('Home');
-        }
+        onActiveChatFound?.(data);
       }
     } catch (error) {
-      logger.error(`Error checking counselor chat: ${error}`);
+      onNoActiveChatFound?.(error);
     } finally {
       isCheckingRef.current = false;
     }
-  }, [dispatch, getCounsellorChat, navigation, route.name]);
+  }, [dispatch, getCounsellorChat, onActiveChatFound, onNoActiveChatFound]);
 
   const handleAppStateChange = useCallback(
     async (nextAppState: AppStateStatus) => {
@@ -65,6 +57,9 @@ export const useCounselorChat = () => {
   );
 
   useEffect(() => {
+    if (!shouldSubscribeToAppState) {
+      return;
+    }
     const subscription = AppState.addEventListener(
       'change',
       handleAppStateChange,
@@ -73,7 +68,7 @@ export const useCounselorChat = () => {
     return () => {
       subscription.remove();
     };
-  }, [handleAppStateChange]);
+  }, [handleAppStateChange, shouldSubscribeToAppState]);
 
   return {
     checkCounselorChat,

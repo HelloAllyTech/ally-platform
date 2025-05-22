@@ -5,7 +5,7 @@ export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Listening: undefined;
-  CallSummary: undefined;
+  CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
 };
 
@@ -21,3 +21,5 @@ export type TabScreenProps<T extends keyof TabParamList> = BottomTabScreenProps<
   TabParamList,
   T
 >;
+
+export type RouteNames = keyof RootStackParamList | keyof TabParamList;
