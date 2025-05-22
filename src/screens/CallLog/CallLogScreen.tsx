@@ -161,7 +161,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   listContent: {
-    paddingBottom: '2@ms',
+    paddingBottom: '100@ms',
   },
   list: {
     flex: 1,

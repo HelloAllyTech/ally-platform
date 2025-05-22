@@ -19,18 +19,17 @@ const TAB_COMPONENTS = [HomeScreen, CallLogScreen];
 export const BottomTabs = () => {
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      HomeTab: <HomeActiveIcon />,
-      CallLog: <CallLogActiveIcon />,
+      HomeTab: <HomeActiveIcon width={18} height={18} />,
+      CallLog: <CallLogActiveIcon width={18} height={18} />,
     };
 
     const unfocusedIcons = {
-      HomeTab: <HomeInactiveIcon />,
-      CallLog: <CallLogInactiveIcon />,
+      HomeTab: <HomeInactiveIcon width={18} height={18} />,
+      CallLog: <CallLogInactiveIcon width={18} height={18} />,
     };
 
     return (
       <View style={styles.iconContainer}>
-        {focused && <View style={styles.iconContainerActive} />}
         {focused
           ? focusedIcons[route as keyof typeof focusedIcons]
           : unfocusedIcons[route as keyof typeof unfocusedIcons]}
@@ -39,41 +38,54 @@ export const BottomTabs = () => {
   };
 
   return (
-    <Tab.Navigator
-      screenOptions={({route}) => ({
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
-        tabBarIcon: ({focused}) => renderTabBarIcon(route.name, focused),
-      })}>
-      {TAB_NAMES.map((name, idx) => (
-        <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
-      ))}
-    </Tab.Navigator>
+    <View style={styles.container}>
+      <Tab.Navigator
+        screenOptions={({route}) => ({
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarStyle: styles.tabBar,
+          tabBarIcon: ({focused}) => renderTabBarIcon(route.name, focused),
+        })}>
+        {TAB_NAMES.map((name, idx) => (
+          <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
+        ))}
+      </Tab.Navigator>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   tabBar: {
-    backgroundColor: colors.darkBlue2,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
     borderTopWidth: 0,
-    height: 80,
-    paddingBottom: 10,
-    paddingTop: 10,
+    height: 60,
+    borderRadius: 40,
+    marginTop: 30,
+    marginHorizontal: 40,
+    marginBottom: 30,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 0.5,
+    borderColor: colors.lightGray2,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 56,
-    height: 56,
-  },
-  iconContainerActive: {
-    position: 'absolute',
-    top: -1,
-    backgroundColor: colors.brightBlue,
-    width: 56,
-    height: 5,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
+    marginTop: 6,
+    minWidth: 60,
+    width: 60, // TODO: change when new icon is added
+    height: 60,
   },
 });

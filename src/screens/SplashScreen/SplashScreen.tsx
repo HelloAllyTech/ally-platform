@@ -29,16 +29,27 @@ import {AuthStep} from './types';
 
 const {height} = Dimensions.get('screen');
 
-export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
+export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
+  navigation,
+}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
-  const [animationProgress, setAnimationProgress] = useState<
-    number | undefined
-  >(undefined);
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading} = useUser();
-  const {checkCounselorChat} = useCounselorChat();
+  const {checkCounselorChat} = useCounselorChat({
+    onActiveChatFound: () => {
+      // Reset the navigation stack to have Home and Listening screens
+      navigation.reset({
+        index: 1,
+        routes: [{name: 'Home'}, {name: 'Listening'}],
+      });
+    },
+    onNoActiveChatFound: () => {
+      navigation.replace('Home');
+    },
+    shouldSubscribeToAppState: false,
+  });
   const {t} = useTranslate();
 
   const animationTranslateY = useSharedValue(0);
@@ -56,7 +67,6 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
 
   useEffect(() => {
     if (isAnimationEnded) {
-      setAnimationProgress(0.9);
       if (!isUserLoading && !isAuthenticated) {
         setIsBottomSheetVisible(true);
         animationTranslateY.value = withTiming(-height * 0.6, {
@@ -178,7 +188,6 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
             resizeMode="cover"
             autoPlay
             loop={false}
-            progress={animationProgress}
             speed={1}
             onAnimationFinish={() => setIsAnimationEnded(true)}
           />
