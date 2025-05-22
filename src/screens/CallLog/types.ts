@@ -9,6 +9,7 @@ export interface CallLog {
       callQuality?: number;
     };
     chatId?: number;
+    createdAt?: string;
   };
   client: {
     name: string;

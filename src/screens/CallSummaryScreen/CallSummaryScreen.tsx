@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -15,14 +15,19 @@ import Animated, {
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon} from '@/assets/icons';
+import {LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
+import {
+  CallSummaryResponse,
+  useLazyGetCallSummaryQuery,
+} from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {formatCallId} from '@/utils/callIdFormatter';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
@@ -44,7 +49,16 @@ export const CallSummaryScreen: React.FC<
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callId = route.params?.callId;
+  const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
+  const [fetchCallSummary, {data: summaryData, isLoading}] =
+    useLazyGetCallSummaryQuery();
+
+  useEffect(() => {
+    if (chatId) {
+      fetchCallSummary(chatId);
+    }
+  }, [chatId, fetchCallSummary]);
   /**
    * Handles the scroll event and updates the scroll position value
    */
@@ -99,18 +113,33 @@ export const CallSummaryScreen: React.FC<
     if (!isFullyExpanded) {
       return (
         <View style={styles.expandedTitleContainer}>
-          <View style={styles.expandedSummeryTitleContainer}>
-            <TouchableOpacity
-              style={styles.backButtonExpanded}
-              onPress={handleBackPress}>
-              <LeftArrowIcon />
+          <View style={styles.expandedTitleContent}>
+            <View style={styles.expandedSummeryTitleContainer}>
+              <TouchableOpacity
+                style={styles.backButtonExpanded}
+                onPress={handleBackPress}>
+                <LeftArrowIcon />
+              </TouchableOpacity>
+              <View>
+                <Text style={styles.expandedSummeryTitle}>
+                  {t('CallSummary.header.title')}{' '}
+                  <Text style={styles.headerSubtitle}>
+                    {t('CallSummary.header.subtitle')}
+                  </Text>
+                </Text>
+                <Text style={styles.expandedSubTitle}>
+                  {callId && summaryData?.createdAt
+                    ? formatCallId(
+                        callId.toString(),
+                        summaryData?.details?.createdAt,
+                      )
+                    : ''}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.moreOptionsContainer}>
+              <ThreeDotsIcon />
             </TouchableOpacity>
-            <Text style={styles.expandedSummeryTitle}>
-              {t('CallSummary.header.title')}{' '}
-              <Text style={styles.headerSubtitle}>
-                {t('CallSummary.header.subtitle')}
-              </Text>
-            </Text>
           </View>
         </View>
       );
@@ -142,7 +171,7 @@ export const CallSummaryScreen: React.FC<
         style={[
           styles.card,
           animatedCardStyle,
-          {maxHeight: WINDOW_HEIGHT - insets.top - 60},
+          {maxHeight: WINDOW_HEIGHT - insets.top - 90},
         ]}>
         <ScrollView
           scrollEnabled={isShowCallSummary}
@@ -153,7 +182,8 @@ export const CallSummaryScreen: React.FC<
           {isShowCallSummary ? (
             // TO DO: Remove hardcoded chatId once future API is implemented
             <CallSummaryDetails
-              chatId={Number(callId || currentChat?.chatId)}
+              summaryData={summaryData as CallSummaryResponse}
+              isLoading={isLoading}
             />
           ) : (
             <CallSummaryProgress
@@ -215,14 +245,18 @@ const styles = ScaledSheet.create({
   },
   expandedSummeryTitleContainer: {
     flexDirection: 'row',
-    height: '57@ms',
+    height: '80@ms',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
   },
   expandedSummeryTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     fontSize: '18@ms',
+  },
+  expandedSubTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    paddingTop: '4@ms',
+    color: colors.black,
   },
   backButtonExpanded: {
     paddingLeft: '4@ms',
@@ -230,5 +264,15 @@ const styles = ScaledSheet.create({
   expandedTitleContainer: {
     backgroundColor: colors.white,
     height: '100@ms',
+  },
+  expandedTitleContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ashGray,
+  },
+  moreOptionsContainer: {
+    paddingRight: '20@ms',
   },
 });
