@@ -20,6 +20,7 @@ import MicWithGradientIcon from './micWithGradient.svg';
 import PauseIcon from './pause.svg';
 import PlayIcon from './play.svg';
 import SearchIcon from './search.svg';
+import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
 import TickRoundIcon from './tickRound.svg';
 
@@ -48,4 +49,5 @@ export {
   HomeInactiveIcon,
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
+  ThreeDotsIcon,
 };
