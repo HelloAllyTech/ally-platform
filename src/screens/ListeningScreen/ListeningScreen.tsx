@@ -10,8 +10,7 @@ import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
-import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {clearCurrentChat} from '@/store/slices/chatSlice';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
@@ -35,7 +34,6 @@ export interface Nudge {
 export const ListeningScreen = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-  const dispatch = useAppDispatch();
   const [isNudgeVisible, setIsNudgeVisible] = useState(false);
   const chat = useAppSelector(state => state.chat.currentChat);
   const [startTime] = useState(() =>
@@ -57,9 +55,8 @@ export const ListeningScreen = () => {
   }, []);
 
   const handleCallEnd = useCallback(() => {
-    dispatch(clearCurrentChat());
     navigation.navigate('CallSummary');
-  }, [dispatch, navigation]);
+  }, [navigation]);
 
   useHardwareBackPressHandler(() => {
     handleCallEnd();

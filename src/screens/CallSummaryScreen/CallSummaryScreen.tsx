@@ -19,7 +19,8 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
-import {useAppSelector} from '@/store/hooks';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -43,6 +44,7 @@ export const CallSummaryScreen: React.FC<
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callId = route.params?.callId;
+  const dispatch = useAppDispatch();
   /**
    * Handles the scroll event and updates the scroll position value
    */
@@ -63,7 +65,12 @@ export const CallSummaryScreen: React.FC<
    * Handles the back button press to navigate back
    */
   const handleBackPress = () => {
-    navigation.goBack();
+    if (currentChat) {
+      dispatch(clearCurrentChat());
+      navigation.navigate('Home');
+    } else {
+      navigation.goBack();
+    }
   };
 
   const animatedCardStyle = useAnimatedStyle(() => {
@@ -124,6 +131,10 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  const isShowCallSummary = Boolean(
+    callId || (summaryProgressComplete && currentChat?.chatId),
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {renderSummeryTitle()}
@@ -134,13 +145,12 @@ export const CallSummaryScreen: React.FC<
           {maxHeight: WINDOW_HEIGHT - insets.top - 60},
         ]}>
         <ScrollView
-          scrollEnabled={summaryProgressComplete}
+          scrollEnabled={isShowCallSummary}
           onScroll={handleScroll}
           scrollEventThrottle={8}
           onLayout={handleLayout}
           contentContainerStyle={styles.stepList}>
-          {(summaryProgressComplete || callId) &&
-          (callId || currentChat?.chatId) ? (
+          {isShowCallSummary ? (
             // TO DO: Remove hardcoded chatId once future API is implemented
             <CallSummaryDetails
               chatId={Number(callId || currentChat?.chatId)}

@@ -6,7 +6,7 @@ import {
   DoubleRightArrowIcon,
   EyeIcon,
 } from '@/assets/icons';
-import {TAG_COLORS} from '@/constants/general';
+import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants/general';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
@@ -51,6 +51,7 @@ const CallLogItem = ({
             <TouchableOpacity
               onPress={onToggle}
               activeOpacity={0.7}
+              hitSlop={DEFAULT_HIT_SLOP}
               style={styles.arrowContainer}>
               {expanded ? (
                 <DoubleBottomArrowIcon width={16} height={16} />

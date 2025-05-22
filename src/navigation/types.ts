@@ -21,3 +21,5 @@ export type TabScreenProps<T extends keyof TabParamList> = BottomTabScreenProps<
   TabParamList,
   T
 >;
+
+export type RouteNames = keyof RootStackParamList | keyof TabParamList;
