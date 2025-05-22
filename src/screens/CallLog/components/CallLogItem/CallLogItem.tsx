@@ -9,6 +9,7 @@ import {
 import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants/general';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {formatCallId} from '@/utils/callIdFormatter';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';
@@ -60,7 +61,9 @@ const CallLogItem = ({
               )}
             </TouchableOpacity>
             <View style={styles.logItemContent}>
-              <Text style={styles.logId}>{item.client.name}</Text>
+              <Text style={styles.logId}>
+                {formatCallId(item?.details?.chatId, item?.details?.createdAt)}
+              </Text>
             </View>
             <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
             <EyeIcon width={16} height={16} style={styles.eyeIcon} />
@@ -135,7 +138,7 @@ const styles = ScaledSheet.create({
     marginRight: '4@ms',
   },
   logId: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     color: colors.darkSlate,
     fontWeight: '500',

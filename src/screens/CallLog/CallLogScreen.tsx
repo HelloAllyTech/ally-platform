@@ -134,6 +134,8 @@ export const CallLogScreen: React.FC = () => {
     );
   };
 
+  console.log('allLogs', allLogs);
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader search={search} onSearchChange={setSearch} />
