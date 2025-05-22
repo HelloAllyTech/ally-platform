@@ -1,7 +1,6 @@
 import React, {useCallback, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
 import {Alert, BackHandler, Text, TouchableOpacity, View} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
@@ -12,9 +11,6 @@ import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
-import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
-import {useAppDispatch} from '@/store/hooks';
-import {setCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
@@ -24,11 +20,11 @@ import {logger} from '@/utils/logger';
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-  const dispatch = useAppDispatch();
-  const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-
-  // Declare hook to check for counselor chat every time the screen is focused
-  useCounselorChat();
+  const {checkCounselorChat} = useCounselorChat({
+    onActiveChatFound: () => {
+      navigation.navigate('Listening');
+    },
+  });
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -51,19 +47,13 @@ export const HomeScreen: React.FC = () => {
       },
       [SocketEvent.USER_JOINED]: async () => {
         try {
-          const {data, error} = await getCounsellorChat();
-          if (data) {
-            dispatch(setCurrentChat(data));
-            navigation.navigate('Listening');
-          } else if (error) {
-            logger.error(`Error fetching counselor chat: ${error}`);
-          }
+          checkCounselorChat();
         } catch (error) {
           logger.error(`Error in USER_JOINED handler: ${error}`);
         }
       },
     }),
-    [dispatch, getCounsellorChat, navigation],
+    [checkCounselorChat],
   );
 
   const {userData} = useUser();
@@ -74,51 +64,42 @@ export const HomeScreen: React.FC = () => {
   });
 
   return (
-    <LinearGradient
-      colors={[colors.black, colors.navyGray, colors.oceanBlue]}
-      style={styles.container}
-      locations={[0, 0.65, 0.9]}
-      start={{x: 0.4, y: 0}}
-      end={{x: 0.6, y: 1}}>
-      <View style={styles.content}>
-        <Text style={styles.titleContainer}>
-          <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-          <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
-        </Text>
+    <View style={styles.content}>
+      <Text style={styles.titleContainer}>
+        <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+        <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
+      </Text>
 
-        <TouchableOpacity
-          style={styles.animationContainer}
-          onPress={handleListeningPress}
-          activeOpacity={0.8}>
-          <LottieView
-            source={require('@/assets/animations/listen.json')}
-            autoPlay
-            loop
-            style={styles.lottieAnimation}
-          />
-          <View style={styles.headphoneContainer}>
-            <HeadphoneIcon width={31} height={31} />
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleListeningPress}
-          style={styles.footer}
-          hitSlop={DEFAULT_HIT_SLOP}
-          activeOpacity={0.8}>
-          <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-          <InfoIcon width={20} height={20} />
-        </TouchableOpacity>
-      </View>
-    </LinearGradient>
+      <TouchableOpacity
+        style={styles.animationContainer}
+        onPress={handleListeningPress}
+        activeOpacity={0.8}>
+        <LottieView
+          source={require('@/assets/animations/listen.json')}
+          autoPlay
+          loop
+          style={styles.lottieAnimation}
+        />
+        <View style={styles.headphoneContainer}>
+          <HeadphoneIcon width={31} height={31} />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={handleListeningPress}
+        style={styles.footer}
+        hitSlop={DEFAULT_HIT_SLOP}
+        activeOpacity={0.8}>
+        <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+        <InfoIcon width={20} height={20} />
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-  },
   content: {
     flex: 1,
+    backgroundColor: colors.white,
     alignItems: 'center',
     paddingTop: '150@vs',
     paddingBottom: '80@vs',
@@ -129,14 +110,14 @@ const styles = ScaledSheet.create({
   },
   startText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.white,
+    color: colors.black,
     fontSize: '32@ms',
     lineHeight: '40@ms',
   },
   listeningText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: 'italic',
-    color: colors.white,
+    color: colors.black,
     fontSize: '32@ms',
     lineHeight: '40@ms',
   },

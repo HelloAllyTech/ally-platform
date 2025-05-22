@@ -34,8 +34,7 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
     if (isAudioActive) {
       lottieRef.current?.play();
     } else {
-      // When stopping, play a tiny segment at the end to ensure we stop at progress 1
-      lottieRef.current?.play(0.99, 1);
+      lottieRef.current?.pause();
     }
   }, [isAudioActive]);
 
@@ -108,8 +107,6 @@ const styles = ScaledSheet.create({
   blobContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '80@ms',
-    paddingBottom: '80@ms',
     overflow: 'hidden',
   },
   blob: {
@@ -123,11 +120,6 @@ const styles = ScaledSheet.create({
     width: '100%',
     height: '100%',
     zIndex: 1,
-    // TO DO: Remove this once animated blob lottie is finalized
-    marginLeft: '20@ms',
   },
-  // TO DO: Remove this once animated blob lottie is finalized
-  marginB: {
-    marginBottom: '10@ms',
-  },
+  marginB: {},
 });

@@ -15,6 +15,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
@@ -28,12 +29,27 @@ import {AuthStep} from './types';
 
 const {height} = Dimensions.get('screen');
 
-export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
+export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
+  navigation,
+}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
   const lottieRef = useRef<LottieView>(null);
+  const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading} = useUser();
-  const {checkCounselorChat} = useCounselorChat();
+  const {checkCounselorChat} = useCounselorChat({
+    onActiveChatFound: () => {
+      // Reset the navigation stack to have Home and Listening screens
+      navigation.reset({
+        index: 1,
+        routes: [{name: 'Home'}, {name: 'Listening'}],
+      });
+    },
+    onNoActiveChatFound: () => {
+      navigation.replace('Home');
+    },
+    shouldSubscribeToAppState: false,
+  });
   const {t} = useTranslate();
 
   const animationTranslateY = useSharedValue(0);
@@ -155,7 +171,9 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = () => {
   });
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback
+      style={{paddingBottom: insets.bottom}}
+      onPress={Keyboard.dismiss}>
       <View style={styles.flex1}>
         {currentStep === 'OTP' && (
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
