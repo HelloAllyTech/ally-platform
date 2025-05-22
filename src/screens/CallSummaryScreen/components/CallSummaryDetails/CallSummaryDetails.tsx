@@ -1,6 +1,6 @@
 // CallSummaryDetails.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -14,7 +14,7 @@ import {
 } from '@/assets/icons';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
+import {CallSummaryResponse} from '@/services/callSummaryApi';
 import {colors} from '@/theme/colors';
 import {SectionKey, summaryFields, visibleFields} from '@/types/callSummary';
 import {getFormattedCallSummary} from '@/utils/callSummary';
@@ -28,7 +28,8 @@ import {NotesSection} from './NotesSection';
 import {SectionHeader} from './SectionHeader';
 
 interface Props {
-  chatId: number;
+  summaryData: CallSummaryResponse;
+  isLoading: boolean;
 }
 
 const SECTION_LIST = [
@@ -47,18 +48,12 @@ const SECTION_LIST = [
   {key: SectionKey.Flow, label: 'Flow', icon: <FlowIcon />},
 ];
 
-export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
+export const CallSummaryDetails: React.FC<Props> = ({
+  summaryData,
+  isLoading,
+}) => {
   const navigation = useAppNavigation();
-  const [fetchCallSummary, {data: summaryData, isLoading}] =
-    useLazyGetCallSummaryQuery();
-  // TO DO: This will be replaced with actual hook when future API is implemented
   const futureData = undefined;
-
-  useEffect(() => {
-    if (chatId) {
-      fetchCallSummary(chatId);
-    }
-  }, [chatId, fetchCallSummary]);
 
   const [expanded, setExpanded] = useState({
     [SectionKey.CallDetails]: true,
