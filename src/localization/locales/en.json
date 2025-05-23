@@ -49,6 +49,20 @@
     },
     "progress": {
       "complete": "Summary Progress Complete"
+    },
+    "customMenu": {
+      "export": "Export",
+      "delete": "Delete"
+    },
+    "info": {
+      "storagePermissionDenied": "Storage permission denied",
+      "fileExportedSuccess": "File exported successfully",
+      "fileExportFailed": "Failed to export file",
+      "summaryDeletedSuccess": "Call summary deleted successfully",
+      "summaryDeleteFailed": "Failed to delete call summary",
+      "fileSavedSuccess": "File saved successfully at: {{path}}",
+      "directoryPathError": "Could not determine directory path",
+      "invalidResponseFormat": "Invalid response format from server"
     }
   },
   "CallLogs": {

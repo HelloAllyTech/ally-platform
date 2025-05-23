@@ -6,6 +6,7 @@ export const colors = {
   brightBlue: '#0473F2',
   black: '#000000',
   blackTransparent50: 'rgba(0, 0, 0, 0.5)',
+  whiteTransparent10: 'rgba(255, 255, 255, 0.1)',
   lightGray: '#F5F5F5',
   deepTeal: '#1b424f',
   lightGray2: '#E5E7EB',
