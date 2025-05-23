@@ -3,9 +3,11 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
+import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
@@ -50,4 +52,6 @@ export {
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
   ThreeDotsIcon,
+  DeleteIcon,
+  ExportIcon,
 };

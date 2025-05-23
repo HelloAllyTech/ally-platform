@@ -91,11 +91,27 @@ export interface CallSummaryResponse {
 }
 
 export const callSummaryApi = api.injectEndpoints({
+  overrideExisting: true,
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
       query: chatId => `/chats/${chatId}`,
     }),
+    exportCallSummary: builder.query<void, number>({
+      query: chatId => ({
+        url: `/chats/${chatId}/export-summary`,
+      }),
+    }),
+    deleteCallSummary: builder.mutation<void, number>({
+      query: chatId => ({
+        url: `/chats/${chatId}`,
+        method: 'DELETE',
+      }),
+    }),
   }),
 });
 
-export const {useLazyGetCallSummaryQuery} = callSummaryApi;
+export const {
+  useLazyGetCallSummaryQuery,
+  useLazyExportCallSummaryQuery,
+  useDeleteCallSummaryMutation,
+} = callSummaryApi;
