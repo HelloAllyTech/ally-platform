@@ -123,6 +123,17 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  const onUpdateSummary = (isSuccess: boolean) => {
+    if (isSuccess) {
+      showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
+    } else {
+      showToast(t('CallSummary.info.summaryUpdateFailed'));
+    }
+  };
+
   const handleExport = async () => {
     if (chatId) {
       try {
@@ -261,6 +272,7 @@ export const CallSummaryScreen: React.FC<
             <CallSummaryDetails
               summaryData={summaryData as CallSummaryResponse}
               isLoading={isLoading}
+              onSubmit={onUpdateSummary}
             />
           ) : (
             <CallSummaryProgress
