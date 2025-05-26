@@ -37,3 +37,19 @@ export const calculateDuration = (start: string, end: string) => {
   const seconds = Math.floor((durationMs % (1000 * 60)) / 1000);
   return `${minutes} mins ${seconds} secs`;
 };
+
+/**
+ * Formats a date into 24-hour time format (HH:mm)
+ * @param date - ISO date string or Date object
+ * @returns Formatted time string in HH:mm format (e.g., "14:30")
+ * @example
+ * formatTimeHHmm("2025-05-26T06:42:07.676Z") // returns "06:42"
+ * formatTimeHHmm(new Date()) // returns current time in HH:mm
+ */
+export const formatTimeHHmm = (date: string | Date): string => {
+  return new Date(date).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};

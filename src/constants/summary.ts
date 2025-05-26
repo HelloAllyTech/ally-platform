@@ -41,7 +41,7 @@ export const SUMMARY_FIELDS = {
   // Features & Demographics
   CALL_ID: 'callId' as const,
   CALL_DURATION: 'callDuration' as const,
-  CALL_DATE: 'dateOfSession' as const,
+  CALL_DATE: 'callDate' as const,
   CALL_TIME: 'callTime' as const,
   CALLER_ID: 'clientId' as const,
   CALLER_TYPE: 'callType' as const,
