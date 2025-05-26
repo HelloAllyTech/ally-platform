@@ -7,6 +7,7 @@ export type RootStackParamList = {
   Listening: undefined;
   CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
+  Breathing: undefined;
 };
 
 export type TabParamList = {

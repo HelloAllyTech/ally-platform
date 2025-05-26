@@ -7,7 +7,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components';
 import {SECTION_LIST, SectionKey} from '@/constants/summary';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
+// import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
 import {CallSummaryResponse} from '@/services/callSummaryApi';
@@ -21,13 +21,15 @@ import {SectionHeader} from './SectionHeader';
 interface Props {
   summaryData: CallSummaryResponse;
   isLoading: boolean;
+  onSubmit: (isUpdateSuccess: boolean) => void;
 }
 
 export const CallSummaryDetails: React.FC<Props> = ({
   summaryData,
   isLoading: isLoadingSummary,
+  onSubmit,
 }) => {
-  const navigation = useAppNavigation();
+  // const navigation = useAppNavigation();
   const {data: visibleFields, isLoading: isLoadingFields} =
     useGetSummaryFieldsQuery();
   const {t} = useTranslate();
@@ -55,6 +57,11 @@ export const CallSummaryDetails: React.FC<Props> = ({
     [SectionKey.Tags]: false,
     [SectionKey.Metrics]: false,
   });
+
+  const onSubmitButtonPress = async () => {
+    const response = await handleSubmit();
+    onSubmit(Boolean(response?.data));
+  };
 
   const toggleSection = (key: SectionKey) => {
     setExpanded(prev => ({...prev, [key]: !prev[key]}));
@@ -115,7 +122,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
       <View style={styles.buttonContainer}>
         <PrimaryButton
           label={t('submit')}
-          onPress={handleSubmit}
+          onPress={onSubmitButtonPress}
           isLoading={isUpdating}
           customContainerStyle={styles.submitButton}
           customTextStyle={styles.submitButtonText}

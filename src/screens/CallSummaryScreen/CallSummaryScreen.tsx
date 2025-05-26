@@ -24,10 +24,10 @@ import {TranslationType} from '@/localization/locales/type';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   CallSummaryResponse,
-  useDeleteCallSummaryMutation,
   useLazyExportCallSummaryQuery,
   useLazyGetCallSummaryQuery,
   useUpdateCallInfoMutation,
+  useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
@@ -67,7 +67,7 @@ export const CallSummaryScreen: React.FC<
   const [fetchCallSummary, {data: summaryData, isLoading}] =
     useLazyGetCallSummaryQuery();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
-  const [deleteCallSummary] = useDeleteCallSummaryMutation();
+  const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -135,6 +135,17 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  const onUpdateSummary = (isSuccess: boolean) => {
+    if (isSuccess) {
+      showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
+    } else {
+      showToast(t('CallSummary.info.summaryUpdateFailed'));
+    }
+  };
+
   const handleExport = async () => {
     if (chatId) {
       try {
@@ -188,10 +199,19 @@ export const CallSummaryScreen: React.FC<
   const handleDelete = async () => {
     if (chatId) {
       try {
-        await deleteCallSummary(chatId).unwrap();
+        const response = await updateCallSummary({
+          chatId,
+          data: {callDetails: {}},
+        });
         showToast(t('CallSummary.info.summaryDeletedSuccess'), 'success');
         setIsMenuVisible(false);
-        navigation.goBack();
+        if (response.data) {
+          setTimeout(() => {
+            navigation.goBack();
+          }, 2000);
+        } else {
+          showToast(t('CallSummary.info.summaryDeleteFailed'));
+        }
       } catch (err) {
         const errorMessage =
           err instanceof Error
@@ -287,6 +307,7 @@ export const CallSummaryScreen: React.FC<
             <CallSummaryDetails
               summaryData={summaryData as CallSummaryResponse}
               isLoading={isLoading}
+              onSubmit={onUpdateSummary}
             />
           ) : (
             <CallSummaryProgress

@@ -40,7 +40,7 @@ export const useCallSummaryForm = ({summaryData}: UseCallSummaryFormProps) => {
       formData,
       summaryData,
     );
-    await updateCallSummary({
+    return await updateCallSummary({
       chatId: summaryData.id,
       data: {
         callDetails: formattedFormData,
