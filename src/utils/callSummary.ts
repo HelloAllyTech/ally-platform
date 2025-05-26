@@ -1,9 +1,3 @@
-import {CallSummaryResponse} from '@/services/callSummaryApi';
-import {
-  CallSummaryAPIResponse,
-  FormattedSummaryValues,
-} from '@/types/callSummary';
-
 // Dummy data for development and fallback
 const CALL_SUMMARY_DATA = {
   callDetails: {
@@ -29,8 +23,34 @@ const CALL_SUMMARY_DATA = {
     concernCode: 'Seeking information',
     diagnosis: 'Depression',
     location: 'Mumbai',
+    languages: 'Hindi (92%), English (8%)',
   },
   flow: "-> Made space for the client to share thoughts and experiences. \n -> Validated their experiences and acknowledged the difficulty of caregiving. \n Reframed self-care and taking time off as not selfish. \n -> Encouraged a small behavioural experiment for letting go of. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict. \n -> Explored the client's dreams and aspirations and acknowledged inner conflict.",
+  objectiveObservations:
+    'Client appeared anxious and fidgety during the call. Spoke rapidly and had difficulty maintaining focus. Showed signs of emotional distress when discussing work-related stress.',
+  subjectiveObservations:
+    'Client seems to be struggling with work-life balance and shows signs of burnout. Demonstrates high self-criticism and perfectionist tendencies.',
+  assessment:
+    'Client is experiencing moderate to severe anxiety symptoms, primarily triggered by work-related stress and perfectionist tendencies. Shows good insight into their patterns but struggles with implementing changes.',
+  dominantFeelings: 'Anxiety, frustration, overwhelm, self-doubt',
+  issuesWorkedOn:
+    '1. Work-related stress\n2. Perfectionism\n3. Self-care strategies\n4. Boundary setting',
+  therapeuticTechniques:
+    '1. Active listening\n2. Cognitive restructuring\n3. Mindfulness exercises\n4. Solution-focused questioning',
+  referralsProvided:
+    '1. Workplace counseling program\n2. Stress management workshop\n3. Local support group for professionals',
+  homeworkRecommended:
+    '1. Daily mindfulness practice (10 minutes)\n2. Stress diary\n3. Setting one boundary per day\n4. Self-care activity schedule',
+  plansForNextCall:
+    '1. Review homework completion\n2. Explore progress with boundary setting\n3. Discuss any new challenges\n4. Refine coping strategies',
+  tags: 'anxiety, work-stress, perfectionism, self-care',
+  metrics: {
+    listeningShare: '75%',
+    reflectiveQuestionsAsked: '8',
+    emotionsLift: '30%',
+  },
+  notes:
+    'Follow up on stress diary entries and boundary-setting exercises in next session. Client shows good engagement and motivation for change.',
 };
 
 const getDateWithOrdinal = (dateTime: string | undefined) => {
@@ -44,134 +64,11 @@ const getDateWithOrdinal = (dateTime: string | undefined) => {
   })}`;
 };
 
-const get24HourTime = (dateTime: string | undefined) => {
-  if (!dateTime) return '--';
+const get24HourTime = (dateTime: string) => {
   const date = new Date(dateTime);
   return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   });
-};
-
-// Use SummaryValues type for FutureAPIResponse
-type FutureAPIResponse = CallSummaryAPIResponse;
-
-export const getFormattedCallSummary = (
-  response: CallSummaryResponse | undefined,
-  futureResponse?: FutureAPIResponse,
-): FormattedSummaryValues => {
-  // Extract data from current API response
-  const {details} = response || {};
-  const {
-    session_details: sessionDetails,
-    demographic_details: demographics,
-    session_documentation: sessionDocs,
-  } = details?.summary?.summaryNote || {};
-
-  // Priority-based field resolution (for now)
-  // TO DO: Remove priority-based field resolution once future API is implemented
-  return {
-    // Call Details section
-    callDate:
-      futureResponse?.callDate || // Try future API first
-      (response?.startedAt
-        ? getDateWithOrdinal(response.startedAt)
-        : undefined) || // Then current API
-      CALL_SUMMARY_DATA.callDetails.date, // Finally fallback to dummy data
-
-    callTime:
-      futureResponse?.callTime ||
-      (response?.startedAt && response?.endedAt
-        ? `${get24HourTime(response.startedAt)} - ${get24HourTime(response.endedAt)}`
-        : undefined) ||
-      CALL_SUMMARY_DATA.callDetails.time,
-
-    callerType:
-      futureResponse?.callerType ||
-      sessionDetails?.new_call_follow_up ||
-      CALL_SUMMARY_DATA.callDetails.type,
-
-    counsellorName:
-      futureResponse?.counsellorName ||
-      sessionDetails?.counselor_name ||
-      CALL_SUMMARY_DATA.callDetails.counsellor,
-
-    // demographics section
-    callerId:
-      futureResponse?.callerId ||
-      response?.clientId?.toString() ||
-      CALL_SUMMARY_DATA.demographics.callerId,
-
-    age:
-      futureResponse?.age ||
-      demographics?.age ||
-      CALL_SUMMARY_DATA.demographics.age,
-
-    gender:
-      futureResponse?.gender ||
-      demographics?.gender ||
-      CALL_SUMMARY_DATA.demographics.gender,
-
-    // TO DO: Check if this is shown
-    location:
-      futureResponse?.location ||
-      demographics?.location ||
-      CALL_SUMMARY_DATA.demographics.location,
-
-    profession:
-      futureResponse?.profession ||
-      demographics?.working_status ||
-      CALL_SUMMARY_DATA.demographics.profession,
-
-    concernCode:
-      futureResponse?.concernCode ||
-      demographics?.code_of_concern ||
-      CALL_SUMMARY_DATA.demographics.concernCode,
-
-    formalDiagnosis:
-      futureResponse?.formalDiagnosis ||
-      demographics?.any_formal_diagnosis ||
-      CALL_SUMMARY_DATA.demographics.diagnosis,
-
-    // Call Highlights section
-    // TO DO: Verify the type of callDuration
-    callLastedOver:
-      futureResponse?.callLastedOver ||
-      details?.callDuration ||
-      CALL_SUMMARY_DATA.callHighlights.duration,
-
-    youAsked:
-      futureResponse?.youAsked ||
-      details?.noOfStages ||
-      CALL_SUMMARY_DATA.callHighlights.questions,
-
-    usedCopilot:
-      futureResponse?.usedCopilot ||
-      details?.noOfNudges ||
-      CALL_SUMMARY_DATA.callHighlights.copilot,
-
-    // Not available in current API, only in future API
-    // TO DO: Check type
-    listeningRatio:
-      futureResponse?.listeningRatio ||
-      CALL_SUMMARY_DATA.callHighlights.listeningRatio,
-
-    // Not available in current API, only in future API
-    // TO DO: Check type
-    moodImprovedBy:
-      futureResponse?.moodImprovedBy ||
-      CALL_SUMMARY_DATA.callHighlights.moodImproved,
-
-    // Other fields
-    flow:
-      futureResponse?.flow ||
-      sessionDocs?.work_done?.counseling_process_flow ||
-      CALL_SUMMARY_DATA.flow,
-
-    keyConcerns:
-      futureResponse?.keyConcerns ||
-      sessionDocs?.key_concerns ||
-      CALL_SUMMARY_DATA.keyConcern,
-  };
 };

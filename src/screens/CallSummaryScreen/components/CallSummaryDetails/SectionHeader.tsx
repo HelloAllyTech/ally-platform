@@ -4,6 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {typography} from '@/theme/typography';
 
 interface SectionHeaderProps {
   label: string;
@@ -34,23 +35,26 @@ const styles = ScaledSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: '10@ms',
+    paddingTop: '16@ms',
+    paddingBottom: '12@ms',
     paddingHorizontal: '10@ms',
+    width: '100%',
+    flex: 1,
   },
   sectionArrow: {
     fontSize: '16@ms',
-    marginRight: '6@ms',
+    marginRight: '10@ms',
     color: colors.darkSlate,
     width: '18@ms',
     textAlign: 'center',
   },
   sectionTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '16@ms',
-    color: colors.darkSlate,
-    fontWeight: '600',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.black,
+    width: '85%',
   },
   iconContainer: {
-    minWidth: '32@ms',
+    marginRight: '8@ms',
   },
 });

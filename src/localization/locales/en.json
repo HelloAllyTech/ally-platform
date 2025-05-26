@@ -50,6 +50,8 @@
     "progress": {
       "complete": "Summary Progress Complete"
     },
+    "points": "points",
+    "minutes": "minutes",
     "customMenu": {
       "export": "Export",
       "delete": "Delete"
@@ -73,5 +75,6 @@
     "search": {
       "placeholder": "Search"
     }
-  }
+  },
+  "submit": "Submit"
 }

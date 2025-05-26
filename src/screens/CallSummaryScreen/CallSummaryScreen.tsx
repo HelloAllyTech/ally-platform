@@ -1,10 +1,11 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   PermissionsAndroid,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import Animated, {
@@ -13,8 +14,9 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrowIcon} from '@/assets/icons';
 import {Toast} from '@/components/Toast/Toast';
 import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
@@ -71,6 +73,8 @@ export const CallSummaryScreen: React.FC<
     type: 'error',
   });
   const {t} = useTranslate();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   useEffect(() => {
     if (chatId) {
@@ -96,6 +100,14 @@ export const CallSummaryScreen: React.FC<
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollY.value = event.nativeEvent.contentOffset.y;
     setIsFullyExpanded(event.nativeEvent.contentOffset.y <= 80);
+
+    // Check if we're near the bottom
+    const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+    const paddingToBottom = moderateScale(30);
+    const isCloseToBottom =
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - paddingToBottom;
+    setShowScrollToBottom(!isCloseToBottom);
   };
 
   const handleLayout = () => {
@@ -130,7 +142,7 @@ export const CallSummaryScreen: React.FC<
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `call-summary-${timestamp}.txt`;
+        const filename = `call-summary-${chatId}-${timestamp}.txt`;
         const directory = Platform.select({
           ios: RNFS.DocumentDirectoryPath,
           android: RNFS.DownloadDirectoryPath,
@@ -205,6 +217,10 @@ export const CallSummaryScreen: React.FC<
     callId || (summaryProgressComplete && currentChat?.chatId),
   );
 
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd({animated: true});
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Header
@@ -227,11 +243,11 @@ export const CallSummaryScreen: React.FC<
           {maxHeight: WINDOW_HEIGHT - insets.top - 90},
         ]}>
         <ScrollView
+          ref={scrollViewRef}
           scrollEnabled={isShowCallSummary}
           onScroll={handleScroll}
           scrollEventThrottle={8}
-          onLayout={handleLayout}
-          contentContainerStyle={styles.stepList}>
+          onLayout={handleLayout}>
           {isShowCallSummary ? (
             <CallSummaryDetails
               summaryData={summaryData as CallSummaryResponse}
@@ -247,6 +263,13 @@ export const CallSummaryScreen: React.FC<
           )}
         </ScrollView>
       </Animated.View>
+      {isShowCallSummary && showScrollToBottom && (
+        <TouchableOpacity
+          style={styles.scrollToBottomButton}
+          onPress={scrollToBottom}>
+          <LeftArrowIcon width={40} height={40} style={styles.downArrow} />
+        </TouchableOpacity>
+      )}
       {toast.visible && (
         <Toast message={toast.message} type={toast.type} onHide={hideToast} />
       )}
@@ -269,7 +292,28 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
   },
-  stepList: {
-    paddingBottom: '20@ms',
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: '60@vs',
+    left: '50%',
+    // To take into account the width of the arrow button
+    marginLeft: '-20@s',
+    width: '40@s',
+    height: '40@s',
+    borderRadius: '20@s',
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  downArrow: {
+    transform: [{rotate: '270deg'}],
   },
 });
