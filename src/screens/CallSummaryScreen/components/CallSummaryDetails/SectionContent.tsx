@@ -39,6 +39,7 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   const renderSummaryField = (field: SummaryField) => {
     return (
       <EditableField
+        key={field.key}
         fieldKey={field.key}
         label={FIELD_LABELS[field.key]}
         value={formData[field.key] ?? null}
