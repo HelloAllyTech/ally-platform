@@ -1,0 +1,569 @@
+import {
+  AssessmentIcon,
+  BrightnessAlertIcon,
+  CallDetailsIcon,
+  DatabaseIcon,
+  DemogsIcon,
+  FlowIcon,
+  HandShareIcon,
+  HeadsetMicIcon,
+  KeyConcernIcon,
+  MagnifyEyeIcon,
+  NewsStandIcon,
+  PrescriptionsIcon,
+  SmileIcon,
+  TableEyeIcon,
+  TagIcon,
+} from '@/assets/icons';
+import {SummaryField} from '@/types/callSummary';
+
+// Section keys for organizing fields
+export enum SectionKey {
+  FeaturesAndDemographics = 'featuresAndDemographics',
+  SessionSummary = 'sessionSummary',
+  Flow = 'flow',
+  KeyConcern = 'keyConcern',
+  ObjectiveObservations = 'objectiveObservations',
+  SubjectiveObservations = 'subjectiveObservations',
+  Assessment = 'assessment',
+  DominantFeelings = 'dominantFeelings',
+  IssuesWorkedOn = 'issuesWorkedOn',
+  KeyTherapeuticTechniques = 'keyTherapeuticTechniques',
+  ReferralsProvided = 'referralsProvided',
+  HomeworkRecommended = 'homeworkRecommended',
+  PlansForNextCall = 'plansForNextCall',
+  Tags = 'tags',
+  Metrics = 'metrics',
+}
+
+// Field names as constants to prevent typos (keys are identical to UI field labels)
+export const SUMMARY_FIELDS = {
+  // Features & Demographics
+  CALL_ID: 'callId' as const,
+  CALL_DURATION: 'callDuration' as const,
+  CALL_DATE: 'dateOfSession' as const,
+  CALL_TIME: 'callTime' as const,
+  CALLER_ID: 'clientId' as const,
+  CALLER_TYPE: 'callType' as const,
+  AGE: 'age' as const,
+  GENDER: 'gender' as const,
+  PROFESSION: 'profession' as const,
+  LOCATION: 'location' as const,
+  LANGUAGES: 'languages' as const,
+  CONCERN_CODE: 'codeOfConcern' as const,
+  MOOD_IMPROVED_BY: 'moodImprovedBy' as const,
+  COUNSELOR_NAME: 'counselorName' as const,
+
+  // Session Summary
+  SESSION_SUMMARY: 'sessionSummary' as const,
+
+  // Flow
+  FLOW: 'counselingProcessFlow' as const,
+
+  // Key Concerns
+  KEY_CONCERNS: 'keyConcerns' as const,
+
+  // Observations and Assessment
+  OBJECTIVE_OBSERVATIONS: 'objectiveObservations' as const,
+
+  // Subjective Observations
+  SUBJECTIVE_OBSERVATIONS: 'subjectiveObservations' as const,
+
+  // Assessment
+  ASSESSMENT: 'assessment' as const,
+
+  // Dominant Feelings
+  DOMINANT_FEELINGS: 'dominantFeelings' as const,
+
+  // Issues Worked On
+  ISSUES_WORKED_ON: 'issuesWorkedOn' as const,
+
+  // Key Therapeutic Techniques
+  KEY_THERAPEUTIC_TECHNIQUES: 'keyTherapeuticTechniques' as const,
+
+  // Referrals Provided
+  REFERRALS_PROVIDED: 'referralsProvided' as const,
+
+  // Homework Recommended
+  HOMEWORK_RECOMMENDED: 'homework' as const,
+
+  // Plans for Next Call
+  PLANS_FOR_NEXT_CALL: 'planForNextCall' as const,
+
+  // Tags
+  TAGS: 'tags' as const,
+
+  // Metrics
+  LISTENING_RATIO: 'listeningRatio' as const,
+  EMOTIONS_LIFT: 'emotionsLift' as const,
+  REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked' as const,
+
+  // Additional fields from response
+  // WORKING_STATUS: 'workingStatus' as const,
+  // NEW_CALL_FOLLOW_UP: 'newCallFollowUp' as const,
+  // COUNSELLOR: 'counsellor' as const,
+  // FOLLOW_UP_GOALS: 'followUpGoals' as const,
+  // SESSION_NUMBER: 'sessionNumber' as const,
+  // FOLLOW_UP_STATUS: 'followUpStatus' as const,
+  // FOLLOW_UP_DATE: 'followUpDate' as const,
+  // COUNSELOR_FEELINGS: 'counselorFeelings' as const,
+  // ANY_FORMAL_DIAGNOSIS: 'anyFormalDiagnosis' as const,
+  // RELATIONSHIP_STATUS: 'relationshipStatus' as const,
+  // EMOTIONAL_STATE_START: 'emotionalStateStart' as const,
+  // EMOTIONAL_STATE_CHANGE: 'emotionalStateChange' as const,
+  // THERAPEUTIC_INTERVENTIONS: 'therapeuticInterventions' as const,
+  // CALL_QUALITY: 'callQuality' as const,
+} as const;
+
+// Derive the type from the object values
+export type SummaryFieldKey =
+  (typeof SUMMARY_FIELDS)[keyof typeof SUMMARY_FIELDS];
+
+// Field labels for display
+// TO DO: Might use labels provided by backend. Keeping labels as constants for now.
+export const FIELD_LABELS: Record<SummaryFieldKey, string> = {
+  // Features & Demographics
+  [SUMMARY_FIELDS.CALL_ID]: 'Call ID',
+  [SUMMARY_FIELDS.CALL_DURATION]: 'Call Duration',
+  [SUMMARY_FIELDS.CALL_DATE]: 'Call Date',
+  [SUMMARY_FIELDS.CALL_TIME]: 'Call Time',
+  [SUMMARY_FIELDS.CALLER_ID]: 'Caller ID',
+  [SUMMARY_FIELDS.CALLER_TYPE]: 'Caller Type',
+  [SUMMARY_FIELDS.AGE]: 'Age',
+  [SUMMARY_FIELDS.GENDER]: 'Gender',
+  [SUMMARY_FIELDS.PROFESSION]: 'Profession',
+  [SUMMARY_FIELDS.LOCATION]: 'Location',
+  [SUMMARY_FIELDS.LANGUAGES]: 'Languages',
+  [SUMMARY_FIELDS.CONCERN_CODE]: 'Concern Code',
+  [SUMMARY_FIELDS.MOOD_IMPROVED_BY]: 'Mood Improved By',
+  [SUMMARY_FIELDS.COUNSELOR_NAME]: 'Counselor Name',
+
+  // Session Summary
+  [SUMMARY_FIELDS.SESSION_SUMMARY]: 'Session Summary',
+
+  // Flow
+  [SUMMARY_FIELDS.FLOW]: 'Flow',
+
+  // Key Concerns
+  [SUMMARY_FIELDS.KEY_CONCERNS]: 'Key Concerns',
+
+  // Observations and Assessment
+  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: 'Objective Observations',
+  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: 'Subjective Observations',
+  [SUMMARY_FIELDS.ASSESSMENT]: 'Assessment',
+  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: 'Dominant Feelings',
+  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: 'Issues Worked On',
+  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: 'Key Therapeutic Techniques',
+  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: 'Referrals Provided',
+  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: 'Homework',
+  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: 'Plans for Next Call',
+  [SUMMARY_FIELDS.TAGS]: 'Tags',
+
+  // Metrics
+  [SUMMARY_FIELDS.LISTENING_RATIO]: 'Listening Ratio',
+  [SUMMARY_FIELDS.EMOTIONS_LIFT]: 'Emotions Lift',
+  [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: 'Reflective Questions Asked',
+
+  // Additional fields from response
+  // [SUMMARY_FIELDS.WORKING_STATUS]: 'Working Status',
+  // [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]: 'New Call Follow Up',
+  // [SUMMARY_FIELDS.COUNSELLOR]: 'Counsellor',
+  // [SUMMARY_FIELDS.FOLLOW_UP_GOALS]: 'Follow Up Goals',
+  // [SUMMARY_FIELDS.SESSION_NUMBER]: 'Session Number',
+  // [SUMMARY_FIELDS.FOLLOW_UP_STATUS]: 'Follow Up Status',
+  // [SUMMARY_FIELDS.FOLLOW_UP_DATE]: 'Follow Up Date',
+  // [SUMMARY_FIELDS.COUNSELOR_FEELINGS]: 'Counselor Feelings',
+  // [SUMMARY_FIELDS.ANY_FORMAL_DIAGNOSIS]: 'Any Formal Diagnosis',
+  // [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: 'Relationship Status',
+  // [SUMMARY_FIELDS.EMOTIONAL_STATE_START]: 'Emotional State Start',
+  // [SUMMARY_FIELDS.EMOTIONAL_STATE_CHANGE]: 'Emotional State Change',
+  // [SUMMARY_FIELDS.THERAPEUTIC_INTERVENTIONS]: 'Therapeutic Interventions',
+  // [SUMMARY_FIELDS.CALL_QUALITY]: 'Call Quality',
+} as const;
+
+// This ensures all fields are mapped to a section
+export const FIELD_TO_SECTION_MAP: Record<SummaryFieldKey, SectionKey> = {
+  // Features & Demographics
+  [SUMMARY_FIELDS.CALL_ID]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CALL_DURATION]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CALL_DATE]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CALL_TIME]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CALLER_ID]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CALLER_TYPE]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.AGE]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.GENDER]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.PROFESSION]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.LOCATION]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.LANGUAGES]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.CONCERN_CODE]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.MOOD_IMPROVED_BY]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.COUNSELOR_NAME]: SectionKey.FeaturesAndDemographics,
+
+  // Session Summary
+  [SUMMARY_FIELDS.SESSION_SUMMARY]: SectionKey.SessionSummary,
+
+  // Flow
+  [SUMMARY_FIELDS.FLOW]: SectionKey.Flow,
+
+  // Key Concerns
+  [SUMMARY_FIELDS.KEY_CONCERNS]: SectionKey.KeyConcern,
+
+  // Observations and Assessment
+  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: SectionKey.ObjectiveObservations,
+
+  // Subjective Observations
+  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: SectionKey.SubjectiveObservations,
+
+  // Assessment
+  [SUMMARY_FIELDS.ASSESSMENT]: SectionKey.Assessment,
+
+  // Dominant Feelings
+  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: SectionKey.DominantFeelings,
+
+  // Issues Worked On
+  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: SectionKey.IssuesWorkedOn,
+
+  // Key Therapeutic Techniques
+  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]:
+    SectionKey.KeyTherapeuticTechniques,
+
+  // Referrals Provided
+  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: SectionKey.ReferralsProvided,
+
+  // Homework Recommended
+  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: SectionKey.HomeworkRecommended,
+
+  // Plans for Next Call
+  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: SectionKey.PlansForNextCall,
+
+  // Tags
+  [SUMMARY_FIELDS.TAGS]: SectionKey.Tags,
+
+  // Metrics
+  [SUMMARY_FIELDS.LISTENING_RATIO]: SectionKey.Metrics,
+  [SUMMARY_FIELDS.EMOTIONS_LIFT]: SectionKey.Metrics,
+  [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: SectionKey.Metrics,
+} as const;
+
+// Gender options
+export const GENDER_OPTIONS = [
+  'Male',
+  'Female',
+  'Other',
+  'Prefer not to say',
+] as const;
+
+// Age range options
+export const AGE_RANGE_OPTIONS = [
+  '18-24',
+  '25-34',
+  '35-44',
+  '45-54',
+  '55-64',
+  '65+',
+] as const;
+
+export const SECTION_LIST = [
+  {
+    key: SectionKey.FeaturesAndDemographics,
+    label: 'Features & Demographics',
+    icon: DemogsIcon,
+  },
+  {
+    key: SectionKey.SessionSummary,
+    label: 'Session Summary',
+    icon: CallDetailsIcon,
+  },
+  {key: SectionKey.Flow, label: 'Flow', icon: FlowIcon},
+  {key: SectionKey.KeyConcern, label: 'Key Concern', icon: KeyConcernIcon},
+  {
+    key: SectionKey.ObjectiveObservations,
+    label: 'Objective Observations',
+    icon: TableEyeIcon,
+  },
+  {
+    key: SectionKey.SubjectiveObservations,
+    label: 'Subjective Observations',
+    icon: MagnifyEyeIcon,
+  },
+  {
+    key: SectionKey.Assessment,
+    label: 'Assessment',
+    icon: AssessmentIcon,
+  },
+  {
+    key: SectionKey.DominantFeelings,
+    label: 'Dominant Feelings',
+    icon: SmileIcon,
+  },
+  {
+    key: SectionKey.IssuesWorkedOn,
+    label: 'Issues Worked On',
+    icon: BrightnessAlertIcon,
+  },
+  {
+    key: SectionKey.KeyTherapeuticTechniques,
+    label: 'Key Therapeutic Techniques',
+    icon: PrescriptionsIcon,
+  },
+  {
+    key: SectionKey.ReferralsProvided,
+    label: 'Referrals Provided',
+    icon: HandShareIcon,
+  },
+  {
+    key: SectionKey.HomeworkRecommended,
+    label: 'Home work Recommended',
+    icon: NewsStandIcon,
+  },
+  {
+    key: SectionKey.PlansForNextCall,
+    label: 'Plans for Next Call',
+    icon: HeadsetMicIcon,
+  },
+  {
+    key: SectionKey.Tags,
+    label: 'Tags',
+    icon: TagIcon,
+  },
+  {
+    key: SectionKey.Metrics,
+    label: 'Metrics',
+    icon: DatabaseIcon,
+  },
+];
+
+// TO DO: Remove later (Current configuration - can be moved to API later)
+export const summaryFields: SummaryField[] = [
+  // Features and Demographics section
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALLER_ID,
+    label: 'Call ID',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALL_DURATION,
+    label: 'Call Duration',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALL_DATE,
+    label: 'Call Date',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALL_TIME,
+    label: 'Call time',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALLER_ID,
+    label: 'Caller ID',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.CALLER_TYPE,
+    label: 'Caller type',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.AGE,
+    label: 'Age',
+    options: AGE_RANGE_OPTIONS,
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Dropdown',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.GENDER,
+    label: 'Gender',
+    options: GENDER_OPTIONS,
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Dropdown',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.PROFESSION,
+    label: 'Profession',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.LOCATION,
+    label: 'Location',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.LANGUAGES,
+    label: 'Languages',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.CONCERN_CODE,
+    label: 'Concern code',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.MOOD_IMPROVED_BY,
+    label: 'Mood Improved By',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.COUNSELOR_NAME,
+    label: 'Counsellor Name',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.SESSION_SUMMARY,
+    label: 'Session Summary',
+    sectionKey: SectionKey.SessionSummary,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.FLOW,
+    label: 'Session Summary',
+    sectionKey: SectionKey.Flow,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.KEY_CONCERNS,
+    label: 'Key concerns',
+    sectionKey: SectionKey.KeyConcern,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS,
+    label: 'Objective Observations',
+    sectionKey: SectionKey.ObjectiveObservations,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS,
+    label: 'Subjective Observations',
+    sectionKey: SectionKey.SubjectiveObservations,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT,
+    label: 'Assessment',
+    sectionKey: SectionKey.Assessment,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.DOMINANT_FEELINGS,
+    label: 'Dominant Feelings',
+    sectionKey: SectionKey.DominantFeelings,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.ISSUES_WORKED_ON,
+    label: 'Issues Worked On',
+    sectionKey: SectionKey.IssuesWorkedOn,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES,
+    label: 'Key Therapeutic Techniques',
+    sectionKey: SectionKey.KeyTherapeuticTechniques,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.REFERRALS_PROVIDED,
+    label: 'Referrals Provided',
+    sectionKey: SectionKey.ReferralsProvided,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.HOMEWORK_RECOMMENDED,
+    label: 'Homework Recommended',
+    sectionKey: SectionKey.HomeworkRecommended,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL,
+    label: 'Plans for Next Call',
+    sectionKey: SectionKey.PlansForNextCall,
+    type: 'Multiline',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.TAGS,
+    label: 'Tags',
+    sectionKey: SectionKey.Tags,
+    type: 'Multiline',
+  },
+
+  // Metrics section
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.LISTENING_RATIO,
+    label: 'Listening Share',
+    sectionKey: SectionKey.Metrics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED,
+    label: 'No of Reflective Questions asked',
+    sectionKey: SectionKey.Metrics,
+    type: 'Text',
+  },
+  {
+    isEditable: true,
+    isEnhanceable: true,
+    key: SUMMARY_FIELDS.EMOTIONS_LIFT,
+    label: 'Emotions Lift',
+    sectionKey: SectionKey.Metrics,
+    type: 'Text',
+  },
+];

@@ -31,6 +31,9 @@ export const colors = {
   lightCyan: '#DAFFFF',
   lightGray3: '#676767',
   lightGray4: '#D5D5D5',
+  lightGray5: '#DBDBDB',
   darkBlue2: '#0E1724',
   darkGreen: '#1B282F',
+  mediumGray2: '#9E9E9E',
+  lightGrayWithOpacity: '#F5F5F5BA',
 };
