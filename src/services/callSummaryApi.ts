@@ -36,6 +36,7 @@ export interface SummaryDetails {
   age: AgeRange | null;
   gender: string | null;
   profession: string | null;
+  relationshipStatus: string | null;
   languages: Language[] | null;
   location: string | null;
   codeOfConcern: string | null;
@@ -80,7 +81,7 @@ export interface SummaryDetails {
   // Metrics
   listeningShare: number | null;
   reflectiveQuestionsAsked: number | null;
-  emotionsLift: number | null;
+  emotionalLift: number | null;
 
   // Additional fields from response
   workingStatus: string | null;
@@ -92,7 +93,6 @@ export interface SummaryDetails {
   followUpDate: string | null;
   counselorFeelings: string | null;
   anyFormalDiagnosis: string | null;
-  relationshipStatus: string | null;
   emotionalStateStart: string | null;
   emotionalStateChange: string | null;
   therapeuticInterventions: string | null;
@@ -155,6 +155,16 @@ export const callSummaryApi = api.injectEndpoints({
         method: 'DELETE',
       }),
     }),
+    updateCallInfo: builder.mutation<
+      void,
+      {chatId: number; summaryName: string}
+    >({
+      query: ({chatId, summaryName}) => ({
+        url: `/chats/${chatId}/call-info`,
+        method: 'PATCH',
+        body: {summaryName},
+      }),
+    }),
   }),
 });
 
@@ -163,4 +173,5 @@ export const {
   useUpdateCallSummaryMutation,
   useLazyExportCallSummaryQuery,
   useDeleteCallSummaryMutation,
+  useUpdateCallInfoMutation,
 } = callSummaryApi;

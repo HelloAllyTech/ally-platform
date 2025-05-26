@@ -9,7 +9,6 @@ import {
 import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants/general';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {formatCallId} from '@/utils/callIdFormatter';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';
@@ -62,7 +61,7 @@ const CallLogItem = ({
             </TouchableOpacity>
             <View style={styles.logItemContent}>
               <Text style={styles.logId}>
-                {formatCallId(item?.details?.chatId, item?.details?.createdAt)}
+                {item?.details?.callInfo?.summaryName || item?.details?.chatId}
               </Text>
             </View>
             <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>

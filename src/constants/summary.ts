@@ -44,15 +44,15 @@ export const SUMMARY_FIELDS = {
   CALL_DATE: 'callDate' as const,
   CALL_TIME: 'callTime' as const,
   CALLER_ID: 'clientId' as const,
+  COUNSELOR_NAME: 'counselorName' as const,
   CALLER_TYPE: 'callType' as const,
   AGE: 'age' as const,
   GENDER: 'gender' as const,
   PROFESSION: 'profession' as const,
-  LOCATION: 'location' as const,
+  RELATIONSHIP_STATUS: 'relationshipStatus' as const,
   LANGUAGES: 'languages' as const,
+  LOCATION: 'location' as const,
   CONCERN_CODE: 'codeOfConcern' as const,
-  MOOD_IMPROVED_BY: 'moodImprovedBy' as const,
-  COUNSELOR_NAME: 'counselorName' as const,
 
   // Session Summary
   SESSION_SUMMARY: 'sessionSummary' as const,
@@ -95,7 +95,7 @@ export const SUMMARY_FIELDS = {
 
   // Metrics
   LISTENING_RATIO: 'listeningRatio' as const,
-  EMOTIONS_LIFT: 'emotionsLift' as const,
+  EMOTIONAL_LIFT: 'emotionalLift' as const,
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked' as const,
 
   // Additional fields from response
@@ -128,15 +128,15 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> = {
   [SUMMARY_FIELDS.CALL_DATE]: 'Call Date',
   [SUMMARY_FIELDS.CALL_TIME]: 'Call Time',
   [SUMMARY_FIELDS.CALLER_ID]: 'Caller ID',
+  [SUMMARY_FIELDS.COUNSELOR_NAME]: 'Counselor Name',
   [SUMMARY_FIELDS.CALLER_TYPE]: 'Caller Type',
   [SUMMARY_FIELDS.AGE]: 'Age',
   [SUMMARY_FIELDS.GENDER]: 'Gender',
   [SUMMARY_FIELDS.PROFESSION]: 'Profession',
-  [SUMMARY_FIELDS.LOCATION]: 'Location',
+  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: 'Relationship Status',
   [SUMMARY_FIELDS.LANGUAGES]: 'Languages',
+  [SUMMARY_FIELDS.LOCATION]: 'Location',
   [SUMMARY_FIELDS.CONCERN_CODE]: 'Concern Code',
-  [SUMMARY_FIELDS.MOOD_IMPROVED_BY]: 'Mood Improved By',
-  [SUMMARY_FIELDS.COUNSELOR_NAME]: 'Counselor Name',
 
   // Session Summary
   [SUMMARY_FIELDS.SESSION_SUMMARY]: 'Session Summary',
@@ -161,7 +161,7 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> = {
 
   // Metrics
   [SUMMARY_FIELDS.LISTENING_RATIO]: 'Listening Ratio',
-  [SUMMARY_FIELDS.EMOTIONS_LIFT]: 'Emotions Lift',
+  [SUMMARY_FIELDS.EMOTIONAL_LIFT]: 'Emotional Lift',
   [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: 'Reflective Questions Asked',
 
   // Additional fields from response
@@ -189,15 +189,15 @@ export const FIELD_TO_SECTION_MAP: Record<SummaryFieldKey, SectionKey> = {
   [SUMMARY_FIELDS.CALL_DATE]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.CALL_TIME]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.CALLER_ID]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.COUNSELOR_NAME]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.CALLER_TYPE]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.AGE]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.GENDER]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.PROFESSION]: SectionKey.FeaturesAndDemographics,
+  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.LOCATION]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.LANGUAGES]: SectionKey.FeaturesAndDemographics,
   [SUMMARY_FIELDS.CONCERN_CODE]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.MOOD_IMPROVED_BY]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.COUNSELOR_NAME]: SectionKey.FeaturesAndDemographics,
 
   // Session Summary
   [SUMMARY_FIELDS.SESSION_SUMMARY]: SectionKey.SessionSummary,
@@ -241,7 +241,7 @@ export const FIELD_TO_SECTION_MAP: Record<SummaryFieldKey, SectionKey> = {
 
   // Metrics
   [SUMMARY_FIELDS.LISTENING_RATIO]: SectionKey.Metrics,
-  [SUMMARY_FIELDS.EMOTIONS_LIFT]: SectionKey.Metrics,
+  [SUMMARY_FIELDS.EMOTIONAL_LIFT]: SectionKey.Metrics,
   [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: SectionKey.Metrics,
 } as const;
 
@@ -424,8 +424,8 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    key: SUMMARY_FIELDS.MOOD_IMPROVED_BY,
-    label: 'Mood Improved By',
+    key: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
+    label: 'Relationship Status',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: 'Text',
   },
@@ -561,7 +561,7 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: true,
     isEnhanceable: true,
-    key: SUMMARY_FIELDS.EMOTIONS_LIFT,
+    key: SUMMARY_FIELDS.EMOTIONAL_LIFT,
     label: 'Emotions Lift',
     sectionKey: SectionKey.Metrics,
     type: 'Text',
