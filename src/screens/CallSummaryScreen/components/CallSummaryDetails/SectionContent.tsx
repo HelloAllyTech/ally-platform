@@ -21,17 +21,18 @@ interface SectionContentProps {
     label: string;
     icon: React.FC<SvgProps>;
   };
-  summary: CallSummaryResponse['details']['summary'];
+  summaryDetails: CallSummaryResponse['details'];
   formData: FormData;
   onFieldChange: (field: SummaryFieldKey) => (value: string) => void;
 }
 
 export const SectionContent: React.FC<SectionContentProps> = ({
   section,
-  summary,
+  summaryDetails,
   formData,
   onFieldChange,
 }) => {
+  const summary = summaryDetails?.summary;
   const sectionFields = summaryFields.filter(
     field => field.sectionKey === section.key,
   );
@@ -51,36 +52,16 @@ export const SectionContent: React.FC<SectionContentProps> = ({
     return (
       <MetricsSection
         metrics={{
-          listeningShare: summary?.metrics?.listeningRatio ?? null,
-          reflectiveQuestionsAsked:
-            summary?.metrics?.reflectiveQuestionsAsked ?? null,
-          emotionsLift: summary?.metrics?.emotionsLift ?? null,
+          listeningShare: summary?.listeningShare ?? null,
+          reflectiveQuestionsAsked: summary?.reflectiveQuestionsAsked ?? null,
+          emotionsLift: summary?.emotionsLift ?? null,
         }}
       />
     );
 
   // TO DO: Remove this component and use the renderSummaryField function instead
   if (section.key === SectionKey.FeaturesAndDemographics)
-    return (
-      <DemographicsSection
-        demographics={{
-          callId: summary?.callId,
-          callDuration: summary?.callDuration,
-          callDate: summary?.dateOfSession,
-          callTime: summary?.callTime,
-          callerId: summary?.clientId,
-          callerType: summary?.callType,
-          age: summary?.age,
-          gender: summary?.gender,
-          profession: summary?.profession,
-          location: summary?.location,
-          languages: summary?.languages,
-          concernCode: summary?.codeOfConcern,
-          moodImprovedBy: summary?.moodImprovedBy,
-          counsellorName: summary?.counselorName,
-        }}
-      />
-    );
+    return <DemographicsSection summaryDetails={summaryDetails} />;
 
   return sectionFields.map(renderSummaryField);
 };

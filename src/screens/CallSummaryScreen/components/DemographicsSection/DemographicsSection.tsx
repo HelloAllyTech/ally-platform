@@ -1,106 +1,108 @@
-import React from 'react';
-import {useTranslation} from 'react-i18next';
+import {useMemo} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {FIELD_LABELS, SUMMARY_FIELDS} from '@/constants/summary';
+import {
+  FIELD_LABELS,
+  SUMMARY_FIELDS,
+  SummaryFieldKey,
+} from '@/constants/summary';
+import useTranslate from '@/hooks/useTranslate';
+import {TranslationType} from '@/localization/locales/type';
+import {CallSummaryResponse} from '@/services/callSummaryApi';
+import {formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
 
-interface DemographicsSectionProps {
-  demographics: {
-    callId: string | null;
-    callDuration: number | null;
-    callDate: string | null;
-    callTime: string | null;
-    callerId: string | null;
-    callerType: string | null;
-    age: string | number | null;
-    gender: string | null;
-    profession: string | null;
-    location: string | null;
-    languages: string | null;
-    concernCode: string | null;
-    moodImprovedBy: number | null;
-    counsellorName: string | null;
-  };
+interface FieldConfig {
+  field: SummaryFieldKey;
+  value: string;
+  showSeparator?: boolean;
 }
 
-export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
-  demographics,
-}) => {
-  const {t} = useTranslation();
+const renderField = (fieldConfig: FieldConfig) => (
+  <FieldRow
+    key={fieldConfig.field}
+    label={FIELD_LABELS[fieldConfig.field]}
+    value={fieldConfig.value}
+  />
+);
 
-  return (
-    <View style={styles.container}>
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALL_ID]}
-        value={demographics.callId || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALL_DURATION]}
-        value={
-          demographics.callDuration
-            ? `${demographics.callDuration} ${t('CallSummary.minutes')}`
-            : '-'
-        }
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALL_DATE]}
-        value={demographics.callDate || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALL_TIME]}
-        value={demographics.callTime || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALLER_ID]}
-        value={demographics.callerId || '-'}
-        showSeparator
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CALLER_TYPE]}
-        value={demographics.callerType || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.AGE]}
-        value={demographics.age?.toString() || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.GENDER]}
-        value={demographics.gender || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.PROFESSION]}
-        value={demographics.profession || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.LOCATION]}
-        value={demographics.location || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.LANGUAGES]}
-        value={demographics.languages || '-'}
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.CONCERN_CODE]}
-        value={demographics.concernCode || '-'}
-        showSeparator
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.MOOD_IMPROVED_BY]}
-        value={
-          demographics.moodImprovedBy
-            ? `${demographics.moodImprovedBy} ${t('CallSummary.points')}`
-            : '-'
-        }
-      />
-      <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.COUNSELOR_NAME]}
-        value={demographics.counsellorName || '-'}
-      />
-    </View>
+export const DemographicsSection = ({
+  summaryDetails,
+}: {
+  summaryDetails: CallSummaryResponse['details'];
+}) => {
+  const {t} = useTranslate();
+  const summary = summaryDetails.summary;
+
+  const fields: FieldConfig[] = useMemo(
+    () => [
+      {
+        field: SUMMARY_FIELDS.CALL_ID,
+        value: summary[SUMMARY_FIELDS.CALL_ID] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CALL_DURATION,
+        value: summary[SUMMARY_FIELDS.CALL_DURATION]
+          ? `${summary[SUMMARY_FIELDS.CALL_DURATION]} ${t('CallSummary.minutes' as TranslationType)}`
+          : '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CALL_DATE,
+        value: summary[SUMMARY_FIELDS.CALL_DATE] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CALL_TIME,
+        value:
+          summaryDetails.startTime && summaryDetails.endTime
+            ? `${formatTimeHHmm(summaryDetails.startTime)}-${formatTimeHHmm(summaryDetails.endTime)}`
+            : '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CALLER_ID,
+        value: summary[SUMMARY_FIELDS.CALLER_ID] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.COUNSELOR_NAME,
+        value: summary[SUMMARY_FIELDS.COUNSELOR_NAME] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CALLER_TYPE,
+        value: summary[SUMMARY_FIELDS.CALLER_TYPE] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.AGE,
+        value: summary[SUMMARY_FIELDS.AGE] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.GENDER,
+        value: summary[SUMMARY_FIELDS.GENDER] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.PROFESSION,
+        value: summary[SUMMARY_FIELDS.PROFESSION] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.LANGUAGES,
+        value:
+          summary[SUMMARY_FIELDS.LANGUAGES]
+            ?.map(language => `${language.language} (${language.percentage}%)`)
+            .join(', ') || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.LOCATION,
+        value: summary[SUMMARY_FIELDS.LOCATION] || '-',
+      },
+      {
+        field: SUMMARY_FIELDS.CONCERN_CODE,
+        value: summary[SUMMARY_FIELDS.CONCERN_CODE] || '-',
+      },
+    ],
+    [summary, summaryDetails, t],
   );
+
+  return <View style={styles.container}>{fields.map(renderField)}</View>;
 };
 
 const styles = ScaledSheet.create({
