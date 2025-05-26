@@ -31,7 +31,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
   const {data: visibleFields, isLoading: isLoadingFields} =
     useGetSummaryFieldsQuery();
   const {t} = useTranslate();
-  const summary = summaryData?.details?.summary;
+  const summaryDetails = summaryData?.details;
 
   const {formData, isUpdating, handleFieldChange, handleSubmit} =
     useCallSummaryForm({
@@ -102,7 +102,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
                 <View style={styles.sectionContent}>
                   <SectionContent
                     section={section}
-                    summary={summary}
+                    summaryDetails={summaryDetails}
                     formData={formData}
                     onFieldChange={handleFieldChange}
                   />

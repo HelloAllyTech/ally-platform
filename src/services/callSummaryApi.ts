@@ -9,23 +9,36 @@ interface CallInfo {
   counselorTalkingPercentage: string;
 }
 
+export interface Language {
+  language: string;
+  percentage: number;
+}
+
+export enum AgeRange {
+  BELOW_18 = '0-17',
+  EIGHTEEN_TO_TWENTY_FOUR = '18-24',
+  TWENTY_FIVE_TO_THIRTY_FOUR = '25-34',
+  THIRTY_FIVE_TO_FORTY_FOUR = '35-44',
+  FORTY_FIVE_TO_FIFTY_FOUR = '45-54',
+  FIFTY_FIVE_TO_SIXTY_FOUR = '55-64',
+  SIXTY_FIVE_PLUS = '65+',
+}
+
 export interface SummaryDetails {
   // Features & Demographics
   callId: string | null;
   callDuration: number | null;
-  dateOfSession: string | null;
+  callDate: string | null;
   callTime: string | null;
   clientId: string | null;
+  counselorName: string | null;
   callType: string | null;
-  age: number | null;
+  age: AgeRange | null;
   gender: string | null;
   profession: string | null;
+  languages: Language[] | null;
   location: string | null;
-  languages: string | null;
   codeOfConcern: string | null;
-  // TO DO: This field isn't available currently
-  moodImprovedBy: number | null;
-  counselorName: string | null;
 
   // Session Summary
   sessionSummary: string | null;
@@ -65,11 +78,9 @@ export interface SummaryDetails {
   tags: string | null;
 
   // Metrics
-  metrics: {
-    listeningRatio: number | null;
-    reflectiveQuestionsAsked: number | null;
-    emotionsLift: number | null;
-  } | null;
+  listeningShare: number | null;
+  reflectiveQuestionsAsked: number | null;
+  emotionsLift: number | null;
 
   // Additional fields from response
   workingStatus: string | null;
