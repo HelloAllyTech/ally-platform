@@ -27,7 +27,9 @@ import MicIcon from './mic.svg';
 import MicWithGradientIcon from './micWithGradient.svg';
 import NewsStandIcon from './newsStand.svg';
 import PauseIcon from './pause.svg';
+import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
+import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import SearchIcon from './search.svg';
 import SmileIcon from './smile.svg';
@@ -36,6 +38,8 @@ import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
 import TickRoundIcon from './tickRound.svg';
+import VolumeOffIcon from './volumeMute.svg';
+import VolumeIcon from './volumeUnmute.svg';
 
 export {
   LeftArrowIcon,
@@ -62,6 +66,10 @@ export {
   HomeInactiveIcon,
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
+  PauseWhiteIcon,
+  PlayWhiteIcon,
+  VolumeIcon,
+  VolumeOffIcon,
   ThreeDotsIcon,
   TableEyeIcon,
   AssessmentIcon,

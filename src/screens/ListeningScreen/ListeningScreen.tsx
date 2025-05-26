@@ -55,7 +55,7 @@ export const ListeningScreen = () => {
   }, []);
 
   const handleCallEnd = useCallback(() => {
-    navigation.navigate('CallSummary');
+    navigation.navigate('Breathing');
   }, [navigation]);
 
   useHardwareBackPressHandler(() => {
