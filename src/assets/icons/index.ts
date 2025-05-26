@@ -10,6 +10,7 @@ import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
+import EditIcon from './edit.svg';
 import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
@@ -76,4 +77,5 @@ export {
   PrescriptionsIcon,
   DeleteIcon,
   ExportIcon,
+  EditIcon,
 };

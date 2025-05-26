@@ -10,7 +10,7 @@ interface MetricsSectionProps {
   metrics: {
     listeningShare: number | null;
     reflectiveQuestionsAsked: number | null;
-    emotionsLift: number | null;
+    emotionalLift: number | null;
   };
 }
 
@@ -28,8 +28,8 @@ export const MetricsSection: React.FC<MetricsSectionProps> = ({metrics}) => {
         showSeparator
       />
       <FieldRow
-        label={FIELD_LABELS[SUMMARY_FIELDS.EMOTIONS_LIFT]}
-        value={metrics.emotionsLift || '-'}
+        label={FIELD_LABELS[SUMMARY_FIELDS.EMOTIONAL_LIFT]}
+        value={metrics.emotionalLift || '-'}
       />
     </View>
   );
