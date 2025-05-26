@@ -149,12 +149,6 @@ export const callSummaryApi = api.injectEndpoints({
         responseHandler: async response => response.text(),
       }),
     }),
-    deleteCallSummary: builder.mutation<void, number>({
-      query: chatId => ({
-        url: `/chats/${chatId}`,
-        method: 'DELETE',
-      }),
-    }),
     updateCallInfo: builder.mutation<
       void,
       {chatId: number; summaryName: string}
@@ -172,6 +166,5 @@ export const {
   useLazyGetCallSummaryQuery,
   useUpdateCallSummaryMutation,
   useLazyExportCallSummaryQuery,
-  useDeleteCallSummaryMutation,
   useUpdateCallInfoMutation,
 } = callSummaryApi;

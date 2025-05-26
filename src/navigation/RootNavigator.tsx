@@ -8,6 +8,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
 import type {RootStackParamList} from '@/navigation/types';
 import {
+  BreathingScreen,
   CallLogScreen,
   CallSummaryScreen,
   ListeningScreen,
@@ -38,6 +39,7 @@ const NavigationContent = ({
       <Stack.Screen name="Listening" component={ListeningScreen} />
       <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
       <Stack.Screen name="CallLog" component={CallLogScreen} />
+      <Stack.Screen name="Breathing" component={BreathingScreen} />
     </Stack.Navigator>
   );
 };

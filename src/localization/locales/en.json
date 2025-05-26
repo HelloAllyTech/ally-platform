@@ -65,7 +65,9 @@
       "directoryPathError": "Could not determine directory path",
       "invalidResponseFormat": "Invalid response format from server",
       "summaryNameUpdateSuccess": "Summary name updated successfully",
-      "summaryNameUpdateFailed": "Failed to update summary name"
+      "summaryNameUpdateFailed": "Failed to update summary name",
+      "summaryUpdatedSuccess": "Call summary updated successfully",
+      "summaryUpdateFailed": "Failed to update call summary"
     }
   },
   "CallLogs": {
@@ -76,6 +78,20 @@
     "search": {
       "placeholder": "Search"
     }
+  },
+  "BreathingScreen": {
+    "header": {
+      "box": "Box",
+      "breathing": "Breathing"
+    },
+    "skip": "Skip",
+    "youGaveYour": "You gave your",
+    "best": "best",
+    "onThatCall": "on that call.",
+    "nowTakeAMoment": "Now, take a moment",
+    "for": "for",
+    "yourself": "yourself.",
+    "takeAMomentForYourself": "Take a moment for yourself."
   },
   "submit": "Submit"
 }

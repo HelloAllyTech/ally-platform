@@ -82,12 +82,12 @@ const styles = ScaledSheet.create({
   },
   menuText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
+    fontSize: '15@ms',
     color: colors.black,
   },
   menuDivider: {
-    height: '1@ms',
-    backgroundColor: colors.lightGray3,
+    height: '0.5@ms',
+    backgroundColor: colors.lightGray2,
     marginHorizontal: '10@ms',
   },
 });
