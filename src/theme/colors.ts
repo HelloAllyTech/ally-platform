@@ -40,5 +40,6 @@ export const colors = {
   darkBlue2: '#0E1724',
   darkGreen: '#1B282F',
   mediumGray2: '#9E9E9E',
+  gray: '#7E7E7E',
   lightGrayWithOpacity: '#F5F5F5BA',
 };
