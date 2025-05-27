@@ -28,7 +28,7 @@ export enum AgeRange {
 
 export interface SummaryDetails {
   // Features & Demographics
-  callId: string | null;
+  callId: number | null;
   callDuration: number | null;
   callDate: string | null;
   callTime: string | null;
