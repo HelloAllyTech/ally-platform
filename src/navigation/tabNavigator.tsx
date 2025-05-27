@@ -48,7 +48,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
           <TouchableOpacity
             key={route.name}
             onPress={() => props.navigation.navigate(route.name)}
-            style={styles.tabItem}>
+            style={[styles.tabItem, {marginTop: insets.bottom}]}>
             {renderTabBarIcon(route.name, isFocused)}
           </TouchableOpacity>
         );
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 40,
     marginHorizontal: 40,
-    marginBottom: 10,
+    marginBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
   tabItem: {
     flex: 1,
     height: '100%',
+    minHeight: 60,
     justifyContent: 'center',
     alignItems: 'center',
   },
