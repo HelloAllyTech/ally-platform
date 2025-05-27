@@ -28,6 +28,7 @@ export const colors = {
   teal: '#4D8779',
   steelBlue: '#072A45',
   charcoal: '#151321',
+  charcoal2: '#49454F',
   brightRed: '#F93535',
   navyGray: '#07131C',
   oceanBlue: '#12365E',

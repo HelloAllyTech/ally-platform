@@ -20,11 +20,13 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {Toast} from '@/components/Toast/Toast';
 import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
+import {TranslationType} from '@/localization/locales/type';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   CallSummaryResponse,
   useLazyExportCallSummaryQuery,
   useLazyGetCallSummaryQuery,
+  useUpdateCallInfoMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
@@ -75,12 +77,22 @@ export const CallSummaryScreen: React.FC<
   const {t} = useTranslate();
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [summaryName, setSummaryName] = useState(
+    summaryData?.details?.callInfo?.summaryName,
+  );
+  const [updateCallInfo] = useUpdateCallInfoMutation();
 
   useEffect(() => {
     if (chatId) {
       fetchCallSummary(chatId);
     }
   }, [chatId, fetchCallSummary]);
+
+  useEffect(() => {
+    if (summaryData?.details?.callInfo?.summaryName) {
+      setSummaryName(summaryData.details.callInfo.summaryName);
+    }
+  }, [summaryData?.details?.callInfo?.summaryName]);
 
   const showToast = (
     message: string,
@@ -211,6 +223,29 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  const handleSummaryNameChange = async (name: string) => {
+    if (chatId) {
+      try {
+        await updateCallInfo({
+          chatId,
+          summaryName: name,
+        }).unwrap();
+        setSummaryName(name);
+        showToast(
+          t('CallSummary.info.summaryNameUpdateSuccess' as TranslationType),
+          'success',
+        );
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : t('CallSummary.info.summaryNameUpdateFailed' as TranslationType);
+        logger.error(errorMessage);
+        showToast(errorMessage);
+      }
+    }
+  };
+
   const animatedCardStyle = useAnimatedStyle(() => {
     const newHeight = Math.min(cardHeight.value + scrollY.value, windowHeight);
     const progress =
@@ -247,8 +282,8 @@ export const CallSummaryScreen: React.FC<
         isFullyExpanded={isFullyExpanded}
         onBackPress={handleBackPress}
         onMenuPress={() => setIsMenuVisible(true)}
-        callId={callId?.toString()}
-        createdAt={summaryData?.details?.createdAt}
+        summaryName={summaryName}
+        onSummaryNameChange={handleSummaryNameChange}
       />
       <CustomMenuModal
         visible={isMenuVisible}
