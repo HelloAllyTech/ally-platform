@@ -24,6 +24,9 @@ interface SectionContentProps {
   summaryDetails: CallSummaryResponse['details'];
   formData: FormData;
   onFieldChange: (field: SummaryFieldKey) => (value: string) => void;
+  canEdit: boolean;
+  isEditing: boolean;
+  setIsEditing: (isEditing: boolean) => void;
 }
 
 export const SectionContent: React.FC<SectionContentProps> = ({
@@ -31,6 +34,9 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   summaryDetails,
   formData,
   onFieldChange,
+  canEdit,
+  isEditing,
+  setIsEditing,
 }) => {
   const summary = summaryDetails?.summary;
   const sectionFields = summaryFields.filter(
@@ -44,6 +50,9 @@ export const SectionContent: React.FC<SectionContentProps> = ({
         label={FIELD_LABELS[field.key]}
         value={formData[field.key] ?? null}
         onChangeText={onFieldChange(field.key)}
+        canEdit={canEdit}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
       />
     );
   };
