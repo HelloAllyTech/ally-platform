@@ -29,11 +29,13 @@ export const useCounselorChat = ({
     try {
       isCheckingRef.current = true;
       const {data, error} = await getCounsellorChat();
-      if (error && 'status' in error && error.status === 404) {
-        onNoActiveChatFound?.(error);
-      } else if (data) {
+
+      // If data is a non-empty object (active chat), dispatch and notify
+      if (data && !Array.isArray(data)) {
         dispatch(setCurrentChat(data));
         onActiveChatFound?.(data);
+      } else {
+        onNoActiveChatFound?.(error);
       }
     } catch (error) {
       onNoActiveChatFound?.(error);
