@@ -1,40 +1,56 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PermissionsAndroid,
+  Platform,
   ScrollView,
-  Text,
   TouchableOpacity,
-  View,
 } from 'react-native';
+import RNFS from 'react-native-fs';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {WINDOW_HEIGHT} from '@/constants/general';
+import {Toast} from '@/components/Toast/Toast';
+import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
+import {
+  CallSummaryResponse,
+  useLazyExportCallSummaryQuery,
+  useLazyGetCallSummaryQuery,
+  useUpdateCallSummaryMutation,
+} from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {logger} from '@/utils/logger';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
+import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
+import {Header} from './components/Header/Header';
 
 /**
  * CallSummaryScreen component displays a summary of the call with an animated card interface.
  * The card can be expanded/collapsed with smooth animations and maintains a scrollable content area.
  */
+
+interface ToastState {
+  visible: boolean;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
 > = ({navigation, route}) => {
-  const {t} = useTranslate();
   const windowHeight = WINDOW_HEIGHT;
   const maxBorderRadius = 30;
   const insets = useSafeAreaInsets();
@@ -44,32 +60,154 @@ export const CallSummaryScreen: React.FC<
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callId = route.params?.callId;
+  const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
-  /**
-   * Handles the scroll event and updates the scroll position value
-   */
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollY.value = event.nativeEvent.contentOffset.y;
-    // Check if card is fully expanded (when scroll position is at the top)
-    setIsFullyExpanded(event.nativeEvent.contentOffset.y <= 80);
+  const [fetchCallSummary, {data: summaryData, isLoading}] =
+    useLazyGetCallSummaryQuery();
+  const [exportCallSummary] = useLazyExportCallSummaryQuery();
+  const [updateCallSummary] = useUpdateCallSummaryMutation();
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [toast, setToast] = useState<ToastState>({
+    visible: false,
+    message: '',
+    type: 'error',
+  });
+  const {t} = useTranslate();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  useEffect(() => {
+    if (chatId) {
+      fetchCallSummary(chatId);
+    }
+  }, [chatId, fetchCallSummary]);
+
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'error',
+  ) => {
+    setToast({
+      visible: true,
+      message,
+      type,
+    });
   };
 
-  /**
-   * Handles the layout event and sets the initial card height
-   */
+  const hideToast = () => {
+    setToast(prev => ({...prev, visible: false}));
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.value = event.nativeEvent.contentOffset.y;
+    setIsFullyExpanded(event.nativeEvent.contentOffset.y <= 80);
+
+    // Check if we're near the bottom
+    const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+    const paddingToBottom = moderateScale(30);
+    const isCloseToBottom =
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - paddingToBottom;
+    setShowScrollToBottom(!isCloseToBottom);
+  };
+
   const handleLayout = () => {
     cardHeight.value = WINDOW_HEIGHT * 0.8;
   };
 
-  /**
-   * Handles the back button press to navigate back
-   */
   const handleBackPress = () => {
     if (currentChat) {
       dispatch(clearCurrentChat());
       navigation.navigate('Home');
     } else {
       navigation.goBack();
+    }
+  };
+
+  const onUpdateSummary = (isSuccess: boolean) => {
+    if (isSuccess) {
+      showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
+    } else {
+      showToast(t('CallSummary.info.summaryUpdateFailed'));
+    }
+  };
+
+  const handleExport = async () => {
+    if (chatId) {
+      try {
+        if (!isIOS) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            showToast(t('CallSummary.info.storagePermissionDenied'));
+            return;
+          }
+        }
+
+        const response = await exportCallSummary(chatId).unwrap();
+        if (typeof response !== 'string') {
+          throw new Error(t('CallSummary.info.invalidResponseFormat'));
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `call-summary-${chatId}-${timestamp}.txt`;
+        const directory = Platform.select({
+          ios: RNFS.DocumentDirectoryPath,
+          android: RNFS.DownloadDirectoryPath,
+        });
+
+        if (!directory) {
+          throw new Error(t('CallSummary.info.directoryPathError'));
+        }
+
+        const filePath = `${directory}/${filename}`;
+        await RNFS.writeFile(filePath, response, 'utf8');
+
+        if (!isIOS) {
+          await RNFS.scanFile(filePath);
+        }
+        logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
+
+        showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
+        setIsMenuVisible(false);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : t('CallSummary.info.fileExportFailed');
+        logger.error(errorMessage);
+        showToast(errorMessage);
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (chatId) {
+      try {
+        const response = await updateCallSummary({
+          chatId,
+          data: {callDetails: {}},
+        });
+        showToast(t('CallSummary.info.summaryDeletedSuccess'), 'success');
+        setIsMenuVisible(false);
+        if (response.data) {
+          setTimeout(() => {
+            navigation.goBack();
+          }, 2000);
+        } else {
+          showToast(t('CallSummary.info.summaryDeleteFailed'));
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : t('CallSummary.info.summaryDeleteFailed');
+        logger.error(errorMessage);
+        showToast(errorMessage);
+      }
     }
   };
 
@@ -95,65 +233,46 @@ export const CallSummaryScreen: React.FC<
     };
   });
 
-  const renderSummeryTitle = () => {
-    if (!isFullyExpanded) {
-      return (
-        <View style={styles.expandedTitleContainer}>
-          <View style={styles.expandedSummeryTitleContainer}>
-            <TouchableOpacity
-              style={styles.backButtonExpanded}
-              onPress={handleBackPress}>
-              <LeftArrowIcon />
-            </TouchableOpacity>
-            <Text style={styles.expandedSummeryTitle}>
-              {t('CallSummary.header.title')}{' '}
-              <Text style={styles.headerSubtitle}>
-                {t('CallSummary.header.subtitle')}
-              </Text>
-            </Text>
-          </View>
-        </View>
-      );
-    } else {
-      return (
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <LeftArrowIcon />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {t('CallSummary.header.title')}{' '}
-            <Text style={styles.headerSubtitle}>
-              {t('CallSummary.header.subtitle')}
-            </Text>
-          </Text>
-        </View>
-      );
-    }
-  };
-
   const isShowCallSummary = Boolean(
     callId || (summaryProgressComplete && currentChat?.chatId),
   );
 
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd({animated: true});
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {renderSummeryTitle()}
+      <Header
+        isFullyExpanded={isFullyExpanded}
+        onBackPress={handleBackPress}
+        onMenuPress={() => setIsMenuVisible(true)}
+        callId={callId?.toString()}
+        createdAt={summaryData?.details?.createdAt}
+      />
+      <CustomMenuModal
+        visible={isMenuVisible}
+        onClose={() => setIsMenuVisible(false)}
+        onExport={handleExport}
+        onDelete={handleDelete}
+      />
       <Animated.View
         style={[
           styles.card,
           animatedCardStyle,
-          {maxHeight: WINDOW_HEIGHT - insets.top - 60},
+          {maxHeight: WINDOW_HEIGHT - insets.top - 90},
         ]}>
         <ScrollView
+          ref={scrollViewRef}
           scrollEnabled={isShowCallSummary}
           onScroll={handleScroll}
           scrollEventThrottle={8}
-          onLayout={handleLayout}
-          contentContainerStyle={styles.stepList}>
+          onLayout={handleLayout}>
           {isShowCallSummary ? (
-            // TO DO: Remove hardcoded chatId once future API is implemented
             <CallSummaryDetails
-              chatId={Number(callId || currentChat?.chatId)}
+              summaryData={summaryData as CallSummaryResponse}
+              isLoading={isLoading}
+              onSubmit={onUpdateSummary}
             />
           ) : (
             <CallSummaryProgress
@@ -165,6 +284,16 @@ export const CallSummaryScreen: React.FC<
           )}
         </ScrollView>
       </Animated.View>
+      {isShowCallSummary && showScrollToBottom && (
+        <TouchableOpacity
+          style={styles.scrollToBottomButton}
+          onPress={scrollToBottom}>
+          <LeftArrowIcon width={40} height={40} style={styles.downArrow} />
+        </TouchableOpacity>
+      )}
+      {toast.visible && (
+        <Toast message={toast.message} type={toast.type} onHide={hideToast} />
+      )}
     </SafeAreaView>
   );
 };
@@ -173,32 +302,6 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: '20@ms',
-    paddingTop: '40@ms',
-  },
-  backButton: {
-    backgroundColor: colors.ashGray,
-    borderRadius: '22@ms',
-    width: '44@ms',
-    height: '44@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: '12@ms',
-    opacity: 0.8,
-  },
-  headerTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '24@ms',
-    color: colors.white,
-    fontWeight: '400',
-  },
-  headerSubtitle: {
-    fontStyle: 'italic',
-    fontWeight: '500',
   },
   card: {
     backgroundColor: colors.white,
@@ -210,25 +313,28 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
   },
-  stepList: {
-    paddingBottom: '20@ms',
-  },
-  expandedSummeryTitleContainer: {
-    flexDirection: 'row',
-    height: '57@ms',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
-  },
-  expandedSummeryTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
-  },
-  backButtonExpanded: {
-    paddingLeft: '4@ms',
-  },
-  expandedTitleContainer: {
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: '60@vs',
+    left: '50%',
+    // To take into account the width of the arrow button
+    marginLeft: '-20@s',
+    width: '40@s',
+    height: '40@s',
+    borderRadius: '20@s',
     backgroundColor: colors.white,
-    height: '100@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  downArrow: {
+    transform: [{rotate: '270deg'}],
   },
 });

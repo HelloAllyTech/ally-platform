@@ -11,7 +11,6 @@ import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
@@ -57,9 +56,8 @@ export const ListeningScreen = () => {
   }, []);
 
   const handleCallEnd = useCallback(() => {
-    dispatch(clearCurrentChat());
-    navigation.navigate('CallSummary');
-  }, [dispatch, navigation]);
+    navigation.navigate('Breathing');
+  }, [navigation]);
 
   useHardwareBackPressHandler(() => {
     handleCallEnd();

@@ -1,151 +1,72 @@
 // CallSummaryDetails.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {
-  CallDetailsIcon,
-  CallHighlightsIcon,
-  DemogsIcon,
-  FlowIcon,
-  KeyConcernIcon,
-} from '@/assets/icons';
-import {WINDOW_HEIGHT} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
+import {PrimaryButton} from '@/components';
+import {SECTION_LIST, SectionKey} from '@/constants/summary';
+// import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
+import useTranslate from '@/hooks/useTranslate';
+import {CallSummaryResponse} from '@/services/callSummaryApi';
+import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {colors} from '@/theme/colors';
-import {SectionKey, summaryFields, visibleFields} from '@/types/callSummary';
-import {getFormattedCallSummary} from '@/utils/callSummary';
+import {typography} from '@/theme/typography';
 
-import {CallDetailsSection} from '../CallDetails/CallDetailsSection';
-import {CallHighlightsSection} from '../CallHighlights/CallHighlightsSection';
-import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
-import {FlowSection} from '../FlowSection/FlowSection';
-import {KeyConcernSection} from '../KeyConcern/KeyConcernSection';
-import {NotesSection} from './NotesSection';
-import {SectionHeader} from './SectionHeader';
+import CallSummarySection from '../CallSummarySections/CallSummarySection';
 
 interface Props {
-  chatId: number;
+  summaryData: CallSummaryResponse;
+  isLoading: boolean;
+  onSubmit: (isUpdateSuccess: boolean) => void;
 }
 
-const SECTION_LIST = [
-  {
-    key: SectionKey.CallDetails,
-    label: 'Call Details',
-    icon: <CallDetailsIcon />,
-  },
-  {key: SectionKey.KeyConcern, label: 'Key concern', icon: <KeyConcernIcon />},
-  {
-    key: SectionKey.CallHighlights,
-    label: 'Call highlights',
-    icon: <CallHighlightsIcon />,
-  },
-  {key: SectionKey.Demographics, label: 'Demographics', icon: <DemogsIcon />},
-  {key: SectionKey.Flow, label: 'Flow', icon: <FlowIcon />},
-];
+export const CallSummaryDetails: React.FC<Props> = ({
+  summaryData,
+  isLoading: isLoadingSummary,
+  onSubmit,
+}) => {
+  // const navigation = useAppNavigation();
+  const {data: visibleFields, isLoading: isLoadingFields} =
+    useGetSummaryFieldsQuery();
+  const {t} = useTranslate();
+  const summaryDetails = summaryData?.details;
 
-export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
-  const navigation = useAppNavigation();
-  const [fetchCallSummary, {data: summaryData, isLoading}] =
-    useLazyGetCallSummaryQuery();
-  // TO DO: This will be replaced with actual hook when future API is implemented
-  const futureData = undefined;
-
-  useEffect(() => {
-    if (chatId) {
-      fetchCallSummary(chatId);
-    }
-  }, [chatId, fetchCallSummary]);
+  const {formData, isUpdating, handleFieldChange, handleSubmit} =
+    useCallSummaryForm({
+      summaryData,
+    });
 
   const [expanded, setExpanded] = useState({
-    [SectionKey.CallDetails]: true,
-    [SectionKey.KeyConcern]: true,
-    [SectionKey.CallHighlights]: true,
-    [SectionKey.Demographics]: true,
-    [SectionKey.Flow]: true,
+    [SectionKey.SessionSummary]: false,
+    [SectionKey.KeyConcern]: false,
+    [SectionKey.FeaturesAndDemographics]: false,
+    [SectionKey.Flow]: false,
+    [SectionKey.ObjectiveObservations]: false,
+    [SectionKey.SubjectiveObservations]: false,
+    [SectionKey.Assessment]: false,
+    [SectionKey.DominantFeelings]: false,
+    [SectionKey.IssuesWorkedOn]: false,
+    [SectionKey.KeyTherapeuticTechniques]: false,
+    [SectionKey.ReferralsProvided]: false,
+    [SectionKey.HomeworkRecommended]: false,
+    [SectionKey.PlansForNextCall]: false,
+    [SectionKey.Tags]: false,
+    [SectionKey.Metrics]: false,
   });
-  const [notes, setNotes] = useState('');
 
-  // Convert API responses to our flat structure with priority fallback
-  const formattedSummary = getFormattedCallSummary(summaryData, futureData);
-
-  // Use the flat data structure but fall back to dummy data when needed
-  const formattedData = {
-    [SectionKey.CallDetails]: {
-      date: formattedSummary.callDate || '--',
-      time: formattedSummary.callTime || '--',
-      type: formattedSummary.callerType || '--',
-      counsellor: formattedSummary.counsellorName || '--',
-    },
-    [SectionKey.KeyConcern]: formattedSummary.keyConcerns || '--',
-    [SectionKey.CallHighlights]: {
-      duration: formattedSummary.callLastedOver,
-      questions: formattedSummary.youAsked,
-      copilot: formattedSummary.usedCopilot,
-      listeningRatio: formattedSummary.listeningRatio,
-      moodImproved: formattedSummary.moodImprovedBy,
-    },
-    [SectionKey.Demographics]: {
-      callerId: formattedSummary.callerId,
-      age: formattedSummary.age,
-      gender: formattedSummary.gender,
-      profession: formattedSummary.profession,
-      concernCode: formattedSummary.concernCode,
-      diagnosis: formattedSummary.formalDiagnosis,
-      location: formattedSummary.location,
-    },
-    [SectionKey.Flow]: formattedSummary.flow || '',
+  const onSubmitButtonPress = async () => {
+    const response = await handleSubmit();
+    onSubmit(Boolean(response?.data));
   };
 
   const toggleSection = (key: SectionKey) => {
     setExpanded(prev => ({...prev, [key]: !prev[key]}));
   };
 
-  const handleSubmit = () => {
-    // Handle submit logic here
-    navigation.navigate('Home');
-  };
-
-  const renderSection = (section: {
-    key: SectionKey;
-    label: string;
-    icon: React.ReactNode;
-  }) => {
-    // Only render sections that have visible fields
-    const sectionFields = summaryFields.filter(
-      field => field.sectionKey === section.key,
-    );
-    const hasVisibleFields = sectionFields.some(
-      field => visibleFields[field.key],
-    );
-
-    if (!hasVisibleFields) {
-      return null;
-    }
-
-    switch (section.key) {
-      case SectionKey.CallDetails:
-        return <CallDetailsSection callDetails={formattedData[section.key]} />;
-      case SectionKey.KeyConcern:
-        return <KeyConcernSection concerns={formattedData[section.key]} />;
-      case SectionKey.CallHighlights:
-        return (
-          <CallHighlightsSection highlights={formattedData[section.key]} />
-        );
-      case SectionKey.Demographics:
-        return (
-          <DemographicsSection demographics={formattedData[section.key]} />
-        );
-      case SectionKey.Flow:
-        return <FlowSection flow={formattedData[section.key]} />;
-    }
-  };
-
-  // TO DO: Add loading state
-  if (isLoading) {
+  if (isLoadingSummary || isLoadingFields) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={colors.darkSlate} />
@@ -156,39 +77,46 @@ export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
   return (
     <KeyboardAwareScrollView style={styles.container}>
       <View style={styles.card}>
-        {SECTION_LIST.map(section => {
-          // Only render sections that have visible fields
-          const sectionFields = summaryFields.filter(
-            field => field.sectionKey === section.key,
-          );
-          const hasVisibleFields = sectionFields.some(
-            field => visibleFields[field.key],
-          );
+        {SECTION_LIST.map((section, index) => {
+          // TO DO: Commenting this out for now to view all sections
+          // const hasVisibleFields = visibleFields?.some(
+          //   field =>
+          //     summaryFields.find(summaryField => summaryField.key === field)
+          //       ?.sectionKey === section.key,
+          // );
 
-          if (!hasVisibleFields) {
-            return null;
-          }
+          // if (!hasVisibleFields) {
+          //   return null;
+          // }
+
+          const Icon = section.icon;
 
           return (
             <View key={section.key} style={styles.sectionBox}>
-              <SectionHeader
+              <CallSummarySection
                 label={section.label}
                 isExpanded={expanded[section.key]}
                 onToggle={() => toggleSection(section.key)}
-                icon={section.icon}
+                icon={<Icon />}
+                canEdit={section.canEdit}
+                formData={formData}
+                sectionData={section}
+                expanded={expanded}
+                summaryDetails={summaryDetails}
+                onFieldChange={handleFieldChange}
+                index={index}
               />
-              {expanded[section.key] && (
-                <View style={styles.sectionContent}>
-                  {renderSection(section)}
-                </View>
-              )}
             </View>
           );
         })}
-        <NotesSection
-          notes={notes}
-          onNotesChange={setNotes}
-          onSubmit={handleSubmit}
+      </View>
+      <View style={styles.buttonContainer}>
+        <PrimaryButton
+          label={t('submit')}
+          onPress={onSubmitButtonPress}
+          isLoading={isUpdating}
+          customContainerStyle={styles.submitButton}
+          customTextStyle={styles.submitButtonText}
         />
       </View>
     </KeyboardAwareScrollView>
@@ -198,20 +126,31 @@ export const CallSummaryDetails: React.FC<Props> = ({chatId}) => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    padding: '20@ms',
+    paddingTop: '10@ms',
+    paddingBottom: '40@ms',
   },
   card: {
+    paddingHorizontal: '16@s',
     backgroundColor: colors.white,
-    width: '95%',
-    minHeight: WINDOW_HEIGHT * 1.2,
     marginBottom: '20@ms',
   },
   sectionBox: {
-    borderBottomColor: colors.lightGray2,
-    borderBottomWidth: 1,
     overflow: 'hidden',
   },
   sectionContent: {
     paddingLeft: '30@ms',
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    paddingTop: '20@ms',
+    borderTopWidth: '1@ms',
+    borderColor: colors.lightGray5,
+  },
+  submitButton: {
+    width: '30%',
+    paddingVertical: '10@vs',
+  },
+  submitButtonText: {
+    ...typography.label.large,
   },
 });
