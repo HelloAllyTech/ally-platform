@@ -107,6 +107,7 @@ const styles = ScaledSheet.create({
   blobContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   blob: {
     width: '280@ms',
