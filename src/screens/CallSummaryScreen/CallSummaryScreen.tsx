@@ -31,6 +31,7 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
+import {clearSummary} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {logger} from '@/utils/logger';
 
@@ -64,8 +65,8 @@ export const CallSummaryScreen: React.FC<
   const callId = route.params?.callId;
   const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
-  const [fetchCallSummary, {data: summaryData, isLoading}] =
-    useLazyGetCallSummaryQuery();
+  const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
+  const summaryData = useAppSelector(state => state.summary.summaryData);
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -86,7 +87,13 @@ export const CallSummaryScreen: React.FC<
     if (chatId) {
       fetchCallSummary(chatId);
     }
-  }, [chatId, fetchCallSummary]);
+
+    // Cleanup function to clear summary state when component unmounts
+    return () => {
+      console.log('🚀 ~ return ~ clearSummary');
+      dispatch(clearSummary());
+    };
+  }, [chatId, fetchCallSummary, dispatch]);
 
   useEffect(() => {
     if (summaryData?.details?.callInfo?.summaryName) {
@@ -127,6 +134,7 @@ export const CallSummaryScreen: React.FC<
   };
 
   const handleBackPress = () => {
+    dispatch(clearSummary());
     if (currentChat) {
       dispatch(clearCurrentChat());
       navigation.navigate('Home');
