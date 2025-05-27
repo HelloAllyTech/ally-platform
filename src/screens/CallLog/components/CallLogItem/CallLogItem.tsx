@@ -82,7 +82,7 @@ const CallLogItem = ({
           {/* Render tags if they exist */}
           {(item.details?.summary?.tags?.length ?? 0) > 0 && (
             <View style={styles.tagsRow}>
-              {item.details?.summary?.tags?.map((tagItem, idx) => {
+              {item.details?.summary?.tags?.map?.((tagItem, idx) => {
                 const rating = tagItem.positivity_rating ?? 5;
                 const tagColor = TAG_COLORS[rating as keyof typeof TAG_COLORS];
                 return (
