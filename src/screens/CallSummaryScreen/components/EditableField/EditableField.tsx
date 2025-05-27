@@ -5,7 +5,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {SummaryFieldKey} from '@/constants/summary';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 
 interface EditableFieldProps {
   fieldKey: SummaryFieldKey;
@@ -13,6 +12,9 @@ interface EditableFieldProps {
   value: string | null;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  canEdit: boolean;
+  isEditing: boolean;
+  setIsEditing: (isEditing: boolean) => void;
 }
 
 // TO DO: Replace with original text component or else delete this file
@@ -22,18 +24,22 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   value,
   onChangeText,
   placeholder,
+  canEdit,
+  isEditing,
+  setIsEditing,
 }) => {
   return (
     <View style={styles.container}>
       <TextInput
+        style={canEdit && isEditing ? styles.editableText : styles.displayText}
         key={fieldKey}
-        style={styles.input}
         value={value || ''}
         onChangeText={onChangeText}
         placeholder={placeholder || `Add ${label?.toLowerCase()}`}
         placeholderTextColor={colors.lightGray3}
         multiline
-        textAlignVertical="top"
+        onBlur={() => setIsEditing(false)}
+        autoFocus={canEdit && isEditing}
       />
     </View>
   );
@@ -43,21 +49,17 @@ const styles = ScaledSheet.create({
   container: {
     marginBottom: '16@vs',
   },
-  label: {
+  editableText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.mediumGray2,
-    marginBottom: '8@vs',
+    fontSize: '14@ms',
+    lineHeight: '20@mvs',
+    color: colors.black,
+    marginRight: '20@ms',
   },
-  input: {
+  displayText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.darkSlate,
-    borderWidth: 1,
-    borderColor: colors.lightGray2,
-    borderRadius: 4,
-    padding: '12@ms',
-    minHeight: '100@vs',
-    textAlignVertical: 'top',
+    fontSize: '14@ms',
+    lineHeight: '20@mvs',
+    color: colors.lightGray3,
   },
 });

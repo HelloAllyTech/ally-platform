@@ -26,10 +26,16 @@ export const BreathingControls: React.FC<Props> = ({
 }) => {
   return (
     <View style={styles.controls}>
-      <TouchableOpacity onPress={onToggleMute} style={styles.button}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onToggleMute}
+        style={styles.button}>
         {isMuted ? <VolumeOffIcon /> : <VolumeIcon />}
       </TouchableOpacity>
-      <TouchableOpacity onPress={onTogglePlayPause} style={styles.button}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onTogglePlayPause}
+        style={styles.button}>
         {isPlaying ? <PauseWhiteIcon /> : <PlayWhiteIcon />}
       </TouchableOpacity>
     </View>
@@ -46,7 +52,7 @@ const styles = ScaledSheet.create({
     width: '56@ms',
     height: '56@ms',
     borderRadius: '28@ms',
-    backgroundColor: colors.lightGray5,
+    backgroundColor: colors.lightGray6,
     alignItems: 'center',
     justifyContent: 'center',
   },
