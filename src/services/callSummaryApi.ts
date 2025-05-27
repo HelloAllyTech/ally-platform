@@ -1,3 +1,5 @@
+import {setSummaryData} from '@/store/slices/summarySlice';
+
 import {api} from './api';
 
 interface CallInfo {
@@ -135,13 +137,24 @@ export const callSummaryApi = api.injectEndpoints({
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
       query: chatId => `/chats/${chatId}`,
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        const {data} = await queryFulfilled;
+        dispatch(setSummaryData(data));
+      },
     }),
-    updateCallSummary: builder.mutation({
+    updateCallSummary: builder.mutation<
+      CallSummaryResponse,
+      {chatId: number; data: any}
+    >({
       query: ({chatId, data}) => ({
         url: `/chats/${chatId}/call-details`,
         method: 'PUT',
         body: data,
       }),
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        const {data} = await queryFulfilled;
+        dispatch(setSummaryData(data));
+      },
     }),
     exportCallSummary: builder.query<string, number>({
       query: chatId => ({
@@ -159,6 +172,13 @@ export const callSummaryApi = api.injectEndpoints({
         body: {summaryName},
       }),
     }),
+    enhanceCallSummary: builder.mutation<void, {chatId: number; data: any}>({
+      query: ({chatId, data}) => ({
+        url: `/chats/${chatId}/call-info`,
+        method: 'PATCH',
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -167,4 +187,5 @@ export const {
   useUpdateCallSummaryMutation,
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
+  useEnhanceCallSummaryMutation,
 } = callSummaryApi;
