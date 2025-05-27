@@ -15,8 +15,7 @@ import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {colors} from '@/theme/colors';
 import {typography} from '@/theme/typography';
 
-import {SectionContent} from './SectionContent';
-import {SectionHeader} from './SectionHeader';
+import CallSummarySection from '../CallSummarySections/CallSummarySection';
 
 interface Props {
   summaryData: CallSummaryResponse;
@@ -93,28 +92,20 @@ export const CallSummaryDetails: React.FC<Props> = ({
           const Icon = section.icon;
 
           return (
-            <View
-              key={section.key}
-              style={[
-                styles.sectionBox,
-                index !== SECTION_LIST.length - 1 && styles.sectionBorderBottom,
-              ]}>
-              <SectionHeader
+            <View key={section.key} style={styles.sectionBox}>
+              <CallSummarySection
                 label={section.label}
                 isExpanded={expanded[section.key]}
                 onToggle={() => toggleSection(section.key)}
                 icon={<Icon />}
+                canEdit={section.canEdit}
+                formData={formData}
+                sectionData={section}
+                expanded={expanded}
+                summaryDetails={summaryDetails}
+                onFieldChange={handleFieldChange}
+                index={index}
               />
-              {expanded[section.key] && (
-                <View style={styles.sectionContent}>
-                  <SectionContent
-                    section={section}
-                    summaryDetails={summaryDetails}
-                    formData={formData}
-                    onFieldChange={handleFieldChange}
-                  />
-                </View>
-              )}
             </View>
           );
         })}
@@ -145,10 +136,6 @@ const styles = ScaledSheet.create({
   },
   sectionBox: {
     overflow: 'hidden',
-  },
-  sectionBorderBottom: {
-    borderBottomColor: colors.lightGray2,
-    borderBottomWidth: 1,
   },
   sectionContent: {
     paddingLeft: '30@ms',

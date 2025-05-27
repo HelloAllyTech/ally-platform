@@ -5,11 +5,14 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import CheckIcon from './check.svg';
+import CloseCircle from './closeCircle.svg';
 import DatabaseIcon from './database.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
+import EditSquareIcon from './editSquare.svg';
 import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
@@ -40,6 +43,7 @@ import ThumbIcon from './thumb.svg';
 import TickRoundIcon from './tickRound.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
+import WandStarsIcon from './wandStars.svg';
 
 export {
   LeftArrowIcon,
@@ -71,6 +75,10 @@ export {
   VolumeIcon,
   VolumeOffIcon,
   ThreeDotsIcon,
+  CheckIcon,
+  CloseCircle,
+  EditSquareIcon,
+  WandStarsIcon,
   TableEyeIcon,
   AssessmentIcon,
   BrightnessAlertIcon,
