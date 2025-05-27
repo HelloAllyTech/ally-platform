@@ -1,9 +1,11 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
+import {useSelector} from 'react-redux';
 
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setCurrentChat} from '@/store/slices/chatSlice';
+import {RootState} from '@/store/store';
 import {Chat} from '@/types/message';
 
 interface UseCounselorChatProps {
@@ -17,6 +19,9 @@ export const useCounselorChat = ({
   onNoActiveChatFound,
   shouldSubscribeToAppState = false,
 }: UseCounselorChatProps = {}) => {
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.user.isAuthenticated,
+  );
   const dispatch = useAppDispatch();
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const appState = useRef(AppState.currentState);
@@ -24,7 +29,7 @@ export const useCounselorChat = ({
 
   const checkCounselorChat = useCallback(async () => {
     // Prevent multiple simultaneous checks
-    if (isCheckingRef.current) return;
+    if (!isAuthenticated || isCheckingRef.current) return;
 
     try {
       isCheckingRef.current = true;
@@ -42,20 +47,27 @@ export const useCounselorChat = ({
     } finally {
       isCheckingRef.current = false;
     }
-  }, [dispatch, getCounsellorChat, onActiveChatFound, onNoActiveChatFound]);
+  }, [
+    dispatch,
+    getCounsellorChat,
+    isAuthenticated,
+    onActiveChatFound,
+    onNoActiveChatFound,
+  ]);
 
   const handleAppStateChange = useCallback(
     async (nextAppState: AppStateStatus) => {
       // Check if app is coming to foreground
       if (
         appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
+        nextAppState === 'active' &&
+        isAuthenticated
       ) {
         await checkCounselorChat();
       }
       appState.current = nextAppState;
     },
-    [checkCounselorChat],
+    [checkCounselorChat, isAuthenticated],
   );
 
   useEffect(() => {
