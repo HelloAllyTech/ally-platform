@@ -84,6 +84,10 @@ export const DemographicsSection = ({
         value: summary[SUMMARY_FIELDS.PROFESSION] || '-',
       },
       {
+        field: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
+        value: summary[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
+      },
+      {
         field: SUMMARY_FIELDS.LANGUAGES,
         value:
           summary[SUMMARY_FIELDS.LANGUAGES]
