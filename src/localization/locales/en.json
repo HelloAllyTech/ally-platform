@@ -49,6 +49,23 @@
     },
     "progress": {
       "complete": "Summary Progress Complete"
+    },
+    "minutes": "minutes",
+    "customMenu": {
+      "export": "Export",
+      "delete": "Delete"
+    },
+    "info": {
+      "storagePermissionDenied": "Storage permission denied",
+      "fileExportedSuccess": "File exported successfully",
+      "fileExportFailed": "Failed to export file",
+      "summaryDeletedSuccess": "Call summary deleted successfully",
+      "summaryDeleteFailed": "Failed to delete call summary",
+      "fileSavedSuccess": "File saved successfully at: {{path}}",
+      "directoryPathError": "Could not determine directory path",
+      "invalidResponseFormat": "Invalid response format from server",
+      "summaryUpdatedSuccess": "Call summary updated successfully",
+      "summaryUpdateFailed": "Failed to update call summary"
     }
   },
   "CallLogs": {
@@ -59,5 +76,20 @@
     "search": {
       "placeholder": "Search"
     }
-  }
+  },
+  "BreathingScreen": {
+    "header": {
+      "box": "Box",
+      "breathing": "Breathing"
+    },
+    "skip": "Skip",
+    "youGaveYour": "You gave your",
+    "best": "best",
+    "onThatCall": "on that call.",
+    "nowTakeAMoment": "Now, take a moment",
+    "for": "for",
+    "yourself": "yourself.",
+    "takeAMomentForYourself": "Take a moment for yourself."
+  },
+  "submit": "Submit"
 }

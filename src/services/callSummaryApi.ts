@@ -1,62 +1,102 @@
 import {api} from './api';
 
-interface SessionDetails {
-  counselor_name: string | null;
-  session_number: number | null;
-  date_of_session: string | null;
-  new_call_follow_up: string | null;
+interface CallInfo {
+  summaryName: string;
+  clientTalkingTime: number;
+  wordCountByLanguage: Record<string, number>;
+  counselorTalkingTime: number;
+  clientTalkingPercentage: string;
+  counselorTalkingPercentage: string;
 }
 
-interface DemographicDetails {
-  age: number | null;
+export interface Language {
+  language: string;
+  percentage: number;
+}
+
+export enum AgeRange {
+  BELOW_18 = '0-17',
+  EIGHTEEN_TO_TWENTY_FOUR = '18-24',
+  TWENTY_FIVE_TO_THIRTY_FOUR = '25-34',
+  THIRTY_FIVE_TO_FORTY_FOUR = '35-44',
+  FORTY_FIVE_TO_FIFTY_FOUR = '45-54',
+  FIFTY_FIVE_TO_SIXTY_FOUR = '55-64',
+  SIXTY_FIVE_PLUS = '65+',
+}
+
+export interface SummaryDetails {
+  // Features & Demographics
+  callId: string | null;
+  callDuration: number | null;
+  callDate: string | null;
+  callTime: string | null;
+  clientId: string | null;
+  counselorName: string | null;
+  callType: string | null;
+  age: AgeRange | null;
   gender: string | null;
+  profession: string | null;
+  languages: Language[] | null;
   location: string | null;
-  client_id: number | null;
-  working_status: string | null;
-  code_of_concern: string | null;
-  any_formal_diagnosis: string | null;
-}
+  codeOfConcern: string | null;
 
-interface CounselorImpressions {
-  client_attitude: string | null;
-  problem_analysis: string | null;
-  counselor_feelings: string | null;
-  additional_insights: string | null;
-  emotional_state_start: string | null;
-  emotional_state_change: string | null;
-}
+  // Session Summary
+  sessionSummary: string | null;
 
-interface FollowUpPlan {
-  goals: string | null;
-  status: string | null;
-  follow_up_date: string | null;
-}
+  // Flow
+  counselingProcessFlow: string | null;
 
-interface WorkDone {
+  // Key Concerns
+  keyConcerns: string | null;
+
+  // Observations and Assessment
+  objectiveObservations: string | null;
+
+  // Subjective Observations
+  subjectiveObservations: string | null;
+
+  // Assessment
+  assessment: string | null;
+
+  // Dominant Feelings
+  dominantFeelings: string | null;
+
+  // Issues Worked On
+  issuesWorkedOn: string | null;
+
+  // Key Therapeutic Techniques
+  keyTherapeuticTechniques: string | null;
+
+  // Referrals Provided
+  referralsProvided: string | null;
+
+  // Homework
   homework: string | null;
-  follow_up_plan: FollowUpPlan;
-  issues_worked_on: string | null;
-  counseling_process_flow: string | null;
-  therapeutic_interventions: string | null;
-}
 
-interface SessionDocumentation {
-  work_done: WorkDone;
-  key_concerns: string | null;
-  dominant_feelings: string[];
-}
+  // Plan for Next Call
+  planForNextCall: string | null;
+  tags: string | null;
 
-interface SummaryNote {
-  session_details: SessionDetails;
-  demographic_details: DemographicDetails;
-  counselor_impressions: CounselorImpressions;
-  session_documentation: SessionDocumentation;
-}
+  // Metrics
+  listeningShare: number | null;
+  reflectiveQuestionsAsked: number | null;
+  emotionsLift: number | null;
 
-interface Summary {
-  tags: string[];
-  callQuality: number;
-  summaryNote: SummaryNote;
+  // Additional fields from response
+  workingStatus: string | null;
+  newCallFollowUp: string | null;
+  counsellor: string | null;
+  followUpGoals: string | null;
+  sessionNumber: string | null;
+  followUpStatus: string | null;
+  followUpDate: string | null;
+  counselorFeelings: string | null;
+  anyFormalDiagnosis: string | null;
+  relationshipStatus: string | null;
+  emotionalStateStart: string | null;
+  emotionalStateChange: string | null;
+  therapeuticInterventions: string | null;
+  callQuality: number | null;
 }
 
 interface CallDetails {
@@ -65,15 +105,15 @@ interface CallDetails {
   tenantId: string;
   id: number;
   chatId: number;
-  callDuration: number | null;
+  callDuration: number;
   startTime: string;
   endTime: string | null;
-  noOfNudges: number | null;
-  noOfStages: number | null;
-  transcript: string | null;
-  summary: Summary;
+  noOfNudges: number;
+  noOfStages: number;
+  transcript: string;
+  summary: SummaryDetails;
   callOutcome: string | null;
-  callInfo: string | null;
+  callInfo: CallInfo;
 }
 
 export interface CallSummaryResponse {
@@ -91,11 +131,29 @@ export interface CallSummaryResponse {
 }
 
 export const callSummaryApi = api.injectEndpoints({
+  overrideExisting: true,
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
       query: chatId => `/chats/${chatId}`,
     }),
+    updateCallSummary: builder.mutation({
+      query: ({chatId, data}) => ({
+        url: `/chats/${chatId}/call-details`,
+        method: 'PUT',
+        body: data,
+      }),
+    }),
+    exportCallSummary: builder.query<string, number>({
+      query: chatId => ({
+        url: `/chats/${chatId}/export-summary`,
+        responseHandler: async response => response.text(),
+      }),
+    }),
   }),
 });
 
-export const {useLazyGetCallSummaryQuery} = callSummaryApi;
+export const {
+  useLazyGetCallSummaryQuery,
+  useUpdateCallSummaryMutation,
+  useLazyExportCallSummaryQuery,
+} = callSummaryApi;
