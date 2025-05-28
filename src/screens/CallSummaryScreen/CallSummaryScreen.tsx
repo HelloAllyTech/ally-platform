@@ -16,7 +16,7 @@ import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon} from '@/assets/icons';
 import {CustomModal} from '@/components/Modal/CustomModal';
 import {Toast} from '@/components/Toast/Toast';
-import {WINDOW_HEIGHT} from '@/constants/general';
+import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useStoragePermissions} from '@/hooks/useStoragePermissions';
 import useTranslate from '@/hooks/useTranslate';
@@ -189,7 +189,9 @@ export const CallSummaryScreen: React.FC<
       logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
 
       showToast(
-        `${t('CallSummary.info.fileExportedSuccess')} to ${filePath}`,
+        `${t('CallSummary.info.fileExportedSuccess')} \n ${
+          isIOS && 'on My iPhone/ally/CallSummary'
+        }`,
         'success',
       );
       setIsMenuVisible(false);
