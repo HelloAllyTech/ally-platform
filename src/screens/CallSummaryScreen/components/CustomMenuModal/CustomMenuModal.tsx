@@ -3,7 +3,7 @@ import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {DeleteIcon, ExportIcon} from '@/assets/icons';
+import {DeleteIcon, EditIcon, ExportIcon} from '@/assets/icons';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
@@ -13,18 +13,23 @@ interface CustomMenuModalProps {
   visible: boolean;
   onClose: () => void;
   onExport: () => void;
-  onDelete: () => void;
+  setModalType: (type: 'rename' | 'delete' | null) => void;
 }
 
 const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   visible,
   onClose,
   onExport,
-  onDelete,
+  setModalType,
 }) => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const onRename = () => {
+    setModalType('rename');
+    onClose();
+  };
 
   useEffect(() => {
     if (visible) {
@@ -41,6 +46,11 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
       }).start();
     }
   }, [visible, fadeAnim]);
+
+  const onPressDelete = () => {
+    setModalType('delete');
+    onClose();
+  };
 
   if (!visible) return null;
 
@@ -77,6 +87,11 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           },
           !isIOS && styles.androidShadow,
         ]}>
+        <TouchableOpacity style={styles.menuItem} onPress={onRename}>
+          <Text style={styles.menuText}>{t('CallSummary.info.rename')}</Text>
+          <EditIcon width={16} height={16} />
+        </TouchableOpacity>
+        <View style={styles.menuDivider} />
         <TouchableOpacity style={styles.menuItem} onPress={onExport}>
           <Text style={styles.menuText}>
             {t('CallSummary.customMenu.export')}
@@ -84,7 +99,7 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           <ExportIcon width={16} height={16} />
         </TouchableOpacity>
         <View style={styles.menuDivider} />
-        <TouchableOpacity style={styles.menuItem} onPress={onDelete}>
+        <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
           <Text style={styles.menuText}>
             {t('CallSummary.customMenu.delete')}
           </Text>
