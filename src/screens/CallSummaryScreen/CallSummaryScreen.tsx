@@ -16,6 +16,7 @@ import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon} from '@/assets/icons';
 import {Toast} from '@/components/Toast/Toast';
 import {WINDOW_HEIGHT} from '@/constants/general';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useStoragePermissions} from '@/hooks/useStoragePermissions';
 import useTranslate from '@/hooks/useTranslate';
 import {TranslationType} from '@/localization/locales/type';
@@ -133,12 +134,15 @@ export const CallSummaryScreen: React.FC<
     cardHeight.value = WINDOW_HEIGHT * 0.8;
   };
 
-  const handleBackPress = () => {
-    dispatch(clearSummary());
-    dispatch(clearFormData());
+  useHardwareBackPressHandler(() => {
+    handleGoBack();
+    return true;
+  });
+
+  const handleGoBack = () => {
     if (currentChat) {
-      dispatch(clearCurrentChat());
       navigation.navigate('Home');
+      dispatch(clearCurrentChat());
     } else {
       navigation.goBack();
     }
@@ -148,7 +152,7 @@ export const CallSummaryScreen: React.FC<
     if (isSuccess) {
       showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
       setTimeout(() => {
-        navigation.goBack();
+        handleGoBack();
       }, 2000);
     } else {
       showToast(t('CallSummary.info.summaryUpdateFailed'));
@@ -273,7 +277,7 @@ export const CallSummaryScreen: React.FC<
     <SafeAreaView style={styles.container}>
       <Header
         isFullyExpanded={isFullyExpanded}
-        onBackPress={handleBackPress}
+        onBackPress={handleGoBack}
         onMenuPress={() => setIsMenuVisible(true)}
         summaryName={summaryName}
         onSummaryNameChange={handleSummaryNameChange}
