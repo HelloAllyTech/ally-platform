@@ -31,6 +31,7 @@ export const styles = ScaledSheet.create({
     zIndex: 100,
     paddingHorizontal: '30@s',
     width: '100%',
+    marginTop: '-15@s',
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,

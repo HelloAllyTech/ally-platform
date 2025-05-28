@@ -4,11 +4,13 @@ import {setupListeners} from '@reduxjs/toolkit/query';
 import {api} from '@/services/api';
 
 import chatReducer from './slices/chatSlice';
+import summaryReducer from './slices/summarySlice';
 import userReducer from './slices/userSlice';
 
 const rootReducer = combineReducers({
   user: userReducer,
   chat: chatReducer,
+  summary: summaryReducer,
   [api.reducerPath]: api.reducer,
 });
 

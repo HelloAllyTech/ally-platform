@@ -1,5 +1,9 @@
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {StyleSheet, View} from 'react-native';
+import {
+  BottomTabBarProps,
+  createBottomTabNavigator,
+} from '@react-navigation/bottom-tabs';
+import {StyleSheet, TouchableOpacity, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {
   CallLogActiveIcon,
@@ -16,36 +20,55 @@ const TAB_NAMES = ['HomeTab', 'CallLog'];
 
 const TAB_COMPONENTS = [HomeScreen, CallLogScreen];
 
-export const BottomTabs = () => {
+const CustomTabBar = (props: BottomTabBarProps) => {
+  const insets = useSafeAreaInsets();
+
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      HomeTab: <HomeActiveIcon width={18} height={18} />,
-      CallLog: <CallLogActiveIcon width={18} height={18} />,
+      HomeTab: <HomeActiveIcon width={20} height={20} />,
+      CallLog: <CallLogActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
-      HomeTab: <HomeInactiveIcon width={18} height={18} />,
-      CallLog: <CallLogInactiveIcon width={18} height={18} />,
+      HomeTab: <HomeInactiveIcon width={20} height={20} />,
+      CallLog: <CallLogInactiveIcon width={20} height={20} />,
     };
 
-    return (
-      <View style={styles.iconContainer}>
-        {focused
-          ? focusedIcons[route as keyof typeof focusedIcons]
-          : unfocusedIcons[route as keyof typeof unfocusedIcons]}
-      </View>
-    );
+    return focused
+      ? focusedIcons[route as keyof typeof focusedIcons]
+      : unfocusedIcons[route as keyof typeof unfocusedIcons];
   };
 
   return (
+    <View style={[styles.tabBar, {paddingBottom: insets.bottom}]}>
+      {props.state.routes.map((route, index) => {
+        const isFocused = props.state.index === index;
+
+        return (
+          <TouchableOpacity
+            key={route.name}
+            onPress={() => props.navigation.navigate(route.name)}
+            style={[styles.tabItem, {marginTop: insets.bottom}]}>
+            {renderTabBarIcon(route.name, isFocused)}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
+const renderCustomTabBar = (props: BottomTabBarProps) => {
+  return <CustomTabBar {...props} />;
+};
+
+export const BottomTabs = () => {
+  return (
     <View style={styles.container}>
       <Tab.Navigator
-        screenOptions={({route}) => ({
+        tabBar={renderCustomTabBar}
+        screenOptions={{
           headerShown: false,
-          tabBarShowLabel: false,
-          tabBarStyle: styles.tabBar,
-          tabBarIcon: ({focused}) => renderTabBarIcon(route.name, focused),
-        })}>
+        }}>
         {TAB_NAMES.map((name, idx) => (
           <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
         ))}
@@ -64,14 +87,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    borderTopWidth: 0,
     height: 60,
     borderRadius: 40,
-    marginTop: 30,
     marginHorizontal: 40,
-    marginBottom: 30,
+    marginBottom: 20,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     alignItems: 'center',
     shadowColor: colors.black,
     shadowOffset: {width: 0, height: 1},
@@ -80,12 +101,11 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: colors.lightGray2,
   },
-  iconContainer: {
-    alignItems: 'center',
+  tabItem: {
+    flex: 1,
+    height: '100%',
+    minHeight: 60,
     justifyContent: 'center',
-    marginTop: 6,
-    minWidth: 60,
-    width: 60, // TODO: change when new icon is added
-    height: 60,
+    alignItems: 'center',
   },
 });

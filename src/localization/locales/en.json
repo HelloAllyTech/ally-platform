@@ -64,6 +64,8 @@
       "fileSavedSuccess": "File saved successfully at: {{path}}",
       "directoryPathError": "Could not determine directory path",
       "invalidResponseFormat": "Invalid response format from server",
+      "summaryNameUpdateSuccess": "Summary name updated successfully",
+      "summaryNameUpdateFailed": "Failed to update summary name",
       "summaryUpdatedSuccess": "Call summary updated successfully",
       "summaryUpdateFailed": "Failed to update call summary"
     }
