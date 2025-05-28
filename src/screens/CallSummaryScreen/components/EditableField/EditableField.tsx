@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -14,7 +14,6 @@ interface EditableFieldProps {
   placeholder?: string;
   canEdit: boolean;
   isEditing: boolean;
-  setIsEditing: (isEditing: boolean) => void;
 }
 
 // TO DO: Replace with original text component or else delete this file
@@ -26,20 +25,30 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   placeholder,
   canEdit,
   isEditing,
-  setIsEditing,
 }) => {
+  const inputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
   return (
     <View style={styles.container}>
       <TextInput
+        ref={inputRef}
         style={canEdit && isEditing ? styles.editableText : styles.displayText}
         key={fieldKey}
         value={value || ''}
         onChangeText={onChangeText}
-        placeholder={placeholder || `Add ${label?.toLowerCase()}`}
+        placeholder={
+          !isEditing ? placeholder || `Add ${label?.toLowerCase()}` : ''
+        }
         placeholderTextColor={colors.lightGray3}
         multiline
-        onBlur={() => setIsEditing(false)}
+        editable={canEdit && isEditing}
         autoFocus={canEdit && isEditing}
+        selectTextOnFocus={canEdit && isEditing}
       />
     </View>
   );

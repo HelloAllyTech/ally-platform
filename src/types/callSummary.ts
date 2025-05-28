@@ -4,6 +4,7 @@ import {
   SectionKey,
   SUMMARY_FIELDS,
 } from '@/constants/summary';
+import {Language} from '@/services/callSummaryApi';
 
 type FieldType = 'Text' | 'Number' | 'Boolean' | 'Multiline' | 'Dropdown';
 
@@ -23,6 +24,8 @@ export interface SummaryField {
 export type VisibleFields = {
   [K in keyof typeof SUMMARY_FIELDS]: boolean;
 };
+
+export type SummaryFieldValueTypes = string | number | Language[];
 
 // Remove the Future API response type since we're using SummaryDetails
 export type {SummaryDetails} from '@/services/callSummaryApi';

@@ -23,7 +23,6 @@ import useTranslate from '@/hooks/useTranslate';
 import {TranslationType} from '@/localization/locales/type';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
-  CallSummaryResponse,
   useLazyExportCallSummaryQuery,
   useLazyGetCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -31,7 +30,7 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {clearSummary} from '@/store/slices/summarySlice';
+import {clearFormData, clearSummary} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {logger} from '@/utils/logger';
 
@@ -90,8 +89,8 @@ export const CallSummaryScreen: React.FC<
 
     // Cleanup function to clear summary state when component unmounts
     return () => {
-      console.log('🚀 ~ return ~ clearSummary');
       dispatch(clearSummary());
+      dispatch(clearFormData());
     };
   }, [chatId, fetchCallSummary, dispatch]);
 
@@ -135,6 +134,7 @@ export const CallSummaryScreen: React.FC<
 
   const handleBackPress = () => {
     dispatch(clearSummary());
+    dispatch(clearFormData());
     if (currentChat) {
       dispatch(clearCurrentChat());
       navigation.navigate('Home');
@@ -209,7 +209,7 @@ export const CallSummaryScreen: React.FC<
       try {
         const response = await updateCallSummary({
           chatId,
-          data: {callDetails: {}},
+          data: {summary: {}},
         });
         showToast(t('CallSummary.info.summaryDeletedSuccess'), 'success');
         setIsMenuVisible(false);
@@ -313,7 +313,6 @@ export const CallSummaryScreen: React.FC<
           onLayout={handleLayout}>
           {isShowCallSummary ? (
             <CallSummaryDetails
-              summaryData={summaryData as CallSummaryResponse}
               isLoading={isLoading}
               onSubmit={onUpdateSummary}
             />

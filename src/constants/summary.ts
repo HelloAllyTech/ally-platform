@@ -94,7 +94,7 @@ export const SUMMARY_FIELDS = {
   TAGS: 'tags' as const,
 
   // Metrics
-  LISTENING_RATIO: 'listeningRatio' as const,
+  LISTENING_RATIO: 'listeningShare' as const,
   EMOTIONAL_LIFT: 'emotionalLift' as const,
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked' as const,
 

@@ -1,8 +1,9 @@
 import {SUMMARY_FIELDS, SummaryFieldKey} from '@/constants/summary';
-import {CallSummaryResponse} from '@/services/callSummaryApi';
+import {AgeRange, CallSummaryResponse} from '@/services/callSummaryApi';
+import {SummaryFieldValueTypes} from '@/types/callSummary';
 
 export type FormData = {
-  [key in SummaryFieldKey]?: string | null;
+  [key in SummaryFieldKey]?: SummaryFieldValueTypes | null;
 };
 
 export const getInitialFormData = (): FormData => ({
@@ -19,6 +20,8 @@ export const getInitialFormData = (): FormData => ({
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: null,
   [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: null,
   [SUMMARY_FIELDS.TAGS]: null,
+  [SUMMARY_FIELDS.AGE]: null,
+  [SUMMARY_FIELDS.GENDER]: null,
 });
 
 export const transformSummaryToFormData = (
@@ -42,6 +45,8 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: summary.homework || null,
   [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: summary.planForNextCall || null,
   [SUMMARY_FIELDS.TAGS]: summary.tags || null,
+  [SUMMARY_FIELDS.AGE]: summary.age || null,
+  [SUMMARY_FIELDS.GENDER]: summary.gender || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -50,28 +55,42 @@ export const transformFormDataForSubmission = (
 ): CallSummaryResponse['details']['summary'] => {
   return {
     ...summaryData?.details?.summary,
-    [SUMMARY_FIELDS.SESSION_SUMMARY]:
-      formData[SUMMARY_FIELDS.SESSION_SUMMARY] || null,
-    [SUMMARY_FIELDS.FLOW]: formData[SUMMARY_FIELDS.FLOW] || null,
-    [SUMMARY_FIELDS.KEY_CONCERNS]:
-      formData[SUMMARY_FIELDS.KEY_CONCERNS] || null,
-    [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]:
-      formData[SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS] || null,
-    [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]:
-      formData[SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS] || null,
-    [SUMMARY_FIELDS.ASSESSMENT]: formData[SUMMARY_FIELDS.ASSESSMENT] || null,
-    [SUMMARY_FIELDS.DOMINANT_FEELINGS]:
-      formData[SUMMARY_FIELDS.DOMINANT_FEELINGS] || null,
-    [SUMMARY_FIELDS.ISSUES_WORKED_ON]:
-      formData[SUMMARY_FIELDS.ISSUES_WORKED_ON] || null,
-    [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]:
-      formData[SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES] || null,
-    [SUMMARY_FIELDS.REFERRALS_PROVIDED]:
-      formData[SUMMARY_FIELDS.REFERRALS_PROVIDED] || null,
-    [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]:
-      formData[SUMMARY_FIELDS.HOMEWORK_RECOMMENDED] || null,
-    [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]:
-      formData[SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL] || null,
-    [SUMMARY_FIELDS.TAGS]: formData[SUMMARY_FIELDS.TAGS] || null,
+    [SUMMARY_FIELDS.AGE]: formData[SUMMARY_FIELDS.AGE] as AgeRange | null,
+    [SUMMARY_FIELDS.GENDER]: formData[SUMMARY_FIELDS.GENDER] as string | null,
+    [SUMMARY_FIELDS.SESSION_SUMMARY]: formData[
+      SUMMARY_FIELDS.SESSION_SUMMARY
+    ] as string | null,
+    [SUMMARY_FIELDS.FLOW]: formData[SUMMARY_FIELDS.FLOW] as string | null,
+    [SUMMARY_FIELDS.KEY_CONCERNS]: formData[SUMMARY_FIELDS.KEY_CONCERNS] as
+      | string
+      | null,
+    [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: formData[
+      SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS
+    ] as string | null,
+    [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: formData[
+      SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS
+    ] as string | null,
+    [SUMMARY_FIELDS.ASSESSMENT]: formData[SUMMARY_FIELDS.ASSESSMENT] as
+      | string
+      | null,
+    [SUMMARY_FIELDS.DOMINANT_FEELINGS]: formData[
+      SUMMARY_FIELDS.DOMINANT_FEELINGS
+    ] as string | null,
+    [SUMMARY_FIELDS.ISSUES_WORKED_ON]: formData[
+      SUMMARY_FIELDS.ISSUES_WORKED_ON
+    ] as string | null,
+    [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: formData[
+      SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES
+    ] as string | null,
+    [SUMMARY_FIELDS.REFERRALS_PROVIDED]: formData[
+      SUMMARY_FIELDS.REFERRALS_PROVIDED
+    ] as string | null,
+    [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: formData[
+      SUMMARY_FIELDS.HOMEWORK_RECOMMENDED
+    ] as string | null,
+    [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: formData[
+      SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL
+    ] as string | null,
+    [SUMMARY_FIELDS.TAGS]: formData[SUMMARY_FIELDS.TAGS] as string | null,
   };
 };

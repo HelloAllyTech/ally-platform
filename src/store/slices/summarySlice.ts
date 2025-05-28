@@ -1,13 +1,16 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 
 import {CallSummaryResponse} from '@/services/callSummaryApi';
+import {FormData} from '@/utils/callSummary/formDataTransformer';
 
 interface SummaryState {
   summaryData: CallSummaryResponse | null;
+  formData: FormData | null;
 }
 
 const initialState: SummaryState = {
   summaryData: null,
+  formData: null,
 };
 
 const summarySlice = createSlice({
@@ -20,9 +23,19 @@ const summarySlice = createSlice({
     clearSummary: state => {
       state.summaryData = null;
     },
+    setFormData: (state, action: PayloadAction<FormData>) => {
+      state.formData = {
+        ...state.formData,
+        ...action.payload,
+      };
+    },
+    clearFormData: state => {
+      state.formData = null;
+    },
   },
 });
 
-export const {setSummaryData, clearSummary} = summarySlice.actions;
+export const {setSummaryData, clearSummary, setFormData, clearFormData} =
+  summarySlice.actions;
 
 export default summarySlice.reducer;
