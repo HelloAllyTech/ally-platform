@@ -65,7 +65,6 @@ const SectionWrapper = ({
 
   const onPressWand = () => {
     if (!summaryData?.details?.chatId) return;
-    console.log('🚀 ~ onPressWand ~ summaryData:', summaryData);
     enhanceCallSummary({
       content: 'This text is pretty good',
     });
