@@ -10,6 +10,9 @@ export interface CallLog {
     };
     chatId?: number;
     createdAt?: string;
+    callInfo?: {
+      summaryName?: string;
+    };
   };
   client: {
     name: string;

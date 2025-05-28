@@ -8,7 +8,6 @@ import {
   SummaryFieldKey,
 } from '@/constants/summary';
 import useTranslate from '@/hooks/useTranslate';
-import {TranslationType} from '@/localization/locales/type';
 import {CallSummaryResponse} from '@/services/callSummaryApi';
 import {formatTimeHHmm} from '@/utils/date';
 
@@ -16,7 +15,7 @@ import {FieldRow} from '../FieldRow/FieldRow';
 
 interface FieldConfig {
   field: SummaryFieldKey;
-  value: string;
+  value: string | number;
   showSeparator?: boolean;
 }
 
@@ -35,17 +34,19 @@ export const DemographicsSection = ({
 }) => {
   const {t} = useTranslate();
   const summary = summaryDetails.summary;
+  const duration =
+    summaryDetails.callDuration || summary[SUMMARY_FIELDS.CALL_DURATION];
 
   const fields: FieldConfig[] = useMemo(
     () => [
       {
         field: SUMMARY_FIELDS.CALL_ID,
-        value: summary[SUMMARY_FIELDS.CALL_ID] || '-',
+        value: summaryDetails?.chatId || summary[SUMMARY_FIELDS.CALL_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_DURATION,
-        value: summary[SUMMARY_FIELDS.CALL_DURATION]
-          ? `${summary[SUMMARY_FIELDS.CALL_DURATION]} ${t('CallSummary.minutes' as TranslationType)}`
+        value: duration
+          ? `${Math.floor(Number(duration))} ${t('CallSummary.minutes')}`
           : '-',
       },
       {
@@ -55,7 +56,7 @@ export const DemographicsSection = ({
       {
         field: SUMMARY_FIELDS.CALL_TIME,
         value:
-          summaryDetails.startTime && summaryDetails.endTime
+          summaryDetails?.startTime && summaryDetails?.endTime
             ? `${formatTimeHHmm(summaryDetails.startTime)}-${formatTimeHHmm(summaryDetails.endTime)}`
             : '-',
       },
@@ -84,6 +85,10 @@ export const DemographicsSection = ({
         value: summary[SUMMARY_FIELDS.PROFESSION] || '-',
       },
       {
+        field: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
+        value: summary[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
+      },
+      {
         field: SUMMARY_FIELDS.LANGUAGES,
         value:
           summary[SUMMARY_FIELDS.LANGUAGES]
@@ -99,7 +104,7 @@ export const DemographicsSection = ({
         value: summary[SUMMARY_FIELDS.CONCERN_CODE] || '-',
       },
     ],
-    [summary, summaryDetails, t],
+    [duration, summary, summaryDetails, t],
   );
 
   return <View style={styles.container}>{fields.map(renderField)}</View>;

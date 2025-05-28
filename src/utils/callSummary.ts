@@ -20,6 +20,7 @@ const CALL_SUMMARY_DATA = {
     age: 28,
     gender: 'Male',
     profession: 'Engineer',
+    relationshipStatus: 'Married',
     concernCode: 'Seeking information',
     diagnosis: 'Depression',
     location: 'Mumbai',
@@ -47,7 +48,7 @@ const CALL_SUMMARY_DATA = {
   metrics: {
     listeningShare: '75%',
     reflectiveQuestionsAsked: '8',
-    emotionsLift: '30%',
+    emotionalLift: '30%',
   },
   notes:
     'Follow up on stress diary entries and boundary-setting exercises in next session. Client shows good engagement and motivation for change.',

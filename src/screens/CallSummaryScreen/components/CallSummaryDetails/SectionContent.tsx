@@ -64,7 +64,7 @@ export const SectionContent: React.FC<SectionContentProps> = ({
         metrics={{
           listeningShare: summary?.listeningShare ?? null,
           reflectiveQuestionsAsked: summary?.reflectiveQuestionsAsked ?? null,
-          emotionsLift: summary?.emotionsLift ?? null,
+          emotionalLift: summary?.emotionalLift ?? null,
         }}
       />
     );

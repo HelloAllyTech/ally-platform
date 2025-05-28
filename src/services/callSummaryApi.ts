@@ -1,3 +1,5 @@
+import {setSummaryData} from '@/store/slices/summarySlice';
+
 import {api} from './api';
 
 interface CallInfo {
@@ -26,7 +28,7 @@ export enum AgeRange {
 
 export interface SummaryDetails {
   // Features & Demographics
-  callId: string | null;
+  callId: number | null;
   callDuration: number | null;
   callDate: string | null;
   callTime: string | null;
@@ -36,6 +38,7 @@ export interface SummaryDetails {
   age: AgeRange | null;
   gender: string | null;
   profession: string | null;
+  relationshipStatus: string | null;
   languages: Language[] | null;
   location: string | null;
   codeOfConcern: string | null;
@@ -80,7 +83,7 @@ export interface SummaryDetails {
   // Metrics
   listeningShare: number | null;
   reflectiveQuestionsAsked: number | null;
-  emotionsLift: number | null;
+  emotionalLift: number | null;
 
   // Additional fields from response
   workingStatus: string | null;
@@ -92,7 +95,6 @@ export interface SummaryDetails {
   followUpDate: string | null;
   counselorFeelings: string | null;
   anyFormalDiagnosis: string | null;
-  relationshipStatus: string | null;
   emotionalStateStart: string | null;
   emotionalStateChange: string | null;
   therapeuticInterventions: string | null;
@@ -135,18 +137,46 @@ export const callSummaryApi = api.injectEndpoints({
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
       query: chatId => `/chats/${chatId}`,
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        const {data} = await queryFulfilled;
+        dispatch(setSummaryData(data));
+      },
     }),
-    updateCallSummary: builder.mutation({
+    updateCallSummary: builder.mutation<
+      CallSummaryResponse,
+      {chatId: number; data: any}
+    >({
       query: ({chatId, data}) => ({
         url: `/chats/${chatId}/call-details`,
         method: 'PUT',
         body: data,
       }),
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        const {data} = await queryFulfilled;
+        dispatch(setSummaryData(data));
+      },
     }),
     exportCallSummary: builder.query<string, number>({
       query: chatId => ({
         url: `/chats/${chatId}/export-summary`,
         responseHandler: async response => response.text(),
+      }),
+    }),
+    updateCallInfo: builder.mutation<
+      void,
+      {chatId: number; summaryName: string}
+    >({
+      query: ({chatId, summaryName}) => ({
+        url: `/chats/${chatId}/call-info`,
+        method: 'PATCH',
+        body: {summaryName},
+      }),
+    }),
+    enhanceCallSummary: builder.mutation<void, {chatId: number; data: any}>({
+      query: ({chatId, data}) => ({
+        url: `/chats/${chatId}/call-info`,
+        method: 'PATCH',
+        body: data,
       }),
     }),
   }),
@@ -156,4 +186,6 @@ export const {
   useLazyGetCallSummaryQuery,
   useUpdateCallSummaryMutation,
   useLazyExportCallSummaryQuery,
+  useUpdateCallInfoMutation,
+  useEnhanceCallSummaryMutation,
 } = callSummaryApi;

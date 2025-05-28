@@ -172,7 +172,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
 
   return (
     <TouchableWithoutFeedback
-      style={{paddingBottom: insets.bottom}}
+      style={{paddingBottom: insets.bottom + 10}}
       onPress={Keyboard.dismiss}>
       <View style={styles.flex1}>
         {currentStep === 'OTP' && (
