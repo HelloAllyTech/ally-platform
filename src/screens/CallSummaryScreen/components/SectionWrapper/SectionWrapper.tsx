@@ -1,9 +1,12 @@
+import {useEffect} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import {SvgProps} from 'react-native-svg';
 
-import {SECTION_LIST, SectionKey} from '@/constants/summary';
+import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
+import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -43,13 +46,28 @@ const SectionWrapper = ({
   isEditing,
   setIsEditing,
 }: SectionWrapperProps) => {
-  const {handleSectionFieldsReset} = useCallSummaryForm();
+  const {handleSectionFieldsReset, handleFieldChange} = useCallSummaryForm();
+  const summaryData = useAppSelector(state => state.summary.summaryData);
+  const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
+    useEnhanceCallSummaryMutation();
+
+  useEffect(() => {
+    if (enhancedResponse) {
+      const field = summaryFields.find(
+        _field => _field.sectionKey === sectionConfig.key,
+      );
+      if (field) {
+        handleFieldChange(field.key)(enhancedResponse.enhanced_content);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enhancedResponse, sectionConfig.key]);
 
   const onPressWand = () => {
-    setIsEditing(prev => ({
-      ...prev,
-      [sectionConfig.key]: false,
-    }));
+    if (!summaryData?.details?.chatId) return;
+    enhanceCallSummary({
+      content: 'This text is pretty good',
+    });
   };
 
   const onEditPress = () => {
@@ -81,6 +99,7 @@ const SectionWrapper = ({
         section={sectionConfig}
         canEdit={canEdit}
         isEditing={isEditing}
+        isEnhancing={isEnhancing}
       />
     );
   };

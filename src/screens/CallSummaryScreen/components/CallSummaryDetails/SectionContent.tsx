@@ -19,12 +19,14 @@ interface SectionContentProps {
   };
   canEdit: boolean;
   isEditing: boolean;
+  isEnhancing: boolean;
 }
 
 export const SectionContent: React.FC<SectionContentProps> = ({
   section,
   canEdit,
   isEditing,
+  isEnhancing,
 }) => {
   const summaryData = useAppSelector(
     (state: AppRootState) => state.summary.summaryData,
@@ -45,6 +47,7 @@ export const SectionContent: React.FC<SectionContentProps> = ({
         onChangeText={handleFieldChange(field.key)}
         canEdit={canEdit}
         isEditing={isEditing}
+        isEnhancing={isEnhancing}
         placeholder={'-'}
       />
     );
