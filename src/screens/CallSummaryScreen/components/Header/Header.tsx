@@ -1,15 +1,13 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React from 'react';
 import {
-  Keyboard,
   Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {EditIcon, LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
+import {LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
@@ -21,7 +19,6 @@ interface HeaderProps {
   onBackPress: () => void;
   onMenuPress: () => void;
   summaryName?: string;
-  onSummaryNameChange?: (name: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,42 +26,12 @@ export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
-  onSummaryNameChange,
 }) => {
   const {t} = useTranslate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState(summaryName);
-  const inputRef = useRef<TextInput>(null);
-
-  useEffect(() => {
-    setEditedName(summaryName);
-  }, [summaryName]);
-
-  const handleEditPress = () => {
-    setIsEditing(true);
-  };
-
-  const handleSubmitEditing = () => {
-    handleBlur();
-  };
-
-  const handleBlur = () => {
-    setIsEditing(false);
-    if (onSummaryNameChange && editedName !== summaryName) {
-      onSummaryNameChange(editedName);
-    }
-  };
-
-  const handleContainerPress = () => {
-    if (isEditing) {
-      Keyboard.dismiss();
-      handleBlur();
-    }
-  };
 
   if (!isFullyExpanded) {
     return (
-      <TouchableWithoutFeedback onPress={handleContainerPress}>
+      <TouchableWithoutFeedback>
         <View style={styles.expandedTitleContainer}>
           <View style={styles.expandedTitleContent}>
             <View style={styles.expandedSummaryTitleContainer}>
@@ -81,27 +48,9 @@ export const Header: React.FC<HeaderProps> = ({
                   </Text>
                 </Text>
                 <View style={styles.nameContainer}>
-                  {isEditing ? (
-                    <TextInput
-                      ref={inputRef}
-                      style={[styles.summaryNameText, styles.nameInput]}
-                      value={editedName}
-                      onChangeText={setEditedName}
-                      onBlur={handleBlur}
-                      onSubmitEditing={handleSubmitEditing}
-                      returnKeyType="done"
-                      autoFocus
-                    />
-                  ) : (
-                    <Text style={styles.summaryNameText} numberOfLines={1}>
-                      {summaryName ? `#${summaryName}` : '-'}
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    onPress={handleEditPress}
-                    style={styles.editButton}>
-                    <EditIcon width={14} height={14} color={colors.darkSlate} />
-                  </TouchableOpacity>
+                  <Text style={styles.summaryNameText}>
+                    {summaryName ? `#${summaryName}` : '-'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -138,6 +87,10 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     padding: '20@ms',
     paddingTop: '40@ms',
+  },
+  summaryNameContainer: {
+    width: '100%',
+    padding: '6@ms',
   },
   backButton: {
     backgroundColor: colors.ashGray,
@@ -200,12 +153,5 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.charcoal2,
-  },
-  nameInput: {
-    minWidth: '200@ms',
-  },
-  editButton: {
-    padding: '4@ms',
-    marginLeft: '8@ms',
   },
 });
