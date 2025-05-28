@@ -30,7 +30,6 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
           auth: {
             user: {
               userId,
-              // chatId: chatId || 0,
             },
           },
           reconnection: true,
