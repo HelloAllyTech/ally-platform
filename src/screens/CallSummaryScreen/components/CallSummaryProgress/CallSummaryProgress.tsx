@@ -140,23 +140,28 @@ export const CallSummaryProgress: React.FC<CallSummaryProgressProps> = ({
 
   const handleAnimationComplete = useCallback(
     (stepId: string) => {
-      setVisibleSteps(prev =>
-        prev.map(step =>
-          step.id === stepId && !step.completed
-            ? {...step, completed: true}
-            : step,
-        ),
-      );
       const nextIndex = currentStepIndex.current + 1;
       const steps = getSteps(t);
-      if (nextIndex < steps.length) {
-        setVisibleSteps(prevSteps => [...prevSteps, steps[nextIndex]]);
-        currentStepIndex.current = nextIndex;
-      }
 
-      if (nextIndex === getSteps(t).length) {
-        onProgressComplete();
-      }
+      // Use requestAnimationFrame to ensure we're not in a render cycle
+      requestAnimationFrame(() => {
+        setVisibleSteps(prev =>
+          prev.map(step =>
+            step.id === stepId && !step.completed
+              ? {...step, completed: true}
+              : step,
+          ),
+        );
+
+        if (nextIndex < steps.length) {
+          setVisibleSteps(prevSteps => [...prevSteps, steps[nextIndex]]);
+          currentStepIndex.current = nextIndex;
+        }
+
+        if (nextIndex === steps.length) {
+          onProgressComplete();
+        }
+      });
     },
     [onProgressComplete, t],
   );

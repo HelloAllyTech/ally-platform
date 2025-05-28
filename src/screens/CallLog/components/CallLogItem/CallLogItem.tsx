@@ -25,6 +25,7 @@ import Tag from '../Tag/Tag';
 interface CallLogItemProps {
   item: CallLog;
   expanded: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   onItemPress: () => void;
 }
@@ -39,11 +40,16 @@ interface CallLogItemProps {
 const CallLogItem = ({
   item,
   expanded,
+  disabled = false,
   onToggle,
   onItemPress,
 }: CallLogItemProps) => {
   return (
-    <TouchableOpacity onPress={onItemPress} style={styles.logItemContainer}>
+    <TouchableOpacity
+      disabled={disabled}
+      activeOpacity={0.7}
+      onPress={onItemPress}
+      style={[styles.logItemContainer, disabled && styles.disabled]}>
       {/* Header section with client info and call quality score */}
       <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
         <View>
@@ -65,7 +71,9 @@ const CallLogItem = ({
               </Text>
             </View>
             <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
-            <EyeIcon width={16} height={16} style={styles.eyeIcon} />
+            {!disabled && (
+              <EyeIcon width={16} height={16} style={styles.eyeIcon} />
+            )}
           </View>
           <Text style={styles.logDate}>
             {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
@@ -112,6 +120,9 @@ const styles = ScaledSheet.create({
     paddingVertical: '10@ms',
     borderBottomWidth: 1,
     borderColor: colors.lightGray2,
+  },
+  disabled: {
+    opacity: 0.6,
   },
   logHeader: {
     borderRadius: '12@ms',
