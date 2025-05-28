@@ -1,5 +1,12 @@
 import React, {useEffect, useRef} from 'react';
 import {TextInput, View} from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SummaryFieldKey} from '@/constants/summary';
@@ -14,7 +21,10 @@ interface EditableFieldProps {
   placeholder?: string;
   canEdit: boolean;
   isEditing: boolean;
+  isEnhancing: boolean;
 }
+
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 // TO DO: Replace with original text component or else delete this file
 export const EditableField: React.FC<EditableFieldProps> = ({
@@ -25,19 +35,48 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   placeholder,
   canEdit,
   isEditing,
+  isEnhancing,
 }) => {
   const inputRef = useRef<TextInput>(null);
+  const opacity = useSharedValue(1);
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (isEnhancing) {
+      // Start pulsing animation when enhancing
+      opacity.value = withRepeat(
+        withSequence(
+          withTiming(0.5, {duration: 800}),
+          withTiming(1, {duration: 800}),
+        ),
+        -1, // Infinite repeat
+        true, // Reverse
+      );
+    } else {
+      // Stop animation and reset to full opacity
+      opacity.value = withTiming(1, {duration: 300});
+    }
+  }, [isEnhancing, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+    };
+  });
+
   return (
     <View style={styles.container}>
-      <TextInput
+      <AnimatedTextInput
         ref={inputRef}
-        style={canEdit && isEditing ? styles.editableText : styles.displayText}
+        style={[
+          canEdit && isEditing ? styles.editableText : styles.displayText,
+          animatedStyle,
+        ]}
         key={fieldKey}
         value={value || ''}
         onChangeText={onChangeText}
@@ -46,7 +85,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         }
         placeholderTextColor={colors.lightGray3}
         multiline
-        editable={canEdit && isEditing}
+        editable={canEdit && isEditing && !isEnhancing}
         autoFocus={canEdit && isEditing}
         selectTextOnFocus={canEdit && isEditing}
       />

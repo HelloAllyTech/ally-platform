@@ -30,7 +30,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
     useGetSummaryFieldsQuery();
   const {t} = useTranslate();
 
-  const {formData, isUpdating, handleSubmit} = useCallSummaryForm();
+  const {isUpdating, handleSubmit} = useCallSummaryForm();
 
   const [expanded, setExpanded] = useState({
     [SectionKey.SessionSummary]: false,
