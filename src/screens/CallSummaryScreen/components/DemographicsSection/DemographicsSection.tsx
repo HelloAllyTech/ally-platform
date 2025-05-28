@@ -85,7 +85,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         );
     }
   };
-  const duration =
+  const durationInSeconds =
     summaryDetails?.callDuration || summary?.[SUMMARY_FIELDS.CALL_DURATION];
 
   const fields: FieldConfig[] = useMemo(
@@ -97,8 +97,8 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.CALL_DURATION,
-        value: duration
-          ? `${Math.floor(Number(duration))} ${t('CallSummary.minutes')}`
+        value: durationInSeconds
+          ? `${Math.floor(Number(durationInSeconds) / 60)} ${t('CallSummary.minutes')}`
           : '-',
       },
       {
@@ -152,7 +152,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         value: summary?.[SUMMARY_FIELDS.LOCATION] || '-',
       },
     ],
-    [duration, formData, summary, summaryDetails, t],
+    [durationInSeconds, formData, summary, summaryDetails, t],
   );
 
   return (
