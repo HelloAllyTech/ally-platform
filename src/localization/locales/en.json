@@ -99,5 +99,11 @@
     "yourself": "yourself.",
     "takeAMomentForYourself": "Take a moment for yourself."
   },
+  "BoxBreathingScreen": {
+    "trackPlayer": {
+      "error": "Error playing audio",
+      "errorAddingTrack": "Error adding track"
+    }
+  },
   "submit": "Submit"
 }

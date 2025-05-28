@@ -12,21 +12,27 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
 import {
-  BoxBreathingLottie,
+  BoxBreathingAnimation,
   BreathingControls,
 } from './components/BreathingVideo';
+import {Phase} from './components/BreathingVideo/BoxBreathingAnimation';
 import {CallEndOverlay} from './components/CallEndOverlay';
 
-export const BreathingScreen: React.FC<
-  RootStackScreenProps<'BreathingScreen'>
-> = ({navigation}) => {
+export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
+  navigation,
+}) => {
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(true);
-  const [seconds, setSeconds] = useState(1);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   const lottieRef = useRef<LottieView>(null); // <-- Add ref for Lottie
   const [showOverlay, setShowOverlay] = useState(true);
   const {t} = useTranslate();
+
+  useEffect(() => {
+    return () => {
+      setIsPlaying(false);
+    };
+  }, []);
 
   useEffect(() => {
     if (showOverlay) {
@@ -35,33 +41,11 @@ export const BreathingScreen: React.FC<
       }, 3000);
       return () => clearTimeout(timer);
     } else {
-      startTimer();
       playVideo();
     }
   }, [showOverlay]);
 
-  const startTimer = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setSeconds(prev => (prev === 4 ? 1 : prev + 1));
-    }, 1000);
-  };
-
-  const stopTimer = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  };
-
   const togglePlayPause = () => {
-    if (isPlaying) {
-      stopTimer();
-      lottieRef.current?.pause();
-    } else {
-      startTimer();
-      lottieRef.current?.play();
-    }
     setIsPlaying(prev => !prev);
   };
 
@@ -75,7 +59,12 @@ export const BreathingScreen: React.FC<
   };
 
   const onPressSkip = () => {
+    setIsPlaying(false);
     navigation.navigate('CallSummary');
+  };
+
+  const onPhaseChange = (phase: Phase) => {
+    setSeconds(phase.time);
   };
 
   return (
@@ -98,9 +87,12 @@ export const BreathingScreen: React.FC<
                 {t('BreathingScreen.header.breathing')}
               </Text>
             </Text>
-
-            <BoxBreathingLottie ref={lottieRef} />
-
+            <BoxBreathingAnimation
+              isPlaying={isPlaying}
+              isMuted={isMuted}
+              animationDuration={4000}
+              onPhaseChange={onPhaseChange}
+            />
             <Text style={styles.timer}>{seconds}</Text>
 
             <BreathingControls
