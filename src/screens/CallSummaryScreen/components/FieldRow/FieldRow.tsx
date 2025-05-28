@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {ReactNode} from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -8,7 +8,7 @@ import {typography} from '@/theme/typography';
 
 interface FieldRowProps {
   label: string;
-  value: string | number;
+  value: string | number | ReactNode;
   showSeparator?: boolean;
 }
 
@@ -20,7 +20,11 @@ export const FieldRow: React.FC<FieldRowProps> = ({
   <>
     <View style={styles.fieldContainer}>
       <Text style={styles.label}>{label}:</Text>
-      <Text style={styles.value}>{value}</Text>
+      {typeof value === 'string' || typeof value === 'number' ? (
+        <Text style={styles.value}>{value}</Text>
+      ) : (
+        value
+      )}
     </View>
     {showSeparator && <View style={styles.separator} />}
   </>
@@ -30,6 +34,7 @@ const styles = ScaledSheet.create({
   fieldContainer: {
     flexDirection: 'row',
     marginBottom: '5@vs',
+    alignItems: 'center',
   },
   label: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -41,6 +46,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.lightGray3,
+    flex: 1,
   },
   separator: {
     height: '1@vs',

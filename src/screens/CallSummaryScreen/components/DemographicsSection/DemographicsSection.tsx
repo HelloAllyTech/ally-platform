@@ -1,47 +1,99 @@
-import {useMemo} from 'react';
+import React, {useMemo} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {CustomDropdown} from '@/components/Dropdown/Dropdown';
 import {
   FIELD_LABELS,
   SUMMARY_FIELDS,
   SummaryFieldKey,
+  summaryFields,
 } from '@/constants/summary';
+import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
-import {CallSummaryResponse} from '@/services/callSummaryApi';
+import {useAppSelector} from '@/store/hooks';
+import {AppRootState} from '@/store/store';
+import {SummaryFieldValueTypes} from '@/types/callSummary';
 import {formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
 
 interface FieldConfig {
   field: SummaryFieldKey;
-  value: string | number;
-  showSeparator?: boolean;
+  value: SummaryFieldValueTypes;
 }
 
-const renderField = (fieldConfig: FieldConfig) => (
-  <FieldRow
-    key={fieldConfig.field}
-    label={FIELD_LABELS[fieldConfig.field]}
-    value={fieldConfig.value}
-  />
-);
+interface DemographicsSectionProps {
+  isEditing: boolean;
+}
 
-export const DemographicsSection = ({
-  summaryDetails,
-}: {
-  summaryDetails: CallSummaryResponse['details'];
+export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
+  isEditing,
 }) => {
   const {t} = useTranslate();
-  const summary = summaryDetails.summary;
+  const {handleFieldChange, formData} = useCallSummaryForm();
+  const summaryData = useAppSelector(
+    (state: AppRootState) => state.summary.summaryData,
+  );
+  const summary = summaryData?.details?.summary;
+  const summaryDetails = summaryData?.details;
+
+  const renderField = (fieldConfig: FieldConfig) => {
+    const fieldItem = summaryFields.find(
+      field => field.key === fieldConfig.field,
+    );
+    switch (fieldItem?.type) {
+      case 'Text':
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={fieldConfig.value as string}
+          />
+        );
+
+      case 'Dropdown':
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={
+              isEditing ? (
+                <View style={styles.dropdownContainer}>
+                  <CustomDropdown
+                    value={fieldConfig.value as string}
+                    options={Array.from(fieldItem.options || [])}
+                    onSelect={(selectedValue: string) => {
+                      handleFieldChange?.(fieldConfig.field)(selectedValue);
+                    }}
+                  />
+                </View>
+              ) : (
+                (fieldConfig.value as string)
+              )
+            }
+          />
+        );
+
+      default:
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={fieldConfig.value as string}
+          />
+        );
+    }
+  };
   const duration =
-    summaryDetails.callDuration || summary[SUMMARY_FIELDS.CALL_DURATION];
+    summaryDetails?.callDuration || summary?.[SUMMARY_FIELDS.CALL_DURATION];
 
   const fields: FieldConfig[] = useMemo(
     () => [
       {
         field: SUMMARY_FIELDS.CALL_ID,
-        value: summaryDetails?.chatId || summary[SUMMARY_FIELDS.CALL_ID] || '-',
+        value:
+          summaryDetails?.chatId || summary?.[SUMMARY_FIELDS.CALL_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_DURATION,
@@ -51,7 +103,7 @@ export const DemographicsSection = ({
       },
       {
         field: SUMMARY_FIELDS.CALL_DATE,
-        value: summary[SUMMARY_FIELDS.CALL_DATE] || '-',
+        value: summary?.[SUMMARY_FIELDS.CALL_DATE] || '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_TIME,
@@ -62,57 +114,60 @@ export const DemographicsSection = ({
       },
       {
         field: SUMMARY_FIELDS.CALLER_ID,
-        value: summary[SUMMARY_FIELDS.CALLER_ID] || '-',
+        value: summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.COUNSELOR_NAME,
-        value: summary[SUMMARY_FIELDS.COUNSELOR_NAME] || '-',
+        value: summary?.[SUMMARY_FIELDS.COUNSELOR_NAME] || '-',
       },
       {
         field: SUMMARY_FIELDS.CALLER_TYPE,
-        value: summary[SUMMARY_FIELDS.CALLER_TYPE] || '-',
+        value: summary?.[SUMMARY_FIELDS.CALLER_TYPE] || '-',
       },
       {
         field: SUMMARY_FIELDS.AGE,
-        value: summary[SUMMARY_FIELDS.AGE] || '-',
+        value: formData?.[SUMMARY_FIELDS.AGE] || '-',
       },
       {
         field: SUMMARY_FIELDS.GENDER,
-        value: summary[SUMMARY_FIELDS.GENDER] || '-',
+        value: formData?.[SUMMARY_FIELDS.GENDER] || '-',
       },
       {
         field: SUMMARY_FIELDS.PROFESSION,
-        value: summary[SUMMARY_FIELDS.PROFESSION] || '-',
+        value: summary?.[SUMMARY_FIELDS.PROFESSION] || '-',
       },
       {
         field: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
-        value: summary[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
+        value: summary?.[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
       },
       {
         field: SUMMARY_FIELDS.LANGUAGES,
         value:
-          summary[SUMMARY_FIELDS.LANGUAGES]
+          summary?.[SUMMARY_FIELDS.LANGUAGES]
             ?.map(language => `${language.language} (${language.percentage}%)`)
             .join(', ') || '-',
       },
       {
         field: SUMMARY_FIELDS.LOCATION,
-        value: summary[SUMMARY_FIELDS.LOCATION] || '-',
-      },
-      {
-        field: SUMMARY_FIELDS.CONCERN_CODE,
-        value: summary[SUMMARY_FIELDS.CONCERN_CODE] || '-',
+        value: summary?.[SUMMARY_FIELDS.LOCATION] || '-',
       },
     ],
-    [duration, summary, summaryDetails, t],
+    [duration, formData, summary, summaryDetails, t],
   );
 
-  return <View style={styles.container}>{fields.map(renderField)}</View>;
+  return (
+    <View style={styles.container}>
+      {fields.map(field => renderField(field))}
+    </View>
+  );
 };
 
 const styles = ScaledSheet.create({
   container: {
-    paddingTop: '4@ms',
-    paddingBottom: '6@ms',
+    flex: 1,
+  },
+  dropdownContainer: {
+    flex: 1,
+    minHeight: '40@vs',
   },
 });
