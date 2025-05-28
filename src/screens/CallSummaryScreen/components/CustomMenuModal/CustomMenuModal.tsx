@@ -1,14 +1,15 @@
-import React from 'react';
-import {Modal, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {DeleteIcon, ExportIcon} from '@/assets/icons';
+import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-export interface CustomMenuModalProps {
+interface CustomMenuModalProps {
   visible: boolean;
   onClose: () => void;
   onExport: () => void;
@@ -23,72 +24,133 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, fadeAnim]);
+
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}>
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPressOut={onClose}>
-        <View style={[styles.menuContainer, {marginTop: insets.top + 56}]}>
-          <TouchableOpacity style={styles.menuItem} onPress={onExport}>
-            <Text style={styles.menuText}>
-              {t('CallSummary.customMenu.export')}
-            </Text>
-            <ExportIcon width={16} height={16} />
-          </TouchableOpacity>
-          <View style={styles.menuDivider} />
-          <TouchableOpacity style={styles.menuItem} onPress={onDelete}>
-            <Text style={styles.menuText}>
-              {t('CallSummary.customMenu.delete')}
-            </Text>
-            <DeleteIcon width={16} height={16} />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Modal>
+    <View style={styles.container}>
+      <Animated.View
+        style={[
+          styles.overlay,
+          {
+            opacity: fadeAnim,
+          },
+        ]}>
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.menuContainer,
+          {
+            marginTop: insets.top + 60,
+            width: Math.min(200, SCREEN_WIDTH * 0.7),
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-10, 0],
+                }),
+              },
+            ],
+          },
+          !isIOS && styles.androidShadow,
+        ]}>
+        <TouchableOpacity style={styles.menuItem} onPress={onExport}>
+          <Text style={styles.menuText}>
+            {t('CallSummary.customMenu.export')}
+          </Text>
+          <ExportIcon width={16} height={16} />
+        </TouchableOpacity>
+        <View style={styles.menuDivider} />
+        <TouchableOpacity style={styles.menuItem} onPress={onDelete}>
+          <Text style={styles.menuText}>
+            {t('CallSummary.customMenu.delete')}
+          </Text>
+          <DeleteIcon width={16} height={16} />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = ScaledSheet.create({
-  modalOverlay: {
-    flex: 1,
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: colors.whiteTransparent10,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
+  },
+  overlayTouchable: {
+    flex: 1,
   },
   menuContainer: {
+    position: 'absolute',
+    right: ms(20),
     backgroundColor: colors.white,
-    borderRadius: '8@ms',
-    marginTop: '60@ms',
-    marginRight: '16@ms',
-    paddingVertical: '4@ms',
-    width: '200@ms',
-    shadowColor: colors.black,
-    shadowOffset: {width: 0, height: 2},
+    borderRadius: ms(8),
+    paddingVertical: ms(4),
+    shadowColor: colors.darkGray,
+    shadowOffset: {width: 0, height: ms(2)},
     shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowRadius: ms(8),
     elevation: 5,
+  },
+  androidShadow: {
+    elevation: 8,
+    shadowColor: colors.black,
+    shadowOffset: {width: 0, height: ms(4)},
+    shadowOpacity: 0.3,
+    shadowRadius: ms(4.65),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: '8@ms',
-    paddingHorizontal: '20@ms',
+    paddingVertical: ms(8),
+    paddingHorizontal: ms(20),
+    minHeight: ms(44),
   },
   menuText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '15@ms',
+    fontSize: ms(15),
     color: colors.black,
   },
   menuDivider: {
-    height: '0.5@ms',
+    height: ms(0.5),
     backgroundColor: colors.lightGray2,
-    marginHorizontal: '10@ms',
+    marginHorizontal: ms(10),
   },
 });
 

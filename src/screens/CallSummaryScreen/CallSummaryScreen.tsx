@@ -2,12 +2,9 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
-  PermissionsAndroid,
-  Platform,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import RNFS from 'react-native-fs';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -18,7 +15,8 @@ import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {Toast} from '@/components/Toast/Toast';
-import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
+import {WINDOW_HEIGHT} from '@/constants/general';
+import {useStoragePermissions} from '@/hooks/useStoragePermissions';
 import useTranslate from '@/hooks/useTranslate';
 import {TranslationType} from '@/localization/locales/type';
 import {RootStackScreenProps} from '@/navigation/types';
@@ -32,6 +30,7 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {clearFormData, clearSummary} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
+import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
@@ -82,6 +81,19 @@ export const CallSummaryScreen: React.FC<
   );
   const [updateCallInfo] = useUpdateCallInfoMutation();
 
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'error',
+  ) => {
+    setToast({
+      visible: true,
+      message,
+      type,
+    });
+  };
+
+  const {checkAndRequestPermissions} = useStoragePermissions(showToast);
+
   useEffect(() => {
     if (chatId) {
       fetchCallSummary(chatId);
@@ -99,17 +111,6 @@ export const CallSummaryScreen: React.FC<
       setSummaryName(summaryData.details.callInfo.summaryName);
     }
   }, [summaryData?.details?.callInfo?.summaryName]);
-
-  const showToast = (
-    message: string,
-    type: 'success' | 'error' | 'info' = 'error',
-  ) => {
-    setToast({
-      visible: true,
-      message,
-      type,
-    });
-  };
 
   const hideToast = () => {
     setToast(prev => ({...prev, visible: false}));
@@ -155,52 +156,36 @@ export const CallSummaryScreen: React.FC<
   };
 
   const handleExport = async () => {
-    if (chatId) {
-      try {
-        if (!isIOS) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            showToast(t('CallSummary.info.storagePermissionDenied'));
-            return;
-          }
-        }
+    if (!chatId) return;
 
-        const response = await exportCallSummary(chatId).unwrap();
-        if (typeof response !== 'string') {
-          throw new Error(t('CallSummary.info.invalidResponseFormat'));
-        }
+    try {
+      const hasPermission = await checkAndRequestPermissions();
+      if (!hasPermission) return;
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `call-summary-${chatId}-${timestamp}.txt`;
-        const directory = Platform.select({
-          ios: RNFS.DocumentDirectoryPath,
-          android: RNFS.DownloadDirectoryPath,
-        });
-
-        if (!directory) {
-          throw new Error(t('CallSummary.info.directoryPathError'));
-        }
-
-        const filePath = `${directory}/${filename}`;
-        await RNFS.writeFile(filePath, response, 'utf8');
-
-        if (!isIOS) {
-          await RNFS.scanFile(filePath);
-        }
-        logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
-
-        showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
-        setIsMenuVisible(false);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : t('CallSummary.info.fileExportFailed');
-        logger.error(errorMessage);
-        showToast(errorMessage);
+      const response = await exportCallSummary(chatId).unwrap();
+      if (typeof response !== 'string') {
+        throw new Error(t('CallSummary.info.invalidResponseFormat'));
       }
+
+      const filePath = await saveFile({
+        content: response,
+        chatId,
+        t,
+      });
+      logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
+
+      showToast(
+        `${t('CallSummary.info.fileExportedSuccess')} to ${filePath}`,
+        'success',
+      );
+      setIsMenuVisible(false);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : t('CallSummary.info.fileExportFailed');
+      logger.error(errorMessage);
+      showToast(errorMessage);
     }
   };
 
@@ -303,7 +288,7 @@ export const CallSummaryScreen: React.FC<
         style={[
           styles.card,
           animatedCardStyle,
-          {maxHeight: WINDOW_HEIGHT - insets.top - 90},
+          {maxHeight: WINDOW_HEIGHT - insets.top},
         ]}>
         <ScrollView
           ref={scrollViewRef}

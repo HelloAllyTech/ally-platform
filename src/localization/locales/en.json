@@ -67,7 +67,13 @@
       "summaryNameUpdateSuccess": "Summary name updated successfully",
       "summaryNameUpdateFailed": "Failed to update summary name",
       "summaryUpdatedSuccess": "Call summary updated successfully",
-      "summaryUpdateFailed": "Failed to update call summary"
+      "summaryUpdateFailed": "Failed to update call summary",
+      "enableStoragePermission": "Enable storage permission to export file",
+      "storagePermissionTitle": "Storage Permission Required",
+      "storagePermissionMessage": "This app needs storage permission to export call summaries to your device",
+      "askMeLater": "Ask me later",
+      "cancel": "Cancel",
+      "ok": "OK"
     }
   },
   "CallLogs": {

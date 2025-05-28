@@ -1,4 +1,5 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, View} from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -6,6 +7,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {colors} from '@/theme/colors';
+import {isEmptyObject} from '@/utils/common';
 
 import {CallLogHeader} from './components/CallLogHeader/CallLogHeader';
 import CallLogItem from './components/CallLogItem/CallLogItem';
@@ -33,23 +35,27 @@ export const CallLogScreen: React.FC = () => {
   // RTK Query hook for fetching call logs
   const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
 
-  // Fetch initial data when component mounts
-  useEffect(() => {
-    fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   /**
    * Fetches the initial set of call logs
    * Sets up the initial state for pagination
    */
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
     if (result.data?.data) {
       setAllLogs(result.data.data);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
     }
-  };
+  }, [getCallLogs]);
+
+  // Use useFocusEffect to refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setOffset(0);
+      setAllLogs([]);
+      setHasMore(true);
+      fetchInitialData();
+    }, [fetchInitialData]),
+  );
 
   /**
    * Handles loading more call logs when user scrolls to the bottom
@@ -113,6 +119,7 @@ export const CallLogScreen: React.FC = () => {
   const renderItem = ({item, index}: {item: CallLog; index: number}) => (
     <CallLogItem
       item={item}
+      disabled={isEmptyObject(item.details?.summary)}
       expanded={expandedIdx === index}
       onToggle={() => handleToggle(index)}
       onItemPress={() => handleItemPress(item)}

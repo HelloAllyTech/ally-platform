@@ -2,10 +2,8 @@ import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import {SvgProps} from 'react-native-svg';
 
-import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
+import {SECTION_LIST, SectionKey} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
-import {useAppSelector} from '@/store/hooks';
-import {AppRootState} from '@/store/store';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -45,17 +43,6 @@ const SectionWrapper = ({
   isEditing,
   setIsEditing,
 }: SectionWrapperProps) => {
-  const summaryData = useAppSelector(
-    (state: AppRootState) => state.summary.summaryData,
-  );
-  const {formData} = useCallSummaryForm();
-  const summary = summaryData?.details?.summary;
-  const sectionField = summaryFields.find(
-    field => field.sectionKey === sectionConfig.key,
-  );
-  const fieldKey = sectionField?.key;
-  // const value = formData?.[fieldKey as SummaryFieldKey] ?? '';
-  const {handleFieldChange} = useCallSummaryForm();
   const {handleSectionFieldsReset} = useCallSummaryForm();
 
   const onPressWand = () => {
@@ -130,10 +117,12 @@ export default SectionWrapper;
 
 const styles = ScaledSheet.create({
   sectionBox: {
+    marginTop: '8@ms',
     borderBottomColor: colors.lightGray5,
     borderBottomWidth: 0.5,
   },
   sectionBoxEditing: {
+    marginTop: '8@ms',
     borderWidth: 0.5,
     borderColor: colors.gray,
     borderRadius: '16@ms',

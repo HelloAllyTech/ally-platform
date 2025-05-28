@@ -10,6 +10,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EditIcon, LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
+import {DEFAULT_HIT_SLOP} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -105,6 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
             </View>
             <TouchableOpacity
+              hitSlop={DEFAULT_HIT_SLOP}
               style={styles.moreOptionsContainer}
               onPress={onMenuPress}>
               <ThreeDotsIcon />
