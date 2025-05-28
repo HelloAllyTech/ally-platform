@@ -1,4 +1,3 @@
-import {Platform} from 'react-native';
 import RNFS from 'react-native-fs';
 
 import {isIOS} from '@/constants/general';
@@ -17,10 +16,18 @@ export const saveFile = async ({
 }: SaveFileOptions): Promise<string> => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `call-summary-${chatId}-${timestamp}.txt`;
-  const directory = Platform.select({
-    ios: RNFS.DocumentDirectoryPath,
-    android: RNFS.DownloadDirectoryPath,
-  });
+  let directory;
+  if (isIOS) {
+    // For iOS, save directly to the app's Documents directory
+    directory = `${RNFS.DocumentDirectoryPath}/CallSummary`;
+    // Create CallSummary directory if it doesn't exist
+    const exists = await RNFS.exists(directory);
+    if (!exists) {
+      await RNFS.mkdir(directory);
+    }
+  } else {
+    directory = RNFS.DownloadDirectoryPath;
+  }
 
   if (!directory) {
     throw new Error(t('CallSummary.info.directoryPathError'));
