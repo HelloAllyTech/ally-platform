@@ -8,17 +8,19 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  CommunityActiveIcon,
+  CommunityInactiveIcon,
   HomeActiveIcon,
   HomeInactiveIcon,
 } from '@/assets/icons';
-import {CallLogScreen, HomeScreen} from '@/screens';
+import {CallLogScreen, CommunityScreen, HomeScreen} from '@/screens';
 import {colors} from '@/theme/colors';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = ['HomeTab', 'CallLog'];
+const TAB_NAMES = ['HomeTab', 'CallLog', 'Community'];
 
-const TAB_COMPONENTS = [HomeScreen, CallLogScreen];
+const TAB_COMPONENTS = [HomeScreen, CallLogScreen, CommunityScreen];
 
 const CustomTabBar = (props: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
@@ -27,11 +29,13 @@ const CustomTabBar = (props: BottomTabBarProps) => {
     const focusedIcons = {
       HomeTab: <HomeActiveIcon width={20} height={20} />,
       CallLog: <CallLogActiveIcon width={20} height={20} />,
+      Community: <CommunityActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
       HomeTab: <HomeInactiveIcon width={20} height={20} />,
       CallLog: <CallLogInactiveIcon width={20} height={20} />,
+      Community: <CommunityInactiveIcon width={20} height={20} />,
     };
 
     return focused
