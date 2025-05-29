@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {ArrowDown} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -20,6 +21,8 @@ interface DropdownProps {
   placeholder?: string;
   disabled?: boolean;
   zIndex?: number;
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
 }
 
 export const CustomDropdown: React.FC<DropdownProps> = ({
@@ -29,8 +32,10 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
   placeholder = 'Select',
   disabled = false,
   zIndex = 1000,
+  isOpen,
+  setIsOpen,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownWidth, setDropdownWidth] = useState<number>(0);
   const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -41,9 +46,16 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
     }).start();
   }, [isOpen, animation]);
 
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const toggleDropdown = () => {
     if (!disabled) {
-      setIsOpen(prev => !prev);
+      setIsOpen(!isOpen);
     }
   };
 
@@ -57,6 +69,10 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
     outputRange: [0, Math.min(200, options.length * 40)],
   });
 
+  const getLongestOption = (optionsList: string[]) => {
+    return optionsList.reduce((a, b) => (a.length > b.length ? a : b), '');
+  };
+
   return (
     <View style={[styles.mainContainer, {zIndex: isOpen ? zIndex : 1}]}>
       <TouchableOpacity
@@ -66,15 +82,21 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
         <Text style={[styles.headerText, !value && styles.placeholder]}>
           {value || placeholder}
         </Text>
-        <Text style={[styles.arrow, isOpen && styles.arrowUp]}>▼</Text>
+        <View style={[styles.arrow, isOpen && styles.arrowUp]}>
+          <ArrowDown width={6} height={6} />
+        </View>
       </TouchableOpacity>
 
-      {isOpen && (
+      {isOpen && dropdownWidth > 0 && (
         <>
           <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
             <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
           </TouchableWithoutFeedback>
-          <Animated.View style={[styles.dropdown, {maxHeight: dropdownHeight}]}>
+          <Animated.View
+            style={[
+              styles.dropdown,
+              {maxHeight: dropdownHeight, minWidth: dropdownWidth},
+            ]}>
             <ScrollView
               nestedScrollEnabled
               scrollEventThrottle={16}
@@ -108,6 +130,18 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
           </Animated.View>
         </>
       )}
+      <View style={styles.hiddenTextContainer}>
+        <Text
+          style={styles.itemText}
+          onLayout={e => {
+            const {width} = e.nativeEvent.layout;
+            if (isMounted.current) {
+              setDropdownWidth(Math.ceil(width + 36));
+            }
+          }}>
+          {getLongestOption(options)}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -115,23 +149,21 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
 const styles = ScaledSheet.create({
   mainContainer: {
     position: 'relative',
+    alignSelf: 'flex-start',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: '8@ms',
+    paddingVertical: '4@ms',
     paddingHorizontal: '12@ms',
     borderRadius: '4@ms',
     backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.lightGray7,
   },
   headerText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
-    color: colors.charcoal2,
-    flex: 1,
+    color: colors.black,
+    fontWeight: '400',
   },
   placeholder: {
     color: colors.charcoal2,
@@ -141,8 +173,6 @@ const styles = ScaledSheet.create({
     opacity: 0.5,
   },
   arrow: {
-    fontSize: '12@ms',
-    color: colors.charcoal2,
     marginLeft: '8@ms',
   },
   arrowUp: {
@@ -157,7 +187,7 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    borderRadius: '4@ms',
+    borderRadius: '10@ms',
     borderWidth: 1,
     borderColor: colors.lightGray7,
     elevation: 5,
@@ -173,10 +203,8 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
   },
   item: {
-    paddingVertical: '10@ms',
-    paddingHorizontal: '15@ms',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray7,
+    paddingVertical: '8@ms',
+    paddingHorizontal: '16@ms',
   },
   lastOption: {
     borderBottomWidth: 0,
@@ -184,10 +212,15 @@ const styles = ScaledSheet.create({
   itemText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
-    color: colors.charcoal2,
+    color: colors.lightGray3,
   },
   selectedItem: {
     color: colors.teal,
     fontWeight: '500',
+  },
+  hiddenTextContainer: {
+    position: 'absolute',
+    opacity: 0,
+    zIndex: -1,
   },
 });
