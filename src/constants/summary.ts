@@ -15,7 +15,7 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
-import {SummaryField} from '@/types/callSummary';
+import {FieldType, SummaryField} from '@/types/callSummary';
 
 // Section keys for organizing fields
 export enum SectionKey {
@@ -249,8 +249,8 @@ export const FIELD_TO_SECTION_MAP: Record<SummaryFieldKey, SectionKey> = {
 export const GENDER_OPTIONS = [
   'Male',
   'Female',
-  'Other',
-  'Prefer not to say',
+  'Non-binary',
+  'Client Prefers Not to Say',
 ] as const;
 
 // Age range options
@@ -359,42 +359,42 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.CALLER_ID,
     label: 'Call ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALL_DURATION,
     label: 'Call Duration',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALL_DATE,
     label: 'Call Date',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALL_TIME,
     label: 'Call time',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALLER_ID,
     label: 'Caller ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALLER_TYPE,
     label: 'Caller type',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: true,
@@ -402,7 +402,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Age',
     options: AGE_RANGE_OPTIONS,
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Dropdown',
+    type: FieldType.Dropdown,
   },
   {
     isEditable: true,
@@ -410,49 +410,49 @@ export const summaryFields: SummaryField[] = [
     label: 'Gender',
     options: GENDER_OPTIONS,
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Dropdown',
+    type: FieldType.Dropdown,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.PROFESSION,
     label: 'Profession',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.InlineTextInput,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.LOCATION,
     label: 'Location',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.LANGUAGES,
     label: 'Languages',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.CONCERN_CODE,
     label: 'Concern code',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.InlineTextInput,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
     label: 'Relationship Status',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.InlineTextInput,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.COUNSELOR_NAME,
     label: 'Counsellor Name',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
     isEditable: true,
@@ -460,7 +460,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.SESSION_SUMMARY,
     label: 'Session Summary',
     sectionKey: SectionKey.SessionSummary,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -468,7 +468,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.FLOW,
     label: 'Session Summary',
     sectionKey: SectionKey.Flow,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -476,7 +476,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.KEY_CONCERNS,
     label: 'Key concerns',
     sectionKey: SectionKey.KeyConcern,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -484,7 +484,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS,
     label: 'Objective Observations',
     sectionKey: SectionKey.ObjectiveObservations,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -492,7 +492,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS,
     label: 'Subjective Observations',
     sectionKey: SectionKey.SubjectiveObservations,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -500,7 +500,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.ASSESSMENT,
     label: 'Assessment',
     sectionKey: SectionKey.Assessment,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -508,7 +508,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.DOMINANT_FEELINGS,
     label: 'Dominant Feelings',
     sectionKey: SectionKey.DominantFeelings,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -516,7 +516,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.ISSUES_WORKED_ON,
     label: 'Issues Worked On',
     sectionKey: SectionKey.IssuesWorkedOn,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -524,7 +524,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES,
     label: 'Key Therapeutic Techniques',
     sectionKey: SectionKey.KeyTherapeuticTechniques,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -532,7 +532,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.REFERRALS_PROVIDED,
     label: 'Referrals Provided',
     sectionKey: SectionKey.ReferralsProvided,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -540,7 +540,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.HOMEWORK_RECOMMENDED,
     label: 'Homework Recommended',
     sectionKey: SectionKey.HomeworkRecommended,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -548,7 +548,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL,
     label: 'Plans for Next Call',
     sectionKey: SectionKey.PlansForNextCall,
-    type: 'Multiline',
+    type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
@@ -556,32 +556,32 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.TAGS,
     label: 'Tags',
     sectionKey: SectionKey.Tags,
-    type: 'Multiline',
+    type: FieldType.Text,
   },
 
   // Metrics section
   {
-    isEditable: true,
+    isEditable: false,
     isEnhanceable: true,
     key: SUMMARY_FIELDS.LISTENING_RATIO,
     label: 'Listening Share',
     sectionKey: SectionKey.Metrics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
-    isEditable: true,
+    isEditable: false,
     isEnhanceable: true,
     key: SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED,
     label: 'No of Reflective Questions asked',
     sectionKey: SectionKey.Metrics,
-    type: 'Text',
+    type: FieldType.Text,
   },
   {
-    isEditable: true,
+    isEditable: false,
     isEnhanceable: true,
     key: SUMMARY_FIELDS.EMOTIONAL_LIFT,
     label: 'Emotions Lift',
     sectionKey: SectionKey.Metrics,
-    type: 'Text',
+    type: FieldType.Text,
   },
 ];
