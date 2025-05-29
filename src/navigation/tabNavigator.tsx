@@ -7,6 +7,8 @@ import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {
+  AnalyticsActiveIcon,
+  AnalyticsInactiveIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CommunityActiveIcon,
@@ -14,14 +16,24 @@ import {
   HomeActiveIcon,
   HomeInactiveIcon,
 } from '@/assets/icons';
-import {CallLogScreen, CommunityScreen, HomeScreen} from '@/screens';
+import {
+  CallLogScreen,
+  CommunityScreen,
+  HomeScreen,
+  UserAnalyticsScreen,
+} from '@/screens';
 import {colors} from '@/theme/colors';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = ['HomeTab', 'CallLog', 'Community'];
+const TAB_NAMES = ['HomeTab', 'CallLog', 'UserAnalytics', 'Community'];
 
-const TAB_COMPONENTS = [HomeScreen, CallLogScreen, CommunityScreen];
+const TAB_COMPONENTS = [
+  HomeScreen,
+  CallLogScreen,
+  UserAnalyticsScreen,
+  CommunityScreen,
+];
 
 interface BottomTabsProps {
   hideTabBar?: boolean;
@@ -36,14 +48,16 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      HomeTab: <HomeActiveIcon width={20} height={20} />,
-      CallLog: <CallLogActiveIcon width={20} height={20} />,
+      HomeTab: <HomeActiveIcon width={18} height={18} />,
+      CallLog: <CallLogActiveIcon width={18} height={18} />,
+      UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
       Community: <CommunityActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
-      HomeTab: <HomeInactiveIcon width={20} height={20} />,
-      CallLog: <CallLogInactiveIcon width={20} height={20} />,
+      HomeTab: <HomeInactiveIcon width={18} height={18} />,
+      CallLog: <CallLogInactiveIcon width={18} height={18} />,
+      UserAnalytics: <AnalyticsInactiveIcon width={18} height={18} />,
       Community: <CommunityInactiveIcon width={20} height={20} />,
     };
 

@@ -4,6 +4,8 @@ import {Linking, Text, View} from 'react-native';
 
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 
+const url = 'https://community.helloally.ai/';
+
 export const CommunityScreen: React.FC = () => {
   const navigation = useAppNavigation();
   useFocusEffect(
@@ -11,12 +13,7 @@ export const CommunityScreen: React.FC = () => {
       navigation.goBack();
 
       //Open community
-      const url = 'https://community.helloally.ai/';
-      Linking.canOpenURL(url).then(supported => {
-        if (supported) {
-          Linking.openURL(url);
-        }
-      });
+      Linking.openURL(url);
     }, [navigation]),
   );
 
