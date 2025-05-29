@@ -6,6 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import images from '@/assets/images';
 import {PrimaryButton} from '@/components';
+import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
 import {colors} from '@/theme/colors';
@@ -131,7 +132,8 @@ const styles = ScaledSheet.create({
     marginBottom: '20@vs',
   },
   headingItalic: {
-    fontStyle: 'italic',
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   timer: {
     fontSize: '48@ms',

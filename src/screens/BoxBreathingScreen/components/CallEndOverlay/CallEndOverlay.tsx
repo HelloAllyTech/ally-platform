@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -83,6 +84,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.REPLAY_PRO.HEADLINE,
   },
   italic: {
-    fontStyle: 'italic',
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
 });
