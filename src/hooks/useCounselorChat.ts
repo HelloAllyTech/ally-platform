@@ -1,12 +1,11 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
-import {useSelector} from 'react-redux';
 
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
-import {useAppDispatch} from '@/store/hooks';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setCurrentChat} from '@/store/slices/chatSlice';
-import {RootState} from '@/store/store';
 import {Chat} from '@/types/message';
+import {UserRole} from '@/types/user';
 
 interface UseCounselorChatProps {
   onActiveChatFound?: (data: Chat) => void;
@@ -19,9 +18,7 @@ export const useCounselorChat = ({
   onNoActiveChatFound,
   shouldSubscribeToAppState = false,
 }: UseCounselorChatProps = {}) => {
-  const isAuthenticated = useSelector(
-    (state: RootState) => state.user.isAuthenticated,
-  );
+  const userData = useAppSelector(state => state.user);
   const dispatch = useAppDispatch();
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const appState = useRef(AppState.currentState);
@@ -29,7 +26,7 @@ export const useCounselorChat = ({
 
   const checkCounselorChat = useCallback(async () => {
     // Prevent multiple simultaneous checks
-    if (!isAuthenticated || isCheckingRef.current) return;
+    if (!userData?.isAuthenticated || isCheckingRef.current) return;
 
     try {
       isCheckingRef.current = true;
@@ -50,7 +47,7 @@ export const useCounselorChat = ({
   }, [
     dispatch,
     getCounsellorChat,
-    isAuthenticated,
+    userData?.isAuthenticated,
     onActiveChatFound,
     onNoActiveChatFound,
   ]);
@@ -61,13 +58,14 @@ export const useCounselorChat = ({
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active' &&
-        isAuthenticated
+        userData?.isAuthenticated &&
+        userData?.user?.role === UserRole.COUNSELOR
       ) {
         await checkCounselorChat();
       }
       appState.current = nextAppState;
     },
-    [checkCounselorChat, isAuthenticated],
+    [checkCounselorChat, userData],
   );
 
   useEffect(() => {

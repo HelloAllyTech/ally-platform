@@ -47,6 +47,8 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.TAGS]: summary.tags || null,
   [SUMMARY_FIELDS.AGE]: summary.age || null,
   [SUMMARY_FIELDS.GENDER]: summary.gender || null,
+  [SUMMARY_FIELDS.PROFESSION]: summary.profession || null,
+  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -57,6 +59,12 @@ export const transformFormDataForSubmission = (
     ...summaryData?.details?.summary,
     [SUMMARY_FIELDS.AGE]: formData[SUMMARY_FIELDS.AGE] as AgeRange | null,
     [SUMMARY_FIELDS.GENDER]: formData[SUMMARY_FIELDS.GENDER] as string | null,
+    [SUMMARY_FIELDS.PROFESSION]: formData[SUMMARY_FIELDS.PROFESSION] as
+      | string
+      | null,
+    [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: formData[
+      SUMMARY_FIELDS.RELATIONSHIP_STATUS
+    ] as string | null,
     [SUMMARY_FIELDS.SESSION_SUMMARY]: formData[
       SUMMARY_FIELDS.SESSION_SUMMARY
     ] as string | null,

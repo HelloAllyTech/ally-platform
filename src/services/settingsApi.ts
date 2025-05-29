@@ -7,7 +7,10 @@ export const settingsApi = api.injectEndpoints({
     getSummaryFields: builder.query<SummaryFieldKey[], void>({
       query: () => '/settings/summary-fields',
     }),
+    getNudgeStatus: builder.query<boolean, void>({
+      query: () => '/settings/nudge-status',
+    }),
   }),
 });
 
-export const {useGetSummaryFieldsQuery} = settingsApi;
+export const {useGetSummaryFieldsQuery, useGetNudgeStatusQuery} = settingsApi;

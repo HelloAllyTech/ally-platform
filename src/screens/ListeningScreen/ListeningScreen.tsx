@@ -10,6 +10,7 @@ import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -43,6 +44,7 @@ export const ListeningScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCallPaused, setIsCallPaused] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
+  const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Clear timeout on unmount
@@ -167,15 +169,15 @@ export const ListeningScreen = () => {
       <View style={styles.content}>
         <View style={styles.blobContainer}>
           <AnimatedBlob
-            isExpanded={!isNudgeVisible}
+            isExpanded={!nudgeStatus || !isNudgeVisible}
             isCallPaused={isCallPaused}
             isAudioActive={isAudioActive}
             onPlayPauseCallPress={handlePlayPauseCallPress}
           />
         </View>
         <NudgeSection
-          isVisible={isNudgeVisible}
-          nudge={currentNudge}
+          isVisible={!!nudgeStatus && isNudgeVisible}
+          nudge={nudgeStatus ? currentNudge : null}
           isLoading={isLoading}
           onFeedbackSuccess={handleNudgeFeedbackSuccess}
         />
@@ -184,7 +186,7 @@ export const ListeningScreen = () => {
       <ControlButtons
         onFocusModeButtonPress={toggleNudgeVisibility}
         isNudgeVisible={isNudgeVisible}
-        showFocusModeButton={!!currentNudge}
+        showFocusModeButton={!!currentNudge && nudgeStatus}
         onEndCallSuccess={handleCallEnd}
       />
     </LinearGradient>

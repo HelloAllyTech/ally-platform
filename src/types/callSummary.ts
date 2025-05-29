@@ -6,7 +6,12 @@ import {
 } from '@/constants/summary';
 import {Language} from '@/services/callSummaryApi';
 
-type FieldType = 'Text' | 'Number' | 'Boolean' | 'Multiline' | 'Dropdown';
+export enum FieldType {
+  Text = 'Text',
+  InlineTextInput = 'InlineTextInput',
+  MultilineTextInput = 'MultilineTextInput',
+  Dropdown = 'Dropdown',
+}
 
 type SummaryFieldKey = (typeof SUMMARY_FIELDS)[keyof typeof SUMMARY_FIELDS];
 

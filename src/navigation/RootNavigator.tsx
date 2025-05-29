@@ -6,6 +6,7 @@ import {
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
+import {useUser} from '@/hooks/useUser';
 import type {RootStackParamList} from '@/navigation/types';
 import {
   BreathingScreen,
@@ -14,6 +15,7 @@ import {
   ListeningScreen,
   SplashScreen,
 } from '@/screens';
+import {UserRole} from '@/types/user';
 
 import {BottomTabs} from './tabNavigator';
 
@@ -28,6 +30,9 @@ const NavigationContent = ({
   // Single subscription that's aware of the current screen
   useNavigationAwareCounselorChat(navigationRef);
 
+  const {userData} = useUser();
+  const isCounselor = userData?.role === UserRole.COUNSELOR;
+
   return (
     <Stack.Navigator
       initialRouteName="Splash"
@@ -35,7 +40,10 @@ const NavigationContent = ({
         headerShown: false,
       }}>
       <Stack.Screen name="Splash" component={SplashScreen} />
-      <Stack.Screen name="Home" component={BottomTabs} />
+      <Stack.Screen
+        name="Home"
+        children={() => <BottomTabs hideTabBar={!isCounselor} />}
+      />
       <Stack.Screen name="Listening" component={ListeningScreen} />
       <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
       <Stack.Screen name="CallLog" component={CallLogScreen} />
