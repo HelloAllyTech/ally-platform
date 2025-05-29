@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
+import {HeadphoneIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {DEFAULT_HIT_SLOP} from '@/constants/general';
+import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -23,7 +23,7 @@ import {useUser} from '@/hooks/useUser';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
-import {SocketEvent, SocketMessage} from '@/types/message';
+import {SocketEvent} from '@/types/message';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
@@ -67,9 +67,6 @@ export const HomeScreen: React.FC = () => {
 
   const socketEventCallbacks = useMemo(
     () => ({
-      [SocketEvent.CHAT_ACCEPTED]: (data: SocketMessage) => {
-        // TO DO: Need to handle
-      },
       [SocketEvent.USER_JOINED]: async () => {
         try {
           if (userData?.role === UserRole.COUNSELOR) {
@@ -139,7 +136,6 @@ export const HomeScreen: React.FC = () => {
         hitSlop={DEFAULT_HIT_SLOP}
         activeOpacity={0.8}>
         <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-        <InfoIcon width={20} height={20} />
       </TouchableOpacity>
     </View>
   );
@@ -165,7 +161,7 @@ const styles = ScaledSheet.create({
   },
   listeningText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: 'italic',
+    fontStyle: isIOS ? 'italic' : 'normal',
     color: colors.black,
     fontSize: '32@ms',
     lineHeight: '40@ms',
@@ -193,7 +189,7 @@ const styles = ScaledSheet.create({
     gap: '8@s',
   },
   tapText: {
-    ...fontFamily.ROBOTO.REGULAR,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.large,
     letterSpacing: 0.15,
     color: colors.mediumGray,
@@ -207,13 +203,13 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '40@s',
   },
   oopsText: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     color: colors.black,
     fontSize: '48@ms',
     lineHeight: '56@ms',
     textAlign: 'center',
     marginBottom: '30@mvs',
-    fontStyle: 'italic',
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   messageContainer: {
     marginBottom: '30@mvs',

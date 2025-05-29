@@ -3,6 +3,7 @@ import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {FilterIcon, SearchIcon} from '@/assets/icons';
+import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -59,7 +60,8 @@ const styles = ScaledSheet.create({
     fontWeight: '400',
   },
   headerItalic: {
-    fontStyle: 'italic',
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
     fontWeight: '500',
   },
   searchBarContainer: {
