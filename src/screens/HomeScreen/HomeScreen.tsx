@@ -15,11 +15,13 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 import {SocketEvent, SocketMessage} from '@/types/message';
+import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
+  const {userData} = useUser();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       navigation.navigate('Listening');
@@ -47,21 +49,30 @@ export const HomeScreen: React.FC = () => {
       },
       [SocketEvent.USER_JOINED]: async () => {
         try {
-          checkCounselorChat();
+          if (userData?.role === UserRole.COUNSELOR) {
+            checkCounselorChat();
+          }
         } catch (error) {
           logger.error(`Error in USER_JOINED handler: ${error}`);
         }
       },
     }),
-    [checkCounselorChat],
+    [checkCounselorChat, userData?.role],
   );
 
-  const {userData} = useUser();
   // Automatically manages socket connection based on screen focus and app state
   useSocketConnection({
     userId: userData?.id || 0,
     eventCallbacks: socketEventCallbacks,
   });
+
+  if (userData?.role !== UserRole.COUNSELOR) {
+    return (
+      <View style={styles.clientContainer}>
+        <Text style={styles.clientText}>{t('Home.noFeaturesAvailable')}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.content}>
@@ -149,5 +160,19 @@ const styles = ScaledSheet.create({
     letterSpacing: 0.15,
     color: colors.mediumGray,
     fontSize: '16@ms',
+  },
+  clientContainer: {
+    flex: 1,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: '20@s',
+  },
+  clientText: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    color: colors.mediumGray,
+    fontSize: '18@ms',
+    lineHeight: '24@ms',
+    textAlign: 'center',
   },
 });

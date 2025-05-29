@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   BottomTabBarProps,
   createBottomTabNavigator,
@@ -20,8 +21,16 @@ const TAB_NAMES = ['HomeTab', 'CallLog'];
 
 const TAB_COMPONENTS = [HomeScreen, CallLogScreen];
 
-const CustomTabBar = (props: BottomTabBarProps) => {
+interface BottomTabsProps {
+  hideTabBar?: boolean;
+}
+
+const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
   const insets = useSafeAreaInsets();
+
+  if (props.hideTabBar) {
+    return null;
+  }
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
@@ -57,18 +66,19 @@ const CustomTabBar = (props: BottomTabBarProps) => {
   );
 };
 
-const renderCustomTabBar = (props: BottomTabBarProps) => {
-  return <CustomTabBar {...props} />;
-};
+export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
+  const renderCustomTabBar = (props: BottomTabBarProps) => {
+    return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
+  };
 
-export const BottomTabs = () => {
   return (
     <View style={styles.container}>
       <Tab.Navigator
         tabBar={renderCustomTabBar}
         screenOptions={{
           headerShown: false,
-        }}>
+        }}
+        initialRouteName="HomeTab">
         {TAB_NAMES.map((name, idx) => (
           <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
         ))}

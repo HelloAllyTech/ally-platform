@@ -4,7 +4,8 @@
     "ok": "OK"
   },
   "Home": {
-    "callConnectionNotImplemented": "Call connection feature is not yet implemented"
+    "callConnectionNotImplemented": "Call connection feature is not yet implemented",
+    "noFeaturesAvailable": "No features are currently available for your account."
   },
   "HomeScreen": {
     "start": "Start",
