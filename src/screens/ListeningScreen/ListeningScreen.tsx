@@ -154,7 +154,11 @@ export const ListeningScreen = () => {
       locations={[0, 0.65, 0.9]}
       start={{x: 0.4, y: 0}}
       end={{x: 0.6, y: 1}}>
-      <StatusBar backgroundColor="transparent" translucent />
+      <StatusBar
+        backgroundColor="transparent"
+        translucent
+        barStyle="light-content"
+      />
       <View style={styles.header}>
         <Text style={styles.headerText}>
           {t('ListeningScreen.takingNotes')}

@@ -1,3 +1,5 @@
+import ArrowDown from './arrowDown.svg';
+import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import CallDetailsIcon from './callDetails.svg';
@@ -7,6 +9,8 @@ import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
 import CloseCircle from './closeCircle.svg';
+import CommunityActiveIcon from './communityActive.svg';
+import CommunityInactiveIcon from './communityInactive.svg';
 import DatabaseIcon from './database.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
@@ -36,6 +40,7 @@ import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import SearchIcon from './search.svg';
+import SessionSummaryIcon from './sessionSummary.svg';
 import SmileIcon from './smile.svg';
 import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
@@ -47,6 +52,8 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  CommunityActiveIcon,
+  CommunityInactiveIcon,
   LeftArrowIcon,
   CallEndIcon,
   MicWithGradientIcon,
@@ -94,4 +101,7 @@ export {
   DeleteIcon,
   ExportIcon,
   EditIcon,
+  ArrowRight,
+  ArrowDown,
+  SessionSummaryIcon,
 };

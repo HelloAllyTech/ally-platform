@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -36,6 +36,11 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
 }) => {
   const {t} = useTranslate();
   const {handleFieldChange, formData} = useCallSummaryForm();
+
+  const [openDropdown, setOpenDropdown] = useState<SummaryFieldKey | null>(
+    null,
+  );
+
   const summaryData = useAppSelector(
     (state: AppRootState) => state.summary.summaryData,
   );
@@ -94,6 +99,10 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
                     options={Array.from(fieldItem.options || [])}
                     onSelect={(selectedValue: string) => {
                       handleFieldChange?.(fieldConfig.field)(selectedValue);
+                    }}
+                    isOpen={openDropdown === fieldConfig.field}
+                    setIsOpen={(value: boolean) => {
+                      setOpenDropdown(value ? fieldConfig.field : null);
                     }}
                   />
                 </View>
@@ -196,8 +205,7 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   dropdownContainer: {
-    flex: 1,
-    minHeight: '40@vs',
+    alignSelf: 'flex-start',
   },
   inlineTextInput: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

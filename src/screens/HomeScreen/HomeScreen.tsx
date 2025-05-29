@@ -4,6 +4,7 @@ import {
   Alert,
   BackHandler,
   Linking,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -112,6 +113,7 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.content}>
+      <StatusBar barStyle="light-content" />
       <Text style={styles.titleContainer}>
         <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
         <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>

@@ -43,4 +43,6 @@ export const colors = {
   mediumGray2: '#9E9E9E',
   gray: '#7E7E7E',
   lightGrayWithOpacity: '#F5F5F5BA',
+  blue: '#1480FB',
+  lightGray8: '#F6F6F6',
 };

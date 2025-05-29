@@ -13,6 +13,7 @@ export type RootStackParamList = {
 export type TabParamList = {
   HomeTab: undefined;
   CallLog: undefined;
+  Community: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
