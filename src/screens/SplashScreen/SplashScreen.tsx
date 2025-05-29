@@ -22,6 +22,7 @@ import {useCounselorChat} from '@/hooks/useCounselorChat';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {RootStackScreenProps} from '@/navigation/types';
+import {UserRole} from '@/types/user';
 
 import {OtpVerification, PhoneLogin} from './components';
 import {styles} from './styles';
@@ -36,7 +37,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
-  const {checkAuth, isAuthenticated, isUserLoading} = useUser();
+  const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       // Reset the navigation stack to have Home and Listening screens
@@ -73,8 +74,11 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
           duration: 1000,
         });
       } else if (isAuthenticated) {
-        // Check for counselor chat after authentication
-        checkCounselorChat();
+        if (userData?.role === UserRole.COUNSELOR) {
+          checkCounselorChat();
+        } else {
+          navigation.replace('Home');
+        }
       }
     }
   }, [
@@ -83,6 +87,8 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     isUserLoading,
     animationTranslateY,
     checkCounselorChat,
+    userData?.role,
+    navigation,
   ]);
 
   const handleOtpGenerationSuccess = async (phone: string) => {
