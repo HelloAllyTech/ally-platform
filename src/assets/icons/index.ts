@@ -1,3 +1,5 @@
+import ArrowDown from './arrowDown.svg';
+import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import CallDetailsIcon from './callDetails.svg';
@@ -36,6 +38,7 @@ import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import SearchIcon from './search.svg';
+import SessionSummaryIcon from './sessionSummary.svg';
 import SmileIcon from './smile.svg';
 import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
@@ -94,4 +97,7 @@ export {
   DeleteIcon,
   ExportIcon,
   EditIcon,
+  ArrowRight,
+  ArrowDown,
+  SessionSummaryIcon,
 };
