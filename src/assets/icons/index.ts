@@ -1,3 +1,5 @@
+import AnalyticsInactiveIcon from './analytics.svg';
+import AnalyticsActiveIcon from './analyticsActive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
@@ -100,6 +102,8 @@ export {
   PrescriptionsIcon,
   DeleteIcon,
   ExportIcon,
+  AnalyticsInactiveIcon,
+  AnalyticsActiveIcon,
   EditIcon,
   ArrowRight,
   ArrowDown,
