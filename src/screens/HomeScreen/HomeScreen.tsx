@@ -1,9 +1,17 @@
 import React, {useCallback, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
-import {Alert, BackHandler, Text, TouchableOpacity, View} from 'react-native';
+import {
+  Alert,
+  BackHandler,
+  Linking,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
+import {env} from '@/config/env';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
@@ -42,6 +50,20 @@ export const HomeScreen: React.FC = () => {
     );
   }, [t]);
 
+  const handleLearnMorePress = useCallback(async () => {
+    try {
+      const supported = await Linking.canOpenURL(env.ALLY_WEB_URL);
+      if (supported) {
+        await Linking.openURL(env.ALLY_WEB_URL);
+      } else {
+        Alert.alert('Error', 'Unable to open the link');
+      }
+    } catch (error) {
+      logger.error(`Error opening learn more URL: ${error}`);
+      Alert.alert('Error', 'Unable to open the link');
+    }
+  }, []);
+
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.CHAT_ACCEPTED]: (data: SocketMessage) => {
@@ -69,7 +91,21 @@ export const HomeScreen: React.FC = () => {
   if (userData?.role !== UserRole.COUNSELOR) {
     return (
       <View style={styles.clientContainer}>
-        <Text style={styles.clientText}>{t('Home.noFeaturesAvailable')}</Text>
+        <Text style={styles.oopsText}>{t('Home.client.oops')}</Text>
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>
+            {t('Home.client.appCurrentlyFor')}
+          </Text>
+          <Text style={styles.messageText}>
+            {t('Home.client.counselorsOnly')}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={handleLearnMorePress}
+          style={styles.learnMoreButton}
+          hitSlop={DEFAULT_HIT_SLOP}>
+          <Text style={styles.learnMoreText}>{t('Home.client.learnMore')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -166,13 +202,38 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: '20@s',
+    paddingHorizontal: '40@s',
   },
-  clientText: {
+  oopsText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
+    color: colors.black,
+    fontSize: '48@ms',
+    lineHeight: '56@ms',
+    textAlign: 'center',
+    marginBottom: '30@mvs',
+    fontStyle: 'italic',
+  },
+  messageContainer: {
+    marginBottom: '30@mvs',
+    alignItems: 'center',
+  },
+  messageText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.mediumGray,
     fontSize: '18@ms',
     lineHeight: '24@ms',
     textAlign: 'center',
+  },
+  learnMoreButton: {
+    paddingVertical: '8@mvs',
+    paddingHorizontal: '24@ms',
+  },
+  learnMoreText: {
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.brightBlue,
+    fontSize: '16@ms',
+    lineHeight: '20@ms',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
 });

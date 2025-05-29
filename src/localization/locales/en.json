@@ -5,7 +5,13 @@
   },
   "Home": {
     "callConnectionNotImplemented": "Call connection feature is not yet implemented",
-    "noFeaturesAvailable": "No features are currently available for your account."
+    "noFeaturesAvailable": "No features are currently available for your account.",
+    "client": {
+      "oops": "Oops!",
+      "appCurrentlyFor": "This app is currently for",
+      "counselorsOnly": "counsellors only.",
+      "learnMore": "Learn more"
+    }
   },
   "HomeScreen": {
     "start": "Start",
