@@ -9,6 +9,8 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {
+  ArrowDown,
+  ArrowRight,
   CheckIcon,
   CloseCircle,
   EditSquareIcon,
@@ -81,7 +83,17 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       onPress={onToggle}
       activeOpacity={0.7}>
       <View style={styles.leftContent}>
-        <Text style={styles.sectionArrow}>{isExpanded ? '▼' : '▶'}</Text>
+        <View style={styles.sectionArrow}>
+          {!isEditing && (
+            <View style={styles.arrowContainer}>
+              {isExpanded ? (
+                <ArrowDown width={10} height={10} />
+              ) : (
+                <ArrowRight width={10} height={10} />
+              )}
+            </View>
+          )}
+        </View>
         <View style={styles.iconContainer}>{icon}</View>
         <View style={styles.titleContainer}>
           <Text
@@ -144,11 +156,14 @@ const styles = ScaledSheet.create({
     marginRight: '10@ms',
   },
   sectionArrow: {
-    fontSize: '16@ms',
     marginRight: '14@ms',
     color: colors.darkSlate,
-    width: '18@ms',
     textAlign: 'center',
+  },
+  arrowContainer: {
+    width: '24@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionTitle: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
