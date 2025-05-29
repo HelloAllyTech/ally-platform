@@ -125,7 +125,7 @@ const SectionWrapper = ({
         onEditPress={onEditPress}
         onPressWand={onPressWand}
       />
-      {isExpanded && expanded[sectionConfig.key] && (
+      {isExpanded && (
         <View style={styles.sectionContent}>{renderSection()}</View>
       )}
     </View>

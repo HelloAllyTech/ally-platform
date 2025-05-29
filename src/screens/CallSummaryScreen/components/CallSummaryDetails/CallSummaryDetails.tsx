@@ -74,10 +74,39 @@ export const CallSummaryDetails: React.FC<Props> = ({
   };
 
   const toggleSection = (key: SectionKey) => {
-    if (isEditing[key]) {
+    // Check if any section is currently being edited
+    const isAnyEditing = Object.values(isEditing).some(editing => editing);
+    const isCurrentSectionEditing = isEditing[key];
+
+    // If another section is being edited and this is not the current section, prevent toggle
+    if (isAnyEditing && !isCurrentSectionEditing) {
+      return;
+    }
+
+    // If the current section is being edited, exit editing mode
+    if (isCurrentSectionEditing) {
       setIsEditing(prev => ({...prev, [key]: false}));
     }
-    setExpanded(prev => ({...prev, [key]: !prev[key]}));
+
+    setExpanded(prev => {
+      const isCurrentlyExpanded = prev[key];
+
+      // If the section is currently expanded, just close it
+      if (isCurrentlyExpanded) {
+        return {...prev, [key]: false};
+      }
+
+      // If the section is currently closed, close all other sections and open this one
+      const newExpanded = Object.keys(prev).reduce(
+        (acc, sectionKey) => {
+          acc[sectionKey as SectionKey] = sectionKey === key;
+          return acc;
+        },
+        {} as Record<SectionKey, boolean>,
+      );
+
+      return newExpanded;
+    });
   };
 
   if (isLoadingSummary || isLoadingFields) {
