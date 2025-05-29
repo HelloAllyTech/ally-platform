@@ -40,6 +40,7 @@ export const addTrack = async (audioFile: any) => {
       title: 'Breathing Exercise',
       artist: 'Meditation Music',
       isLiveStream: false,
+      loop: true,
     });
   } catch (error) {
     logger.error(

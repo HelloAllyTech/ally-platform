@@ -48,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </Text>
                 </Text>
                 <View style={styles.nameContainer}>
-                  <Text style={styles.summaryNameText}>
+                  <Text numberOfLines={1} style={styles.summaryNameText}>
                     {summaryName ? `#${summaryName}` : '-'}
                   </Text>
                 </View>
@@ -147,11 +147,11 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     marginTop: '8@ms',
     marginBottom: '8@ms',
-    maxWidth: '90%',
   },
   summaryNameText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.charcoal2,
+    marginRight: '10@ms',
   },
 });
