@@ -170,6 +170,14 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     };
   });
 
+  const onAnimationFinish = () => {
+    setIsAnimationEnded(true);
+    setTimeout(() => {
+      StatusBar.setHidden(false);
+      StatusBar.setBarStyle('dark-content');
+    }, 1000);
+  };
+
   return (
     <TouchableWithoutFeedback
       style={{paddingBottom: insets.bottom + 10}}
@@ -189,7 +197,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
             autoPlay
             loop={false}
             speed={1}
-            onAnimationFinish={() => setIsAnimationEnded(true)}
+            onAnimationFinish={onAnimationFinish}
           />
         </Animated.View>
         <Animated.View style={[styles.titleContainer, textStyle]}>

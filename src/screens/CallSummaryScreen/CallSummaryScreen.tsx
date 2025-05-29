@@ -3,6 +3,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
+  StatusBar,
   TouchableOpacity,
 } from 'react-native';
 import Animated, {
@@ -293,6 +294,7 @@ export const CallSummaryScreen: React.FC<
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       {activeModal === 'delete' && (
         <CustomModal
           visible={activeModal === 'delete'}

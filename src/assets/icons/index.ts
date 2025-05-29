@@ -9,6 +9,8 @@ import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
 import CloseCircle from './closeCircle.svg';
+import CommunityActiveIcon from './communityActive.svg';
+import CommunityInactiveIcon from './communityInactive.svg';
 import DatabaseIcon from './database.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
@@ -50,6 +52,8 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  CommunityActiveIcon,
+  CommunityInactiveIcon,
   LeftArrowIcon,
   CallEndIcon,
   MicWithGradientIcon,

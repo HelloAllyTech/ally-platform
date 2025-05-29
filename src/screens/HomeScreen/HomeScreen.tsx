@@ -1,6 +1,13 @@
 import React, {useCallback, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
-import {Alert, BackHandler, Text, TouchableOpacity, View} from 'react-native';
+import {
+  Alert,
+  BackHandler,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {HeadphoneIcon, InfoIcon} from '@/assets/icons';
@@ -65,6 +72,7 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.content}>
+      <StatusBar barStyle="light-content" />
       <Text style={styles.titleContainer}>
         <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
         <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
