@@ -25,7 +25,10 @@ interface SectionHeaderProps {
   icon: React.ReactNode;
   canEdit: boolean;
   isEditing: boolean;
-  setIsEditing: (isEditing: boolean) => void;
+  onTickPress: () => void;
+  onClosePress: () => void;
+  onEditPress: () => void;
+  onPressWand: () => void;
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -35,7 +38,10 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   icon,
   canEdit = true,
   isEditing,
-  setIsEditing,
+  onTickPress,
+  onClosePress,
+  onEditPress,
+  onPressWand,
 }) => {
   const [shouldRenderButtons, setShouldRenderButtons] = useState(false);
 
@@ -51,18 +57,6 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       });
     }
   }, [isEditing, animValue]);
-
-  const onSubmitPress = () => {
-    setIsEditing(false);
-  };
-
-  const onWandPress = () => {
-    setIsEditing(true);
-  };
-
-  const onEditPress = () => {
-    setIsEditing(true);
-  };
 
   const editButtonStyle = useAnimatedStyle(() => {
     return {
@@ -114,17 +108,17 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
               style={[styles.editButtonContainer, editButtonsContainerStyle]}>
               <TouchableOpacity
                 style={styles.buttonContainer}
-                onPress={onWandPress}>
+                onPress={onPressWand}>
                 <WandStarsIcon />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.buttonContainer}
-                onPress={onSubmitPress}>
+                onPress={onTickPress}>
                 <CheckIcon />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.buttonContainer}
-                onPress={onSubmitPress}>
+                onPress={onClosePress}>
                 <CloseCircle />
               </TouchableOpacity>
             </Animated.View>

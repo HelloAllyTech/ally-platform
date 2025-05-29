@@ -39,80 +39,80 @@ export enum SectionKey {
 // Field names as constants to prevent typos (keys are identical to UI field labels)
 export const SUMMARY_FIELDS = {
   // Features & Demographics
-  CALL_ID: 'callId' as const,
-  CALL_DURATION: 'callDuration' as const,
-  CALL_DATE: 'callDate' as const,
-  CALL_TIME: 'callTime' as const,
-  CALLER_ID: 'clientId' as const,
-  COUNSELOR_NAME: 'counselorName' as const,
-  CALLER_TYPE: 'callType' as const,
-  AGE: 'age' as const,
-  GENDER: 'gender' as const,
-  PROFESSION: 'profession' as const,
-  RELATIONSHIP_STATUS: 'relationshipStatus' as const,
-  LANGUAGES: 'languages' as const,
-  LOCATION: 'location' as const,
-  CONCERN_CODE: 'codeOfConcern' as const,
+  CALL_ID: 'callId',
+  CALL_DURATION: 'callDuration',
+  CALL_DATE: 'callDate',
+  CALL_TIME: 'callTime',
+  CALLER_ID: 'clientId',
+  COUNSELOR_NAME: 'counselorName',
+  CALLER_TYPE: 'callType',
+  AGE: 'age',
+  GENDER: 'gender',
+  PROFESSION: 'profession',
+  RELATIONSHIP_STATUS: 'relationshipStatus',
+  LANGUAGES: 'languages',
+  LOCATION: 'location',
+  CONCERN_CODE: 'codeOfConcern',
 
   // Session Summary
-  SESSION_SUMMARY: 'sessionSummary' as const,
+  SESSION_SUMMARY: 'sessionSummary',
 
   // Flow
-  FLOW: 'counselingProcessFlow' as const,
+  FLOW: 'counselingProcessFlow',
 
   // Key Concerns
-  KEY_CONCERNS: 'keyConcerns' as const,
+  KEY_CONCERNS: 'keyConcerns',
 
   // Observations and Assessment
-  OBJECTIVE_OBSERVATIONS: 'objectiveObservations' as const,
+  OBJECTIVE_OBSERVATIONS: 'objectiveObservations',
 
   // Subjective Observations
-  SUBJECTIVE_OBSERVATIONS: 'subjectiveObservations' as const,
+  SUBJECTIVE_OBSERVATIONS: 'subjectiveObservations',
 
   // Assessment
-  ASSESSMENT: 'assessment' as const,
+  ASSESSMENT: 'assessment',
 
   // Dominant Feelings
-  DOMINANT_FEELINGS: 'dominantFeelings' as const,
+  DOMINANT_FEELINGS: 'dominantFeelings',
 
   // Issues Worked On
-  ISSUES_WORKED_ON: 'issuesWorkedOn' as const,
+  ISSUES_WORKED_ON: 'issuesWorkedOn',
 
   // Key Therapeutic Techniques
-  KEY_THERAPEUTIC_TECHNIQUES: 'keyTherapeuticTechniques' as const,
+  KEY_THERAPEUTIC_TECHNIQUES: 'keyTherapeuticTechniques',
 
   // Referrals Provided
-  REFERRALS_PROVIDED: 'referralsProvided' as const,
+  REFERRALS_PROVIDED: 'referralsProvided',
 
   // Homework Recommended
-  HOMEWORK_RECOMMENDED: 'homework' as const,
+  HOMEWORK_RECOMMENDED: 'homework',
 
   // Plans for Next Call
-  PLANS_FOR_NEXT_CALL: 'planForNextCall' as const,
+  PLANS_FOR_NEXT_CALL: 'planForNextCall',
 
   // Tags
-  TAGS: 'tags' as const,
+  TAGS: 'tags',
 
   // Metrics
-  LISTENING_RATIO: 'listeningRatio' as const,
-  EMOTIONAL_LIFT: 'emotionalLift' as const,
-  REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked' as const,
+  LISTENING_RATIO: 'listeningShare',
+  EMOTIONAL_LIFT: 'emotionalLift',
+  REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked',
 
   // Additional fields from response
-  // WORKING_STATUS: 'workingStatus' as const,
-  // NEW_CALL_FOLLOW_UP: 'newCallFollowUp' as const,
-  // COUNSELLOR: 'counsellor' as const,
-  // FOLLOW_UP_GOALS: 'followUpGoals' as const,
-  // SESSION_NUMBER: 'sessionNumber' as const,
-  // FOLLOW_UP_STATUS: 'followUpStatus' as const,
-  // FOLLOW_UP_DATE: 'followUpDate' as const,
-  // COUNSELOR_FEELINGS: 'counselorFeelings' as const,
-  // ANY_FORMAL_DIAGNOSIS: 'anyFormalDiagnosis' as const,
-  // RELATIONSHIP_STATUS: 'relationshipStatus' as const,
-  // EMOTIONAL_STATE_START: 'emotionalStateStart' as const,
-  // EMOTIONAL_STATE_CHANGE: 'emotionalStateChange' as const,
-  // THERAPEUTIC_INTERVENTIONS: 'therapeuticInterventions' as const,
-  // CALL_QUALITY: 'callQuality' as const,
+  // WORKING_STATUS: 'workingStatus',
+  // NEW_CALL_FOLLOW_UP: 'newCallFollowUp',
+  // COUNSELLOR: 'counsellor',
+  // FOLLOW_UP_GOALS: 'followUpGoals',
+  // SESSION_NUMBER: 'sessionNumber',
+  // FOLLOW_UP_STATUS: 'followUpStatus',
+  // FOLLOW_UP_DATE: 'followUpDate',
+  // COUNSELOR_FEELINGS: 'counselorFeelings',
+  // ANY_FORMAL_DIAGNOSIS: 'anyFormalDiagnosis',
+  // RELATIONSHIP_STATUS: 'relationshipStatus',
+  // EMOTIONAL_STATE_START: 'emotionalStateStart',
+  // EMOTIONAL_STATE_CHANGE: 'emotionalStateChange',
+  // THERAPEUTIC_INTERVENTIONS: 'therapeuticInterventions',
+  // CALL_QUALITY: 'callQuality',
 } as const;
 
 // Derive the type from the object values

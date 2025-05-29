@@ -10,21 +10,18 @@ import {SECTION_LIST, SectionKey} from '@/constants/summary';
 // import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
-import {CallSummaryResponse} from '@/services/callSummaryApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {colors} from '@/theme/colors';
 import {typography} from '@/theme/typography';
 
-import CallSummarySection from '../CallSummarySections/CallSummarySection';
+import SectionWrapper from '../SectionWrapper/SectionWrapper';
 
 interface Props {
-  summaryData: CallSummaryResponse;
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
 }
 
 export const CallSummaryDetails: React.FC<Props> = ({
-  summaryData,
   isLoading: isLoadingSummary,
   onSubmit,
 }) => {
@@ -32,14 +29,28 @@ export const CallSummaryDetails: React.FC<Props> = ({
   const {data: visibleFields, isLoading: isLoadingFields} =
     useGetSummaryFieldsQuery();
   const {t} = useTranslate();
-  const summaryDetails = summaryData?.details;
 
-  const {formData, isUpdating, handleFieldChange, handleSubmit} =
-    useCallSummaryForm({
-      summaryData,
-    });
+  const {isUpdating, handleSubmit} = useCallSummaryForm();
 
   const [expanded, setExpanded] = useState({
+    [SectionKey.SessionSummary]: false,
+    [SectionKey.KeyConcern]: false,
+    [SectionKey.FeaturesAndDemographics]: false,
+    [SectionKey.Flow]: false,
+    [SectionKey.ObjectiveObservations]: false,
+    [SectionKey.SubjectiveObservations]: false,
+    [SectionKey.Assessment]: false,
+    [SectionKey.DominantFeelings]: false,
+    [SectionKey.IssuesWorkedOn]: false,
+    [SectionKey.KeyTherapeuticTechniques]: false,
+    [SectionKey.ReferralsProvided]: false,
+    [SectionKey.HomeworkRecommended]: false,
+    [SectionKey.PlansForNextCall]: false,
+    [SectionKey.Tags]: false,
+    [SectionKey.Metrics]: false,
+  });
+
+  const [isEditing, setIsEditing] = useState({
     [SectionKey.SessionSummary]: false,
     [SectionKey.KeyConcern]: false,
     [SectionKey.FeaturesAndDemographics]: false,
@@ -63,6 +74,9 @@ export const CallSummaryDetails: React.FC<Props> = ({
   };
 
   const toggleSection = (key: SectionKey) => {
+    if (isEditing[key]) {
+      setIsEditing(prev => ({...prev, [key]: false}));
+    }
     setExpanded(prev => ({...prev, [key]: !prev[key]}));
   };
 
@@ -75,9 +89,14 @@ export const CallSummaryDetails: React.FC<Props> = ({
   }
 
   return (
-    <KeyboardAwareScrollView style={styles.container}>
+    <KeyboardAwareScrollView
+      style={styles.container}
+      nestedScrollEnabled
+      extraScrollHeight={150}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid>
       <View style={styles.card}>
-        {SECTION_LIST.map((section, index) => {
+        {SECTION_LIST.map((sectionConfig, index) => {
           // TO DO: Commenting this out for now to view all sections
           // const hasVisibleFields = visibleFields?.some(
           //   field =>
@@ -89,22 +108,22 @@ export const CallSummaryDetails: React.FC<Props> = ({
           //   return null;
           // }
 
-          const Icon = section.icon;
+          const Icon = sectionConfig.icon;
 
           return (
-            <View key={section.key} style={styles.sectionBox}>
-              <CallSummarySection
-                label={section.label}
-                isExpanded={expanded[section.key]}
-                onToggle={() => toggleSection(section.key)}
+            <View key={sectionConfig.key}>
+              <SectionWrapper
+                label={sectionConfig.label}
+                isExpanded={expanded[sectionConfig.key]}
+                onToggle={() => toggleSection(sectionConfig.key)}
                 icon={<Icon />}
-                canEdit={section.canEdit}
-                formData={formData}
-                sectionData={section}
+                canEdit={sectionConfig.canEdit}
+                sectionConfig={sectionConfig}
                 expanded={expanded}
-                summaryDetails={summaryDetails}
-                onFieldChange={handleFieldChange}
                 index={index}
+                handleSubmit={handleSubmit}
+                isEditing={isEditing[sectionConfig.key]}
+                setIsEditing={setIsEditing}
               />
             </View>
           );
@@ -133,9 +152,6 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@s',
     backgroundColor: colors.white,
     marginBottom: '20@ms',
-  },
-  sectionBox: {
-    overflow: 'hidden',
   },
   sectionContent: {
     paddingLeft: '30@ms',

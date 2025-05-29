@@ -1,4 +1,4 @@
-import BoxBreathingLottie from './BoxBreathingLottie';
+import BoxBreathingAnimation from './BoxBreathingAnimation';
 import {BreathingControls} from './BreathingControls';
 
-export {BreathingControls, BoxBreathingLottie};
+export {BreathingControls, BoxBreathingAnimation};

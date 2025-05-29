@@ -2,12 +2,9 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
-  PermissionsAndroid,
-  Platform,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import RNFS from 'react-native-fs';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,13 +14,15 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
+import {CustomModal} from '@/components/Modal/CustomModal';
 import {Toast} from '@/components/Toast/Toast';
 import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {useStoragePermissions} from '@/hooks/useStoragePermissions';
 import useTranslate from '@/hooks/useTranslate';
 import {TranslationType} from '@/localization/locales/type';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
-  CallSummaryResponse,
   useLazyExportCallSummaryQuery,
   useLazyGetCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -31,8 +30,9 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {clearSummary} from '@/store/slices/summarySlice';
+import {clearFormData, clearSummary} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
+import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
@@ -50,6 +50,8 @@ interface ToastState {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+type ModalType = 'rename' | 'delete' | null;
 
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
@@ -75,31 +77,20 @@ export const CallSummaryScreen: React.FC<
     message: '',
     type: 'error',
   });
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
   const {t} = useTranslate();
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [summaryName, setSummaryName] = useState(
     summaryData?.details?.callInfo?.summaryName,
   );
+
+  const [editedName, setEditedName] = useState(summaryName);
   const [updateCallInfo] = useUpdateCallInfoMutation();
 
   useEffect(() => {
-    if (chatId) {
-      fetchCallSummary(chatId);
-    }
-
-    // Cleanup function to clear summary state when component unmounts
-    return () => {
-      console.log('🚀 ~ return ~ clearSummary');
-      dispatch(clearSummary());
-    };
-  }, [chatId, fetchCallSummary, dispatch]);
-
-  useEffect(() => {
-    if (summaryData?.details?.callInfo?.summaryName) {
-      setSummaryName(summaryData.details.callInfo.summaryName);
-    }
-  }, [summaryData?.details?.callInfo?.summaryName]);
+    setEditedName(summaryName);
+  }, [summaryName]);
 
   const showToast = (
     message: string,
@@ -111,6 +102,26 @@ export const CallSummaryScreen: React.FC<
       type,
     });
   };
+
+  const {checkAndRequestPermissions} = useStoragePermissions(showToast);
+
+  useEffect(() => {
+    if (chatId) {
+      fetchCallSummary(chatId);
+    }
+
+    // Cleanup function to clear summary state when component unmounts
+    return () => {
+      dispatch(clearSummary());
+      dispatch(clearFormData());
+    };
+  }, [chatId, fetchCallSummary, dispatch]);
+
+  useEffect(() => {
+    if (summaryData?.details?.callInfo?.summaryName) {
+      setSummaryName(summaryData.details.callInfo.summaryName);
+    }
+  }, [summaryData?.details?.callInfo?.summaryName]);
 
   const hideToast = () => {
     setToast(prev => ({...prev, visible: false}));
@@ -133,11 +144,15 @@ export const CallSummaryScreen: React.FC<
     cardHeight.value = WINDOW_HEIGHT * 0.8;
   };
 
-  const handleBackPress = () => {
-    dispatch(clearSummary());
+  useHardwareBackPressHandler(() => {
+    handleGoBack();
+    return true;
+  });
+
+  const handleGoBack = () => {
     if (currentChat) {
-      dispatch(clearCurrentChat());
       navigation.navigate('Home');
+      dispatch(clearCurrentChat());
     } else {
       navigation.goBack();
     }
@@ -147,7 +162,7 @@ export const CallSummaryScreen: React.FC<
     if (isSuccess) {
       showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
       setTimeout(() => {
-        navigation.goBack();
+        handleGoBack();
       }, 2000);
     } else {
       showToast(t('CallSummary.info.summaryUpdateFailed'));
@@ -155,52 +170,38 @@ export const CallSummaryScreen: React.FC<
   };
 
   const handleExport = async () => {
-    if (chatId) {
-      try {
-        if (!isIOS) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            showToast(t('CallSummary.info.storagePermissionDenied'));
-            return;
-          }
-        }
+    if (!chatId) return;
 
-        const response = await exportCallSummary(chatId).unwrap();
-        if (typeof response !== 'string') {
-          throw new Error(t('CallSummary.info.invalidResponseFormat'));
-        }
+    try {
+      const hasPermission = await checkAndRequestPermissions();
+      if (!hasPermission) return;
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `call-summary-${chatId}-${timestamp}.txt`;
-        const directory = Platform.select({
-          ios: RNFS.DocumentDirectoryPath,
-          android: RNFS.DownloadDirectoryPath,
-        });
-
-        if (!directory) {
-          throw new Error(t('CallSummary.info.directoryPathError'));
-        }
-
-        const filePath = `${directory}/${filename}`;
-        await RNFS.writeFile(filePath, response, 'utf8');
-
-        if (!isIOS) {
-          await RNFS.scanFile(filePath);
-        }
-        logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
-
-        showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
-        setIsMenuVisible(false);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : t('CallSummary.info.fileExportFailed');
-        logger.error(errorMessage);
-        showToast(errorMessage);
+      const response = await exportCallSummary(chatId).unwrap();
+      if (typeof response !== 'string') {
+        throw new Error(t('CallSummary.info.invalidResponseFormat'));
       }
+
+      const filePath = await saveFile({
+        content: response,
+        chatId,
+        t,
+      });
+      logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
+
+      showToast(
+        `${t('CallSummary.info.fileExportedSuccess')} \n ${
+          isIOS && 'on My iPhone/ally/CallSummary'
+        }`,
+        'success',
+      );
+      setIsMenuVisible(false);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : t('CallSummary.info.fileExportFailed');
+      logger.error(errorMessage);
+      showToast(errorMessage);
     }
   };
 
@@ -209,7 +210,7 @@ export const CallSummaryScreen: React.FC<
       try {
         const response = await updateCallSummary({
           chatId,
-          data: {callDetails: {}},
+          data: {summary: {}},
         });
         showToast(t('CallSummary.info.summaryDeletedSuccess'), 'success');
         setIsMenuVisible(false);
@@ -284,26 +285,60 @@ export const CallSummaryScreen: React.FC<
     scrollViewRef.current?.scrollToEnd({animated: true});
   };
 
+  const handleBlur = () => {
+    if (handleSummaryNameChange) {
+      handleSummaryNameChange(editedName || '');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {activeModal === 'delete' && (
+        <CustomModal
+          visible={activeModal === 'delete'}
+          onClose={() => setActiveModal(null)}
+          title={t('CallSummary.customMenu.delete')}
+          primaryButtonText={t('CallSummary.customMenu.delete')}
+          secondaryButtonText={t('CallSummary.info.cancel')}
+          onPrimaryPress={handleDelete}
+          onSecondaryPress={() => setActiveModal(null)}
+          description={t('CallSummary.customMenu.deleteConfirmation')}
+          primaryTextColor={colors.brightRed}
+        />
+      )}
+      {activeModal === 'rename' && (
+        <CustomModal
+          visible={activeModal === 'rename'}
+          onClose={() => setActiveModal(null)}
+          title={t('CallSummary.info.rename')}
+          primaryButtonText={t('CallSummary.info.confirm')}
+          secondaryButtonText={t('CallSummary.info.cancel')}
+          onPrimaryPress={handleBlur}
+          onSecondaryPress={() => setActiveModal(null)}
+          showInput
+          inputProps={{
+            value: editedName,
+            onChangeText: setEditedName,
+          }}
+        />
+      )}
       <Header
         isFullyExpanded={isFullyExpanded}
-        onBackPress={handleBackPress}
+        onBackPress={handleGoBack}
         onMenuPress={() => setIsMenuVisible(true)}
         summaryName={summaryName}
-        onSummaryNameChange={handleSummaryNameChange}
       />
       <CustomMenuModal
         visible={isMenuVisible}
         onClose={() => setIsMenuVisible(false)}
         onExport={handleExport}
-        onDelete={handleDelete}
+        setModalType={setActiveModal}
       />
       <Animated.View
         style={[
           styles.card,
           animatedCardStyle,
-          {maxHeight: WINDOW_HEIGHT - insets.top - 90},
+          {maxHeight: WINDOW_HEIGHT - insets.top},
         ]}>
         <ScrollView
           ref={scrollViewRef}
@@ -313,7 +348,6 @@ export const CallSummaryScreen: React.FC<
           onLayout={handleLayout}>
           {isShowCallSummary ? (
             <CallSummaryDetails
-              summaryData={summaryData as CallSummaryResponse}
               isLoading={isLoading}
               onSubmit={onUpdateSummary}
             />

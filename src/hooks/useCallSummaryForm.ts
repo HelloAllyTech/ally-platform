@@ -1,41 +1,56 @@
-import {useEffect, useState} from 'react';
+import {useEffect} from 'react';
 
-import {SummaryFieldKey} from '@/constants/summary';
+import {SectionKey, SummaryFieldKey, summaryFields} from '@/constants/summary';
+import {useUpdateCallSummaryMutation} from '@/services/callSummaryApi';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {setFormData} from '@/store/slices/summarySlice';
+import {SummaryFieldValueTypes} from '@/types/callSummary';
 import {
-  CallSummaryResponse,
-  useUpdateCallSummaryMutation,
-} from '@/services/callSummaryApi';
-import {
-  FormData,
-  getInitialFormData,
   transformFormDataForSubmission,
   transformSummaryToFormData,
 } from '@/utils/callSummary/formDataTransformer';
 
-interface UseCallSummaryFormProps {
-  summaryData: CallSummaryResponse;
-}
-
-export const useCallSummaryForm = ({summaryData}: UseCallSummaryFormProps) => {
-  const [formData, setFormData] = useState<FormData>(getInitialFormData());
+export const useCallSummaryForm = () => {
+  const dispatch = useAppDispatch();
+  const summaryData = useAppSelector(state => state.summary.summaryData);
+  const formData = useAppSelector(state => state.summary.formData);
   const [updateCallSummary, {isLoading: isUpdating}] =
     useUpdateCallSummaryMutation();
   const summary = summaryData?.details?.summary;
 
   useEffect(() => {
     if (summary) {
-      setFormData(transformSummaryToFormData(summary));
+      dispatch(setFormData(transformSummaryToFormData(summary)));
     }
-  }, [summary]);
+  }, [dispatch, summary]);
 
-  const handleFieldChange = (field: SummaryFieldKey) => (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleFieldChange =
+    (field: SummaryFieldKey) => (value: string | null) => {
+      dispatch(
+        setFormData({
+          [field]: value,
+        }),
+      );
+    };
+
+  const handleSectionFieldsReset = (sectionKey: SectionKey) => {
+    if (!summary) return;
+    const sectionFields = summaryFields.filter(
+      field => field.sectionKey === sectionKey,
+    );
+    const sectionData = sectionFields.reduce(
+      (acc, field) => {
+        acc[field.key] = summary[field.key] ?? null;
+        return acc;
+      },
+      {} as Record<SummaryFieldKey, SummaryFieldValueTypes | null>,
+    );
+
+    dispatch(setFormData(sectionData));
   };
 
   const handleSubmit = async () => {
+    if (!formData || !summaryData) return;
     const formattedFormData = transformFormDataForSubmission(
       formData,
       summaryData,
@@ -43,7 +58,7 @@ export const useCallSummaryForm = ({summaryData}: UseCallSummaryFormProps) => {
     return await updateCallSummary({
       chatId: summaryData.id,
       data: {
-        callDetails: formattedFormData,
+        summary: formattedFormData,
       },
     });
   };
@@ -53,5 +68,6 @@ export const useCallSummaryForm = ({summaryData}: UseCallSummaryFormProps) => {
     isUpdating,
     handleFieldChange,
     handleSubmit,
+    handleSectionFieldsReset,
   };
 };

@@ -60,7 +60,7 @@ export const ListeningScreen = () => {
   }, [navigation]);
 
   useHardwareBackPressHandler(() => {
-    handleCallEnd();
+    navigation.goBack();
     return true;
   });
 
