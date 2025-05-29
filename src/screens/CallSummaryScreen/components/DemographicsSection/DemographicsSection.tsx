@@ -3,6 +3,7 @@ import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components/Dropdown/Dropdown';
+import commonStyles from '@/components/styles';
 import {
   FIELD_LABELS,
   SUMMARY_FIELDS,
@@ -14,8 +15,6 @@ import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
 import {formatTimeHHmm} from '@/utils/date';
 
@@ -70,7 +69,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
             value={
               isEditing && fieldItem?.isEditable ? (
                 <TextInput
-                  style={styles.inlineTextInput}
+                  style={[commonStyles.fieldValueText, styles.inlineTextInput]}
                   value={(formData?.[fieldConfig.field] as string) || ''}
                   onChangeText={handleFieldChange(fieldConfig.field)}
                   placeholder={t('CallSummary.enterDetail')}
@@ -208,9 +207,6 @@ const styles = ScaledSheet.create({
     alignSelf: 'flex-start',
   },
   inlineTextInput: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.lightGray3,
     flex: 1,
     marginRight: '10@ms',
   },
