@@ -3,6 +3,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
+  StatusBar,
   TouchableOpacity,
 } from 'react-native';
 import Animated, {
@@ -14,8 +15,9 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
+import {CustomModal} from '@/components/Modal/CustomModal';
 import {Toast} from '@/components/Toast/Toast';
-import {WINDOW_HEIGHT} from '@/constants/general';
+import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useStoragePermissions} from '@/hooks/useStoragePermissions';
 import useTranslate from '@/hooks/useTranslate';
@@ -50,6 +52,8 @@ interface ToastState {
   type: 'success' | 'error' | 'info';
 }
 
+type ModalType = 'rename' | 'delete' | null;
+
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
 > = ({navigation, route}) => {
@@ -74,13 +78,20 @@ export const CallSummaryScreen: React.FC<
     message: '',
     type: 'error',
   });
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
   const {t} = useTranslate();
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [summaryName, setSummaryName] = useState(
     summaryData?.details?.callInfo?.summaryName,
   );
+
+  const [editedName, setEditedName] = useState(summaryName);
   const [updateCallInfo] = useUpdateCallInfoMutation();
+
+  useEffect(() => {
+    setEditedName(summaryName);
+  }, [summaryName]);
 
   const showToast = (
     message: string,
@@ -179,7 +190,9 @@ export const CallSummaryScreen: React.FC<
       logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
 
       showToast(
-        `${t('CallSummary.info.fileExportedSuccess')} to ${filePath}`,
+        `${t('CallSummary.info.fileExportedSuccess')} \n ${
+          isIOS && 'on My iPhone/ally/CallSummary'
+        }`,
         'success',
       );
       setIsMenuVisible(false);
@@ -273,20 +286,55 @@ export const CallSummaryScreen: React.FC<
     scrollViewRef.current?.scrollToEnd({animated: true});
   };
 
+  const handleBlur = () => {
+    if (handleSummaryNameChange) {
+      handleSummaryNameChange(editedName || '');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      {activeModal === 'delete' && (
+        <CustomModal
+          visible={activeModal === 'delete'}
+          onClose={() => setActiveModal(null)}
+          title={t('CallSummary.customMenu.delete')}
+          primaryButtonText={t('CallSummary.customMenu.delete')}
+          secondaryButtonText={t('CallSummary.info.cancel')}
+          onPrimaryPress={handleDelete}
+          onSecondaryPress={() => setActiveModal(null)}
+          description={t('CallSummary.customMenu.deleteConfirmation')}
+          primaryTextColor={colors.brightRed}
+        />
+      )}
+      {activeModal === 'rename' && (
+        <CustomModal
+          visible={activeModal === 'rename'}
+          onClose={() => setActiveModal(null)}
+          title={t('CallSummary.info.rename')}
+          primaryButtonText={t('CallSummary.info.confirm')}
+          secondaryButtonText={t('CallSummary.info.cancel')}
+          onPrimaryPress={handleBlur}
+          onSecondaryPress={() => setActiveModal(null)}
+          showInput
+          inputProps={{
+            value: editedName,
+            onChangeText: setEditedName,
+          }}
+        />
+      )}
       <Header
         isFullyExpanded={isFullyExpanded}
         onBackPress={handleGoBack}
         onMenuPress={() => setIsMenuVisible(true)}
         summaryName={summaryName}
-        onSummaryNameChange={handleSummaryNameChange}
       />
       <CustomMenuModal
         visible={isMenuVisible}
         onClose={() => setIsMenuVisible(false)}
         onExport={handleExport}
-        onDelete={handleDelete}
+        setModalType={setActiveModal}
       />
       <Animated.View
         style={[

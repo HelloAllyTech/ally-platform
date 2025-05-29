@@ -61,7 +61,8 @@
     "minutes": "minutes",
     "customMenu": {
       "export": "Export",
-      "delete": "Delete"
+      "delete": "Delete",
+      "deleteConfirmation": "Are you sure you want to delete this summary? this action can’t be undone"
     },
     "info": {
       "storagePermissionDenied": "Storage permission denied",
@@ -81,7 +82,9 @@
       "storagePermissionMessage": "This app needs storage permission to export call summaries to your device",
       "askMeLater": "Ask me later",
       "cancel": "Cancel",
-      "ok": "OK"
+      "ok": "OK",
+      "confirm": "Confirm",
+      "rename": "Rename"
     }
   },
   "CallLogs": {
@@ -106,6 +109,12 @@
     "for": "for",
     "yourself": "yourself.",
     "takeAMomentForYourself": "Take a moment for yourself."
+  },
+  "BoxBreathingScreen": {
+    "trackPlayer": {
+      "error": "Error playing audio",
+      "errorAddingTrack": "Error adding track"
+    }
   },
   "submit": "Submit"
 }
