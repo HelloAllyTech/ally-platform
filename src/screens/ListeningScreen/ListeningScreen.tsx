@@ -34,7 +34,6 @@ export interface Nudge {
 export const ListeningScreen = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-
   const [isNudgeVisible, setIsNudgeVisible] = useState(false);
   const chat = useAppSelector(state => state.chat.currentChat);
   const [startTime] = useState(() =>
