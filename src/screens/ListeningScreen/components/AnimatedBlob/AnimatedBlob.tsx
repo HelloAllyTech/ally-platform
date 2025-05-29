@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import LottieView, {AnimationObject} from 'lottie-react-native';
+import LottieView from 'lottie-react-native';
 import {View} from 'react-native';
 import Animated, {
   Easing,
@@ -8,8 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import blobAnimation from '@/assets/animations/blobAnimation.json';
-
+import ListeningAnimation from '../ListeningAnimation/ListeningAnimation';
 import {PlayPauseOverlay} from '../PlayPauseOverlay';
 
 interface AnimatedBlobProps {
@@ -18,8 +17,6 @@ interface AnimatedBlobProps {
   isAudioActive: boolean;
   onPlayPauseCallPress: () => void;
 }
-
-const AnimatedLottieView = Animated.createAnimatedComponent(LottieView);
 
 export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
   isExpanded,
@@ -75,13 +72,9 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.blobContainer}>
-        <AnimatedLottieView
-          ref={lottieRef}
-          source={blobAnimation as AnimationObject}
-          style={[styles.blob, blobAnimatedStyle]}
-          loop
-          autoPlay={false}
-        />
+        <Animated.View style={[styles.blob, blobAnimatedStyle]}>
+          <ListeningAnimation />
+        </Animated.View>
         <Animated.View
           style={[
             styles.overlayContainer,
@@ -110,7 +103,6 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
   },
   blob: {
-    width: '280@ms',
     height: '280@ms',
   },
   overlayContainer: {

@@ -161,6 +161,13 @@ const BoxBreathingAnimation = ({
     };
   }, [isPlaying, animationDuration]);
 
+  useEffect(() => {
+    if (phaseIndex === 1 && !isMuted && isPlayerReady) {
+      TrackPlayer.seekTo(0);
+      TrackPlayer.play();
+    }
+  }, [isMuted, phaseIndex, isPlayerReady]);
+
   // Animate dot movement
   useEffect(() => {
     if (isPlaying) {
