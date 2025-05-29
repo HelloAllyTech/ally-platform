@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {View} from 'react-native';
+import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components/Dropdown/Dropdown';
@@ -13,7 +13,10 @@ import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
-import {SummaryFieldValueTypes} from '@/types/callSummary';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+import {typography} from '@/theme/typography';
+import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
 import {formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
@@ -25,6 +28,7 @@ interface FieldConfig {
 
 interface DemographicsSectionProps {
   isEditing: boolean;
+  handleFieldChange?: (field: string) => (value: string) => void;
 }
 
 export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
@@ -42,8 +46,9 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
     const fieldItem = summaryFields.find(
       field => field.key === fieldConfig.field,
     );
+
     switch (fieldItem?.type) {
-      case 'Text':
+      case FieldType.Text:
         return (
           <FieldRow
             key={fieldConfig.field}
@@ -52,7 +57,31 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
           />
         );
 
-      case 'Dropdown':
+      case FieldType.InlineTextInput:
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={
+              isEditing && fieldItem?.isEditable ? (
+                <TextInput
+                  style={styles.inlineTextInput}
+                  value={(formData?.[fieldConfig.field] as string) || ''}
+                  onChangeText={handleFieldChange(fieldConfig.field)}
+                  placeholder={t('CallSummary.enterDetail')}
+                  placeholderTextColor={colors.lightGray3}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                  numberOfLines={1}
+                />
+              ) : (
+                (fieldConfig.value as string)
+              )
+            }
+          />
+        );
+
+      case FieldType.Dropdown:
         return (
           <FieldRow
             key={fieldConfig.field}
@@ -134,11 +163,11 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.PROFESSION,
-        value: summary?.[SUMMARY_FIELDS.PROFESSION] || '-',
+        value: formData?.[SUMMARY_FIELDS.PROFESSION] || '-',
       },
       {
         field: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
-        value: summary?.[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
+        value: formData?.[SUMMARY_FIELDS.RELATIONSHIP_STATUS] || '-',
       },
       {
         field: SUMMARY_FIELDS.LANGUAGES,
@@ -169,5 +198,12 @@ const styles = ScaledSheet.create({
   dropdownContainer: {
     flex: 1,
     minHeight: '40@vs',
+  },
+  inlineTextInput: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.lightGray3,
+    flex: 1,
+    marginRight: '10@ms',
   },
 });
