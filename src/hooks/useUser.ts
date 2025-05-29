@@ -9,16 +9,18 @@ import {
   setLoading,
   setUser,
 } from '@/store/slices/userSlice';
-import {RootState, store} from '@/store/store';
+import {AppRootState, store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
 export const useUser = () => {
   const isAuthenticated = useSelector(
-    (state: RootState) => state.user.isAuthenticated,
+    (state: AppRootState) => state.user.isAuthenticated,
   );
-  const userData = useSelector((state: RootState) => state.user.user);
-  const isUserLoading = useSelector((state: RootState) => state.user.loading);
+  const userData = useSelector((state: AppRootState) => state.user.user);
+  const isUserLoading = useSelector(
+    (state: AppRootState) => state.user.loading,
+  );
   const [getUser] = useLazyGetUserQuery();
 
   const checkAuth = useCallback(async () => {

@@ -172,11 +172,14 @@ export const callSummaryApi = api.injectEndpoints({
         body: {summaryName},
       }),
     }),
-    enhanceCallSummary: builder.mutation<void, {chatId: number; data: any}>({
-      query: ({chatId, data}) => ({
-        url: `/chats/${chatId}/call-info`,
-        method: 'PATCH',
-        body: data,
+    enhanceCallSummary: builder.mutation<
+      {enhanced_content: string},
+      {content: string}
+    >({
+      query: ({content}) => ({
+        url: `/chats/enhance`,
+        method: 'POST',
+        body: {content},
       }),
     }),
   }),
