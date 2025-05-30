@@ -12,8 +12,10 @@ import {ms} from 'react-native-size-matters';
 
 import {ArrowDown, SearchIcon} from '@/assets/icons';
 import commonStyles from '@/components/styles';
+import {WINDOW_HEIGHT} from '@/constants/general';
 import {PLACES_PER_PAGE} from '@/constants/summary';
 import {useDebounce} from '@/hooks/useDebounce';
+import {useKeyboardState} from '@/hooks/useKeyboardState';
 import useTranslate from '@/hooks/useTranslate';
 import {
   Place,
@@ -65,6 +67,9 @@ export const SearchableLocationDropdown: React.FC<
     page: currentPage,
     limit: PLACES_PER_PAGE,
   });
+
+  // Use the simplified keyboard hook
+  const keyboardState = useKeyboardState();
 
   // Create debounced search function
   const debouncedSearch = useDebounce(
@@ -242,6 +247,49 @@ export const SearchableLocationDropdown: React.FC<
     return renderInstructions();
   };
 
+  // Calculate modal positioning considering keyboard
+  const getModalPositioning = () => {
+    const screenHeight = WINDOW_HEIGHT;
+    const maxModalHeight = ms(300);
+    const minSpacing = ms(20);
+
+    // When keyboard is visible, adjust the modal position
+    if (keyboardState.height > 0) {
+      const availableHeight = screenHeight - keyboardState.height;
+      const spaceBelow =
+        availableHeight - (headerLayout.y + headerLayout.height);
+
+      // If modal would be covered by keyboard, position it to fit above keyboard
+      if (spaceBelow < maxModalHeight + minSpacing) {
+        const adjustedTop = Math.max(
+          minSpacing,
+          availableHeight - maxModalHeight - minSpacing,
+        );
+        return {
+          top: adjustedTop,
+          left: headerLayout.x,
+          width: headerLayout.width,
+          maxHeight: Math.min(
+            maxModalHeight,
+            availableHeight - adjustedTop - minSpacing,
+          ),
+        };
+      }
+    }
+
+    // Default positioning (keyboard hidden or enough space)
+    const spaceBelow = screenHeight - (headerLayout.y + headerLayout.height);
+    return {
+      top: headerLayout.y + headerLayout.height - ms(2),
+      left: headerLayout.x,
+      width: headerLayout.width,
+      maxHeight: Math.min(
+        maxModalHeight,
+        Math.max(ms(150), spaceBelow - minSpacing),
+      ),
+    };
+  };
+
   return (
     <>
       <View style={styles.mainContainer}>
@@ -268,16 +316,7 @@ export const SearchableLocationDropdown: React.FC<
         <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.modalDropdown,
-                  {
-                    top: headerLayout.y + headerLayout.height - ms(2),
-                    left: headerLayout.x,
-                    width: headerLayout.width,
-                    maxHeight: ms(300),
-                  },
-                ]}>
+              <View style={[styles.modalDropdown, getModalPositioning()]}>
                 <View style={styles.searchContainer}>
                   <SearchIcon
                     width={16}
