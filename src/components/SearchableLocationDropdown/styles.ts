@@ -9,6 +9,9 @@ export const styles = ScaledSheet.create({
     alignSelf: 'stretch',
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -71,7 +74,7 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: 0,
   },
   scrollView: {
-    maxHeight: '200@ms',
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,

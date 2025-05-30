@@ -30,7 +30,7 @@ interface SectionHeaderProps {
   onTickPress: () => void;
   onClosePress: () => void;
   onEditPress: () => void;
-  onPressWand: () => void;
+  onWandPress: () => void;
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -43,7 +43,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   onTickPress,
   onClosePress,
   onEditPress,
-  onPressWand,
+  onWandPress,
 }) => {
   const [shouldRenderButtons, setShouldRenderButtons] = useState(false);
 
@@ -120,7 +120,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
               style={[styles.editButtonContainer, editButtonsContainerStyle]}>
               <TouchableOpacity
                 style={styles.buttonContainer}
-                onPress={onPressWand}>
+                onPress={onWandPress}>
                 <WandStarsIcon />
               </TouchableOpacity>
               <TouchableOpacity
