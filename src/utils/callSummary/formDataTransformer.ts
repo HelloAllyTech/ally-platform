@@ -51,6 +51,7 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.PROFESSION]: summary.profession || null,
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
   [SUMMARY_FIELDS.LOCATION]: summary.location || null,
+  [SUMMARY_FIELDS.CONCERN_CODE]: summary.codeOfConcern || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -62,6 +63,9 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.AGE]: formData[SUMMARY_FIELDS.AGE] as AgeRange | null,
     [SUMMARY_FIELDS.GENDER]: formData[SUMMARY_FIELDS.GENDER] as string | null,
     [SUMMARY_FIELDS.PROFESSION]: formData[SUMMARY_FIELDS.PROFESSION] as
+      | string
+      | null,
+    [SUMMARY_FIELDS.CONCERN_CODE]: formData[SUMMARY_FIELDS.CONCERN_CODE] as
       | string
       | null,
     [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: formData[

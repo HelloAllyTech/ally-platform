@@ -215,6 +215,10 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         field: SUMMARY_FIELDS.LOCATION,
         value: formData?.[SUMMARY_FIELDS.LOCATION] || '-',
       },
+      {
+        field: SUMMARY_FIELDS.CONCERN_CODE,
+        value: formData?.[SUMMARY_FIELDS.CONCERN_CODE] || '-',
+      },
     ],
     [durationInSeconds, formData, summary, summaryDetails, t],
   );
