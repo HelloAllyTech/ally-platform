@@ -20,7 +20,9 @@
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
-    "isThisHelpful": "Is this helpful"
+    "isThisHelpful": "Is this helpful",
+    "callEndConfirmation": "Are you sure you want to end this call?",
+    "endCall": "End Call"
   },
   "SplashScreen": {
     "hey": "Hey,",

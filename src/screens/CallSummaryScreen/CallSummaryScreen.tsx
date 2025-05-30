@@ -307,7 +307,6 @@ export const CallSummaryScreen: React.FC<
   useEffect(() => {
     if (hasCollapsedBeenShown && showAnimation) {
       setShowAnimation(false);
-      setHasCollapsedBeenShown(false);
     }
   }, [hasCollapsedBeenShown, showAnimation]);
 
@@ -421,10 +420,10 @@ const styles = ScaledSheet.create({
     elevation: 5,
   },
   contentContainer: {
-    paddingTop: '40@ms',
+    paddingTop: '80@ms',
   },
   paddingTop: {
-    paddingTop: '50@ms',
+    paddingTop: '80@ms',
   },
   downArrow: {
     transform: [{rotate: '270deg'}],

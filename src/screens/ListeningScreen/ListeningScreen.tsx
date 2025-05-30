@@ -3,6 +3,7 @@ import {StatusBar, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {CustomModal} from '@/components';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
@@ -10,6 +11,7 @@ import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {useEndCallMutation} from '@/services/chatApi';
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
@@ -44,8 +46,28 @@ export const ListeningScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCallPaused, setIsCallPaused] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
+  const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const chatData = useAppSelector(state => state.chat.currentChat);
+  const [endCall, {isSuccess}] = useEndCallMutation();
+
+  const handleCallEnd = useCallback(() => {
+    navigation.navigate('Breathing');
+  }, [navigation]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      handleCallEnd();
+    }
+  }, [isSuccess, handleCallEnd]);
+
+  const handleEndCall = () => {
+    if (chatData?.chatId) {
+      endCall({chatId: chatData.chatId});
+    }
+  };
 
   // Clear timeout on unmount
   useEffect(() => {
@@ -55,10 +77,6 @@ export const ListeningScreen = () => {
       }
     };
   }, []);
-
-  const handleCallEnd = useCallback(() => {
-    navigation.navigate('Breathing');
-  }, [navigation]);
 
   useHardwareBackPressHandler(() => {
     navigation.goBack();
@@ -154,6 +172,19 @@ export const ListeningScreen = () => {
       locations={[0, 0.65, 0.9]}
       start={{x: 0.4, y: 0}}
       end={{x: 0.6, y: 1}}>
+      {showCallEndConfirmation && (
+        <CustomModal
+          visible={showCallEndConfirmation}
+          onClose={() => setShowCallEndConfirmation(false)}
+          description={t('ListeningScreen.callEndConfirmation')}
+          onPrimaryPress={handleEndCall}
+          onSecondaryPress={() => setShowCallEndConfirmation(false)}
+          primaryButtonText={t('ListeningScreen.endCall')}
+          secondaryButtonText={t('CallSummary.info.cancel')}
+          title={t('ListeningScreen.endCall')}
+          primaryTextColor={colors.brightRed}
+        />
+      )}
       <StatusBar
         backgroundColor="transparent"
         translucent
@@ -187,7 +218,7 @@ export const ListeningScreen = () => {
         onFocusModeButtonPress={toggleNudgeVisibility}
         isNudgeVisible={isNudgeVisible}
         showFocusModeButton={!!currentNudge && nudgeStatus}
-        onEndCallSuccess={handleCallEnd}
+        onEndCallSuccess={() => setShowCallEndConfirmation(true)}
       />
     </LinearGradient>
   );
