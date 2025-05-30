@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown} from '@/assets/icons';
 import commonStyles from '@/components/styles';
@@ -131,7 +131,7 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
                 style={[
                   styles.modalDropdown,
                   {
-                    top: headerLayout.y + headerLayout.height + 2,
+                    top: headerLayout.y + headerLayout.height - ms(2),
                     left: headerLayout.x,
                     minWidth: Math.max(dropdownWidth, headerLayout.width),
                     maxHeight: Math.min(200, options.length * 40),

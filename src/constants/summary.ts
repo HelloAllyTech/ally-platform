@@ -17,6 +17,8 @@ import {
 } from '@/assets/icons';
 import {FieldType, SummaryField} from '@/types/callSummary';
 
+export const PLACES_PER_PAGE = 50;
+
 // Section keys for organizing fields
 export enum SectionKey {
   FeaturesAndDemographics = 'featuresAndDemographics',
