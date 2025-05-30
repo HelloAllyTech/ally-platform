@@ -1,13 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator, ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
+import WebView from 'react-native-webview';
 
 import {SCREEN_WIDTH} from '@/constants/general';
 import {
@@ -52,29 +47,21 @@ export const UserAnalyticsScreen: React.FC = () => {
     }
   }, [dashboards, triggerDashboardUrl]);
 
-  const handleDashboardPress = async (url: string) => {
-    await Linking.openURL(url);
+  const renderLoading = () => {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.azureBlue} />
+      </View>
+    );
   };
 
   if (isLoadingDashboards) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Analytics</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.azureBlue} />
-        </View>
-      </SafeAreaView>
-    );
+    return renderLoading();
   }
 
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Analytics</Text>
-        </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load analytics</Text>
           <ActivityIndicator size="large" color={colors.darkGray} />
@@ -85,19 +72,40 @@ export const UserAnalyticsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Analytics</Text>
-      </View>
-      <View style={styles.content}>
-        {Object.keys(dashboardUrls)?.map(id => (
-          <TouchableOpacity
-            onPress={() => handleDashboardPress(dashboardUrls[id])}
-            key={id}
-            style={styles.dashboardContainer}>
-            <Text style={styles.dashboardLink}>Open Dashboard</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={
+          Object.keys(dashboardUrls).length === 0 &&
+          dashboards &&
+          dashboards.length > 0
+            ? styles.loadingContent
+            : styles.content
+        }
+        showsVerticalScrollIndicator={false}>
+        {Object.keys(dashboardUrls).length === 0 &&
+        dashboards &&
+        dashboards.length > 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.azureBlue} />
+          </View>
+        ) : (
+          dashboards?.map(dashboard => {
+            const url = dashboardUrls[dashboard.externalId];
+            if (!url) return null;
+
+            return (
+              <View key={dashboard.externalId} style={styles.webViewContainer}>
+                <WebView
+                  source={{uri: url}}
+                  style={styles.webView}
+                  startInLoadingState
+                  renderLoading={renderLoading}
+                />
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -105,21 +113,25 @@ export const UserAnalyticsScreen: React.FC = () => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: '30@s',
     backgroundColor: colors.white,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-  },
+
   title: {
     ...fontFamily.REPLAY_PRO.BOLD,
-    fontSize: 18,
+    fontSize: '18@s',
     color: colors.darkSlate,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: '16@s',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   loadingContainer: {
@@ -131,31 +143,26 @@ const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: '16@s',
   },
   errorText: {
     ...typography.body,
     color: colors.darkGray,
   },
-  dashboardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: colors.lightGray8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    marginBottom: 12,
-    width: SCREEN_WIDTH - 50,
-    height: 80,
-    gap: 12,
+  scrollView: {
+    flex: 1,
   },
-  dashboardText: {
+  webViewContainer: {
+    marginBottom: ms(16),
+  },
+  webView: {
+    width: SCREEN_WIDTH - ms(50),
+    height: SCREEN_WIDTH - ms(50),
+    borderRadius: ms(8),
+  },
+  loadingText: {
     ...typography.body,
     color: colors.darkSlate,
-  },
-  dashboardLink: {
-    fontSize: 16,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray,
+    marginTop: ms(16),
   },
 });
