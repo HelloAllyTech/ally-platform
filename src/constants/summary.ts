@@ -458,7 +458,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.SESSION_SUMMARY,
     label: 'Session Summary',
     sectionKey: SectionKey.SessionSummary,
@@ -466,7 +465,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.FLOW,
     label: 'Session Summary',
     sectionKey: SectionKey.Flow,
@@ -474,7 +472,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.KEY_CONCERNS,
     label: 'Key concerns',
     sectionKey: SectionKey.KeyConcern,
@@ -482,7 +479,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS,
     label: 'Objective Observations',
     sectionKey: SectionKey.ObjectiveObservations,
@@ -490,7 +486,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS,
     label: 'Subjective Observations',
     sectionKey: SectionKey.SubjectiveObservations,
@@ -498,7 +493,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.ASSESSMENT,
     label: 'Assessment',
     sectionKey: SectionKey.Assessment,
@@ -506,7 +500,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.DOMINANT_FEELINGS,
     label: 'Dominant Feelings',
     sectionKey: SectionKey.DominantFeelings,
@@ -514,7 +507,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.ISSUES_WORKED_ON,
     label: 'Issues Worked On',
     sectionKey: SectionKey.IssuesWorkedOn,
@@ -522,7 +514,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES,
     label: 'Key Therapeutic Techniques',
     sectionKey: SectionKey.KeyTherapeuticTechniques,
@@ -530,7 +521,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.REFERRALS_PROVIDED,
     label: 'Referrals Provided',
     sectionKey: SectionKey.ReferralsProvided,
@@ -538,7 +528,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.HOMEWORK_RECOMMENDED,
     label: 'Homework Recommended',
     sectionKey: SectionKey.HomeworkRecommended,
@@ -546,7 +535,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL,
     label: 'Plans for Next Call',
     sectionKey: SectionKey.PlansForNextCall,
@@ -554,7 +542,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.TAGS,
     label: 'Tags',
     sectionKey: SectionKey.Tags,
@@ -564,7 +551,6 @@ export const summaryFields: SummaryField[] = [
   // Metrics section
   {
     isEditable: false,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.LISTENING_RATIO,
     label: 'Listening Share',
     sectionKey: SectionKey.Metrics,
@@ -572,7 +558,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: false,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED,
     label: 'No of Reflective Questions asked',
     sectionKey: SectionKey.Metrics,
@@ -580,7 +565,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: false,
-    isEnhanceable: true,
     key: SUMMARY_FIELDS.EMOTIONAL_LIFT,
     label: 'Emotions Lift',
     sectionKey: SectionKey.Metrics,
