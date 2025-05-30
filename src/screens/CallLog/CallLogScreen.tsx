@@ -6,6 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {isEmptyObject} from '@/utils/common';
 
@@ -28,6 +29,7 @@ export const CallLogScreen: React.FC = () => {
   const [offset, setOffset] = useState(0);
   const [allLogs, setAllLogs] = useState<CallLog[]>([]);
   const [hasMore, setHasMore] = useState(true);
+  const currentChat = useAppSelector(state => state.chat.currentChat);
 
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -42,10 +44,14 @@ export const CallLogScreen: React.FC = () => {
   const fetchInitialData = useCallback(async () => {
     const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
     if (result.data?.data) {
-      setAllLogs(result.data.data);
+      // This is to avoid showing the ongoing call log
+      const filteredCallLogs = result.data.data.filter(
+        (log: CallLog) => log.details?.chatId !== currentChat?.chatId,
+      );
+      setAllLogs(filteredCallLogs);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
     }
-  }, [getCallLogs]);
+  }, [currentChat?.chatId, getCallLogs]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
