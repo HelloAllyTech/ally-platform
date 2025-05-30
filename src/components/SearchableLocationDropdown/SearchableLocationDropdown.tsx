@@ -12,6 +12,8 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, SearchIcon} from '@/assets/icons';
 import commonStyles from '@/components/styles';
+import {PLACES_PER_PAGE} from '@/constants/summary';
+import {useDebounce} from '@/hooks/useDebounce';
 import useTranslate from '@/hooks/useTranslate';
 import {
   Place,
@@ -44,6 +46,9 @@ export const SearchableLocationDropdown: React.FC<
   } = props;
   const [searchQuery, setSearchQuery] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(true);
+
   const [headerLayout, setHeaderLayout] = useState({
     x: 0,
     y: 0,
@@ -56,21 +61,39 @@ export const SearchableLocationDropdown: React.FC<
     useLazySearchPlacesQuery();
 
   const {data: initialPlaces, isLoading: isLoadingInitial} = useGetPlacesQuery({
-    page: 1,
-    limit: 20,
+    page: currentPage,
+    limit: PLACES_PER_PAGE,
   });
+
+  // Create debounced search function
+  const debouncedSearch = useDebounce(
+    (query: string) => {
+      if (query.trim().length > 0) {
+        searchPlaces({query});
+        // Reset pagination when searching
+        setCurrentPage(1);
+        setHasMorePages(true);
+      }
+    },
+    {delay: 300},
+  );
 
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
-      searchPlaces({query: searchQuery});
-    } else if (isOpen && initialPlaces && Array.isArray(initialPlaces.data)) {
+      debouncedSearch(searchQuery);
+    } else if (
+      isOpen &&
+      initialPlaces &&
+      Array.isArray(initialPlaces.data) &&
+      currentPage === 1
+    ) {
       setPlaces(initialPlaces.data);
-    } else if (isOpen && initialPlaces) {
-      setPlaces(initialPlaces.data || []);
-    } else {
-      setPlaces([]);
+    } else if (isOpen && !searchQuery.trim().length && currentPage === 1) {
+      // Reset to first page when opening dropdown without search
+      setCurrentPage(1);
+      setHasMorePages(true);
     }
-  }, [searchQuery, searchPlaces, isOpen, initialPlaces]);
+  }, [searchQuery, debouncedSearch, isOpen, initialPlaces, currentPage]);
 
   useEffect(() => {
     if (searchResults && Array.isArray(searchResults)) {
@@ -80,18 +103,40 @@ export const SearchableLocationDropdown: React.FC<
     }
   }, [searchResults, searchQuery]);
 
-  // Set initial places when they're first loaded
+  // Handle pagination - append new places to existing list
   useEffect(() => {
     if (
       initialPlaces &&
       initialPlaces.data &&
-      Array.isArray(initialPlaces.data) &&
-      isOpen &&
-      searchQuery.trim().length === 0
+      Array.isArray(initialPlaces.data)
     ) {
-      setPlaces(initialPlaces.data);
+      if (currentPage === 1) {
+        // First page - replace places
+        setPlaces(initialPlaces.data);
+        // If we got all the data in first request, no more pages needed
+        setHasMorePages(initialPlaces.data.length < initialPlaces.total);
+      } else {
+        // Subsequent pages - append only unique places to existing places
+        setPlaces(prevPlaces => {
+          const existingIds = new Set(prevPlaces.map(place => place.id));
+          const newPlaces = initialPlaces.data.filter(
+            place => !existingIds.has(place.id),
+          );
+          return [...prevPlaces, ...newPlaces];
+        });
+
+        // Check if there are more pages
+        const totalLoaded = currentPage * PLACES_PER_PAGE;
+        setHasMorePages(totalLoaded < initialPlaces.total);
+      }
     }
-  }, [initialPlaces, isOpen, searchQuery]);
+  }, [initialPlaces, currentPage]);
+
+  const loadMorePlaces = () => {
+    if (hasMorePages && !isLoadingInitial && searchQuery.trim().length === 0) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
 
   const toggleDropdown = () => {
     if (!disabled) {
@@ -103,8 +148,24 @@ export const SearchableLocationDropdown: React.FC<
       setIsOpen(!isOpen);
       if (!isOpen) {
         setSearchQuery('');
-        setPlaces([]);
+        // Reset pagination when opening dropdown
+        setCurrentPage(1);
+        setHasMorePages(true);
       }
+    }
+  };
+
+  const handleScroll = (event: any) => {
+    const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+    const isCloseToBottom =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+    if (
+      isCloseToBottom &&
+      hasMorePages &&
+      !isLoadingInitial &&
+      searchQuery.trim().length === 0
+    ) {
+      loadMorePlaces();
     }
   };
 
@@ -114,6 +175,70 @@ export const SearchableLocationDropdown: React.FC<
     setIsOpen(false);
     setSearchQuery('');
     setPlaces([]);
+  };
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <Text style={styles.loadingText}>
+        {searchQuery.length > 0
+          ? t('LocationDropdown.searching')
+          : t('LocationDropdown.loadingPlaces')}
+      </Text>
+    </View>
+  );
+
+  const renderPlacesList = () => (
+    <>
+      {places.map((place, index) => (
+        <TouchableOpacity
+          key={place.id}
+          style={[
+            styles.item,
+            index === places.length - 1 && styles.lastOption,
+          ]}
+          onPress={() => handleSelect(place)}
+          activeOpacity={0.7}>
+          <Text style={styles.itemText}>
+            {place.city}, {place.state}
+          </Text>
+        </TouchableOpacity>
+      ))}
+      {isLoadingInitial && currentPage > 1 && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>
+            {t('LocationDropdown.loadingPlaces')}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const renderNoResults = () => (
+    <View style={styles.noResultsContainer}>
+      <Text style={styles.noResultsText}>
+        {t('LocationDropdown.noLocationsFound')}
+      </Text>
+    </View>
+  );
+
+  const renderInstructions = () => (
+    <View style={styles.instructionContainer}>
+      <Text style={styles.instructionText}>
+        {t('LocationDropdown.startTypingToSearch')}
+      </Text>
+    </View>
+  );
+
+  const renderDropdownContent = () => {
+    const isLoadingState =
+      (isLoading || isLoadingInitial) && places.length === 0;
+    const hasPlaces = places.length > 0;
+    const hasSearchQuery = searchQuery.length > 0;
+
+    if (isLoadingState) return renderLoadingState();
+    if (hasPlaces) return renderPlacesList();
+    if (hasSearchQuery) return renderNoResults();
+    return renderInstructions();
   };
 
   return (
@@ -146,7 +271,7 @@ export const SearchableLocationDropdown: React.FC<
                 style={[
                   styles.modalDropdown,
                   {
-                    top: headerLayout.y + headerLayout.height + 2,
+                    top: headerLayout.y + headerLayout.height - ms(2),
                     left: headerLayout.x,
                     width: headerLayout.width,
                     maxHeight: ms(300),
@@ -171,43 +296,10 @@ export const SearchableLocationDropdown: React.FC<
                 <ScrollView
                   style={styles.scrollView}
                   contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps="handled">
-                  {(isLoading || isLoadingInitial) && places.length === 0 ? (
-                    <View style={styles.loadingContainer}>
-                      <Text style={styles.loadingText}>
-                        {searchQuery.length > 0
-                          ? t('LocationDropdown.searching')
-                          : t('LocationDropdown.loadingPlaces')}
-                      </Text>
-                    </View>
-                  ) : places.length > 0 ? (
-                    places.map((place, index) => (
-                      <TouchableOpacity
-                        key={place.id}
-                        style={[
-                          styles.item,
-                          index === places.length - 1 && styles.lastOption,
-                        ]}
-                        onPress={() => handleSelect(place)}
-                        activeOpacity={0.7}>
-                        <Text style={styles.itemText}>
-                          {place.city}, {place.state}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : searchQuery.length > 0 ? (
-                    <View style={styles.noResultsContainer}>
-                      <Text style={styles.noResultsText}>
-                        {t('LocationDropdown.noLocationsFound')}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.instructionContainer}>
-                      <Text style={styles.instructionText}>
-                        {t('LocationDropdown.startTypingToSearch')}
-                      </Text>
-                    </View>
-                  )}
+                  keyboardShouldPersistTaps="handled"
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}>
+                  {renderDropdownContent()}
                 </ScrollView>
               </View>
             </TouchableWithoutFeedback>
