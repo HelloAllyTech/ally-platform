@@ -113,13 +113,15 @@ export const CallSummaryScreen: React.FC<
     if (chatId) {
       fetchCallSummary(chatId);
     }
+  }, [chatId, fetchCallSummary]);
 
-    // Cleanup function to clear summary state when component unmounts
+  // Cleanup function to clear summary state when component unmounts
+  useEffect(() => {
     return () => {
       dispatch(clearSummary());
       dispatch(clearFormData());
     };
-  }, [chatId, fetchCallSummary, dispatch]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (summaryData?.details?.callInfo?.summaryName) {
