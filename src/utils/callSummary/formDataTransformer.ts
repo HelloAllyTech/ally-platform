@@ -22,6 +22,7 @@ export const getInitialFormData = (): FormData => ({
   [SUMMARY_FIELDS.TAGS]: null,
   [SUMMARY_FIELDS.AGE]: null,
   [SUMMARY_FIELDS.GENDER]: null,
+  [SUMMARY_FIELDS.LOCATION]: null,
 });
 
 export const transformSummaryToFormData = (
@@ -49,6 +50,7 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.GENDER]: summary.gender || null,
   [SUMMARY_FIELDS.PROFESSION]: summary.profession || null,
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
+  [SUMMARY_FIELDS.LOCATION]: summary.location || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -65,6 +67,9 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: formData[
       SUMMARY_FIELDS.RELATIONSHIP_STATUS
     ] as string | null,
+    [SUMMARY_FIELDS.LOCATION]: formData[SUMMARY_FIELDS.LOCATION] as
+      | string
+      | null,
     [SUMMARY_FIELDS.SESSION_SUMMARY]: formData[
       SUMMARY_FIELDS.SESSION_SUMMARY
     ] as string | null,

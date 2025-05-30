@@ -17,6 +17,8 @@ import {
 } from '@/assets/icons';
 import {FieldType, SummaryField} from '@/types/callSummary';
 
+export const PLACES_PER_PAGE = 50;
+
 // Section keys for organizing fields
 export enum SectionKey {
   FeaturesAndDemographics = 'featuresAndDemographics',
@@ -424,7 +426,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.LOCATION,
     label: 'Location',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.Text,
+    type: FieldType.SearchableDropdown,
   },
   {
     isEditable: true,
