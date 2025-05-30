@@ -10,14 +10,14 @@ interface ControlButtonsProps {
   onFocusModeButtonPress: () => void;
   isNudgeVisible: boolean;
   showFocusModeButton?: boolean;
-  onEndCallSuccess: () => void;
+  onCallEndPress: () => void;
 }
 
 export const ControlButtons: React.FC<ControlButtonsProps> = ({
   onFocusModeButtonPress,
   isNudgeVisible,
   showFocusModeButton = true,
-  onEndCallSuccess,
+  onCallEndPress,
 }) => {
   return (
     <View style={styles.container}>
@@ -41,7 +41,7 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
       )}
       <TouchableOpacity
         style={[styles.buttonContainer, styles.rightButton]}
-        onPress={onEndCallSuccess}>
+        onPress={onCallEndPress}>
         <CallEndIcon width={35} height={35} color={colors.darkBlue} />
       </TouchableOpacity>
     </View>
