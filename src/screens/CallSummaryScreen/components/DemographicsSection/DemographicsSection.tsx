@@ -178,7 +178,8 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.CALLER_ID,
-        value: summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
+        value:
+          summaryDetails?.chatId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.COUNSELOR_NAME,

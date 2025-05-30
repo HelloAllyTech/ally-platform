@@ -18,7 +18,6 @@ type SummaryFieldKey = (typeof SUMMARY_FIELDS)[keyof typeof SUMMARY_FIELDS];
 
 export interface SummaryField {
   isEditable: boolean;
-  isEnhanceable?: boolean;
   key: SummaryFieldKey;
   label: string;
   options?: typeof GENDER_OPTIONS | typeof AGE_RANGE_OPTIONS;
