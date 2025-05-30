@@ -11,6 +11,7 @@ export enum FieldType {
   InlineTextInput = 'InlineTextInput',
   MultilineTextInput = 'MultilineTextInput',
   Dropdown = 'Dropdown',
+  SearchableDropdown = 'SearchableDropdown',
 }
 
 type SummaryFieldKey = (typeof SUMMARY_FIELDS)[keyof typeof SUMMARY_FIELDS];

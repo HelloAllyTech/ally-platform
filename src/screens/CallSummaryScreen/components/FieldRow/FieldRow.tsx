@@ -2,6 +2,7 @@ import React, {ReactNode} from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import commonStyles from '@/components/styles';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
@@ -21,7 +22,7 @@ export const FieldRow: React.FC<FieldRowProps> = ({
     <View style={styles.fieldContainer}>
       <Text style={styles.label}>{label}:</Text>
       {typeof value === 'string' || typeof value === 'number' ? (
-        <Text style={styles.value}>{value}</Text>
+        <Text style={[styles.value, commonStyles.fieldValueText]}>{value}</Text>
       ) : (
         value
       )}
@@ -43,9 +44,6 @@ const styles = ScaledSheet.create({
     marginRight: '8@ms',
   },
   value: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.lightGray3,
     flex: 1,
   },
   separator: {

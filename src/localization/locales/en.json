@@ -62,7 +62,7 @@
     "customMenu": {
       "export": "Export",
       "delete": "Delete",
-      "deleteConfirmation": "Are you sure you want to delete this summary? this action can’t be undone"
+      "deleteConfirmation": "Are you sure you want to delete this summary? this action can't be undone"
     },
     "info": {
       "storagePermissionDenied": "Storage permission denied",
@@ -115,6 +115,14 @@
       "error": "Error playing audio",
       "errorAddingTrack": "Error adding track"
     }
+  },
+  "LocationDropdown": {
+    "placeholder": "Select location",
+    "searchPlaceholder": "Search locations...",
+    "searching": "Searching...",
+    "loadingPlaces": "Loading places...",
+    "noLocationsFound": "No locations found",
+    "startTypingToSearch": "Start typing to search for locations"
   },
   "submit": "Submit"
 }

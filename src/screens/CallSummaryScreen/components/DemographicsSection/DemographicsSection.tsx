@@ -3,6 +3,8 @@ import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components/Dropdown/Dropdown';
+import {SearchableLocationDropdown} from '@/components/SearchableLocationDropdown/SearchableLocationDropdown';
+import commonStyles from '@/components/styles';
 import {
   FIELD_LABELS,
   SUMMARY_FIELDS,
@@ -14,8 +16,6 @@ import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
 import {formatTimeHHmm} from '@/utils/date';
 
@@ -70,7 +70,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
             value={
               isEditing && fieldItem?.isEditable ? (
                 <TextInput
-                  style={styles.inlineTextInput}
+                  style={[commonStyles.fieldValueText, styles.inlineTextInput]}
                   value={(formData?.[fieldConfig.field] as string) || ''}
                   onChangeText={handleFieldChange(fieldConfig.field)}
                   placeholder={t('CallSummary.enterDetail')}
@@ -97,6 +97,32 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
                   <CustomDropdown
                     value={fieldConfig.value as string}
                     options={Array.from(fieldItem.options || [])}
+                    onSelect={(selectedValue: string) => {
+                      handleFieldChange?.(fieldConfig.field)(selectedValue);
+                    }}
+                    isOpen={openDropdown === fieldConfig.field}
+                    setIsOpen={(value: boolean) => {
+                      setOpenDropdown(value ? fieldConfig.field : null);
+                    }}
+                  />
+                </View>
+              ) : (
+                (fieldConfig.value as string)
+              )
+            }
+          />
+        );
+
+      case FieldType.SearchableDropdown:
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={
+              isEditing ? (
+                <View style={styles.dropdownContainer}>
+                  <SearchableLocationDropdown
+                    value={fieldConfig.value as string}
                     onSelect={(selectedValue: string) => {
                       handleFieldChange?.(fieldConfig.field)(selectedValue);
                     }}
@@ -187,7 +213,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.LOCATION,
-        value: summary?.[SUMMARY_FIELDS.LOCATION] || '-',
+        value: formData?.[SUMMARY_FIELDS.LOCATION] || '-',
       },
     ],
     [durationInSeconds, formData, summary, summaryDetails, t],
@@ -205,12 +231,9 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   dropdownContainer: {
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   inlineTextInput: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.lightGray3,
     flex: 1,
     marginRight: '10@ms',
   },
