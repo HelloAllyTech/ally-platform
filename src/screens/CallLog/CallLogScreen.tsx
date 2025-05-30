@@ -46,7 +46,7 @@ export const CallLogScreen: React.FC = () => {
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
       const filteredCallLogs = result.data.data.filter(
-        (log: CallLog) => log.details.chatId !== currentChat?.chatId,
+        (log: CallLog) => log.details?.chatId !== currentChat?.chatId,
       );
       setAllLogs(filteredCallLogs);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
