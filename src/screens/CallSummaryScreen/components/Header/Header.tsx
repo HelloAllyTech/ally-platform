@@ -19,6 +19,7 @@ interface HeaderProps {
   onBackPress: () => void;
   onMenuPress: () => void;
   summaryName?: string;
+  showAnimation: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,10 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
+  showAnimation,
 }) => {
   const {t} = useTranslate();
 
-  if (!isFullyExpanded) {
+  if (!isFullyExpanded || !showAnimation) {
     return (
       <TouchableWithoutFeedback>
         <View style={styles.expandedTitleContainer}>
