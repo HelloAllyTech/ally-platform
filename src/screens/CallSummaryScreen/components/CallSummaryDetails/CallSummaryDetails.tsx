@@ -148,7 +148,6 @@ export const CallSummaryDetails: React.FC<Props> = ({
                 icon={<Icon />}
                 canEdit={sectionConfig.canEdit}
                 sectionConfig={sectionConfig}
-                expanded={expanded}
                 index={index}
                 handleSubmit={handleSubmit}
                 isEditing={isEditing[sectionConfig.key]}

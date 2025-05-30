@@ -24,7 +24,6 @@ interface SectionWrapperProps {
     label: string;
     icon: React.FC<SvgProps>;
   };
-  expanded: Record<SectionKey, any>;
   index: number;
   handleSubmit: () => void;
   isEditing: boolean;
@@ -40,13 +39,13 @@ const SectionWrapper = ({
   icon,
   canEdit,
   sectionConfig,
-  expanded,
   index,
   handleSubmit,
   isEditing,
   setIsEditing,
 }: SectionWrapperProps) => {
-  const {handleSectionFieldsReset, handleFieldChange} = useCallSummaryForm();
+  const {handleSectionFieldsReset, handleFieldChange, formData} =
+    useCallSummaryForm();
   const summaryData = useAppSelector(state => state.summary.summaryData);
   const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
     useEnhanceCallSummaryMutation();
@@ -63,11 +62,16 @@ const SectionWrapper = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enhancedResponse, sectionConfig.key]);
 
-  const onPressWand = () => {
+  const onWandPress = () => {
     if (!summaryData?.details?.chatId) return;
-    enhanceCallSummary({
-      content: 'This text is pretty good',
-    });
+    const field = summaryFields.find(
+      _field => _field.sectionKey === sectionConfig.key,
+    );
+    if (field?.key && formData?.[field.key]) {
+      enhanceCallSummary({
+        content: formData[field.key] as string,
+      });
+    }
   };
 
   const onEditPress = () => {
@@ -123,7 +127,7 @@ const SectionWrapper = ({
         onTickPress={onTickPress}
         onClosePress={onClosePress}
         onEditPress={onEditPress}
-        onPressWand={onPressWand}
+        onWandPress={onWandPress}
       />
       {isExpanded && (
         <View style={styles.sectionContent}>{renderSection()}</View>
