@@ -424,7 +424,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.LOCATION,
     label: 'Location',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.Text,
+    type: FieldType.SearchableDropdown,
   },
   {
     isEditable: true,
