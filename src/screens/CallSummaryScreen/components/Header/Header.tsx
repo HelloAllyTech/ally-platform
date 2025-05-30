@@ -8,7 +8,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
-import {DEFAULT_HIT_SLOP} from '@/constants/general';
+import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -109,7 +109,8 @@ const styles = ScaledSheet.create({
     fontWeight: '400',
   },
   headerSubtitle: {
-    fontStyle: 'italic',
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
     fontWeight: '500',
   },
   expandedSummaryTitleContainer: {

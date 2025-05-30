@@ -1,5 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {isIOS} from '@/constants/general';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -42,7 +43,7 @@ export const styles = ScaledSheet.create({
   },
   allyText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: 'italic',
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   sheetContent: {
     padding: '20@ms',
