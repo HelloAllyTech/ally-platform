@@ -5,6 +5,7 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -15,7 +16,6 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {CustomModal} from '@/components/Modal/CustomModal';
 import {Toast} from '@/components/Toast/Toast';
 import {isIOS, WINDOW_HEIGHT} from '@/constants/general';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -39,6 +39,7 @@ import {logger} from '@/utils/logger';
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
+import {DeleteRenameModal} from './components/DeleteRenameModal/DeletRenameModal';
 import {Header} from './components/Header/Header';
 
 /**
@@ -88,6 +89,8 @@ export const CallSummaryScreen: React.FC<
 
   const [editedName, setEditedName] = useState(summaryName);
   const [updateCallInfo] = useUpdateCallInfoMutation();
+  const [showAnimation, setShowAnimation] = useState(!callId);
+  const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
 
   useEffect(() => {
     setEditedName(summaryName);
@@ -131,6 +134,15 @@ export const CallSummaryScreen: React.FC<
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollY.value = event.nativeEvent.contentOffset.y;
     setIsFullyExpanded(event.nativeEvent.contentOffset.y <= 80);
+
+    // Only track hasCollapsedBeenShown if animation is still on
+    if (
+      showAnimation &&
+      event.nativeEvent.contentOffset.y > 80 &&
+      !hasCollapsedBeenShown
+    ) {
+      setHasCollapsedBeenShown(true);
+    }
 
     // Check if we're near the bottom
     const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
@@ -292,43 +304,34 @@ export const CallSummaryScreen: React.FC<
     }
   };
 
+  useEffect(() => {
+    if (hasCollapsedBeenShown && showAnimation) {
+      setShowAnimation(false);
+      setHasCollapsedBeenShown(false);
+    }
+  }, [hasCollapsedBeenShown, showAnimation]);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      {activeModal === 'delete' && (
-        <CustomModal
-          visible={activeModal === 'delete'}
-          onClose={() => setActiveModal(null)}
-          title={t('CallSummary.customMenu.delete')}
-          primaryButtonText={t('CallSummary.customMenu.delete')}
-          secondaryButtonText={t('CallSummary.info.cancel')}
-          onPrimaryPress={handleDelete}
-          onSecondaryPress={() => setActiveModal(null)}
-          description={t('CallSummary.customMenu.deleteConfirmation')}
-          primaryTextColor={colors.brightRed}
-        />
-      )}
-      {activeModal === 'rename' && (
-        <CustomModal
-          visible={activeModal === 'rename'}
-          onClose={() => setActiveModal(null)}
-          title={t('CallSummary.info.rename')}
-          primaryButtonText={t('CallSummary.info.confirm')}
-          secondaryButtonText={t('CallSummary.info.cancel')}
-          onPrimaryPress={handleBlur}
-          onSecondaryPress={() => setActiveModal(null)}
-          showInput
-          inputProps={{
-            value: editedName,
-            onChangeText: setEditedName,
-          }}
-        />
-      )}
+    <SafeAreaView
+      style={[
+        styles.container,
+        {backgroundColor: !showAnimation ? colors.white : colors.black},
+      ]}>
+      <StatusBar barStyle={!showAnimation ? 'dark-content' : 'light-content'} />
+      <DeleteRenameModal
+        activeModal={activeModal || ''}
+        setActiveModal={modal => setActiveModal(modal as ModalType)}
+        handleDelete={handleDelete}
+        handleBlur={handleBlur}
+        editedName={editedName || ''}
+        setEditedName={setEditedName}
+      />
       <Header
         isFullyExpanded={isFullyExpanded}
         onBackPress={handleGoBack}
         onMenuPress={() => setIsMenuVisible(true)}
         summaryName={summaryName}
+        showAnimation={showAnimation}
       />
       <CustomMenuModal
         visible={isMenuVisible}
@@ -339,7 +342,7 @@ export const CallSummaryScreen: React.FC<
       <Animated.View
         style={[
           styles.card,
-          animatedCardStyle,
+          showAnimation && animatedCardStyle,
           {maxHeight: WINDOW_HEIGHT - insets.top},
         ]}>
         <ScrollView
@@ -347,7 +350,11 @@ export const CallSummaryScreen: React.FC<
           scrollEnabled={isShowCallSummary}
           onScroll={handleScroll}
           scrollEventThrottle={8}
-          onLayout={handleLayout}>
+          onLayout={handleLayout}
+          contentContainerStyle={
+            hasCollapsedBeenShown && styles.contentContainer
+          }>
+          {!!callId && <View style={styles.paddingTop} />}
           {isShowCallSummary ? (
             <CallSummaryDetails
               isLoading={isLoading}
@@ -412,6 +419,12 @@ const styles = ScaledSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  contentContainer: {
+    paddingTop: '40@ms',
+  },
+  paddingTop: {
+    paddingTop: '50@ms',
   },
   downArrow: {
     transform: [{rotate: '270deg'}],
