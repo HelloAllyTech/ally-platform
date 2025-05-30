@@ -3,6 +3,7 @@ import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components/Dropdown/Dropdown';
+import {SearchableLocationDropdown} from '@/components/SearchableLocationDropdown/SearchableLocationDropdown';
 import commonStyles from '@/components/styles';
 import {
   FIELD_LABELS,
@@ -112,6 +113,32 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
           />
         );
 
+      case FieldType.SearchableDropdown:
+        return (
+          <FieldRow
+            key={fieldConfig.field}
+            label={FIELD_LABELS[fieldConfig.field]}
+            value={
+              isEditing ? (
+                <View style={styles.dropdownContainer}>
+                  <SearchableLocationDropdown
+                    value={fieldConfig.value as string}
+                    onSelect={(selectedValue: string) => {
+                      handleFieldChange?.(fieldConfig.field)(selectedValue);
+                    }}
+                    isOpen={openDropdown === fieldConfig.field}
+                    setIsOpen={(value: boolean) => {
+                      setOpenDropdown(value ? fieldConfig.field : null);
+                    }}
+                  />
+                </View>
+              ) : (
+                (fieldConfig.value as string)
+              )
+            }
+          />
+        );
+
       default:
         return (
           <FieldRow
@@ -186,7 +213,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.LOCATION,
-        value: summary?.[SUMMARY_FIELDS.LOCATION] || '-',
+        value: formData?.[SUMMARY_FIELDS.LOCATION] || '-',
       },
     ],
     [durationInSeconds, formData, summary, summaryDetails, t],
@@ -204,7 +231,7 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   dropdownContainer: {
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   inlineTextInput: {
     flex: 1,
