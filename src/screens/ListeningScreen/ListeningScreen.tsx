@@ -218,7 +218,8 @@ export const ListeningScreen = () => {
         onFocusModeButtonPress={toggleNudgeVisibility}
         isNudgeVisible={isNudgeVisible}
         showFocusModeButton={!!currentNudge && nudgeStatus}
-        onCallEndPress={() => setShowCallEndConfirmation(true)}
+        // TODO: Need to show confirmation modal here
+        onCallEndPress={handleEndCall}
       />
     </LinearGradient>
   );
