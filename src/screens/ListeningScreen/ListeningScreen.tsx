@@ -3,7 +3,6 @@ import {StatusBar, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CustomModal} from '@/components';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
@@ -20,10 +19,13 @@ import {typography} from '@/theme/typography';
 import {FeedbackResponse, SocketEvent, SocketMessage} from '@/types/message';
 import {Maybe} from '@/utils/common';
 
-import {AnimatedBlob} from './components/AnimatedBlob';
-import {ControlButtons} from './components/ControlButtons';
-import {NudgeSection} from './components/NudgeSection';
-import {Timer} from './components/Timer/Timer';
+import {
+  AnimatedBlob,
+  CallEndModal,
+  ControlButtons,
+  NudgeSection,
+  Timer,
+} from './components';
 
 export interface Nudge {
   id: number;
@@ -166,62 +168,57 @@ export const ListeningScreen = () => {
   );
 
   return (
-    <LinearGradient
-      colors={[colors.black, colors.navyGray, colors.oceanBlue]}
-      style={styles.container}
-      locations={[0, 0.65, 0.9]}
-      start={{x: 0.4, y: 0}}
-      end={{x: 0.6, y: 1}}>
+    <>
       {showCallEndConfirmation && (
-        <CustomModal
-          visible={showCallEndConfirmation}
-          onClose={() => setShowCallEndConfirmation(false)}
-          description={t('ListeningScreen.callEndConfirmation')}
-          onPrimaryPress={handleEndCall}
-          onSecondaryPress={() => setShowCallEndConfirmation(false)}
-          primaryButtonText={t('ListeningScreen.endCall')}
-          secondaryButtonText={t('CallSummary.info.cancel')}
-          title={t('ListeningScreen.endCall')}
-          primaryTextColor={colors.brightRed}
+        <CallEndModal
+          showCallEndConfirmation={showCallEndConfirmation}
+          setShowCallEndConfirmation={setShowCallEndConfirmation}
+          handleEndCall={handleEndCall}
         />
       )}
-      <StatusBar
-        backgroundColor="transparent"
-        translucent
-        barStyle="light-content"
-      />
-      <View style={styles.header}>
-        <Text style={styles.headerText}>
-          {t('ListeningScreen.takingNotes')}
-        </Text>
-        <Timer startTime={startTime} />
-      </View>
+      <LinearGradient
+        colors={[colors.black, colors.navyGray, colors.oceanBlue]}
+        style={styles.container}
+        locations={[0, 0.65, 0.9]}
+        start={{x: 0.4, y: 0}}
+        end={{x: 0.6, y: 1}}>
+        <StatusBar
+          backgroundColor="transparent"
+          translucent
+          barStyle="light-content"
+        />
+        <View style={styles.header}>
+          <Text style={styles.headerText}>
+            {t('ListeningScreen.takingNotes')}
+          </Text>
+          <Timer startTime={startTime} />
+        </View>
 
-      <View style={styles.content}>
-        <View style={styles.blobContainer}>
-          <AnimatedBlob
-            isExpanded={!nudgeStatus || !isNudgeVisible}
-            isCallPaused={isCallPaused}
-            isAudioActive={isAudioActive}
-            onPlayPauseCallPress={handlePlayPauseCallPress}
+        <View style={styles.content}>
+          <View style={styles.blobContainer}>
+            <AnimatedBlob
+              isExpanded={!nudgeStatus || !isNudgeVisible}
+              isCallPaused={isCallPaused}
+              isAudioActive={isAudioActive}
+              onPlayPauseCallPress={handlePlayPauseCallPress}
+            />
+          </View>
+          <NudgeSection
+            isVisible={!!nudgeStatus && isNudgeVisible}
+            nudge={nudgeStatus ? currentNudge : null}
+            isLoading={isLoading}
+            onFeedbackSuccess={handleNudgeFeedbackSuccess}
           />
         </View>
-        <NudgeSection
-          isVisible={!!nudgeStatus && isNudgeVisible}
-          nudge={nudgeStatus ? currentNudge : null}
-          isLoading={isLoading}
-          onFeedbackSuccess={handleNudgeFeedbackSuccess}
-        />
-      </View>
 
-      <ControlButtons
-        onFocusModeButtonPress={toggleNudgeVisibility}
-        isNudgeVisible={isNudgeVisible}
-        showFocusModeButton={!!currentNudge && nudgeStatus}
-        // TODO: Need to show confirmation modal here
-        onCallEndPress={handleEndCall}
-      />
-    </LinearGradient>
+        <ControlButtons
+          onFocusModeButtonPress={toggleNudgeVisibility}
+          isNudgeVisible={isNudgeVisible}
+          showFocusModeButton={!!currentNudge && nudgeStatus}
+          onCallEndPress={() => setShowCallEndConfirmation(true)}
+        />
+      </LinearGradient>
+    </>
   );
 };
 
