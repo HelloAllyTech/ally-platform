@@ -51,11 +51,12 @@ const ShimmerItem = ({widthPercentage, height}: ShimmerItemProps) => {
 export const SkeletonLoader = () => {
   return (
     <View style={styles.container}>
-      <ShimmerItem widthPercentage={100} height={12} />
-      <ShimmerItem widthPercentage={90} height={12} />
-      <ShimmerItem widthPercentage={70} height={12} />
-      <ShimmerItem widthPercentage={80} height={12} />
-      <ShimmerItem widthPercentage={90} height={12} />
+      <ShimmerItem widthPercentage={100} height={8} />
+      <ShimmerItem widthPercentage={90} height={8} />
+      <ShimmerItem widthPercentage={70} height={8} />
+      <ShimmerItem widthPercentage={80} height={8} />
+      <ShimmerItem widthPercentage={90} height={8} />
+      <ShimmerItem widthPercentage={90} height={8} />
     </View>
   );
 };
@@ -67,7 +68,7 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   skeleton: {
-    backgroundColor: colors.paleGray,
+    backgroundColor: colors.charcoalBlue,
     borderRadius: 6,
     overflow: 'hidden',
   },
