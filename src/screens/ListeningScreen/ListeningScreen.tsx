@@ -1,10 +1,10 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {StatusBar, Text, View} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomModal} from '@/components';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
+import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -23,6 +23,7 @@ import {Maybe} from '@/utils/common';
 import {AnimatedBlob} from './components/AnimatedBlob';
 import {ControlButtons} from './components/ControlButtons';
 import {NudgeSection} from './components/NudgeSection';
+import RadialGradientBackground from './components/RadialGradientBackground';
 import {Timer} from './components/Timer/Timer';
 
 export interface Nudge {
@@ -166,12 +167,7 @@ export const ListeningScreen = () => {
   );
 
   return (
-    <LinearGradient
-      colors={[colors.black, colors.navyGray, colors.oceanBlue]}
-      style={styles.container}
-      locations={[0, 0.65, 0.9]}
-      start={{x: 0.4, y: 0}}
-      end={{x: 0.6, y: 1}}>
+    <View style={styles.container}>
       {showCallEndConfirmation && (
         <CustomModal
           visible={showCallEndConfirmation}
@@ -214,20 +210,26 @@ export const ListeningScreen = () => {
         />
       </View>
 
-      <ControlButtons
-        onFocusModeButtonPress={toggleNudgeVisibility}
-        isNudgeVisible={isNudgeVisible}
-        showFocusModeButton={!!currentNudge && nudgeStatus}
-        // TODO: Need to show confirmation modal here
-        onCallEndPress={handleEndCall}
-      />
-    </LinearGradient>
+      <View style={styles.radialGradientBackgroundContainer}>
+        <View style={styles.controlButtonsContainer}>
+          <ControlButtons
+            onFocusModeButtonPress={toggleNudgeVisibility}
+            isNudgeVisible={isNudgeVisible}
+            showFocusModeButton={!!currentNudge && nudgeStatus}
+            // TODO: Need to show confirmation modal here
+            onCallEndPress={handleEndCall}
+          />
+        </View>
+        <RadialGradientBackground />
+      </View>
+    </View>
   );
 };
 
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.black,
   },
   header: {
     alignItems: 'center',
@@ -251,5 +253,19 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: '16@vs',
+  },
+  controlButtonsContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 1000,
+    top: 60,
+    left: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radialGradientBackgroundContainer: {
+    width: '100%',
+    height: WINDOW_HEIGHT * 0.35,
   },
 });
