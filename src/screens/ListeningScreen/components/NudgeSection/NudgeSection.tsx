@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -129,7 +128,9 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
                 height={18}
                 style={styles.thumbDown}
                 color={
-                  nudge.feedback?.rating === 0 ? colors.white : colors.teal
+                  nudge.feedback?.rating === 0
+                    ? colors.white
+                    : colors.powderBlue
                 }
               />
             </TouchableOpacity>
@@ -142,7 +143,9 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
                 width={18}
                 height={18}
                 color={
-                  nudge.feedback?.rating === 1 ? colors.white : colors.teal
+                  nudge.feedback?.rating === 1
+                    ? colors.white
+                    : colors.powderBlue
                 }
               />
             </TouchableOpacity>
@@ -154,13 +157,7 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      {nudge && (
-        <LinearGradient
-          colors={[colors.deepNavy, colors.darkNavy]}
-          locations={[0, 0.24]}>
-          <View style={styles.content}>{renderContent()}</View>
-        </LinearGradient>
-      )}
+      {nudge && <View style={styles.content}>{renderContent()}</View>}
     </Animated.View>
   );
 };

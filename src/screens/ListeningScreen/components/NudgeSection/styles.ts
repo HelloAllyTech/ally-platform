@@ -10,15 +10,8 @@ export const styles = ScaledSheet.create({
     borderRadius: '16@ms',
     borderWidth: 0.5,
     borderColor: colors.gunmetal,
+    backgroundColor: colors.smokyBlack,
     overflow: 'hidden',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
     marginHorizontal: '27@s',
   },
   content: {
