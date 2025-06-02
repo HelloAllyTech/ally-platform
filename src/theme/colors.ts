@@ -22,8 +22,6 @@ export const colors = {
   lightBlue2: '#142B4E',
   nudgeBackground: '#0A1729',
   gray99: '#999999',
-  deepNavy: '#0D0E2A',
-  darkNavy: '#03051F',
   paleBlue: '#EAFEFE',
   teal: '#4D8779',
   steelBlue: '#072A45',
@@ -47,4 +45,8 @@ export const colors = {
   lightGray8: '#F6F6F6',
   charcoalBlue: '#1C3C51',
   gunmetal: '#424242',
+  semiTransparentGray: 'rgba(229, 231, 235, 0.6)',
+  lightGraySubtle: 'rgba(229, 231, 235, 0.1)',
+  smokyBlack: 'rgba(19, 19, 19, 0.55)',
+  powderBlue: '#B7D9FF',
 };
