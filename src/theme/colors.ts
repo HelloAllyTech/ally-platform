@@ -45,4 +45,6 @@ export const colors = {
   lightGrayWithOpacity: '#F5F5F5BA',
   blue: '#1480FB',
   lightGray8: '#F6F6F6',
+  charcoalBlue: '#1C3C51',
+  gunmetal: '#424242',
 };
