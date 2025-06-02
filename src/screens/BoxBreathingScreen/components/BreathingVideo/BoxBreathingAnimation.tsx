@@ -114,9 +114,10 @@ const BoxBreathingAnimation = ({
       if (!isPlayerReady) return;
 
       if (isPlaying) {
+        await SoundPlayer.seek(0);
         await SoundPlayer.play();
       } else {
-        await SoundPlayer.stop();
+        await SoundPlayer.pause();
       }
     };
 
