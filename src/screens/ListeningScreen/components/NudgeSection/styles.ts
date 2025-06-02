@@ -9,7 +9,7 @@ export const styles = ScaledSheet.create({
     minHeight: '120@vs',
     borderRadius: '16@ms',
     borderWidth: 0.5,
-    borderColor: colors.gray99,
+    borderColor: colors.gunmetal,
     overflow: 'hidden',
     shadowColor: colors.black,
     shadowOffset: {
