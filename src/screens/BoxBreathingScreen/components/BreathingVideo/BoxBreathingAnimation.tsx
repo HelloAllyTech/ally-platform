@@ -1,12 +1,10 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {Animated, StyleSheet, Text, View} from 'react-native';
-import TrackPlayer from 'react-native-track-player';
+import SoundPlayer from 'react-native-sound-player';
 
 import {SCREEN_WIDTH} from '@/constants/general';
-import {addTrack, setupPlayer} from '@/services/TrackPlayerService';
 import {colors} from '@/theme/colors';
 
-import BreathingAudio from '../../../../assets/sounds/breath.mp3';
 import FlowerPetal from './FlowerPetal';
 
 export interface Phase {
@@ -84,28 +82,29 @@ const BoxBreathingAnimation = ({
   const dotSize = 14;
   const dotOffset = dotSize * 0.5;
 
+  const squareSize = Math.min(SCREEN_WIDTH * 0.8, 350);
+
   // Animated values
   const dotPosition = useRef(
-    new Animated.ValueXY({x: -dotOffset, y: -dotOffset}),
+    new Animated.ValueXY({
+      x: -squareSize * 0.5,
+      y: -squareSize * 0.5,
+    }),
   ).current;
   const bloomAnimation = useRef(new Animated.Value(0)).current;
 
   // Refs for intervals
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const squareSize = Math.min(SCREEN_WIDTH * 0.8, 350);
-
   // Initialize track player
   useEffect(() => {
     const setup = async () => {
-      await setupPlayer();
-      await addTrack(BreathingAudio);
+      SoundPlayer.playAsset(require('../../../../assets/sounds/breath.mp3'));
       setIsPlayerReady(true);
     };
     setup();
     return () => {
-      TrackPlayer.reset();
-      TrackPlayer.stop();
+      SoundPlayer.stop();
     };
   }, []);
 
@@ -115,9 +114,10 @@ const BoxBreathingAnimation = ({
       if (!isPlayerReady) return;
 
       if (isPlaying) {
-        await TrackPlayer.play();
+        await SoundPlayer.seek(0);
+        await SoundPlayer.play();
       } else {
-        await TrackPlayer.stop();
+        await SoundPlayer.pause();
       }
     };
 
@@ -127,10 +127,10 @@ const BoxBreathingAnimation = ({
   // Convert relative positions to absolute coordinates
   const getAbsolutePosition = useCallback(
     (relativePos: Position) => ({
-      x: relativePos.left * squareSize - dotSize * 0.6,
-      y: relativePos.top * squareSize - dotSize * 0.6,
+      x: relativePos.left * squareSize - squareSize * 0.5,
+      y: relativePos.top * squareSize - squareSize * 0.5,
     }),
-    [squareSize, dotSize],
+    [squareSize],
   );
 
   useEffect(() => {
@@ -163,8 +163,8 @@ const BoxBreathingAnimation = ({
 
   useEffect(() => {
     if (phaseIndex === 1 && !isMuted && isPlayerReady) {
-      TrackPlayer.seekTo(0);
-      TrackPlayer.play();
+      SoundPlayer.seek(0);
+      SoundPlayer.play();
     }
   }, [isMuted, phaseIndex, isPlayerReady]);
 
@@ -177,16 +177,20 @@ const BoxBreathingAnimation = ({
       Animated.timing(dotPosition, {
         toValue: targetPos,
         duration: animationDuration,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
     } else {
       // Reset dot position to initial position when stopped
-      dotPosition.setValue({x: -dotOffset, y: -dotOffset});
+      dotPosition.setValue({
+        x: -(squareSize * 0.5),
+        y: -(squareSize * 0.5),
+      });
       setBloomProgress(0);
       setPhaseIndex(0);
       bloomAnimation.setValue(0);
     }
   }, [
+    squareSize,
     dotOffset,
     bloomAnimation,
     phaseIndex,
@@ -215,13 +219,13 @@ const BoxBreathingAnimation = ({
       Animated.timing(bloomAnimation, {
         toValue: targetBloom,
         duration: animationDuration,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
     }
   }, [phaseIndex, isPlaying, bloomAnimation, animationDuration]);
 
   useEffect(() => {
-    TrackPlayer.setVolume(isMuted ? 0 : 1);
+    SoundPlayer.setVolume(isMuted ? 0 : 1);
   }, [isMuted]);
 
   // Update bloom progress for FlowerPetal component
@@ -241,8 +245,10 @@ const BoxBreathingAnimation = ({
           style={[
             styles.dot,
             {
-              left: dotPosition.x,
-              top: dotPosition.y,
+              transform: [
+                {translateX: dotPosition.x},
+                {translateY: dotPosition.y},
+              ],
               width: dotSize,
               height: dotSize,
             },
