@@ -27,6 +27,8 @@ import {SocketEvent} from '@/types/message';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
+import ListeningAnimation from '../ListeningScreen/components/ListeningAnimation/ListeningAnimation';
+
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
@@ -136,6 +138,10 @@ export const HomeScreen: React.FC = () => {
         hitSlop={DEFAULT_HIT_SLOP}
         activeOpacity={0.8}>
         <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+      </TouchableOpacity>
+      <ListeningAnimation />
+      <TouchableOpacity onPress={() => navigation.navigate('Breathing')}>
+        <Text>Breathing</Text>
       </TouchableOpacity>
     </View>
   );

@@ -2,7 +2,6 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CustomModal} from '@/components';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
@@ -20,11 +19,14 @@ import {typography} from '@/theme/typography';
 import {FeedbackResponse, SocketEvent, SocketMessage} from '@/types/message';
 import {Maybe} from '@/utils/common';
 
-import {AnimatedBlob} from './components/AnimatedBlob';
-import {ControlButtons} from './components/ControlButtons';
-import {NudgeSection} from './components/NudgeSection';
-import RadialGradientBackground from './components/RadialGradientBackground';
-import {Timer} from './components/Timer/Timer';
+import {
+  AnimatedBlob,
+  CallEndModal,
+  ControlButtons,
+  NudgeSection,
+  RadialGradientBackground,
+  Timer,
+} from './components';
 
 export interface Nudge {
   id: number;
@@ -169,16 +171,10 @@ export const ListeningScreen = () => {
   return (
     <View style={styles.container}>
       {showCallEndConfirmation && (
-        <CustomModal
-          visible={showCallEndConfirmation}
-          onClose={() => setShowCallEndConfirmation(false)}
-          description={t('ListeningScreen.callEndConfirmation')}
-          onPrimaryPress={handleEndCall}
-          onSecondaryPress={() => setShowCallEndConfirmation(false)}
-          primaryButtonText={t('ListeningScreen.endCall')}
-          secondaryButtonText={t('CallSummary.info.cancel')}
-          title={t('ListeningScreen.endCall')}
-          primaryTextColor={colors.brightRed}
+        <CallEndModal
+          showCallEndConfirmation={showCallEndConfirmation}
+          setShowCallEndConfirmation={setShowCallEndConfirmation}
+          handleEndCall={handleEndCall}
         />
       )}
       <StatusBar
@@ -216,8 +212,7 @@ export const ListeningScreen = () => {
             onFocusModeButtonPress={toggleNudgeVisibility}
             isNudgeVisible={isNudgeVisible}
             showFocusModeButton={!!currentNudge && nudgeStatus}
-            // TODO: Need to show confirmation modal here
-            onCallEndPress={handleEndCall}
+            onCallEndPress={() => setShowCallEndConfirmation(true)}
           />
         </View>
         <RadialGradientBackground />
