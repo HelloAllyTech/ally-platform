@@ -1,8 +1,7 @@
 import React from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {FilterIcon, SearchIcon} from '@/assets/icons';
 import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
@@ -26,7 +25,8 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
         <Text style={styles.headerItalic}>{t('CallLogs.header.subtitle')}</Text>
       </Text>
       <View style={styles.searchBarContainer}>
-        <View style={styles.searchBar}>
+        {/* TODO: Can uncomment later when we have the search and filter functionality */}
+        {/* <View style={styles.searchBar}>
           <SearchIcon width={16} height={16} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
@@ -38,7 +38,7 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
         </View>
         <TouchableOpacity style={styles.filterCircle}>
           <FilterIcon width={16} height={16} />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
