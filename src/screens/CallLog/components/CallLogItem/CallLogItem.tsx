@@ -155,7 +155,7 @@ const styles = ScaledSheet.create({
   },
   logDate: {
     fontSize: '12@ms',
-    color: colors.lightGray3,
+    color: colors.darkCharcoal,
     marginLeft: '30@ms',
     marginTop: '-4@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -165,7 +165,7 @@ const styles = ScaledSheet.create({
     marginLeft: '4@ms',
   },
   duration: {
-    color: colors.lightGray3,
+    color: colors.darkCharcoal,
     fontSize: '12@ms',
     marginBottom: '8@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
