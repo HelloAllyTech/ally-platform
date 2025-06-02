@@ -6,25 +6,6 @@ export type FormData = {
   [key in SummaryFieldKey]?: SummaryFieldValueTypes | null;
 };
 
-export const getInitialFormData = (): FormData => ({
-  [SUMMARY_FIELDS.SESSION_SUMMARY]: null,
-  [SUMMARY_FIELDS.FLOW]: null,
-  [SUMMARY_FIELDS.KEY_CONCERNS]: null,
-  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: null,
-  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: null,
-  [SUMMARY_FIELDS.ASSESSMENT]: null,
-  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: null,
-  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: null,
-  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: null,
-  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: null,
-  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: null,
-  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: null,
-  [SUMMARY_FIELDS.TAGS]: null,
-  [SUMMARY_FIELDS.AGE]: null,
-  [SUMMARY_FIELDS.GENDER]: null,
-  [SUMMARY_FIELDS.LOCATION]: null,
-});
-
 export const transformSummaryToFormData = (
   summary: CallSummaryResponse['details']['summary'],
 ): FormData => ({
@@ -51,6 +32,7 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.PROFESSION]: summary.profession || null,
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
   [SUMMARY_FIELDS.LOCATION]: summary.location || null,
+  [SUMMARY_FIELDS.CONCERN_CODE]: summary.codeOfConcern || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -62,6 +44,9 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.AGE]: formData[SUMMARY_FIELDS.AGE] as AgeRange | null,
     [SUMMARY_FIELDS.GENDER]: formData[SUMMARY_FIELDS.GENDER] as string | null,
     [SUMMARY_FIELDS.PROFESSION]: formData[SUMMARY_FIELDS.PROFESSION] as
+      | string
+      | null,
+    [SUMMARY_FIELDS.CONCERN_CODE]: formData[SUMMARY_FIELDS.CONCERN_CODE] as
       | string
       | null,
     [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: formData[
