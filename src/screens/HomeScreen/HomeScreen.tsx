@@ -137,13 +137,6 @@ export const HomeScreen: React.FC = () => {
         activeOpacity={0.8}>
         <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => {
-          navigation.navigate('Breathing');
-        }}
-        style={styles.footer}>
-        <Text style={styles.tapText}>Breath</Text>
-      </TouchableOpacity>
     </View>
   );
 };
