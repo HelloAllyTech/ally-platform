@@ -1,5 +1,11 @@
-import React, {useState} from 'react';
-import {Modal, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
@@ -46,6 +52,14 @@ export const CustomModal: React.FC<CustomModalProps> = ({
   const [inputValue, setInputValue] = useState(initialValue);
   const [isFocused, setIsFocused] = useState(false);
 
+  useEffect(() => {
+    if (visible) {
+      setInputValue(initialValue);
+    }
+  }, [visible, initialValue]);
+
+  if (!visible) return null;
+
   const handlePrimaryPress = () => {
     onPrimaryPress(inputValue);
     onClose();
@@ -58,17 +72,8 @@ export const CustomModal: React.FC<CustomModalProps> = ({
     onClose();
   };
 
-  const handleModalClose = () => {
-    setInputValue(initialValue);
-    onClose();
-  };
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleModalClose}>
+    <View style={StyleSheet.absoluteFill}>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <Text style={styles.title}>{title}</Text>
@@ -113,7 +118,7 @@ export const CustomModal: React.FC<CustomModalProps> = ({
           </View>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 };
 
@@ -123,6 +128,12 @@ const styles = ScaledSheet.create({
     backgroundColor: 'rgba(19, 19, 19, 0.37)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    left: 0,
+    zIndex: 9999,
   },
   modalContainer: {
     backgroundColor: colors.white,
