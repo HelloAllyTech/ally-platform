@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
+import SoundPlayer from 'react-native-sound-player';
 
 import {HeadphoneIcon} from '@/assets/icons';
 import {env} from '@/config/env';
@@ -36,6 +37,39 @@ export const HomeScreen: React.FC = () => {
       navigation.navigate('Listening');
     },
   });
+
+  useEffect(() => {
+    const playSound = async () => {
+      try {
+        // Check if SoundPlayer is available
+        if (!SoundPlayer) {
+          console.log('SoundPlayer is not available');
+          return;
+        }
+
+        // Try playing the sound
+        console.log('Attempting to play sound...');
+        // SoundPlayer.playSoundFile('breath', 'mp3');
+        SoundPlayer.playAsset(require('../../assets/sounds/breath.mp3'));
+        console.log('Sound play command sent');
+      } catch (e) {
+        console.log('Error playing sound:', e);
+      }
+    };
+
+    playSound();
+
+    // Cleanup
+    return () => {
+      try {
+        if (SoundPlayer) {
+          SoundPlayer.stop();
+        }
+      } catch (e) {
+        console.log('Error cleaning up sound player:', e);
+      }
+    };
+  }, []);
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -136,6 +170,13 @@ export const HomeScreen: React.FC = () => {
         hitSlop={DEFAULT_HIT_SLOP}
         activeOpacity={0.8}>
         <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => {
+          navigation.navigate('Breathing');
+        }}
+        style={styles.footer}>
+        <Text style={styles.tapText}>Breath</Text>
       </TouchableOpacity>
     </View>
   );
