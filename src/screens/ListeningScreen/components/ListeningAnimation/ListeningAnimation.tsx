@@ -9,7 +9,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
 
-const WAVE_CONFIGS = [
+import {colors as globalColors} from '@/theme/colors';
+
+const DEFAULT_WAVE_CONFIGS = [
   {
     amplitude: 30,
     frequency: 1,
@@ -87,11 +89,6 @@ interface EchoWaveProps {
   index: number;
   frequency: number;
   amplitude: number;
-  colors: {
-    start: string;
-    middle: string;
-    end: string;
-  };
   isAnimating?: boolean;
 }
 
@@ -99,7 +96,6 @@ const EchoWave: React.FC<EchoWaveProps> = ({
   index,
   frequency,
   amplitude,
-  colors,
   isAnimating = true,
 }) => {
   const echoRandomSpeed = React.useMemo(() => 3000 + Math.random() * 2000, []);
@@ -153,8 +149,8 @@ const EchoWave: React.FC<EchoWaveProps> = ({
   return (
     <AnimatedPath
       animatedProps={animatedProps}
-      stroke={`url(#grad-${colors.start})`}
-      strokeWidth={3}
+      stroke={globalColors.lightGraySubtle}
+      strokeWidth={2}
       fill="none"
     />
   );
@@ -205,8 +201,8 @@ const Wave: React.FC<WaveProps> = ({
         x={0}
         y={SCREEN_HEIGHT / 2 - 3}
         width={SCREEN_WIDTH}
-        height={2}
-        fill="url(#grad-center-line)"
+        height={1}
+        fill={globalColors.semiTransparentGray}
       />
       {Array.from({length: echoCount}).map((_, index) => (
         <EchoWave
@@ -214,7 +210,6 @@ const Wave: React.FC<WaveProps> = ({
           index={index}
           frequency={frequency}
           amplitude={amplitude}
-          colors={colors}
           isAnimating={isAnimating}
         />
       ))}
@@ -224,15 +219,25 @@ const Wave: React.FC<WaveProps> = ({
 
 interface ListeningAnimationProps {
   isAnimating?: boolean;
+  maxAmplitude?: number;
 }
 
 const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
   isAnimating = true,
+  maxAmplitude = 110,
 }) => {
+  const waveConfigs = React.useMemo(() => {
+    const amplitudeScale = maxAmplitude / 110;
+    return DEFAULT_WAVE_CONFIGS.map(config => ({
+      ...config,
+      amplitude: config.amplitude * amplitudeScale,
+    }));
+  }, [maxAmplitude]);
+
   return (
     <View style={styles.container}>
       <View style={styles.waveContainer}>
-        {WAVE_CONFIGS.map((config, index) => (
+        {waveConfigs.map((config, index) => (
           <Wave key={index} {...config} isAnimating={isAnimating} />
         ))}
       </View>
