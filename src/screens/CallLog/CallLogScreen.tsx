@@ -1,13 +1,16 @@
 import React, {useCallback, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
-import {ActivityIndicator, FlatList, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import useTranslate from '@/hooks/useTranslate';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
 import {isEmptyObject} from '@/utils/common';
 
 import {CallLogHeader} from './components/CallLogHeader/CallLogHeader';
@@ -33,7 +36,7 @@ export const CallLogScreen: React.FC = () => {
 
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-
+  const {t} = useTranslate();
   // RTK Query hook for fetching call logs
   const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
 
@@ -108,15 +111,6 @@ export const CallLogScreen: React.FC = () => {
     setExpandedIdx(expandedIdx === idx ? -1 : idx);
   };
 
-  // Show loading indicator when initially loading data
-  if (isLoading && allLogs.length === 0) {
-    return (
-      <SafeAreaView style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.darkSlate} />
-      </SafeAreaView>
-    );
-  }
-
   /**
    * Renders individual call log items
    * @param item - Call log data
@@ -150,19 +144,28 @@ export const CallLogScreen: React.FC = () => {
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader search={search} onSearchChange={setSearch} />
-
-      <FlatList
-        data={allLogs}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        contentContainerStyle={styles.listContent}
-        renderItem={renderItem}
-        style={styles.list}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        refreshing={isLoading && allLogs.length === 0}
-        onRefresh={handleRefresh}
-      />
+      {isLoading || isFetching ? (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.darkSlate} />
+        </View>
+      ) : allLogs.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>{t('CallLogs.noCallLogs')}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={allLogs}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          contentContainerStyle={styles.listContent}
+          renderItem={renderItem}
+          style={styles.list}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          refreshing={isLoading}
+          onRefresh={handleRefresh}
+        />
+      )}
     </View>
   );
 };
@@ -180,10 +183,23 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   footerLoader: {
     paddingVertical: '16@ms',
+  },
+  emptyText: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
+    fontWeight: '500',
+    fontSize: '30@ms',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: '100@ms',
   },
 });
