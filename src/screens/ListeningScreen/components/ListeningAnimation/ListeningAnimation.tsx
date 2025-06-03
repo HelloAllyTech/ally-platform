@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
 
-const WAVE_CONFIGS = [
+const DEFAULT_WAVE_CONFIGS = [
   {
     amplitude: 30,
     frequency: 1,
@@ -224,15 +224,25 @@ const Wave: React.FC<WaveProps> = ({
 
 interface ListeningAnimationProps {
   isAnimating?: boolean;
+  maxAmplitude?: number;
 }
 
 const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
   isAnimating = true,
+  maxAmplitude = 110,
 }) => {
+  const waveConfigs = React.useMemo(() => {
+    const amplitudeScale = maxAmplitude / 110;
+    return DEFAULT_WAVE_CONFIGS.map(config => ({
+      ...config,
+      amplitude: config.amplitude * amplitudeScale,
+    }));
+  }, [maxAmplitude]);
+
   return (
     <View style={styles.container}>
       <View style={styles.waveContainer}>
-        {WAVE_CONFIGS.map((config, index) => (
+        {waveConfigs.map((config, index) => (
           <Wave key={index} {...config} isAnimating={isAnimating} />
         ))}
       </View>
