@@ -173,7 +173,6 @@ export const CallSummaryDetails: React.FC<Props> = ({
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingTop: '10@ms',
     paddingBottom: '40@ms',
   },
   card: {
