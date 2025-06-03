@@ -17,7 +17,7 @@ import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme/colors';
 import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
-import {formatTimeHHmm} from '@/utils/date';
+import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
 
@@ -167,7 +167,9 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.CALL_DATE,
-        value: summary?.[SUMMARY_FIELDS.CALL_DATE] || '-',
+        value: summaryDetails?.startTime
+          ? formatDateWithOrdinal(summaryDetails.startTime)
+          : '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_TIME,

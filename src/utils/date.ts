@@ -1,20 +1,8 @@
+import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants/dates';
+
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  const month = months[date.getMonth()];
+  const month = MONTH_NAMES_SHORT[date.getMonth()];
   const day = date.getDate().toString().padStart(2, '0');
   return `${month} ${day}`;
 };
@@ -52,4 +40,48 @@ export const formatTimeHHmm = (date: string | Date): string => {
     minute: '2-digit',
     hour12: false,
   });
+};
+
+/**
+ * Formats a date into 'do MMMM yyyy' format with ordinal suffix
+ * @param dateString - ISO date string or Date object
+ * @returns Formatted date string (e.g., "26th May 2024")
+ * @example
+ * formatDateWithOrdinal("2024-05-26") // returns "26th May 2024"
+ * formatDateWithOrdinal("2024-01-01") // returns "1st January 2024"
+ */
+export const formatDateWithOrdinal = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+
+  // Get day with ordinal suffix
+  const day = date.getDate();
+  const ordinalSuffix = getOrdinalSuffix(day);
+
+  // Get full month name
+  const month = MONTH_NAMES_FULL[date.getMonth()];
+
+  // Get full year
+  const year = date.getFullYear();
+
+  return `${day}${ordinalSuffix} ${month} ${year}`;
+};
+
+/**
+ * Helper function to get ordinal suffix for a day
+ * @param day - Day of the month (1-31)
+ * @returns Ordinal suffix ('st', 'nd', 'rd', 'th')
+ * @private
+ */
+const getOrdinalSuffix = (day: number): string => {
+  if (day > 3 && day < 21) return 'th'; // 11th, 12th, 13th, etc.
+  switch (day % 10) {
+    case 1:
+      return 'st';
+    case 2:
+      return 'nd';
+    case 3:
+      return 'rd';
+    default:
+      return 'th';
+  }
 };
