@@ -132,7 +132,7 @@ export const ListeningScreen = () => {
   const {userData} = useUser();
   // Automatically manages socket connection based on screen focus and app state
   const {emitSocketEvent} = useSocketConnection({
-    userId: userData?.id || 0,
+    userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
   });
 
