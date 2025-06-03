@@ -45,7 +45,6 @@ jobs:
         run: |
           npm i -g corepack
           npm ci
-          npm run postinstall  # Explicitly run postinstall to ensure patches are applied
 
       - name: Cache Gradle Wrapper
         uses: actions/cache@v3
