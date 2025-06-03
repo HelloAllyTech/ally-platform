@@ -5,6 +5,7 @@ export interface Env {
   API_BASE_URL: string;
   API_VERSION: string;
   ALLY_WEB_URL: string;
+  THIRD_PARTY_CALL_NUMBER: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -22,4 +23,8 @@ export const env: Env = {
   API_BASE_URL: assertEnvVar(Config.API_BASE_URL, 'API_BASE_URL'),
   API_VERSION: assertEnvVar(Config.API_VERSION, 'API_VERSION'),
   ALLY_WEB_URL: assertEnvVar(Config.ALLY_WEB_URL, 'ALLY_WEB_URL'),
+  THIRD_PARTY_CALL_NUMBER: assertEnvVar(
+    Config.THIRD_PARTY_CALL_NUMBER,
+    'THIRD_PARTY_CALL_NUMBER',
+  ),
 };
