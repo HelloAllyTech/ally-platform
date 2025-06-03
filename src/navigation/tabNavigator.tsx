@@ -128,6 +128,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     borderWidth: 0.5,
     borderColor: colors.lightGray2,
+    elevation: 3,
   },
   tabItem: {
     flex: 1,
