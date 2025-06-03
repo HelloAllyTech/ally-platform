@@ -165,7 +165,10 @@ export const CallSummaryScreen: React.FC<
 
   const handleGoBack = () => {
     if (currentChat) {
-      navigation.navigate('Home');
+      navigation.reset({
+        index: 0,
+        routes: [{name: 'Home'}],
+      });
       dispatch(clearCurrentChat());
     } else {
       navigation.goBack();
