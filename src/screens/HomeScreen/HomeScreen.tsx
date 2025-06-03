@@ -43,13 +43,15 @@ export const HomeScreen: React.FC = () => {
     return true;
   });
 
-  const handleListeningPress = useCallback(() => {
-    Alert.alert(
-      t('Common.comingSoon'),
-      t('Home.callConnectionNotImplemented'),
-      [{text: t('Common.ok')}],
-    );
-  }, [t]);
+  const handleThirdPartyCall = async () => {
+    const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
+    }
+  };
 
   const handleLearnMorePress = useCallback(async () => {
     try {
@@ -118,7 +120,7 @@ export const HomeScreen: React.FC = () => {
 
       <TouchableOpacity
         style={styles.animationContainer}
-        onPress={handleListeningPress}
+        onPress={handleThirdPartyCall}
         activeOpacity={0.8}>
         <LottieView
           source={require('@/assets/animations/listen.json')}
@@ -129,6 +131,12 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.headphoneContainer}>
           <HeadphoneIcon width={31} height={31} />
         </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={handleThirdPartyCall}
+        activeOpacity={0.8}
+        style={styles.textContainer}>
+        <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -226,5 +234,11 @@ const styles = ScaledSheet.create({
     lineHeight: '20@ms',
     textAlign: 'center',
     textDecorationLine: 'underline',
+  },
+  textContainer: {
+    width: '100%',
+    paddingVertical: '16@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

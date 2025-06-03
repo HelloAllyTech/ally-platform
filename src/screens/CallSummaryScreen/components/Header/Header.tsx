@@ -109,6 +109,7 @@ const styles = ScaledSheet.create({
     fontSize: '24@ms',
     color: colors.white,
     fontWeight: '400',
+    lineHeight: '44@ms',
   },
   headerSubtitle: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
