@@ -96,7 +96,8 @@
     },
     "search": {
       "placeholder": "Search"
-    }
+    },
+    "noCallLogs": "No call logs found"
   },
   "BreathingScreen": {
     "header": {
