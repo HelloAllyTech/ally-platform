@@ -130,13 +130,6 @@ export const HomeScreen: React.FC = () => {
           <HeadphoneIcon width={31} height={31} />
         </View>
       </TouchableOpacity>
-      <TouchableOpacity
-        onPress={handleListeningPress}
-        style={styles.footer}
-        hitSlop={DEFAULT_HIT_SLOP}
-        activeOpacity={0.8}>
-        <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-      </TouchableOpacity>
     </View>
   );
 };
