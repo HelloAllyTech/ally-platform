@@ -6,7 +6,7 @@ import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
-  userId: number;
+  userId?: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
 }
 
@@ -17,8 +17,8 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   const baseUrl = env.API_BASE_URL;
 
   const connect = useCallback(
-    (chatId?: number) => {
-      if (connectionAttemptsRef.current >= maxAttempts) {
+    () => {
+      if (!userId || connectionAttemptsRef.current >= maxAttempts) {
         logger.error('Max connection attempts reached');
         return;
       }
@@ -47,7 +47,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
         connectionAttemptsRef.current++;
       } catch (error) {
         connectionAttemptsRef.current++;
-        setTimeout(() => connect(chatId), 2000);
+        setTimeout(() => connect(), 2000);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
