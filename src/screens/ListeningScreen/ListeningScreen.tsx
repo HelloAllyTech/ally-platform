@@ -1,9 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {StatusBar, Text, View} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
+import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -24,6 +24,7 @@ import {
   CallEndModal,
   ControlButtons,
   NudgeSection,
+  RadialGradientBackground,
   Timer,
 } from './components';
 
@@ -168,7 +169,7 @@ export const ListeningScreen = () => {
   );
 
   return (
-    <>
+    <View style={styles.container}>
       {showCallEndConfirmation && (
         <CallEndModal
           showCallEndConfirmation={showCallEndConfirmation}
@@ -176,55 +177,54 @@ export const ListeningScreen = () => {
           handleEndCall={handleEndCall}
         />
       )}
-      <LinearGradient
-        colors={[colors.black, colors.navyGray, colors.oceanBlue]}
-        style={styles.container}
-        locations={[0, 0.65, 0.9]}
-        start={{x: 0.4, y: 0}}
-        end={{x: 0.6, y: 1}}>
-        <StatusBar
-          backgroundColor="transparent"
-          translucent
-          barStyle="light-content"
-        />
-        <View style={styles.header}>
-          <Text style={styles.headerText}>
-            {t('ListeningScreen.takingNotes')}
-          </Text>
-          <Timer startTime={startTime} />
-        </View>
+      <StatusBar
+        backgroundColor="transparent"
+        translucent
+        barStyle="light-content"
+      />
+      <View style={styles.header}>
+        <Text style={styles.headerText}>
+          {t('ListeningScreen.takingNotes')}
+        </Text>
+        <Timer startTime={startTime} />
+      </View>
 
-        <View style={styles.content}>
-          <View style={styles.blobContainer}>
-            <AnimatedBlob
-              isExpanded={!nudgeStatus || !isNudgeVisible}
-              isCallPaused={isCallPaused}
-              isAudioActive={isAudioActive}
-              onPlayPauseCallPress={handlePlayPauseCallPress}
-            />
-          </View>
-          <NudgeSection
-            isVisible={!!nudgeStatus && isNudgeVisible}
-            nudge={nudgeStatus ? currentNudge : null}
-            isLoading={isLoading}
-            onFeedbackSuccess={handleNudgeFeedbackSuccess}
+      <View style={styles.content}>
+        <View style={styles.blobContainer}>
+          <AnimatedBlob
+            isExpanded={!nudgeStatus || !isNudgeVisible}
+            isCallPaused={isCallPaused}
+            isAudioActive={isAudioActive}
+            onPlayPauseCallPress={handlePlayPauseCallPress}
           />
         </View>
-
-        <ControlButtons
-          onFocusModeButtonPress={toggleNudgeVisibility}
-          isNudgeVisible={isNudgeVisible}
-          showFocusModeButton={!!currentNudge && nudgeStatus}
-          onCallEndPress={() => setShowCallEndConfirmation(true)}
+        <NudgeSection
+          isVisible={!!nudgeStatus && isNudgeVisible}
+          nudge={nudgeStatus ? currentNudge : null}
+          isLoading={isLoading}
+          onFeedbackSuccess={handleNudgeFeedbackSuccess}
         />
-      </LinearGradient>
-    </>
+      </View>
+
+      <View style={styles.radialGradientBackgroundContainer}>
+        <View style={styles.controlButtonsContainer}>
+          <ControlButtons
+            onFocusModeButtonPress={toggleNudgeVisibility}
+            isNudgeVisible={isNudgeVisible}
+            showFocusModeButton={!!currentNudge && nudgeStatus}
+            onCallEndPress={() => setShowCallEndConfirmation(true)}
+          />
+        </View>
+        <RadialGradientBackground />
+      </View>
+    </View>
   );
 };
 
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.black,
   },
   header: {
     alignItems: 'center',
@@ -248,5 +248,19 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: '16@vs',
+  },
+  controlButtonsContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 1000,
+    top: 60,
+    left: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radialGradientBackgroundContainer: {
+    width: '100%',
+    height: WINDOW_HEIGHT * 0.35,
   },
 });
