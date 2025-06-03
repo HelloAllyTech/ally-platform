@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
@@ -15,15 +15,12 @@ import {HeadphoneIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
-import {SocketEvent} from '@/types/message';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
@@ -31,11 +28,6 @@ export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const {userData} = useUser();
-  const {checkCounselorChat} = useCounselorChat({
-    onActiveChatFound: () => {
-      navigation.navigate('Listening');
-    },
-  });
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -65,26 +57,7 @@ export const HomeScreen: React.FC = () => {
     }
   }, []);
 
-  const socketEventCallbacks = useMemo(
-    () => ({
-      [SocketEvent.USER_JOINED]: async () => {
-        try {
-          if (userData?.role === UserRole.COUNSELOR) {
-            checkCounselorChat();
-          }
-        } catch (error) {
-          logger.error(`Error in USER_JOINED handler: ${error}`);
-        }
-      },
-    }),
-    [checkCounselorChat, userData?.role],
-  );
-
   // Automatically manages socket connection based on screen focus and app state
-  useSocketConnection({
-    userId: userData?.id || 0,
-    eventCallbacks: socketEventCallbacks,
-  });
 
   if (userData?.role !== UserRole.COUNSELOR) {
     return (

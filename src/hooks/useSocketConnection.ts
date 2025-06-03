@@ -7,7 +7,7 @@ import {SocketEvent} from '@/types/message';
 import {useSocket} from './useSocket';
 
 interface UseSocketConnectionOptions {
-  userId: number;
+  userId?: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -63,33 +63,37 @@ export const useSocketConnection = ({
   // Handle screen focus/blur
   useFocusEffect(
     useCallback(() => {
-      connect();
-      onConnect?.();
-      const subscription = AppState.addEventListener('change', nextAppState => {
-        if (
-          appState.current.match(/inactive|background/) &&
-          nextAppState === 'active'
-        ) {
-          // App has come to foreground
-          connect();
-          onConnect?.();
-        } else if (
-          appState.current === 'active' &&
-          nextAppState.match(/inactive|background/)
-        ) {
-          // App has gone to background
+      if (userId) {
+        connect();
+        onConnect?.();
+        const subscription = AppState.addEventListener(
+          'change',
+          nextAppState => {
+            if (
+              appState.current.match(/inactive|background/) &&
+              nextAppState === 'active'
+            ) {
+              // App has come to foreground
+              connect();
+              onConnect?.();
+            } else if (
+              appState.current === 'active' &&
+              nextAppState.match(/inactive|background/)
+            ) {
+              // App has gone to background
+              disconnect();
+              onDisconnect?.();
+            }
+            appState.current = nextAppState;
+          },
+        );
+        return () => {
           disconnect();
           onDisconnect?.();
-        }
-        appState.current = nextAppState;
-      });
-
-      return () => {
-        disconnect();
-        onDisconnect?.();
-        subscription.remove();
-      };
-    }, [connect, disconnect, onConnect, onDisconnect]),
+          subscription.remove();
+        };
+      }
+    }, [connect, disconnect, onConnect, onDisconnect, userId]),
   );
 
   return {
