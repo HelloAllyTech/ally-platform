@@ -5,7 +5,6 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -353,9 +352,8 @@ export const CallSummaryScreen: React.FC<
           scrollEventThrottle={8}
           onLayout={handleLayout}
           contentContainerStyle={
-            hasCollapsedBeenShown && styles.contentContainer
+            !isFullyExpanded || !showAnimation ? styles.contentContainer : {}
           }>
-          {!!callId && <View style={styles.paddingTop} />}
           {isShowCallSummary ? (
             <CallSummaryDetails
               isLoading={isLoading}

@@ -51,7 +51,9 @@ const styles = ScaledSheet.create({
     justifyContent: 'space-between',
     marginTop: '4@ms',
     paddingHorizontal: '20@ms',
-    paddingBottom: '6@ms',
+    paddingBottom: '16@ms',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.lightGray5,
   },
   headerTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
