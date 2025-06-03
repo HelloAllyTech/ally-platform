@@ -47,7 +47,7 @@ export const AnimatedBlob: React.FC<AnimatedBlobProps> = ({
     return {
       transform: [
         {
-          scale: withTiming(isExpanded ? 1.4 : 1, {
+          scaleY: withTiming(isExpanded ? 1.4 : 1, {
             duration: 500,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1),
           }),
