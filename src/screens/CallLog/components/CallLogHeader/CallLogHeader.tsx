@@ -49,7 +49,7 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: '4@ms',
+    marginTop: '16@mvs',
     paddingHorizontal: '20@ms',
     paddingBottom: '16@ms',
     borderBottomWidth: 0.5,

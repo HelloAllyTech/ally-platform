@@ -22,5 +22,8 @@ export const fontFamily = {
     REGULAR: {
       fontFamily: 'IBMPlexSerif-Regular',
     },
+    MEDIUM: {
+      fontFamily: 'IBMPlexSerif-Medium',
+    },
   },
 };

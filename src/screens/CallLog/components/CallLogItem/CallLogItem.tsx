@@ -65,19 +65,21 @@ const CallLogItem = ({
                 <DoubleRightArrowIcon width={16} height={16} />
               )}
             </TouchableOpacity>
-            <View style={styles.logItemContent}>
+            <View>
               <Text style={styles.logId}>
                 {item?.details?.callInfo?.summaryName || item?.details?.chatId}
               </Text>
             </View>
-            <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
-            {!disabled && (
-              <EyeIcon width={16} height={16} style={styles.eyeIcon} />
-            )}
           </View>
           <Text style={styles.logDate}>
             {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
           </Text>
+        </View>
+        <View style={styles.pointsContainer}>
+          <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
+          {!disabled && (
+            <EyeIcon width={16} height={16} style={styles.eyeIcon} />
+          )}
         </View>
       </View>
 
@@ -125,6 +127,8 @@ const styles = ScaledSheet.create({
     opacity: 0.6,
   },
   logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     borderRadius: '12@ms',
     padding: '8@ms',
     marginTop: '-2@ms',
@@ -133,12 +137,14 @@ const styles = ScaledSheet.create({
   expandedLogHeader: {
     backgroundColor: colors.lightGray,
   },
+  pointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '2@ms',
+  },
   logHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  logItemContent: {
-    flex: 1,
   },
   arrowContainer: {
     width: '24@ms',
@@ -148,16 +154,14 @@ const styles = ScaledSheet.create({
     marginRight: '4@ms',
   },
   logId: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
-    color: colors.darkSlate,
-    fontWeight: '500',
+    color: colors.black,
   },
   logDate: {
     fontSize: '12@ms',
     color: colors.darkCharcoal,
     marginLeft: '30@ms',
-    marginTop: '-4@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
   },
   logDetails: {

@@ -166,7 +166,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.large,
     letterSpacing: 0.15,
-    color: colors.mediumGray,
+    color: colors.darkCharcoal,
     fontSize: '16@ms',
   },
   clientContainer: {

@@ -18,7 +18,6 @@ import {
 } from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 
 interface SectionHeaderProps {
   label: string;
@@ -166,8 +165,8 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
   },
   sectionTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
     color: colors.black,
     width: '85%',
   },

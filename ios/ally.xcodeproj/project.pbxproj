@@ -16,6 +16,8 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		D7E80D5568D445CBB488E6B2 /* Roboto-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */; };
+		F46AFA792DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */; };
+		F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ally/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		906261E9D5EA43119D9980AD /* ReplayPro-Bold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ReplayPro-Bold.otf"; path = "../src/assets/fonts/ReplayPro-Bold.otf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Regular.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Regular.ttf"; sourceTree = "<group>"; };
+		F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Medium.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +105,8 @@
 		A6B1B120E4F843D2BE11BAD4 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */,
+				F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */,
 				664E565B023A4633A1ECA2B7 /* ReplayPro-BoldItalic.otf */,
 				6EDB66A9BCCA4802A590CB62 /* ReplayPro-Headline.otf */,
 				81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */,
@@ -179,10 +185,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
+				F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				0575529D285843CD8E52C59D /* ReplayPro-BoldItalic.otf in Resources */,
 				25B7937C2C90405B9DF04E66 /* ReplayPro-Headline.otf in Resources */,
 				D7E80D5568D445CBB488E6B2 /* Roboto-Regular.ttf in Resources */,
+				F46AFA792DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf in Resources */,
 				315EA2BB9865486E85DC00EC /* ReplayPro-Bold.otf in Resources */,
 				D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -402,10 +410,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -474,10 +479,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
