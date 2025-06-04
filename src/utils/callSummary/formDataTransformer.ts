@@ -1,6 +1,8 @@
 import {SUMMARY_FIELDS, SummaryFieldKey} from '@/constants/summary';
-import {AgeRange, CallSummaryResponse} from '@/services/callSummaryApi';
+import {AgeRange, CallSummaryResponse, Tag} from '@/services/callSummaryApi';
 import {SummaryFieldValueTypes} from '@/types/callSummary';
+
+import {mapTagsToString} from '../callSummary';
 
 export type FormData = {
   [key in SummaryFieldKey]?: SummaryFieldValueTypes | null;
@@ -26,7 +28,7 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.REFERRALS_PROVIDED]: summary.referralsProvided || null,
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: summary.homework || null,
   [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: summary.planForNextCall || null,
-  [SUMMARY_FIELDS.TAGS]: summary.tags || null,
+  [SUMMARY_FIELDS.TAGS]: mapTagsToString(summary?.tags || []) || null,
   [SUMMARY_FIELDS.AGE]: summary.age || null,
   [SUMMARY_FIELDS.GENDER]: summary.gender || null,
   [SUMMARY_FIELDS.PROFESSION]: summary.profession || null,
@@ -38,6 +40,7 @@ export const transformSummaryToFormData = (
 export const transformFormDataForSubmission = (
   formData: FormData,
   summaryData: CallSummaryResponse,
+  tags: Tag[],
 ): CallSummaryResponse['details']['summary'] => {
   return {
     ...summaryData?.details?.summary,
@@ -89,6 +92,6 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: formData[
       SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL
     ] as string | null,
-    [SUMMARY_FIELDS.TAGS]: formData[SUMMARY_FIELDS.TAGS] as string | null,
+    [SUMMARY_FIELDS.TAGS]: tags,
   };
 };
