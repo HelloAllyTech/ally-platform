@@ -159,5 +159,10 @@
       "placeholder": "Live recording feature coming soon"
     }
   },
-  "submit": "Submit"
+  "submit": "Submit",
+  "LiveRecordingScreen": {
+    "error": {
+      "maxRetriesReached": "Maximum connection retry attempts reached. Please try again later."
+    }
+  }
 }
