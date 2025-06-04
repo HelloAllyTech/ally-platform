@@ -151,5 +151,13 @@
       "ok": "OK"
     }
   },
+  "liveRecording": {
+    "header": {
+      "title": "Live Recording"
+    },
+    "content": {
+      "placeholder": "Live recording feature coming soon"
+    }
+  },
   "submit": "Submit"
 }
