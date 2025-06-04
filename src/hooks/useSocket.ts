@@ -7,20 +7,25 @@ import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
   userId?: number;
+  socketUrl?: string;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
 }
 
-export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
+export const useSocket = ({
+  socketUrl,
+  userId,
+  eventCallbacks,
+}: UseSocketOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const connectionAttemptsRef = useRef(0);
   const maxAttempts = 5;
-  const baseUrl = env.API_BASE_URL;
+  const baseUrl = socketUrl || env.API_BASE_URL;
 
   const connect = useCallback(
     () => {
       if (!userId || connectionAttemptsRef.current >= maxAttempts) {
         logger.error('Max connection attempts reached');
-        return;
+        throw new Error('Max connection attempts reached');
       }
 
       try {
@@ -128,6 +133,21 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     socketRef.current.off(socketEvent);
   }, []);
 
+  // TODO: Update this to send audio data to the socket
+  const sendAudioData = (
+    data: string | ArrayBufferLike | Blob | ArrayBufferView,
+  ) => {
+    if (!isConnected()) {
+      logger.error('Socket not connected');
+      return;
+    }
+    try {
+      socketRef?.current?.send(data);
+    } catch (error) {
+      logger.error(`Failed to send data: ${error}`);
+    }
+  };
+
   useEffect(() => {
     return () => {
       socketRef.current?.disconnect();
@@ -138,6 +158,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     connect,
     disconnect,
     sendMessage,
+    sendAudioData,
     isConnected,
     emitSocketEvent,
     setListenerForEvent,

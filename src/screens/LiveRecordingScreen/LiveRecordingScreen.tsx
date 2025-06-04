@@ -1,18 +1,48 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Platform, Text, TouchableOpacity} from 'react-native';
+import Config from 'react-native-config';
 import LiveAudioStream from 'react-native-live-audio-stream';
 import {PERMISSIONS, request} from 'react-native-permissions';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {useWebSocket} from '@/hooks/useWebSocket';
+import {Toast} from '@/components/Toast/Toast';
+import {useSocket} from '@/hooks/useSocket';
+import useTranslate from '@/hooks/useTranslate';
 import {logger} from '@/utils/logger';
 
 export const LiveRecordingScreen: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    visible: false,
+    message: '',
+    type: 'error',
+  });
   const dataCountRef = useRef(0);
-  const {sendAudioData, isConnected, connect, disconnect} = useWebSocket({});
+  const {t} = useTranslate();
+  const {sendAudioData, isConnected, connect, disconnect} = useSocket({
+    socketUrl: Config.ALLY_WEB_SOCKET_URL,
+  });
+
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'error',
+  ) => {
+    setToast({
+      visible: true,
+      message,
+      type,
+    });
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({...prev, visible: false}));
+  };
 
   const checkPermissions = async () => {
     return await requestIosPermissions();
@@ -84,7 +114,9 @@ export const LiveRecordingScreen: React.FC = () => {
       dataCountRef.current = 0;
     } catch (error) {
       logger.error(`Error starting stream: ${error}`);
+      showToast(t('LiveRecordingScreen.error.maxRetriesReached'), 'error');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, connect]);
 
   const stopStreaming = useCallback(() => {
@@ -114,6 +146,9 @@ export const LiveRecordingScreen: React.FC = () => {
           {isStreaming ? 'Stop Streaming' : 'Start Streaming'}
         </Text>
       </TouchableOpacity>
+      {toast.visible && (
+        <Toast message={toast.message} type={toast.type} onHide={hideToast} />
+      )}
     </SafeAreaView>
   );
 };

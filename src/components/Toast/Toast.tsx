@@ -16,12 +16,14 @@ interface ToastProps {
   type?: 'success' | 'error' | 'info';
   duration?: number;
   onHide?: () => void;
+  position?: 'top' | 'bottom';
 }
 
 export const Toast: React.FC<ToastProps> = ({
   message,
   type = 'info',
   duration = 3000,
+  position = 'bottom',
   onHide,
 }) => {
   const translateY = useSharedValue(100);
@@ -65,7 +67,12 @@ export const Toast: React.FC<ToastProps> = ({
   });
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
+    <Animated.View
+      style={[
+        styles.container,
+        animatedStyle,
+        position === 'top' ? styles.top : styles.bottom,
+      ]}>
       <View style={[styles.toast, {backgroundColor: getBackgroundColor()}]}>
         <Text style={styles.message}>{message}</Text>
       </View>
@@ -81,6 +88,12 @@ const styles = ScaledSheet.create({
     right: '20@ms',
     alignItems: 'center',
     zIndex: 9999,
+  },
+  top: {
+    top: '100@ms',
+  },
+  bottom: {
+    bottom: '100@ms',
   },
   toast: {
     padding: '12@ms',
