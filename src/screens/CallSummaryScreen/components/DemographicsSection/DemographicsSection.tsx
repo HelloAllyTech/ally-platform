@@ -181,7 +181,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       {
         field: SUMMARY_FIELDS.CALLER_ID,
         value:
-          summaryDetails?.chatId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
+          summaryData?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.COUNSELOR_NAME,
@@ -223,7 +223,14 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         value: formData?.[SUMMARY_FIELDS.CONCERN_CODE] || '-',
       },
     ],
-    [durationInSeconds, formData, summary, summaryDetails, t],
+    [
+      durationInSeconds,
+      formData,
+      summary,
+      summaryDetails,
+      summaryData?.clientId,
+      t,
+    ],
   );
 
   return (

@@ -78,7 +78,7 @@ export interface SummaryDetails {
 
   // Plan for Next Call
   planForNextCall: string | null;
-  tags: string | null;
+  tags: Tag[] | null;
 
   // Metrics
   listeningShare: number | null;
@@ -132,6 +132,11 @@ export interface CallSummaryResponse {
   details: CallDetails;
 }
 
+export interface Tag {
+  tag: string;
+  priority_rating: number;
+}
+
 export const callSummaryApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: builder => ({
@@ -182,6 +187,13 @@ export const callSummaryApi = api.injectEndpoints({
         body: {content},
       }),
     }),
+    getTags: builder.mutation<Tag[], {tags: string[]}>({
+      query: body => ({
+        url: '/chats/summary/tag-positivity-ratings',
+        method: 'POST',
+        body,
+      }),
+    }),
   }),
 });
 
@@ -191,4 +203,5 @@ export const {
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
   useEnhanceCallSummaryMutation,
+  useGetTagsMutation,
 } = callSummaryApi;
