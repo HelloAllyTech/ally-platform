@@ -35,6 +35,10 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to your microphone for recording and transcription</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>We need access to speech recognition for live transcription</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReplayPro-BoldItalic.otf</string>

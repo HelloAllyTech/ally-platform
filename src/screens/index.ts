@@ -6,3 +6,4 @@ export {CallSummaryScreen} from './CallSummaryScreen/CallSummaryScreen';
 export {UserAnalyticsScreen} from './UserAnalyticsScreen/UserAnalyticsScreen';
 export {BreathingScreen} from './BoxBreathingScreen/BreathingScreen';
 export {CommunityScreen} from './CommunityScreen/CommunityScreen';
+export {LiveRecordingScreen} from './LiveRecordingScreen/LiveRecordingScreen';
