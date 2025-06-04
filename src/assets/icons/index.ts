@@ -31,7 +31,8 @@ import HomeInactiveIcon from './home.svg';
 import HomeActiveIcon from './homeActive.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
-import LeftArrowIcon from './leftArrow.svg';
+import LeftArrow from './leftArrow.svg';
+import LeftArrowIcon from './leftArrowIcon.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicWithGradientIcon from './micWithGradient.svg';
@@ -41,6 +42,7 @@ import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
+import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
 import SmileIcon from './smile.svg';
@@ -108,4 +110,6 @@ export {
   ArrowRight,
   ArrowDown,
   SessionSummaryIcon,
+  RightArrow,
+  LeftArrow,
 };
