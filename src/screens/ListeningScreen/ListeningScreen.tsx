@@ -159,8 +159,8 @@ export const ListeningScreen = () => {
     () => {
       emitSocketEvent(
         isCallPaused
-          ? SocketEvent.AUDIO_CHAT_NUDGE_RESUMED
-          : SocketEvent.AUDIO_CHAT_NUDGE_PAUSED,
+          ? SocketEvent.AUDIO_CHAT_RESUMED
+          : SocketEvent.AUDIO_CHAT_PAUSED,
         {chatId: chat?.chatId},
       );
       setIsCallPaused(prev => !prev);
