@@ -121,132 +121,6 @@ export const SUMMARY_FIELDS = {
 export type SummaryFieldKey =
   (typeof SUMMARY_FIELDS)[keyof typeof SUMMARY_FIELDS];
 
-// Field labels for display
-// TO DO: Might use labels provided by backend. Keeping labels as constants for now.
-export const FIELD_LABELS: Record<SummaryFieldKey, string> = {
-  // Features & Demographics
-  [SUMMARY_FIELDS.CALL_ID]: 'Call ID',
-  [SUMMARY_FIELDS.CALL_DURATION]: 'Call Duration',
-  [SUMMARY_FIELDS.CALL_DATE]: 'Call Date',
-  [SUMMARY_FIELDS.CALL_TIME]: 'Call Time',
-  [SUMMARY_FIELDS.CALLER_ID]: 'Caller ID',
-  [SUMMARY_FIELDS.COUNSELOR_NAME]: 'Counselor Name',
-  [SUMMARY_FIELDS.CALLER_TYPE]: 'Caller Type',
-  [SUMMARY_FIELDS.AGE]: 'Age',
-  [SUMMARY_FIELDS.GENDER]: 'Gender',
-  [SUMMARY_FIELDS.PROFESSION]: 'Profession',
-  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: 'Relationship Status',
-  [SUMMARY_FIELDS.LANGUAGES]: 'Languages',
-  [SUMMARY_FIELDS.LOCATION]: 'Location',
-  [SUMMARY_FIELDS.CONCERN_CODE]: 'Concern Code',
-
-  // Session Summary
-  [SUMMARY_FIELDS.SESSION_SUMMARY]: 'Session Summary',
-
-  // Flow
-  [SUMMARY_FIELDS.FLOW]: 'Flow',
-
-  // Key Concerns
-  [SUMMARY_FIELDS.KEY_CONCERNS]: 'Key Concerns',
-
-  // Observations and Assessment
-  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: 'Objective Observations',
-  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: 'Subjective Observations',
-  [SUMMARY_FIELDS.ASSESSMENT]: 'Assessment',
-  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: 'Dominant Feelings',
-  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: 'Issues Worked On',
-  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: 'Key Therapeutic Techniques',
-  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: 'Referrals Provided',
-  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: 'Homework',
-  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: 'Plans for Next Call',
-  [SUMMARY_FIELDS.TAGS]: 'Tags',
-
-  // Metrics
-  [SUMMARY_FIELDS.LISTENING_RATIO]: 'Listening Ratio',
-  [SUMMARY_FIELDS.EMOTIONAL_LIFT]: 'Emotional Lift',
-  [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: 'Reflective Questions Asked',
-
-  // Additional fields from response
-  // [SUMMARY_FIELDS.WORKING_STATUS]: 'Working Status',
-  // [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]: 'New Call Follow Up',
-  // [SUMMARY_FIELDS.COUNSELLOR]: 'Counsellor',
-  // [SUMMARY_FIELDS.FOLLOW_UP_GOALS]: 'Follow Up Goals',
-  // [SUMMARY_FIELDS.SESSION_NUMBER]: 'Session Number',
-  // [SUMMARY_FIELDS.FOLLOW_UP_STATUS]: 'Follow Up Status',
-  // [SUMMARY_FIELDS.FOLLOW_UP_DATE]: 'Follow Up Date',
-  // [SUMMARY_FIELDS.COUNSELOR_FEELINGS]: 'Counselor Feelings',
-  // [SUMMARY_FIELDS.ANY_FORMAL_DIAGNOSIS]: 'Any Formal Diagnosis',
-  // [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: 'Relationship Status',
-  // [SUMMARY_FIELDS.EMOTIONAL_STATE_START]: 'Emotional State Start',
-  // [SUMMARY_FIELDS.EMOTIONAL_STATE_CHANGE]: 'Emotional State Change',
-  // [SUMMARY_FIELDS.THERAPEUTIC_INTERVENTIONS]: 'Therapeutic Interventions',
-  // [SUMMARY_FIELDS.CALL_QUALITY]: 'Call Quality',
-} as const;
-
-// This ensures all fields are mapped to a section
-export const FIELD_TO_SECTION_MAP: Record<SummaryFieldKey, SectionKey> = {
-  // Features & Demographics
-  [SUMMARY_FIELDS.CALL_ID]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CALL_DURATION]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CALL_DATE]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CALL_TIME]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CALLER_ID]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.COUNSELOR_NAME]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CALLER_TYPE]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.AGE]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.GENDER]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.PROFESSION]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.LOCATION]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.LANGUAGES]: SectionKey.FeaturesAndDemographics,
-  [SUMMARY_FIELDS.CONCERN_CODE]: SectionKey.FeaturesAndDemographics,
-
-  // Session Summary
-  [SUMMARY_FIELDS.SESSION_SUMMARY]: SectionKey.SessionSummary,
-
-  // Flow
-  [SUMMARY_FIELDS.FLOW]: SectionKey.Flow,
-
-  // Key Concerns
-  [SUMMARY_FIELDS.KEY_CONCERNS]: SectionKey.KeyConcern,
-
-  // Observations and Assessment
-  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: SectionKey.ObjectiveObservations,
-
-  // Subjective Observations
-  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: SectionKey.SubjectiveObservations,
-
-  // Assessment
-  [SUMMARY_FIELDS.ASSESSMENT]: SectionKey.Assessment,
-
-  // Dominant Feelings
-  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: SectionKey.DominantFeelings,
-
-  // Issues Worked On
-  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: SectionKey.IssuesWorkedOn,
-
-  // Key Therapeutic Techniques
-  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]:
-    SectionKey.KeyTherapeuticTechniques,
-
-  // Referrals Provided
-  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: SectionKey.ReferralsProvided,
-
-  // Homework Recommended
-  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: SectionKey.HomeworkRecommended,
-
-  // Plans for Next Call
-  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: SectionKey.PlansForNextCall,
-
-  // Tags
-  [SUMMARY_FIELDS.TAGS]: SectionKey.Tags,
-
-  // Metrics
-  [SUMMARY_FIELDS.LISTENING_RATIO]: SectionKey.Metrics,
-  [SUMMARY_FIELDS.EMOTIONAL_LIFT]: SectionKey.Metrics,
-  [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]: SectionKey.Metrics,
-} as const;
-
 // Gender options
 export const GENDER_OPTIONS = [
   'Male',
@@ -353,12 +227,12 @@ export const SECTION_LIST = [
   },
 ];
 
-// TO DO: Remove later (Current configuration - can be moved to API later)
+// Single source of truth for field configuration
 export const summaryFields: SummaryField[] = [
   // Features and Demographics section
   {
     isEditable: false,
-    key: SUMMARY_FIELDS.CALLER_ID,
+    key: SUMMARY_FIELDS.CALL_ID,
     label: 'Call ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
@@ -380,7 +254,7 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: false,
     key: SUMMARY_FIELDS.CALL_TIME,
-    label: 'Call time',
+    label: 'Call Time',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
   },
@@ -393,8 +267,15 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: false,
+    key: SUMMARY_FIELDS.COUNSELOR_NAME,
+    label: 'Counselor Name',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: FieldType.Text,
+  },
+  {
+    isEditable: false,
     key: SUMMARY_FIELDS.CALLER_TYPE,
-    label: 'Caller type',
+    label: 'Caller Type',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
   },
@@ -423,10 +304,10 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    key: SUMMARY_FIELDS.LOCATION,
-    label: 'Location',
+    key: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
+    label: 'Relationship Status',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.SearchableDropdown,
+    type: FieldType.InlineTextInput,
   },
   {
     isEditable: true,
@@ -437,25 +318,19 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    key: SUMMARY_FIELDS.CONCERN_CODE,
-    label: 'Concern code',
+    key: SUMMARY_FIELDS.LOCATION,
+    label: 'Location',
     sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.InlineTextInput,
+    type: FieldType.SearchableDropdown,
   },
   {
     isEditable: true,
-    key: SUMMARY_FIELDS.RELATIONSHIP_STATUS,
-    label: 'Relationship Status',
+    key: SUMMARY_FIELDS.CONCERN_CODE,
+    label: 'Concern Code',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.InlineTextInput,
   },
-  {
-    isEditable: false,
-    key: SUMMARY_FIELDS.COUNSELOR_NAME,
-    label: 'Counsellor Name',
-    sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.Text,
-  },
+
   {
     isEditable: true,
     key: SUMMARY_FIELDS.SESSION_SUMMARY,
@@ -466,14 +341,14 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: true,
     key: SUMMARY_FIELDS.FLOW,
-    label: 'Session Summary',
+    label: 'Flow',
     sectionKey: SectionKey.Flow,
     type: FieldType.MultilineTextInput,
   },
   {
     isEditable: true,
     key: SUMMARY_FIELDS.KEY_CONCERNS,
-    label: 'Key concerns',
+    label: 'Key Concerns',
     sectionKey: SectionKey.KeyConcern,
     type: FieldType.MultilineTextInput,
   },
@@ -529,7 +404,7 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: true,
     key: SUMMARY_FIELDS.HOMEWORK_RECOMMENDED,
-    label: 'Homework Recommended',
+    label: 'Home work Recommended',
     sectionKey: SectionKey.HomeworkRecommended,
     type: FieldType.MultilineTextInput,
   },
@@ -559,15 +434,24 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: false,
     key: SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED,
-    label: 'No of Reflective Questions asked',
+    label: 'Reflective Questions Asked',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
   },
   {
     isEditable: false,
     key: SUMMARY_FIELDS.EMOTIONAL_LIFT,
-    label: 'Emotions Lift',
+    label: 'Emotional Lift',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
   },
 ];
+
+export const FIELD_LABELS: Record<SummaryFieldKey, string> =
+  summaryFields.reduce(
+    (acc, field) => {
+      acc[field.key] = field.label;
+      return acc;
+    },
+    {} as Record<SummaryFieldKey, string>,
+  );

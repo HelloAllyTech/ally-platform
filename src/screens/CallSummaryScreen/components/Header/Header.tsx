@@ -12,7 +12,6 @@ import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 
 interface HeaderProps {
   isFullyExpanded: boolean;
@@ -153,8 +152,8 @@ const styles = ScaledSheet.create({
     marginBottom: '8@ms',
   },
   summaryNameText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
     color: colors.charcoal2,
     marginRight: '10@ms',
   },

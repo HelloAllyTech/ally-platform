@@ -4,7 +4,7 @@ import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {isIOS} from '@/constants/general';
+import {NoCallLogsIcon} from '@/assets/icons';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import useTranslate from '@/hooks/useTranslate';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
@@ -144,13 +144,21 @@ export const CallLogScreen: React.FC = () => {
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader search={search} onSearchChange={setSearch} />
-      {isLoading || isFetching ? (
+      {isLoading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.darkSlate} />
         </View>
-      ) : allLogs.length === 0 ? (
+      ) : allLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
+          <NoCallLogsIcon
+            style={styles.noCallLogsIcon}
+            width={160}
+            height={130}
+          />
           <Text style={styles.emptyText}>{t('CallLogs.noCallLogs')}</Text>
+          <Text style={styles.emptyDescription}>
+            {t('CallLogs.noCallLogsDescription')}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -162,7 +170,7 @@ export const CallLogScreen: React.FC = () => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
-          refreshing={isLoading}
+          refreshing={isFetching}
           onRefresh={handleRefresh}
         />
       )}
@@ -191,15 +199,27 @@ const styles = ScaledSheet.create({
     paddingVertical: '16@ms',
   },
   emptyText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: isIOS ? 'italic' : 'normal',
-    fontWeight: '500',
-    fontSize: '30@ms',
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '20@ms',
+    lineHeight: '24@ms',
+    color: colors.darkGray2,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: '100@ms',
+  },
+  noCallLogsIcon: {
+    marginBottom: '28@ms',
+  },
+  emptyDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    lineHeight: '24@ms',
+    color: colors.darkGray2,
+    textAlign: 'center',
+    marginTop: '16@vs',
+    marginBottom: '30@vs',
   },
 });
