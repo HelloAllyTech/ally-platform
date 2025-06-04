@@ -24,10 +24,9 @@ const styles = ScaledSheet.create({
     borderColor: colors.gray99,
   },
   badgeText: {
-    color: colors.gray99,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.charcoal2,
     fontSize: '12@ms',
-    fontWeight: '400',
-    ...fontFamily.REPLAY_PRO.HEADLINE,
   },
 });
 

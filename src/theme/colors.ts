@@ -55,4 +55,5 @@ export const colors = {
   lightGraySubtle: 'rgba(229, 231, 235, 0.1)',
   smokyBlack: 'rgba(19, 19, 19, 0.55)',
   powderBlue: '#B7D9FF',
+  darkGray2: '#222222',
 };
