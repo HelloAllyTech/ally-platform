@@ -1,10 +1,19 @@
 import {useEffect} from 'react';
 
-import {SectionKey, SummaryFieldKey, summaryFields} from '@/constants/summary';
-import {useUpdateCallSummaryMutation} from '@/services/callSummaryApi';
+import {
+  SectionKey,
+  SUMMARY_FIELDS,
+  SummaryFieldKey,
+  summaryFields,
+} from '@/constants/summary';
+import {
+  useGetTagsMutation,
+  useUpdateCallSummaryMutation,
+} from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setFormData} from '@/store/slices/summarySlice';
 import {SummaryFieldValueTypes} from '@/types/callSummary';
+import {mapTagsToString} from '@/utils/callSummary';
 import {
   transformFormDataForSubmission,
   transformSummaryToFormData,
@@ -16,6 +25,7 @@ export const useCallSummaryForm = () => {
   const formData = useAppSelector(state => state.summary.formData);
   const [updateCallSummary, {isLoading: isUpdating}] =
     useUpdateCallSummaryMutation();
+  const [getTags] = useGetTagsMutation();
   const summary = summaryData?.details?.summary;
 
   useEffect(() => {
@@ -40,6 +50,10 @@ export const useCallSummaryForm = () => {
     );
     const sectionData = sectionFields.reduce(
       (acc, field) => {
+        if (field.key === SUMMARY_FIELDS.TAGS) {
+          acc[field.key] = mapTagsToString(summary?.tags || []) || null;
+          return acc;
+        }
         acc[field.key] = summary[field.key] ?? null;
         return acc;
       },
@@ -51,9 +65,20 @@ export const useCallSummaryForm = () => {
 
   const handleSubmit = async () => {
     if (!formData || !summaryData) return;
+    let tagsResponse;
+    if (
+      formData[SUMMARY_FIELDS.TAGS] &&
+      formData[SUMMARY_FIELDS.TAGS] !==
+        mapTagsToString(summaryData.details?.summary?.tags || [])
+    ) {
+      tagsResponse = await getTags({
+        tags: (formData[SUMMARY_FIELDS.TAGS] as string)?.split(',') || [],
+      });
+    }
     const formattedFormData = transformFormDataForSubmission(
       formData,
       summaryData,
+      tagsResponse?.data || summary?.tags || [],
     );
     return await updateCallSummary({
       chatId: summaryData.id,

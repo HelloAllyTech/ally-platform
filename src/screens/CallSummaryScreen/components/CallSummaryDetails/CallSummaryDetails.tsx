@@ -32,41 +32,25 @@ export const CallSummaryDetails: React.FC<Props> = ({
 
   const {isUpdating, handleSubmit} = useCallSummaryForm();
 
-  const [expanded, setExpanded] = useState({
-    [SectionKey.SessionSummary]: false,
-    [SectionKey.KeyConcern]: false,
-    [SectionKey.FeaturesAndDemographics]: false,
-    [SectionKey.Flow]: false,
-    [SectionKey.ObjectiveObservations]: false,
-    [SectionKey.SubjectiveObservations]: false,
-    [SectionKey.Assessment]: false,
-    [SectionKey.DominantFeelings]: false,
-    [SectionKey.IssuesWorkedOn]: false,
-    [SectionKey.KeyTherapeuticTechniques]: false,
-    [SectionKey.ReferralsProvided]: false,
-    [SectionKey.HomeworkRecommended]: false,
-    [SectionKey.PlansForNextCall]: false,
-    [SectionKey.Tags]: false,
-    [SectionKey.Metrics]: false,
-  });
+  const [expanded, setExpanded] = useState(() =>
+    SECTION_LIST.reduce(
+      (acc, section) => {
+        acc[section.key] = false;
+        return acc;
+      },
+      {} as Record<SectionKey, boolean>,
+    ),
+  );
 
-  const [isEditing, setIsEditing] = useState({
-    [SectionKey.SessionSummary]: false,
-    [SectionKey.KeyConcern]: false,
-    [SectionKey.FeaturesAndDemographics]: false,
-    [SectionKey.Flow]: false,
-    [SectionKey.ObjectiveObservations]: false,
-    [SectionKey.SubjectiveObservations]: false,
-    [SectionKey.Assessment]: false,
-    [SectionKey.DominantFeelings]: false,
-    [SectionKey.IssuesWorkedOn]: false,
-    [SectionKey.KeyTherapeuticTechniques]: false,
-    [SectionKey.ReferralsProvided]: false,
-    [SectionKey.HomeworkRecommended]: false,
-    [SectionKey.PlansForNextCall]: false,
-    [SectionKey.Tags]: false,
-    [SectionKey.Metrics]: false,
-  });
+  const [isEditing, setIsEditing] = useState(() =>
+    SECTION_LIST.reduce(
+      (acc, section) => {
+        acc[section.key] = false;
+        return acc;
+      },
+      {} as Record<SectionKey, boolean>,
+    ),
+  );
 
   const onSubmitButtonPress = async () => {
     const response = await handleSubmit();
