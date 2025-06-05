@@ -1,14 +1,16 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Platform, Text, TouchableOpacity} from 'react-native';
-import Config from 'react-native-config';
 import LiveAudioStream from 'react-native-live-audio-stream';
 import {PERMISSIONS, request} from 'react-native-permissions';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Toast} from '@/components/Toast/Toast';
-import {useSocket} from '@/hooks/useSocket';
+import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
+import {useUser} from '@/hooks/useUser';
+import {useAppSelector} from '@/store/hooks';
+import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 export const LiveRecordingScreen: React.FC = () => {
@@ -25,8 +27,27 @@ export const LiveRecordingScreen: React.FC = () => {
   });
   const dataCountRef = useRef(0);
   const {t} = useTranslate();
-  const {sendAudioData, isConnected, connect, disconnect} = useSocket({
-    socketUrl: Config.ALLY_WEB_SOCKET_URL,
+  const {userData} = useUser();
+  const currentChat = useAppSelector(state => state.chat.currentChat);
+  const chatId = currentChat?.chatId;
+
+  const socketEventCallbacks = useMemo(
+    () => ({
+      [SocketEvent.NUDGE]: (data: any) => {
+        logger.info(`NUDGE, data: ${data}`);
+        // TODO: Implement socket event callbacks
+      },
+      [SocketEvent.AUDIO_STREAM]: (data: any) => {
+        logger.info(`AUDIO_STREAM, data: ${data}`);
+        // TODO: Implement socket event callbacks
+      },
+    }),
+    [],
+  );
+
+  const {emitSocketEvent} = useSocketConnection({
+    userId: userData?.id,
+    eventCallbacks: socketEventCallbacks,
   });
 
   const showToast = (
@@ -65,12 +86,11 @@ export const LiveRecordingScreen: React.FC = () => {
   };
   const handleAudioData = useCallback(
     (data: string) => {
+      // logger.info(`handleAudioData, data: ${data}`);
       dataCountRef.current += 1;
-      if (isConnected()) {
-        sendAudioData(data);
-      }
+      emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {audioData: data, chatId});
     },
-    [sendAudioData, isConnected],
+    [emitSocketEvent, chatId],
   );
 
   useEffect(() => {
@@ -108,7 +128,8 @@ export const LiveRecordingScreen: React.FC = () => {
         logger.info('Microphone permission not granted');
         return;
       }
-      connect();
+      logger.info(`startStreaming, chatId: ${chatId}`);
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {chatId});
       LiveAudioStream.start();
       setIsStreaming(true);
       dataCountRef.current = 0;
@@ -117,14 +138,14 @@ export const LiveRecordingScreen: React.FC = () => {
       showToast(t('LiveRecordingScreen.error.maxRetriesReached'), 'error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPermission, connect]);
+  }, [hasPermission]);
 
-  const stopStreaming = useCallback(() => {
+  const stopStreaming = () => {
     LiveAudioStream.stop();
-    disconnect();
+    emitSocketEvent(SocketEvent.CHAT_ENDED, {chatId});
     setIsStreaming(false);
     dataCountRef.current = 0;
-  }, [disconnect]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
