@@ -96,11 +96,6 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
 
   const emitSocketEvent = useCallback(
     (socketEvent: SocketEvent, message: Record<string, any>) => {
-      logger.info(
-        `emitSocketEvent, socketEvent: ${socketEvent}, message: ${JSON.stringify(
-          message,
-        )}`,
-      );
       if (!socketRef.current) {
         logger.error('Socket not connected');
         return;

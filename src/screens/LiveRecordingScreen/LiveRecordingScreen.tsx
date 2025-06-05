@@ -1,11 +1,10 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Platform, Text, TouchableOpacity} from 'react-native';
-import LiveAudioStream from 'react-native-live-audio-stream';
-import {PERMISSIONS, request} from 'react-native-permissions';
+import React, {useCallback, useMemo, useState} from 'react';
+import {Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Toast} from '@/components/Toast/Toast';
+import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
@@ -16,8 +15,6 @@ import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 export const LiveRecordingScreen: React.FC = () => {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [toast, setToast] = useState<{
     visible: boolean;
@@ -28,11 +25,10 @@ export const LiveRecordingScreen: React.FC = () => {
     message: '',
     type: 'error',
   });
-  const dataCountRef = useRef(0);
   const {t} = useTranslate();
   const {userData} = useUser();
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const chatId = currentChat?.chatId;
+  const chatId = currentChat?.chatId?.toString();
 
   const socketEventCallbacks = useMemo(
     () => ({
@@ -41,8 +37,15 @@ export const LiveRecordingScreen: React.FC = () => {
         // TODO: Implement socket event callbacks
       },
       [SocketEvent.AUDIO_STREAM]: (data: any) => {
-        logger.info(`AUDIO_STREAM, data: ${data}`);
+        // logger.info(`AUDIO_STREAM, data: ${data}`);
         // TODO: Implement socket event callbacks
+      },
+      [SocketEvent.MESSAGE_RECEIVED]: (data: any) => {
+        const message = data.payload;
+        logger.info(`Message received: ${message}`);
+        if (message.type === 'TEXT') {
+          logger.info(`Message received: ${message}`);
+        }
       },
     }),
     [],
@@ -68,107 +71,35 @@ export const LiveRecordingScreen: React.FC = () => {
     setToast(prev => ({...prev, visible: false}));
   };
 
-  const checkPermissions = async () => {
-    if (Platform.OS === 'ios') {
-      return await requestIosPermissions();
-    } else {
-      return await requestAndroidPermissions();
-    }
-  };
-
-  const requestIosPermissions = async () => {
-    try {
-      const result = await request(PERMISSIONS.IOS.MICROPHONE);
-
-      if (result !== 'granted') {
-        logger.error('Microphone permission denied');
-        return false;
-      } else {
-        return true;
-      }
-    } catch (err) {
-      return false;
-    }
-  };
-
-  const requestAndroidPermissions = async () => {
-    try {
-      const result = await request(PERMISSIONS.ANDROID.RECORD_AUDIO);
-
-      if (result !== 'granted') {
-        logger.error('Microphone permission denied');
-        return false;
-      } else {
-        return true;
-      }
-    } catch (err) {
-      return false;
-    }
-  };
-
   const handleAudioData = useCallback(
     (data: string) => {
-      // logger.info(`handleAudioData, data: ${data}`);
-      dataCountRef.current += 1;
       emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {audioData: data, chatId});
     },
     [emitSocketEvent, chatId],
   );
 
-  useEffect(() => {
-    const initPermissions = async () => {
-      const permissionGranted = await checkPermissions();
-      setHasPermission(permissionGranted);
-    };
+  const {isStreaming, hasPermission, startStreaming, stopStreaming} =
+    useLiveAudioStream({
+      onAudioData: handleAudioData,
+      chatId,
+    });
 
-    initPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const options = {
-      sampleRate: 44100,
-      channels: 1,
-      bitsPerSample: 16,
-      audioSource: Platform.OS === 'ios' ? 1 : 7,
-      bufferSize: 2048,
-      wavFile: 'audio.wav',
-    };
-
-    LiveAudioStream.init(options);
-    LiveAudioStream.on('data', handleAudioData);
-
-    return () => {
-      LiveAudioStream.stop();
-      dataCountRef.current = 0;
-    };
-  }, [handleAudioData]);
-
-  const startStreaming = useCallback(async () => {
+  const handleStartStreaming = useCallback(async () => {
     try {
-      if (!hasPermission) {
-        logger.info('Microphone permission not granted');
-        return;
-      }
-      logger.info(`startStreaming, chatId: ${chatId}`);
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {chatId});
-      LiveAudioStream.start();
-      setIsStreaming(true);
+      await startStreaming();
       setStartTime(Date.now());
-      dataCountRef.current = 0;
     } catch (error) {
       logger.error(`Error starting stream: ${error}`);
       showToast(t('LiveRecordingScreen.error.maxRetriesReached'), 'error');
     }
-  }, [hasPermission, chatId, emitSocketEvent, t]);
+  }, [chatId, emitSocketEvent, startStreaming, t]);
 
-  const stopStreaming = () => {
-    LiveAudioStream.stop();
+  const handleStopStreaming = useCallback(() => {
+    stopStreaming();
     emitSocketEvent(SocketEvent.CHAT_ENDED, {chatId});
-    setIsStreaming(false);
     setStartTime(null);
-    dataCountRef.current = 0;
-  };
+  }, [chatId, emitSocketEvent, stopStreaming]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -184,7 +115,7 @@ export const LiveRecordingScreen: React.FC = () => {
           isStreaming ? styles.stopButton : styles.startButton,
           !hasPermission && styles.disabledButton,
         ]}
-        onPress={isStreaming ? stopStreaming : startStreaming}
+        onPress={isStreaming ? handleStopStreaming : handleStartStreaming}
         disabled={!hasPermission}>
         <Text style={styles.buttonText}>
           {isStreaming ? 'Stop Streaming' : 'Start Streaming'}
