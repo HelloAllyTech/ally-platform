@@ -8,7 +8,6 @@ import {useSocket} from './useSocket';
 
 interface UseSocketConnectionOptions {
   userId: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
   onConnect?: () => void;
   onDisconnect?: () => void;
