@@ -1,9 +1,10 @@
-import React, {useCallback} from 'react';
+import React, {useCallback, useState} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
   BackHandler,
   Linking,
+  Modal,
   StatusBar,
   Text,
   TouchableOpacity,
@@ -28,6 +29,7 @@ export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const {userData} = useUser();
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -36,6 +38,7 @@ export const HomeScreen: React.FC = () => {
   });
 
   const handleThirdPartyCall = async () => {
+    setIsPopupVisible(false);
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
     const supported = await Linking.canOpenURL(url);
     if (supported) {
@@ -58,6 +61,15 @@ export const HomeScreen: React.FC = () => {
       Alert.alert('Error', 'Unable to open the link');
     }
   }, []);
+
+  const handleVoiceRecording = () => {
+    setIsPopupVisible(false);
+    navigation.navigate('Listening', {isRecording: true});
+  };
+
+  const handleHeadphonePress = () => {
+    setIsPopupVisible(true);
+  };
 
   // Automatically manages socket connection based on screen focus and app state
 
@@ -83,6 +95,35 @@ export const HomeScreen: React.FC = () => {
     );
   }
 
+  // TODO: Create a new component for the popup
+  const renderPopup = () => {
+    return (
+      <Modal
+        visible={isPopupVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPopupVisible(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsPopupVisible(false)}>
+          <View style={styles.popupContainer}>
+            <TouchableOpacity
+              style={styles.popupOption}
+              onPress={handleThirdPartyCall}>
+              <Text style={styles.popupOptionText}>New Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.popupOption}
+              onPress={handleVoiceRecording}>
+              <Text style={styles.popupOptionText}>Record Audio</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   return (
     <View style={styles.content}>
       <StatusBar barStyle="light-content" />
@@ -93,7 +134,7 @@ export const HomeScreen: React.FC = () => {
 
       <TouchableOpacity
         style={styles.animationContainer}
-        onPress={handleThirdPartyCall}
+        onPress={handleHeadphonePress}
         activeOpacity={0.8}>
         <LottieView
           source={require('@/assets/animations/listen.json')}
@@ -106,11 +147,12 @@ export const HomeScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
       <TouchableOpacity
-        onPress={handleThirdPartyCall}
+        onPress={handleHeadphonePress}
         activeOpacity={0.8}
         style={styles.textContainer}>
         <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
       </TouchableOpacity>
+      {renderPopup()}
     </View>
   );
 };
@@ -213,5 +255,27 @@ const styles = ScaledSheet.create({
     paddingVertical: '16@ms',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popupContainer: {
+    backgroundColor: colors.white,
+    borderRadius: '12@ms',
+    padding: '16@ms',
+    width: '80%',
+    maxWidth: '300@ms',
+  },
+  popupOption: {
+    paddingVertical: '12@ms',
+    paddingHorizontal: '16@ms',
+  },
+  popupOptionText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '16@ms',
+    color: colors.darkCharcoal,
   },
 });

@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {RouteProp} from '@react-navigation/native';
 import {StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -7,9 +8,11 @@ import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {RootStackParamList} from '@/navigation/types';
 import {useEndCallMutation} from '@/services/chatApi';
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -18,6 +21,7 @@ import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 import {FeedbackResponse, SocketEvent, SocketMessage} from '@/types/message';
 import {Maybe} from '@/utils/common';
+import {logger} from '@/utils/logger';
 
 import {
   AnimatedBlob,
@@ -37,12 +41,20 @@ export interface Nudge {
   feedback?: FeedbackResponse;
 }
 
-export const ListeningScreen = () => {
+export const ListeningScreen = ({
+  route,
+}: {
+  route: RouteProp<RootStackParamList, 'Listening'>;
+}) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
+
+  const {isRecording} = route.params || {};
+
   const [isNudgeVisible, setIsNudgeVisible] = useState(false);
   const chat = useAppSelector(state => state.chat.currentChat);
-  const [startTime] = useState(() =>
+
+  const [startTime, setStartTime] = useState<number | null>(() =>
     chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
   );
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
@@ -67,6 +79,10 @@ export const ListeningScreen = () => {
   }, [isSuccess, handleCallEnd]);
 
   const handleEndCall = () => {
+    if (isRecording) {
+      handleStopStreaming();
+    }
+
     if (chatData?.chatId) {
       endCall({chatId: chatData.chatId});
     }
@@ -136,6 +152,42 @@ export const ListeningScreen = () => {
     eventCallbacks: socketEventCallbacks,
   });
 
+  const handleAudioData = useCallback(
+    (data: string) => {
+      emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+        audioData: data,
+        chatId: chat?.chatId?.toString(),
+      });
+    },
+    [emitSocketEvent, chat?.chatId],
+  );
+
+  const {startStreaming, stopStreaming} = useLiveAudioStream({
+    onAudioData: handleAudioData,
+    chatId: chat?.chatId?.toString(),
+  });
+
+  const handleStartStreaming = useCallback(async () => {
+    try {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
+        chatId: chat?.chatId?.toString(),
+      });
+      await startStreaming();
+      setStartTime(Date.now());
+    } catch (error) {
+      logger.error(`Error starting stream: ${error}`);
+    }
+  }, [chat?.chatId, emitSocketEvent, startStreaming]);
+
+  const handleStopStreaming = useCallback(() => {
+    stopStreaming();
+    emitSocketEvent(SocketEvent.CHAT_ENDED, {
+      chatId: chat?.chatId?.toString(),
+    });
+    setStartTime(null);
+    navigation.pop();
+  }, [chat?.chatId, emitSocketEvent, stopStreaming, navigation]);
+
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
       setCurrentNudge(prev => {
@@ -150,6 +202,12 @@ export const ListeningScreen = () => {
       // TODO: Implement API call to send feedback
     }
   };
+
+  useEffect(() => {
+    if (isRecording) {
+      handleStartStreaming();
+    }
+  }, [isRecording, handleStartStreaming]);
 
   const toggleNudgeVisibility = () => {
     setIsNudgeVisible(prev => !prev);
@@ -186,7 +244,7 @@ export const ListeningScreen = () => {
         <Text style={styles.headerText}>
           {t('ListeningScreen.takingNotes')}
         </Text>
-        <Timer startTime={startTime} />
+        {startTime && <Timer startTime={startTime} />}
       </View>
 
       <View style={styles.content}>
