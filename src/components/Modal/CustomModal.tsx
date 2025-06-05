@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TextInputProps,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -27,7 +28,7 @@ interface CustomModalProps {
   primaryTextColor?: string;
   secondaryTextColor?: string;
   showInput?: boolean;
-  inputProps?: any;
+  inputProps?: Partial<TextInputProps>;
   description?: string;
 }
 

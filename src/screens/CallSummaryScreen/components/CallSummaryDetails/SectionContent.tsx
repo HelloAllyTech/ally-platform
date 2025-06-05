@@ -69,5 +69,7 @@ export const SectionContent: React.FC<SectionContentProps> = ({
     return <DemographicsSection isEditing={isEditing} />;
   }
 
-  return sectionFields.map(renderSummaryField);
+  return <>{sectionFields.map(renderSummaryField)}</>;
 };
+
+export default SectionContent;

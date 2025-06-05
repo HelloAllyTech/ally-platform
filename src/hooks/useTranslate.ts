@@ -6,7 +6,7 @@ const useTranslate = () => {
   const {t} = useTranslation();
   const translate = (
     key: TranslationType,
-    interpolationKeys: {[key: string]: any} = {},
+    interpolationKeys: {[key: string]: unknown} = {},
   ): string => {
     return t(key, interpolationKeys) as string;
   };
