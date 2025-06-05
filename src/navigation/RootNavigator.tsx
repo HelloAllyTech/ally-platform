@@ -1,3 +1,4 @@
+import {useMemo} from 'react';
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -5,7 +6,9 @@ import {
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
+import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
+import {useSocketConnection} from '@/hooks/useSocketConnection';
 import {useUser} from '@/hooks/useUser';
 import type {RootStackParamList} from '@/navigation/types';
 import {
@@ -15,7 +18,9 @@ import {
   ListeningScreen,
   SplashScreen,
 } from '@/screens';
+import {SocketEvent} from '@/types/message';
 import {UserRole} from '@/types/user';
+import {logger} from '@/utils/logger';
 
 import {BottomTabs} from './tabNavigator';
 
@@ -27,11 +32,40 @@ const NavigationContent = ({
 }: {
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
+  const {userData} = useUser();
+  const isCounselor = userData?.role === UserRole.COUNSELOR;
+
+  const {checkCounselorChat} = useCounselorChat({
+    onActiveChatFound: () => {
+      navigationRef.reset({
+        index: 1,
+        routes: [{name: 'Home'}, {name: 'Listening'}],
+      });
+    },
+  });
+
   // Single subscription that's aware of the current screen
   useNavigationAwareCounselorChat(navigationRef);
 
-  const {userData} = useUser();
-  const isCounselor = userData?.role === UserRole.COUNSELOR;
+  const socketEventCallbacks = useMemo(
+    () => ({
+      [SocketEvent.USER_JOINED]: async () => {
+        try {
+          if (userData?.role === UserRole.COUNSELOR) {
+            checkCounselorChat();
+          }
+        } catch (error) {
+          logger.error(`Error in USER_JOINED handler: ${error}`);
+        }
+      },
+    }),
+    [checkCounselorChat, userData?.role],
+  );
+
+  useSocketConnection({
+    userId: userData?.id,
+    eventCallbacks: socketEventCallbacks,
+  });
 
   return (
     <Stack.Navigator

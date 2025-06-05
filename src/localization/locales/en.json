@@ -97,7 +97,8 @@
     "search": {
       "placeholder": "Search"
     },
-    "noCallLogs": "No call logs found"
+    "noCallLogs": "No call records found",
+    "noCallLogsDescription": "Your recent calls and insights \n will be listed here."
   },
   "BreathingScreen": {
     "header": {
@@ -126,6 +127,30 @@
     "loadingPlaces": "Loading places...",
     "noLocationsFound": "No locations found",
     "startTypingToSearch": "Start typing to search for locations"
+  },
+  "analytics": {
+    "header": {
+      "title": "Call",
+      "subtitle": "Analytics"
+    },
+    "dateSelector": {
+      "selectDate": "Select Date",
+      "selectMonth": "Select Month",
+      "selectYear": "Select Year"
+    },
+    "listeningTalking": {
+      "title": "Listening : Talking Distribution",
+      "listening": "Listening",
+      "talking": "Talking"
+    },
+    "questions": {
+      "title": "Questions used",
+      "description": "This is the total number of questions per 60 conversation minutes used by you to facilitate reflections across your sessions. Number on the right is average of all counsellors."
+    },
+    "modal": {
+      "cancel": "Cancel",
+      "ok": "OK"
+    }
   },
   "submit": "Submit"
 }
