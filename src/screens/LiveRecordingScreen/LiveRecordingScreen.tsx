@@ -9,13 +9,16 @@ import {Toast} from '@/components/Toast/Toast';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {Timer} from '@/screens/ListeningScreen/components/Timer';
 import {useAppSelector} from '@/store/hooks';
+import {colors} from '@/theme/colors';
 import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 export const LiveRecordingScreen: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
@@ -132,18 +135,19 @@ export const LiveRecordingScreen: React.FC = () => {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {chatId});
       LiveAudioStream.start();
       setIsStreaming(true);
+      setStartTime(Date.now());
       dataCountRef.current = 0;
     } catch (error) {
       logger.error(`Error starting stream: ${error}`);
       showToast(t('LiveRecordingScreen.error.maxRetriesReached'), 'error');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPermission]);
+  }, [hasPermission, chatId, emitSocketEvent, t]);
 
   const stopStreaming = () => {
     LiveAudioStream.stop();
     emitSocketEvent(SocketEvent.CHAT_ENDED, {chatId});
     setIsStreaming(false);
+    setStartTime(null);
     dataCountRef.current = 0;
   };
 
@@ -167,6 +171,7 @@ export const LiveRecordingScreen: React.FC = () => {
           {isStreaming ? 'Stop Streaming' : 'Start Streaming'}
         </Text>
       </TouchableOpacity>
+      {startTime && <Timer customStyle={styles.timer} startTime={startTime} />}
       {toast.visible && (
         <Toast message={toast.message} type={toast.type} onHide={hideToast} />
       )}
@@ -195,5 +200,9 @@ const styles = ScaledSheet.create({
     color: '#FF3B30',
     marginBottom: '20@ms',
     textAlign: 'center',
+  },
+  timer: {
+    marginTop: '20@ms',
+    color: colors.azureBlue,
   },
 });
