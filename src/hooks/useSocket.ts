@@ -26,7 +26,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
       try {
         socketRef.current = io(baseUrl, {
           path: '',
-          transports: ['polling', 'websocket'] as const,
+          transports: ['polling', 'websocket'],
           auth: {
             user: {
               userId,
