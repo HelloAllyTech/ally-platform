@@ -26,7 +26,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
   onSubmit,
 }) => {
   // const navigation = useAppNavigation();
-  const {data: visibleFields, isLoading: isLoadingFields} =
+  const {data: _visibleFields, isLoading: isLoadingFields} =
     useGetSummaryFieldsQuery();
   const {t} = useTranslate();
 
