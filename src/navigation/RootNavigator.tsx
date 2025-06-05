@@ -22,7 +22,7 @@ import {SocketEvent} from '@/types/message';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
-import {BottomTabs} from './tabNavigator';
+import {DrawerNavigator} from './DrawerNavigator';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -76,7 +76,7 @@ const NavigationContent = ({
       <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen
         name="Home"
-        children={() => <BottomTabs hideTabBar={!isCounselor} />}
+        children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
       />
       <Stack.Screen name="Listening" component={ListeningScreen} />
       <Stack.Screen name="CallSummary" component={CallSummaryScreen} />

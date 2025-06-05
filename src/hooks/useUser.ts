@@ -23,6 +23,12 @@ export const useUser = () => {
   );
   const [getUser] = useLazyGetUserQuery();
 
+  const logout = () => {
+    store.dispatch(setUser(null));
+    store.dispatch(clearTokens());
+    store.dispatch(setAuthenticated(false));
+  };
+
   const checkAuth = useCallback(async () => {
     try {
       const token = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
@@ -57,5 +63,6 @@ export const useUser = () => {
     isAuthenticated,
     checkAuth,
     isUserLoading,
+    logout,
   };
 };
