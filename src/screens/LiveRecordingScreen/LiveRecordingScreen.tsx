@@ -69,7 +69,11 @@ export const LiveRecordingScreen: React.FC = () => {
   };
 
   const checkPermissions = async () => {
-    return await requestIosPermissions();
+    if (Platform.OS === 'ios') {
+      return await requestIosPermissions();
+    } else {
+      return await requestAndroidPermissions();
+    }
   };
 
   const requestIosPermissions = async () => {
@@ -78,7 +82,6 @@ export const LiveRecordingScreen: React.FC = () => {
 
       if (result !== 'granted') {
         logger.error('Microphone permission denied');
-
         return false;
       } else {
         return true;
@@ -87,6 +90,22 @@ export const LiveRecordingScreen: React.FC = () => {
       return false;
     }
   };
+
+  const requestAndroidPermissions = async () => {
+    try {
+      const result = await request(PERMISSIONS.ANDROID.RECORD_AUDIO);
+
+      if (result !== 'granted') {
+        logger.error('Microphone permission denied');
+        return false;
+      } else {
+        return true;
+      }
+    } catch (err) {
+      return false;
+    }
+  };
+
   const handleAudioData = useCallback(
     (data: string) => {
       // logger.info(`handleAudioData, data: ${data}`);
