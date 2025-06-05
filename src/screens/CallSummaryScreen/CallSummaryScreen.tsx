@@ -38,7 +38,7 @@ import {logger} from '@/utils/logger';
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
-import {DeleteRenameModal} from './components/DeleteRenameModal/DeletRenameModal';
+import {DeleteRenameModal} from './components/DeleteRenameModal/DeleteRenameModal';
 import {Header} from './components/Header/Header';
 
 /**
