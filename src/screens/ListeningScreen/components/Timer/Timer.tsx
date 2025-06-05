@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {StyleProp, Text, TextStyle} from 'react-native';
+import {Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
@@ -7,10 +7,9 @@ import {fontFamily} from '@/theme/fonts';
 
 interface TimerProps {
   startTime: number; // timestamp in milliseconds
-  customStyle?: StyleProp<TextStyle>;
 }
 
-export const Timer: React.FC<TimerProps> = ({startTime, customStyle = {}}) => {
+export const Timer: React.FC<TimerProps> = ({startTime}) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -38,11 +37,7 @@ export const Timer: React.FC<TimerProps> = ({startTime, customStyle = {}}) => {
       .padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <Text style={[styles.timer, customStyle]}>
-      {formatTime(elapsedSeconds)}
-    </Text>
-  );
+  return <Text style={styles.timer}>{formatTime(elapsedSeconds)}</Text>;
 };
 
 const styles = ScaledSheet.create({

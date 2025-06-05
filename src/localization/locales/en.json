@@ -152,18 +152,5 @@
       "ok": "OK"
     }
   },
-  "liveRecording": {
-    "header": {
-      "title": "Live Recording"
-    },
-    "content": {
-      "placeholder": "Live recording feature coming soon"
-    }
-  },
-  "submit": "Submit",
-  "LiveRecordingScreen": {
-    "error": {
-      "maxRetriesReached": "Maximum connection retry attempts reached. Please try again later."
-    }
-  }
+  "submit": "Submit"
 }
