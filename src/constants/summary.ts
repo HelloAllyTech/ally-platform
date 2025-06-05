@@ -99,22 +99,6 @@ export const SUMMARY_FIELDS = {
   LISTENING_RATIO: 'listeningShare',
   EMOTIONAL_LIFT: 'emotionalLift',
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked',
-
-  // Additional fields from response
-  // WORKING_STATUS: 'workingStatus',
-  // NEW_CALL_FOLLOW_UP: 'newCallFollowUp',
-  // COUNSELLOR: 'counsellor',
-  // FOLLOW_UP_GOALS: 'followUpGoals',
-  // SESSION_NUMBER: 'sessionNumber',
-  // FOLLOW_UP_STATUS: 'followUpStatus',
-  // FOLLOW_UP_DATE: 'followUpDate',
-  // COUNSELOR_FEELINGS: 'counselorFeelings',
-  // ANY_FORMAL_DIAGNOSIS: 'anyFormalDiagnosis',
-  // RELATIONSHIP_STATUS: 'relationshipStatus',
-  // EMOTIONAL_STATE_START: 'emotionalStateStart',
-  // EMOTIONAL_STATE_CHANGE: 'emotionalStateChange',
-  // THERAPEUTIC_INTERVENTIONS: 'therapeuticInterventions',
-  // CALL_QUALITY: 'callQuality',
 } as const;
 
 // Derive the type from the object values
