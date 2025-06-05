@@ -15,33 +15,23 @@ import {
   CommunityInactiveIcon,
   HomeActiveIcon,
   HomeInactiveIcon,
-  LiveRecordingActiveIcon,
-  LiveRecordingInactiveIcon,
 } from '@/assets/icons';
 import {
   CallLogScreen,
   CommunityScreen,
   HomeScreen,
-  LiveRecordingScreen,
   UserAnalyticsScreen,
 } from '@/screens';
 import {colors} from '@/theme/colors';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = [
-  'HomeTab',
-  'CallLog',
-  'UserAnalytics',
-  'LiveRecording',
-  'Community',
-];
+const TAB_NAMES = ['HomeTab', 'CallLog', 'UserAnalytics', 'Community'];
 
 const TAB_COMPONENTS = [
   HomeScreen,
   CallLogScreen,
   UserAnalyticsScreen,
-  LiveRecordingScreen,
   CommunityScreen,
 ];
 
@@ -61,7 +51,6 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       HomeTab: <HomeActiveIcon width={18} height={18} />,
       CallLog: <CallLogActiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
-      LiveRecording: <LiveRecordingActiveIcon width={18} height={18} />,
       Community: <CommunityActiveIcon width={20} height={20} />,
     };
 
@@ -69,7 +58,6 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       HomeTab: <HomeInactiveIcon width={18} height={18} />,
       CallLog: <CallLogInactiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsInactiveIcon width={18} height={18} />,
-      LiveRecording: <LiveRecordingInactiveIcon width={18} height={18} />,
       Community: <CommunityInactiveIcon width={20} height={20} />,
     };
 

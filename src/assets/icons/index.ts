@@ -33,8 +33,6 @@ import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
-import LiveRecordingActiveIcon from './liveRecordingActive.svg';
-import LiveRecordingInactiveIcon from './liveRecordingInactive.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicWithGradientIcon from './micWithGradient.svg';
@@ -116,6 +114,4 @@ export {
   SessionSummaryIcon,
   RightArrow,
   LeftArrow,
-  LiveRecordingActiveIcon,
-  LiveRecordingInactiveIcon,
 };
