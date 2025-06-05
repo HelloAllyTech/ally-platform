@@ -7,6 +7,7 @@ import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
   userId: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
 }
 
@@ -26,7 +27,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
       try {
         socketRef.current = io(baseUrl, {
           path: '',
-          transports: ['polling', 'websocket'] as const,
+          transports: ['polling', 'websocket'],
           auth: {
             user: {
               userId,
@@ -95,6 +96,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   }, []);
 
   const emitSocketEvent = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (socketEvent: SocketEvent, message: Record<string, any>) => {
       if (!socketRef.current) {
         logger.error('Socket not connected');
@@ -110,6 +112,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   }, []);
 
   const setListenerForEvent = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (socketEvent: SocketEvent, callback: (data: any) => void) => {
       if (!socketRef.current) {
         logger.error('Socket not connected');

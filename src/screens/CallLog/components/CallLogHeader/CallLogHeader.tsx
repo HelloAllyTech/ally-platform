@@ -13,8 +13,8 @@ interface CallLogHeaderProps {
 }
 
 export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
-  search,
-  onSearchChange,
+  search: _search,
+  onSearchChange: _onSearchChange,
 }) => {
   const {t} = useTranslate();
 
