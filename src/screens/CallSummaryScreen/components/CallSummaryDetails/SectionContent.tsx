@@ -5,7 +5,7 @@ import {FIELD_LABELS, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
-import {SummaryField} from '@/types/callSummary';
+import {EditableFieldKey, SummaryField} from '@/types/callSummary';
 
 import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
 import {EditableField} from '../EditableField/EditableField';
@@ -38,12 +38,20 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   const {handleFieldChange, formData} = useCallSummaryForm();
 
   const renderSummaryField = (field: SummaryField) => {
+    // For editable fields, use formData; for non-editable fields, use summary
+    const getValue = () => {
+      if (field.isEditable && formData?.[field.key as EditableFieldKey]) {
+        return formData[field.key as EditableFieldKey] || null;
+      }
+      return summary?.[field.key] as string | null;
+    };
+
     return (
       <EditableField
         key={field.key}
         fieldKey={field.key}
         label={FIELD_LABELS[field.key]}
-        value={formData?.[field.key] as string | null}
+        value={getValue()}
         onChangeText={handleFieldChange(field.key)}
         canEdit={canEdit}
         isEditing={isEditing}

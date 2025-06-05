@@ -12,9 +12,9 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setFormData} from '@/store/slices/summarySlice';
-import {SummaryFieldValueTypes} from '@/types/callSummary';
 import {mapTagsToString} from '@/utils/callSummary';
 import {
+  FormData,
   transformFormDataForSubmission,
   transformSummaryToFormData,
 } from '@/utils/callSummary/formDataTransformer';
@@ -46,19 +46,18 @@ export const useCallSummaryForm = () => {
   const handleSectionFieldsReset = (sectionKey: SectionKey) => {
     if (!summary) return;
     const sectionFields = summaryFields.filter(
-      field => field.sectionKey === sectionKey,
+      field => field.sectionKey === sectionKey && field.isEditable,
     );
-    const sectionData = sectionFields.reduce(
-      (acc, field) => {
-        if (field.key === SUMMARY_FIELDS.TAGS) {
-          acc[field.key] = mapTagsToString(summary?.tags || []) || null;
-          return acc;
-        }
-        acc[field.key] = summary[field.key] ?? null;
+    const sectionData = sectionFields.reduce((acc, field) => {
+      if (field.key === SUMMARY_FIELDS.TAGS) {
+        acc[field.key] = mapTagsToString(summary?.tags || []) || null;
         return acc;
-      },
-      {} as Record<SummaryFieldKey, SummaryFieldValueTypes | null>,
-    );
+      }
+      if (field.key in summary) {
+        (acc as any)[field.key] = summary[field.key] ?? null;
+      }
+      return acc;
+    }, {} as Partial<FormData>);
 
     dispatch(setFormData(sectionData));
   };
