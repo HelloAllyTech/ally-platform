@@ -164,10 +164,11 @@ const styles = ScaledSheet.create({
     borderRadius: '8@s',
     padding: '12@s',
     fontSize: '16@s',
-    color: colors.black,
+    color: colors.charcoal2,
     marginBottom: '24@vs',
     marginHorizontal: '20@ms',
     backgroundColor: colors.lightGray,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
   },
   inputFocused: {
     borderColor: colors.brightBlue,
