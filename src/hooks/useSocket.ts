@@ -20,7 +20,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     () => {
       if (!userId || connectionAttemptsRef.current >= maxAttempts) {
         logger.error('Max connection attempts reached');
-        throw new Error('Max connection attempts reached');
+        return;
       }
 
       try {
@@ -128,21 +128,6 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     socketRef.current.off(socketEvent);
   }, []);
 
-  // TODO: Update this to send audio data to the socket
-  const sendAudioData = (
-    data: string | ArrayBufferLike | Blob | ArrayBufferView,
-  ) => {
-    if (!isConnected()) {
-      logger.error('Socket not connected');
-      return;
-    }
-    try {
-      socketRef?.current?.send(data);
-    } catch (error) {
-      logger.error(`Failed to send data: ${error}`);
-    }
-  };
-
   useEffect(() => {
     return () => {
       socketRef.current?.disconnect();
@@ -153,7 +138,6 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
     connect,
     disconnect,
     sendMessage,
-    sendAudioData,
     isConnected,
     emitSocketEvent,
     setListenerForEvent,

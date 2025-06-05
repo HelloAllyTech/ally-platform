@@ -37,8 +37,6 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone for audio streaming</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>We need access to speech recognition for live transcription</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReplayPro-BoldItalic.otf</string>
