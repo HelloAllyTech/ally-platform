@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {HeadphoneIcon} from '@/assets/icons';
+import {DrawerMenuIcon, HeadphoneIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
@@ -26,7 +26,7 @@ import {logger} from '@/utils/logger';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
-  const navigation = useAppNavigation();
+  const drawerNavigation = useDrawerNavigation();
   const {userData} = useUser();
 
   // Use the custom hook for back press handling
@@ -84,43 +84,59 @@ export const HomeScreen: React.FC = () => {
   }
 
   return (
-    <View style={styles.content}>
-      <StatusBar barStyle="light-content" />
-      <Text style={styles.titleContainer}>
-        <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-        <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
-      </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <TouchableOpacity
+        style={styles.headerContainer}
+        onPress={() => drawerNavigation.openDrawer()}>
+        <DrawerMenuIcon />
+      </TouchableOpacity>
+      <View style={styles.content}>
+        <Text style={styles.titleContainer}>
+          <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+          <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
+        </Text>
 
-      <TouchableOpacity
-        style={styles.animationContainer}
-        onPress={handleThirdPartyCall}
-        activeOpacity={0.8}>
-        <LottieView
-          source={require('@/assets/animations/listen.json')}
-          autoPlay
-          loop
-          style={styles.lottieAnimation}
-        />
-        <View style={styles.headphoneContainer}>
-          <HeadphoneIcon width={31} height={31} />
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={handleThirdPartyCall}
-        activeOpacity={0.8}
-        style={styles.textContainer}>
-        <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.animationContainer}
+          onPress={handleThirdPartyCall}
+          activeOpacity={0.8}>
+          <LottieView
+            source={require('@/assets/animations/listen.json')}
+            autoPlay
+            loop
+            style={styles.lottieAnimation}
+          />
+          <View style={styles.headphoneContainer}>
+            <HeadphoneIcon width={31} height={31} />
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleThirdPartyCall}
+          activeOpacity={0.8}
+          style={styles.textContainer}>
+          <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = ScaledSheet.create({
-  content: {
+  container: {
     flex: 1,
     backgroundColor: colors.white,
+    paddingTop: '50@mvs',
+  },
+  headerContainer: {
+    paddingHorizontal: '20@ms',
+    paddingVertical: '10@mvs',
+    alignSelf: 'flex-start',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: '150@vs',
+    paddingTop: '80@vs',
     paddingBottom: '80@vs',
   },
   titleContainer: {

@@ -32,9 +32,13 @@ const {height} = Dimensions.get('screen');
 
 export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
   navigation,
+  route,
 }) => {
+  const isLoggedOut = route.params?.logout;
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
-  const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const [isAnimationEnded, setIsAnimationEnded] = useState(
+    isLoggedOut || false,
+  );
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();

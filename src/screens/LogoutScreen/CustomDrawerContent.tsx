@@ -1,0 +1,92 @@
+import {Text, TouchableOpacity, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {LogoutIcon, ProfileIcon} from '@/assets/icons';
+import useTranslate from '@/hooks/useTranslate';
+import {useUser} from '@/hooks/useUser';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+
+interface DrawerContentProps {
+  openLogoutModal: () => void;
+}
+
+export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
+  const {userData} = useUser();
+  const {t} = useTranslate();
+  const {name, phone} = userData ?? {};
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.profileContainer}>
+        <View style={styles.profileIconContainer}>
+          <ProfileIcon />
+        </View>
+        <View>
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.phone}>{phone}</Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={styles.logoutContainer}
+        onPress={openLogoutModal}>
+        <View style={styles.logoutIconContainer}>
+          <LogoutIcon />
+        </View>
+        <Text style={styles.logoutText}>{t('Home.logout.logout')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const styles = ScaledSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: '70@mvs',
+    paddingHorizontal: '16@ms',
+  },
+  profileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.lightGray5,
+    paddingBottom: '16@ms',
+  },
+  profileIconContainer: {
+    width: '40@ms',
+    height: '40@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    fontSize: '18@ms',
+    lineHeight: '24@mvs',
+    color: colors.darkGray2,
+  },
+  phone: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    lineHeight: '16@mvs',
+    color: colors.darkCharcoal,
+  },
+  logoutContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+    marginTop: '16@ms',
+  },
+  logoutIconContainer: {
+    width: '24@ms',
+    height: '24@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    lineHeight: '24@mvs',
+    color: colors.black,
+  },
+});
