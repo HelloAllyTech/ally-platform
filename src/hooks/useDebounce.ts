@@ -12,7 +12,6 @@ interface DebounceOptions {
  * @param options.leading Whether to call the function on the leading edge (default: false)
  * @returns A debounced version of the callback
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const useDebounce = <T extends (...args: any[]) => any>(
   callback: T,
   options: DebounceOptions = {},
