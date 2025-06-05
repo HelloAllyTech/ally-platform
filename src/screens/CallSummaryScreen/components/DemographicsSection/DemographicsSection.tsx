@@ -16,7 +16,11 @@ import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme/colors';
-import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
+import {
+  EditableFieldKey,
+  FieldType,
+  SummaryFieldValueTypes,
+} from '@/types/callSummary';
 import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
@@ -71,7 +75,11 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
               isEditing && fieldItem?.isEditable ? (
                 <TextInput
                   style={[commonStyles.fieldValueText, styles.inlineTextInput]}
-                  value={(formData?.[fieldConfig.field] as string) || ''}
+                  value={
+                    fieldItem?.isEditable
+                      ? formData?.[fieldConfig.field as EditableFieldKey] || ''
+                      : (fieldConfig.value as string) || ''
+                  }
                   onChangeText={handleFieldChange(fieldConfig.field)}
                   placeholder={t('CallSummary.enterDetail')}
                   placeholderTextColor={colors.lightGray3}

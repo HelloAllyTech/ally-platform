@@ -9,6 +9,7 @@ import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {EditableFieldKey} from '@/types/callSummary';
 
 import {SectionContent} from '../CallSummaryDetails/SectionContent';
 import {SectionHeader} from '../CallSummaryDetails/SectionHeader';
@@ -67,11 +68,10 @@ const SectionWrapper = ({
     const field = summaryFields.find(
       _field => _field.sectionKey === sectionConfig.key,
     );
-    if (field?.key && formData?.[field.key]) {
-      enhanceCallSummary({
-        content: formData[field.key] as string,
-      });
-    }
+    if (!field?.key || !field?.isEditable) return;
+    const content = formData?.[field.key as EditableFieldKey];
+    if (!content) return;
+    enhanceCallSummary({content});
   };
 
   const onEditPress = () => {

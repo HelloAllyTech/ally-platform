@@ -5,6 +5,7 @@ import {
   SUMMARY_FIELDS,
 } from '@/constants/summary';
 import {Language} from '@/services/callSummaryApi';
+import {FormData} from '@/utils/callSummary/formDataTransformer';
 
 export enum FieldType {
   Text = 'Text',
@@ -31,6 +32,9 @@ export type VisibleFields = {
 };
 
 export type SummaryFieldValueTypes = string | number | Language[];
+
+// Type utility for editable field keys
+export type EditableFieldKey = keyof FormData;
 
 // Remove the Future API response type since we're using SummaryDetails
 export type {SummaryDetails} from '@/services/callSummaryApi';

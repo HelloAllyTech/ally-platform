@@ -23,11 +23,11 @@ const summarySlice = createSlice({
     clearSummary: state => {
       state.summaryData = null;
     },
-    setFormData: (state, action: PayloadAction<FormData>) => {
+    setFormData: (state, action: PayloadAction<Partial<FormData>>) => {
       state.formData = {
         ...state.formData,
         ...action.payload,
-      };
+      } as FormData;
     },
     clearFormData: state => {
       state.formData = null;
