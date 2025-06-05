@@ -7,19 +7,14 @@ import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
   userId?: number;
-  socketUrl?: string;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
 }
 
-export const useSocket = ({
-  socketUrl,
-  userId,
-  eventCallbacks,
-}: UseSocketOptions) => {
+export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const connectionAttemptsRef = useRef(0);
   const maxAttempts = 5;
-  const baseUrl = socketUrl || env.API_BASE_URL;
+  const baseUrl = env.API_BASE_URL;
 
   const connect = useCallback(
     () => {
@@ -101,6 +96,11 @@ export const useSocket = ({
 
   const emitSocketEvent = useCallback(
     (socketEvent: SocketEvent, message: Record<string, any>) => {
+      logger.info(
+        `emitSocketEvent, socketEvent: ${socketEvent}, message: ${JSON.stringify(
+          message,
+        )}`,
+      );
       if (!socketRef.current) {
         logger.error('Socket not connected');
         return;
