@@ -4,7 +4,7 @@ import {SvgProps} from 'react-native-svg';
 import {FIELD_LABELS, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useAppSelector} from '@/store/hooks';
-import {AppRootState} from '@/store/store';
+import {selectMetrics, selectSummary} from '@/store/slices/summarySlice';
 import {EditableFieldKey, SummaryField} from '@/types/callSummary';
 
 import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
@@ -28,10 +28,9 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   isEditing,
   isEnhancing,
 }) => {
-  const summaryData = useAppSelector(
-    (state: AppRootState) => state.summary.summaryData,
-  );
-  const summary = summaryData?.details?.summary;
+  const summary = useAppSelector(selectSummary);
+  const metrics = useAppSelector(selectMetrics);
+
   const sectionFields = summaryFields.filter(
     field => field.sectionKey === section.key,
   );
@@ -61,17 +60,10 @@ export const SectionContent: React.FC<SectionContentProps> = ({
     );
   };
 
-  // TO DO: Remove this component and use the renderSummaryField function instead
-  if (section.key === SectionKey.Metrics)
-    return (
-      <MetricsSection
-        metrics={{
-          listeningShare: summary?.listeningShare ?? null,
-          reflectiveQuestionsAsked: summary?.reflectiveQuestionsAsked ?? null,
-          emotionalLift: summary?.emotionalLift ?? null,
-        }}
-      />
-    );
+  if (section.key === SectionKey.Metrics) {
+    return <MetricsSection metrics={metrics} />;
+  }
+
   // TO DO: Remove this component and use the renderSummaryField function instead
   if (section.key === SectionKey.FeaturesAndDemographics) {
     return <DemographicsSection isEditing={isEditing} />;

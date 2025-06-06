@@ -15,7 +15,7 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
-import {FieldType, SummaryField} from '@/types/callSummary';
+import {FieldType, SectionItem, SummaryField} from '@/types/callSummary';
 
 export const PLACES_PER_PAGE = 50;
 
@@ -123,7 +123,7 @@ export const AGE_RANGE_OPTIONS = [
   '65+',
 ] as const;
 
-export const SECTION_LIST = [
+export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.FeaturesAndDemographics,
     label: 'Features & Demographics',

@@ -11,7 +11,12 @@ import {
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setFormData} from '@/store/slices/summarySlice';
+import {
+  selectFormData,
+  selectSummary,
+  selectSummaryData,
+  setFormData,
+} from '@/store/slices/summarySlice';
 import {mapTagsToString} from '@/utils/callSummary';
 import {
   FormData,
@@ -21,12 +26,14 @@ import {
 
 export const useCallSummaryForm = () => {
   const dispatch = useAppDispatch();
-  const summaryData = useAppSelector(state => state.summary.summaryData);
-  const formData = useAppSelector(state => state.summary.formData);
+
+  const summaryData = useAppSelector(selectSummaryData);
+  const formData = useAppSelector(selectFormData);
+  const summary = useAppSelector(selectSummary);
+
   const [updateCallSummary, {isLoading: isUpdating}] =
     useUpdateCallSummaryMutation();
   const [getTags] = useGetTagsMutation();
-  const summary = summaryData?.details?.summary;
 
   useEffect(() => {
     if (summary) {
