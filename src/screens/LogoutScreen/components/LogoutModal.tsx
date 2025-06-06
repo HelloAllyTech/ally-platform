@@ -14,14 +14,14 @@ export const LogoutModal = ({
   setIsLogoutModalVisible,
 }: LogoutModalProps) => {
   const {t} = useTranslate();
-  const {logout} = useUser();
+  const {handleUserLogout} = useUser();
   const navigation = useAppNavigation();
 
   const onPressLogoutCancel = () => {
     setIsLogoutModalVisible(false);
   };
   const onPressLogoutConfirm = () => {
-    logout();
+    handleUserLogout();
     navigation.navigate('Splash', {
       logout: true,
     });

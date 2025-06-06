@@ -8,7 +8,8 @@ import {
 
 import {env} from '@/config/env';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {clearTokens, storeTokens} from '@/store/slices/userSlice';
+import {handleLogout, storeTokens} from '@/store/slices/userSlice';
+import {store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
@@ -26,13 +27,17 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+const handleUserLogout = () => {
+  store.dispatch(handleLogout());
+};
+
 const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
   unknown,
   FetchBaseQueryError
-> = async (args, store, extraOptions) => {
+> = async (args, _store, extraOptions) => {
   try {
-    let result = await baseQuery(args, store, extraOptions);
+    let result = await baseQuery(args, _store, extraOptions);
     if (result.error && result.error.status === 401) {
       // Try to get a new token
       const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
@@ -40,9 +45,9 @@ const baseQueryWithReauth: BaseQueryFn<
         AsyncStorageKeys.REFRESH_TOKEN,
       );
 
-      // If there is no access token or refresh token, return the error
+      // If there is no access token or refresh token, logout user
       if (!accessToken || !refreshToken) {
-        store.dispatch(clearTokens());
+        handleUserLogout();
         return result;
       }
 
@@ -53,7 +58,7 @@ const baseQueryWithReauth: BaseQueryFn<
             method: 'POST',
             body: {refreshToken},
           },
-          store,
+          _store,
           extraOptions,
         );
 
@@ -73,13 +78,13 @@ const baseQueryWithReauth: BaseQueryFn<
           );
 
           // Retry the original query with new access token
-          result = await baseQuery(args, store, extraOptions);
+          result = await baseQuery(args, _store, extraOptions);
         } else {
-          store.dispatch(clearTokens());
+          handleUserLogout();
         }
       } catch (error) {
         logger.error(`Error refreshing token: ${error}`);
-        store.dispatch(clearTokens());
+        handleUserLogout();
         return result;
       }
     }
