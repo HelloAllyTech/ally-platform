@@ -93,7 +93,6 @@ const NavigationContent = ({
 
 export const RootNavigator = () => {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
-
   return (
     <NavigationContainer ref={navigationRef}>
       <NavigationContent navigationRef={navigationRef} />
