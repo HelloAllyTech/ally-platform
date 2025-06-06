@@ -1,6 +1,6 @@
 // CallSummaryDetails.tsx
 
-import React, {useState} from 'react';
+import React, {memo, useCallback, useState} from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -13,15 +13,16 @@ import useTranslate from '@/hooks/useTranslate';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {colors} from '@/theme/colors';
 import {typography} from '@/theme/typography';
+import {SectionItem} from '@/types/callSummary';
 
-import SectionWrapper from '../SectionWrapper/SectionWrapper';
+import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
 
 interface Props {
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
 }
 
-export const CallSummaryDetails: React.FC<Props> = ({
+const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
 }) => {
@@ -52,46 +53,84 @@ export const CallSummaryDetails: React.FC<Props> = ({
     ),
   );
 
-  const onSubmitButtonPress = async () => {
+  const onSubmitButtonPress = useCallback(async () => {
     const response = await handleSubmit();
     onSubmit(Boolean(response?.data));
-  };
+  }, [handleSubmit, onSubmit]);
 
-  const toggleSection = (key: SectionKey) => {
-    // Check if any section is currently being edited
-    const isAnyEditing = Object.values(isEditing).some(editing => editing);
-    const isCurrentSectionEditing = isEditing[key];
+  const toggleSection = useCallback(
+    (key: SectionKey) => {
+      // Check if any section is currently being edited
+      const isAnyEditing = Object.values(isEditing).some(editing => editing);
+      const isCurrentSectionEditing = isEditing[key];
 
-    // If another section is being edited and this is not the current section, prevent toggle
-    if (isAnyEditing && !isCurrentSectionEditing) {
-      return;
-    }
-
-    // If the current section is being edited, exit editing mode
-    if (isCurrentSectionEditing) {
-      setIsEditing(prev => ({...prev, [key]: false}));
-    }
-
-    setExpanded(prev => {
-      const isCurrentlyExpanded = prev[key];
-
-      // If the section is currently expanded, just close it
-      if (isCurrentlyExpanded) {
-        return {...prev, [key]: false};
+      // If another section is being edited and this is not the current section, prevent toggle
+      if (isAnyEditing && !isCurrentSectionEditing) {
+        return;
       }
 
-      // If the section is currently closed, close all other sections and open this one
-      const newExpanded = Object.keys(prev).reduce(
-        (acc, sectionKey) => {
-          acc[sectionKey as SectionKey] = sectionKey === key;
-          return acc;
-        },
-        {} as Record<SectionKey, boolean>,
-      );
+      // If the current section is being edited, exit editing mode
+      if (isCurrentSectionEditing) {
+        setIsEditing(prev => ({...prev, [key]: false}));
+      }
 
-      return newExpanded;
-    });
-  };
+      setExpanded(prev => {
+        const isCurrentlyExpanded = prev[key];
+
+        // If the section is currently expanded, just close it
+        if (isCurrentlyExpanded) {
+          return {...prev, [key]: false};
+        }
+
+        // If the section is currently closed, close all other sections and open this one
+        const newExpanded = Object.keys(prev).reduce(
+          (acc, sectionKey) => {
+            acc[sectionKey as SectionKey] = sectionKey === key;
+            return acc;
+          },
+          {} as Record<SectionKey, boolean>,
+        );
+
+        return newExpanded;
+      });
+    },
+    [isEditing],
+  );
+
+  const renderSection = useCallback(
+    (sectionConfig: SectionItem, index: number) => {
+      // TO DO: Commenting this out for now to view all sections
+      // const hasVisibleFields = visibleFields?.some(
+      //   field =>
+      //     summaryFields.find(summaryField => summaryField.key === field)
+      //       ?.sectionKey === section.key,
+      // );
+
+      // if (!hasVisibleFields) {
+      //   return null;
+      // }
+
+      const Icon = sectionConfig.icon;
+
+      return (
+        <View key={sectionConfig.key}>
+          <SectionWrapper
+            label={sectionConfig.label}
+            isExpanded={expanded[sectionConfig.key]}
+            onToggle={() => toggleSection(sectionConfig.key)}
+            icon={<Icon />}
+            canEdit={sectionConfig.canEdit}
+            sectionConfig={sectionConfig}
+            index={index}
+            handleSubmit={handleSubmit}
+            isEditing={isEditing[sectionConfig.key]}
+            setIsEditing={setIsEditing}
+          />
+        </View>
+      );
+    },
+    [expanded, isEditing, handleSubmit, toggleSection],
+  );
 
   if (isLoadingSummary || isLoadingFields) {
     return (
@@ -108,39 +147,7 @@ export const CallSummaryDetails: React.FC<Props> = ({
       extraScrollHeight={150}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid>
-      <View style={styles.card}>
-        {SECTION_LIST.map((sectionConfig, index) => {
-          // TO DO: Commenting this out for now to view all sections
-          // const hasVisibleFields = visibleFields?.some(
-          //   field =>
-          //     summaryFields.find(summaryField => summaryField.key === field)
-          //       ?.sectionKey === section.key,
-          // );
-
-          // if (!hasVisibleFields) {
-          //   return null;
-          // }
-
-          const Icon = sectionConfig.icon;
-
-          return (
-            <View key={sectionConfig.key}>
-              <SectionWrapper
-                label={sectionConfig.label}
-                isExpanded={expanded[sectionConfig.key]}
-                onToggle={() => toggleSection(sectionConfig.key)}
-                icon={<Icon />}
-                canEdit={sectionConfig.canEdit}
-                sectionConfig={sectionConfig}
-                index={index}
-                handleSubmit={handleSubmit}
-                isEditing={isEditing[sectionConfig.key]}
-                setIsEditing={setIsEditing}
-              />
-            </View>
-          );
-        })}
-      </View>
+      <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
       <View style={styles.buttonContainer}>
         <PrimaryButton
           label={t('submit')}
@@ -153,6 +160,8 @@ export const CallSummaryDetails: React.FC<Props> = ({
     </KeyboardAwareScrollView>
   );
 };
+
+export const CallSummaryDetails = memo(CallSummaryDetailsComponent);
 
 const styles = ScaledSheet.create({
   container: {

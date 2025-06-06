@@ -11,22 +11,29 @@ import {
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setFormData} from '@/store/slices/summarySlice';
-import {SummaryFieldValueTypes} from '@/types/callSummary';
+import {
+  selectFormData,
+  selectSummary,
+  selectSummaryData,
+  setFormData,
+} from '@/store/slices/summarySlice';
 import {mapTagsToString} from '@/utils/callSummary';
 import {
+  FormData,
   transformFormDataForSubmission,
   transformSummaryToFormData,
 } from '@/utils/callSummary/formDataTransformer';
 
 export const useCallSummaryForm = () => {
   const dispatch = useAppDispatch();
-  const summaryData = useAppSelector(state => state.summary.summaryData);
-  const formData = useAppSelector(state => state.summary.formData);
+
+  const summaryData = useAppSelector(selectSummaryData);
+  const formData = useAppSelector(selectFormData);
+  const summary = useAppSelector(selectSummary);
+
   const [updateCallSummary, {isLoading: isUpdating}] =
     useUpdateCallSummaryMutation();
   const [getTags] = useGetTagsMutation();
-  const summary = summaryData?.details?.summary;
 
   useEffect(() => {
     if (summary) {
@@ -46,19 +53,18 @@ export const useCallSummaryForm = () => {
   const handleSectionFieldsReset = (sectionKey: SectionKey) => {
     if (!summary) return;
     const sectionFields = summaryFields.filter(
-      field => field.sectionKey === sectionKey,
+      field => field.sectionKey === sectionKey && field.isEditable,
     );
-    const sectionData = sectionFields.reduce(
-      (acc, field) => {
-        if (field.key === SUMMARY_FIELDS.TAGS) {
-          acc[field.key] = mapTagsToString(summary?.tags || []) || null;
-          return acc;
-        }
-        acc[field.key] = summary[field.key] ?? null;
+    const sectionData = sectionFields.reduce((acc, field) => {
+      if (field.key === SUMMARY_FIELDS.TAGS) {
+        acc[field.key] = mapTagsToString(summary?.tags || []) || null;
         return acc;
-      },
-      {} as Record<SummaryFieldKey, SummaryFieldValueTypes | null>,
-    );
+      }
+      if (field.key in summary) {
+        (acc as any)[field.key] = summary[field.key] ?? null;
+      }
+      return acc;
+    }, {} as Partial<FormData>);
 
     dispatch(setFormData(sectionData));
   };
