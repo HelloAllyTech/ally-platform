@@ -1,4 +1,4 @@
-import React, {useCallback} from 'react';
+import React from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
@@ -13,7 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {DrawerMenuIcon, HeadphoneIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
+import {isIOS} from '@/constants/general';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
@@ -22,7 +22,8 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 import {UserRole} from '@/types/user';
-import {logger} from '@/utils/logger';
+
+import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
@@ -45,44 +46,6 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleLearnMorePress = useCallback(async () => {
-    try {
-      const supported = await Linking.canOpenURL(env.ALLY_WEB_URL);
-      if (supported) {
-        await Linking.openURL(env.ALLY_WEB_URL);
-      } else {
-        Alert.alert('Error', 'Unable to open the link');
-      }
-    } catch (error) {
-      logger.error(`Error opening learn more URL: ${error}`);
-      Alert.alert('Error', 'Unable to open the link');
-    }
-  }, []);
-
-  // Automatically manages socket connection based on screen focus and app state
-
-  if (userData?.role !== UserRole.COUNSELOR) {
-    return (
-      <View style={styles.clientContainer}>
-        <Text style={styles.oopsText}>{t('Home.client.oops')}</Text>
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>
-            {t('Home.client.appCurrentlyFor')}
-          </Text>
-          <Text style={styles.messageText}>
-            {t('Home.client.counselorsOnly')}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={handleLearnMorePress}
-          style={styles.learnMoreButton}
-          hitSlop={DEFAULT_HIT_SLOP}>
-          <Text style={styles.learnMoreText}>{t('Home.client.learnMore')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -91,33 +54,39 @@ export const HomeScreen: React.FC = () => {
         onPress={() => drawerNavigation.openDrawer()}>
         <DrawerMenuIcon />
       </TouchableOpacity>
-      <View style={styles.content}>
-        <Text style={styles.titleContainer}>
-          <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-          <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
-        </Text>
+      {userData?.role !== UserRole.COUNSELOR ? (
+        <FeatureNotAvailable />
+      ) : (
+        <View style={styles.content}>
+          <Text style={styles.titleContainer}>
+            <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+            <Text style={styles.listeningText}>
+              {t('HomeScreen.listening')}
+            </Text>
+          </Text>
 
-        <TouchableOpacity
-          style={styles.animationContainer}
-          onPress={handleThirdPartyCall}
-          activeOpacity={0.8}>
-          <LottieView
-            source={require('@/assets/animations/listen.json')}
-            autoPlay
-            loop
-            style={styles.lottieAnimation}
-          />
-          <View style={styles.headphoneContainer}>
-            <HeadphoneIcon width={31} height={31} />
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleThirdPartyCall}
-          activeOpacity={0.8}
-          style={styles.textContainer}>
-          <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.animationContainer}
+            onPress={handleThirdPartyCall}
+            activeOpacity={0.8}>
+            <LottieView
+              source={require('@/assets/animations/listen.json')}
+              autoPlay
+              loop
+              style={styles.lottieAnimation}
+            />
+            <View style={styles.headphoneContainer}>
+              <HeadphoneIcon width={31} height={31} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleThirdPartyCall}
+            activeOpacity={0.8}
+            style={styles.textContainer}>
+            <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -184,45 +153,6 @@ const styles = ScaledSheet.create({
     letterSpacing: 0.15,
     color: colors.darkCharcoal,
     fontSize: '16@ms',
-  },
-  clientContainer: {
-    flex: 1,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: '40@s',
-  },
-  oopsText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    color: colors.black,
-    fontSize: '48@ms',
-    lineHeight: '56@ms',
-    textAlign: 'center',
-    marginBottom: '30@mvs',
-    fontStyle: isIOS ? 'italic' : 'normal',
-  },
-  messageContainer: {
-    marginBottom: '30@mvs',
-    alignItems: 'center',
-  },
-  messageText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.mediumGray,
-    fontSize: '18@ms',
-    lineHeight: '24@ms',
-    textAlign: 'center',
-  },
-  learnMoreButton: {
-    paddingVertical: '8@mvs',
-    paddingHorizontal: '24@ms',
-  },
-  learnMoreText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    color: colors.brightBlue,
-    fontSize: '16@ms',
-    lineHeight: '20@ms',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
   },
   textContainer: {
     width: '100%',
