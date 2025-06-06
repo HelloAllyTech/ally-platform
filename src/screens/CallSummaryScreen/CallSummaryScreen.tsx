@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -30,7 +30,11 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {clearFormData, clearSummary} from '@/store/slices/summarySlice';
+import {
+  clearFormData,
+  clearSummary,
+  selectCallInfo,
+} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
@@ -38,7 +42,7 @@ import {logger} from '@/utils/logger';
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
-import {DeleteRenameModal} from './components/DeleteRenameModal/DeletRenameModal';
+import {DeleteRenameModal} from './components/DeleteRenameModal/DeleteRenameModal';
 import {Header} from './components/Header/Header';
 
 /**
@@ -65,11 +69,11 @@ export const CallSummaryScreen: React.FC<
   const [summaryProgressComplete, setSummaryProgressComplete] = useState(false);
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const currentChat = useAppSelector(state => state.chat.currentChat);
+  const callInfo = useAppSelector(selectCallInfo);
   const callId = route.params?.callId;
   const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
   const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
-  const summaryData = useAppSelector(state => state.summary.summaryData);
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -82,9 +86,7 @@ export const CallSummaryScreen: React.FC<
   const {t} = useTranslate();
   const scrollViewRef = useRef<ScrollView>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [summaryName, setSummaryName] = useState(
-    summaryData?.details?.callInfo?.summaryName,
-  );
+  const [summaryName, setSummaryName] = useState(callInfo.summaryName);
 
   const [editedName, setEditedName] = useState(summaryName);
   const [updateCallInfo] = useUpdateCallInfoMutation();
@@ -95,16 +97,16 @@ export const CallSummaryScreen: React.FC<
     setEditedName(summaryName);
   }, [summaryName]);
 
-  const showToast = (
-    message: string,
-    type: 'success' | 'error' | 'info' = 'error',
-  ) => {
-    setToast({
-      visible: true,
-      message,
-      type,
-    });
-  };
+  const showToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' = 'error') => {
+      setToast({
+        visible: true,
+        message,
+        type,
+      });
+    },
+    [],
+  );
 
   const {checkAndRequestPermissions} = useStoragePermissions(showToast);
 
@@ -123,47 +125,47 @@ export const CallSummaryScreen: React.FC<
   }, [dispatch]);
 
   useEffect(() => {
-    if (summaryData?.details?.callInfo?.summaryName) {
-      setSummaryName(summaryData.details.callInfo.summaryName);
+    if (callInfo.summaryName) {
+      setSummaryName(callInfo.summaryName);
     }
-  }, [summaryData?.details?.callInfo?.summaryName]);
+  }, [callInfo.summaryName]);
 
-  const hideToast = () => {
+  const hideToast = useCallback(() => {
     setToast(prev => ({...prev, visible: false}));
-  };
+  }, []);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollY.value = event.nativeEvent.contentOffset.y;
-    setIsFullyExpanded(event.nativeEvent.contentOffset.y <= 80);
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const {contentOffset, layoutMeasurement, contentSize} = event.nativeEvent;
 
-    // Only track hasCollapsedBeenShown if animation is still on
-    if (
-      showAnimation &&
-      event.nativeEvent.contentOffset.y > 80 &&
-      !hasCollapsedBeenShown
-    ) {
-      setHasCollapsedBeenShown(true);
-    }
+      scrollY.value = contentOffset.y;
+      setIsFullyExpanded(contentOffset.y <= 80);
 
-    // Check if we're near the bottom
-    const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
-    const paddingToBottom = moderateScale(30);
-    const isCloseToBottom =
-      layoutMeasurement.height + contentOffset.y >=
-      contentSize.height - paddingToBottom;
-    setShowScrollToBottom(!isCloseToBottom);
-  };
+      // Only track hasCollapsedBeenShown if animation is still on
+      if (showAnimation && contentOffset.y > 80 && !hasCollapsedBeenShown) {
+        setHasCollapsedBeenShown(true);
+      }
 
-  const handleLayout = () => {
+      // Check if we're near the bottom
+      const paddingToBottom = moderateScale(30);
+      const isCloseToBottom =
+        layoutMeasurement.height + contentOffset.y >=
+        contentSize.height - paddingToBottom;
+      setShowScrollToBottom(!isCloseToBottom);
+    },
+    [showAnimation, hasCollapsedBeenShown, scrollY],
+  );
+
+  const handleLayout = useCallback(() => {
     cardHeight.value = WINDOW_HEIGHT * 0.8;
-  };
+  }, [cardHeight]);
 
   useHardwareBackPressHandler(() => {
     handleGoBack();
     return true;
   });
 
-  const handleGoBack = () => {
+  const handleGoBack = useCallback(() => {
     if (currentChat) {
       navigation.reset({
         index: 0,
@@ -173,18 +175,21 @@ export const CallSummaryScreen: React.FC<
     } else {
       navigation.goBack();
     }
-  };
+  }, [currentChat, navigation, dispatch]);
 
-  const onUpdateSummary = (isSuccess: boolean) => {
-    if (isSuccess) {
-      showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
-      setTimeout(() => {
-        handleGoBack();
-      }, 2000);
-    } else {
-      showToast(t('CallSummary.info.summaryUpdateFailed'));
-    }
-  };
+  const onUpdateSummary = useCallback(
+    (isSuccess: boolean) => {
+      if (isSuccess) {
+        showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
+        setTimeout(() => {
+          handleGoBack();
+        }, 2000);
+      } else {
+        showToast(t('CallSummary.info.summaryUpdateFailed'));
+      }
+    },
+    [showToast, t, handleGoBack],
+  );
 
   const handleExport = async () => {
     if (!chatId) return;

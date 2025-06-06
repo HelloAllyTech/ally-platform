@@ -19,7 +19,7 @@ module.exports = {
     'no-console': ['warn', {allow: ['warn', 'error']}],
     eqeqeq: ['error', 'always'], // enforce === instead of ==
     'no-duplicate-imports': 'error',
-    'no-shadow': 'warn',
+    'no-shadow': 'off', // disabled due to false positives with enums
     'no-undef': 'off', // handled by TS
 
     // React-specific
