@@ -55,4 +55,6 @@ export const DeleteRenameModal: React.FC<DeleteRenameModalProps> = ({
       />
     );
   }
+
+  return null;
 };

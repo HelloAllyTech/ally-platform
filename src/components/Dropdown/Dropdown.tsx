@@ -88,9 +88,15 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
     return optionsList.reduce((a, b) => (a.length > b.length ? a : b), '');
   };
 
+  const dynamicStyles = {
+    mainContainer: {
+      zIndex: isOpen ? zIndex : 1,
+    },
+  };
+
   return (
     <>
-      <View style={[styles.mainContainer, {zIndex: isOpen ? zIndex : 1}]}>
+      <View style={[styles.mainContainer, dynamicStyles.mainContainer]}>
         <TouchableOpacity
           ref={headerRef}
           onPress={toggleDropdown}

@@ -1,14 +1,15 @@
-import {useEffect} from 'react';
+import React, {memo, useEffect} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
-import {SvgProps} from 'react-native-svg';
 
 import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
+import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {EditableFieldKey, SectionItem} from '@/types/callSummary';
 
 import {SectionContent} from '../CallSummaryDetails/SectionContent';
 import {SectionHeader} from '../CallSummaryDetails/SectionHeader';
@@ -19,11 +20,7 @@ interface SectionWrapperProps {
   onToggle: () => void;
   icon: React.ReactNode;
   canEdit: boolean;
-  sectionConfig: {
-    key: SectionKey;
-    label: string;
-    icon: React.FC<SvgProps>;
-  };
+  sectionConfig: SectionItem;
   index: number;
   handleSubmit: () => void;
   isEditing: boolean;
@@ -32,7 +29,7 @@ interface SectionWrapperProps {
   >;
 }
 
-const SectionWrapper = ({
+const SectionWrapperComponent = ({
   label,
   isExpanded,
   onToggle,
@@ -46,7 +43,7 @@ const SectionWrapper = ({
 }: SectionWrapperProps) => {
   const {handleSectionFieldsReset, handleFieldChange, formData} =
     useCallSummaryForm();
-  const summaryData = useAppSelector(state => state.summary.summaryData);
+  const {chatId} = useAppSelector(selectCallInfo);
   const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
     useEnhanceCallSummaryMutation();
 
@@ -63,15 +60,14 @@ const SectionWrapper = ({
   }, [enhancedResponse, sectionConfig.key]);
 
   const onWandPress = () => {
-    if (!summaryData?.details?.chatId) return;
+    if (!chatId) return;
     const field = summaryFields.find(
       _field => _field.sectionKey === sectionConfig.key,
     );
-    if (field?.key && formData?.[field.key]) {
-      enhanceCallSummary({
-        content: formData[field.key] as string,
-      });
-    }
+    if (!field?.key || !field?.isEditable) return;
+    const content = formData?.[field.key as EditableFieldKey];
+    if (!content) return;
+    enhanceCallSummary({content});
   };
 
   const onEditPress = () => {
@@ -136,7 +132,7 @@ const SectionWrapper = ({
   );
 };
 
-export default SectionWrapper;
+export const SectionWrapper = memo(SectionWrapperComponent);
 
 const styles = ScaledSheet.create({
   sectionBox: {
