@@ -32,7 +32,7 @@ const NavigationContent = ({
 }: {
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
-  const {userData} = useUser();
+  const {userData, isAuthenticated} = useUser();
   const isCounselor = userData?.role === UserRole.COUNSELOR;
 
   const {checkCounselorChat} = useCounselorChat({
@@ -73,22 +73,26 @@ const NavigationContent = ({
       screenOptions={{
         headerShown: false,
       }}>
-      <Stack.Screen name="Splash" component={SplashScreen} />
-      <Stack.Screen
-        name="Home"
-        children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
-      />
-      <Stack.Screen name="Listening" component={ListeningScreen} />
-      <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
-      <Stack.Screen name="CallLog" component={CallLogScreen} />
-      <Stack.Screen name="Breathing" component={BreathingScreen} />
+      {isAuthenticated ? (
+        <>
+          <Stack.Screen
+            name="Home"
+            children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
+          />
+          <Stack.Screen name="Listening" component={ListeningScreen} />
+          <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
+          <Stack.Screen name="CallLog" component={CallLogScreen} />
+          <Stack.Screen name="Breathing" component={BreathingScreen} />
+        </>
+      ) : (
+        <Stack.Screen name="Splash" component={SplashScreen} />
+      )}
     </Stack.Navigator>
   );
 };
 
 export const RootNavigator = () => {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
-
   return (
     <NavigationContainer ref={navigationRef}>
       <NavigationContent navigationRef={navigationRef} />
