@@ -2,7 +2,7 @@ import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
-  Splash: {logout?: boolean} | undefined;
+  Splash: undefined;
   Home: undefined;
   Listening: undefined;
   CallSummary: {callId?: number} | undefined;

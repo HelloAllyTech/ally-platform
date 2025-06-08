@@ -22,9 +22,7 @@ export const LogoutModal = ({
   };
   const onPressLogoutConfirm = () => {
     logout();
-    navigation.navigate('Splash', {
-      logout: true,
-    });
+    navigation.navigate('Splash');
     setIsLogoutModalVisible(false);
   };
 
