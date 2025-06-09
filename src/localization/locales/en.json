@@ -11,6 +11,12 @@
       "appCurrentlyFor": "This app is currently for",
       "counselorsOnly": "counsellors only.",
       "learnMore": "Learn more"
+    },
+    "logout": {
+      "logout": "Logout",
+      "logoutDescription": "Are you sure you want to logout?",
+      "cancel": "Cancel",
+      "confirm": "Confirm Logout"
     }
   },
   "HomeScreen": {
