@@ -17,10 +17,6 @@ export const styles = ScaledSheet.create({
     fontSize: '18@ms',
     marginBottom: '32@ms',
   },
-  phoneNumber: {
-    fontSize: '18@ms',
-    fontWeight: '500',
-  },
   inputContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

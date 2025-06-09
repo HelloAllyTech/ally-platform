@@ -19,7 +19,7 @@ export const styles = ScaledSheet.create({
     color: colors.darkSlate,
     marginBottom: '24@ms',
   },
-  phoneNumberText: {
+  emailText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.headline.small,
   },

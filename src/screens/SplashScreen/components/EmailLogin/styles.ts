@@ -22,17 +22,6 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  countryCode: {
-    backgroundColor: colors.lightGray,
-    paddingHorizontal: '7.5@ms',
-    paddingVertical: '10@vs',
-    borderRadius: '8@ms',
-    marginRight: '9@ms',
-  },
-  countryCodeText: {
-    ...typography.body.medium,
-    color: colors.black,
-  },
   input: {
     ...typography.body.medium,
     color: colors.black,
