@@ -22,6 +22,7 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 import {UserRole} from '@/types/user';
+import {logger} from '@/utils/logger';
 
 import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
 
@@ -38,10 +39,10 @@ export const HomeScreen: React.FC = () => {
 
   const handleThirdPartyCall = async () => {
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
+    try {
       await Linking.openURL(url);
-    } else {
+    } catch (error) {
+      logger.error(`Error opening phone call URL: ${error}`);
       Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
     }
   };
