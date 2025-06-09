@@ -23,3 +23,8 @@ export const TAG_COLORS = {
   4: {bg: '#D7F4DC80', text: '#388E3C'},
   5: {bg: '#B9EFC880', text: '#1B5E20'},
 };
+
+export const isValidEmail = (emailAddress: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(emailAddress);
+};
