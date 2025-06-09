@@ -18,6 +18,7 @@ import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
+import DrawerMenuIcon from './drawerMenu.svg';
 import EditIcon from './edit.svg';
 import EditSquareIcon from './editSquare.svg';
 import ExportIcon from './export.svg';
@@ -33,6 +34,7 @@ import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
+import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicWithGradientIcon from './micWithGradient.svg';
@@ -43,6 +45,7 @@ import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
+import ProfileIcon from './profileIcon.svg';
 import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
@@ -57,6 +60,9 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  ProfileIcon,
+  DrawerMenuIcon,
+  LogoutIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
   LeftArrowIcon,

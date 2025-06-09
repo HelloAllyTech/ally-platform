@@ -4,7 +4,7 @@ import {useSelector} from 'react-redux';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {useLazyGetUserQuery} from '@/services/authApi';
 import {
-  clearTokens,
+  handleLogout,
   setAuthenticated,
   setLoading,
   setUser,
@@ -23,6 +23,10 @@ export const useUser = () => {
   );
   const [getUser] = useLazyGetUserQuery();
 
+  const handleUserLogout = () => {
+    store.dispatch(handleLogout());
+  };
+
   const checkAuth = useCallback(async () => {
     try {
       const token = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
@@ -33,19 +37,16 @@ export const useUser = () => {
           store.dispatch(setAuthenticated(true));
           return response?.data;
         } else {
-          store.dispatch(setUser(null));
-          store.dispatch(clearTokens());
-          store.dispatch(setAuthenticated(false));
+          handleUserLogout();
           return null;
         }
       } else {
-        store.dispatch(setUser(null));
-        store.dispatch(setAuthenticated(false));
+        handleUserLogout();
         return null;
       }
     } catch (error) {
       logger.error(`Error authenticating - ${error}`);
-      store.dispatch(clearTokens());
+      handleUserLogout();
       return null;
     } finally {
       store.dispatch(setLoading(false));
@@ -57,5 +58,6 @@ export const useUser = () => {
     isAuthenticated,
     checkAuth,
     isUserLoading,
+    handleUserLogout,
   };
 };

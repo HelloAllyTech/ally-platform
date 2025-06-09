@@ -10,6 +10,12 @@ export type RootStackParamList = {
   Breathing: undefined;
 };
 
+export type DrawerParamList = {
+  BottomTabs: {
+    hideTabBar?: boolean;
+  };
+};
+
 export type TabParamList = {
   HomeTab: undefined;
   CallLog: undefined;
