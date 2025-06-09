@@ -1,18 +1,17 @@
-name: "Build Android app"
+name: 'Build Android app - Staging'
 
 on:
   push:
     branches:
-      - develop
+      - staging
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to deploy to"
+        description: 'Environment to deploy to'
         required: true
-        default: "dev"
+        default: 'staging'
         type: choice
         options:
-          - development
           - staging
           - production
 
@@ -23,7 +22,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'development' }}
+    environment: staging
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,14 +31,14 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
-          distribution: "temurin"
+          distribution: 'temurin'
           cache: gradle
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
@@ -67,7 +66,7 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "${{ secrets.ENV_VALUES }}" > .env
+          echo "${{ secrets.ENV_VALUES_STAGING }}" > .env
 
       - name: Build with Gradle
         env:
@@ -82,7 +81,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-staging-release
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
 
@@ -92,7 +91,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: Android Build Successful!
+          text: Android Staging Build Successful!
           attachments: |
             [
               {
@@ -105,8 +104,12 @@ jobs:
                     "value": "${{ github.event.head_commit.message }}"
                   },
                   {
-                    "title": "Download APK",
+                    "title": "Download Staging APK",
                     "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+                  },
+                  {
+                    "title": "Environment",
+                    "value": "Staging"
                   }
                 ]
               }
