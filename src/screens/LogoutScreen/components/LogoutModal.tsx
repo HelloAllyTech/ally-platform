@@ -1,5 +1,4 @@
 import {CustomModal} from '@/components';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {colors} from '@/theme/colors';
@@ -15,14 +14,12 @@ export const LogoutModal = ({
 }: LogoutModalProps) => {
   const {t} = useTranslate();
   const {handleUserLogout} = useUser();
-  const navigation = useAppNavigation();
 
   const onPressLogoutCancel = () => {
     setIsLogoutModalVisible(false);
   };
   const onPressLogoutConfirm = () => {
     handleUserLogout();
-    navigation.navigate('Splash');
     setIsLogoutModalVisible(false);
   };
 

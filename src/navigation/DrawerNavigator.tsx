@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {createDrawerNavigator} from '@react-navigation/drawer';
+import {StyleSheet} from 'react-native';
 
 import {LogoutModal} from '@/screens/LogoutScreen/components/LogoutModal';
 import {colors} from '@/theme/colors';
@@ -24,10 +25,7 @@ export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
         drawerContent={renderDrawerContent}
         screenOptions={{
           headerShown: false,
-          drawerStyle: {
-            backgroundColor: colors.white,
-            width: '75%',
-          },
+          drawerStyle: styles.drawerContent,
           drawerType: 'front',
         }}>
         <Drawer.Screen
@@ -44,3 +42,10 @@ export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  drawerContent: {
+    backgroundColor: colors.white,
+    width: '75%',
+  },
+});
