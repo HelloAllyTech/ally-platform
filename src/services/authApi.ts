@@ -8,28 +8,28 @@ export interface AuthResponse {
 }
 
 export interface GenerateOtpRequest {
-  phone: string;
+  email: string;
 }
 
 export interface VerifyOtpRequest {
-  phone: string;
+  email: string;
   otp: string;
 }
 
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<{success: boolean}, GenerateOtpRequest>({
-      query: ({phone}) => ({
+      query: ({email}) => ({
         url: '/auth/generate-otp',
         method: 'POST',
-        body: {phone},
+        body: {email},
       }),
     }),
     verifyOtp: builder.mutation<AuthResponse, VerifyOtpRequest>({
-      query: ({phone, otp}) => ({
+      query: ({email, otp}) => ({
         url: '/auth/verify-otp',
         method: 'POST',
-        body: {phone, otp},
+        body: {email, otp},
       }),
     }),
     getUser: builder.query<User, void>({

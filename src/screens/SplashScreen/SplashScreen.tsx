@@ -24,7 +24,7 @@ import {useUser} from '@/hooks/useUser';
 import {RootStackScreenProps} from '@/navigation/types';
 import {UserRole} from '@/types/user';
 
-import {OtpVerification, PhoneLogin} from './components';
+import {EmailLogin, OtpVerification} from './components';
 import {styles} from './styles';
 import {AuthStep} from './types';
 
@@ -55,8 +55,8 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
 
   const animationTranslateY = useSharedValue(0);
 
-  const [currentStep, setCurrentStep] = useState<AuthStep>('PHONE_NUMBER');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [currentStep, setCurrentStep] = useState<AuthStep>('EMAIL');
+  const [email, setEmail] = useState('');
 
   useEffect(() => {
     StatusBar.setHidden(true); // Hide status bar
@@ -91,8 +91,8 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     navigation,
   ]);
 
-  const handleOtpGenerationSuccess = async (phone: string) => {
-    setPhoneNumber(phone);
+  const handleOtpGenerationSuccess = async (emailAddress: string) => {
+    setEmail(emailAddress);
     setCurrentStep('OTP');
   };
 
@@ -101,19 +101,19 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
   };
 
   const handleBackPress = () => {
-    setCurrentStep('PHONE_NUMBER');
+    setCurrentStep('EMAIL');
   };
 
   const renderAuthContent = () => {
     switch (currentStep) {
-      case 'PHONE_NUMBER':
+      case 'EMAIL':
         return (
-          <PhoneLogin onOtpGenerationSuccess={handleOtpGenerationSuccess} />
+          <EmailLogin onOtpGenerationSuccess={handleOtpGenerationSuccess} />
         );
       case 'OTP':
         return (
           <OtpVerification
-            phoneNumber={phoneNumber}
+            email={email}
             onOtpVerificationSuccess={handleOtpVerificationSuccess}
           />
         );
@@ -207,7 +207,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
           />
         </Animated.View>
         <Animated.View style={[styles.titleContainer, textStyle]}>
-          {currentStep === 'PHONE_NUMBER' ? (
+          {currentStep === 'EMAIL' ? (
             <>
               <Text style={styles.title}>{t('SplashScreen.hey')}</Text>
               <Text style={styles.title}>
@@ -217,7 +217,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
             </>
           ) : (
             <Text style={styles.title}>
-              {t('SplashScreen.verifyYourPhoneNumber')}
+              {t('SplashScreen.verifyYourEmail')}
             </Text>
           )}
         </Animated.View>
