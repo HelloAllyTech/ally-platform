@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, { useCallback, useState } from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
@@ -10,25 +10,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import { ScaledSheet } from 'react-native-size-matters';
 
-import {HeadphoneIcon} from '@/assets/icons';
-import {env} from '@/config/env';
-import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import { DrawerMenuIcon, HeadphoneIcon } from '@/assets/icons';
+import { env } from '@/config/env';
+import { DEFAULT_HIT_SLOP, isIOS } from '@/constants/general';
+import { useDrawerNavigation } from '@/hooks/useDrawerNavigation';
+import { useHardwareBackPressHandler } from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
-import {UserRole} from '@/types/user';
-import {logger} from '@/utils/logger';
+import { useUser } from '@/hooks/useUser';
+import { colors } from '@/theme/colors';
+import { fontFamily } from '@/theme/fonts';
+import { typography } from '@/theme/typography';
+import { UserRole } from '@/types/user';
+import { logger } from '@/utils/logger';
+
+import { FeatureNotAvailable } from './components/FeatureNotAvailable/FeatureNotAvailable';
+import { useAppNavigation } from '@/hooks/useAppNavigation';
 
 export const HomeScreen: React.FC = () => {
-  const {t} = useTranslate();
+  const { t } = useTranslate();
+  const drawerNavigation = useDrawerNavigation();
   const navigation = useAppNavigation();
-  const {userData} = useUser();
+  const { userData } = useUser();
   const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   // Use the custom hook for back press handling
@@ -40,11 +44,11 @@ export const HomeScreen: React.FC = () => {
   const handleThirdPartyCall = async () => {
     setIsPopupVisible(false);
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
+    try {
       await Linking.openURL(url);
-    } else {
-      Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
+    } catch (error) {
+      logger.error(`Error opening phone call URL: ${error}`);
+      Alert.alert('Error', "Can't handle phone call", [{ text: t('Common.ok') }]);
     }
   };
 
@@ -64,7 +68,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleVoiceRecording = () => {
     setIsPopupVisible(false);
-    navigation.navigate('Listening', {isRecording: true});
+    navigation.navigate('Listening', { isRecording: true });
   };
 
   const handleHeadphonePress = () => {
@@ -125,44 +129,66 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.content}>
-      <StatusBar barStyle="light-content" />
-      <Text style={styles.titleContainer}>
-        <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-        <Text style={styles.listeningText}>{t('HomeScreen.listening')}</Text>
-      </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <TouchableOpacity
+        style={styles.headerContainer}
+        onPress={() => drawerNavigation.openDrawer()}>
+        <DrawerMenuIcon />
+      </TouchableOpacity>
+      {userData?.role !== UserRole.COUNSELOR ? (
+        <FeatureNotAvailable />
+      ) : (
+        <View style={styles.content}>
+          <Text style={styles.titleContainer}>
+            <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+            <Text style={styles.listeningText}>
+              {t('HomeScreen.listening')}
+            </Text>
+          </Text>
 
-      <TouchableOpacity
-        style={styles.animationContainer}
-        onPress={handleHeadphonePress}
-        activeOpacity={0.8}>
-        <LottieView
-          source={require('@/assets/animations/listen.json')}
-          autoPlay
-          loop
-          style={styles.lottieAnimation}
-        />
-        <View style={styles.headphoneContainer}>
-          <HeadphoneIcon width={31} height={31} />
+          <TouchableOpacity
+            style={styles.animationContainer}
+            onPress={handleHeadphonePress}
+            activeOpacity={0.8}>
+            <LottieView
+              source={require('@/assets/animations/listen.json')}
+              autoPlay
+              loop
+              style={styles.lottieAnimation}
+            />
+            <View style={styles.headphoneContainer}>
+              <HeadphoneIcon width={31} height={31} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleHeadphonePress}
+            activeOpacity={0.8}
+            style={styles.textContainer}>
+            <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+          </TouchableOpacity>
+          {renderPopup()}
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={handleHeadphonePress}
-        activeOpacity={0.8}
-        style={styles.textContainer}>
-        <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-      </TouchableOpacity>
-      {renderPopup()}
+      )}
     </View>
   );
 };
 
 const styles = ScaledSheet.create({
-  content: {
+  container: {
     flex: 1,
     backgroundColor: colors.white,
+    paddingTop: '50@mvs',
+  },
+  headerContainer: {
+    paddingHorizontal: '20@ms',
+    paddingVertical: '10@mvs',
+    alignSelf: 'flex-start',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: '150@vs',
+    paddingTop: '80@vs',
     paddingBottom: '80@vs',
   },
   titleContainer: {
@@ -211,45 +237,6 @@ const styles = ScaledSheet.create({
     color: colors.darkCharcoal,
     fontSize: '16@ms',
   },
-  clientContainer: {
-    flex: 1,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: '40@s',
-  },
-  oopsText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    color: colors.black,
-    fontSize: '48@ms',
-    lineHeight: '56@ms',
-    textAlign: 'center',
-    marginBottom: '30@mvs',
-    fontStyle: isIOS ? 'italic' : 'normal',
-  },
-  messageContainer: {
-    marginBottom: '30@mvs',
-    alignItems: 'center',
-  },
-  messageText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.mediumGray,
-    fontSize: '18@ms',
-    lineHeight: '24@ms',
-    textAlign: 'center',
-  },
-  learnMoreButton: {
-    paddingVertical: '8@mvs',
-    paddingHorizontal: '24@ms',
-  },
-  learnMoreText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    color: colors.brightBlue,
-    fontSize: '16@ms',
-    lineHeight: '20@ms',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
-  },
   textContainer: {
     width: '100%',
     paddingVertical: '16@ms',
@@ -275,6 +262,31 @@ const styles = ScaledSheet.create({
   },
   popupOptionText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '16@ms',
+    color: colors.darkCharcoal,
+  },
+  clientContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  oopsText: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+  },
+  messageContainer: {
+    marginBottom: '20@vs',
+  },
+  messageText: {
+    ...fontFamily.REPLAY_PRO.BOLD,
+    fontSize: '16@ms',
+    color: colors.darkCharcoal,
+  },
+  learnMoreButton: {
+    paddingHorizontal: '20@ms',
+    paddingVertical: '10@mvs',
+  },
+  learnMoreText: {
+    ...fontFamily.REPLAY_PRO.BOLD,
     fontSize: '16@ms',
     color: colors.darkCharcoal,
   },

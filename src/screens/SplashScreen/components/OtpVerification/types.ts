@@ -1,4 +1,4 @@
 export interface OtpVerificationProps {
-  phoneNumber: string;
+  email: string;
   onOtpVerificationSuccess: (otp: string) => void;
 }

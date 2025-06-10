@@ -4,8 +4,8 @@ import {SvgProps} from 'react-native-svg';
 import {FIELD_LABELS, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useAppSelector} from '@/store/hooks';
-import {AppRootState} from '@/store/store';
-import {SummaryField} from '@/types/callSummary';
+import {selectMetrics, selectSummary} from '@/store/slices/summarySlice';
+import {EditableFieldKey, SummaryField} from '@/types/callSummary';
 
 import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
 import {EditableField} from '../EditableField/EditableField';
@@ -28,22 +28,29 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   isEditing,
   isEnhancing,
 }) => {
-  const summaryData = useAppSelector(
-    (state: AppRootState) => state.summary.summaryData,
-  );
-  const summary = summaryData?.details?.summary;
+  const summary = useAppSelector(selectSummary);
+  const metrics = useAppSelector(selectMetrics);
+
   const sectionFields = summaryFields.filter(
     field => field.sectionKey === section.key,
   );
   const {handleFieldChange, formData} = useCallSummaryForm();
 
   const renderSummaryField = (field: SummaryField) => {
+    // For editable fields, use formData; for non-editable fields, use summary
+    const getValue = () => {
+      if (field.isEditable && formData?.[field.key as EditableFieldKey]) {
+        return formData[field.key as EditableFieldKey] || null;
+      }
+      return summary?.[field.key] as string | null;
+    };
+
     return (
       <EditableField
         key={field.key}
         fieldKey={field.key}
         label={FIELD_LABELS[field.key]}
-        value={formData?.[field.key] as string | null}
+        value={getValue()}
         onChangeText={handleFieldChange(field.key)}
         canEdit={canEdit}
         isEditing={isEditing}
@@ -53,21 +60,16 @@ export const SectionContent: React.FC<SectionContentProps> = ({
     );
   };
 
-  // TO DO: Remove this component and use the renderSummaryField function instead
-  if (section.key === SectionKey.Metrics)
-    return (
-      <MetricsSection
-        metrics={{
-          listeningShare: summary?.listeningShare ?? null,
-          reflectiveQuestionsAsked: summary?.reflectiveQuestionsAsked ?? null,
-          emotionalLift: summary?.emotionalLift ?? null,
-        }}
-      />
-    );
+  if (section.key === SectionKey.Metrics) {
+    return <MetricsSection metrics={metrics} />;
+  }
+
   // TO DO: Remove this component and use the renderSummaryField function instead
   if (section.key === SectionKey.FeaturesAndDemographics) {
     return <DemographicsSection isEditing={isEditing} />;
   }
 
-  return sectionFields.map(renderSummaryField);
+  return <>{sectionFields.map(renderSummaryField)}</>;
 };
+
+export default SectionContent;

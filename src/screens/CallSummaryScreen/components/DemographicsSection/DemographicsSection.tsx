@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {memo, useCallback, useMemo, useState} from 'react';
 import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -14,24 +14,19 @@ import {
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
-import {AppRootState} from '@/store/store';
+import {selectCallDetails, selectSummary} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
-import {FieldType, SummaryFieldValueTypes} from '@/types/callSummary';
+import {EditableFieldKey, FieldConfig, FieldType} from '@/types/callSummary';
 import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';
-
-interface FieldConfig {
-  field: SummaryFieldKey;
-  value: SummaryFieldValueTypes;
-}
 
 interface DemographicsSectionProps {
   isEditing: boolean;
   handleFieldChange?: (field: string) => (value: string) => void;
 }
 
-export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
+const DemographicsSectionComponent: React.FC<DemographicsSectionProps> = ({
   isEditing,
 }) => {
   const {t} = useTranslate();
@@ -41,123 +36,17 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
     null,
   );
 
-  const summaryData = useAppSelector(
-    (state: AppRootState) => state.summary.summaryData,
-  );
-  const summary = summaryData?.details?.summary;
-  const summaryDetails = summaryData?.details;
+  const callDetails = useAppSelector(selectCallDetails);
+  const summary = useAppSelector(selectSummary);
 
-  const renderField = (fieldConfig: FieldConfig) => {
-    const fieldItem = summaryFields.find(
-      field => field.key === fieldConfig.field,
-    );
+  const fields = useMemo(() => {
+    const durationInSeconds =
+      callDetails?.callDuration || summary?.[SUMMARY_FIELDS.CALL_DURATION];
 
-    switch (fieldItem?.type) {
-      case FieldType.Text:
-        return (
-          <FieldRow
-            key={fieldConfig.field}
-            label={FIELD_LABELS[fieldConfig.field]}
-            value={fieldConfig.value as string}
-          />
-        );
-
-      case FieldType.InlineTextInput:
-        return (
-          <FieldRow
-            key={fieldConfig.field}
-            label={FIELD_LABELS[fieldConfig.field]}
-            value={
-              isEditing && fieldItem?.isEditable ? (
-                <TextInput
-                  style={[commonStyles.fieldValueText, styles.inlineTextInput]}
-                  value={(formData?.[fieldConfig.field] as string) || ''}
-                  onChangeText={handleFieldChange(fieldConfig.field)}
-                  placeholder={t('CallSummary.enterDetail')}
-                  placeholderTextColor={colors.lightGray3}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                  numberOfLines={1}
-                />
-              ) : (
-                (fieldConfig.value as string)
-              )
-            }
-          />
-        );
-
-      case FieldType.Dropdown:
-        return (
-          <FieldRow
-            key={fieldConfig.field}
-            label={FIELD_LABELS[fieldConfig.field]}
-            value={
-              isEditing ? (
-                <View style={styles.dropdownContainer}>
-                  <CustomDropdown
-                    value={fieldConfig.value as string}
-                    options={Array.from(fieldItem.options || [])}
-                    onSelect={(selectedValue: string) => {
-                      handleFieldChange?.(fieldConfig.field)(selectedValue);
-                    }}
-                    isOpen={openDropdown === fieldConfig.field}
-                    setIsOpen={(value: boolean) => {
-                      setOpenDropdown(value ? fieldConfig.field : null);
-                    }}
-                  />
-                </View>
-              ) : (
-                (fieldConfig.value as string)
-              )
-            }
-          />
-        );
-
-      case FieldType.SearchableDropdown:
-        return (
-          <FieldRow
-            key={fieldConfig.field}
-            label={FIELD_LABELS[fieldConfig.field]}
-            value={
-              isEditing ? (
-                <View style={styles.dropdownContainer}>
-                  <SearchableLocationDropdown
-                    value={fieldConfig.value as string}
-                    onSelect={(selectedValue: string) => {
-                      handleFieldChange?.(fieldConfig.field)(selectedValue);
-                    }}
-                    isOpen={openDropdown === fieldConfig.field}
-                    setIsOpen={(value: boolean) => {
-                      setOpenDropdown(value ? fieldConfig.field : null);
-                    }}
-                  />
-                </View>
-              ) : (
-                (fieldConfig.value as string)
-              )
-            }
-          />
-        );
-
-      default:
-        return (
-          <FieldRow
-            key={fieldConfig.field}
-            label={FIELD_LABELS[fieldConfig.field]}
-            value={fieldConfig.value as string}
-          />
-        );
-    }
-  };
-  const durationInSeconds =
-    summaryDetails?.callDuration || summary?.[SUMMARY_FIELDS.CALL_DURATION];
-
-  const fields: FieldConfig[] = useMemo(
-    () => [
+    return [
       {
         field: SUMMARY_FIELDS.CALL_ID,
-        value:
-          summaryDetails?.chatId || summary?.[SUMMARY_FIELDS.CALL_ID] || '-',
+        value: callDetails?.chatId || summary?.[SUMMARY_FIELDS.CALL_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_DURATION,
@@ -167,21 +56,21 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.CALL_DATE,
-        value: summaryDetails?.startTime
-          ? formatDateWithOrdinal(summaryDetails.startTime)
+        value: callDetails?.startTime
+          ? formatDateWithOrdinal(callDetails.startTime)
           : '-',
       },
       {
         field: SUMMARY_FIELDS.CALL_TIME,
         value:
-          summaryDetails?.startTime && summaryDetails?.endTime
-            ? `${formatTimeHHmm(summaryDetails.startTime)}-${formatTimeHHmm(summaryDetails.endTime)}`
+          callDetails?.startTime && callDetails?.endTime
+            ? `${formatTimeHHmm(callDetails.startTime)}-${formatTimeHHmm(callDetails.endTime)}`
             : '-',
       },
       {
         field: SUMMARY_FIELDS.CALLER_ID,
         value:
-          summaryData?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
+          callDetails?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
       },
       {
         field: SUMMARY_FIELDS.COUNSELOR_NAME,
@@ -211,7 +100,10 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         field: SUMMARY_FIELDS.LANGUAGES,
         value:
           summary?.[SUMMARY_FIELDS.LANGUAGES]
-            ?.map(language => `${language.language} (${language.percentage}%)`)
+            ?.map(
+              (language: {language: string; percentage: number}) =>
+                `${language.language} (${language.percentage}%)`,
+            )
             .join(', ') || '-',
       },
       {
@@ -222,23 +114,145 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({
         field: SUMMARY_FIELDS.CONCERN_CODE,
         value: formData?.[SUMMARY_FIELDS.CONCERN_CODE] || '-',
       },
-    ],
+    ];
+  }, [callDetails, summary, formData, t]);
+
+  const handleDropdownToggle = useCallback(
+    (field: SummaryFieldKey, value: boolean) => {
+      setOpenDropdown(value ? field : null);
+    },
+    [],
+  );
+
+  const handleDropdownSelect = useCallback(
+    (field: SummaryFieldKey) => (value: string) => {
+      handleFieldChange?.(field)(value);
+    },
+    [handleFieldChange],
+  );
+
+  const renderField = useCallback(
+    (fieldConfig: FieldConfig) => {
+      const fieldItem = summaryFields.find(
+        field => field.key === fieldConfig.field,
+      );
+
+      switch (fieldItem?.type) {
+        case FieldType.Text:
+          return (
+            <FieldRow
+              key={fieldConfig.field}
+              label={FIELD_LABELS[fieldConfig.field]}
+              value={fieldConfig.value as string}
+            />
+          );
+
+        case FieldType.InlineTextInput:
+          return (
+            <FieldRow
+              key={fieldConfig.field}
+              label={FIELD_LABELS[fieldConfig.field]}
+              value={
+                isEditing && fieldItem?.isEditable ? (
+                  <TextInput
+                    style={[
+                      commonStyles.fieldValueText,
+                      styles.inlineTextInput,
+                    ]}
+                    value={
+                      fieldItem?.isEditable
+                        ? formData?.[fieldConfig.field as EditableFieldKey] ||
+                          ''
+                        : (fieldConfig.value as string) || ''
+                    }
+                    onChangeText={handleFieldChange(fieldConfig.field)}
+                    placeholder={t('CallSummary.enterDetail')}
+                    placeholderTextColor={colors.lightGray3}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                    numberOfLines={1}
+                  />
+                ) : (
+                  (fieldConfig.value as string)
+                )
+              }
+            />
+          );
+
+        case FieldType.Dropdown:
+          return (
+            <FieldRow
+              key={fieldConfig.field}
+              label={FIELD_LABELS[fieldConfig.field]}
+              value={
+                isEditing ? (
+                  <View style={styles.dropdownContainer}>
+                    <CustomDropdown
+                      value={fieldConfig.value as string}
+                      options={Array.from(fieldItem.options || [])}
+                      onSelect={handleDropdownSelect(fieldConfig.field)}
+                      isOpen={openDropdown === fieldConfig.field}
+                      setIsOpen={(value: boolean) =>
+                        handleDropdownToggle(fieldConfig.field, value)
+                      }
+                    />
+                  </View>
+                ) : (
+                  (fieldConfig.value as string)
+                )
+              }
+            />
+          );
+
+        case FieldType.SearchableDropdown:
+          return (
+            <FieldRow
+              key={fieldConfig.field}
+              label={FIELD_LABELS[fieldConfig.field]}
+              value={
+                isEditing ? (
+                  <View style={styles.dropdownContainer}>
+                    <SearchableLocationDropdown
+                      value={fieldConfig.value as string}
+                      onSelect={handleDropdownSelect(fieldConfig.field)}
+                      isOpen={openDropdown === fieldConfig.field}
+                      setIsOpen={(value: boolean) =>
+                        handleDropdownToggle(fieldConfig.field, value)
+                      }
+                    />
+                  </View>
+                ) : (
+                  (fieldConfig.value as string)
+                )
+              }
+            />
+          );
+
+        default:
+          return (
+            <FieldRow
+              key={fieldConfig.field}
+              label={FIELD_LABELS[fieldConfig.field]}
+              value={fieldConfig.value as string}
+            />
+          );
+      }
+    },
     [
-      durationInSeconds,
+      isEditing,
       formData,
-      summary,
-      summaryDetails,
-      summaryData?.clientId,
+      handleFieldChange,
       t,
+      openDropdown,
+      handleDropdownToggle,
+      handleDropdownSelect,
     ],
   );
 
-  return (
-    <View style={styles.container}>
-      {fields.map(field => renderField(field))}
-    </View>
-  );
+  return <View style={styles.container}>{fields.map(renderField)}</View>;
 };
+
+export const DemographicsSection = memo(DemographicsSectionComponent);
 
 const styles = ScaledSheet.create({
   container: {
