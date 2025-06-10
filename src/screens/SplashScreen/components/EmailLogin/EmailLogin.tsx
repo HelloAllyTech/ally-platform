@@ -12,19 +12,19 @@ import {
 } from 'react-native';
 
 import {PrimaryButton} from '@/components';
+import {isValidEmail} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme/colors';
 import {getErrorMessage} from '@/utils/error';
-import {formatPhoneNumberForInput} from '@/utils/phone';
 
 import {styles} from './styles';
-import type {PhoneLoginProps} from './types';
+import type {EmailLoginProps} from './types';
 
-export const PhoneLogin: React.FC<PhoneLoginProps> = ({
+export const EmailLogin: React.FC<EmailLoginProps> = ({
   onOtpGenerationSuccess,
 }) => {
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [generateOtp, {isLoading, isSuccess, isError, error, data}] =
     useGenerateOtpMutation();
@@ -46,10 +46,10 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   // Handle success
   useEffect(() => {
     if (isSuccess && data) {
-      onOtpGenerationSuccess(`+91${phoneNumber}`);
+      onOtpGenerationSuccess(email);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess, data, phoneNumber]);
+  }, [isSuccess, data, email]);
 
   // Handle error
   useEffect(() => {
@@ -58,21 +58,15 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
     }
   }, [isError, error, handleOtpError]);
 
-  const handlePhoneChange = useCallback((text: string) => {
-    // Remove any non-numeric characters
-    const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length <= 10) {
-      setPhoneNumber(cleaned);
-    }
+  const handleEmailChange = useCallback((text: string) => {
+    setEmail(text.trim().toLowerCase());
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (phoneNumber.length === 10) {
-      await generateOtp({phone: `+91${phoneNumber}`});
+    if (isValidEmail(email)) {
+      await generateOtp({email});
     }
-  }, [phoneNumber, generateOtp]);
-
-  const formattedPhoneNumberForInput = formatPhoneNumberForInput(phoneNumber);
+  }, [email, generateOtp]);
 
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
@@ -84,25 +78,23 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
       <View style={styles.container}>
         <View style={styles.contentContainer}>
           <Text style={styles.headerText}>
-            {t('SplashScreen.enterYourPhoneNumber')}
+            {t('SplashScreen.enterYourEmail')}
           </Text>
           <View style={styles.inputContainer}>
-            <View style={styles.countryCode}>
-              <Text style={styles.countryCodeText}>+91</Text>
-            </View>
             <TextInput
               style={[
                 styles.input,
                 isFocused && styles.inputFocused,
                 !isLoading && styles.inputEnabled,
               ]}
-              value={formattedPhoneNumberForInput}
-              onChangeText={handlePhoneChange}
-              keyboardType="numeric"
-              maxLength={11} // 10 digits + 1 space
+              value={email}
+              onChangeText={handleEmailChange}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Enter phone number"
+              placeholder={t('SplashScreen.emailPlaceholder')}
               editable={!isLoading}
               placeholderTextColor={colors.mediumGray}
             />
@@ -131,7 +123,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
           <PrimaryButton
             label={t('SplashScreen.next')}
             onPress={handleSubmit}
-            isDisabled={phoneNumber.length !== 10}
+            isDisabled={!isValidEmail(email)}
             isLoading={isLoading}
           />
         </View>

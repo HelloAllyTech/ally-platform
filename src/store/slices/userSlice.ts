@@ -31,12 +31,13 @@ export const storeTokens = createAsyncThunk(
   },
 );
 
-export const clearTokens = createAsyncThunk(
-  'user/clearTokens',
+export const handleLogout = createAsyncThunk(
+  'user/handleLogout',
   async (_, {dispatch}) => {
     await removeItem(AsyncStorageKeys.ACCESS_TOKEN);
     await removeItem(AsyncStorageKeys.REFRESH_TOKEN);
     dispatch(setAuthenticated(false));
+    dispatch(clearUser());
   },
 );
 
@@ -53,9 +54,13 @@ const userSlice = createSlice({
     setUser: (state, action: PayloadAction<Maybe<User>>) => {
       state.user = action.payload;
     },
+    clearUser: state => {
+      state.user = null;
+    },
   },
 });
 
-export const {setAuthenticated, setLoading, setUser} = userSlice.actions;
+export const {setUser, setAuthenticated, clearUser, setLoading} =
+  userSlice.actions;
 
 export default userSlice.reducer;

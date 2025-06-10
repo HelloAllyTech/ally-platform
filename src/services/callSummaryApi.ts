@@ -149,7 +149,7 @@ export const callSummaryApi = api.injectEndpoints({
     }),
     updateCallSummary: builder.mutation<
       CallSummaryResponse,
-      {chatId: number; data: any}
+      {chatId: number; data: any} // eslint-disable-line @typescript-eslint/no-explicit-any
     >({
       query: ({chatId, data}) => ({
         url: `/chats/${chatId}/call-details`,

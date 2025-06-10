@@ -1,1 +1,1 @@
-export type AuthStep = 'PHONE_NUMBER' | 'OTP';
+export type AuthStep = 'EMAIL' | 'OTP';

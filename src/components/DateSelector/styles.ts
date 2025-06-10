@@ -1,0 +1,244 @@
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+
+export const styles = ScaledSheet.create({
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '2@s',
+    width: '100%',
+    marginBottom: '18@s',
+  },
+  arrowContainer: {
+    width: '30@s',
+    height: '30@s',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthGridHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: '8@mvs',
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12@s',
+    borderWidth: 1,
+    borderColor: colors.lightGray7,
+    minWidth: '100@s',
+    borderRadius: '8@s',
+    paddingHorizontal: '24@s',
+    paddingVertical: '8@s',
+    backgroundColor: colors.white,
+  },
+  yearTitle: {
+    marginLeft: '12@ms',
+  },
+  yearWrapper: {
+    borderWidth: 1,
+    borderColor: colors.lightGray7,
+    paddingHorizontal: '16@ms',
+    paddingVertical: '6@ms',
+    borderRadius: '4@ms',
+  },
+  todayText: {
+    fontSize: '13@ms',
+    color: colors.lightGray4,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+  },
+  monthText: {
+    fontSize: '14@ms',
+    color: colors.darkSlate,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: colors.white,
+    borderRadius: '10@ms',
+    alignItems: 'center',
+    marginBottom: '50@ms',
+  },
+  modalHeader: {
+    padding: '20@ms',
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: '15@s',
+    fontFamily: fontFamily.ROBOTO.REGULAR.fontFamily,
+    fontWeight: '900',
+    color: colors.darkSlate,
+    marginBottom: '12@s',
+    textAlign: 'left',
+  },
+  disabledYear: {
+    color: colors.lightGray10,
+  },
+  monthTitle: {
+    marginBottom: 0,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    width: '100%',
+    padding: '16@ms',
+    paddingVertical: '12@ms',
+    paddingRight: '20@ms',
+    gap: '8@s',
+    borderTopColor: colors.lightGray,
+    borderTopWidth: 1,
+  },
+  modalCancel: {
+    fontSize: '14@s',
+    color: colors.black,
+    fontWeight: '500',
+  },
+  modalOk: {
+    fontSize: '14@s',
+    color: colors.blue,
+    fontWeight: '500',
+  },
+  monthGridContainer: {
+    width: '100%',
+    alignItems: 'center',
+    padding: '20@ms',
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    marginBottom: '12@s',
+    gap: '8@s',
+    width: '100%',
+  },
+  monthCell: {
+    width: '80@ms',
+    height: '32@mvs',
+    borderRadius: '16@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+  },
+  monthCellSelected: {
+    backgroundColor: colors.azureBlue,
+  },
+  monthCellText: {
+    fontSize: '14@ms',
+    lineHeight: '18@mvs',
+    color: colors.darkSlate,
+    ...fontFamily.ROBOTO.REGULAR,
+    fontWeight: 'bold',
+  },
+  monthCellTextSelected: {
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  yearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '8@s',
+    gap: '16@s',
+  },
+  yearText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    lineHeight: '18@mvs',
+    color: colors.darkSlate,
+  },
+  yearGridContainer: {
+    width: '100%',
+    padding: '20@ms',
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: '5@s',
+    width: '100%',
+  },
+  yearCell: {
+    width: '70@s',
+    height: '30@s',
+    borderRadius: '18@s',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: '4@s',
+    backgroundColor: colors.white,
+  },
+  yearCellSelected: {
+    backgroundColor: colors.azureBlue,
+  },
+  yearCellText: {
+    fontSize: '14@ms',
+    lineHeight: '16@mvs',
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.darkSlate,
+    fontWeight: 'bold',
+  },
+  yearCellTextSelected: {
+    color: colors.white,
+  },
+  calendarContainer: {
+    marginBottom: '12@s',
+  },
+  modalButton: {
+    padding: '10@ms',
+  },
+  disabledArrow: {
+    opacity: 0.5,
+  },
+  dayHeader: {
+    paddingVertical: '12@ms',
+    paddingHorizontal: '16@ms',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '8@mvs',
+  },
+  dayHeaderText: {
+    fontSize: '16@ms',
+    color: colors.darkSlate,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+  },
+  dayHeaderArrowContainer: {
+    flexDirection: 'row',
+  },
+  iconContainer: {
+    width: '20@ms',
+    height: '20@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayTitle: {
+    ...fontFamily.ROBOTO.REGULAR,
+    fontWeight: 'bold',
+    fontSize: '14@ms',
+    lineHeight: '18@mvs',
+    color: colors.darkSlate,
+  },
+  allGridContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: '12@mvs',
+    marginBottom: '24@mvs',
+  },
+  allGridText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    lineHeight: '32@mvs',
+    color: colors.black,
+  },
+});

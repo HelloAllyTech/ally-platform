@@ -7,7 +7,6 @@ import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services/authApi';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
 import {getErrorMessage} from '@/utils/error';
-import {formatPhoneNumberForDisplay} from '@/utils/phone';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
 import {styles} from './styles';
@@ -16,7 +15,7 @@ import type {OtpVerificationProps} from './types';
 const DEFAULT_OTP = ['', '', '', ''];
 
 export const OtpVerification: React.FC<OtpVerificationProps> = ({
-  phoneNumber,
+  email,
   onOtpVerificationSuccess,
 }) => {
   const [otpValue, setOtpValue] = useState(DEFAULT_OTP);
@@ -71,8 +70,8 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   }, []);
 
   const handleSubmit = useCallback(() => {
-    verifyOtp({phone: phoneNumber, otp: otp});
-  }, [phoneNumber, otp, verifyOtp]);
+    verifyOtp({email, otp});
+  }, [email, otp, verifyOtp]);
 
   const resetOtpState = useCallback(() => {
     setOtpValue(DEFAULT_OTP);
@@ -83,13 +82,13 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   const handleResendOtp = useCallback(async () => {
     try {
-      await generateOtp({phone: phoneNumber});
+      await generateOtp({email});
       resetOtpState();
       otpInputRef.current?.focusFirst();
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     }
-  }, [phoneNumber, generateOtp, resetOtpState]);
+  }, [email, generateOtp, resetOtpState]);
 
   return (
     <View style={styles.container}>
@@ -97,9 +96,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         <Text style={styles.headerText}>
           {t('SplashScreen.enterTheCodeSentTo')}
           {'\n'}
-          <Text style={styles.phoneNumberText}>
-            {formatPhoneNumberForDisplay(phoneNumber)}
-          </Text>
+          <Text style={styles.emailText}>{email}</Text>
         </Text>
 
         <View style={styles.otpContainer}>

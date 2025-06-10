@@ -11,6 +11,12 @@
       "appCurrentlyFor": "This app is currently for",
       "counselorsOnly": "counsellors only.",
       "learnMore": "Learn more"
+    },
+    "logout": {
+      "logout": "Logout",
+      "logoutDescription": "Are you sure you want to logout?",
+      "cancel": "Cancel",
+      "confirm": "Confirm Logout"
     }
   },
   "HomeScreen": {
@@ -28,8 +34,9 @@
     "hey": "Hey,",
     "welcome": "Welcome to",
     "ally": "Ally",
-    "verifyYourPhoneNumber": "Verify your phone Number",
-    "enterYourPhoneNumber": "Enter your phone number to continue",
+    "verifyYourEmail": "Verify your email",
+    "enterYourEmail": "Enter your email to continue",
+    "emailPlaceholder": "Enter your email address",
     "byTappingNext": "By tapping next, you agree to Ally's ",
     "termsAndConditions": "Terms and Conditions",
     "and": "and",
@@ -136,12 +143,14 @@
     "dateSelector": {
       "selectDate": "Select Date",
       "selectMonth": "Select Month",
-      "selectYear": "Select Year"
+      "selectYear": "Select Year",
+      "today": "Today"
     },
     "listeningTalking": {
       "title": "Listening : Talking Distribution",
       "listening": "Listening",
-      "talking": "Talking"
+      "talking": "Talking",
+      "noData": "No data available for this date"
     },
     "questions": {
       "title": "Questions used",
