@@ -1,25 +1,108 @@
-import React, {useMemo, useState} from 'react';
-import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DateSelector} from '@/components/DateSelector/DateSelector';
-import {
-  ANALYTICS_DUMMY_DATA,
-  ANALYTICS_TABS,
-  CALENDAR_MODES,
-} from '@/constants/analytics';
+import {LoadingSkeleton} from '@/components/LoadingSkeleton/LoadingSkeleton';
+import {CALENDAR_MODES} from '@/constants/analytics';
+import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
+import {useLazyGetCounselorStatsQuery} from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
+import {ListeningTalkingDistribution, TabBar} from './components';
+
+interface DateRange {
+  startDate: string;
+  endDate: string;
+}
+
+const useAnalyticsDateRange = (selectedTab: string) => {
+  const today = new Date();
+  const formattedDate = today.toISOString().split('T')[0];
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: formattedDate,
+    endDate: formattedDate,
+  });
+
+  useEffect(() => {
+    const updateDateRange = () => {
+      const endDate = new Date(dateRange.startDate);
+      const startDate = new Date(dateRange.startDate);
+
+      switch (selectedTab) {
+        case 'W':
+          const tempEnd = new Date(dateRange.startDate);
+          tempEnd.setDate(tempEnd.getDate() + 6); // 7-day week range
+
+          // Cap to today if it exceeds today
+          endDate.setTime(Math.min(tempEnd.getTime(), today.getTime()));
+          break;
+        case 'M':
+          // Set start date to first day of the month
+          startDate.setDate(1);
+
+          // Set end date to last day of the month
+          endDate.setMonth(endDate.getMonth() + 1);
+          endDate.setDate(0); // This gives us the last day of the current month
+
+          // Cap to today if it exceeds today
+          endDate.setTime(Math.min(endDate.getTime(), today.getTime()));
+          break;
+        case 'Y':
+          // Set start date to January 1st of the year
+          startDate.setMonth(0);
+          startDate.setDate(1);
+
+          // Set end date to December 31st of the year
+          endDate.setMonth(11);
+          endDate.setDate(31);
+
+          // Cap to today if it exceeds today
+          endDate.setTime(Math.min(endDate.getTime(), today.getTime()));
+          break;
+        case 'A': {
+          endDate.setTime(today.getTime());
+          break;
+        }
+        default:
+          endDate.setDate(endDate.getDate() + 1);
+      }
+
+      setDateRange(prevRange => ({
+        ...prevRange,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+      }));
+    };
+
+    updateDateRange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTab]);
+
+  return {dateRange, setDateRange};
+};
+
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
-  const [selectedTab, setSelectedTab] = useState('M');
-  const [selectedDate, setSelectedDate] = useState('2025-01-05');
+  const [selectedTab, setSelectedTab] = useState('D');
+  const {dateRange, setDateRange} = useAnalyticsDateRange(selectedTab);
 
-  const {listeningPercent, talkingPercent, questionsUsed, questionsTotal} =
-    ANALYTICS_DUMMY_DATA;
+  const [getCounselorStats, {data: stats, isLoading}] =
+    useLazyGetCounselorStatsQuery();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      await getCounselorStats(dateRange);
+    };
+
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange]);
+
+  const {counselorSharingPercentage} = stats || {};
 
   const pickerMode = useMemo(() => {
     switch (selectedTab) {
@@ -31,69 +114,17 @@ export const UserAnalyticsScreen: React.FC = () => {
         return CALENDAR_MODES.M;
       case 'Y':
         return CALENDAR_MODES.Y;
+      case 'A':
+        return CALENDAR_MODES.A;
       default:
         return CALENDAR_MODES.D;
     }
   }, [selectedTab]);
 
-  const renderTabBar = () => (
-    <View style={styles.tabBar}>
-      {ANALYTICS_TABS.map(tab => (
-        <TouchableOpacity
-          key={tab}
-          style={[
-            styles.tabButton,
-            selectedTab === tab && styles.tabButtonActive,
-          ]}
-          onPress={() => setSelectedTab(tab)}>
-          <Text style={styles.tabText}>{tab}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderListeningTalkingDistribution = () => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>
-        {t('analytics.listeningTalking.title')}
-      </Text>
-      <View style={styles.barContainer}>
-        <View style={[styles.barListening, {flex: listeningPercent}]}>
-          <Text style={styles.barText}>{listeningPercent}%</Text>
-        </View>
-        <View style={[styles.barTalking, {flex: talkingPercent}]}>
-          <Text style={styles.barTextDark}>{talkingPercent}%</Text>
-        </View>
-      </View>
-      <View style={styles.legendRow}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, styles.legendColorListening]} />
-          <Text style={styles.legendLabel}>
-            {t('analytics.listeningTalking.listening')}
-          </Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, styles.legendColorTalking]} />
-          <Text style={styles.legendLabel}>
-            {t('analytics.listeningTalking.talking')}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderQuestionsUsed = () => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{t('analytics.questions.title')}</Text>
-      <Text style={styles.questionsUsed}>
-        <Text style={styles.questionsUsedNum}>{questionsUsed}</Text>
-        <Text style={styles.questionsUsedTotal}>/{questionsTotal}</Text>
-      </Text>
-      <Text style={styles.questionsDesc}>
-        {t('analytics.questions.description')}
-      </Text>
-    </View>
-  );
+  const ListeningTalkingStats = {
+    listeningPercent: 100 - (counselorSharingPercentage || 0),
+    talkingPercent: counselorSharingPercentage,
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -108,14 +139,20 @@ export const UserAnalyticsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {renderTabBar()}
+        <TabBar selectedTab={selectedTab} onTabChange={setSelectedTab} />
         <DateSelector
           pickerMode={pickerMode}
-          initialDate={selectedDate}
-          onChangeDate={setSelectedDate}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
         />
-        {renderListeningTalkingDistribution()}
-        {renderQuestionsUsed()}
+        {isLoading ? (
+          <LoadingSkeleton />
+        ) : (
+          <>
+            <ListeningTalkingDistribution stats={ListeningTalkingStats} />
+            {/* <QuestionsUsed /> */}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -135,7 +172,7 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: '4@ms',
+    marginTop: '16@ms',
     paddingHorizontal: '20@ms',
     paddingBottom: '16@ms',
     borderBottomWidth: 0.5,
@@ -149,133 +186,7 @@ const styles = ScaledSheet.create({
     fontWeight: '400',
   },
   headerSubtitle: {
-    fontWeight: '700',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: '12@s',
-    padding: '8@s',
-    paddingHorizontal: '10@s',
-    width: '100%',
-    borderRadius: '4@s',
-    gap: '8@s',
-    backgroundColor: colors.lightGray9,
-  },
-  tabButton: {
-    paddingVertical: '4@s',
-    paddingHorizontal: '18@s',
-    borderRadius: '5@s',
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
-    elevation: 2,
-  },
-  tabButtonActive: {
-    backgroundColor: colors.white,
-    elevation: 2,
-    shadowColor: colors.black,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  tabText: {
-    fontSize: '12@s',
-    color: colors.darkSlate,
-    fontFamily: fontFamily.ROBOTO.REGULAR.fontFamily,
-  },
-  card: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: '12@s',
-    padding: '18@s',
-    marginBottom: '18@s',
-    borderWidth: 0.5,
-    borderColor: colors.lightGray7,
-  },
-  cardTitle: {
-    fontSize: '16@s',
-    color: colors.darkSlate,
-    fontFamily: fontFamily.REPLAY_PRO.BOLD.fontFamily,
-    marginBottom: '20@s',
-  },
-  barContainer: {
-    flexDirection: 'row',
-    height: '36@s',
-    borderRadius: '4@s',
-    overflow: 'hidden',
-    marginBottom: '16@s',
-    marginTop: '4@s',
-    backgroundColor: colors.lightGray,
-  },
-  barListening: {
-    backgroundColor: colors.lightBlue3,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingLeft: '12@s',
-  },
-  barTalking: {
-    backgroundColor: colors.lightBlue4,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingRight: '12@s',
-  },
-  barText: {
-    color: colors.darkSlate,
-    fontSize: '16@s',
-    fontFamily: fontFamily.ROBOTO.REGULAR.fontFamily,
-  },
-  barTextDark: {
-    color: colors.white,
-    fontSize: '16@s',
-    fontFamily: fontFamily.ROBOTO.REGULAR.fontFamily,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    gap: '18@s',
-    marginTop: '2@s',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '6@s',
-  },
-  legendColor: {
-    width: '18@s',
-    height: '18@s',
-    borderRadius: '4@s',
-    marginRight: '2@s',
-  },
-  legendLabel: {
-    fontSize: '12@s',
-    color: colors.darkSlate,
-    fontFamily: fontFamily.REPLAY_PRO.BOLD.fontFamily,
-  },
-  questionsUsed: {
-    fontSize: '32@s',
-    color: colors.darkSlate,
-    marginBottom: '4@s',
-    fontFamily: fontFamily.REPLAY_PRO.BOLD.fontFamily,
-  },
-  questionsUsedNum: {
-    fontSize: '36@s',
-    fontFamily: fontFamily.IBM_PLEX_SERIF.REGULAR.fontFamily,
-  },
-  questionsUsedTotal: {
-    fontSize: '36@s',
-    fontFamily: fontFamily.IBM_PLEX_SERIF.REGULAR.fontFamily,
-  },
-  questionsDesc: {
-    fontSize: '14@s',
-    color: colors.gray,
-    marginTop: '6@s',
-    lineHeight: '20@s',
-    fontFamily: fontFamily.IBM_PLEX_SERIF.REGULAR.fontFamily,
-  },
-  legendColorListening: {
-    backgroundColor: colors.lightBlue3,
-  },
-  legendColorTalking: {
-    backgroundColor: colors.lightBlue4,
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
 });

@@ -1,4 +1,4 @@
-export const ANALYTICS_TABS = ['D', 'W', 'M', 'Y', 'All'] as const;
+export const ANALYTICS_TABS = ['D', 'W', 'M', 'Y', 'A'] as const;
 export const MONTHS = [
   'Jan',
   'Feb',
@@ -14,7 +14,7 @@ export const MONTHS = [
   'Dec',
 ] as const;
 
-export const YEARS = Array.from({length: 13}, (_, i) => 2022 + i);
+export const YEARS = Array.from({length: 12}, (_, i) => 2022 + i);
 
 export const ANALYTICS_DUMMY_DATA = {
   listeningPercent: 76,
@@ -28,4 +28,5 @@ export const CALENDAR_MODES = {
   W: 'week',
   M: 'month',
   Y: 'year',
+  A: 'all',
 };
