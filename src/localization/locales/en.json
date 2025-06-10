@@ -143,12 +143,14 @@
     "dateSelector": {
       "selectDate": "Select Date",
       "selectMonth": "Select Month",
-      "selectYear": "Select Year"
+      "selectYear": "Select Year",
+      "today": "Today"
     },
     "listeningTalking": {
       "title": "Listening : Talking Distribution",
       "listening": "Listening",
-      "talking": "Talking"
+      "talking": "Talking",
+      "noData": "No data available for this date"
     },
     "questions": {
       "title": "Questions used",
