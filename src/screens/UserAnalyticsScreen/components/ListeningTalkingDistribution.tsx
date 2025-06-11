@@ -99,12 +99,14 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray,
   },
   barListening: {
+    height: '36@s',
     backgroundColor: colors.lightBlue3,
     justifyContent: 'center',
     alignItems: 'flex-start',
     paddingLeft: '12@s',
   },
   barTalking: {
+    height: '36@s',
     backgroundColor: colors.lightBlue4,
     justifyContent: 'center',
     alignItems: 'flex-end',

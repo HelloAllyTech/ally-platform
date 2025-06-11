@@ -35,6 +35,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires access to the microphone to enable audio features.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReplayPro-BoldItalic.otf</string>
