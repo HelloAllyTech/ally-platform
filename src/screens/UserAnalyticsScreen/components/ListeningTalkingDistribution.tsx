@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import useTranslate from '@/hooks/useTranslate';
@@ -13,9 +13,13 @@ interface ListeningTalkingStats {
 
 interface Props {
   stats: ListeningTalkingStats;
+  isLoading?: boolean;
 }
 
-export const ListeningTalkingDistribution: React.FC<Props> = ({stats}) => {
+export const ListeningTalkingDistribution: React.FC<Props> = ({
+  stats,
+  isLoading,
+}) => {
   const {t} = useTranslate();
   const {listeningPercent = 0, talkingPercent = 0} = stats;
 
@@ -25,22 +29,28 @@ export const ListeningTalkingDistribution: React.FC<Props> = ({stats}) => {
         {t('analytics.listeningTalking.title')}
       </Text>
       <View style={styles.barContainer}>
-        {listeningPercent > 0 && (
-          <View style={[styles.barListening, {flex: listeningPercent}]}>
-            <Text style={styles.barText}>{listeningPercent}%</Text>
-          </View>
-        )}
-        {talkingPercent > 0 && (
-          <View style={[styles.barTalking, {flex: talkingPercent}]}>
-            <Text style={styles.barTextDark}>{talkingPercent}%</Text>
-          </View>
-        )}
-        {listeningPercent === 0 && talkingPercent === 0 && (
-          <View style={styles.barNoData}>
-            <Text style={styles.barNoDataText}>
-              {t('analytics.listeningTalking.noData')}
-            </Text>
-          </View>
+        {isLoading ? (
+          <ActivityIndicator size="small" color={colors.lightBlue3} />
+        ) : (
+          <>
+            {listeningPercent > 0 && (
+              <View style={[styles.barListening, {flex: listeningPercent}]}>
+                <Text style={styles.barText}>{listeningPercent}%</Text>
+              </View>
+            )}
+            {talkingPercent > 0 && (
+              <View style={[styles.barTalking, {flex: talkingPercent}]}>
+                <Text style={styles.barTextDark}>{talkingPercent}%</Text>
+              </View>
+            )}
+            {listeningPercent === 0 && talkingPercent === 0 && (
+              <View style={styles.barNoData}>
+                <Text style={styles.barNoDataText}>
+                  {t('analytics.listeningTalking.noData')}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </View>
       <View style={styles.legendRow}>
@@ -84,6 +94,8 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
     marginBottom: '16@s',
     marginTop: '4@s',
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.lightGray,
   },
   barListening: {

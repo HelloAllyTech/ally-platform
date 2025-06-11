@@ -8,7 +8,7 @@ import {LoadingSkeleton} from '@/components/LoadingSkeleton/LoadingSkeleton';
 import {CALENDAR_MODES} from '@/constants/analytics';
 import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
-import {useLazyGetCounselorStatsQuery} from '@/services/analyticsApi';
+import {useGetCounselorStatsQuery} from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -90,17 +90,12 @@ export const UserAnalyticsScreen: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState('D');
   const {dateRange, setDateRange} = useAnalyticsDateRange(selectedTab);
 
-  const [getCounselorStats, {data: stats, isLoading}] =
-    useLazyGetCounselorStatsQuery();
-
-  useEffect(() => {
-    const fetchData = async () => {
-      await getCounselorStats(dateRange);
-    };
-
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange]);
+  const {
+    data: stats,
+    isLoading,
+    isFetching,
+    error,
+  } = useGetCounselorStatsQuery(dateRange);
 
   const {counselorSharingPercentage} = stats || {};
 
@@ -121,10 +116,12 @@ export const UserAnalyticsScreen: React.FC = () => {
     }
   }, [selectedTab]);
 
-  const ListeningTalkingStats = {
-    listeningPercent: 100 - (counselorSharingPercentage || 0),
-    talkingPercent: counselorSharingPercentage,
-  };
+  const ListeningTalkingStats = error
+    ? {listeningPercent: 0, talkingPercent: 0}
+    : {
+        listeningPercent: Math.max(0, 100 - (counselorSharingPercentage || 0)),
+        talkingPercent: counselorSharingPercentage || 0,
+      };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -149,7 +146,10 @@ export const UserAnalyticsScreen: React.FC = () => {
           <LoadingSkeleton />
         ) : (
           <>
-            <ListeningTalkingDistribution stats={ListeningTalkingStats} />
+            <ListeningTalkingDistribution
+              isLoading={isFetching}
+              stats={ListeningTalkingStats}
+            />
             {/* <QuestionsUsed /> */}
           </>
         )}

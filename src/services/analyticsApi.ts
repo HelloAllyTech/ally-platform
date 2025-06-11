@@ -24,4 +24,4 @@ export const analyticsApi = api.injectEndpoints({
   }),
 });
 
-export const {useLazyGetCounselorStatsQuery} = analyticsApi;
+export const {useGetCounselorStatsQuery} = analyticsApi;
