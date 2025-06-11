@@ -161,5 +161,8 @@
       "ok": "OK"
     }
   },
+  "NetworkLogs": {
+    "logs": "Logs"
+  },
   "submit": "Submit"
 }
