@@ -2,7 +2,6 @@ import {memo, useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   Animated,
-  Modal,
   PanResponder,
   SafeAreaView,
   Text,
@@ -12,6 +11,7 @@ import NetworkLogger, {startNetworkLogging} from 'react-native-network-logger';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseCircle} from '@/assets/icons';
+import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants/general';
 import {colors} from '@/theme/colors';
 
 const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
@@ -42,7 +42,7 @@ const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
     colors: {
       background: colors.white,
       link: colors.blue,
-      card: colors.lightGray,
+      card: colors.white,
       text: colors.black,
     },
   };
@@ -64,21 +64,19 @@ const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
 
   return (
     <>
-      <Modal
-        style={styles.modal}
-        visible={isNetworkModalVisible}
-        animationType="slide"
-        onRequestClose={() => setIsNetworkVIsible(false)}
-        transparent={false}>
-        <SafeAreaView style={[styles.contentContainer, themeStyle.background]}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setIsNetworkVIsible(false)}>
-            <CloseCircle width={24} height={24} />
-          </TouchableOpacity>
-          <NetworkLogger theme={theme} maxRows={100} compact />
+      {isNetworkModalVisible && (
+        <SafeAreaView style={styles.customModalOverlay}>
+          <SafeAreaView
+            style={[styles.contentContainer, themeStyle.background]}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsNetworkVIsible(false)}>
+              <CloseCircle width={24} height={24} />
+            </TouchableOpacity>
+            <NetworkLogger theme={theme} maxRows={100} compact />
+          </SafeAreaView>
         </SafeAreaView>
-      </Modal>
+      )}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -100,9 +98,6 @@ const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
 };
 
 const styles = ScaledSheet.create({
-  modal: {
-    margin: 0,
-  },
   container: {
     width: '50@s',
     height: '50@s',
@@ -113,6 +108,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    backgroundColor: colors.white,
   },
   content: {
     fontSize: '10@s',
@@ -123,6 +119,7 @@ const styles = ScaledSheet.create({
   contentContainer: {
     flex: 1,
     padding: '12@s',
+    width: SCREEN_WIDTH,
   },
   closeButton: {
     width: '100%',
@@ -134,6 +131,15 @@ const styles = ScaledSheet.create({
   close: {
     fontSize: '17@s',
     fontWeight: '600',
+  },
+  customModalOverlay: {
+    width: SCREEN_WIDTH,
+    height: WINDOW_HEIGHT,
+    position: 'absolute',
+    zIndex: 9999,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
