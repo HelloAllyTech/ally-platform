@@ -119,7 +119,6 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
             isExpanded={expanded[sectionConfig.key]}
             onToggle={() => toggleSection(sectionConfig.key)}
             icon={<Icon />}
-            canEdit={sectionConfig.canEdit}
             sectionConfig={sectionConfig}
             index={index}
             handleSubmit={handleSubmit}

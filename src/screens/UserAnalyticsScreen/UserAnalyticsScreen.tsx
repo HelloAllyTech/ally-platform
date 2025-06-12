@@ -29,57 +29,56 @@ const useAnalyticsDateRange = (selectedTab: string) => {
 
   useEffect(() => {
     const updateDateRange = () => {
-      const endDate = new Date(dateRange.startDate);
-      const startDate = new Date(dateRange.startDate);
+      const today = new Date();
+      let startDate: Date;
+      let endDate: Date;
 
       switch (selectedTab) {
-        case 'W':
-          const tempEnd = new Date(dateRange.startDate);
-          tempEnd.setDate(tempEnd.getDate() + 6); // 7-day week range
+        case 'W': {
+          // Monday of current week
+          const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+          const diffToMonday = (dayOfWeek + 6) % 7;
+          startDate = new Date(today);
+          startDate.setDate(today.getDate() - diffToMonday);
 
-          // Cap to today if it exceeds today
-          endDate.setTime(Math.min(tempEnd.getTime(), today.getTime()));
-          break;
-        case 'M':
-          // Set start date to first day of the month
-          startDate.setDate(1);
-
-          // Set end date to last day of the month
-          endDate.setMonth(endDate.getMonth() + 1);
-          endDate.setDate(0); // This gives us the last day of the current month
-
-          // Cap to today if it exceeds today
-          endDate.setTime(Math.min(endDate.getTime(), today.getTime()));
-          break;
-        case 'Y':
-          // Set start date to January 1st of the year
-          startDate.setMonth(0);
-          startDate.setDate(1);
-
-          // Set end date to December 31st of the year
-          endDate.setMonth(11);
-          endDate.setDate(31);
-
-          // Cap to today if it exceeds today
-          endDate.setTime(Math.min(endDate.getTime(), today.getTime()));
-          break;
-        case 'A': {
-          endDate.setTime(today.getTime());
+          // Sunday of current week (or today if before Sunday)
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
           break;
         }
-        default:
+        case 'M': {
+          // First day of current month
+          startDate = new Date(today.getFullYear(), today.getMonth(), 2);
+          // Last day of current month (or today if before last day)
+          endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          break;
+        }
+        case 'Y': {
+          // First day of current year
+          startDate = new Date(today.getFullYear(), 0, 2);
+          // Last day of current year (or today if before last day)
+          endDate = new Date(today.getFullYear(), 11, 31);
+          break;
+        }
+        case 'A': {
+          startDate = new Date(today);
+          endDate = new Date(today);
+          break;
+        }
+        default: {
+          startDate = new Date(today);
+          endDate = new Date(today);
           endDate.setDate(endDate.getDate() + 1);
+        }
       }
 
-      setDateRange(prevRange => ({
-        ...prevRange,
+      setDateRange({
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
-      }));
+      });
     };
 
     updateDateRange();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTab]);
 
   return {dateRange, setDateRange};

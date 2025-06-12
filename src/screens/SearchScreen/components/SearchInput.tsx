@@ -1,0 +1,139 @@
+import React, {useEffect, useRef} from 'react';
+import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {SearchIcon} from '@/assets/icons';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+
+interface SearchInputProps {
+  onFocus: () => void;
+  placeholder: string;
+  onBlur: () => void;
+  isFocused: boolean;
+  searchText: string;
+  setSearchText: (text: string) => void;
+  suggestions: Array<{id: number; text: string}>;
+  onSuggestionPress: (suggestion: {id: number; text: string}) => void;
+  showSuggestions: boolean;
+  onSubmitEditing: () => void;
+  showSearchResults: boolean;
+}
+
+export const SearchInput: React.FC<SearchInputProps> = ({
+  onFocus,
+  placeholder,
+  onBlur,
+  isFocused,
+  searchText,
+  setSearchText,
+  suggestions,
+  onSuggestionPress,
+  showSuggestions,
+  onSubmitEditing,
+  showSearchResults,
+}) => {
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (isFocused) {
+      inputRef.current?.focus();
+    }
+  }, [isFocused]);
+
+  return (
+    <View style={isFocused && !showSearchResults && styles.baseContainer}>
+      <View
+        style={[
+          styles.searchBar,
+          isFocused && !showSearchResults && styles.cardContainer,
+        ]}>
+        <SearchIcon width={16} height={16} />
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor={colors.lightGray13}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          value={searchText}
+          onChangeText={setSearchText}
+          onSubmitEditing={onSubmitEditing}
+        />
+      </View>
+      {showSuggestions && suggestions.length > 0 && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.suggestionsWrapper}>
+            {suggestions.map(suggestion => (
+              <TouchableOpacity
+                key={suggestion.id}
+                style={styles.suggestionRow}
+                activeOpacity={0.7}
+                onPress={() => onSuggestionPress(suggestion)}>
+                <SearchIcon width={16} height={16} />
+                <Text style={styles.suggestionText}>{suggestion.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+};
+
+const styles = ScaledSheet.create({
+  searchBar: {
+    backgroundColor: colors.white,
+    borderColor: colors.lightGray4,
+    borderWidth: 0.5,
+    borderRadius: '60@ms',
+    paddingVertical: '8@mvs',
+    paddingHorizontal: '20@s',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: '10@mvs',
+  },
+  input: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    lineHeight: '20@ms',
+    marginLeft: '12@s',
+    flex: 1,
+    color: colors.darkSlate,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: '12@vs',
+    paddingHorizontal: '20@s',
+    backgroundColor: colors.white,
+  },
+  suggestionText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '16@ms',
+    color: colors.gray99,
+    marginLeft: '12@s',
+  },
+  cardContainer: {
+    backgroundColor: colors.white,
+    borderRadius: '12@ms',
+    marginVertical: '0@mvs',
+    borderWidth: 0,
+  },
+  divider: {
+    borderBottomWidth: 0.6,
+    borderColor: colors.lightGray4,
+    height: 1,
+    marginHorizontal: '8@s',
+  },
+  suggestionsWrapper: {
+    paddingBottom: '8@vs',
+  },
+  baseContainer: {
+    backgroundColor: colors.white,
+    borderWidth: 0.5,
+    borderColor: colors.lightGray4,
+    borderRadius: '12@ms',
+  },
+});

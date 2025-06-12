@@ -161,8 +161,19 @@
       "ok": "OK"
     }
   },
-  "NetworkLogs": {
+  "SearchScreen": {
+    "header": {
+      "title": "Ally",
+      "subTitle": "Guidance, safety, and support — whenever you need it."
+    },
+    "try": "Try:",
+    "noData": "No results found for"
+  },
+    "NetworkLogs": {
     "logs": "Logs"
   },
-  "submit": "Submit"
+  "submit": "Submit",
+  "ResourceArticleCard": {
+    "more": "more"
+  }
 }

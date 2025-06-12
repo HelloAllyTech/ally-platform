@@ -232,8 +232,8 @@ export const styles = ScaledSheet.create({
   allGridContainer: {
     width: '100%',
     alignItems: 'center',
-    marginTop: '12@mvs',
-    marginBottom: '24@mvs',
+    marginTop: '2@mvs',
+    marginBottom: '18@mvs',
   },
   allGridText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
