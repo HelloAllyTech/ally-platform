@@ -47,4 +47,5 @@ export interface SectionItem {
   label: string;
   icon: React.FC<SvgProps>;
   canEdit: boolean;
+  canEnhance: boolean;
 }

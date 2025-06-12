@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, {useCallback, useState} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Alert,
@@ -10,29 +10,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ScaledSheet } from 'react-native-size-matters';
+import {ScaledSheet} from 'react-native-size-matters';
 
-import { DrawerMenuIcon, HeadphoneIcon } from '@/assets/icons';
-import { env } from '@/config/env';
-import { DEFAULT_HIT_SLOP, isIOS } from '@/constants/general';
-import { useDrawerNavigation } from '@/hooks/useDrawerNavigation';
-import { useHardwareBackPressHandler } from '@/hooks/useHardwareBackPressHandler';
+import {DrawerMenuIcon, HeadphoneIcon} from '@/assets/icons';
+import {env} from '@/config/env';
+import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
+import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
-import { useUser } from '@/hooks/useUser';
-import { colors } from '@/theme/colors';
-import { fontFamily } from '@/theme/fonts';
-import { typography } from '@/theme/typography';
-import { UserRole } from '@/types/user';
-import { logger } from '@/utils/logger';
+import {useUser} from '@/hooks/useUser';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+import {typography} from '@/theme/typography';
+import {UserRole} from '@/types/user';
+import {logger} from '@/utils/logger';
 
-import { FeatureNotAvailable } from './components/FeatureNotAvailable/FeatureNotAvailable';
-import { useAppNavigation } from '@/hooks/useAppNavigation';
+import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
 
 export const HomeScreen: React.FC = () => {
-  const { t } = useTranslate();
+  const {t} = useTranslate();
   const drawerNavigation = useDrawerNavigation();
   const navigation = useAppNavigation();
-  const { userData } = useUser();
+  const {userData} = useUser();
   const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   // Use the custom hook for back press handling
@@ -48,7 +48,7 @@ export const HomeScreen: React.FC = () => {
       await Linking.openURL(url);
     } catch (error) {
       logger.error(`Error opening phone call URL: ${error}`);
-      Alert.alert('Error', "Can't handle phone call", [{ text: t('Common.ok') }]);
+      Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
     }
   };
 
@@ -68,7 +68,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleVoiceRecording = () => {
     setIsPopupVisible(false);
-    navigation.navigate('Listening', { isRecording: true });
+    navigation.navigate('Listening', {isRecording: true});
   };
 
   const handleHeadphonePress = () => {

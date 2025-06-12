@@ -82,33 +82,10 @@ export const useDateSelection = ({
   };
 
   const handleWeekDayPress = (day: {dateString: string}) => {
-    const clickedDate = new Date(day.dateString);
-
-    if (day.dateString === tempSelectedDate.startDate) {
-      setTempDateRange('', '');
-      return;
-    }
-    if (day.dateString === tempSelectedDate.endDate) {
-      setTempSelectedDate({
-        ...tempSelectedDate,
-        endDate: '',
-      });
-      return;
-    }
-
-    if (!tempSelectedDate.startDate) {
-      setTempDateRange(day.dateString, day.dateString);
-    } else {
-      const startDate = new Date(tempSelectedDate.startDate);
-      if (clickedDate < startDate) {
-        setTempDateRange(day.dateString, tempSelectedDate.startDate);
-      } else {
-        setTempSelectedDate({
-          ...tempSelectedDate,
-          endDate: day.dateString,
-        });
-      }
-    }
+    const endDate = new Date(day.dateString);
+    const startDate = new Date(day.dateString);
+    startDate.setDate(endDate.getDate() - 6);
+    setTempDateRange(formatDate(startDate), formatDate(endDate));
   };
 
   const handleCancel = () => {

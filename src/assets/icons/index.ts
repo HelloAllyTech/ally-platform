@@ -48,6 +48,8 @@ import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
 import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
+import SearchActiveIcon from './searchActive.svg';
+import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
 import SmileIcon from './smile.svg';
 import TableEyeIcon from './tableEye.svg';
@@ -63,6 +65,8 @@ export {
   ProfileIcon,
   DrawerMenuIcon,
   LogoutIcon,
+  SearchActiveIcon,
+  SearchInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
   LeftArrowIcon,

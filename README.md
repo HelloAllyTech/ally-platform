@@ -121,8 +121,8 @@ The project uses several tools to maintain code quality:
 
   ```typescript
   import {useEffect} from 'react';
-  import {View} from 'react-native';
   import AsyncStorage from '@react-native-async-storage/async-storage';
+  import {View} from 'react-native';
 
   import {useAppTheme} from '@/hooks';
 

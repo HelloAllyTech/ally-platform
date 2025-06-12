@@ -25,6 +25,7 @@ interface SectionHeaderProps {
   onToggle: () => void;
   icon: React.ReactNode;
   canEdit: boolean;
+  canEnhance: boolean;
   isEditing: boolean;
   onTickPress: () => void;
   onClosePress: () => void;
@@ -38,6 +39,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   onToggle,
   icon,
   canEdit = true,
+  canEnhance = true,
   isEditing,
   onTickPress,
   onClosePress,
@@ -117,11 +119,13 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
           {shouldRenderButtons && (
             <Animated.View
               style={[styles.editButtonContainer, editButtonsContainerStyle]}>
-              <TouchableOpacity
-                style={styles.buttonContainer}
-                onPress={onWandPress}>
-                <WandStarsIcon />
-              </TouchableOpacity>
+              {canEnhance && (
+                <TouchableOpacity
+                  style={styles.buttonContainer}
+                  onPress={onWandPress}>
+                  <WandStarsIcon />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.buttonContainer}
                 onPress={onTickPress}>
