@@ -15,23 +15,33 @@ import {
   CommunityInactiveIcon,
   HomeActiveIcon,
   HomeInactiveIcon,
+  SearchActiveIcon,
+  SearchInactiveIcon,
 } from '@/assets/icons';
 import {
   CallLogScreen,
   CommunityScreen,
   HomeScreen,
+  SearchScreen,
   UserAnalyticsScreen,
 } from '@/screens';
 import {colors} from '@/theme/colors';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = ['HomeTab', 'CallLog', 'UserAnalytics', 'Community'];
+const TAB_NAMES = [
+  'HomeTab',
+  'CallLog',
+  'UserAnalytics',
+  'Search',
+  'Community',
+];
 
 const TAB_COMPONENTS = [
   HomeScreen,
   CallLogScreen,
   UserAnalyticsScreen,
+  SearchScreen,
   CommunityScreen,
 ];
 
@@ -52,6 +62,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       CallLog: <CallLogActiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
       Community: <CommunityActiveIcon width={20} height={20} />,
+      Search: <SearchActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
@@ -59,6 +70,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       CallLog: <CallLogInactiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsInactiveIcon width={18} height={18} />,
       Community: <CommunityInactiveIcon width={20} height={20} />,
+      Search: <SearchInactiveIcon width={20} height={20} />,
     };
 
     return focused
