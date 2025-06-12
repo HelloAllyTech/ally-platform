@@ -19,7 +19,6 @@ interface SectionWrapperProps {
   isExpanded: boolean;
   onToggle: () => void;
   icon: React.ReactNode;
-  canEdit: boolean;
   sectionConfig: SectionItem;
   index: number;
   handleSubmit: () => void;
@@ -34,7 +33,6 @@ const SectionWrapperComponent = ({
   isExpanded,
   onToggle,
   icon,
-  canEdit,
   sectionConfig,
   index,
   handleSubmit,
@@ -97,7 +95,7 @@ const SectionWrapperComponent = ({
     return (
       <SectionContent
         section={sectionConfig}
-        canEdit={canEdit}
+        canEdit={sectionConfig.canEdit}
         isEditing={isEditing}
         isEnhancing={isEnhancing}
       />
@@ -118,7 +116,8 @@ const SectionWrapperComponent = ({
         isExpanded={isExpanded}
         onToggle={onToggle}
         icon={icon}
-        canEdit={canEdit}
+        canEdit={sectionConfig.canEdit}
+        canEnhance={sectionConfig.canEnhance}
         isEditing={isEditing}
         onTickPress={onTickPress}
         onClosePress={onClosePress}
