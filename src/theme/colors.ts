@@ -7,6 +7,7 @@ export const colors = {
   black: '#000000',
   blackTransparent50: 'rgba(0, 0, 0, 0.5)',
   whiteTransparent10: 'rgba(255, 255, 255, 0.1)',
+  whiteTransparent90: 'rgba(255, 255, 255, 0.9)',
   lightGray: '#F5F5F5',
   lightGray9: '#fbfbfb',
   darkGray: 'rgba(2,6,11,0.7)',
@@ -60,4 +61,9 @@ export const colors = {
   lightGray11: '#6C6C6C',
   lightBlue5: '#DAE9FC',
   lightGray12: '#A5A5A5',
+  lightGray13: '#898989',
+  lightGray14: '#DADCE1',
+  darkGray4: '#292C33',
+  darkGray5: '#1E2025',
+  darkGray6: '#525252',
 };
