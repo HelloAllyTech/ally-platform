@@ -101,7 +101,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       borderWidth: 0.5,
       borderRadius: '60@ms',
       paddingVertical: '8@mvs',
-      paddingHorizontal: '20@s',
+      paddingHorizontal: '12@ms',
       flexDirection: 'row',
       alignItems: 'center',
       marginVertical: '10@mvs',
