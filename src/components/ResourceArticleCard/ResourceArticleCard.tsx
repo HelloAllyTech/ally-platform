@@ -9,13 +9,14 @@ import {
 
 import useTranslate from '@/hooks/useTranslate';
 
-import styles from './styles';
+import {getThemedStyles} from './styles';
 
 interface ResourceArticleCardProps {
   category: string;
   tags: string[];
   title: string;
   content: string;
+  colorTheme?: 'light' | 'dark';
 }
 
 const MAX_LINES = 3;
@@ -25,9 +26,12 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
   tags = [],
   title,
   content,
+  colorTheme = 'light',
 }) => {
   const [expanded, setExpanded] = useState(false);
   const {t} = useTranslate();
+
+  const themedStyles = useMemo(() => getThemedStyles(colorTheme), [colorTheme]);
 
   const toggleExpand = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -36,45 +40,47 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
 
   const renderedTags = useMemo(
     () => (
-      <View style={styles.tagsRow}>
+      <View style={themedStyles.tagsRow}>
         {tags.map((tag, idx) => (
-          <View style={styles.tagChip} key={tag + idx}>
-            <Text style={styles.tagText}>{tag}</Text>
+          <View style={themedStyles.tagChip} key={tag + idx}>
+            <Text style={themedStyles.tagText}>{tag}</Text>
           </View>
         ))}
       </View>
     ),
-    [tags],
+    [tags, themedStyles],
   );
 
   return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <View style={styles.categoryChip}>
-          <Text style={styles.categoryText}>{category}</Text>
+    <View style={themedStyles.card}>
+      <View style={themedStyles.topRow}>
+        <View style={themedStyles.categoryChip}>
+          <Text style={themedStyles.categoryText}>{category}</Text>
         </View>
         {renderedTags}
       </View>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={themedStyles.title}>{title}</Text>
       {!expanded ? (
-        <View style={styles.contentRow}>
+        <View style={themedStyles.contentRow}>
           <Text
-            style={styles.content}
+            style={themedStyles.content}
             numberOfLines={MAX_LINES}
             ellipsizeMode="tail">
             {content}
           </Text>
           <TouchableOpacity
-            style={styles.moreButton}
+            style={themedStyles.moreButton}
             onPress={toggleExpand}
             activeOpacity={0.7}>
-            <Text style={styles.moreText}>{t('ResourceArticleCard.more')}</Text>
+            <Text style={themedStyles.moreText}>
+              {t('ResourceArticleCard.more')}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableWithoutFeedback onPress={toggleExpand}>
-          <View style={styles.contentRow}>
-            <Text style={styles.content}>{content}</Text>
+          <View style={themedStyles.contentRow}>
+            <Text style={themedStyles.content}>{content}</Text>
           </View>
         </TouchableWithoutFeedback>
       )}

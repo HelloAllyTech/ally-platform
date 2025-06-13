@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   Keyboard,
+  ScrollView,
   StatusBar,
   Text,
   TouchableWithoutFeedback,
@@ -17,13 +18,14 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchIcon} from '@/assets/icons';
 import CustomTabs from '@/components/CustomTabs/CustomTabs';
-import ResourceArticleCard from '@/components/ResourceArticleCard';
+import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
 import {SearchHeader, SearchInput, SearchSuggestion} from './components';
+import {SearchEmpty} from './components/SearchEmpty';
 import {allData, PAGE_SIZE, tabDefs, trySuggestions} from './searchConfig';
 import {ResourceArticle, TabState} from './types';
 
@@ -181,18 +183,11 @@ export const SearchScreen: React.FC = () => {
       );
     }
     return (
-      <View style={styles.emptyComponent}>
-        <Text style={styles.emptyComponentText}>
-          {`${t('SearchScreen.noData')} "${searchText}"`}
-        </Text>
-        <Text style={styles.tryText}>{t('SearchScreen.try')}</Text>
-        {trySuggestions.map(suggestion => (
-          <View key={suggestion.id} style={styles.trySuggestion}>
-            <SearchIcon width={14} height={14} />
-            <Text style={styles.suggestionText}>{suggestion.text}</Text>
-          </View>
-        ))}
-      </View>
+      <SearchEmpty
+        searchText={searchText}
+        trySuggestions={trySuggestions}
+        colorTheme="dark"
+      />
     );
   };
 
@@ -274,15 +269,20 @@ export const SearchScreen: React.FC = () => {
               <View style={styles.tryContainer}>
                 <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
               </View>
-              {trySuggestions.map(suggestion => (
-                <SearchSuggestion
-                  key={suggestion.id}
-                  text={suggestion.text}
-                  icon={<SearchIcon width={16} height={16} />}
-                  onPressSuggestion={() => onPressSuggestion(suggestion.text)}
-                  suggestionId={suggestion.id}
-                />
-              ))}
+              <ScrollView
+                style={styles.trySuggestions}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.trySuggestionsContainer}>
+                {trySuggestions.map(suggestion => (
+                  <SearchSuggestion
+                    key={suggestion.id}
+                    text={suggestion.text}
+                    icon={<SearchIcon width={16} height={16} />}
+                    onPressSuggestion={() => onPressSuggestion(suggestion.text)}
+                    suggestionId={suggestion.id}
+                  />
+                ))}
+              </ScrollView>
             </>
           )}
         </View>
@@ -336,26 +336,10 @@ const styles = ScaledSheet.create({
     lineHeight: '20@ms',
     marginLeft: '16@ms',
   },
-  tryText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.black,
-    fontSize: '14@ms',
-    lineHeight: '20@ms',
-    marginLeft: '16@ms',
-    marginTop: '18@ms',
-    marginBottom: '10@ms',
+  trySuggestionsContainer: {
+    paddingBottom: '100@ms',
   },
-  trySuggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: '18@ms',
-    marginLeft: '16@ms',
-  },
-  suggestionText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray6,
-    fontSize: '14@ms',
-    lineHeight: '20@ms',
-    marginLeft: '10@ms',
+  trySuggestions: {
+    flex: 1,
   },
 });
