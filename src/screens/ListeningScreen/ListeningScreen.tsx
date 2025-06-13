@@ -3,7 +3,6 @@ import {StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {WINDOW_HEIGHT} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -22,9 +21,8 @@ import {Maybe} from '@/utils/common';
 import {
   AnimatedBlob,
   CallEndModal,
-  ControlButtons,
+  ControlButtonsSection,
   NudgeSection,
-  RadialGradientBackground,
   Timer,
 } from './components';
 
@@ -40,7 +38,7 @@ export interface Nudge {
 export const ListeningScreen = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-  const [isNudgeVisible, setIsNudgeVisible] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const chat = useAppSelector(state => state.chat.currentChat);
   const [startTime] = useState(() =>
     chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
@@ -52,6 +50,8 @@ export const ListeningScreen = () => {
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [isControlSectionMaximized, setIsControlSectionMaximized] =
+    useState(true);
 
   const chatData = useAppSelector(state => state.chat.currentChat);
   const [endCall, {isSuccess}] = useEndCallMutation();
@@ -95,7 +95,7 @@ export const ListeningScreen = () => {
         if (data.payload) {
           setIsLoading(true);
           if (!currentNudge) {
-            setIsNudgeVisible(true);
+            setIsFocusMode(true);
           }
           setTimeout(() => {
             setCurrentNudge({
@@ -152,7 +152,7 @@ export const ListeningScreen = () => {
   };
 
   const toggleNudgeVisibility = () => {
-    setIsNudgeVisible(prev => !prev);
+    setIsFocusMode(prev => !prev);
   };
 
   const handlePlayPauseCallPress = useDebounce(
@@ -192,30 +192,29 @@ export const ListeningScreen = () => {
       <View style={styles.content}>
         <View style={styles.blobContainer}>
           <AnimatedBlob
-            isExpanded={!nudgeStatus || !isNudgeVisible}
+            isExpanded={!nudgeStatus || !isFocusMode}
             isCallPaused={isCallPaused}
             isAudioActive={isAudioActive}
             onPlayPauseCallPress={handlePlayPauseCallPress}
           />
         </View>
         <NudgeSection
-          isVisible={!!nudgeStatus && isNudgeVisible}
+          isVisible={!!nudgeStatus && isFocusMode}
           nudge={nudgeStatus ? currentNudge : null}
           isLoading={isLoading}
           onFeedbackSuccess={handleNudgeFeedbackSuccess}
         />
       </View>
 
-      <View style={styles.radialGradientBackgroundContainer}>
-        <View style={styles.controlButtonsContainer}>
-          <ControlButtons
-            onFocusModeButtonPress={toggleNudgeVisibility}
-            isNudgeVisible={isNudgeVisible}
-            showFocusModeButton={!!currentNudge && nudgeStatus}
-            onCallEndPress={() => setShowCallEndConfirmation(true)}
-          />
-        </View>
-        <RadialGradientBackground />
+      <View style={styles.controlButtonsContainer}>
+        <ControlButtonsSection
+          isMaximized={isControlSectionMaximized}
+          onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
+          onFocusModeButtonPress={toggleNudgeVisibility}
+          isFocusMode={isFocusMode}
+          showFocusModeButton={!!currentNudge && nudgeStatus}
+          onCallEndPress={() => setShowCallEndConfirmation(true)}
+        />
       </View>
     </View>
   );
@@ -250,17 +249,7 @@ const styles = ScaledSheet.create({
     marginBottom: '16@vs',
   },
   controlButtonsContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 1000,
-    top: 60,
-    left: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  radialGradientBackgroundContainer: {
-    width: '100%',
-    height: WINDOW_HEIGHT * 0.35,
   },
 });

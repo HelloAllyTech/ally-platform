@@ -3,8 +3,9 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
+import type {ThemeMode} from '@/types/general';
 
-export const getThemedStyles = (colorScheme: string | null) => {
+export const getThemedStyles = (colorScheme: ThemeMode | null) => {
   const isDark = colorScheme === 'dark';
   return ScaledSheet.create({
     container: {
