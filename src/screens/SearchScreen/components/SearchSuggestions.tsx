@@ -4,9 +4,10 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import type {ThemeMode} from '@/types/general';
 
 interface SearchSuggestionProps {
-  colorTheme?: 'dark' | 'light';
+  colorTheme?: ThemeMode;
   icon: React.ReactNode;
   text: string;
   onPressSuggestion: (suggestionId: number) => void;

@@ -66,6 +66,8 @@ export const colors = {
   darkGray4: '#292C33',
   darkGray5: '#1E2025',
   darkGray6: '#525252',
+  lightGrayD9: '#D9D9D9',
+  darkGray3: '#191B1F',
   darkGray7: '#17181A',
   darkGray8: '#797C84',
   darkGray9: '#5A5F6A',

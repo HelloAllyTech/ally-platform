@@ -11,6 +11,8 @@ import {
   ViewStyle,
 } from 'react-native';
 
+import type {ThemeMode} from '@/types/general';
+
 import {getThemedStyles} from './styles';
 
 export interface TabData<T> {
@@ -21,7 +23,7 @@ export interface TabData<T> {
 
 export interface CustomTabsProps<T> {
   tabs: TabData<T>[];
-  colorScheme?: 'light' | 'dark' | null;
+  colorScheme?: ThemeMode;
   initialTab?: number;
   flatListProps?: Partial<FlatListProps<T>>;
   tabHeaderProps?: Partial<ScrollViewProps>;

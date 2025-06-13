@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {ThemeMode} from '@/types/general';
 
 interface SearchInputProps {
   onFocus: () => void;
@@ -18,7 +19,7 @@ interface SearchInputProps {
   showSuggestions: boolean;
   onSubmitEditing: () => void;
   showSearchResults: boolean;
-  colorTheme?: 'light' | 'dark';
+  colorTheme?: ThemeMode;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
