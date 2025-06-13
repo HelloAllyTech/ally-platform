@@ -45,7 +45,7 @@ const getThemedStyles = (colorScheme: string | null) => {
       borderWidth: 0.5,
       borderRadius: '8@ms',
       paddingVertical: '8@mvs',
-      paddingHorizontal: '16@ms',
+      paddingHorizontal: '12@ms',
       marginBottom: '16@mvs',
       alignSelf: 'flex-start',
       borderColor: isDark ? colors.darkGray4 : colors.lightGray14,
