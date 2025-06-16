@@ -1,17 +1,5 @@
 import React from 'react';
-import {
-  Dimensions,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 
 import {ThumbIcon} from '@/assets/icons';
 import {useDebounce} from '@/hooks/useDebounce';
@@ -29,17 +17,13 @@ import {CustomMarkdown} from '../CustomMarkdown';
 import {SkeletonLoader} from '../SkeletonLoader';
 import {styles} from './styles';
 
-const {width, height} = Dimensions.get('window');
-
 interface NudgeSectionProps {
-  isVisible: boolean;
-  nudge: Nudge | null;
+  nudge: Nudge;
   isLoading: boolean;
   onFeedbackSuccess: (feedback: FeedbackResponse) => void;
 }
 
 export const NudgeSection: React.FC<NudgeSectionProps> = ({
-  isVisible,
   nudge,
   isLoading,
   onFeedbackSuccess,
@@ -77,26 +61,6 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
   const handleFeedback = useDebounce(handleFeedbackSubmit, {
     delay: 500,
     leading: true, // Call on the leading edge for better UX
-  });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const translateX = withSpring(isVisible ? 0 : width * 0.2, {
-      damping: 15,
-      mass: 0.8,
-    });
-
-    const translateY = withSpring(isVisible ? 0 : height * 0.1, {
-      damping: 15,
-      mass: 0.8,
-    });
-
-    return {
-      opacity: withTiming(isVisible ? 1 : 0, {
-        duration: 200,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-      }),
-      transform: [{translateX}, {translateY}],
-    };
   });
 
   const renderContent = () => {
@@ -156,8 +120,8 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
   };
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
-      {nudge && <View style={styles.content}>{renderContent()}</View>}
-    </Animated.View>
+    <View style={[styles.container]}>
+      <View style={styles.content}>{renderContent()}</View>
+    </View>
   );
 };
