@@ -14,17 +14,19 @@ import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {globalStyles} from '@/theme/helpers';
 import {FeedbackResponse, SocketEvent, SocketMessage} from '@/types/message';
 import {Maybe} from '@/utils/common';
 
+import {audioDataToAmplitudes, NUM_BARS} from './audioUtils';
 import {
-  AnimatedBlob,
   CallEndModal,
   ControlButtonsSection,
   NudgeSection,
   Timer,
 } from './components';
+import {AudioWaveform} from './components/AudioWaveform';
+import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
 
 export interface Nudge {
   id: number;
@@ -38,7 +40,7 @@ export interface Nudge {
 export const ListeningScreen = () => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(true);
   const chat = useAppSelector(state => state.chat.currentChat);
   const [startTime] = useState(() =>
     chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
@@ -52,6 +54,10 @@ export const ListeningScreen = () => {
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
+  const [amplitudes, setAmplitudes] = useState<number[] | null>(
+    new Array(NUM_BARS).fill(0),
+  );
+  const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
 
   const chatData = useAppSelector(state => state.chat.currentChat);
   const [endCall, {isSuccess}] = useEndCallMutation();
@@ -86,6 +92,20 @@ export const ListeningScreen = () => {
     return true;
   });
 
+  // Throttle waveform updates to every 120ms
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Generate random amplitudes for visual testing
+      // TO DO: Remove this later
+      const randomAmplitudes = Array.from({length: NUM_BARS}, () =>
+        Math.random(),
+      );
+      // setAmplitudes(latestAmplitudesRef.current);
+      setAmplitudes(randomAmplitudes);
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
+
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.CHAT_ENDED]: () => {
@@ -94,9 +114,6 @@ export const ListeningScreen = () => {
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
           setIsLoading(true);
-          if (!currentNudge) {
-            setIsFocusMode(true);
-          }
           setTimeout(() => {
             setCurrentNudge({
               id: data.payload!.id,
@@ -110,23 +127,28 @@ export const ListeningScreen = () => {
           }, 500);
         }
       },
-      [SocketEvent.AUDIO_STREAM]: () => {
+      [SocketEvent.AUDIO_STREAM]: (data: SocketMessage) => {
         if (!isAudioActive) {
           setIsAudioActive(true);
         }
-
+        // Process audioData to amplitudes
+        if (data.payload?.audioData) {
+          latestAmplitudesRef.current = audioDataToAmplitudes(
+            data.payload.audioData,
+          );
+        }
         // Clear any existing timeout
         if (audioTimeoutRef.current) {
           clearTimeout(audioTimeoutRef.current);
         }
-
         // Set new timeout to mark audio as inactive if no new messages come
         audioTimeoutRef.current = setTimeout(() => {
           setIsAudioActive(false);
+          latestAmplitudesRef.current = null; // trigger fade out
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [currentNudge, handleCallEnd, isAudioActive],
+    [handleCallEnd, isAudioActive],
   );
 
   const {userData} = useUser();
@@ -182,29 +204,48 @@ export const ListeningScreen = () => {
         translucent
         barStyle="light-content"
       />
-      <View style={styles.header}>
-        <Text style={styles.headerText}>
-          {t('ListeningScreen.takingNotes')}
-        </Text>
-        <Timer startTime={startTime} />
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.blobContainer}>
-          <AnimatedBlob
-            isExpanded={!nudgeStatus || !isFocusMode}
-            isCallPaused={isCallPaused}
-            isAudioActive={isAudioActive}
-            onPlayPauseCallPress={handlePlayPauseCallPress}
+      {isFocusMode ? (
+        <View style={styles.focusModeLayout}>
+          <Text style={styles.takingNotesText}>
+            {t('ListeningScreen.takingNotes')}
+          </Text>
+          <Timer startTime={startTime} />
+          <View style={styles.focusModeWaveformWrapper}>
+            <AudioWaveform amplitudes={!isAudioActive ? amplitudes : null} />
+          </View>
+          <PlayPauseOverlay
+            isPlaying={!isCallPaused}
+            onPress={handlePlayPauseCallPress}
+            isFocusMode
           />
         </View>
-        <NudgeSection
-          isVisible={!!nudgeStatus && isFocusMode}
-          nudge={nudgeStatus ? currentNudge : null}
-          isLoading={isLoading}
-          onFeedbackSuccess={handleNudgeFeedbackSuccess}
-        />
-      </View>
+      ) : (
+        <View style={styles.nonFocusModeLayout}>
+          <View style={globalStyles.rowCenter}>
+            <PlayPauseOverlay
+              isPlaying={!isCallPaused}
+              onPress={handlePlayPauseCallPress}
+              isFocusMode={false}
+            />
+            <View style={styles.nonFocusLabelBlock}>
+              <Text style={styles.takingNotesText}>
+                {t('ListeningScreen.takingNotes')}
+              </Text>
+              <Timer startTime={startTime} />
+            </View>
+            <View style={styles.nonFocusModeWaveformWrapper}>
+              <AudioWaveform amplitudes={!isAudioActive ? amplitudes : null} />
+            </View>
+          </View>
+          {!isFocusMode && !!nudgeStatus && currentNudge && (
+            <NudgeSection
+              nudge={currentNudge}
+              isLoading={isLoading}
+              onFeedbackSuccess={handleNudgeFeedbackSuccess}
+            />
+          )}
+        </View>
+      )}
 
       <View style={styles.controlButtonsContainer}>
         <ControlButtonsSection
@@ -212,7 +253,6 @@ export const ListeningScreen = () => {
           onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
           onFocusModeButtonPress={toggleNudgeVisibility}
           isFocusMode={isFocusMode}
-          showFocusModeButton={!!currentNudge && nudgeStatus}
           onCallEndPress={() => setShowCallEndConfirmation(true)}
         />
       </View>
@@ -223,33 +263,40 @@ export const ListeningScreen = () => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: '16@vs',
-    marginTop: '40@vs',
-  },
-  headerText: {
-    ...fontFamily.REPLAY_PRO.BOLD,
-    ...typography.body.large,
-    letterSpacing: 0,
-    color: colors.lightCyan,
-    marginBottom: '8@vs',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  blobContainer: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '16@vs',
+    backgroundColor: colors.darkGray7,
   },
   controlButtonsContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  focusModeLayout: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: '40@vs',
+  },
+  takingNotesText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    color: colors.white,
+    textAlign: 'left',
+  },
+  nonFocusLabelBlock: {
+    alignItems: 'flex-start',
+    flex: 1,
+    marginLeft: '10@s',
+  },
+  focusModeWaveformWrapper: {
+    marginVertical: '40@vs',
+  },
+  nonFocusModeWaveformWrapper: {
+    width: '50%',
+  },
+  nonFocusModeLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: '20@s',
+    marginTop: '40@vs',
   },
 });
