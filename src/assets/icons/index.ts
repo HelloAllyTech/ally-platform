@@ -10,6 +10,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
+import ChevronDown from './chevronDown.svg';
 import CloseCircle from './closeCircle.svg';
 import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
@@ -37,7 +38,6 @@ import LeftArrowIcon from './leftArrowIcon.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
-import MicWithGradientIcon from './micWithGradient.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
 import PauseIcon from './pause.svg';
@@ -72,7 +72,6 @@ export {
   LeftArrowIcon,
   CallEndIcon,
   NoCallLogsIcon,
-  MicWithGradientIcon,
   MicIcon,
   ThumbIcon,
   HeadphoneIcon,
@@ -124,4 +123,5 @@ export {
   SessionSummaryIcon,
   RightArrow,
   LeftArrow,
+  ChevronDown,
 };

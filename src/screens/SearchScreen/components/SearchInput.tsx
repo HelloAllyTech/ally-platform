@@ -2,9 +2,10 @@ import React, {useEffect, useRef} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SearchIcon} from '@/assets/icons';
+import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {ThemeMode} from '@/types/general';
 
 interface SearchInputProps {
   onFocus: () => void;
@@ -18,6 +19,7 @@ interface SearchInputProps {
   showSuggestions: boolean;
   onSubmitEditing: () => void;
   showSearchResults: boolean;
+  colorTheme?: ThemeMode;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -32,8 +34,13 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   showSuggestions,
   onSubmitEditing,
   showSearchResults,
+  colorTheme = 'light',
 }) => {
   const inputRef = useRef<TextInput>(null);
+
+  const styles = getThemedStyles(colorTheme);
+
+  const isDark = colorTheme === 'dark';
 
   useEffect(() => {
     if (isFocused) {
@@ -48,12 +55,16 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           styles.searchBar,
           isFocused && !showSearchResults && styles.cardContainer,
         ]}>
-        <SearchIcon width={16} height={16} />
+        {isDark ? (
+          <SearchActiveIcon width={16} height={16} color={colors.darkGray8} />
+        ) : (
+          <SearchIcon width={16} height={16} />
+        )}
         <TextInput
           ref={inputRef}
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={colors.lightGray13}
+          placeholderTextColor={isDark ? colors.darkGray8 : colors.lightGray13}
           onFocus={onFocus}
           onBlur={onBlur}
           value={searchText}
@@ -82,58 +93,61 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   );
 };
 
-const styles = ScaledSheet.create({
-  searchBar: {
-    backgroundColor: colors.white,
-    borderColor: colors.lightGray4,
-    borderWidth: 0.5,
-    borderRadius: '60@ms',
-    paddingVertical: '8@mvs',
-    paddingHorizontal: '20@s',
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: '10@mvs',
-  },
-  input: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '20@ms',
-    marginLeft: '12@s',
-    flex: 1,
-    color: colors.darkSlate,
-  },
-  suggestionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: '12@vs',
-    paddingHorizontal: '20@s',
-    backgroundColor: colors.white,
-  },
-  suggestionText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
-    color: colors.gray99,
-    marginLeft: '12@s',
-  },
-  cardContainer: {
-    backgroundColor: colors.white,
-    borderRadius: '12@ms',
-    marginVertical: '0@mvs',
-    borderWidth: 0,
-  },
-  divider: {
-    borderBottomWidth: 0.6,
-    borderColor: colors.lightGray4,
-    height: 1,
-    marginHorizontal: '8@s',
-  },
-  suggestionsWrapper: {
-    paddingBottom: '8@vs',
-  },
-  baseContainer: {
-    backgroundColor: colors.white,
-    borderWidth: 0.5,
-    borderColor: colors.lightGray4,
-    borderRadius: '12@ms',
-  },
-});
+const getThemedStyles = (colorTheme: 'light' | 'dark') => {
+  const isDark = colorTheme === 'dark';
+  return ScaledSheet.create({
+    searchBar: {
+      backgroundColor: isDark ? colors.darkGray5 : colors.white,
+      borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
+      borderWidth: 0.5,
+      borderRadius: '60@ms',
+      paddingVertical: '8@mvs',
+      paddingHorizontal: '12@ms',
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: '10@mvs',
+    },
+    input: {
+      ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+      fontSize: '14@ms',
+      lineHeight: '20@ms',
+      marginLeft: '12@s',
+      flex: 1,
+      color: isDark ? colors.white : colors.darkSlate,
+    },
+    suggestionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: '12@vs',
+      paddingHorizontal: '20@s',
+      backgroundColor: colors.white,
+    },
+    suggestionText: {
+      ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+      fontSize: '16@ms',
+      color: colors.gray99,
+      marginLeft: '12@s',
+    },
+    cardContainer: {
+      backgroundColor: colors.white,
+      borderRadius: '12@ms',
+      marginVertical: '0@mvs',
+      borderWidth: 0,
+    },
+    divider: {
+      borderBottomWidth: 0.6,
+      borderColor: colors.lightGray4,
+      height: 1,
+      marginHorizontal: '8@s',
+    },
+    suggestionsWrapper: {
+      paddingBottom: '8@vs',
+    },
+    baseContainer: {
+      backgroundColor: colors.white,
+      borderWidth: 0.5,
+      borderColor: colors.lightGray4,
+      borderRadius: '12@ms',
+    },
+  });
+};

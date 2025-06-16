@@ -62,7 +62,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       CallLog: <CallLogActiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
       Community: <CommunityActiveIcon width={20} height={20} />,
-      Search: <SearchActiveIcon width={20} height={20} />,
+      Search: <SearchActiveIcon width={20} height={20} color={colors.blue} />,
     };
 
     const unfocusedIcons = {
