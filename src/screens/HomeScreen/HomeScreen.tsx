@@ -3,7 +3,6 @@ import {
   Alert,
   BackHandler,
   Linking,
-  Modal,
   StatusBar,
   Text,
   TouchableOpacity,
@@ -100,35 +99,6 @@ export const HomeScreen: React.FC = () => {
     );
   }
 
-  // TODO: Create a new component for the popup
-  const renderPopup = () => {
-    return (
-      <Modal
-        visible={isPopupVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsPopupVisible(false)}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsPopupVisible(false)}>
-          <View style={styles.popupContainer}>
-            <TouchableOpacity
-              style={styles.popupOption}
-              onPress={handleThirdPartyCall}>
-              <Text style={styles.popupOptionText}>New Call</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.popupOption}
-              onPress={handleVoiceRecording}>
-              <Text style={styles.popupOptionText}>Record Audio</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -185,7 +155,7 @@ export const HomeScreen: React.FC = () => {
               image={images.listenLive}
               header={t('Home.listenLive')}
               subtitle={t('Home.allyWillHearAudio')}
-              onPressCard={handleThirdPartyCall}
+              onPressCard={handleVoiceRecording}
             />
           </View>
         </View>
