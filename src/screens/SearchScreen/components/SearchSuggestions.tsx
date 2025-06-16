@@ -1,12 +1,13 @@
 import React from 'react';
-import {Text, TouchableOpacity} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import type {ThemeMode} from '@/types/general';
 
 interface SearchSuggestionProps {
-  colorTheme?: 'dark' | 'light';
+  colorTheme?: ThemeMode;
   icon: React.ReactNode;
   text: string;
   onPressSuggestion: (suggestionId: number) => void;
@@ -25,8 +26,10 @@ export const SearchSuggestion: React.FC<SearchSuggestionProps> = ({
     <TouchableOpacity
       style={themedStyles.container}
       onPress={() => onPressSuggestion(suggestionId)}>
-      {icon}
-      <Text style={themedStyles.text}>{text}</Text>
+      <View style={themedStyles.textContainer}>
+        {icon}
+        <Text style={themedStyles.text}>{text}</Text>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -35,12 +38,15 @@ const getThemedStyles = (colorScheme: string | null) => {
   const isDark = colorScheme === 'dark';
   return ScaledSheet.create({
     container: {
+      width: '100%',
+    },
+    textContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 0.5,
       borderRadius: '8@ms',
       paddingVertical: '8@mvs',
-      paddingHorizontal: '16@ms',
+      paddingHorizontal: '12@ms',
       marginBottom: '16@mvs',
       alignSelf: 'flex-start',
       borderColor: isDark ? colors.darkGray4 : colors.lightGray14,
@@ -52,7 +58,7 @@ const getThemedStyles = (colorScheme: string | null) => {
       lineHeight: '20@ms',
       marginLeft: '12@s',
       fontWeight: '400',
-      color: isDark ? colors.lightGray14 : colors.gray99,
+      color: colors.gray99,
     },
   });
 };

@@ -1,5 +1,4 @@
 import React, {useCallback, useState} from 'react';
-import LottieView from 'lottie-react-native';
 import {
   Alert,
   BackHandler,
@@ -12,7 +11,8 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {DrawerMenuIcon, HeadphoneIcon} from '@/assets/icons';
+import {DrawerMenuIcon} from '@/assets/icons';
+import images from '@/assets/images';
 import {env} from '@/config/env';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
@@ -27,6 +27,7 @@ import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
 import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
+import StartCallCard from './components/StartCallCard/StartCallCard';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
@@ -139,35 +140,54 @@ export const HomeScreen: React.FC = () => {
       {userData?.role !== UserRole.COUNSELOR ? (
         <FeatureNotAvailable />
       ) : (
+        // <View style={styles.content}>
+        //   <Text style={styles.titleContainer}>
+        //     <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
+        //     <Text style={styles.listeningText}>
+        //       {t('HomeScreen.listening')}
+        //     </Text>
+        //   </Text>
+        //   <TouchableOpacity
+        //     style={styles.animationContainer}
+        //     onPress={handleThirdPartyCall}
+        //     activeOpacity={0.8}>
+        //     <LottieView
+        //       source={require('@/assets/animations/listen.json')}
+        //       autoPlay
+        //       loop
+        //       style={styles.lottieAnimation}
+        //     />
+        //     <View style={styles.headphoneContainer}>
+        //       <HeadphoneIcon width={31} height={31} />
+        //     </View>
+        //   </TouchableOpacity>
+        //   <TouchableOpacity
+        //     onPress={handleThirdPartyCall}
+        //     activeOpacity={0.8}
+        //     style={styles.textContainer}>
+        //     <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
+        //   </TouchableOpacity>
+        // </View>
         <View style={styles.content}>
-          <Text style={styles.titleContainer}>
-            <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-            <Text style={styles.listeningText}>
-              {t('HomeScreen.listening')}
-            </Text>
+          <Text style={styles.title}>{t('Home.start')}</Text>
+          <Text style={styles.subtitle}>{t('Home.session')}</Text>
+          <Text style={styles.chooseListening}>
+            {t('Home.chooseListening')}
           </Text>
-
-          <TouchableOpacity
-            style={styles.animationContainer}
-            onPress={handleHeadphonePress}
-            activeOpacity={0.8}>
-            <LottieView
-              source={require('@/assets/animations/listen.json')}
-              autoPlay
-              loop
-              style={styles.lottieAnimation}
+          <View style={styles.buttonContainer}>
+            <StartCallCard
+              image={images.joinCall}
+              header={t('Home.joinCall')}
+              subtitle={t('Home.allyWillJoinOngoingCall')}
+              onPressCard={handleThirdPartyCall}
             />
-            <View style={styles.headphoneContainer}>
-              <HeadphoneIcon width={31} height={31} />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleHeadphonePress}
-            activeOpacity={0.8}
-            style={styles.textContainer}>
-            <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-          </TouchableOpacity>
-          {renderPopup()}
+            <StartCallCard
+              image={images.listenLive}
+              header={t('Home.listenLive')}
+              subtitle={t('Home.allyWillHearAudio')}
+              onPressCard={handleThirdPartyCall}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -179,16 +199,40 @@ const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
     paddingTop: '50@mvs',
+    paddingHorizontal: '32@ms',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  title: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    color: colors.darkGray12,
+    fontSize: '56@ms',
+    lineHeight: '64@mvs',
+  },
+  subtitle: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
+    color: colors.darkGray12,
+    fontSize: '56@ms',
+    lineHeight: '64@mvs',
+    marginTop: '8@mvs',
+  },
+  chooseListening: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.charcoal2,
+    fontSize: '16@ms',
+    lineHeight: '24@mvs',
+    marginTop: '8@mvs',
   },
   headerContainer: {
-    paddingHorizontal: '20@ms',
     paddingVertical: '10@mvs',
     alignSelf: 'flex-start',
   },
   content: {
     flex: 1,
-    alignItems: 'center',
-    paddingTop: '80@vs',
+    paddingTop: '60@mvs',
     paddingBottom: '80@vs',
   },
   titleContainer: {

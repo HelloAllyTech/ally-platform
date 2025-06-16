@@ -3,8 +3,9 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
+import type {ThemeMode} from '@/types/general';
 
-export const getThemedStyles = (colorScheme: string | null) => {
+export const getThemedStyles = (colorScheme: ThemeMode | null) => {
   const isDark = colorScheme === 'dark';
   return ScaledSheet.create({
     container: {
@@ -13,7 +14,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
     tabHeader: {
       height: '38@ms',
       borderBottomWidth: 0.5,
-      borderBottomColor: colors.lightGray4,
+      borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray4,
       backgroundColor: isDark ? colors.darkSlate : colors.white,
     },
     tabHeaderContent: {
@@ -34,17 +35,17 @@ export const getThemedStyles = (colorScheme: string | null) => {
       backgroundColor: 'transparent',
     },
     activeTabButton: {
-      borderBottomColor: colors.black,
+      borderBottomColor: isDark ? colors.white : colors.black,
     },
     tabText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
       ...typography.body.small,
-      color: colors.lightGray3,
+      color: isDark ? colors.lightGray15 : colors.lightGray3,
       textAlign: 'center',
       fontWeight: '400',
     },
     activeTabText: {
-      color: colors.darkSlate,
+      color: isDark ? colors.lightGray15 : colors.darkSlate,
       fontWeight: '500',
     },
     tabBody: {
@@ -52,7 +53,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
       marginTop: '6@ms',
     },
     tabBodyContent: {
-      paddingBottom: '16@ms',
+      paddingBottom: '200@ms',
     },
     moreTab: {
       flexDirection: 'row',

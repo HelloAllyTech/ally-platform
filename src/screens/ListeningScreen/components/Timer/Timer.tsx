@@ -43,9 +43,10 @@ export const Timer: React.FC<TimerProps> = ({startTime}) => {
 const styles = ScaledSheet.create({
   timer: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '22@ms',
-    lineHeight: '28@ms',
+    fontSize: '16@ms',
+    lineHeight: '20.8@ms',
     letterSpacing: 0,
     color: colors.white,
+    textAlign: 'center',
   },
 });

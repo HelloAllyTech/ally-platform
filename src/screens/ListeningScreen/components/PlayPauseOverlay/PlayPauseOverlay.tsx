@@ -1,11 +1,6 @@
 import React from 'react';
 import {TouchableOpacity} from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
-import {ScaledSheet} from 'react-native-size-matters';
+import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {PauseIcon, PlayIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
@@ -13,42 +8,51 @@ import {colors} from '@/theme/colors';
 interface PlayPauseOverlayProps {
   isPlaying: boolean;
   onPress: () => void;
+  isFocusMode?: boolean;
 }
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const PlayPauseOverlay: React.FC<PlayPauseOverlayProps> = ({
   isPlaying,
   onPress,
+  isFocusMode = true,
 }) => {
-  const fadeStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(1, {
-        duration: 200,
-        easing: Easing.ease,
-      }),
-    };
-  }, []);
+  const size = isFocusMode ? 40 : 28;
+  const iconWidth = isFocusMode ? 16 : 11;
+  const iconHeight = isFocusMode ? 17 : 12;
 
   return (
-    <AnimatedTouchable style={[styles.container, fadeStyle]} onPress={onPress}>
+    <TouchableOpacity
+      style={[
+        styles.container,
+        {
+          width: moderateScale(size),
+          height: moderateScale(size),
+          borderRadius: moderateScale(size / 2),
+          backgroundColor: colors.gunmetal,
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.8}>
       {isPlaying ? (
-        <PauseIcon width={17} height={27} />
+        <PauseIcon
+          width={moderateScale(iconWidth)}
+          height={moderateScale(iconHeight)}
+          color={colors.lightGray16}
+        />
       ) : (
-        <PlayIcon width={16} height={21} />
+        <PlayIcon
+          width={moderateScale(iconWidth)}
+          height={moderateScale(iconHeight)}
+          color={colors.lightGray16}
+        />
       )}
-    </AnimatedTouchable>
+    </TouchableOpacity>
   );
 };
 
 const styles = ScaledSheet.create({
   container: {
-    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    width: '60@ms',
-    height: '60@ms',
-    borderRadius: '30@ms',
-    backgroundColor: colors.blackTransparent50,
   },
 });
