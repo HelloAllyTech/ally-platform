@@ -16,7 +16,7 @@ export const PlayPauseOverlay: React.FC<PlayPauseOverlayProps> = ({
   onPress,
   isFocusMode = true,
 }) => {
-  const size = isFocusMode ? 40 : 28;
+  const size = isFocusMode ? 40 : 32;
   const iconWidth = isFocusMode ? 16 : 11;
   const iconHeight = isFocusMode ? 17 : 12;
 
