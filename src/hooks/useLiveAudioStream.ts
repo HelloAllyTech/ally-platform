@@ -75,7 +75,7 @@ export const useLiveAudioStream = ({
 
   useEffect(() => {
     const options = {
-      sampleRate: 44100,
+      sampleRate: 16000,
       channels: 1,
       bitsPerSample: 16,
       audioSource: Platform.OS === 'ios' ? 1 : 7,
