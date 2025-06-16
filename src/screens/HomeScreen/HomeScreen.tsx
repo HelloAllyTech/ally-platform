@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback} from 'react';
 import {
   Alert,
   BackHandler,
@@ -33,7 +33,6 @@ export const HomeScreen: React.FC = () => {
   const drawerNavigation = useDrawerNavigation();
   const navigation = useAppNavigation();
   const {userData} = useUser();
-  const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -42,7 +41,6 @@ export const HomeScreen: React.FC = () => {
   });
 
   const handleThirdPartyCall = async () => {
-    setIsPopupVisible(false);
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
     try {
       await Linking.openURL(url);
@@ -67,15 +65,8 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   const handleVoiceRecording = () => {
-    setIsPopupVisible(false);
     navigation.navigate('Listening', {isRecording: true});
   };
-
-  const handleHeadphonePress = () => {
-    setIsPopupVisible(true);
-  };
-
-  // Automatically manages socket connection based on screen focus and app state
 
   if (userData?.role !== UserRole.COUNSELOR) {
     return (
