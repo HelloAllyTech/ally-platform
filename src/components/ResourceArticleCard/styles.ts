@@ -34,7 +34,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     categoryText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-      color: isDark ? colors.darkGray5 : colors.darkGray12,
+      color: isDark ? colors.darkGray5 : colors.darkGray14,
       fontSize: '12@ms',
       lineHeight: '16@ms',
     },
@@ -51,7 +51,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     tagText: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      color: isDark ? colors.white2 : colors.darkGray13,
+      color: isDark ? colors.white2 : colors.darkGray15,
       fontSize: '12@ms',
       lineHeight: '20@mvs',
     },

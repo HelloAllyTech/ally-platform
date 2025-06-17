@@ -11,7 +11,6 @@ interface ControlButtonsSectionProps {
   isMaximized: boolean;
   isFocusMode: boolean;
   onToggleMaximized: () => void;
-  showFocusModeButton?: boolean;
   onCallEndPress: () => void;
 }
 
@@ -19,7 +18,6 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
   isMaximized,
   onToggleMaximized,
   isFocusMode,
-  showFocusModeButton = true,
   onCallEndPress,
   onFocusModeButtonPress,
 }) => {
@@ -46,15 +44,13 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
       {isMaximized && (
         <>
           <View style={styles.buttonsRow}>
-            {showFocusModeButton && (
-              <TouchableOpacity
-                style={[styles.buttonContainer, isFocusMode && styles.bgWhite]}
-                onPress={onFocusModeButtonPress}
-                activeOpacity={1}
-                hitSlop={DEFAULT_HIT_SLOP}>
-                <MicIcon color={isFocusMode ? colors.black : colors.white} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.buttonContainer, isFocusMode && styles.bgWhite]}
+              onPress={onFocusModeButtonPress}
+              activeOpacity={1}
+              hitSlop={DEFAULT_HIT_SLOP}>
+              <MicIcon color={isFocusMode ? colors.black : colors.white} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.buttonContainer, styles.callEndButton]}
               onPress={onCallEndPress}

@@ -59,6 +59,7 @@ export type SocketMessage = {
     createdAt: string;
     updatedAt: string;
     feedback?: FeedbackResponse;
+    audioData: string;
   };
   content?: string;
   context?: {
