@@ -13,28 +13,26 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
     },
     tabHeader: {
       height: '38@ms',
-      borderBottomWidth: 0.5,
-      borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray4,
       backgroundColor: isDark ? colors.darkSlate : colors.white,
     },
     tabHeaderContent: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: '12@ms',
       paddingHorizontal: 0,
       minHeight: '36@ms',
     },
     tabButton: {
-      paddingHorizontal: '8@ms',
+      paddingHorizontal: '10@ms',
       paddingBottom: '3@ms',
       height: '36@ms',
       justifyContent: 'flex-end',
       alignItems: 'center',
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent',
-      backgroundColor: 'transparent',
+      borderBottomWidth: 0.7,
+      borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray14,
+      backgroundColor: colors.white,
     },
     activeTabButton: {
+      borderBottomWidth: 2,
       borderBottomColor: isDark ? colors.white : colors.black,
     },
     tabText: {

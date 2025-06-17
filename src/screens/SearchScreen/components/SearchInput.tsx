@@ -55,11 +55,13 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           styles.searchBar,
           isFocused && !showSearchResults && styles.cardContainer,
         ]}>
-        {isDark ? (
-          <SearchActiveIcon width={16} height={16} color={colors.darkGray8} />
-        ) : (
-          <SearchIcon width={16} height={16} />
-        )}
+        <View style={styles.searchIconContainer}>
+          {isDark ? (
+            <SearchActiveIcon width={14} height={14} color={colors.darkGray8} />
+          ) : (
+            <SearchIcon width={14} height={14} />
+          )}
+        </View>
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -107,13 +109,19 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       alignItems: 'center',
       marginVertical: '10@mvs',
     },
+    searchIconContainer: {
+      width: '18@ms',
+      height: '18@ms',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     input: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
       fontSize: '14@ms',
-      lineHeight: '20@ms',
-      marginLeft: '12@s',
+      marginLeft: '8@ms',
       flex: 1,
       color: isDark ? colors.white : colors.darkSlate,
+      padding: 0,
     },
     suggestionRow: {
       flexDirection: 'row',
@@ -148,6 +156,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       borderWidth: 0.5,
       borderColor: colors.lightGray4,
       borderRadius: '12@ms',
+      padding: '1@s',
     },
   });
 };

@@ -1,6 +1,7 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {
   LayoutAnimation,
+  ScrollView,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
@@ -14,7 +15,7 @@ import {getThemedStyles} from './styles';
 interface ResourceArticleCardProps {
   category: string;
   tags: string[];
-  title: string;
+  heading: string;
   content: string;
   colorTheme?: 'light' | 'dark';
 }
@@ -24,7 +25,7 @@ const MAX_LINES = 3;
 const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
   category,
   tags = [],
-  title,
+  heading,
   content,
   colorTheme = 'light',
 }) => {
@@ -40,26 +41,32 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
 
   const renderedTags = useMemo(
     () => (
-      <View style={themedStyles.tagsRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {tags.map((tag, idx) => (
           <View style={themedStyles.tagChip} key={tag + idx}>
             <Text style={themedStyles.tagText}>{tag}</Text>
           </View>
         ))}
-      </View>
+      </ScrollView>
     ),
     [tags, themedStyles],
   );
+
+  const formatLabel = (str: string) =>
+    str
+      .split('-')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
 
   return (
     <View style={themedStyles.card}>
       <View style={themedStyles.topRow}>
         <View style={themedStyles.categoryChip}>
-          <Text style={themedStyles.categoryText}>{category}</Text>
+          <Text style={themedStyles.categoryText}>{formatLabel(category)}</Text>
         </View>
         {renderedTags}
       </View>
-      <Text style={themedStyles.title}>{title}</Text>
+      <Text style={themedStyles.title}>{heading}</Text>
       {!expanded ? (
         <View style={themedStyles.contentRow}>
           <Text
@@ -73,7 +80,7 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
             onPress={toggleExpand}
             activeOpacity={0.7}>
             <Text style={themedStyles.moreText}>
-              {t('ResourceArticleCard.more')}
+              {`... ${t('ResourceArticleCard.more')}`}
             </Text>
           </TouchableOpacity>
         </View>
