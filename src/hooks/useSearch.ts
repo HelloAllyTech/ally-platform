@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {Keyboard} from 'react-native';
 
 import {searchSuggestions} from '@/screens/SearchScreen/searchConfig';
+import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
@@ -12,13 +13,19 @@ export const useSearch = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean up debounceTimeout on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-    };
-  }, []);
+  const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
+    useLazyGetSearchResultsQuery();
 
+  // Only call this to trigger a search
+  const triggerSearch = useCallback(() => {
+    if (searchText.trim() !== '') {
+      searchDocuments({query: searchText});
+      setShowSearchResults(true);
+      setShowSuggestions(false);
+    }
+  }, [searchText, searchDocuments]);
+
+  // Debounce for suggestions only
   const debounceSearch = useCallback(() => {
     if (searchText.trim() === '') {
       setFilteredSuggestions([]);
@@ -40,6 +47,7 @@ export const useSearch = () => {
     setShowSuggestions(false);
     setFocused(false);
     Keyboard.dismiss();
+    searchDocuments({query: suggestion.text});
     setShowSearchResults(true);
   };
 
@@ -72,5 +80,10 @@ export const useSearch = () => {
     setShowSuggestions,
     setFocused,
     onChangeText,
+    searchResults,
+    isLoading,
+    isFetching,
+    triggerSearch,
+    searchDocuments,
   };
 };

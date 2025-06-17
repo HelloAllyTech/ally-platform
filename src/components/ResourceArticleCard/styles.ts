@@ -9,7 +9,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
     card: {
       backgroundColor: isDark ? colors.darkGray5 : colors.white,
       borderRadius: '8@ms',
-      borderWidth: 0.7,
+      borderWidth: 0.5,
       borderColor: isDark ? colors.darkGray5 : colors.lightGray14,
       paddingHorizontal: '10@s',
       paddingVertical: '10@vs',
@@ -34,13 +34,9 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     categoryText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-      color: isDark ? colors.darkGray5 : colors.gray,
+      color: isDark ? colors.darkGray5 : colors.darkGray14,
       fontSize: '12@ms',
       lineHeight: '16@ms',
-    },
-    tagsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
     },
     tagChip: {
       backgroundColor: isDark ? colors.darkGray10 : colors.white,
@@ -55,7 +51,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     tagText: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      color: isDark ? colors.white2 : colors.gray,
+      color: isDark ? colors.white2 : colors.darkGray15,
       fontSize: '12@ms',
       lineHeight: '20@mvs',
     },
@@ -80,7 +76,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
       position: 'absolute',
       right: 0,
       bottom: 0,
-      backgroundColor: isDark ? colors.darkGray5 : colors.whiteTransparent90,
+      backgroundColor: isDark ? colors.darkGray5 : colors.white,
       paddingHorizontal: 0,
       paddingVertical: 0,
     },
@@ -88,9 +84,9 @@ export const getThemedStyles = (colorScheme: string | null) => {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
       color: isDark ? colors.white2 : colors.darkGray6,
       fontSize: '14@ms',
-      paddingLeft: '10@s',
       textDecorationLine: 'underline',
       lineHeight: '18@ms',
+      marginRight: '50%',
     },
   });
 };
