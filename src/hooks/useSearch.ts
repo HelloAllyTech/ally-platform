@@ -1,7 +1,12 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {Keyboard} from 'react-native';
 
 import {searchSuggestions} from '@/screens/SearchScreen/searchConfig';
+import {
+  ResourceArticle,
+  TabDefinition,
+  TabState,
+} from '@/screens/SearchScreen/types';
 import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 
 export const useSearch = () => {
@@ -15,6 +20,114 @@ export const useSearch = () => {
 
   const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
     useLazyGetSearchResultsQuery();
+
+  const [activeTab, setActiveTab] = useState(0);
+  const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
+  const [tabsState, setTabsState] = useState<TabState[]>([]);
+
+  useEffect(() => {
+    if (searchResults?.documents) {
+      // Create unique categories
+      const categories = Array.from(
+        new Set(
+          searchResults.documents.map(
+            (result: ResourceArticle) => result.category,
+          ),
+        ),
+      ) as string[];
+
+      // Create tab definitions with "All" as first tab
+      const newTabs: TabDefinition[] = [
+        {
+          key: 'all',
+          label: `All (${searchResults.documents.length})`,
+          data: searchResults.documents,
+        },
+        ...categories.map((category: string) => {
+          const categoryDocs = searchResults.documents.filter(
+            (result: ResourceArticle) => result.category === category,
+          );
+          const formattedCategory = category
+            .split('-')
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          return {
+            key: category,
+            label: `${formattedCategory} (${categoryDocs.length})`,
+            data: categoryDocs,
+          };
+        }),
+      ];
+
+      setDynamicTabs(newTabs);
+
+      // Initialize tab states with data
+      setTabsState(
+        newTabs.map(tab => ({
+          data: tab.data || [],
+          page: 0,
+          hasMore: false,
+          loading: false,
+          error: null,
+        })),
+      );
+    }
+  }, [searchResults]);
+
+  const loadTabData = useCallback(
+    (tabIdx: number = 0, nextPage: number = 0, append = false) => {
+      const currentTab = dynamicTabs[tabIdx];
+      if (!currentTab?.data) return;
+
+      setTabsState(prev => {
+        const newState = [...prev];
+        newState[tabIdx] = {...newState[tabIdx], loading: true, error: null};
+        return newState;
+      });
+
+      try {
+        const data = currentTab.data;
+        setTabsState(prev => {
+          const newState = [...prev];
+          newState[tabIdx] = {
+            ...newState[tabIdx],
+            data: append ? [...newState[tabIdx].data, ...data] : data,
+            page: nextPage,
+            hasMore: false,
+            loading: false,
+            error: null,
+          };
+          return newState;
+        });
+      } catch (e) {
+        setTabsState(prev => {
+          const newState = [...prev];
+          newState[tabIdx] = {
+            ...newState[tabIdx],
+            loading: false,
+            error: 'Failed to load data',
+          };
+          return newState;
+        });
+      }
+    },
+    [dynamicTabs],
+  );
+
+  // Load data when tab changes
+  useEffect(() => {
+    if (dynamicTabs.length > 0) {
+      loadTabData(activeTab, 0, false);
+    }
+  }, [activeTab, dynamicTabs, loadTabData]);
+
+  // Handler for loading more data
+  const handleEndReached = () => {
+    const tab = tabsState[activeTab];
+    if (!tab.loading && tab.hasMore) {
+      loadTabData(activeTab, tab.page + 1, true);
+    }
+  };
 
   // Only call this to trigger a search
   const triggerSearch = useCallback(() => {
@@ -65,6 +178,12 @@ export const useSearch = () => {
     else setShowSuggestions(false);
   };
 
+  const onPressSuggestion = (suggestion: string) => {
+    setSearchText(suggestion);
+    searchDocuments({query: suggestion});
+    setShowSearchResults(true);
+  };
+
   return {
     searchText,
     setSearchText,
@@ -85,5 +204,11 @@ export const useSearch = () => {
     isFetching,
     triggerSearch,
     searchDocuments,
+    setActiveTab,
+    handleEndReached,
+    tabsState,
+    activeTab,
+    dynamicTabs,
+    onPressSuggestion,
   };
 };

@@ -9,7 +9,7 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
   const isDark = colorScheme === 'dark';
   return ScaledSheet.create({
     container: {
-      backgroundColor: isDark ? colors.darkSlate : colors.white,
+      backgroundColor: isDark ? colors.darkGray7 : colors.white,
     },
     tabHeader: {
       height: '38@ms',
@@ -29,7 +29,7 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       alignItems: 'center',
       borderBottomWidth: 0.7,
       borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray14,
-      backgroundColor: colors.white,
+      backgroundColor: isDark ? colors.darkGray7 : colors.white,
     },
     activeTabButton: {
       borderBottomWidth: 2,
@@ -47,7 +47,7 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       fontWeight: '500',
     },
     tabBody: {
-      backgroundColor: isDark ? colors.darkSlate : colors.white,
+      backgroundColor: isDark ? colors.darkGray7 : colors.white,
       marginTop: '6@ms',
     },
     tabBodyContent: {

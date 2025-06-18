@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useEffect} from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -27,12 +27,11 @@ import {fontFamily} from '@/theme/fonts';
 import {SearchHeader, SearchInput, SearchSuggestion} from './components';
 import {SearchEmpty} from './components/SearchEmpty';
 import {trySuggestions} from './searchConfig';
-import {ResourceArticle, TabDefinition, TabState} from './types';
+import {ResourceArticle} from './types';
 
 export const SearchScreen: React.FC = () => {
   const {
     searchText,
-    setSearchText,
     filteredSuggestions,
     focused,
     showSearchResults,
@@ -40,69 +39,19 @@ export const SearchScreen: React.FC = () => {
     onSearchBlur,
     handleSuggestionPress,
     setShowSuggestions,
-    setShowSearchResults,
     setFocused,
     onChangeText,
-    searchResults,
+    handleEndReached,
+    tabsState,
+    activeTab,
+    dynamicTabs,
+    setActiveTab,
     isLoading,
     triggerSearch,
-    searchDocuments,
     isFetching,
+    onPressSuggestion,
   } = useSearch();
   const {t} = useTranslate();
-
-  const [activeTab, setActiveTab] = useState(0);
-  const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
-  const [tabsState, setTabsState] = useState<TabState[]>([]);
-
-  useEffect(() => {
-    if (searchResults?.documents) {
-      // Create unique categories
-      const categories = Array.from(
-        new Set(
-          searchResults.documents.map(
-            (result: ResourceArticle) => result.category,
-          ),
-        ),
-      ) as string[];
-
-      // Create tab definitions with "All" as first tab
-      const newTabs: TabDefinition[] = [
-        {
-          key: 'all',
-          label: `All (${searchResults.documents.length})`,
-          data: searchResults.documents,
-        },
-        ...categories.map((category: string) => {
-          const categoryDocs = searchResults.documents.filter(
-            (result: ResourceArticle) => result.category === category,
-          );
-          const formattedCategory = category
-            .split('-')
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          return {
-            key: category,
-            label: `${formattedCategory} (${categoryDocs.length})`,
-            data: categoryDocs,
-          };
-        }),
-      ];
-
-      setDynamicTabs(newTabs);
-
-      // Initialize tab states with data
-      setTabsState(
-        newTabs.map(tab => ({
-          data: tab.data || [],
-          page: 0,
-          hasMore: false,
-          loading: false,
-          error: null,
-        })),
-      );
-    }
-  }, [searchResults]);
 
   const anim = useSharedValue(0);
 
@@ -129,61 +78,6 @@ export const SearchScreen: React.FC = () => {
       transform: [{translateY}],
     };
   });
-
-  const loadTabData = useCallback(
-    (tabIdx: number = 0, nextPage: number = 0, append = false) => {
-      const currentTab = dynamicTabs[tabIdx];
-      if (!currentTab?.data) return;
-
-      setTabsState(prev => {
-        const newState = [...prev];
-        newState[tabIdx] = {...newState[tabIdx], loading: true, error: null};
-        return newState;
-      });
-
-      try {
-        const data = currentTab.data;
-        setTabsState(prev => {
-          const newState = [...prev];
-          newState[tabIdx] = {
-            ...newState[tabIdx],
-            data: append ? [...newState[tabIdx].data, ...data] : data,
-            page: nextPage,
-            hasMore: false,
-            loading: false,
-            error: null,
-          };
-          return newState;
-        });
-      } catch (e) {
-        setTabsState(prev => {
-          const newState = [...prev];
-          newState[tabIdx] = {
-            ...newState[tabIdx],
-            loading: false,
-            error: 'Failed to load data',
-          };
-          return newState;
-        });
-      }
-    },
-    [dynamicTabs],
-  );
-
-  // Load data when tab changes
-  useEffect(() => {
-    if (dynamicTabs.length > 0) {
-      loadTabData(activeTab, 0, false);
-    }
-  }, [activeTab, dynamicTabs, loadTabData]);
-
-  // Handler for loading more data
-  const handleEndReached = () => {
-    const tab = tabsState[activeTab];
-    if (!tab.loading && tab.hasMore) {
-      loadTabData(activeTab, tab.page + 1, true);
-    }
-  };
 
   const onFocus = () => {
     onSearchFocus();
@@ -264,12 +158,6 @@ export const SearchScreen: React.FC = () => {
         onSubmitEditing={triggerSearch}
       />
     );
-  };
-
-  const onPressSuggestion = (suggestion: string) => {
-    setSearchText(suggestion);
-    searchDocuments({query: suggestion});
-    setShowSearchResults(true);
   };
 
   const renderSearchLaunch = () => {
