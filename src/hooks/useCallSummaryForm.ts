@@ -70,12 +70,12 @@ export const useCallSummaryForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData || !summaryData) return;
+    if (!summaryData) return;
     let tagsResponse;
     if (
-      formData[SUMMARY_FIELDS.TAGS] &&
-      formData[SUMMARY_FIELDS.TAGS] !==
-        mapTagsToString(summaryData.details?.summary?.tags || [])
+      formData?.[SUMMARY_FIELDS.TAGS] &&
+      formData?.[SUMMARY_FIELDS.TAGS] !==
+        mapTagsToString(summaryData?.details?.summary?.tags || [])
     ) {
       tagsResponse = await getTags({
         tags: (formData[SUMMARY_FIELDS.TAGS] as string)?.split(',') || [],
