@@ -158,6 +158,10 @@ jobs:
                 "author_icon": "${{ github.event.sender.avatar_url }}",
                 "fields": [
                   {
+                    "title": "What's New",
+                    "value": "${{ github.event.head_commit.message }}"
+                  },
+                  {
                     "title": "Build Number",
                     "value": "${{ steps.increment_version.outputs.build_number }}"
                   },
