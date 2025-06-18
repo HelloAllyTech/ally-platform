@@ -27,6 +27,7 @@ import {
 } from './components';
 import {AudioWaveform} from './components/AudioWaveform';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
+import Search from './components/Search/Search';
 
 export interface Nudge {
   id: number;
@@ -100,8 +101,8 @@ export const ListeningScreen = () => {
       const randomAmplitudes = Array.from({length: NUM_BARS}, () =>
         Math.random(),
       );
-      // setAmplitudes(latestAmplitudesRef.current);
-      setAmplitudes(randomAmplitudes);
+      setAmplitudes(latestAmplitudesRef.current);
+      // setAmplitudes(randomAmplitudes);
     }, 120);
     return () => clearInterval(interval);
   }, []);
@@ -244,6 +245,7 @@ export const ListeningScreen = () => {
               onFeedbackSuccess={handleNudgeFeedbackSuccess}
             />
           )}
+          <Search />
         </View>
       )}
 
@@ -294,7 +296,6 @@ const styles = ScaledSheet.create({
   },
   nonFocusModeLayout: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: '20@s',
     marginTop: '40@vs',

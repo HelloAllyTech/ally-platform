@@ -1,5 +1,12 @@
 import React, {useEffect, useRef} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {
+  StyleProp,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
@@ -20,6 +27,7 @@ interface SearchInputProps {
   onSubmitEditing: () => void;
   showSearchResults: boolean;
   colorTheme?: ThemeMode;
+  customStyles?: StyleProp<ViewStyle>;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -34,6 +42,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   showSuggestions,
   onSubmitEditing,
   showSearchResults,
+  customStyles,
   colorTheme = 'light',
 }) => {
   const inputRef = useRef<TextInput>(null);
@@ -54,6 +63,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         style={[
           styles.searchBar,
           isFocused && !showSearchResults && styles.cardContainer,
+          customStyles,
         ]}>
         <View style={styles.searchIconContainer}>
           {isDark ? (
@@ -137,7 +147,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       marginLeft: '12@s',
     },
     cardContainer: {
-      backgroundColor: colors.white,
+      backgroundColor: isDark ? colors.darkGray5 : colors.white,
       borderRadius: '12@ms',
       marginVertical: '0@mvs',
       borderWidth: 0,
@@ -152,9 +162,9 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       paddingBottom: '8@vs',
     },
     baseContainer: {
-      backgroundColor: colors.white,
+      backgroundColor: isDark ? colors.darkGray5 : colors.white,
       borderWidth: 0.5,
-      borderColor: colors.lightGray4,
+      borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
       borderRadius: '12@ms',
       padding: '1@s',
     },
