@@ -82,4 +82,5 @@ export const colors = {
   lightGray16: '#BDBDBD',
   darkGray12: '#434343',
   darkGray13: '#D3D3D3',
+  gunMetal90: 'rgba(23, 24, 26, 0.9)',
 };

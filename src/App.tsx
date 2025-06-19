@@ -4,7 +4,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {Provider} from 'react-redux';
 
-import NetworkLogs from './components/NetworkLogs/NetworkLogs';
+// import NetworkLogs from './components/NetworkLogs/NetworkLogs';
 import {RootNavigator} from './navigation/RootNavigator';
 import {store} from './store/store';
 
@@ -17,7 +17,7 @@ export const App = () => {
         <SafeAreaProvider style={styles.container}>
           <StatusBar translucent backgroundColor="transparent" />
           <RootNavigator />
-          <NetworkLogs />
+          {/* <NetworkLogs /> */}
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>
