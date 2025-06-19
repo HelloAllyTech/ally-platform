@@ -101,8 +101,8 @@ export const ListeningScreen = () => {
       const randomAmplitudes = Array.from({length: NUM_BARS}, () =>
         Math.random(),
       );
-      setAmplitudes(latestAmplitudesRef.current);
-      // setAmplitudes(randomAmplitudes);
+      // setAmplitudes(latestAmplitudesRef.current);
+      setAmplitudes(randomAmplitudes);
     }, 120);
     return () => clearInterval(interval);
   }, []);
