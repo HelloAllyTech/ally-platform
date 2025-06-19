@@ -4,6 +4,7 @@ import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
+import CallIcon from './call.svg';
 import CallDetailsIcon from './callDetails.svg';
 import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
@@ -56,12 +57,15 @@ import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
+import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
+import TranscriptIcon from './transcript.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  TickIcon,
   ProfileIcon,
   DrawerMenuIcon,
   LogoutIcon,
@@ -124,4 +128,6 @@ export {
   RightArrow,
   LeftArrow,
   ChevronDown,
+  CallIcon,
+  TranscriptIcon,
 };
