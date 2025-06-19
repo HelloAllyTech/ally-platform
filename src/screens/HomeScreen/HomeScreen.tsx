@@ -100,12 +100,12 @@ export const HomeScreen: React.FC = () => {
               subtitle={t('Home.allyWillJoinOngoingCall')}
               onPressCard={handleThirdPartyCall}
             />
-            <StartCallCard
+            {/* <StartCallCard
               image={images.listenLive}
               header={t('Home.listenLive')}
               subtitle={t('Home.allyWillHearAudio')}
               onPressCard={handleThirdPartyCall}
-            />
+            /> */}
           </View>
         </View>
       )}
