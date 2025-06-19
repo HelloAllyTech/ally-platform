@@ -92,7 +92,14 @@ export const UserAnalyticsScreen: React.FC = () => {
     error,
   } = useGetCounselorStatsQuery(dateRange);
 
-  const {counselorSharingPercentage} = stats || {};
+  const {
+    counselorSharingPercentage,
+    counselorListeningDuration,
+    counselorSharingDuration,
+  } = stats || {};
+
+  const durationZero =
+    counselorListeningDuration === 0 && counselorSharingDuration === 0;
 
   const pickerMode = useMemo(() => {
     switch (selectedTab) {
@@ -114,8 +121,10 @@ export const UserAnalyticsScreen: React.FC = () => {
   const ListeningTalkingStats = error
     ? {listeningPercent: 0, talkingPercent: 0}
     : {
-        listeningPercent: Math.max(0, 100 - (counselorSharingPercentage || 0)),
-        talkingPercent: counselorSharingPercentage || 0,
+        listeningPercent: durationZero
+          ? 0
+          : Math.max(0, 100 - (counselorSharingPercentage || 0)),
+        talkingPercent: durationZero ? 0 : counselorSharingPercentage || 0,
       };
 
   return (
