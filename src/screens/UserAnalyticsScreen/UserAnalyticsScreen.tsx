@@ -57,7 +57,7 @@ const useAnalyticsDateRange = (selectedTab: string) => {
           break;
         }
         case 'A': {
-          startDate = new Date(today);
+          startDate = new Date(today.getFullYear(), 0, 2);
           endDate = new Date(today);
           break;
         }
