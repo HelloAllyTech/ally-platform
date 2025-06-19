@@ -212,7 +212,10 @@ export const ListeningScreen = () => {
           </Text>
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
-            <AudioWaveform amplitudes={!isAudioActive ? amplitudes : null} />
+            <AudioWaveform
+              amplitudes={isAudioActive ? amplitudes : null}
+              isFocusMode
+            />
           </View>
           <PlayPauseOverlay
             isPlaying={!isCallPaused}
@@ -235,7 +238,10 @@ export const ListeningScreen = () => {
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveform amplitudes={!isAudioActive ? amplitudes : null} />
+              <AudioWaveform
+                amplitudes={isAudioActive ? amplitudes : null}
+                isFocusMode={false}
+              />
             </View>
           </View>
           {!isFocusMode && !!nudgeStatus && currentNudge && (
@@ -290,6 +296,7 @@ const styles = ScaledSheet.create({
   },
   focusModeWaveformWrapper: {
     marginVertical: '40@vs',
+    width: '90%',
   },
   nonFocusModeWaveformWrapper: {
     width: '50%',
