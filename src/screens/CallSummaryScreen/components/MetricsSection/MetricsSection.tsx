@@ -8,7 +8,7 @@ import {FieldRow} from '../FieldRow/FieldRow';
 
 interface MetricsSectionProps {
   metrics: {
-    listeningShare: number | null;
+    listeningShare: string | null;
     reflectiveQuestionsAsked: number | null;
     emotionalLift: number | null;
   };
@@ -19,7 +19,11 @@ export const MetricsSection: React.FC<MetricsSectionProps> = ({metrics}) => {
     <View style={styles.container}>
       <FieldRow
         label={FIELD_LABELS[SUMMARY_FIELDS.LISTENING_RATIO]}
-        value={metrics.listeningShare || '-'}
+        value={
+          metrics.listeningShare
+            ? `${Math.round(Number(metrics.listeningShare) * 100)}%`
+            : '-'
+        }
         showSeparator
       />
       <FieldRow
