@@ -39,8 +39,8 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   const renderSummaryField = (field: SummaryField) => {
     // For editable fields, use formData; for non-editable fields, use summary
     const getValue = () => {
-      if (field.isEditable && formData?.[field.key as EditableFieldKey]) {
-        return formData[field.key as EditableFieldKey] || null;
+      if (field.isEditable && formData && field.key in formData) {
+        return formData[field.key as EditableFieldKey] ?? null;
       }
       return summary?.[field.key] as string | null;
     };
