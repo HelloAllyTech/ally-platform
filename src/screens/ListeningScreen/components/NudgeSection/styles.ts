@@ -6,31 +6,30 @@ import {typography} from '@/theme/typography';
 
 export const styles = ScaledSheet.create({
   container: {
-    minHeight: '120@vs',
     borderRadius: '16@ms',
     borderWidth: 0.5,
     borderColor: colors.gunmetal,
     backgroundColor: colors.smokyBlack,
     overflow: 'hidden',
-    marginHorizontal: '27@s',
+    marginTop: '10@vs',
+    alignSelf: 'stretch',
   },
   content: {
-    padding: '16@ms',
+    padding: '12@ms',
   },
   scrollView: {
-    marginBottom: '12@vs',
-    maxHeight: '160@vs',
+    maxHeight: '80@vs',
   },
   title: {
     ...fontFamily.REPLAY_PRO.BOLD,
     fontSize: '16@ms',
-    lineHeight: '41@ms',
+    lineHeight: '24@ms',
     color: colors.white,
   },
   feedbackContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: '16@vs',
+    paddingTop: '8@vs',
     borderTopWidth: '0.5@ms',
     borderTopColor: colors.teal,
   },
