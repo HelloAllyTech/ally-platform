@@ -35,12 +35,16 @@ export const ListeningTalkingDistribution: React.FC<Props> = ({
           <>
             {listeningPercent > 0 && (
               <View style={[styles.barListening, {flex: listeningPercent}]}>
-                <Text style={styles.barText}>{listeningPercent}%</Text>
+                <Text style={styles.barText}>
+                  {listeningPercent.toFixed(2)}%
+                </Text>
               </View>
             )}
             {talkingPercent > 0 && (
               <View style={[styles.barTalking, {flex: talkingPercent}]}>
-                <Text style={styles.barTextDark}>{talkingPercent}%</Text>
+                <Text style={styles.barTextDark}>
+                  {talkingPercent.toFixed(2)}%
+                </Text>
               </View>
             )}
             {listeningPercent === 0 && talkingPercent === 0 && (

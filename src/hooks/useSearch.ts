@@ -27,43 +27,70 @@ export const useSearch = () => {
 
   useEffect(() => {
     if (searchResults?.documents) {
-      // Create unique categories
-      const categories = Array.from(
-        new Set(
-          searchResults.documents.map(
-            (result: ResourceArticle) => result.category,
-          ),
-        ),
-      ) as string[];
+      // Filter documents by category
+      const resourcesDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Resources',
+      );
+      const questionDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Question',
+      );
+      const techniquesDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Techniques',
+      );
+      const assessmentDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Assessment',
+      );
+      const metaphorDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Metaphor',
+      );
+      const interventionDocs = searchResults.documents.filter(
+        (result: ResourceArticle) => result.category === 'Intervention',
+      );
 
-      // Create tab definitions with "All" as first tab
-      const newTabs: TabDefinition[] = [
+      // Fixed list of tabs
+      const fixedTabs: TabDefinition[] = [
         {
           key: 'all',
           label: `All (${searchResults.documents.length})`,
           data: searchResults.documents,
         },
-        ...categories.map((category: string) => {
-          const categoryDocs = searchResults.documents.filter(
-            (result: ResourceArticle) => result.category === category,
-          );
-          const formattedCategory = category
-            .split('-')
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          return {
-            key: category,
-            label: `${formattedCategory} (${categoryDocs.length})`,
-            data: categoryDocs,
-          };
-        }),
+        {
+          key: 'resources',
+          label: `Resources (${resourcesDocs.length})`,
+          data: resourcesDocs,
+        },
+        {
+          key: 'question',
+          label: `Question (${questionDocs.length})`,
+          data: questionDocs,
+        },
+        {
+          key: 'techniques',
+          label: `Techniques (${techniquesDocs.length})`,
+          data: techniquesDocs,
+        },
+        {
+          key: 'metaphor',
+          label: `Metaphor (${metaphorDocs.length})`,
+          data: metaphorDocs,
+        },
+        {
+          key: 'assessment',
+          label: `Assessment (${assessmentDocs.length})`,
+          data: assessmentDocs,
+        },
+        {
+          key: 'intervention',
+          label: `Intervention (${interventionDocs.length})`,
+          data: interventionDocs,
+        },
       ];
 
-      setDynamicTabs(newTabs);
+      setDynamicTabs(fixedTabs);
 
       // Initialize tab states with data
       setTabsState(
-        newTabs.map(tab => ({
+        fixedTabs.map(tab => ({
           data: tab.data || [],
           page: 0,
           hasMore: false,
