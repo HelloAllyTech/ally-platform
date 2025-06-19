@@ -37,8 +37,8 @@ const useAnalyticsDateRange = (selectedTab: string) => {
         case 'W': {
           // Last 7 days: from 6 days ago to today
           // Week: 7 days ending on current startDate
-          endDate = new Date(dateRange.startDate); // endDate is the current startDate
-          startDate = new Date(dateRange.startDate);
+          endDate = new Date(today); // endDate is the current startDate
+          startDate = new Date(today);
           startDate.setDate(startDate.getDate() - 6); // startDate is 6 days before
           break;
         }
@@ -75,7 +75,7 @@ const useAnalyticsDateRange = (selectedTab: string) => {
     };
 
     updateDateRange();
-  }, [selectedTab, dateRange]);
+  }, [selectedTab]);
 
   return {dateRange, setDateRange};
 };
