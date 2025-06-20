@@ -28,12 +28,13 @@ import {
   useUpdateCallInfoMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
+import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {
-  clearFormData,
-  clearSummary,
+  clearSummaryStates,
   selectCallInfo,
+  setSummaryVisibleFields,
 } from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {saveFile} from '@/utils/fileOperations';
@@ -74,6 +75,7 @@ export const CallSummaryScreen: React.FC<
   const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
   const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
+  const {data: visibleFields} = useGetSummaryFieldsQuery();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -97,6 +99,13 @@ export const CallSummaryScreen: React.FC<
     setEditedName(summaryName);
   }, [summaryName]);
 
+  useEffect(() => {
+    if (visibleFields) {
+      console.log('🚀 ~ visibleFields:', visibleFields);
+      dispatch(setSummaryVisibleFields(visibleFields));
+    }
+  }, [visibleFields, dispatch]);
+
   const showToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'error') => {
       setToast({
@@ -119,8 +128,7 @@ export const CallSummaryScreen: React.FC<
   // Cleanup function to clear summary state when component unmounts
   useEffect(() => {
     return () => {
-      dispatch(clearSummary());
-      dispatch(clearFormData());
+      dispatch(clearSummaryStates());
     };
   }, [dispatch]);
 
