@@ -31,6 +31,7 @@ import {
 } from './components';
 import {AudioWaveform} from './components/AudioWaveform';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
+import Search from './components/Search/Search';
 
 export interface Nudge {
   id: number;
@@ -269,7 +270,7 @@ export const ListeningScreen = ({
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveform
-              amplitudes={!isAudioActive ? amplitudes : null}
+              amplitudes={isAudioActive ? amplitudes : null}
               isFocusMode
             />
           </View>
@@ -295,7 +296,7 @@ export const ListeningScreen = ({
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
               <AudioWaveform
-                amplitudes={!isAudioActive ? amplitudes : null}
+                amplitudes={isAudioActive ? amplitudes : null}
                 isFocusMode={false}
               />
             </View>
@@ -307,6 +308,7 @@ export const ListeningScreen = ({
               onFeedbackSuccess={handleNudgeFeedbackSuccess}
             />
           )}
+          <Search />
         </View>
       )}
 
@@ -358,7 +360,6 @@ const styles = ScaledSheet.create({
   },
   nonFocusModeLayout: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: '20@s',
     marginTop: '40@vs',

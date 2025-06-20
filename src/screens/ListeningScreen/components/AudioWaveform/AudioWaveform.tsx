@@ -16,6 +16,7 @@ const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
 const MAX_HEIGHT = 50;
 const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
+const TINY_BAR_HEIGHT = 0.08; // Tiny bar height for no audio case
 
 const WaveformBar = ({
   amplitude,
@@ -47,11 +48,15 @@ export const AudioWaveform: React.FC<WaveformProps> = ({
   amplitudes,
   isFocusMode = true,
 }) => {
-  // If amplitudes is null or empty, fade out all bars
-  const displayAmplitudes =
-    amplitudes && amplitudes.length > 0
-      ? amplitudes
-      : new Array(NUM_BARS).fill(0);
+  // Show tiny bars if no audio or all amplitudes are near zero
+  const isSilent =
+    !amplitudes ||
+    amplitudes.length === 0 ||
+    amplitudes.every(a => Math.abs(a) < 0.001);
+
+  const displayAmplitudes = isSilent
+    ? new Array(NUM_BARS).fill(TINY_BAR_HEIGHT)
+    : amplitudes;
 
   return (
     <View style={styles.container}>

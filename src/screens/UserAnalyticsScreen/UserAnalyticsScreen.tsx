@@ -35,15 +35,11 @@ const useAnalyticsDateRange = (selectedTab: string) => {
 
       switch (selectedTab) {
         case 'W': {
-          // Monday of current week
-          const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
-          const diffToMonday = (dayOfWeek + 6) % 7;
+          // Last 7 days: from 6 days ago to today
+          // Week: 7 days ending on current startDate
+          endDate = new Date(today); // endDate is the current startDate
           startDate = new Date(today);
-          startDate.setDate(today.getDate() - diffToMonday);
-
-          // Sunday of current week (or today if before Sunday)
-          endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 6);
+          startDate.setDate(startDate.getDate() - 6); // startDate is 6 days before
           break;
         }
         case 'M': {
@@ -61,7 +57,7 @@ const useAnalyticsDateRange = (selectedTab: string) => {
           break;
         }
         case 'A': {
-          startDate = new Date(today);
+          startDate = new Date(today.getFullYear(), 0, 2);
           endDate = new Date(today);
           break;
         }
@@ -96,7 +92,14 @@ export const UserAnalyticsScreen: React.FC = () => {
     error,
   } = useGetCounselorStatsQuery(dateRange);
 
-  const {counselorSharingPercentage} = stats || {};
+  const {
+    counselorSharingPercentage,
+    counselorListeningDuration,
+    counselorSharingDuration,
+  } = stats || {};
+
+  const durationZero =
+    counselorListeningDuration === 0 && counselorSharingDuration === 0;
 
   const pickerMode = useMemo(() => {
     switch (selectedTab) {
@@ -118,8 +121,10 @@ export const UserAnalyticsScreen: React.FC = () => {
   const ListeningTalkingStats = error
     ? {listeningPercent: 0, talkingPercent: 0}
     : {
-        listeningPercent: Math.max(0, 100 - (counselorSharingPercentage || 0)),
-        talkingPercent: counselorSharingPercentage || 0,
+        listeningPercent: durationZero
+          ? 0
+          : Math.max(0, 100 - (counselorSharingPercentage || 0)),
+        talkingPercent: durationZero ? 0 : counselorSharingPercentage || 0,
       };
 
   return (
