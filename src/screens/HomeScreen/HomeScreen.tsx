@@ -45,7 +45,6 @@ export const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     if (visibleFields) {
-      console.log('🚀 ~ useEffect in home ~ visibleFields:', visibleFields);
       dispatch(setSummaryVisibleFields(visibleFields));
     }
   }, [visibleFields, dispatch]);
