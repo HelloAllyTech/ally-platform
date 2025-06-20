@@ -3,7 +3,7 @@ import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {DeleteIcon, EditIcon, ExportIcon} from '@/assets/icons';
+import {EditIcon, ExportIcon} from '@/assets/icons';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
@@ -99,12 +99,13 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           <ExportIcon width={16} height={16} />
         </TouchableOpacity>
         <View style={styles.menuDivider} />
-        <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
+        {/* Hiding delete option for now */}
+        {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
           <Text style={styles.menuText}>
             {t('CallSummary.customMenu.delete')}
           </Text>
           <DeleteIcon width={16} height={16} />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </Animated.View>
     </View>
   );

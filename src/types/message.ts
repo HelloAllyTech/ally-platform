@@ -18,6 +18,10 @@ export enum ChatStatus {
   ACTIVE = 'ACTIVE',
 }
 
+export enum ChatProvider {
+  EXOTEL = 'EXOTEL',
+}
+
 export interface Chat {
   chatId: number;
   client: User;
@@ -28,6 +32,7 @@ export interface Chat {
   messages: ChatMessage[];
   startedAt: string;
   status: ChatStatus;
+  provider: ChatProvider;
 }
 
 export enum QueueStatus {

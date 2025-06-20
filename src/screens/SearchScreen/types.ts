@@ -1,14 +1,48 @@
-export type ResourceArticle = {
+export interface ResourceArticle {
+  id: string;
+  heading: string;
+  content: string;
   category: string;
   tags: string[];
-  title: string;
-  content: string;
-};
+  score: number;
+}
 
-export type TabState = {
+export interface SearchResponse {
+  documents: ResourceArticle[];
+  total: number;
+  limit: number;
+}
+
+export interface TabState {
   data: ResourceArticle[];
   page: number;
   hasMore: boolean;
   loading: boolean;
   error: string | null;
-};
+}
+
+export interface TabDefinition {
+  key: string;
+  label: string;
+  data?: ResourceArticle[];
+}
+
+export interface SearchResult {
+  documents: ResourceArticle[];
+  total: number;
+  limit: number;
+}
+
+export interface SearchFilters {
+  category?: string;
+  tags?: string[];
+}
+
+export interface SearchRequest {
+  query: string;
+  limit?: number;
+  excludedIds?: string[];
+  filters?: SearchFilters;
+  sortBy?: string;
+  sortOrder?: string;
+}

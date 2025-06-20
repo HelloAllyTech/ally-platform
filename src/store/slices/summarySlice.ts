@@ -74,7 +74,8 @@ export const selectCallInfo = createSelector(
 export const selectMetrics = createSelector(
   [selectSummaryData],
   summaryData => ({
-    listeningShare: summaryData?.details?.summary?.listeningShare ?? null,
+    listeningShare:
+      summaryData?.details?.callInfo?.counselorTalkingPercentage ?? null,
     reflectiveQuestionsAsked:
       summaryData?.details?.summary?.reflectiveQuestionsAsked ?? null,
     emotionalLift: summaryData?.details?.summary?.emotionalLift ?? null,
