@@ -37,8 +37,7 @@ const Search = () => {
     setActiveTab,
     activeTab,
     onPressSuggestion,
-    isLoading,
-    isFetching,
+    loading,
     handleEndReached,
   } = useSearch();
 
@@ -79,7 +78,7 @@ const Search = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {isLoading || isFetching ? (
+        {loading ? (
           <ActivityIndicator style={styles.activityIndicator} />
         ) : (
           dynamicTabs.length > 0 && (
