@@ -50,6 +50,8 @@ export interface FeedbackResponse {
   feedbackId: number;
 }
 
+export type WebRTCAudioData = {type: 'Buffer'; data: number[]};
+
 export type SocketMessage = {
   type: SocketEvent | string;
   payload?: {
@@ -64,7 +66,7 @@ export type SocketMessage = {
     createdAt: string;
     updatedAt: string;
     feedback?: FeedbackResponse;
-    audioData: string;
+    audioData: string | WebRTCAudioData;
   };
   content?: string;
   context?: {

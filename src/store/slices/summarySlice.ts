@@ -1,5 +1,6 @@
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
 
+import {SummaryFieldKey} from '@/constants/summary';
 import {CallSummaryResponse} from '@/services/callSummaryApi';
 import {AppRootState} from '@/store/store';
 import {FormData} from '@/utils/callSummary/formDataTransformer';
@@ -7,11 +8,13 @@ import {FormData} from '@/utils/callSummary/formDataTransformer';
 interface SummaryState {
   summaryData: CallSummaryResponse | null;
   formData: FormData | null;
+  visibleFields: SummaryFieldKey[];
 }
 
 const initialState: SummaryState = {
   summaryData: null,
   formData: null,
+  visibleFields: [],
 };
 
 const summarySlice = createSlice({
@@ -21,23 +24,31 @@ const summarySlice = createSlice({
     setSummaryData: (state, action: PayloadAction<CallSummaryResponse>) => {
       state.summaryData = action.payload;
     },
-    clearSummary: state => {
-      state.summaryData = null;
-    },
     setFormData: (state, action: PayloadAction<Partial<FormData>>) => {
       state.formData = {
         ...state.formData,
         ...action.payload,
       } as FormData;
     },
-    clearFormData: state => {
+    setSummaryVisibleFields: (
+      state,
+      action: PayloadAction<SummaryFieldKey[]>,
+    ) => {
+      state.visibleFields = action.payload;
+    },
+    clearSummaryStates: state => {
+      state.summaryData = null;
       state.formData = null;
     },
   },
 });
 
-export const {setSummaryData, clearSummary, setFormData, clearFormData} =
-  summarySlice.actions;
+export const {
+  setSummaryData,
+  setFormData,
+  clearSummaryStates,
+  setSummaryVisibleFields,
+} = summarySlice.actions;
 
 export default summarySlice.reducer;
 
@@ -81,3 +92,6 @@ export const selectMetrics = createSelector(
     emotionalLift: summaryData?.details?.summary?.emotionalLift ?? null,
   }),
 );
+
+export const selectSummaryVisibleFields = (state: AppRootState) =>
+  state.summary.visibleFields;

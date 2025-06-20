@@ -33,7 +33,7 @@ export enum SectionKey {
   KeyTherapeuticTechniques = 'keyTherapeuticTechniques',
   ReferralsProvided = 'referralsProvided',
   HomeworkRecommended = 'homeworkRecommended',
-  PlansForNextCall = 'plansForNextCall',
+  PlanForNextCall = 'planForNextCall',
   Tags = 'tags',
   Metrics = 'metrics',
 }
@@ -90,7 +90,7 @@ export const SUMMARY_FIELDS = {
   HOMEWORK_RECOMMENDED: 'homework',
 
   // Plans for Next Call
-  PLANS_FOR_NEXT_CALL: 'planForNextCall',
+  PLAN_FOR_NEXT_CALL: 'planForNextCall',
 
   // Tags
   TAGS: 'tags',
@@ -209,7 +209,7 @@ export const SECTION_LIST: SectionItem[] = [
     canEnhance: true,
   },
   {
-    key: SectionKey.PlansForNextCall,
+    key: SectionKey.PlanForNextCall,
     label: 'Plans for Next Call',
     icon: HeadsetMicIcon,
     canEdit: true,
@@ -414,9 +414,9 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: true,
-    key: SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL,
+    key: SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL,
     label: 'Plans for Next Call',
-    sectionKey: SectionKey.PlansForNextCall,
+    sectionKey: SectionKey.PlanForNextCall,
     type: FieldType.MultilineTextInput,
   },
   {
