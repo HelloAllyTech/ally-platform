@@ -30,11 +30,7 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {
-  clearFormData,
-  clearSummary,
-  selectCallInfo,
-} from '@/store/slices/summarySlice';
+import {clearSummaryStates, selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
@@ -119,8 +115,7 @@ export const CallSummaryScreen: React.FC<
   // Cleanup function to clear summary state when component unmounts
   useEffect(() => {
     return () => {
-      dispatch(clearSummary());
-      dispatch(clearFormData());
+      dispatch(clearSummaryStates());
     };
   }, [dispatch]);
 
