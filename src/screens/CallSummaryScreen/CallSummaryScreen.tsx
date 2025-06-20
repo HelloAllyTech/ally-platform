@@ -28,14 +28,9 @@ import {
   useUpdateCallInfoMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
-import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {
-  clearSummaryStates,
-  selectCallInfo,
-  setSummaryVisibleFields,
-} from '@/store/slices/summarySlice';
+import {clearSummaryStates, selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
@@ -75,7 +70,6 @@ export const CallSummaryScreen: React.FC<
   const chatId = callId || currentChat?.chatId;
   const dispatch = useAppDispatch();
   const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
-  const {data: visibleFields} = useGetSummaryFieldsQuery();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -98,13 +92,6 @@ export const CallSummaryScreen: React.FC<
   useEffect(() => {
     setEditedName(summaryName);
   }, [summaryName]);
-
-  useEffect(() => {
-    if (visibleFields) {
-      console.log('🚀 ~ visibleFields:', visibleFields);
-      dispatch(setSummaryVisibleFields(visibleFields));
-    }
-  }, [visibleFields, dispatch]);
 
   const showToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'error') => {
