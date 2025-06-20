@@ -11,7 +11,14 @@ export const searchApi = api.injectEndpoints({
         body: params,
       }),
     }),
+    getCategories: builder.query<string[], void>({
+      query: () => ({
+        url: 'reference-document/categories',
+        method: 'GET',
+      }),
+    }),
   }),
 });
 
-export const {useLazyGetSearchResultsQuery} = searchApi;
+export const {useLazyGetSearchResultsQuery, useLazyGetCategoriesQuery} =
+  searchApi;
