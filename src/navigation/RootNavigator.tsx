@@ -83,6 +83,7 @@ const NavigationContent = ({
           <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
           <Stack.Screen name="CallLog" component={CallLogScreen} />
           <Stack.Screen name="Breathing" component={BreathingScreen} />
+          <Stack.Screen name="Splash" component={SplashScreen} />
         </>
       ) : (
         <Stack.Screen name="Splash" component={SplashScreen} />

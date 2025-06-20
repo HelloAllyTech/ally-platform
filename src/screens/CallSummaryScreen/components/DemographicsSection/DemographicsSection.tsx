@@ -14,7 +14,11 @@ import {
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
-import {selectCallDetails, selectSummary} from '@/store/slices/summarySlice';
+import {
+  selectCallDetails,
+  selectSummary,
+  selectSummaryVisibleFields,
+} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {EditableFieldKey, FieldConfig, FieldType} from '@/types/callSummary';
 import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
@@ -31,6 +35,7 @@ const DemographicsSectionComponent: React.FC<DemographicsSectionProps> = ({
 }) => {
   const {t} = useTranslate();
   const {handleFieldChange, formData} = useCallSummaryForm();
+  const visibleFields = useAppSelector(selectSummaryVisibleFields);
 
   const [openDropdown, setOpenDropdown] = useState<SummaryFieldKey | null>(
     null,
@@ -249,7 +254,13 @@ const DemographicsSectionComponent: React.FC<DemographicsSectionProps> = ({
     ],
   );
 
-  return <View style={styles.container}>{fields.map(renderField)}</View>;
+  const filteredFields = fields.filter(field =>
+    visibleFields.includes(field.field),
+  );
+
+  return (
+    <View style={styles.container}>{filteredFields.map(renderField)}</View>
+  );
 };
 
 export const DemographicsSection = memo(DemographicsSectionComponent);

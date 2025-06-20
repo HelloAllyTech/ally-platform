@@ -1,4 +1,4 @@
-import React, {useCallback} from 'react';
+import React, {useCallback, useEffect} from 'react';
 import {
   Alert,
   BackHandler,
@@ -19,6 +19,9 @@ import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {useAppDispatch} from '@/store/hooks';
+import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
@@ -33,12 +36,20 @@ export const HomeScreen: React.FC = () => {
   const drawerNavigation = useDrawerNavigation();
   const navigation = useAppNavigation();
   const {userData} = useUser();
+  const dispatch = useAppDispatch();
+  const {data: visibleFields} = useGetSummaryFieldsQuery();
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
     BackHandler.exitApp();
     return true;
   });
+
+  useEffect(() => {
+    if (visibleFields) {
+      dispatch(setSummaryVisibleFields(visibleFields));
+    }
+  }, [visibleFields, dispatch]);
 
   const handleThirdPartyCall = async () => {
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;

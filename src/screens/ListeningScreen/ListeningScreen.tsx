@@ -18,11 +18,21 @@ import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {globalStyles} from '@/theme/helpers';
-import {FeedbackResponse, SocketEvent, SocketMessage} from '@/types/message';
+import {
+  ChatProvider,
+  FeedbackResponse,
+  SocketEvent,
+  SocketMessage,
+  WebRTCAudioData,
+} from '@/types/message';
 import {Maybe} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
-import {audioDataToAmplitudes, NUM_BARS} from './audioUtils';
+import {
+  exotelAudioDataToAmplitudes,
+  NUM_BARS,
+  webRTCAudioDataToAmplitudes,
+} from './audioUtils';
 import {
   CallEndModal,
   ControlButtonsSection,
@@ -58,6 +68,10 @@ export const ListeningScreen = ({
   const [startTime, setStartTime] = useState<number>(() =>
     chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
   );
+  const callProvider = useAppSelector(
+    state => state.chat.currentChat?.provider,
+  );
+  const isConferenceCall = callProvider === ChatProvider.EXOTEL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCallPaused, setIsCallPaused] = useState(false);
@@ -112,13 +126,7 @@ export const ListeningScreen = ({
   // Throttle waveform updates to every 120ms
   useEffect(() => {
     const interval = setInterval(() => {
-      // Generate random amplitudes for visual testing
-      // TO DO: Remove this later
-      const randomAmplitudes = Array.from({length: NUM_BARS}, () =>
-        Math.random(),
-      );
-      // setAmplitudes(latestAmplitudesRef.current);
-      setAmplitudes(randomAmplitudes);
+      setAmplitudes(latestAmplitudesRef.current);
     }, 120);
     return () => clearInterval(interval);
   }, []);
@@ -150,9 +158,15 @@ export const ListeningScreen = ({
         }
         // Process audioData to amplitudes
         if (data.payload?.audioData) {
-          latestAmplitudesRef.current = audioDataToAmplitudes(
-            data.payload.audioData,
-          );
+          if (isConferenceCall) {
+            latestAmplitudesRef.current = exotelAudioDataToAmplitudes(
+              data.payload.audioData as string,
+            );
+          } else {
+            latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
+              data.payload.audioData as WebRTCAudioData,
+            );
+          }
         }
         // Clear any existing timeout
         if (audioTimeoutRef.current) {
@@ -165,7 +179,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [handleCallEnd, isAudioActive],
+    [handleCallEnd, isAudioActive, isConferenceCall],
   );
 
   const {userData} = useUser();

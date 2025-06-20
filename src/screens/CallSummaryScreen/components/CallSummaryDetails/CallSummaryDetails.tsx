@@ -6,11 +6,11 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components';
-import {SECTION_LIST, SectionKey} from '@/constants/summary';
-// import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
-import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {useAppSelector} from '@/store/hooks';
+import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {typography} from '@/theme/typography';
 import {SectionItem} from '@/types/callSummary';
@@ -26,11 +26,8 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
 }) => {
-  // const navigation = useAppNavigation();
-  const {data: _visibleFields, isLoading: isLoadingFields} =
-    useGetSummaryFieldsQuery();
   const {t} = useTranslate();
-
+  const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const {isUpdating, handleSubmit} = useCallSummaryForm();
 
   const [expanded, setExpanded] = useState(() =>
@@ -99,16 +96,15 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 
   const renderSection = useCallback(
     (sectionConfig: SectionItem, index: number) => {
-      // TO DO: Commenting this out for now to view all sections
-      // const hasVisibleFields = visibleFields?.some(
-      //   field =>
-      //     summaryFields.find(summaryField => summaryField.key === field)
-      //       ?.sectionKey === section.key,
-      // );
+      const hasVisibleFields = visibleFields?.some(
+        field =>
+          summaryFields.find(summaryField => summaryField.key === field)
+            ?.sectionKey === sectionConfig.key,
+      );
 
-      // if (!hasVisibleFields) {
-      //   return null;
-      // }
+      if (!hasVisibleFields) {
+        return null;
+      }
 
       const Icon = sectionConfig.icon;
 
@@ -128,10 +124,10 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         </View>
       );
     },
-    [expanded, isEditing, handleSubmit, toggleSection],
+    [expanded, isEditing, handleSubmit, toggleSection, visibleFields],
   );
 
-  if (isLoadingSummary || isLoadingFields) {
+  if (isLoadingSummary) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={colors.darkSlate} />
