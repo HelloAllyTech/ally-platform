@@ -24,7 +24,7 @@ export type FormData = {
   [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: string | null;
   [SUMMARY_FIELDS.REFERRALS_PROVIDED]: string | null;
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: string | null;
-  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: string | null;
+  [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: string | null;
   [SUMMARY_FIELDS.TAGS]: string | null;
 };
 
@@ -47,7 +47,7 @@ export const transformSummaryToFormData = (
     summary.keyTherapeuticTechniques || null,
   [SUMMARY_FIELDS.REFERRALS_PROVIDED]: summary.referralsProvided || null,
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: summary.homework || null,
-  [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]: summary.planForNextCall || null,
+  [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: summary.planForNextCall || null,
   [SUMMARY_FIELDS.TAGS]: mapTagsToString(summary?.tags || []) || null,
   [SUMMARY_FIELDS.AGE]: summary.age || null,
   [SUMMARY_FIELDS.GENDER]: summary.gender || null,
@@ -92,8 +92,8 @@ export const transformFormDataForSubmission = (
       formData?.[SUMMARY_FIELDS.REFERRALS_PROVIDED] ?? null,
     [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]:
       formData?.[SUMMARY_FIELDS.HOMEWORK_RECOMMENDED] ?? null,
-    [SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL]:
-      formData?.[SUMMARY_FIELDS.PLANS_FOR_NEXT_CALL] ?? null,
+    [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]:
+      formData?.[SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL] ?? null,
     [SUMMARY_FIELDS.TAGS]: tags,
   };
 };
