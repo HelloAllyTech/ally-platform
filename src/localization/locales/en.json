@@ -69,7 +69,10 @@
     "enterDetail": "Enter detail",
     "header": {
       "title": "Call",
-      "subtitle": "Summary"
+      "subtitle": "Summary",
+      "callSummary": "Call summary",
+      "transcript": "Transcript",
+      "callTranscript": "Call transcript"
     },
     "progress": {
       "complete": "Summary Progress Complete"

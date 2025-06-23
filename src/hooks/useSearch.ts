@@ -7,7 +7,10 @@ import {
   TabDefinition,
   TabState,
 } from '@/screens/SearchScreen/types';
-import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
+import {
+  useLazyGetCategoriesQuery,
+  useLazyGetSearchResultsQuery,
+} from '@/services/searchApi';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
@@ -21,76 +24,51 @@ export const useSearch = () => {
   const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
     useLazyGetSearchResultsQuery();
 
+  const [
+    getCategories,
+    {
+      data: categories,
+      isLoading: categoryLoading,
+      isFetching: categoryFetching,
+    },
+  ] = useLazyGetCategoriesQuery();
+
   const [activeTab, setActiveTab] = useState(0);
   const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
   const [tabsState, setTabsState] = useState<TabState[]>([]);
 
   useEffect(() => {
-    if (searchResults?.documents) {
-      // Filter documents by category
-      const resourcesDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Resources',
-      );
-      const questionDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Question',
-      );
-      const techniquesDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Techniques',
-      );
-      const assessmentDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Assessment',
-      );
-      const metaphorDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Metaphor',
-      );
-      const interventionDocs = searchResults.documents.filter(
-        (result: ResourceArticle) => result.category === 'Intervention',
-      );
+    getCategories();
+  }, [getCategories]);
 
-      // Fixed list of tabs
-      const fixedTabs: TabDefinition[] = [
+  useEffect(() => {
+    if (searchResults?.documents && categories) {
+      const allTabs: TabDefinition[] = [
         {
           key: 'all',
           label: `All (${searchResults.documents.length})`,
           data: searchResults.documents,
         },
-        {
-          key: 'resources',
-          label: `Resources (${resourcesDocs.length})`,
-          data: resourcesDocs,
-        },
-        {
-          key: 'question',
-          label: `Question (${questionDocs.length})`,
-          data: questionDocs,
-        },
-        {
-          key: 'techniques',
-          label: `Techniques (${techniquesDocs.length})`,
-          data: techniquesDocs,
-        },
-        {
-          key: 'metaphor',
-          label: `Metaphor (${metaphorDocs.length})`,
-          data: metaphorDocs,
-        },
-        {
-          key: 'assessment',
-          label: `Assessment (${assessmentDocs.length})`,
-          data: assessmentDocs,
-        },
-        {
-          key: 'intervention',
-          label: `Intervention (${interventionDocs.length})`,
-          data: interventionDocs,
-        },
       ];
 
-      setDynamicTabs(fixedTabs);
+      // Create tabs for each category from the API
+      categories.forEach(category => {
+        const categoryDocs = searchResults.documents.filter(
+          (result: ResourceArticle) => result.category === category,
+        );
+
+        allTabs.push({
+          key: category.toLowerCase(),
+          label: `${category} (${categoryDocs.length})`,
+          data: categoryDocs,
+        });
+      });
+
+      setDynamicTabs(allTabs);
 
       // Initialize tab states with data
       setTabsState(
-        fixedTabs.map(tab => ({
+        allTabs.map(tab => ({
           data: tab.data || [],
           page: 0,
           hasMore: false,
@@ -99,7 +77,7 @@ export const useSearch = () => {
         })),
       );
     }
-  }, [searchResults]);
+  }, [searchResults, categories]);
 
   const loadTabData = useCallback(
     (tabIdx: number = 0, nextPage: number = 0, append = false) => {
@@ -211,6 +189,9 @@ export const useSearch = () => {
     setShowSearchResults(true);
   };
 
+  const loading =
+    isLoading || categoryLoading || isFetching || categoryFetching;
+
   return {
     searchText,
     setSearchText,
@@ -227,8 +208,7 @@ export const useSearch = () => {
     setFocused,
     onChangeText,
     searchResults,
-    isLoading,
-    isFetching,
+    loading,
     triggerSearch,
     searchDocuments,
     setActiveTab,
