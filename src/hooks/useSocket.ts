@@ -6,11 +6,16 @@ import {SocketEvent} from '@/types/message';
 import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
+  path?: string;
   userId?: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
 }
 
-export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
+export const useSocket = ({
+  userId,
+  eventCallbacks,
+  path = '',
+}: UseSocketOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const connectionAttemptsRef = useRef(0);
   const maxAttempts = 5;
@@ -24,7 +29,7 @@ export const useSocket = ({userId, eventCallbacks}: UseSocketOptions) => {
       }
 
       try {
-        socketRef.current = io(baseUrl, {
+        socketRef.current = io(`${baseUrl}${path}`, {
           path: '',
           transports: ['polling', 'websocket'],
           auth: {
