@@ -46,9 +46,8 @@ export const SearchScreen: React.FC = () => {
     activeTab,
     dynamicTabs,
     setActiveTab,
-    isLoading,
+    loading,
     triggerSearch,
-    isFetching,
     onPressSuggestion,
   } = useSearch();
   const {t} = useTranslate();
@@ -115,7 +114,7 @@ export const SearchScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {isLoading || isFetching ? (
+        {loading ? (
           <ActivityIndicator style={styles.activityIndicator} />
         ) : (
           dynamicTabs.length > 0 && (
