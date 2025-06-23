@@ -52,17 +52,11 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
     [tags, themedStyles],
   );
 
-  const formatLabel = (str: string) =>
-    str
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-
   return (
     <View style={themedStyles.card}>
       <View style={themedStyles.topRow}>
         <View style={themedStyles.categoryChip}>
-          <Text style={themedStyles.categoryText}>{formatLabel(category)}</Text>
+          <Text style={themedStyles.categoryText}>{category}</Text>
         </View>
         {renderedTags}
       </View>
