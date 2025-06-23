@@ -6,6 +6,7 @@ import {
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
+import {env} from '@/config/env';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
@@ -63,6 +64,13 @@ const NavigationContent = ({
   );
 
   useSocketConnection({
+    path: env.WEBRTC_SOCKET_PATH,
+    userId: userData?.id,
+    eventCallbacks: socketEventCallbacks,
+  });
+
+  useSocketConnection({
+    path: env.MICROPHONE_SOCKET_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
   });
