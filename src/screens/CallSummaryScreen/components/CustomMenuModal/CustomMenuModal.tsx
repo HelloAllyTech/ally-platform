@@ -98,7 +98,7 @@ const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           </Text>
           <ExportIcon width={16} height={16} />
         </TouchableOpacity>
-        <View style={styles.menuDivider} />
+        {/* <View style={styles.menuDivider} /> */}
         {/* Hiding delete option for now */}
         {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
           <Text style={styles.menuText}>
