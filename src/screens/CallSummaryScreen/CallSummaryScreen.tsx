@@ -40,6 +40,7 @@ import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryP
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
 import {DeleteRenameModal} from './components/DeleteRenameModal/DeleteRenameModal';
 import {Header} from './components/Header/Header';
+import SummaryDropdown from './components/Header/SummaryDropdown';
 
 /**
  * CallSummaryScreen component displays a summary of the call with an animated card interface.
@@ -73,6 +74,9 @@ export const CallSummaryScreen: React.FC<
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isSummaryDropdownVisible, setIsSummaryDropdownVisible] =
+    useState(false);
+  const [showSummary, setShowSummary] = useState(true);
   const [toast, setToast] = useState<ToastState>({
     visible: false,
     message: '',
@@ -314,6 +318,10 @@ export const CallSummaryScreen: React.FC<
     }
   }, [hasCollapsedBeenShown, showAnimation]);
 
+  const onHeaderPress = () => {
+    setIsSummaryDropdownVisible(true);
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -335,6 +343,15 @@ export const CallSummaryScreen: React.FC<
         onMenuPress={() => setIsMenuVisible(true)}
         summaryName={summaryName}
         showAnimation={showAnimation}
+        showSummary={showSummary}
+        onHeaderPress={onHeaderPress}
+      />
+      <SummaryDropdown
+        visible={isSummaryDropdownVisible}
+        onClose={() => setIsSummaryDropdownVisible(false)}
+        isFullyExpanded={isFullyExpanded}
+        showSummary={showSummary}
+        setShowSummary={setShowSummary}
       />
       <CustomMenuModal
         visible={isMenuVisible}
