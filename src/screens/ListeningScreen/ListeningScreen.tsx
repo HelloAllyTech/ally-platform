@@ -3,6 +3,7 @@ import {RouteProp} from '@react-navigation/native';
 import {StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
@@ -92,6 +93,13 @@ export const ListeningScreen = ({
   const handleCallEnd = useCallback(() => {
     navigation.navigate('Breathing');
   }, [navigation]);
+
+  const getSocketPath = () => {
+    if (isConferenceCall) {
+      return env.MICROPHONE_SOCKET_PATH;
+    }
+    return env.WEBRTC_SOCKET_PATH;
+  };
 
   useEffect(() => {
     if (isSuccess) {
@@ -185,6 +193,7 @@ export const ListeningScreen = ({
   const {userData} = useUser();
   // Automatically manages socket connection based on screen focus and app state
   const {emitSocketEvent} = useSocketConnection({
+    path: getSocketPath(),
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
   });
