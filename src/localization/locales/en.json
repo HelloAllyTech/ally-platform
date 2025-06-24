@@ -106,6 +106,11 @@
       "rename": "Rename"
     }
   },
+  "CallTranscript": {
+    "empty": "No transcript available",
+    "you": "You",
+    "client": "Client"
+  },
   "CallLogs": {
     "header": {
       "title": "Call",
