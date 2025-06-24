@@ -38,6 +38,7 @@ const baseQueryWithReauth: BaseQueryFn<
 > = async (args, _store, extraOptions) => {
   try {
     let result = await baseQuery(args, _store, extraOptions);
+    console.log('result', result);
     if (result.error && result.error.status === 401) {
       // Try to get a new token
       const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);

@@ -15,15 +15,11 @@ export const useCallTranscriptDetails = (chatId: number) => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const listRef = useRef<FlatList>(null);
-  const currentRequestRef = useRef<{id: string; offset: number} | null>(null);
-  const processedDataRef = useRef<Set<string>>(new Set());
-  const lastChatIdRef = useRef<string | null>(null);
 
   const [getChatMessages, {data, isLoading, isFetching}] =
     useLazyGetChatMessagesQuery();
 
   const summaryData = useAppSelector(selectSummaryData);
-
   const counselor = summaryData?.counselorId;
   const client = summaryData?.clientId;
   const startedTime = summaryData?.startedAt;
@@ -32,78 +28,53 @@ export const useCallTranscriptDetails = (chatId: number) => {
     () => ({
       id: chatId,
       limit: LIMIT,
-      offset: 0,
       sortOrder: 'ASC',
-      type: 'TEXT',
     }),
     [chatId],
   );
+
+  // Process data only if it's for a new offset
+  useEffect(() => {
+    if (data) {
+      const newMessages = data.data;
+
+      setMessages(prev => {
+        const updated = [...prev, ...newMessages];
+        if (updated.length >= data.count) {
+          setHasMore(false);
+        }
+        return updated;
+      });
+    }
+  }, [data]);
+
+  // Reset state and load first page on chatId change
+  useEffect(() => {
+    if (!chatId) return;
+
+    setMessages([]);
+    setHasMore(true);
+    setOffset(0);
+
+    getChatMessages({
+      ...queryParams,
+      offset: 0,
+    });
+  }, [chatId, getChatMessages, queryParams]);
 
   const fetchMessages = useCallback(
     (currentOffset: number) => {
       if (!hasMore) return;
 
-      const requestKey = `${chatId}-${currentOffset}`;
-      if (processedDataRef.current.has(requestKey)) return;
-
-      currentRequestRef.current = {
-        id: chatId.toString(),
-        offset: currentOffset,
-      };
-
       getChatMessages({
         ...queryParams,
         offset: currentOffset,
       });
-    },
-    [getChatMessages, chatId, hasMore, queryParams],
-  );
 
-  // Initial fetch - only run when chatId changes
-  useEffect(() => {
-    if (chatId && chatId.toString() !== lastChatIdRef.current) {
-      lastChatIdRef.current = chatId.toString();
-      setMessages([]);
-      setOffset(0);
-      setHasMore(true);
-      processedDataRef.current.clear();
-
-      // Call API directly to avoid dependency issues
-      getChatMessages({
-        ...queryParams,
-        offset: 0,
-      });
-    }
-  }, [chatId, getChatMessages, queryParams]);
-
-  // Effect to watch for incoming data
-  useEffect(() => {
-    if (data && currentRequestRef.current) {
-      const {id, offset: currentOffset} = currentRequestRef.current;
-      const requestKey = `${id}-${currentOffset}`;
-
-      // Check if we've already processed this data
-      if (processedDataRef.current.has(requestKey)) {
-        return;
-      }
-
-      // Mark this request as processed
-      processedDataRef.current.add(requestKey);
-
-      setMessages(prev => [...prev, ...data]);
-
-      // Update offset for next fetch
       setOffset(currentOffset + LIMIT);
-
-      // Check if we have more data
-      if (data.length < LIMIT) {
-        setHasMore(false);
-      }
-
-      // Clear current request
-      currentRequestRef.current = null;
-    }
-  }, [data]);
+    },
+    [getChatMessages, hasMore, queryParams],
+  );
 
   const handleEndReached = useCallback(() => {
     if (!isLoading && hasMore) {
@@ -116,30 +87,32 @@ export const useCallTranscriptDetails = (chatId: number) => {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
 
-    const paddedMinutes = minutes.toString().padStart(2, '0');
-    const paddedSeconds = seconds.toString().padStart(2, '0');
-
-    return `${paddedMinutes}.${paddedSeconds}`;
+    return `${minutes.toString().padStart(2, '0')}.${seconds
+      .toString()
+      .padStart(2, '0')}`;
   };
 
-  // Format messages with required information
-  const formattedMessages = messages.map(message => ({
-    id: message.messageId,
-    message: message.content,
-    time: formatTimeToMMSS(
-      startedTime
-        ? new Date(message.createdAt).getTime() -
-            new Date(startedTime).getTime()
-        : 0,
-    ),
-    counselor: message.senderId === counselor,
-    client: message.senderId === client,
-  }));
+  const formattedMessages = useMemo(
+    () =>
+      messages.map(message => ({
+        id: message.messageId,
+        message: message.content,
+        time: formatTimeToMMSS(
+          startedTime
+            ? new Date(message.createdAt).getTime() -
+                new Date(startedTime).getTime()
+            : 0,
+        ),
+        counselor: message.senderId === counselor,
+        client: message.senderId === client || message.senderId === -1,
+      })),
+    [messages, startedTime, counselor, client],
+  );
 
   return {
     formattedMessages,
     data,
-    isLoading: isLoading,
+    isLoading,
     isFetching,
     summaryData,
     hasMore,
