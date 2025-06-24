@@ -23,6 +23,7 @@ import DoubleRightArrowIcon from './doubleRightArrow.svg';
 import DrawerMenuIcon from './drawerMenu.svg';
 import EditIcon from './edit.svg';
 import EditSquareIcon from './editSquare.svg';
+import EmptyTranscriptIcon from './emptyTranscript.svg';
 import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
@@ -130,4 +131,5 @@ export {
   ChevronDown,
   CallIcon,
   TranscriptIcon,
+  EmptyTranscriptIcon,
 };
