@@ -7,6 +7,7 @@ import {SocketEvent} from '@/types/message';
 import {useSocket} from './useSocket';
 
 interface UseSocketConnectionOptions {
+  path?: string;
   userId?: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
   onConnect?: () => void;
@@ -48,6 +49,7 @@ interface UseSocketConnectionOptions {
  * ```
  */
 export const useSocketConnection = ({
+  path = '',
   userId,
   eventCallbacks,
   onConnect,
@@ -56,6 +58,7 @@ export const useSocketConnection = ({
   const appState = useRef(AppState.currentState);
 
   const {connect, disconnect, emitSocketEvent} = useSocket({
+    path,
     userId,
     eventCallbacks,
   });
