@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {FlatList} from 'react-native';
 
 import {
@@ -8,9 +8,9 @@ import {
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryData} from '@/store/slices/summarySlice';
 
-const LIMIT = 40;
+const LIMIT = 20;
 
-export const useCallSummaryDetails = (chatId: string) => {
+export const useCallTranscriptDetails = (chatId: number) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -28,6 +28,17 @@ export const useCallSummaryDetails = (chatId: string) => {
   const client = summaryData?.clientId;
   const startedTime = summaryData?.startedAt;
 
+  const queryParams = useMemo(
+    () => ({
+      id: chatId,
+      limit: LIMIT,
+      offset: 0,
+      sortOrder: 'ASC',
+      type: 'TEXT',
+    }),
+    [chatId],
+  );
+
   const fetchMessages = useCallback(
     (currentOffset: number) => {
       if (!hasMore) return;
@@ -35,21 +46,23 @@ export const useCallSummaryDetails = (chatId: string) => {
       const requestKey = `${chatId}-${currentOffset}`;
       if (processedDataRef.current.has(requestKey)) return;
 
-      currentRequestRef.current = {id: chatId, offset: currentOffset};
+      currentRequestRef.current = {
+        id: chatId.toString(),
+        offset: currentOffset,
+      };
 
       getChatMessages({
-        id: chatId,
-        limit: LIMIT,
+        ...queryParams,
         offset: currentOffset,
       });
     },
-    [getChatMessages, chatId, hasMore],
+    [getChatMessages, chatId, hasMore, queryParams],
   );
 
   // Initial fetch - only run when chatId changes
   useEffect(() => {
-    if (chatId && chatId !== lastChatIdRef.current) {
-      lastChatIdRef.current = chatId;
+    if (chatId && chatId.toString() !== lastChatIdRef.current) {
+      lastChatIdRef.current = chatId.toString();
       setMessages([]);
       setOffset(0);
       setHasMore(true);
@@ -57,12 +70,11 @@ export const useCallSummaryDetails = (chatId: string) => {
 
       // Call API directly to avoid dependency issues
       getChatMessages({
-        id: chatId,
-        limit: LIMIT,
+        ...queryParams,
         offset: 0,
       });
     }
-  }, [chatId, getChatMessages]);
+  }, [chatId, getChatMessages, queryParams]);
 
   // Effect to watch for incoming data
   useEffect(() => {
@@ -78,11 +90,7 @@ export const useCallSummaryDetails = (chatId: string) => {
       // Mark this request as processed
       processedDataRef.current.add(requestKey);
 
-      const newMessages = data.filter(
-        (message: ChatMessage) => message.type === 'TEXT',
-      );
-
-      setMessages(prev => [...prev, ...newMessages]);
+      setMessages(prev => [...prev, ...data]);
 
       // Update offset for next fetch
       setOffset(currentOffset + LIMIT);
@@ -116,7 +124,7 @@ export const useCallSummaryDetails = (chatId: string) => {
 
   // Format messages with required information
   const formattedMessages = messages.map(message => ({
-    id: message.id,
+    id: message.messageId,
     message: message.content,
     time: formatTimeToMMSS(
       startedTime
