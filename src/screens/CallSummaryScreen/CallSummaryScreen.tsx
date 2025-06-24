@@ -393,9 +393,7 @@ export const CallSummaryScreen: React.FC<
             )}
           </ScrollView>
         ) : (
-          <CallTranscript
-            chatId={chatId?.toString() || currentChat?.chatId?.toString() || ''}
-          />
+          <CallTranscript chatId={chatId || 0} />
         )}
       </Animated.View>
       {isShowCallSummary && showScrollToBottom && showSummary && (

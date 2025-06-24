@@ -9,7 +9,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscriptIcon} from '@/assets/icons';
-import {useCallSummaryDetails} from '@/hooks/useCallTranscriptDetails';
+import {useCallTranscriptDetails} from '@/hooks/useCallTranscriptDetails';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -22,9 +22,9 @@ type Message = {
   client: boolean;
 };
 
-const CallTranscript = ({chatId}: {chatId: string}) => {
+const CallTranscript = ({chatId}: {chatId: number}) => {
   const {formattedMessages, isLoading, listRef, handleEndReached} =
-    useCallSummaryDetails(chatId);
+    useCallTranscriptDetails(chatId);
 
   const [isContentShort, setIsContentShort] = useState(false);
   const {height: screenHeight} = useWindowDimensions();
