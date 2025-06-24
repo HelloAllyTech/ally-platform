@@ -8,10 +8,12 @@ export interface ChatMessage {
   createdAt: string;
   feedback: string | null;
   senderId: number;
-  messageType: string;
 }
 
-type ChatMessagesResponse = ChatMessage[];
+type ChatMessagesResponse = {
+  data: ChatMessage[];
+  count: number;
+};
 
 interface ChatMessagesParams {
   id: number;
