@@ -21,14 +21,13 @@ import {
   FeedbackResponse,
   SocketEvent,
   SocketMessage,
-  WebRTCAudioData,
 } from '@/types/message';
 import {Maybe} from '@/utils/common';
 
 import {
+  audioDataToAmplitudes,
   exotelAudioDataToAmplitudes,
   NUM_BARS,
-  webRTCAudioDataToAmplitudes,
 } from './audioUtils';
 import {
   CallEndModal,
@@ -155,8 +154,8 @@ export const ListeningScreen = () => {
               data.payload.audioData as string,
             );
           } else {
-            latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
-              data.payload.audioData as WebRTCAudioData,
+            latestAmplitudesRef.current = audioDataToAmplitudes(
+              data.payload.audioData as string,
             );
           }
         }

@@ -1,3 +1,4 @@
+import {toByteArray} from 'base64-js';
 import {Dimensions} from 'react-native';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -39,6 +40,23 @@ export function exotelAudioDataToAmplitudes(audioData: string): number[] {
   }
   return amplitudes;
 }
+
+export const audioDataToAmplitudes = (input: string): number[] => {
+  const bytesArray = toByteArray(input);
+  const targetLength = NUM_BARS;
+  const amplitudes = [];
+  const usedIndices = new Set();
+
+  while (amplitudes.length < targetLength) {
+    const idx = Math.floor(Math.random() * bytesArray.length);
+    if (!usedIndices.has(idx)) {
+      amplitudes.push(bytesArray[idx] / 255); // normalize here
+      usedIndices.add(idx);
+    }
+  }
+
+  return amplitudes;
+};
 
 export function webRTCAudioDataToAmplitudes(input: {
   type: string;
