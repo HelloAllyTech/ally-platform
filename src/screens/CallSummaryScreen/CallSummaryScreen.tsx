@@ -37,6 +37,7 @@ import {logger} from '@/utils/logger';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
 import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
+import CallTranscript from './components/CallTranscript/CallTranscript';
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
 import {DeleteRenameModal} from './components/DeleteRenameModal/DeleteRenameModal';
 import {Header} from './components/Header/Header';
@@ -92,6 +93,7 @@ export const CallSummaryScreen: React.FC<
   const [updateCallInfo] = useUpdateCallInfoMutation();
   const [showAnimation, setShowAnimation] = useState(!callId);
   const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
+  const showTranscript = Boolean(callId);
 
   useEffect(() => {
     setEditedName(summaryName);
@@ -345,6 +347,7 @@ export const CallSummaryScreen: React.FC<
         showAnimation={showAnimation}
         showSummary={showSummary}
         onHeaderPress={onHeaderPress}
+        showTranscript={showTranscript}
       />
       <SummaryDropdown
         visible={isSummaryDropdownVisible}
@@ -365,31 +368,35 @@ export const CallSummaryScreen: React.FC<
           showAnimation && animatedCardStyle,
           {maxHeight: WINDOW_HEIGHT - insets.top},
         ]}>
-        <ScrollView
-          ref={scrollViewRef}
-          scrollEnabled={isShowCallSummary}
-          onScroll={handleScroll}
-          scrollEventThrottle={8}
-          onLayout={handleLayout}
-          contentContainerStyle={
-            !isFullyExpanded || !showAnimation ? styles.contentContainer : {}
-          }>
-          {isShowCallSummary ? (
-            <CallSummaryDetails
-              isLoading={isLoading}
-              onSubmit={onUpdateSummary}
-            />
-          ) : (
-            <CallSummaryProgress
-              onProgressComplete={() => {
-                setSummaryProgressComplete(true);
-              }}
-              animationDuration={300}
-            />
-          )}
-        </ScrollView>
+        {showSummary ? (
+          <ScrollView
+            ref={scrollViewRef}
+            scrollEnabled={isShowCallSummary}
+            onScroll={handleScroll}
+            scrollEventThrottle={8}
+            onLayout={handleLayout}
+            contentContainerStyle={
+              !isFullyExpanded || !showAnimation ? styles.contentContainer : {}
+            }>
+            {isShowCallSummary ? (
+              <CallSummaryDetails
+                isLoading={isLoading}
+                onSubmit={onUpdateSummary}
+              />
+            ) : (
+              <CallSummaryProgress
+                onProgressComplete={() => {
+                  setSummaryProgressComplete(true);
+                }}
+                animationDuration={300}
+              />
+            )}
+          </ScrollView>
+        ) : (
+          <CallTranscript chatId={chatId || 0} />
+        )}
       </Animated.View>
-      {isShowCallSummary && showScrollToBottom && (
+      {isShowCallSummary && showScrollToBottom && showSummary && (
         <TouchableOpacity
           style={styles.scrollToBottomButton}
           onPress={scrollToBottom}>
