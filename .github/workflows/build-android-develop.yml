@@ -1,9 +1,6 @@
 name: 'Build Android app - Develop'
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch:
     inputs:
       environment:
