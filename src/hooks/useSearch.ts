@@ -14,6 +14,7 @@ import {
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
+  const [lastSearchedText, setLastSearchedText] = useState('');
   const [focused, setFocused] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] =
@@ -136,6 +137,7 @@ export const useSearch = () => {
 
   // Only call this to trigger a search
   const triggerSearch = useCallback(() => {
+    setLastSearchedText(searchText);
     if (searchText.trim() !== '') {
       searchDocuments({query: searchText});
       setShowSearchResults(true);
@@ -161,6 +163,7 @@ export const useSearch = () => {
   }, [searchText]);
 
   const handleSuggestionPress = (suggestion: {id: number; text: string}) => {
+    setLastSearchedText(suggestion.text);
     setSearchText(suggestion.text);
     setShowSuggestions(false);
     setFocused(false);
@@ -185,6 +188,7 @@ export const useSearch = () => {
 
   const onPressSuggestion = (suggestion: string) => {
     setSearchText(suggestion);
+    setLastSearchedText(suggestion);
     searchDocuments({query: suggestion});
     setShowSearchResults(true);
   };
@@ -217,5 +221,6 @@ export const useSearch = () => {
     activeTab,
     dynamicTabs,
     onPressSuggestion,
+    lastSearchedText,
   };
 };
