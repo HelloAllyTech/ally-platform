@@ -51,7 +51,8 @@ export const Header: React.FC<HeaderProps> = ({
                 <TouchableOpacity
                   style={styles.summaryTitleContainer}
                   onPress={onHeaderPress}
-                  activeOpacity={0.8}>
+                  activeOpacity={0.8}
+                  disabled={!showTranscript}>
                   <Text style={styles.expandedSummaryTitle}>
                     {t('CallSummary.header.title')}{' '}
                     <Text style={styles.headerSubtitle}>
