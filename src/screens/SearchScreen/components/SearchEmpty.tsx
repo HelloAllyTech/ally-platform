@@ -1,4 +1,4 @@
-import {Text, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
@@ -10,15 +10,18 @@ interface SearchEmptyProps {
   searchText: string;
   trySuggestions: {id: number; text: string}[];
   colorTheme: 'light' | 'dark';
+  onPressSuggestion: (suggestion: string) => void;
 }
 
 export const SearchEmpty: React.FC<SearchEmptyProps> = ({
   searchText,
   trySuggestions,
   colorTheme = 'light',
+  onPressSuggestion,
 }) => {
   const {t} = useTranslate();
   const themedStyles = getThemedStyles(colorTheme);
+
   return (
     <View style={themedStyles.emptyComponent}>
       <Text style={themedStyles.emptyComponentText}>
@@ -26,14 +29,18 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
       </Text>
       <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
       {trySuggestions.map(suggestion => (
-        <View key={suggestion.id} style={themedStyles.trySuggestion}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          key={suggestion.id}
+          style={themedStyles.trySuggestion}
+          onPress={() => onPressSuggestion(suggestion.text)}>
           {colorTheme === 'dark' ? (
             <SearchActiveIcon width={14} height={14} color={colors.darkGray8} />
           ) : (
             <SearchIcon width={14} height={14} />
           )}
           <Text style={themedStyles.suggestionText}>{suggestion.text}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );

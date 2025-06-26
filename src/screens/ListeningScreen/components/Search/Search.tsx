@@ -39,6 +39,7 @@ const Search = () => {
     onPressSuggestion,
     loading,
     handleEndReached,
+    lastSearchedText,
   } = useSearch();
 
   const {t} = useTranslate();
@@ -57,9 +58,10 @@ const Search = () => {
   const renderEmptyComponent = () => {
     return (
       <SearchEmpty
-        searchText={searchText}
+        searchText={lastSearchedText}
         trySuggestions={trySuggestions}
         colorTheme="dark"
+        onPressSuggestion={onPressSuggestion}
       />
     );
   };
