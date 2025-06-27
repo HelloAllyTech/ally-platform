@@ -3,11 +3,13 @@ import {
   Alert,
   BackHandler,
   Linking,
+  Platform,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DrawerMenuIcon} from '@/assets/icons';
@@ -17,6 +19,7 @@ import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {usePermission} from '@/hooks/usePermission';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
@@ -51,6 +54,17 @@ export const HomeScreen: React.FC = () => {
     }
   }, [visibleFields, dispatch]);
 
+  const micPermission = Platform.select({
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+  });
+
+  const {
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicGranted,
+  } = usePermission(micPermission!);
+
   const handleThirdPartyCall = async () => {
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
     try {
@@ -75,8 +89,24 @@ export const HomeScreen: React.FC = () => {
     }
   }, []);
 
-  const handleVoiceRecording = () => {
-    navigation.navigate('Listening', {isRecording: true});
+  const handleVoiceRecording = async () => {
+    if (isMicGranted) {
+      navigation.navigate('Listening', {isRecording: true});
+      return;
+    }
+    const result = await requestMicPermission();
+    if (result === RESULTS.GRANTED) {
+      navigation.navigate('Listening', {isRecording: true});
+    } else {
+      Alert.alert(
+        'Microphone Permission Required',
+        'Please enable microphone access in your device settings to use voice recording.',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {text: 'Open Settings', onPress: openAppSettings},
+        ],
+      );
+    }
   };
 
   if (userData?.role !== UserRole.COUNSELOR) {
@@ -112,34 +142,6 @@ export const HomeScreen: React.FC = () => {
       {userData?.role !== UserRole.COUNSELOR ? (
         <FeatureNotAvailable />
       ) : (
-        // <View style={styles.content}>
-        //   <Text style={styles.titleContainer}>
-        //     <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-        //     <Text style={styles.listeningText}>
-        //       {t('HomeScreen.listening')}
-        //     </Text>
-        //   </Text>
-        //   <TouchableOpacity
-        //     style={styles.animationContainer}
-        //     onPress={handleThirdPartyCall}
-        //     activeOpacity={0.8}>
-        //     <LottieView
-        //       source={require('@/assets/animations/listen.json')}
-        //       autoPlay
-        //       loop
-        //       style={styles.lottieAnimation}
-        //     />
-        //     <View style={styles.headphoneContainer}>
-        //       <HeadphoneIcon width={31} height={31} />
-        //     </View>
-        //   </TouchableOpacity>
-        //   <TouchableOpacity
-        //     onPress={handleThirdPartyCall}
-        //     activeOpacity={0.8}
-        //     style={styles.textContainer}>
-        //     <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-        //   </TouchableOpacity>
-        // </View>
         <View style={styles.content}>
           <Text style={styles.title}>{t('Home.start')}</Text>
           <Text style={styles.subtitle}>{t('Home.session')}</Text>
@@ -153,12 +155,12 @@ export const HomeScreen: React.FC = () => {
               subtitle={t('Home.allyWillJoinOngoingCall')}
               onPressCard={handleThirdPartyCall}
             />
-            {/* <StartCallCard
+            <StartCallCard
               image={images.listenLive}
               header={t('Home.listenLive')}
               subtitle={t('Home.allyWillHearAudio')}
               onPressCard={handleVoiceRecording}
-            /> */}
+            />
           </View>
         </View>
       )}

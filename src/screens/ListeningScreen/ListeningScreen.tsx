@@ -32,6 +32,7 @@ import {logger} from '@/utils/logger';
 import {
   exotelAudioDataToAmplitudes,
   NUM_BARS,
+  recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
 } from './audioUtils';
 import {
@@ -61,13 +62,12 @@ export const ListeningScreen = ({
   const {t} = useTranslate();
   const navigation = useAppNavigation();
 
-  const {isRecording} = route.params || {};
-
   const [isFocusMode, setIsFocusMode] = useState(true);
   const chat = useAppSelector(state => state.chat.currentChat);
 
-  const [startTime, setStartTime] = useState<number>(() =>
-    chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
+  const startTime = useMemo(
+    () => (chat?.startedAt ? +new Date(chat.startedAt) : Date.now()),
+    [chat?.startedAt],
   );
   const callProvider = useAppSelector(
     state => state.chat.currentChat?.provider,
@@ -87,19 +87,26 @@ export const ListeningScreen = ({
   );
   const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
 
+  // Current chat won't be available initially for microphone mode flow
+  // as the new chat is created only on emitting the event START_AUDIO_CHAT
   const chatData = useAppSelector(state => state.chat.currentChat);
+  const isRecording =
+    route.params?.isRecording || chatData?.provider === ChatProvider.MICROPHONE;
+
+  /** Show timer for webrtc/exotel call and in case of microphone mode when chat has started */
+  const showTimer = !isRecording || chatData?.chatId;
   const [endCall, {isSuccess}] = useEndCallMutation();
 
   const handleCallEnd = useCallback(() => {
     navigation.navigate('Breathing');
   }, [navigation]);
 
-  const getSocketPath = () => {
-    if (isConferenceCall) {
+  const getSocketPath = useCallback(() => {
+    if (isConferenceCall || isRecording) {
       return env.MICROPHONE_SOCKET_PATH;
     }
     return env.WEBRTC_SOCKET_PATH;
-  };
+  }, [isConferenceCall, isRecording]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -107,12 +114,17 @@ export const ListeningScreen = ({
     }
   }, [isSuccess, handleCallEnd]);
 
-  const handleEndCall = () => {
-    if (isRecording) {
-      handleStopStreaming();
-    }
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: !isRecording,
+    });
+  }, [isRecording, navigation]);
 
+  const handleEndCall = () => {
     if (chatData?.chatId) {
+      if (isRecording) {
+        handleStopStreaming();
+      }
       endCall({chatId: chatData.chatId});
     }
   };
@@ -127,6 +139,10 @@ export const ListeningScreen = ({
   }, []);
 
   useHardwareBackPressHandler(() => {
+    if (isRecording) {
+      setShowCallEndConfirmation(true);
+      return true;
+    }
     navigation.goBack();
     return true;
   });
@@ -198,40 +214,38 @@ export const ListeningScreen = ({
     eventCallbacks: socketEventCallbacks,
   });
 
-  const handleAudioData = useCallback(
-    (data: string) => {
-      emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
-        audioData: data,
-        chatId: chat?.chatId?.toString(),
+  useEffect(() => {
+    if (isRecording && !chatData?.chatId) {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
+        isLinear16Encoded: true,
       });
-    },
-    [emitSocketEvent, chat?.chatId],
-  );
+    }
+  }, [chatData?.chatId, emitSocketEvent, isRecording]);
+
+  const handleAudioData = (base64Wav: string) => {
+    latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
+    emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+      audioData: base64Wav,
+      chatId: chatData?.chatId,
+    });
+  };
 
   const {startStreaming, stopStreaming} = useLiveAudioStream({
     onAudioData: handleAudioData,
-    chatId: chat?.chatId?.toString(),
+    enableLiveAudio: isRecording && !!chatData?.chatId,
   });
 
   const handleStartStreaming = useCallback(async () => {
     try {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
-        chatId: chat?.chatId?.toString(),
-      });
       await startStreaming();
-      setStartTime(Date.now());
     } catch (error) {
       logger.error(`Error starting stream: ${error}`);
     }
-  }, [chat?.chatId, emitSocketEvent, startStreaming]);
+  }, [startStreaming]);
 
   const handleStopStreaming = useCallback(() => {
     stopStreaming();
-    emitSocketEvent(SocketEvent.CHAT_ENDED, {
-      chatId: chat?.chatId?.toString(),
-    });
-    navigation.pop();
-  }, [chat?.chatId, emitSocketEvent, stopStreaming, navigation]);
+  }, [stopStreaming]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
@@ -244,15 +258,14 @@ export const ListeningScreen = ({
         }
         return prev;
       });
-      // TODO: Implement API call to send feedback
     }
   };
 
   useEffect(() => {
-    if (isRecording) {
+    if (isRecording && chatData?.chatId) {
       handleStartStreaming();
     }
-  }, [isRecording, handleStartStreaming]);
+  }, [chatData?.chatId, handleStartStreaming, isRecording]);
 
   const toggleNudgeVisibility = () => {
     setIsFocusMode(prev => !prev);
@@ -278,6 +291,7 @@ export const ListeningScreen = ({
           showCallEndConfirmation={showCallEndConfirmation}
           setShowCallEndConfirmation={setShowCallEndConfirmation}
           handleEndCall={handleEndCall}
+          isMicrophoneMode={!!isRecording}
         />
       )}
       <StatusBar
@@ -290,12 +304,9 @@ export const ListeningScreen = ({
           <Text style={styles.takingNotesText}>
             {t('ListeningScreen.takingNotes')}
           </Text>
-          <Timer startTime={startTime} />
+          {showTimer && <Timer startTime={startTime} />}
           <View style={styles.focusModeWaveformWrapper}>
-            <AudioWaveform
-              amplitudes={isAudioActive ? amplitudes : null}
-              isFocusMode
-            />
+            <AudioWaveform amplitudes={amplitudes} isFocusMode />
           </View>
           <PlayPauseOverlay
             isPlaying={!isCallPaused}
@@ -318,10 +329,7 @@ export const ListeningScreen = ({
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveform
-                amplitudes={isAudioActive ? amplitudes : null}
-                isFocusMode={false}
-              />
+              <AudioWaveform amplitudes={amplitudes} isFocusMode={false} />
             </View>
           </View>
           {!isFocusMode && !!nudgeStatus && currentNudge && (
