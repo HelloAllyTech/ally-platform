@@ -20,6 +20,7 @@ export enum ChatStatus {
 
 export enum ChatProvider {
   EXOTEL = 'EXOTEL',
+  MICROPHONE = 'MICROPHONE',
 }
 
 export interface Chat {

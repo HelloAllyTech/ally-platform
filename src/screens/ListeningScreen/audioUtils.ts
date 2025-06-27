@@ -1,6 +1,5 @@
-import {Dimensions} from 'react-native';
+import {SCREEN_WIDTH} from '@/constants/general';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
 export const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
@@ -19,7 +18,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 // Maps Exotel audio data to normalized amplitudes for the waveform
-export function exotelAudioDataToAmplitudes(audioData: string): number[] {
+export const exotelAudioDataToAmplitudes = (audioData: string): number[] => {
   const samples = base64ToUint8Array(audioData);
   const samplesPerBar = Math.floor(samples.length / NUM_BARS) || 1;
   const amplitudes: number[] = [];
@@ -38,12 +37,12 @@ export function exotelAudioDataToAmplitudes(audioData: string): number[] {
     amplitudes.push(avg / 255);
   }
   return amplitudes;
-}
+};
 
-export function webRTCAudioDataToAmplitudes(input: {
+export const webRTCAudioDataToAmplitudes = (input: {
   type: string;
   data: number[];
-}): number[] {
+}): number[] => {
   const byteArray = input?.data || [];
   if (!Array.isArray(byteArray) || byteArray.length < 2) {
     return new Array(NUM_BARS).fill(0);
@@ -80,4 +79,39 @@ export function webRTCAudioDataToAmplitudes(input: {
   }
 
   return amplitudes;
-}
+};
+
+export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
+  const audioBytes = base64ToUint8Array(base64Audio);
+
+  // Skip WAV header if present
+  const WAV_HEADER_SIZE = 44;
+  const isWav = String.fromCharCode(...audioBytes.slice(0, 4)) === 'RIFF';
+  const pcmData = isWav ? audioBytes.slice(WAV_HEADER_SIZE) : audioBytes;
+
+  const samplesPerBar = Math.floor(pcmData.length / NUM_BARS) || 1;
+  const amplitudes: number[] = [];
+
+  for (let i = 0; i < NUM_BARS; i++) {
+    let sum = 0;
+    let count = 0;
+
+    for (let j = 0; j < samplesPerBar; j++) {
+      const idx = i * samplesPerBar + j;
+      if (idx < pcmData.length) {
+        // Boost the sample artificially for better visual amplitude
+        const sample = Math.min(pcmData[idx] * 2, 255);
+        sum += sample;
+        count++;
+      }
+    }
+
+    const avg = count > 0 ? sum / count : 0;
+    const normalized = avg / 255;
+
+    // Avoid invisible bars by clamping to minimum
+    amplitudes.push(Math.max(normalized, 0.05));
+  }
+
+  return amplitudes;
+};
