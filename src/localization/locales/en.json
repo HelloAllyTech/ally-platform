@@ -35,7 +35,9 @@
     "takingNotes": "Taking Notes",
     "isThisHelpful": "Is this helpful",
     "callEndConfirmation": "Are you sure you want to end this call?",
-    "endCall": "End Call"
+    "microphoneModeEndConfirmation": "Are you sure you want to end this session?",
+    "endCall": "End Call",
+    "endSession": "End Session"
   },
   "SplashScreen": {
     "hey": "Hey,",
@@ -103,7 +105,8 @@
       "cancel": "Cancel",
       "ok": "OK",
       "confirm": "Confirm",
-      "rename": "Rename"
+      "rename": "Rename",
+      "endSession": "End Session"
     }
   },
   "CallTranscript": {
@@ -184,7 +187,7 @@
     "try": "Try:",
     "noData": "No results found for"
   },
-    "NetworkLogs": {
+  "NetworkLogs": {
     "logs": "Logs"
   },
   "submit": "Submit",

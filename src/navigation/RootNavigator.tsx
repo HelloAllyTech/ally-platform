@@ -11,7 +11,7 @@ import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import {useUser} from '@/hooks/useUser';
-import type {RootStackParamList} from '@/navigation/types';
+import type {RootStackParamList, RouteNames} from '@/navigation/types';
 import {
   BreathingScreen,
   CallLogScreen,
@@ -38,10 +38,14 @@ const NavigationContent = ({
 
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
-      navigationRef.reset({
-        index: 1,
-        routes: [{name: 'Home'}, {name: 'Listening'}],
-      });
+      if (
+        (navigationRef?.getCurrentRoute()?.name as RouteNames) !== 'Listening'
+      ) {
+        navigationRef.reset({
+          index: 1,
+          routes: [{name: 'Home'}, {name: 'Listening'}],
+        });
+      }
     },
   });
 
