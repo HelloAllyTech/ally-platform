@@ -39,7 +39,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
         style={styles.toggleIconContainer}
         onPress={onToggleMaximized}
         activeOpacity={0.8}>
-        <ChevronDown width={28} height={18} color={colors.lightGrayD9} />
+        <ChevronDown width={24} height={12} color={colors.lightGrayD9} />
       </TouchableOpacity>
       {isMaximized && (
         <>
@@ -70,7 +70,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     backgroundColor: colors.darkGray3,
     borderRadius: '24@ms',
-    paddingVertical: '15@vs',
+    paddingVertical: '8@mvs',
     minHeight: '44@ms',
   },
   buttonContainer: {
@@ -84,7 +84,11 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   toggleIconContainer: {
-    marginBottom: '22@vs',
+    width: '48@ms',
+    height: '32@mvs',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: '20@mvs',
   },
   buttonsRow: {
     flexDirection: 'row',

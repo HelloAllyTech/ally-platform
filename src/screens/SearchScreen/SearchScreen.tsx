@@ -49,6 +49,7 @@ export const SearchScreen: React.FC = () => {
     loading,
     triggerSearch,
     onPressSuggestion,
+    lastSearchedText,
   } = useSearch();
   const {t} = useTranslate();
 
@@ -93,9 +94,10 @@ export const SearchScreen: React.FC = () => {
   const renderEmptyComponent = () => {
     return (
       <SearchEmpty
-        searchText={searchText}
+        searchText={lastSearchedText}
         trySuggestions={trySuggestions}
-        colorTheme="dark"
+        colorTheme="light"
+        onPressSuggestion={onPressSuggestion}
       />
     );
   };
