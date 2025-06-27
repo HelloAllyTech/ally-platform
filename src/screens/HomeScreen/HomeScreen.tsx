@@ -3,19 +3,23 @@ import {
   Alert,
   BackHandler,
   Linking,
+  Platform,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DrawerMenuIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {env} from '@/config/env';
 import {isIOS} from '@/constants/general';
+import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {usePermission} from '@/hooks/usePermission';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
@@ -23,7 +27,6 @@ import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
@@ -33,6 +36,7 @@ import StartCallCard from './components/StartCallCard/StartCallCard';
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();
   const drawerNavigation = useDrawerNavigation();
+  const navigation = useAppNavigation();
   const {userData} = useUser();
   const dispatch = useAppDispatch();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
@@ -49,6 +53,17 @@ export const HomeScreen: React.FC = () => {
     }
   }, [visibleFields, dispatch]);
 
+  const micPermission = Platform.select({
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+  });
+
+  const {
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicGranted,
+  } = usePermission(micPermission!);
+
   const handleThirdPartyCall = async () => {
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
     try {
@@ -56,6 +71,26 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       logger.error(`Error opening phone call URL: ${error}`);
       Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
+    }
+  };
+
+  const handleVoiceRecording = async () => {
+    if (isMicGranted) {
+      navigation.navigate('Listening', {isRecording: true});
+      return;
+    }
+    const result = await requestMicPermission();
+    if (result === RESULTS.GRANTED) {
+      navigation.navigate('Listening', {isRecording: true});
+    } else {
+      Alert.alert(
+        'Microphone Permission Required',
+        'Please enable microphone access in your device settings to use voice recording.',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {text: 'Open Settings', onPress: openAppSettings},
+        ],
+      );
     }
   };
 
@@ -70,34 +105,6 @@ export const HomeScreen: React.FC = () => {
       {userData?.role !== UserRole.COUNSELOR ? (
         <FeatureNotAvailable />
       ) : (
-        // <View style={styles.content}>
-        //   <Text style={styles.titleContainer}>
-        //     <Text style={styles.startText}>{t('HomeScreen.start')} </Text>
-        //     <Text style={styles.listeningText}>
-        //       {t('HomeScreen.listening')}
-        //     </Text>
-        //   </Text>
-        //   <TouchableOpacity
-        //     style={styles.animationContainer}
-        //     onPress={handleThirdPartyCall}
-        //     activeOpacity={0.8}>
-        //     <LottieView
-        //       source={require('@/assets/animations/listen.json')}
-        //       autoPlay
-        //       loop
-        //       style={styles.lottieAnimation}
-        //     />
-        //     <View style={styles.headphoneContainer}>
-        //       <HeadphoneIcon width={31} height={31} />
-        //     </View>
-        //   </TouchableOpacity>
-        //   <TouchableOpacity
-        //     onPress={handleThirdPartyCall}
-        //     activeOpacity={0.8}
-        //     style={styles.textContainer}>
-        //     <Text style={styles.tapText}>{t('HomeScreen.tapToBegin')}</Text>
-        //   </TouchableOpacity>
-        // </View>
         <View style={styles.content}>
           <Text style={styles.title}>{t('Home.start')}</Text>
           <Text style={styles.subtitle}>{t('Home.session')}</Text>
@@ -111,12 +118,12 @@ export const HomeScreen: React.FC = () => {
               subtitle={t('Home.allyWillJoinOngoingCall')}
               onPressCard={handleThirdPartyCall}
             />
-            {/* <StartCallCard
+            <StartCallCard
               image={images.listenLive}
               header={t('Home.listenLive')}
               subtitle={t('Home.allyWillHearAudio')}
-              onPressCard={handleThirdPartyCall}
-            /> */}
+              onPressCard={handleVoiceRecording}
+            />
           </View>
         </View>
       )}
@@ -164,57 +171,5 @@ const styles = ScaledSheet.create({
     flex: 1,
     paddingTop: '60@mvs',
     paddingBottom: '80@vs',
-  },
-  titleContainer: {
-    textAlign: 'center',
-    marginBottom: '71@vs',
-  },
-  startText: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.black,
-    fontSize: '32@ms',
-    lineHeight: '40@ms',
-  },
-  listeningText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: isIOS ? 'italic' : 'normal',
-    color: colors.black,
-    fontSize: '32@ms',
-    lineHeight: '40@ms',
-  },
-  animationContainer: {
-    width: '180@ms',
-    height: '180@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: '40@vs',
-  },
-  lottieAnimation: {
-    width: '100%',
-    height: '100%',
-  },
-  headphoneContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8@s',
-  },
-  tapText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.large,
-    letterSpacing: 0.15,
-    color: colors.darkCharcoal,
-    fontSize: '16@ms',
-  },
-  textContainer: {
-    width: '100%',
-    paddingVertical: '16@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

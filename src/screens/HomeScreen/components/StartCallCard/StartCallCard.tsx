@@ -22,7 +22,7 @@ const StartCallCard: React.FC<StartCallCardProps> = ({
     <TouchableOpacity
       style={styles.card}
       onPress={onPressCard}
-      activeOpacity={0.8}>
+      activeOpacity={1}>
       <Text style={styles.header}>{header}</Text>
       <Text style={styles.subtitle}>
         {subtitle}
