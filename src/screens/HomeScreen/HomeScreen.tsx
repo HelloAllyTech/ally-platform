@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect} from 'react';
+import React, {useEffect} from 'react';
 import {
   Alert,
   BackHandler,
@@ -15,7 +15,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {DrawerMenuIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {env} from '@/config/env';
-import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
+import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -27,7 +27,6 @@ import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
@@ -75,20 +74,6 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleLearnMorePress = useCallback(async () => {
-    try {
-      const supported = await Linking.canOpenURL(env.ALLY_WEB_URL);
-      if (supported) {
-        await Linking.openURL(env.ALLY_WEB_URL);
-      } else {
-        Alert.alert('Error', 'Unable to open the link');
-      }
-    } catch (error) {
-      logger.error(`Error opening learn more URL: ${error}`);
-      Alert.alert('Error', 'Unable to open the link');
-    }
-  }, []);
-
   const handleVoiceRecording = async () => {
     if (isMicGranted) {
       navigation.navigate('Listening', {isRecording: true});
@@ -108,28 +93,6 @@ export const HomeScreen: React.FC = () => {
       );
     }
   };
-
-  if (userData?.role !== UserRole.COUNSELOR) {
-    return (
-      <View style={styles.clientContainer}>
-        <Text style={styles.oopsText}>{t('Home.client.oops')}</Text>
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>
-            {t('Home.client.appCurrentlyFor')}
-          </Text>
-          <Text style={styles.messageText}>
-            {t('Home.client.counselorsOnly')}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={handleLearnMorePress}
-          style={styles.learnMoreButton}
-          hitSlop={DEFAULT_HIT_SLOP}>
-          <Text style={styles.learnMoreText}>{t('Home.client.learnMore')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -208,104 +171,5 @@ const styles = ScaledSheet.create({
     flex: 1,
     paddingTop: '60@mvs',
     paddingBottom: '80@vs',
-  },
-  titleContainer: {
-    textAlign: 'center',
-    marginBottom: '71@vs',
-  },
-  startText: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.black,
-    fontSize: '32@ms',
-    lineHeight: '40@ms',
-  },
-  listeningText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: isIOS ? 'italic' : 'normal',
-    color: colors.black,
-    fontSize: '32@ms',
-    lineHeight: '40@ms',
-  },
-  animationContainer: {
-    width: '180@ms',
-    height: '180@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: '40@vs',
-  },
-  lottieAnimation: {
-    width: '100%',
-    height: '100%',
-  },
-  headphoneContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8@s',
-  },
-  tapText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.large,
-    letterSpacing: 0.15,
-    color: colors.darkCharcoal,
-    fontSize: '16@ms',
-  },
-  textContainer: {
-    width: '100%',
-    paddingVertical: '16@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  popupContainer: {
-    backgroundColor: colors.white,
-    borderRadius: '12@ms',
-    padding: '16@ms',
-    width: '80%',
-    maxWidth: '300@ms',
-  },
-  popupOption: {
-    paddingVertical: '12@ms',
-    paddingHorizontal: '16@ms',
-  },
-  popupOptionText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
-    color: colors.darkCharcoal,
-  },
-  clientContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  oopsText: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-  },
-  messageContainer: {
-    marginBottom: '20@vs',
-  },
-  messageText: {
-    ...fontFamily.REPLAY_PRO.BOLD,
-    fontSize: '16@ms',
-    color: colors.darkCharcoal,
-  },
-  learnMoreButton: {
-    paddingHorizontal: '20@ms',
-    paddingVertical: '10@mvs',
-  },
-  learnMoreText: {
-    ...fontFamily.REPLAY_PRO.BOLD,
-    fontSize: '16@ms',
-    color: colors.darkCharcoal,
   },
 });
