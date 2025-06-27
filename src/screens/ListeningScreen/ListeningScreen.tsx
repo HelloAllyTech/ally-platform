@@ -66,7 +66,7 @@ export const ListeningScreen = ({
   const chat = useAppSelector(state => state.chat.currentChat);
 
   const startTime = useMemo(
-    () => (chat?.startedAt ? +new Date(chat.startedAt) : Date.now()),
+    () => (chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now()),
     [chat?.startedAt],
   );
   const callProvider = useAppSelector(
@@ -224,10 +224,12 @@ export const ListeningScreen = ({
 
   const handleAudioData = (base64Wav: string) => {
     latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
-    emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
-      audioData: base64Wav,
-      chatId: chatData?.chatId,
-    });
+    if (!isCallPaused) {
+      emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+        audioData: base64Wav,
+        chatId: chatData?.chatId,
+      });
+    }
   };
 
   const {startStreaming, stopStreaming} = useLiveAudioStream({
@@ -273,12 +275,15 @@ export const ListeningScreen = ({
 
   const handlePlayPauseCallPress = useDebounce(
     () => {
-      emitSocketEvent(
-        isCallPaused
-          ? SocketEvent.AUDIO_CHAT_RESUMED
-          : SocketEvent.AUDIO_CHAT_PAUSED,
-        {chatId: chat?.chatId},
-      );
+      if (!isRecording) {
+        emitSocketEvent(
+          isCallPaused
+            ? SocketEvent.AUDIO_CHAT_RESUMED
+            : SocketEvent.AUDIO_CHAT_PAUSED,
+          {chatId: chat?.chatId},
+        );
+      }
+      console.log('🚀 ~ handlePlayPauseCallPress: isCallPaused', isCallPaused);
       setIsCallPaused(prev => !prev);
     },
     {delay: 500},
@@ -306,7 +311,10 @@ export const ListeningScreen = ({
           </Text>
           {showTimer && <Timer startTime={startTime} />}
           <View style={styles.focusModeWaveformWrapper}>
-            <AudioWaveform amplitudes={amplitudes} isFocusMode />
+            <AudioWaveform
+              amplitudes={isCallPaused ? null : amplitudes}
+              isFocusMode
+            />
           </View>
           <PlayPauseOverlay
             isPlaying={!isCallPaused}
@@ -329,7 +337,10 @@ export const ListeningScreen = ({
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveform amplitudes={amplitudes} isFocusMode={false} />
+              <AudioWaveform
+                amplitudes={isCallPaused ? null : amplitudes}
+                isFocusMode={false}
+              />
             </View>
           </View>
           {!isFocusMode && !!nudgeStatus && currentNudge && (
