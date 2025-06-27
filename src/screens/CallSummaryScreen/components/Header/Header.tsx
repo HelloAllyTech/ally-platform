@@ -21,6 +21,7 @@ interface HeaderProps {
   showAnimation: boolean;
   onHeaderPress: () => void;
   showSummary: boolean;
+  showTranscript: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   showAnimation,
   onHeaderPress,
   showSummary,
+  showTranscript,
 }) => {
   const {t} = useTranslate();
 
@@ -58,9 +60,11 @@ export const Header: React.FC<HeaderProps> = ({
                         : t('CallSummary.header.transcript')}
                     </Text>
                   </Text>
-                  <View style={styles.arrowDownContainer}>
-                    <ArrowDown width={9} height={5} />
-                  </View>
+                  {showTranscript && (
+                    <View style={styles.arrowDownContainer}>
+                      <ArrowDown width={9} height={5} />
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <View style={styles.nameContainer}>
                   <Text numberOfLines={1} style={styles.summaryNameText}>
