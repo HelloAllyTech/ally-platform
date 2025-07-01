@@ -28,6 +28,7 @@ export interface TabDefinition {
 }
 
 export interface SearchResult {
+  categories: Record<string, number>;
   documents: ResourceArticle[];
   total: number;
   limit: number;
