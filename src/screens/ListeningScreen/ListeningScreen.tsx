@@ -25,7 +25,6 @@ import {
   FeedbackResponse,
   SocketEvent,
   SocketMessage,
-  WebRTCAudioData,
 } from '@/types/message';
 import {Maybe} from '@/utils/common';
 import {logger} from '@/utils/logger';
@@ -197,7 +196,7 @@ export const ListeningScreen = ({
             );
           } else {
             latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
-              data.payload.audioData as WebRTCAudioData,
+              data.payload.audioData as string,
             );
           }
         }
