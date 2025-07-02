@@ -1,6 +1,5 @@
 import {useCallback, useEffect, useState} from 'react';
 
-import {isIOS} from '@/constants/general';
 import {
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -124,12 +123,7 @@ const useCallSummaryActions = ({
       });
       logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
 
-      showToast(
-        `${t('CallSummary.info.fileExportedSuccess')} \n ${
-          isIOS && 'on My iPhone/ally/CallSummary'
-        }`,
-        'success',
-      );
+      showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
       setIsMenuVisible(false);
     } catch (err) {
       const errorMessage =

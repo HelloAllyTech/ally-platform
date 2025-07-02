@@ -1,7 +1,13 @@
 {
   "Common": {
     "comingSoon": "Coming Soon",
-    "ok": "OK"
+    "ok": "OK",
+    "cancel": "Cancel",
+    "permissions": {
+      "microphoneRequired": "Microphone Permission Required",
+      "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
+      "openSettings": "Open Settings"
+    }
   },
   "Home": {
     "callConnectionNotImplemented": "Call connection feature is not yet implemented",
@@ -13,6 +19,7 @@
     "listenLive": "Listen Live",
     "allyWillJoinOngoingCall": "Ally will join your ongoing call",
     "allyWillHearAudio": "Ally will hear audio alongside you",
+    "consentNotice": "By starting, you confirm everyone being transcribed has given consent",
     "client": {
       "oops": "Oops!",
       "appCurrentlyFor": "This app is currently for",

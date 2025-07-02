@@ -15,7 +15,7 @@ export const useLiveAudioStream = ({
 
   useEffect(() => {
     if (!enableLiveAudio) return;
-    LiveAudioStream.init({
+    LiveAudioStream?.init?.({
       sampleRate: 16000,
       channels: 1,
       bitsPerSample: 16,
@@ -24,21 +24,21 @@ export const useLiveAudioStream = ({
       wavFile: 'audio.wav', // required
     });
 
-    LiveAudioStream.on('data', onAudioData);
+    LiveAudioStream?.on?.('data', onAudioData);
 
     return () => {
-      LiveAudioStream.stop();
+      LiveAudioStream?.stop?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableLiveAudio]);
 
   const startStreaming = useCallback(async () => {
-    LiveAudioStream.start();
+    LiveAudioStream?.start?.();
     setIsStreaming(true);
   }, []);
 
   const stopStreaming = useCallback(() => {
-    LiveAudioStream.stop();
+    LiveAudioStream?.stop?.();
     setIsStreaming(false);
   }, []);
 

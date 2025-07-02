@@ -39,7 +39,12 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
         style={styles.toggleIconContainer}
         onPress={onToggleMaximized}
         activeOpacity={0.8}>
-        <ChevronDown width={24} height={12} color={colors.lightGrayD9} />
+        <Animated.View
+          style={{
+            transform: [{rotate: isMaximized ? '0deg' : '180deg'}],
+          }}>
+          <ChevronDown width={24} height={12} color={colors.lightGrayD9} />
+        </Animated.View>
       </TouchableOpacity>
       {isMaximized && (
         <>

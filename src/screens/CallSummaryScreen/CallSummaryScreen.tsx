@@ -18,6 +18,7 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {Toast} from '@/components/Toast/Toast';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useCallSummaryActions from '@/hooks/useCallSummaryActions';
+import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {RootStackScreenProps} from '@/navigation/types';
 import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
@@ -54,6 +55,7 @@ export const CallSummaryScreen: React.FC<
   const callInfo = useAppSelector(selectCallInfo);
   const dispatch = useAppDispatch();
   const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
+  const {hasChanges} = useCallSummaryForm();
 
   const callId = route.params?.callId;
   const chatId = callId || currentChat?.chatId;
@@ -238,6 +240,8 @@ export const CallSummaryScreen: React.FC<
               <CallSummaryDetails
                 isLoading={isLoading}
                 onSubmit={onUpdateSummary}
+                // show submit button always after coming from live call else only if there are changes
+                showSubmitButton={callId ? hasChanges : true}
               />
             ) : (
               <CallSummaryProgress

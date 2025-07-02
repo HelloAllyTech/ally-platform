@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
+import {AllyPlatforms} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -86,6 +87,10 @@ export const ListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
   const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
+  // Use ref to always access the latest isCallPaused value inside audio event callback,
+  // since react-native-live-audio-stream registers the handler once and won't re-subscribe
+  // on state changes, avoiding unnecessary re-inits of the stream.
+  const isCallPausedRef = useRef(isCallPaused);
 
   // Current chat won't be available initially for microphone mode flow
   // as the new chat is created only on emitting the event START_AUDIO_CHAT
@@ -113,6 +118,10 @@ export const ListeningScreen = ({
       handleCallEnd();
     }
   }, [isSuccess, handleCallEnd]);
+
+  useEffect(() => {
+    isCallPausedRef.current = isCallPaused;
+  }, [isCallPaused]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -218,19 +227,23 @@ export const ListeningScreen = ({
     if (isRecording && !chatData?.chatId) {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
+        platform: AllyPlatforms.MOBILE,
       });
     }
   }, [chatData?.chatId, emitSocketEvent, isRecording]);
 
-  const handleAudioData = (base64Wav: string) => {
-    latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
-    if (!isCallPaused) {
-      emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
-        audioData: base64Wav,
-        chatId: chatData?.chatId,
-      });
-    }
-  };
+  const handleAudioData = useCallback(
+    (base64Wav: string) => {
+      latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
+      if (!isCallPausedRef.current) {
+        emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+          audioData: base64Wav,
+          chatId: chatData?.chatId,
+        });
+      }
+    },
+    [emitSocketEvent, chatData?.chatId],
+  );
 
   const {startStreaming, stopStreaming} = useLiveAudioStream({
     onAudioData: handleAudioData,
@@ -283,11 +296,29 @@ export const ListeningScreen = ({
           {chatId: chat?.chatId},
         );
       }
-      console.log('🚀 ~ handlePlayPauseCallPress: isCallPaused', isCallPaused);
       setIsCallPaused(prev => !prev);
     },
     {delay: 500},
   );
+
+  const playPauseButton = useMemo(() => {
+    if (isRecording && chatData?.platform === AllyPlatforms.WEB) {
+      return null;
+    }
+    return (
+      <PlayPauseOverlay
+        isPlaying={!isCallPaused}
+        onPress={handlePlayPauseCallPress}
+        isFocusMode={isFocusMode}
+      />
+    );
+  }, [
+    isRecording,
+    chatData?.platform,
+    isCallPaused,
+    handlePlayPauseCallPress,
+    isFocusMode,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -316,20 +347,12 @@ export const ListeningScreen = ({
               isFocusMode
             />
           </View>
-          <PlayPauseOverlay
-            isPlaying={!isCallPaused}
-            onPress={handlePlayPauseCallPress}
-            isFocusMode
-          />
+          {playPauseButton}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
           <View style={globalStyles.rowCenter}>
-            <PlayPauseOverlay
-              isPlaying={!isCallPaused}
-              onPress={handlePlayPauseCallPress}
-              isFocusMode={false}
-            />
+            {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
               <Text style={styles.takingNotesText}>
                 {t('ListeningScreen.takingNotes')}
