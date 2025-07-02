@@ -55,23 +55,6 @@ export const useNavigationAwareCounselorChat = (
           break;
       }
     },
-    onNoActiveChatFound: () => {
-      // Handle no active chat based on current screen
-      switch (currentRouteName.current) {
-        case 'Splash':
-        case 'Listening':
-          navigation.navigate('Home');
-          break;
-
-        case 'Home':
-        case 'HomeTab':
-        case 'CallSummary':
-        case 'CallLog':
-        default:
-          logger.error('No active chat found');
-          break;
-      }
-    },
     // Always subscribe to AppState changes
     shouldSubscribeToAppState: true,
   });
