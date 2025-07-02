@@ -5,11 +5,10 @@ import {
   Permission,
   PermissionStatus,
   request,
-  RESULTS,
 } from 'react-native-permissions';
 
-export function usePermission(permission: Permission) {
-  const [status, setStatus] = useState<PermissionStatus>(RESULTS.UNAVAILABLE);
+export const usePermission = (permission: Permission) => {
+  const [status, setStatus] = useState<PermissionStatus>('unavailable');
 
   // Check permission on mount
   useEffect(() => {
@@ -32,6 +31,6 @@ export function usePermission(permission: Permission) {
     status,
     requestPermission,
     openAppSettings,
-    isGranted: status === RESULTS.GRANTED,
+    isGranted: status === 'granted',
   };
-}
+};

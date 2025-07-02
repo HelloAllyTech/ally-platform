@@ -1,3 +1,4 @@
+import {AllyPlatforms} from '@/constants/general';
 import {User} from '@/types/user';
 
 export type ChatMessage = {
@@ -34,6 +35,7 @@ export interface Chat {
   startedAt: string;
   status: ChatStatus;
   provider: ChatProvider;
+  platform: AllyPlatforms;
 }
 
 export enum QueueStatus {

@@ -1,4 +1,4 @@
-import {SCREEN_WIDTH} from '@/constants/general';
+import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
@@ -84,13 +84,28 @@ export const webRTCAudioDataToAmplitudes = (input: {
 export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
   const audioBytes = base64ToUint8Array(base64Audio);
 
-  // Skip WAV header if present
   const WAV_HEADER_SIZE = 44;
   const isWav = String.fromCharCode(...audioBytes.slice(0, 4)) === 'RIFF';
   const pcmData = isWav ? audioBytes.slice(WAV_HEADER_SIZE) : audioBytes;
 
-  const samplesPerBar = Math.floor(pcmData.length / NUM_BARS) || 1;
+  const sampleCount = Math.floor(pcmData.length / 2);
+  const pcmSamples = new Int16Array(sampleCount);
+
+  let globalMax = 0;
+  for (let i = 0; i < sampleCount; i++) {
+    const lo = pcmData[i * 2];
+    const hi = pcmData[i * 2 + 1];
+    const val = hi * 256 + lo; // avoid bitwise shift for lint
+    const sample = val >= 0x8000 ? val - 0x10000 : val;
+    pcmSamples[i] = sample;
+    globalMax = Math.max(globalMax, Math.abs(sample));
+  }
+
+  const samplesPerBar = Math.floor(sampleCount / NUM_BARS) || 1;
   const amplitudes: number[] = [];
+
+  const scale = globalMax > 0 ? 1 / (globalMax / 32768) : 1;
+  const PLATFORM_GAIN = isIOS ? 10.0 : 1.0;
 
   for (let i = 0; i < NUM_BARS; i++) {
     let sum = 0;
@@ -98,19 +113,23 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
 
     for (let j = 0; j < samplesPerBar; j++) {
       const idx = i * samplesPerBar + j;
-      if (idx < pcmData.length) {
-        // Boost the sample artificially for better visual amplitude
-        const sample = Math.min(pcmData[idx] * 2, 255);
-        sum += sample;
+      if (idx < sampleCount) {
+        sum += Math.abs(pcmSamples[idx]);
         count++;
       }
     }
 
     const avg = count > 0 ? sum / count : 0;
-    const normalized = avg / 255;
+    let normalized = avg / 32768;
 
-    // Avoid invisible bars by clamping to minimum
-    amplitudes.push(Math.max(normalized, 0.05));
+    normalized *= scale * PLATFORM_GAIN;
+    normalized = Math.min(normalized, 1);
+
+    if (globalMax < 500) {
+      normalized = 0.02;
+    }
+
+    amplitudes.push(Math.max(normalized, 0.02));
   }
 
   return amplitudes;

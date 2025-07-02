@@ -1,4 +1,4 @@
-import {useEffect} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 
 import {
   SectionKey,
@@ -26,6 +26,7 @@ import {
 
 export const useCallSummaryForm = () => {
   const dispatch = useAppDispatch();
+  const originalFormDataRef = useRef<FormData | null>(null);
 
   const summaryData = useAppSelector(selectSummaryData);
   const formData = useAppSelector(selectFormData);
@@ -37,7 +38,10 @@ export const useCallSummaryForm = () => {
 
   useEffect(() => {
     if (summary) {
-      dispatch(setFormData(transformSummaryToFormData(summary)));
+      const transformedData = transformSummaryToFormData(summary);
+      dispatch(setFormData(transformedData));
+      // Store the original form data for comparison
+      originalFormDataRef.current = transformedData;
     }
   }, [dispatch, summary]);
 
@@ -94,11 +98,26 @@ export const useCallSummaryForm = () => {
     });
   };
 
+  // Check if form data has been modified
+  const hasChanges = useCallback(() => {
+    if (!originalFormDataRef.current || !formData) return false;
+
+    const original = originalFormDataRef.current;
+    const current = formData;
+
+    // Compare all fields in the form data
+    return Object.keys(current).some(key => {
+      const fieldKey = key as keyof FormData;
+      return original[fieldKey] !== current[fieldKey];
+    });
+  }, [formData]);
+
   return {
     formData,
     isUpdating,
     handleFieldChange,
     handleSubmit,
     handleSectionFieldsReset,
+    hasChanges: hasChanges(),
   };
 };

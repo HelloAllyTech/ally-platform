@@ -111,19 +111,22 @@ export const HomeScreen: React.FC = () => {
           <Text style={styles.chooseListening}>
             {t('Home.chooseListening')}
           </Text>
-          <View style={styles.buttonContainer}>
-            <StartCallCard
-              image={images.joinCall}
-              header={t('Home.joinCall')}
-              subtitle={t('Home.allyWillJoinOngoingCall')}
-              onPressCard={handleThirdPartyCall}
-            />
-            <StartCallCard
-              image={images.listenLive}
-              header={t('Home.listenLive')}
-              subtitle={t('Home.allyWillHearAudio')}
-              onPressCard={handleVoiceRecording}
-            />
+          <View style={styles.buttonContainerWrapper}>
+            <View style={styles.buttonContainer}>
+              <StartCallCard
+                image={images.joinCall}
+                header={t('Home.joinCall')}
+                subtitle={t('Home.allyWillJoinOngoingCall')}
+                onPressCard={handleThirdPartyCall}
+              />
+              <StartCallCard
+                image={images.listenLive}
+                header={t('Home.listenLive')}
+                subtitle={t('Home.allyWillHearAudio')}
+                onPressCard={handleVoiceRecording}
+              />
+            </View>
+            <Text style={styles.consentNotice}>{t('Home.consentNotice')}</Text>
           </View>
         </View>
       )}
@@ -137,6 +140,15 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
     paddingTop: '50@mvs',
     paddingHorizontal: '32@ms',
+  },
+  buttonContainerWrapper: {
+    marginTop: '45@vs',
+    borderWidth: '0.5@ms',
+    borderColor: colors.darkGray13,
+    borderRadius: '6@ms',
+    padding: '8@ms',
+    paddingBottom: 0,
+    backgroundColor: colors.lightGray1,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -171,5 +183,12 @@ const styles = ScaledSheet.create({
     flex: 1,
     paddingTop: '60@mvs',
     paddingBottom: '80@vs',
+  },
+  consentNotice: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.darkGray16,
+    fontSize: '12@ms',
+    marginTop: '10@mvs',
+    marginBottom: '13@mvs',
   },
 });
