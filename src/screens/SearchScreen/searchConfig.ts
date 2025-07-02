@@ -1,23 +1,19 @@
 export const trySuggestions = [
   {
     id: 1,
-    text: 'Grounding Techniques',
+    text: 'Violence safety plan',
   },
   {
     id: 2,
-    text: 'Domestic Violence',
+    text: 'Suicide assessment',
   },
   {
     id: 3,
-    text: 'Questions To Encourage Disclosure',
+    text: 'Survivors of abuse',
   },
   {
     id: 4,
-    text: 'Things To Say To Help Process Grief',
-  },
-  {
-    id: 5,
-    text: 'Boundaries',
+    text: "Client's resistance",
   },
 ];
 
