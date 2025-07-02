@@ -1,7 +1,7 @@
 import {toByteArray} from 'base64-js';
-import {Dimensions} from 'react-native';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+import {isIOS, SCREEN_WIDTH} from '@/constants/general';
+
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
 export const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
@@ -20,7 +20,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 // Maps Exotel audio data to normalized amplitudes for the waveform
-export function exotelAudioDataToAmplitudes(audioData: string): number[] {
+export const exotelAudioDataToAmplitudes = (audioData: string): number[] => {
   const samples = base64ToUint8Array(audioData);
   const samplesPerBar = Math.floor(samples.length / NUM_BARS) || 1;
   const amplitudes: number[] = [];
@@ -39,10 +39,10 @@ export function exotelAudioDataToAmplitudes(audioData: string): number[] {
     amplitudes.push(avg / 255);
   }
   return amplitudes;
-}
+};
 
-export const audioDataToAmplitudes = (input: string): number[] => {
-  const bytesArray = toByteArray(input);
+export const webRTCAudioDataToAmplitudes = (base64Audio: string): number[] => {
+  const bytesArray = toByteArray(base64Audio);
   const targetLength = NUM_BARS;
   const amplitudes = [];
   const usedIndices = new Set();
@@ -58,28 +58,31 @@ export const audioDataToAmplitudes = (input: string): number[] => {
   return amplitudes;
 };
 
-export function webRTCAudioDataToAmplitudes(input: {
-  type: string;
-  data: number[];
-}): number[] {
-  const byteArray = input?.data || [];
-  if (!Array.isArray(byteArray) || byteArray.length < 2) {
-    return new Array(NUM_BARS).fill(0);
-  }
+export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
+  const audioBytes = base64ToUint8Array(base64Audio);
 
-  const sampleCount = Math.floor(byteArray.length / 2); // 2 bytes per Int16 sample
+  const WAV_HEADER_SIZE = 44;
+  const isWav = String.fromCharCode(...audioBytes.slice(0, 4)) === 'RIFF';
+  const pcmData = isWav ? audioBytes.slice(WAV_HEADER_SIZE) : audioBytes;
+
+  const sampleCount = Math.floor(pcmData.length / 2);
   const pcmSamples = new Int16Array(sampleCount);
 
+  let globalMax = 0;
   for (let i = 0; i < sampleCount; i++) {
-    const lo = byteArray[i * 2];
-    const hi = byteArray[i * 2 + 1];
-    // Combine little-endian bytes to Int16
-    const val = (hi << 8) | lo;
-    pcmSamples[i] = val >= 0x8000 ? val - 0x10000 : val; // Convert unsigned to signed
+    const lo = pcmData[i * 2];
+    const hi = pcmData[i * 2 + 1];
+    const val = hi * 256 + lo; // avoid bitwise shift for lint
+    const sample = val >= 0x8000 ? val - 0x10000 : val;
+    pcmSamples[i] = sample;
+    globalMax = Math.max(globalMax, Math.abs(sample));
   }
 
-  const samplesPerBar = Math.floor(pcmSamples.length / NUM_BARS) || 1;
+  const samplesPerBar = Math.floor(sampleCount / NUM_BARS) || 1;
   const amplitudes: number[] = [];
+
+  const scale = globalMax > 0 ? 1 / (globalMax / 32768) : 1;
+  const PLATFORM_GAIN = isIOS ? 10.0 : 1.0;
 
   for (let i = 0; i < NUM_BARS; i++) {
     let sum = 0;
@@ -87,15 +90,24 @@ export function webRTCAudioDataToAmplitudes(input: {
 
     for (let j = 0; j < samplesPerBar; j++) {
       const idx = i * samplesPerBar + j;
-      if (idx < pcmSamples.length) {
+      if (idx < sampleCount) {
         sum += Math.abs(pcmSamples[idx]);
         count++;
       }
     }
 
     const avg = count > 0 ? sum / count : 0;
-    amplitudes.push(Math.min(avg / 32768, 1)); // Clamp max to 1
+    let normalized = avg / 32768;
+
+    normalized *= scale * PLATFORM_GAIN;
+    normalized = Math.min(normalized, 1);
+
+    if (globalMax < 500) {
+      normalized = 0.02;
+    }
+
+    amplitudes.push(Math.max(normalized, 0.02));
   }
 
   return amplitudes;
-}
+};

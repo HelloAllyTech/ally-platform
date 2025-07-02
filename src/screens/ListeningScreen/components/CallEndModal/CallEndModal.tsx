@@ -6,24 +6,42 @@ interface CallEndModalProps {
   showCallEndConfirmation: boolean;
   setShowCallEndConfirmation: (show: boolean) => void;
   handleEndCall: () => void;
+  isMicrophoneMode: boolean;
 }
 
 export const CallEndModal = ({
   showCallEndConfirmation,
   setShowCallEndConfirmation,
   handleEndCall,
+  isMicrophoneMode,
 }: CallEndModalProps) => {
   const {t} = useTranslate();
   return (
     <CustomModal
       visible={showCallEndConfirmation}
       onClose={() => setShowCallEndConfirmation(false)}
-      description={t('ListeningScreen.callEndConfirmation')}
+      description={t(
+        isMicrophoneMode
+          ? 'ListeningScreen.microphoneModeEndConfirmation'
+          : 'ListeningScreen.callEndConfirmation',
+      )}
       onPrimaryPress={handleEndCall}
       onSecondaryPress={() => setShowCallEndConfirmation(false)}
-      primaryButtonText={t('ListeningScreen.endCall')}
-      secondaryButtonText={t('CallSummary.info.cancel')}
-      title={t('ListeningScreen.endCall')}
+      primaryButtonText={t(
+        isMicrophoneMode
+          ? 'ListeningScreen.endSession'
+          : 'ListeningScreen.endCall',
+      )}
+      secondaryButtonText={t(
+        isMicrophoneMode
+          ? 'CallSummary.info.cancel'
+          : 'CallSummary.info.cancel',
+      )}
+      title={t(
+        isMicrophoneMode
+          ? 'ListeningScreen.endSession'
+          : 'ListeningScreen.endCall',
+      )}
       primaryTextColor={colors.brightRed}
     />
   );

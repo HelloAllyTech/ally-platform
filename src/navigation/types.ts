@@ -4,7 +4,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
-  Listening: undefined;
+  Listening: {isRecording?: boolean} | undefined;
   CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
   Breathing: undefined;

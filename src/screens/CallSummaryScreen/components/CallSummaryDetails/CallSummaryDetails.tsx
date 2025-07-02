@@ -1,5 +1,3 @@
-// CallSummaryDetails.tsx
-
 import React, {memo, useCallback, useState} from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
@@ -20,11 +18,13 @@ import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
 interface Props {
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
+  showSubmitButton: boolean;
 }
 
 const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
+  showSubmitButton,
 }) => {
   const {t} = useTranslate();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
@@ -143,15 +143,17 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       keyboardShouldPersistTaps="handled"
       enableOnAndroid>
       <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
-      <View style={styles.buttonContainer}>
-        <PrimaryButton
-          label={t('submit')}
-          onPress={onSubmitButtonPress}
-          isLoading={isUpdating}
-          customContainerStyle={styles.submitButton}
-          customTextStyle={styles.submitButtonText}
-        />
-      </View>
+      {showSubmitButton && (
+        <View style={styles.buttonContainer}>
+          <PrimaryButton
+            label={t('submit')}
+            onPress={onSubmitButtonPress}
+            isLoading={isUpdating}
+            customContainerStyle={styles.submitButton}
+            customTextStyle={styles.submitButtonText}
+          />
+        </View>
+      )}
     </KeyboardAwareScrollView>
   );
 };

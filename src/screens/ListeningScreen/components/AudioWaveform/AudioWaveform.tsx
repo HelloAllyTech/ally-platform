@@ -84,6 +84,7 @@ export const AudioWaveform: React.FC<WaveformProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
+    width: SCREEN_WIDTH,
     flexDirection: 'row',
     alignItems: 'center',
     height: moderateScale(MAX_HEIGHT),

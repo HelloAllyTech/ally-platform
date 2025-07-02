@@ -28,3 +28,8 @@ export const isValidEmail = (emailAddress: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(emailAddress);
 };
+
+export enum AllyPlatforms {
+  WEB = 'WEB',
+  MOBILE = 'MOBILE',
+}

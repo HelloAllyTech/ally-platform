@@ -7,13 +7,11 @@ import {
   TabDefinition,
   TabState,
 } from '@/screens/SearchScreen/types';
-import {
-  useLazyGetCategoriesQuery,
-  useLazyGetSearchResultsQuery,
-} from '@/services/searchApi';
+import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
+  const [lastSearchedText, setLastSearchedText] = useState('');
   const [focused, setFocused] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] =
@@ -24,60 +22,53 @@ export const useSearch = () => {
   const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
     useLazyGetSearchResultsQuery();
 
-  const [
-    getCategories,
-    {
-      data: categories,
-      isLoading: categoryLoading,
-      isFetching: categoryFetching,
-    },
-  ] = useLazyGetCategoriesQuery();
-
   const [activeTab, setActiveTab] = useState(0);
   const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
   const [tabsState, setTabsState] = useState<TabState[]>([]);
 
   useEffect(() => {
-    getCategories();
-  }, [getCategories]);
+    if (searchResults?.documents) {
+      if (searchResults.documents.length > 0) {
+        const allTabs: TabDefinition[] = [
+          {
+            key: 'all',
+            label: `All (${searchResults.documents.length})`,
+            data: searchResults.documents,
+          },
+        ];
 
-  useEffect(() => {
-    if (searchResults?.documents && categories) {
-      const allTabs: TabDefinition[] = [
-        {
-          key: 'all',
-          label: `All (${searchResults.documents.length})`,
-          data: searchResults.documents,
-        },
-      ];
+        if (searchResults.categories) {
+          Object.entries(searchResults.categories).forEach(
+            ([category, count]) => {
+              const categoryDocs = searchResults.documents.filter(
+                (result: ResourceArticle) => result.category === category,
+              );
+              allTabs.push({
+                key: category.toLowerCase(),
+                label: `${category} (${count})`,
+                data: categoryDocs,
+              });
+            },
+          );
+        }
 
-      // Create tabs for each category from the API
-      categories.forEach(category => {
-        const categoryDocs = searchResults.documents.filter(
-          (result: ResourceArticle) => result.category === category,
+        setDynamicTabs(allTabs);
+        setTabsState(
+          allTabs.map(tab => ({
+            data: tab.data || [],
+            page: 0,
+            hasMore: false,
+            loading: false,
+            error: null,
+          })),
         );
-
-        allTabs.push({
-          key: category.toLowerCase(),
-          label: `${category} (${categoryDocs.length})`,
-          data: categoryDocs,
-        });
-      });
-
-      setDynamicTabs(allTabs);
-
-      // Initialize tab states with data
-      setTabsState(
-        allTabs.map(tab => ({
-          data: tab.data || [],
-          page: 0,
-          hasMore: false,
-          loading: false,
-          error: null,
-        })),
-      );
+      } else {
+        // No search results, show no tabs
+        setDynamicTabs([]);
+        setTabsState([]);
+      }
     }
-  }, [searchResults, categories]);
+  }, [searchResults]);
 
   const loadTabData = useCallback(
     (tabIdx: number = 0, nextPage: number = 0, append = false) => {
@@ -136,6 +127,7 @@ export const useSearch = () => {
 
   // Only call this to trigger a search
   const triggerSearch = useCallback(() => {
+    setLastSearchedText(searchText);
     if (searchText.trim() !== '') {
       searchDocuments({query: searchText});
       setShowSearchResults(true);
@@ -161,6 +153,7 @@ export const useSearch = () => {
   }, [searchText]);
 
   const handleSuggestionPress = (suggestion: {id: number; text: string}) => {
+    setLastSearchedText(suggestion.text);
     setSearchText(suggestion.text);
     setShowSuggestions(false);
     setFocused(false);
@@ -185,12 +178,12 @@ export const useSearch = () => {
 
   const onPressSuggestion = (suggestion: string) => {
     setSearchText(suggestion);
+    setLastSearchedText(suggestion);
     searchDocuments({query: suggestion});
     setShowSearchResults(true);
   };
 
-  const loading =
-    isLoading || categoryLoading || isFetching || categoryFetching;
+  const loading = isLoading || isFetching;
 
   return {
     searchText,
@@ -217,5 +210,6 @@ export const useSearch = () => {
     activeTab,
     dynamicTabs,
     onPressSuggestion,
+    lastSearchedText,
   };
 };
