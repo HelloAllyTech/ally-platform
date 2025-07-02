@@ -1,15 +1,19 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {RouteProp} from '@react-navigation/native';
 import {StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
+import {AllyPlatforms} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
 import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
+import {RootStackParamList} from '@/navigation/types';
 import {useEndCallMutation} from '@/services/chatApi';
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -23,11 +27,13 @@ import {
   SocketMessage,
 } from '@/types/message';
 import {Maybe} from '@/utils/common';
+import {logger} from '@/utils/logger';
 
 import {
-  audioDataToAmplitudes,
   exotelAudioDataToAmplitudes,
   NUM_BARS,
+  recorderAudioToAmplitudes,
+  webRTCAudioDataToAmplitudes,
 } from './audioUtils';
 import {
   CallEndModal,
@@ -48,13 +54,20 @@ export interface Nudge {
   feedback?: FeedbackResponse;
 }
 
-export const ListeningScreen = () => {
+export const ListeningScreen = ({
+  route,
+}: {
+  route: RouteProp<RootStackParamList, 'Listening'>;
+}) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
+
   const [isFocusMode, setIsFocusMode] = useState(true);
   const chat = useAppSelector(state => state.chat.currentChat);
-  const [startTime] = useState(() =>
-    chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now(),
+
+  const startTime = useMemo(
+    () => (chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now()),
+    [chat?.startedAt],
   );
   const callProvider = useAppSelector(
     state => state.chat.currentChat?.provider,
@@ -73,20 +86,31 @@ export const ListeningScreen = () => {
     new Array(NUM_BARS).fill(0),
   );
   const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
+  // Use ref to always access the latest isCallPaused value inside audio event callback,
+  // since react-native-live-audio-stream registers the handler once and won't re-subscribe
+  // on state changes, avoiding unnecessary re-inits of the stream.
+  const isCallPausedRef = useRef(isCallPaused);
 
+  // Current chat won't be available initially for microphone mode flow
+  // as the new chat is created only on emitting the event START_AUDIO_CHAT
   const chatData = useAppSelector(state => state.chat.currentChat);
+  const isRecording =
+    route.params?.isRecording || chatData?.provider === ChatProvider.MICROPHONE;
+
+  /** Show timer for webrtc/exotel call and in case of microphone mode when chat has started */
+  const showTimer = !isRecording || chatData?.chatId;
   const [endCall, {isSuccess}] = useEndCallMutation();
 
   const handleCallEnd = useCallback(() => {
     navigation.navigate('Breathing');
   }, [navigation]);
 
-  const getSocketPath = () => {
-    if (isConferenceCall) {
+  const getSocketPath = useCallback(() => {
+    if (isConferenceCall || isRecording) {
       return env.MICROPHONE_SOCKET_PATH;
     }
     return env.WEBRTC_SOCKET_PATH;
-  };
+  }, [isConferenceCall, isRecording]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -94,8 +118,21 @@ export const ListeningScreen = () => {
     }
   }, [isSuccess, handleCallEnd]);
 
+  useEffect(() => {
+    isCallPausedRef.current = isCallPaused;
+  }, [isCallPaused]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: !isRecording,
+    });
+  }, [isRecording, navigation]);
+
   const handleEndCall = () => {
     if (chatData?.chatId) {
+      if (isRecording) {
+        handleStopStreaming();
+      }
       endCall({chatId: chatData.chatId});
     }
   };
@@ -110,6 +147,10 @@ export const ListeningScreen = () => {
   }, []);
 
   useHardwareBackPressHandler(() => {
+    if (isRecording) {
+      setShowCallEndConfirmation(true);
+      return true;
+    }
     navigation.goBack();
     return true;
   });
@@ -154,7 +195,7 @@ export const ListeningScreen = () => {
               data.payload.audioData as string,
             );
           } else {
-            latestAmplitudesRef.current = audioDataToAmplitudes(
+            latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
               data.payload.audioData as string,
             );
           }
@@ -181,6 +222,45 @@ export const ListeningScreen = () => {
     eventCallbacks: socketEventCallbacks,
   });
 
+  useEffect(() => {
+    if (isRecording && !chatData?.chatId) {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
+        isLinear16Encoded: true,
+        platform: AllyPlatforms.MOBILE,
+      });
+    }
+  }, [chatData?.chatId, emitSocketEvent, isRecording]);
+
+  const handleAudioData = useCallback(
+    (base64Wav: string) => {
+      latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
+      if (!isCallPausedRef.current) {
+        emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+          audioData: base64Wav,
+          chatId: chatData?.chatId,
+        });
+      }
+    },
+    [emitSocketEvent, chatData?.chatId],
+  );
+
+  const {startStreaming, stopStreaming} = useLiveAudioStream({
+    onAudioData: handleAudioData,
+    enableLiveAudio: isRecording && !!chatData?.chatId,
+  });
+
+  const handleStartStreaming = useCallback(async () => {
+    try {
+      await startStreaming();
+    } catch (error) {
+      logger.error(`Error starting stream: ${error}`);
+    }
+  }, [startStreaming]);
+
+  const handleStopStreaming = useCallback(() => {
+    stopStreaming();
+  }, [stopStreaming]);
+
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
       setCurrentNudge(prev => {
@@ -192,9 +272,14 @@ export const ListeningScreen = () => {
         }
         return prev;
       });
-      // TODO: Implement API call to send feedback
     }
   };
+
+  useEffect(() => {
+    if (isRecording && chatData?.chatId) {
+      handleStartStreaming();
+    }
+  }, [chatData?.chatId, handleStartStreaming, isRecording]);
 
   const toggleNudgeVisibility = () => {
     setIsFocusMode(prev => !prev);
@@ -202,16 +287,37 @@ export const ListeningScreen = () => {
 
   const handlePlayPauseCallPress = useDebounce(
     () => {
-      emitSocketEvent(
-        isCallPaused
-          ? SocketEvent.AUDIO_CHAT_RESUMED
-          : SocketEvent.AUDIO_CHAT_PAUSED,
-        {chatId: chat?.chatId},
-      );
+      if (!isRecording) {
+        emitSocketEvent(
+          isCallPaused
+            ? SocketEvent.AUDIO_CHAT_RESUMED
+            : SocketEvent.AUDIO_CHAT_PAUSED,
+          {chatId: chat?.chatId},
+        );
+      }
       setIsCallPaused(prev => !prev);
     },
     {delay: 500},
   );
+
+  const playPauseButton = useMemo(() => {
+    if (isRecording && chatData?.platform === AllyPlatforms.WEB) {
+      return null;
+    }
+    return (
+      <PlayPauseOverlay
+        isPlaying={!isCallPaused}
+        onPress={handlePlayPauseCallPress}
+        isFocusMode={isFocusMode}
+      />
+    );
+  }, [
+    isRecording,
+    chatData?.platform,
+    isCallPaused,
+    handlePlayPauseCallPress,
+    isFocusMode,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -220,6 +326,7 @@ export const ListeningScreen = () => {
           showCallEndConfirmation={showCallEndConfirmation}
           setShowCallEndConfirmation={setShowCallEndConfirmation}
           handleEndCall={handleEndCall}
+          isMicrophoneMode={!!isRecording}
         />
       )}
       <StatusBar
@@ -232,27 +339,19 @@ export const ListeningScreen = () => {
           <Text style={styles.takingNotesText}>
             {t('ListeningScreen.takingNotes')}
           </Text>
-          <Timer startTime={startTime} />
+          {showTimer && <Timer startTime={startTime} />}
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveform
-              amplitudes={isAudioActive ? amplitudes : null}
+              amplitudes={isCallPaused ? null : amplitudes}
               isFocusMode
             />
           </View>
-          <PlayPauseOverlay
-            isPlaying={!isCallPaused}
-            onPress={handlePlayPauseCallPress}
-            isFocusMode
-          />
+          {playPauseButton}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
           <View style={globalStyles.rowCenter}>
-            <PlayPauseOverlay
-              isPlaying={!isCallPaused}
-              onPress={handlePlayPauseCallPress}
-              isFocusMode={false}
-            />
+            {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
               <Text style={styles.takingNotesText}>
                 {t('ListeningScreen.takingNotes')}
@@ -261,7 +360,7 @@ export const ListeningScreen = () => {
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
               <AudioWaveform
-                amplitudes={isAudioActive ? amplitudes : null}
+                amplitudes={isCallPaused ? null : amplitudes}
                 isFocusMode={false}
               />
             </View>

@@ -22,7 +22,7 @@ const StartCallCard: React.FC<StartCallCardProps> = ({
     <TouchableOpacity
       style={styles.card}
       onPress={onPressCard}
-      activeOpacity={0.8}>
+      activeOpacity={1}>
       <Text style={styles.header}>{header}</Text>
       <Text style={styles.subtitle}>
         {subtitle}
@@ -42,8 +42,7 @@ const styles = ScaledSheet.create({
     shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.08,
     shadowRadius: 24,
-    elevation: 8,
-    marginTop: '40@mvs',
+    elevation: 2,
     width: '49%',
     borderWidth: 0.35,
     borderColor: colors.darkGray13,

@@ -1,9 +1,6 @@
 name: 'Build & Upload iOS app - Develop'
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch:
 
 permissions:

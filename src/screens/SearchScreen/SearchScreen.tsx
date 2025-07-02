@@ -49,6 +49,7 @@ export const SearchScreen: React.FC = () => {
     loading,
     triggerSearch,
     onPressSuggestion,
+    lastSearchedText,
   } = useSearch();
   const {t} = useTranslate();
 
@@ -93,9 +94,10 @@ export const SearchScreen: React.FC = () => {
   const renderEmptyComponent = () => {
     return (
       <SearchEmpty
-        searchText={searchText}
+        searchText={lastSearchedText}
         trySuggestions={trySuggestions}
-        colorTheme="dark"
+        colorTheme="light"
+        onPressSuggestion={onPressSuggestion}
       />
     );
   };
@@ -103,7 +105,6 @@ export const SearchScreen: React.FC = () => {
   const flatListProps = {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
-    ListEmptyComponent: renderEmptyComponent(),
     ListFooterComponent:
       tabsState[activeTab]?.loading && tabsState[activeTab]?.data.length > 0 ? (
         <ActivityIndicator style={styles.footerActivityIndicator} />
@@ -116,20 +117,20 @@ export const SearchScreen: React.FC = () => {
         {renderSearchInput()}
         {loading ? (
           <ActivityIndicator style={styles.activityIndicator} />
+        ) : dynamicTabs.length > 0 ? (
+          <CustomTabs
+            tabs={dynamicTabs.map((tab, idx) => ({
+              ...tab,
+              title: tab.label,
+              data: tabsState[idx]?.data || [],
+            }))}
+            onTabChange={setActiveTab}
+            renderItem={renderItem}
+            initialTab={activeTab}
+            flatListProps={flatListProps}
+          />
         ) : (
-          dynamicTabs.length > 0 && (
-            <CustomTabs
-              tabs={dynamicTabs.map((tab, idx) => ({
-                ...tab,
-                title: tab.label,
-                data: tabsState[idx]?.data || [],
-              }))}
-              onTabChange={setActiveTab}
-              renderItem={renderItem}
-              initialTab={activeTab}
-              flatListProps={flatListProps}
-            />
-          )
+          renderEmptyComponent()
         )}
       </View>
     );
