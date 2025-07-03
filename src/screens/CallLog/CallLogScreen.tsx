@@ -170,7 +170,7 @@ export const CallLogScreen: React.FC = () => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
-          refreshing={isFetching}
+          refreshing={false}
           onRefresh={handleRefresh}
         />
       )}

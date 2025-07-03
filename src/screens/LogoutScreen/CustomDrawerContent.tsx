@@ -22,9 +22,13 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         <View style={styles.profileIconContainer}>
           <ProfileIcon />
         </View>
-        <View>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.phone}>{phone}</Text>
+        <View style={styles.textContainer}>
+          <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
+            {name}
+          </Text>
+          <Text style={styles.phone} numberOfLines={2} ellipsizeMode="tail">
+            {phone}
+          </Text>
         </View>
       </View>
       <TouchableOpacity
@@ -58,6 +62,9 @@ const styles = ScaledSheet.create({
     height: '40@ms',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  textContainer: {
+    flex: 1,
   },
   name: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
