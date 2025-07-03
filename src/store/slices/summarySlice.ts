@@ -86,7 +86,7 @@ export const selectMetrics = createSelector(
   [selectSummaryData],
   summaryData => ({
     listeningShare:
-      summaryData?.details?.callInfo?.counselorTalkingPercentage ?? null,
+      summaryData?.details?.callInfo?.clientTalkingPercentage ?? null,
     reflectiveQuestionsAsked:
       summaryData?.details?.summary?.reflectiveQuestionsAsked ?? null,
     emotionalLift: summaryData?.details?.summary?.emotionalLift ?? null,
