@@ -3,13 +3,12 @@ import {
   Alert,
   BackHandler,
   Linking,
-  Platform,
+  ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DrawerMenuIcon} from '@/assets/icons';
@@ -19,7 +18,6 @@ import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import {usePermission} from '@/hooks/usePermission';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
@@ -53,17 +51,6 @@ export const HomeScreen: React.FC = () => {
     }
   }, [visibleFields, dispatch]);
 
-  const micPermission = Platform.select({
-    ios: PERMISSIONS.IOS.MICROPHONE,
-    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
-  });
-
-  const {
-    requestPermission: requestMicPermission,
-    openAppSettings,
-    isGranted: isMicGranted,
-  } = usePermission(micPermission!);
-
   const handleThirdPartyCall = async () => {
     const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
     try {
@@ -75,23 +62,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleVoiceRecording = async () => {
-    if (isMicGranted) {
-      navigation.navigate('Listening', {isRecording: true});
-      return;
-    }
-    const result = await requestMicPermission();
-    if (result === RESULTS.GRANTED) {
-      navigation.navigate('Listening', {isRecording: true});
-    } else {
-      Alert.alert(
-        'Microphone Permission Required',
-        'Please enable microphone access in your device settings to use voice recording.',
-        [
-          {text: 'Cancel', style: 'cancel'},
-          {text: 'Open Settings', onPress: openAppSettings},
-        ],
-      );
-    }
+    navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
   return (
@@ -105,7 +76,11 @@ export const HomeScreen: React.FC = () => {
       {userData?.role !== UserRole.COUNSELOR ? (
         <FeatureNotAvailable />
       ) : (
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
           <Text style={styles.title}>{t('Home.start')}</Text>
           <Text style={styles.subtitle}>{t('Home.session')}</Text>
           <Text style={styles.chooseListening}>
@@ -128,7 +103,7 @@ export const HomeScreen: React.FC = () => {
             </View>
             <Text style={styles.consentNotice}>{t('Home.consentNotice')}</Text>
           </View>
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -138,7 +113,7 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingTop: '50@mvs',
+    paddingTop: '50@ms',
     paddingHorizontal: '32@ms',
   },
   buttonContainerWrapper: {
@@ -179,8 +154,10 @@ const styles = ScaledSheet.create({
     paddingVertical: '10@mvs',
     alignSelf: 'flex-start',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     paddingTop: '60@mvs',
     paddingBottom: '80@vs',
   },

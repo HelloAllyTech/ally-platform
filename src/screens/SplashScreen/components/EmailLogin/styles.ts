@@ -23,7 +23,9 @@ export const styles = ScaledSheet.create({
     alignItems: 'center',
   },
   input: {
-    ...typography.body.medium,
+    fontSize: '14@ms',
+    letterSpacing: 0.25,
+    fontWeight: '400',
     color: colors.black,
     flex: 1,
     borderWidth: 1,
