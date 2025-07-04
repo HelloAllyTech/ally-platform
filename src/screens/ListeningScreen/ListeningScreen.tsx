@@ -94,11 +94,12 @@ export const ListeningScreen = ({
   // Current chat won't be available initially for microphone mode flow
   // as the new chat is created only on emitting the event START_AUDIO_CHAT
   const chatData = useAppSelector(state => state.chat.currentChat);
-  const isRecording =
-    route.params?.isRecording || chatData?.provider === ChatProvider.MICROPHONE;
+  const isMicrophoneMode =
+    route.params?.isMicrophoneMode ||
+    chatData?.provider === ChatProvider.MICROPHONE;
 
   /** Show timer for webrtc/exotel call and in case of microphone mode when chat has started */
-  const showTimer = !isRecording || chatData?.chatId;
+  const showTimer = !isMicrophoneMode || chatData?.chatId;
   const [endCall, {isSuccess}] = useEndCallMutation();
 
   const handleCallEnd = useCallback(() => {
@@ -106,11 +107,11 @@ export const ListeningScreen = ({
   }, [navigation]);
 
   const getSocketPath = useCallback(() => {
-    if (isConferenceCall || isRecording) {
+    if (isConferenceCall || isMicrophoneMode) {
       return env.MICROPHONE_SOCKET_PATH;
     }
     return env.WEBRTC_SOCKET_PATH;
-  }, [isConferenceCall, isRecording]);
+  }, [isConferenceCall, isMicrophoneMode]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -124,13 +125,13 @@ export const ListeningScreen = ({
 
   useEffect(() => {
     navigation.setOptions({
-      gestureEnabled: !isRecording,
+      gestureEnabled: !isMicrophoneMode,
     });
-  }, [isRecording, navigation]);
+  }, [isMicrophoneMode, navigation]);
 
   const handleEndCall = () => {
     if (chatData?.chatId) {
-      if (isRecording) {
+      if (isMicrophoneMode) {
         handleStopStreaming();
       }
       endCall({chatId: chatData.chatId});
@@ -147,7 +148,7 @@ export const ListeningScreen = ({
   }, []);
 
   useHardwareBackPressHandler(() => {
-    if (isRecording) {
+    if (isMicrophoneMode) {
       setShowCallEndConfirmation(true);
       return true;
     }
@@ -222,19 +223,11 @@ export const ListeningScreen = ({
     eventCallbacks: socketEventCallbacks,
   });
 
-  useEffect(() => {
-    if (isRecording && !chatData?.chatId) {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
-        isLinear16Encoded: true,
-        platform: AllyPlatforms.MOBILE,
-      });
-    }
-  }, [chatData?.chatId, emitSocketEvent, isRecording]);
-
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (!isCallPausedRef.current) {
+        console.log('🚀 ~ handleAudioData ~ emitting:');
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
           chatId: chatData?.chatId,
@@ -244,18 +237,39 @@ export const ListeningScreen = ({
     [emitSocketEvent, chatData?.chatId],
   );
 
-  const {startStreaming, stopStreaming} = useLiveAudioStream({
-    onAudioData: handleAudioData,
-    enableLiveAudio: isRecording && !!chatData?.chatId,
-  });
+  const {startStreaming, stopStreaming, isPermissionGranted} =
+    useLiveAudioStream({
+      onAudioData: handleAudioData,
+      enableLiveAudio: isMicrophoneMode,
+    });
 
   const handleStartStreaming = useCallback(async () => {
     try {
+      if (!isPermissionGranted) {
+        logger.warn('Cannot start streaming: permission not granted');
+        return;
+      }
       await startStreaming();
     } catch (error) {
       logger.error(`Error starting stream: ${error}`);
     }
-  }, [startStreaming]);
+  }, [startStreaming, isPermissionGranted]);
+
+  useEffect(() => {
+    if (isMicrophoneMode && !chatData?.chatId && isPermissionGranted) {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
+        isLinear16Encoded: true,
+        platform: AllyPlatforms.MOBILE,
+      });
+      handleStartStreaming();
+    }
+  }, [
+    chatData?.chatId,
+    emitSocketEvent,
+    isMicrophoneMode,
+    isPermissionGranted,
+    handleStartStreaming,
+  ]);
 
   const handleStopStreaming = useCallback(() => {
     stopStreaming();
@@ -274,20 +288,13 @@ export const ListeningScreen = ({
       });
     }
   };
-
-  useEffect(() => {
-    if (isRecording && chatData?.chatId) {
-      handleStartStreaming();
-    }
-  }, [chatData?.chatId, handleStartStreaming, isRecording]);
-
   const toggleNudgeVisibility = () => {
     setIsFocusMode(prev => !prev);
   };
 
   const handlePlayPauseCallPress = useDebounce(
     () => {
-      if (!isRecording) {
+      if (!isMicrophoneMode) {
         emitSocketEvent(
           isCallPaused
             ? SocketEvent.AUDIO_CHAT_RESUMED
@@ -301,7 +308,7 @@ export const ListeningScreen = ({
   );
 
   const playPauseButton = useMemo(() => {
-    if (isRecording && chatData?.platform === AllyPlatforms.WEB) {
+    if (isMicrophoneMode && chatData?.platform === AllyPlatforms.WEB) {
       return null;
     }
     return (
@@ -312,7 +319,7 @@ export const ListeningScreen = ({
       />
     );
   }, [
-    isRecording,
+    isMicrophoneMode,
     chatData?.platform,
     isCallPaused,
     handlePlayPauseCallPress,
@@ -326,7 +333,7 @@ export const ListeningScreen = ({
           showCallEndConfirmation={showCallEndConfirmation}
           setShowCallEndConfirmation={setShowCallEndConfirmation}
           handleEndCall={handleEndCall}
-          isMicrophoneMode={!!isRecording}
+          isMicrophoneMode={!!isMicrophoneMode}
         />
       )}
       <StatusBar
