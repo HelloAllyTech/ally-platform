@@ -26,6 +26,7 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       minHeight: '36@ms',
       width: '100%',
       alignSelf: 'stretch',
+      backgroundColor: isDark ? colors.darkGray7 : colors.white,
     },
     tabButton: {
       paddingHorizontal: '10@ms',
