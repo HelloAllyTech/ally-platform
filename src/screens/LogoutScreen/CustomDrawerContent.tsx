@@ -14,7 +14,7 @@ interface DrawerContentProps {
 export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
   const {userData} = useUser();
   const {t} = useTranslate();
-  const {name, phone} = userData ?? {};
+  const {name, email} = userData ?? {};
 
   return (
     <View style={styles.container}>
@@ -27,7 +27,7 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
             {name}
           </Text>
           <Text style={styles.phone} numberOfLines={2} ellipsizeMode="tail">
-            {phone}
+            {email}
           </Text>
         </View>
       </View>
