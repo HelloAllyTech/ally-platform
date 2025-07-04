@@ -70,6 +70,14 @@ export const CallSummaryScreen: React.FC<
   const [editedName, setEditedName] = useState(callInfo.summaryName);
   const [showAnimation, setShowAnimation] = useState(!callId);
   const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
+  /**
+   * React Native bug workaround:
+   * When showAnimation transitions from true to false (after the card expands),
+   * the touch responder system may not recalculate the touchable area for the card and its children.
+   * Forcing a remount of the card ensures the layout and touch regions are recalculated,
+   * preventing touch issues on section headers after scrolling.
+   */
+  const [forceRemountKey, setForceRemountKey] = useState(0);
 
   const {
     handleSummaryNameChange,
@@ -112,6 +120,7 @@ export const CallSummaryScreen: React.FC<
   useEffect(() => {
     if (hasCollapsedBeenShown && showAnimation) {
       setShowAnimation(false);
+      setForceRemountKey(prev => prev + 1);
     }
   }, [hasCollapsedBeenShown, showAnimation]);
 
@@ -221,6 +230,7 @@ export const CallSummaryScreen: React.FC<
         setModalType={setActiveModal}
       />
       <Animated.View
+        key={forceRemountKey}
         style={[
           styles.card,
           showAnimation && animatedCardStyle,
