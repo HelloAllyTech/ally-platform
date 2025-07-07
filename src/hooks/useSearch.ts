@@ -18,13 +18,12 @@ export const useSearch = () => {
     useState(searchSuggestions);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
-    useLazyGetSearchResultsQuery();
-
   const [activeTab, setActiveTab] = useState(0);
   const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
   const [tabsState, setTabsState] = useState<TabState[]>([]);
+
+  const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
+    useLazyGetSearchResultsQuery();
 
   useEffect(() => {
     if (searchResults?.documents) {
