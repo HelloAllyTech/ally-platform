@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert, Text, TouchableOpacity, View} from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
 import useTranslate from '@/hooks/useTranslate';
@@ -92,49 +93,54 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.contentContainer}>
-        <Text style={styles.headerText}>
-          {t('SplashScreen.enterTheCodeSentTo')}
-          {'\n'}
-          <Text style={styles.emailText}>{email}</Text>
-        </Text>
-
-        <View style={styles.otpContainer}>
-          <OtpInput
-            ref={otpInputRef}
-            value={otpValue}
-            onChange={handleOtpChange}
-            inputCount={4}
-            hasError={!!error}
-          />
-        </View>
-
-        {error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.resendContainer}>
-          <Text style={styles.helperText}>
-            {t('SplashScreen.didNotReceiveTheCode')}
+      <KeyboardAwareScrollView
+        contentContainerStyle={{flex: 1}}
+        enableOnAndroid
+        extraScrollHeight={0}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.contentContainer}>
+          <Text style={styles.headerText}>
+            {t('SplashScreen.enterTheCodeSentTo')}
+            {'\n'}
+            <Text style={styles.emailText}>{email}</Text>
           </Text>
-          <TouchableOpacity
-            style={styles.resendButton}
-            onPress={handleResendOtp}
-            disabled={isResendDisabled || isResending}>
-            <Text
-              style={[
-                styles.resendButtonText,
-                (isResendDisabled || isResending) &&
-                  styles.resendButtonDisabled,
-              ]}>
-              {t('SplashScreen.resend')}{' '}
-              {countdown > 0 ? `(${countdown}s)` : ''}
+
+          <View style={styles.otpContainer}>
+            <OtpInput
+              ref={otpInputRef}
+              value={otpValue}
+              onChange={handleOtpChange}
+              inputCount={4}
+              hasError={!!error}
+            />
+          </View>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+          <View style={styles.resendContainer}>
+            <Text style={styles.helperText}>
+              {t('SplashScreen.didNotReceiveTheCode')}
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={handleResendOtp}
+              disabled={isResendDisabled || isResending}>
+              <Text
+                style={[
+                  styles.resendButtonText,
+                  (isResendDisabled || isResending) &&
+                    styles.resendButtonDisabled,
+                ]}>
+                {t('SplashScreen.resend')}{' '}
+                {countdown > 0 ? `(${countdown}s)` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </KeyboardAwareScrollView>
 
       <PrimaryButton
         label={t('SplashScreen.verifyOtp')}
