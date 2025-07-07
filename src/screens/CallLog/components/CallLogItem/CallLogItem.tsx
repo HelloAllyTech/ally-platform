@@ -52,7 +52,7 @@ const CallLogItem = ({
       style={[styles.logItemContainer, disabled && styles.disabled]}>
       {/* Header section with client info and call quality score */}
       <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
-        <View>
+        <View style={styles.leftContainer}>
           <View style={styles.logHeaderContent}>
             <TouchableOpacity
               onPress={onToggle}
@@ -75,7 +75,7 @@ const CallLogItem = ({
             {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
           </Text>
         </View>
-        <View style={styles.pointsContainer}>
+        <View style={styles.rightContainer}>
           <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
           {!disabled && (
             <EyeIcon width={16} height={16} style={styles.eyeIcon} />
@@ -126,9 +126,13 @@ const styles = ScaledSheet.create({
   disabled: {
     opacity: 0.6,
   },
+  leftContainer: {
+    flex: 1,
+    marginRight: '10@ms',
+  },
   logHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     borderRadius: '12@ms',
     padding: '8@ms',
     marginTop: '-2@ms',
@@ -137,7 +141,7 @@ const styles = ScaledSheet.create({
   expandedLogHeader: {
     backgroundColor: colors.lightGray,
   },
-  pointsContainer: {
+  rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: '2@ms',
@@ -145,6 +149,7 @@ const styles = ScaledSheet.create({
   logHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   arrowContainer: {
     width: '24@ms',
@@ -152,6 +157,9 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: '4@ms',
+  },
+  textContainer: {
+    flex: 1,
   },
   logId: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
