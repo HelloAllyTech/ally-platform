@@ -100,9 +100,9 @@ export const ListeningScreen = ({
 
   /** Show timer for webrtc/exotel call and in case of microphone mode when chat has started */
   const showTimer = !isMicrophoneMode || chatData?.chatId;
-  const [endCall, {isSuccess}] = useEndCallMutation();
+  const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
-  const handleCallEnd = useCallback(() => {
+  const onCallEndSuccess = useCallback(() => {
     navigation.navigate('Breathing');
   }, [navigation]);
 
@@ -114,10 +114,10 @@ export const ListeningScreen = ({
   }, [isConferenceCall, isMicrophoneMode]);
 
   useEffect(() => {
-    if (isSuccess) {
-      handleCallEnd();
+    if (isEndCallSuccess) {
+      onCallEndSuccess();
     }
-  }, [isSuccess, handleCallEnd]);
+  }, [isEndCallSuccess, onCallEndSuccess]);
 
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
@@ -167,7 +167,10 @@ export const ListeningScreen = ({
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.CHAT_ENDED]: () => {
-        handleCallEnd();
+        onCallEndSuccess();
+      },
+      [SocketEvent.USER_DISCONNECTED]: () => {
+        onCallEndSuccess();
       },
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
@@ -212,7 +215,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [handleCallEnd, isAudioActive, isConferenceCall],
+    [onCallEndSuccess, isAudioActive, isConferenceCall],
   );
 
   const {userData} = useUser();
@@ -227,7 +230,6 @@ export const ListeningScreen = ({
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (!isCallPausedRef.current) {
-        console.log('🚀 ~ handleAudioData ~ emitting:');
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
           chatId: chatData?.chatId,
@@ -261,7 +263,10 @@ export const ListeningScreen = ({
         isLinear16Encoded: true,
         platform: AllyPlatforms.MOBILE,
       });
-      handleStartStreaming();
+      setTimeout(() => {
+        // TODO: Need to change this workaround
+        handleStartStreaming();
+      }, 2000);
     }
   }, [
     chatData?.chatId,
