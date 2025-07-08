@@ -23,7 +23,7 @@ export const useCallTranscriptDetails = (chatId: number) => {
   const summaryData = useAppSelector(selectSummaryData);
   const counselor = summaryData?.counselorId;
   const client = summaryData?.clientId;
-  const startedTime = summaryData?.startedAt;
+  const startedTime = summaryData?.createdAt;
 
   const queryParams = useMemo(
     () => ({
