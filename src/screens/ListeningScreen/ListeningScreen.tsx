@@ -230,7 +230,6 @@ export const ListeningScreen = ({
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (!isCallPausedRef.current) {
-        console.log('🚀 ~ handleAudioData ~ emitting:');
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
           chatId: chatData?.chatId,
@@ -264,7 +263,10 @@ export const ListeningScreen = ({
         isLinear16Encoded: true,
         platform: AllyPlatforms.MOBILE,
       });
-      handleStartStreaming();
+      setTimeout(() => {
+        // TODO: Need to change this workaround
+        handleStartStreaming();
+      }, 2000);
     }
   }, [
     chatData?.chatId,
