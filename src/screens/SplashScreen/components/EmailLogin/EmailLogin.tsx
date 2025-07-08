@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import crashlytics from '@react-native-firebase/crashlytics';
 import {SerializedError} from '@reduxjs/toolkit';
 import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
 import {
@@ -63,6 +64,9 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    // TODO: Remove this after testing
+    crashlytics().crash();
+
     if (isValidEmail(email)) {
       await generateOtp({email});
     }
