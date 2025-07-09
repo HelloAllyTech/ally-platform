@@ -14,8 +14,6 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
     tabHeader: {
       height: '38@ms',
       backgroundColor: isDark ? colors.darkSlate : colors.white,
-      width: '100%',
-      alignSelf: 'stretch',
       borderBottomWidth: 1,
       borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray14,
     },
@@ -24,8 +22,6 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       alignItems: 'center',
       paddingHorizontal: 0,
       minHeight: '36@ms',
-      width: '100%',
-      alignSelf: 'stretch',
       backgroundColor: isDark ? colors.darkGray7 : colors.white,
     },
     tabButton: {
