@@ -46,9 +46,7 @@ export const SearchScreen: React.FC = () => {
     lastSearchedText,
     resources,
     categoryCountList,
-    selectedCategory,
     onCategoryChange,
-    hasMore,
     loading,
     triggerSearchOnSubmit,
     showSuggestions,
@@ -117,9 +115,7 @@ export const SearchScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {loading ? (
-          <ActivityIndicator style={styles.activityIndicator} />
-        ) : resources.length > 0 ? (
+        {resources.length > 0 ? (
           <CustomTabs
             tabs={[
               {
@@ -145,6 +141,8 @@ export const SearchScreen: React.FC = () => {
             initialTab={0}
             flatListProps={flatListProps}
           />
+        ) : loading ? (
+          <ActivityIndicator style={styles.footerActivityIndicator} />
         ) : (
           renderEmptyComponent()
         )}

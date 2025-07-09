@@ -115,4 +115,4 @@ export const tabDefs = [
   {key: 'events', title: 'Events'},
 ];
 
-export const PAGE_SIZE = 10;
+export const PAGE_SIZE = 3;
