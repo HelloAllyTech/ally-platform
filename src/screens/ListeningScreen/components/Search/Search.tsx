@@ -27,19 +27,22 @@ const Search = () => {
     focused,
     onChangeText,
     handleSuggestionPress,
-    triggerSearch,
+    triggerSearchOnSubmit,
     filteredSuggestions,
     setShowSuggestions,
     onSearchFocus,
     setFocused,
     dynamicTabs,
     tabsState,
-    setActiveTab,
-    activeTab,
     onPressSuggestion,
     loading,
     handleEndReached,
     lastSearchedText,
+    resources,
+    categoryCountList,
+    selectedCategory,
+    onCategoryChange,
+    hasMore,
   } = useSearch();
 
   const {t} = useTranslate();
@@ -71,7 +74,7 @@ const Search = () => {
     onEndReachedThreshold: 0.5,
     ListEmptyComponent: renderEmptyComponent(),
     ListFooterComponent:
-      tabsState[activeTab]?.loading && tabsState[activeTab]?.data.length > 0 ? (
+      loading && resources.length > 0 ? (
         <ActivityIndicator style={styles.footerActivityIndicator} />
       ) : null,
   };
@@ -83,16 +86,32 @@ const Search = () => {
         {loading ? (
           <ActivityIndicator style={styles.activityIndicator} />
         ) : (
-          dynamicTabs.length > 0 && (
+          resources.length > 0 && (
             <CustomTabs
-              tabs={dynamicTabs.map((tab, idx) => ({
-                ...tab,
-                title: tab.label,
-                data: tabsState[idx]?.data || [],
-              }))}
-              onTabChange={setActiveTab}
+              tabs={[
+                {
+                  key: 'all',
+                  title: `All (${resources.length})`,
+                  data: resources,
+                },
+                ...Object.entries(categoryCountList).map(
+                  ([category, count]) => ({
+                    key: category.toLowerCase(),
+                    title: `${category} (${count})`,
+                    data: [], // Category data will be loaded separately
+                  }),
+                ),
+              ]}
+              onTabChange={tabIndex => {
+                if (tabIndex === 0) {
+                  onCategoryChange('All');
+                } else {
+                  const category = Object.keys(categoryCountList)[tabIndex - 1];
+                  onCategoryChange(category);
+                }
+              }}
               renderItem={renderItem}
-              initialTab={activeTab}
+              initialTab={0}
               flatListProps={flatListProps}
               colorScheme="dark"
             />
@@ -115,7 +134,7 @@ const Search = () => {
         suggestions={filteredSuggestions}
         showSuggestions={false}
         onSuggestionPress={handleSuggestionPress}
-        onSubmitEditing={triggerSearch}
+        onSubmitEditing={triggerSearchOnSubmit}
         colorTheme="dark"
         customStyles={styles.input}
       />
