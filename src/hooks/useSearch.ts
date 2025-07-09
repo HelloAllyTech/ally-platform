@@ -10,9 +10,7 @@ import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
-  console.log('🚀 ~ useSearch ~ searchText:', searchText);
   const [lastSearchedText, setLastSearchedText] = useState('');
-  console.log('🚀 ~ useSearch ~ lastSearchedText:', lastSearchedText);
   const [focused, setFocused] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] =
@@ -27,7 +25,6 @@ export const useSearch = () => {
     [key: string]: number;
   }>({});
 
-  console.log('🚀 ~ useSearch ~ categoryCountList:', categoryCountList);
   const [hasMore, setHasMore] = useState(true);
 
   const [searchDocuments, {isLoading, isFetching}] =
@@ -103,9 +100,7 @@ export const useSearch = () => {
       if (response.data) {
         const newDocuments = response.data.documents || [];
         setResources(prevResources => [...prevResources, ...newDocuments]);
-        setHasMore(
-          response.data.total > resources.length + newDocuments.length,
-        );
+        setHasMore(response.data.total > newDocuments.length);
       }
     } catch (error) {
       console.error('Error fetching remaining resources:', error);
@@ -182,13 +177,9 @@ export const useSearch = () => {
   const onPressSuggestion = useCallback(
     (suggestion: string) => {
       setShowSearchResults(true);
-      console.log(
-        '🚀 ~ handleSuggestionPress ~ showSearchResults:',
-        showSearchResults,
-      );
       onSearch(suggestion);
     },
-    [onSearch, showSearchResults],
+    [onSearch],
   );
 
   // Trigger search on submit
