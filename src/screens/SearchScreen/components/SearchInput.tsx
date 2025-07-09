@@ -118,6 +118,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       flexDirection: 'row',
       alignItems: 'center',
       marginVertical: '10@mvs',
+      maxHeight: '40@ms',
     },
     searchIconContainer: {
       width: '18@ms',
