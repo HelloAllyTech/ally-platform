@@ -120,13 +120,13 @@ export const SearchScreen: React.FC = () => {
             tabs={[
               {
                 key: 'all',
-                title: `All (${resources.length})`,
+                title: `All (${Object.values(categoryCountList).reduce((acc, curr) => acc + curr, 0)})`,
                 data: resources,
               },
               ...Object.entries(categoryCountList).map(([category, count]) => ({
                 key: category.toLowerCase(),
                 title: `${category} (${count})`,
-                data: [], // Category data will be loaded separately
+                data: resources,
               })),
             ]}
             onTabChange={tabIndex => {
