@@ -42,9 +42,12 @@ export const EditableField: React.FC<EditableFieldProps> = ({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
+      // Defer focus to next tick to ensure TextInput is fully rendered and focusable
+      setTimeout(() => {
+        inputRef.current?.focus();
+      });
     }
-  }, [isEditing]);
+  }, [isEditing, canEdit, isEnhancing]);
 
   useEffect(() => {
     if (isEnhancing) {
@@ -86,8 +89,6 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         placeholderTextColor={colors.lightGray3}
         multiline
         editable={canEdit && isEditing && !isEnhancing}
-        autoFocus={canEdit && isEditing}
-        selectTextOnFocus={canEdit && isEditing}
       />
     </View>
   );
