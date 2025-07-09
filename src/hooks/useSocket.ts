@@ -71,11 +71,6 @@ export const useSocket = ({
       connectionAttemptsRef.current = 0;
     });
 
-    socketRef.current.onAny((event, ...args) => {
-      console.log('🚀 ~ event:', event);
-      console.log('🚀 ~ args:', args);
-    });
-
     socketRef.current.on('connect_error', error => {
       logger.error(`connect_error: Socket connection error: ${error}`);
     });
