@@ -42,14 +42,16 @@ export const SearchScreen: React.FC = () => {
     setFocused,
     onChangeText,
     handleEndReached,
-    tabsState,
-    activeTab,
-    dynamicTabs,
-    setActiveTab,
-    loading,
-    triggerSearch,
     onPressSuggestion,
     lastSearchedText,
+    resources,
+    categoryCountList,
+    selectedCategory,
+    onCategoryChange,
+    hasMore,
+    loading,
+    triggerSearchOnSubmit,
+    showSuggestions,
   } = useSearch();
   const {t} = useTranslate();
 
@@ -106,7 +108,7 @@ export const SearchScreen: React.FC = () => {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
     ListFooterComponent:
-      tabsState[activeTab]?.loading && tabsState[activeTab]?.data.length > 0 ? (
+      loading && resources.length > 0 ? (
         <ActivityIndicator style={styles.footerActivityIndicator} />
       ) : null,
   };
@@ -117,16 +119,30 @@ export const SearchScreen: React.FC = () => {
         {renderSearchInput()}
         {loading ? (
           <ActivityIndicator style={styles.activityIndicator} />
-        ) : dynamicTabs.length > 0 ? (
+        ) : resources.length > 0 ? (
           <CustomTabs
-            tabs={dynamicTabs.map((tab, idx) => ({
-              ...tab,
-              title: tab.label,
-              data: tabsState[idx]?.data || [],
-            }))}
-            onTabChange={setActiveTab}
+            tabs={[
+              {
+                key: 'all',
+                title: `All (${resources.length})`,
+                data: resources,
+              },
+              ...Object.entries(categoryCountList).map(([category, count]) => ({
+                key: category.toLowerCase(),
+                title: `${category} (${count})`,
+                data: [], // Category data will be loaded separately
+              })),
+            ]}
+            onTabChange={tabIndex => {
+              if (tabIndex === 0) {
+                onCategoryChange('All');
+              } else {
+                const category = Object.keys(categoryCountList)[tabIndex - 1];
+                onCategoryChange(category);
+              }
+            }}
             renderItem={renderItem}
-            initialTab={activeTab}
+            initialTab={0}
             flatListProps={flatListProps}
           />
         ) : (
@@ -136,11 +152,11 @@ export const SearchScreen: React.FC = () => {
     );
   };
 
-  // const isShowSuggestions =
-  //   !showSearchResults &&
-  //   showSuggestions &&
-  //   focused &&
-  //   searchText.trim() !== '';
+  const isShowSuggestions =
+    !showSearchResults &&
+    showSuggestions &&
+    focused &&
+    searchText.trim() !== '';
 
   const renderSearchInput = () => {
     return (
@@ -153,9 +169,9 @@ export const SearchScreen: React.FC = () => {
         searchText={searchText}
         setSearchText={onChangeText}
         suggestions={filteredSuggestions}
-        showSuggestions={false}
+        showSuggestions={isShowSuggestions}
         onSuggestionPress={handleSuggestionPress}
-        onSubmitEditing={triggerSearch}
+        onSubmitEditing={triggerSearchOnSubmit}
       />
     );
   };
