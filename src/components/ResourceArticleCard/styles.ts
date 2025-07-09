@@ -11,9 +11,11 @@ export const getThemedStyles = (colorScheme: string | null) => {
       borderRadius: '8@ms',
       borderWidth: 0.5,
       borderColor: isDark ? colors.darkGray5 : colors.lightGray14,
-      paddingHorizontal: '10@s',
       paddingVertical: '10@vs',
       marginVertical: '6@vs',
+    },
+    paddingH10: {
+      paddingHorizontal: '10@s',
     },
     topRow: {
       flexDirection: 'row',
@@ -31,6 +33,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
       alignItems: 'center',
       marginRight: '8@s',
       height: '24@ms',
+      marginLeft: '10@s',
     },
     categoryText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
