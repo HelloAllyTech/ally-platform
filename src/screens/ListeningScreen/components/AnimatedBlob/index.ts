@@ -1,0 +1,1 @@
+export {AnimatedBlob} from './AnimatedBlob';
