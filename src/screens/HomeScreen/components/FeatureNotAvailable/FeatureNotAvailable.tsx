@@ -13,12 +13,7 @@ export const FeatureNotAvailable = () => {
 
   const handleLearnMorePress = useCallback(async () => {
     try {
-      const supported = await Linking.canOpenURL(env.ALLY_WEB_URL);
-      if (supported) {
-        await Linking.openURL(env.ALLY_WEB_URL);
-      } else {
-        Alert.alert('Error', 'Unable to open the link');
-      }
+      await Linking.openURL(env.ALLY_WEB_URL);
     } catch (error) {
       logger.error(`Error opening learn more URL: ${error}`);
       Alert.alert('Error', 'Unable to open the link');
