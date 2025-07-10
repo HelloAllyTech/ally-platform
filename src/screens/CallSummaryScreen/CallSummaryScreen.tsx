@@ -258,7 +258,7 @@ export const CallSummaryScreen: React.FC<
                 onProgressComplete={() => {
                   setSummaryProgressComplete(true);
                 }}
-                animationDuration={300}
+                animationDuration={1000}
               />
             )}
           </ScrollView>
