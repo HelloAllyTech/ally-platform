@@ -1,5 +1,9 @@
 export const trySuggestions = [
   {
+    id: 1,
+    text: 'Violence safety plan',
+  },
+  {
     id: 2,
     text: 'Suicide assessment',
   },
