@@ -60,31 +60,33 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
         </View>
         {renderedTags}
       </View>
-      <Text style={themedStyles.title}>{heading}</Text>
-      {!expanded ? (
-        <View style={themedStyles.contentRow}>
-          <Text
-            style={themedStyles.content}
-            numberOfLines={MAX_LINES}
-            ellipsizeMode="tail">
-            {content}
-          </Text>
-          <TouchableOpacity
-            style={themedStyles.moreButton}
-            onPress={toggleExpand}
-            activeOpacity={0.7}>
-            <Text style={themedStyles.moreText}>
-              {`... ${t('ResourceArticleCard.more')}`}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableWithoutFeedback onPress={toggleExpand}>
+      <View style={themedStyles.paddingH10}>
+        <Text style={themedStyles.title}>{heading}</Text>
+        {!expanded ? (
           <View style={themedStyles.contentRow}>
-            <Text style={themedStyles.content}>{content}</Text>
+            <Text
+              style={themedStyles.content}
+              numberOfLines={MAX_LINES}
+              ellipsizeMode="tail">
+              {content}
+            </Text>
+            <TouchableOpacity
+              style={themedStyles.moreButton}
+              onPress={toggleExpand}
+              activeOpacity={0.7}>
+              <Text style={themedStyles.moreText}>
+                {`... ${t('ResourceArticleCard.more')}`}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </TouchableWithoutFeedback>
-      )}
+        ) : (
+          <TouchableWithoutFeedback onPress={toggleExpand}>
+            <View style={themedStyles.contentRow}>
+              <Text style={themedStyles.content}>{content}</Text>
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+      </View>
     </View>
   );
 };

@@ -1,8 +1,6 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {
   AccessibilityRole,
-  FlatList,
-  FlatListProps,
   ScrollView,
   ScrollViewProps,
   Text,
@@ -15,41 +13,40 @@ import type {ThemeMode} from '@/types/general';
 
 import {getThemedStyles} from './styles';
 
-export interface TabData<T> {
+export interface TabMeta {
   key: string;
   title: string;
-  data: T[];
 }
 
-export interface CustomTabsProps<T> {
-  tabs: TabData<T>[];
+export interface CustomTabsProps {
+  tabs: TabMeta[];
   colorScheme?: ThemeMode;
   initialTab?: number;
-  flatListProps?: Partial<FlatListProps<T>>;
+  activeTab?: number;
   tabHeaderProps?: Partial<ScrollViewProps>;
   containerStyle?: ViewStyle;
   onTabChange?: (tabIndex: number) => void;
-  renderItem: ({item}: {item: T}) => React.ReactElement;
   renderTabHeader?: (
-    tab: TabData<T>,
+    tab: TabMeta,
     idx: number,
     isActive: boolean,
     onPress: () => void,
   ) => React.ReactNode;
 }
 
-function CustomTabs<T>({
+function CustomTabs({
   tabs,
-  renderItem,
   colorScheme = 'light',
   initialTab = 0,
+  activeTab: controlledActiveTab,
   onTabChange,
-  flatListProps,
   tabHeaderProps,
   renderTabHeader,
   containerStyle,
-}: CustomTabsProps<T>) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+}: CustomTabsProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState(initialTab);
+  const activeTab =
+    controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
   const themedStyles = useMemo(
     () => getThemedStyles(colorScheme),
     [colorScheme],
@@ -57,7 +54,7 @@ function CustomTabs<T>({
 
   const handleTabPress = useCallback(
     (idx: number) => {
-      setActiveTab(idx);
+      setInternalActiveTab(idx);
       if (onTabChange) onTabChange(idx);
     },
     [onTabChange],
@@ -109,15 +106,6 @@ function CustomTabs<T>({
         {...tabHeaderProps}>
         {tabHeaders}
       </ScrollView>
-      <FlatList
-        data={tabs[activeTab]?.data || []}
-        renderItem={renderItem}
-        keyExtractor={(_, i) => `${tabs[activeTab]?.key ?? 'tab'}-${i}`}
-        style={themedStyles.tabBody}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={themedStyles.tabBodyContent}
-        {...flatListProps}
-      />
     </View>
   );
 }
