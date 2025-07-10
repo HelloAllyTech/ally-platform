@@ -1,10 +1,7 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Keyboard} from 'react-native';
 
-import {
-  PAGE_SIZE,
-  searchSuggestions,
-} from '@/screens/SearchScreen/searchConfig';
+import {PAGE_SIZE, trySuggestions} from '@/screens/SearchScreen/searchConfig';
 import {ResourceArticle} from '@/screens/SearchScreen/types';
 import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 
@@ -14,7 +11,7 @@ export const useSearch = () => {
   const [focused, setFocused] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] =
-    useState(searchSuggestions);
+    useState(trySuggestions);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -37,7 +34,7 @@ export const useSearch = () => {
     }
   }, [searchText, lastSearchedText]);
 
-  // Main search function matching web implementation
+  // Main search function
   const triggerSearch = useCallback(
     async (query: string, category?: string) => {
       let filters;
@@ -69,7 +66,7 @@ export const useSearch = () => {
     [searchDocuments],
   );
 
-  // Category change handler matching web implementation
+  // Category change handler
   const onCategoryChange = useCallback(
     async (category: string) => {
       setSelectedCategory(category);
@@ -80,7 +77,7 @@ export const useSearch = () => {
     [lastSearchedText, triggerSearch],
   );
 
-  // Infinite scroll handler matching web implementation
+  // Infinite scroll handler
   const fetchRemainingResources = useCallback(async () => {
     if (isLoading || isFetching || !hasMore) return;
 
@@ -100,7 +97,9 @@ export const useSearch = () => {
       if (response.data) {
         const newDocuments = response.data.documents || [];
         setResources(prevResources => [...prevResources, ...newDocuments]);
-        setHasMore(response.data.total > newDocuments.length);
+        setHasMore(
+          response.data.total > resources.length + newDocuments.length,
+        );
       }
     } catch (error) {
       console.error('Error fetching remaining resources:', error);
@@ -141,7 +140,7 @@ export const useSearch = () => {
     setShowSuggestions(true);
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      const filtered = searchSuggestions.filter(s =>
+      const filtered = trySuggestions.filter(s =>
         s.text.toLowerCase().includes(searchText.toLowerCase()),
       );
       setFilteredSuggestions(filtered);
@@ -191,41 +190,43 @@ export const useSearch = () => {
 
   const loading = isLoading || isFetching;
 
-  // Generate dynamic tabs from category count list
-  const dynamicTabs = useCallback(() => {
-    if (Object.keys(categoryCountList).length === 0) {
-      return [];
-    }
-
-    const tabs = [
+  // --- Centralized tab meta and active tab logic ---
+  const tabsMeta = useMemo(
+    () => [
       {
         key: 'all',
-        label: `All (${resources.length})`,
-        data: resources,
+        title: `All (${Object.values(categoryCountList).reduce((acc, curr) => acc + curr, 0)})`,
       },
-    ];
-
-    Object.entries(categoryCountList).forEach(([category, count]) => {
-      tabs.push({
+      ...Object.entries(categoryCountList).map(([category, count]) => ({
         key: category.toLowerCase(),
-        label: `${category} (${count})`,
-        data: [], // Category data will be loaded separately
-      });
-    });
+        title: `${category} (${count})`,
+      })),
+    ],
+    [categoryCountList],
+  );
 
-    return tabs;
-  }, [categoryCountList, resources]);
+  const normalizedSelectedCategory = selectedCategory.toLowerCase();
+  const activeTabIndex = tabsMeta.findIndex(
+    tab => tab.key === normalizedSelectedCategory,
+  );
 
-  // Tab state management
-  const tabsState = useCallback(() => {
-    return dynamicTabs().map((tab, idx) => ({
-      data: idx === 0 ? tab.data : [], // Only "All" tab has data initially
-      page: 0,
-      hasMore: idx === 0 ? hasMore : false,
-      loading: false,
-      error: null,
-    }));
-  }, [dynamicTabs, hasMore]);
+  // Centralized loader/empty state logic
+  const showInitialLoader = resources.length === 0 && loading;
+  const showFooterLoader = resources.length > 0 && loading;
+  const showEmptyState = resources.length === 0 && !loading;
+
+  // Centralized tab change handler
+  const handleTabChange = useCallback(
+    (tabIndex: number) => {
+      const tabKey = tabsMeta[tabIndex].key;
+      if (tabKey === 'all') {
+        onCategoryChange('All');
+      } else {
+        onCategoryChange(tabKey);
+      }
+    },
+    [tabsMeta, onCategoryChange],
+  );
 
   return {
     searchText,
@@ -246,9 +247,6 @@ export const useSearch = () => {
     triggerSearchOnSubmit,
     searchDocuments,
     handleEndReached: fetchRemainingResources,
-    tabsState: tabsState(),
-    activeTab: 0, // We'll handle tab switching separately
-    dynamicTabs: dynamicTabs(),
     onPressSuggestion,
     lastSearchedText,
     selectedCategory,
@@ -256,5 +254,11 @@ export const useSearch = () => {
     resources,
     categoryCountList,
     hasMore,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
   };
 };

@@ -1,6 +1,7 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Keyboard,
   ScrollView,
   StatusBar,
@@ -18,6 +19,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchIcon} from '@/assets/icons';
 import CustomTabs from '@/components/CustomTabs/CustomTabs';
+import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
 import useTranslate from '@/hooks/useTranslate';
@@ -45,15 +47,24 @@ export const SearchScreen: React.FC = () => {
     onPressSuggestion,
     lastSearchedText,
     resources,
-    categoryCountList,
-    onCategoryChange,
-    loading,
     triggerSearchOnSubmit,
+    selectedCategory,
     showSuggestions,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
   } = useSearch();
   const {t} = useTranslate();
 
   const anim = useSharedValue(0);
+
+  const {tabBody: tabBodyStyle, tabBodyContent: tabBodyContentStyle} = useMemo(
+    () => getThemedStyles('light'),
+    [],
+  );
 
   useEffect(() => {
     anim.value = withTiming(focused ? 1 : 0, {duration: 300});
@@ -106,7 +117,7 @@ export const SearchScreen: React.FC = () => {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
     ListFooterComponent:
-      loading && resources.length > 0 ? (
+      showFooterLoader && resources.length > 0 ? (
         <ActivityIndicator style={styles.footerActivityIndicator} />
       ) : null,
   };
@@ -115,46 +126,39 @@ export const SearchScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {resources.length > 0 ? (
+        {tabsMeta.length > 0 && (
           <CustomTabs
-            tabs={[
-              {
-                key: 'all',
-                title: `All (${Object.values(categoryCountList).reduce((acc, curr) => acc + curr, 0)})`,
-                data: resources,
-              },
-              ...Object.entries(categoryCountList).map(([category, count]) => ({
-                key: category.toLowerCase(),
-                title: `${category} (${count})`,
-                data: resources,
-              })),
-            ]}
-            onTabChange={tabIndex => {
-              if (tabIndex === 0) {
-                onCategoryChange('All');
-              } else {
-                const category = Object.keys(categoryCountList)[tabIndex - 1];
-                onCategoryChange(category);
-              }
-            }}
-            renderItem={renderItem}
-            initialTab={0}
-            flatListProps={flatListProps}
+            tabs={tabsMeta}
+            activeTab={activeTabIndex}
+            onTabChange={handleTabChange}
           />
-        ) : loading ? (
-          <ActivityIndicator style={styles.footerActivityIndicator} />
-        ) : (
-          renderEmptyComponent()
         )}
+        {showInitialLoader ? (
+          <ActivityIndicator style={styles.footerActivityIndicator} />
+        ) : resources.length > 0 ? (
+          <FlatList
+            data={resources}
+            renderItem={renderItem}
+            keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
+            {...flatListProps}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={tabBodyContentStyle}
+            style={tabBodyStyle}
+            ListFooterComponent={
+              showFooterLoader ? (
+                <ActivityIndicator style={styles.footerActivityIndicator} />
+              ) : null
+            }
+          />
+        ) : showEmptyState ? (
+          renderEmptyComponent()
+        ) : null}
       </View>
     );
   };
 
-  const isShowSuggestions =
-    !showSearchResults &&
-    showSuggestions &&
-    focused &&
-    searchText.trim() !== '';
+  // const isShowSuggestions =
+  //   showSearchResults && showSuggestions && focused && searchText.trim() !== '';
 
   const renderSearchInput = () => {
     return (
@@ -167,7 +171,7 @@ export const SearchScreen: React.FC = () => {
         searchText={searchText}
         setSearchText={onChangeText}
         suggestions={filteredSuggestions}
-        showSuggestions={isShowSuggestions}
+        showSuggestions={false}
         onSuggestionPress={handleSuggestionPress}
         onSubmitEditing={triggerSearchOnSubmit}
       />

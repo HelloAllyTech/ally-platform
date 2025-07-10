@@ -1,5 +1,7 @@
+import {useMemo} from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Keyboard,
   Text,
   TouchableWithoutFeedback,
@@ -9,6 +11,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon} from '@/assets/icons';
 import CustomTabs from '@/components/CustomTabs/CustomTabs';
+import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
 import useTranslate from '@/hooks/useTranslate';
@@ -32,20 +35,24 @@ const Search = () => {
     setShowSuggestions,
     onSearchFocus,
     setFocused,
-    dynamicTabs,
-    tabsState,
     onPressSuggestion,
-    loading,
-    handleEndReached,
     lastSearchedText,
     resources,
-    categoryCountList,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
     selectedCategory,
-    onCategoryChange,
-    hasMore,
+    handleEndReached,
   } = useSearch();
 
   const {t} = useTranslate();
+  const {tabBody: tabBodyStyle, tabBodyContent: tabBodyContentStyle} = useMemo(
+    () => getThemedStyles('dark'),
+    [],
+  );
   const onFocus = () => {
     onSearchFocus();
     if (searchText.trim() !== '') setShowSuggestions(true);
@@ -73,50 +80,40 @@ const Search = () => {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
     ListEmptyComponent: renderEmptyComponent(),
-    ListFooterComponent:
-      loading && resources.length > 0 ? (
-        <ActivityIndicator style={styles.footerActivityIndicator} />
-      ) : null,
   };
 
   const renderDetailSearch = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {loading ? (
-          <ActivityIndicator style={styles.activityIndicator} />
-        ) : (
-          resources.length > 0 && (
-            <CustomTabs
-              tabs={[
-                {
-                  key: 'all',
-                  title: `All (${resources.length})`,
-                  data: resources,
-                },
-                ...Object.entries(categoryCountList).map(
-                  ([category, count]) => ({
-                    key: category.toLowerCase(),
-                    title: `${category} (${count})`,
-                    data: [], // Category data will be loaded separately
-                  }),
-                ),
-              ]}
-              onTabChange={tabIndex => {
-                if (tabIndex === 0) {
-                  onCategoryChange('All');
-                } else {
-                  const category = Object.keys(categoryCountList)[tabIndex - 1];
-                  onCategoryChange(category);
-                }
-              }}
-              renderItem={renderItem}
-              initialTab={0}
-              flatListProps={flatListProps}
-              colorScheme="dark"
-            />
-          )
+        {tabsMeta.length > 0 && (
+          <CustomTabs
+            tabs={tabsMeta}
+            activeTab={activeTabIndex}
+            onTabChange={handleTabChange}
+            colorScheme="dark"
+          />
         )}
+        {showInitialLoader ? (
+          <ActivityIndicator style={styles.activityIndicator} />
+        ) : resources.length > 0 ? (
+          <FlatList
+            data={resources}
+            renderItem={renderItem}
+            keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
+            {...flatListProps}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={tabBodyContentStyle}
+            style={tabBodyStyle}
+            ListFooterComponent={
+              showFooterLoader ? (
+                <ActivityIndicator style={styles.footerActivityIndicator} />
+              ) : null
+            }
+          />
+        ) : showEmptyState ? (
+          renderEmptyComponent()
+        ) : null}
       </View>
     );
   };

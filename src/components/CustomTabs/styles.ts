@@ -13,7 +13,7 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
     },
     tabHeader: {
       height: '38@ms',
-      backgroundColor: isDark ? colors.darkSlate : colors.white,
+      backgroundColor: isDark ? colors.darkGray7 : colors.white,
       borderBottomWidth: 1,
       borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray14,
     },
