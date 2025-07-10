@@ -124,36 +124,42 @@ export const SearchScreen: React.FC = () => {
 
   const renderDetailSearch = () => {
     return (
-      <View style={styles.container}>
-        {renderSearchInput()}
-        {tabsMeta.length > 0 && resources.length > 0 && (
-          <CustomTabs
-            tabs={tabsMeta}
-            activeTab={activeTabIndex}
-            onTabChange={handleTabChange}
-          />
-        )}
-        {showInitialLoader ? (
-          <ActivityIndicator style={styles.footerActivityIndicator} />
-        ) : resources.length > 0 ? (
-          <FlatList
-            data={resources}
-            renderItem={renderItem}
-            keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
-            {...flatListProps}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={tabBodyContentStyle}
-            style={tabBodyStyle}
-            ListFooterComponent={
-              showFooterLoader ? (
-                <ActivityIndicator style={styles.footerActivityIndicator} />
-              ) : null
-            }
-          />
-        ) : showEmptyState ? (
-          renderEmptyComponent()
-        ) : null}
-      </View>
+      <TouchableWithoutFeedback
+        onPress={() => {
+          Keyboard.dismiss();
+          setFocused(false);
+        }}>
+        <View style={styles.container}>
+          {renderSearchInput()}
+          {tabsMeta.length > 0 && resources.length > 0 && (
+            <CustomTabs
+              tabs={tabsMeta}
+              activeTab={activeTabIndex}
+              onTabChange={handleTabChange}
+            />
+          )}
+          {showInitialLoader ? (
+            <ActivityIndicator style={styles.footerActivityIndicator} />
+          ) : resources.length > 0 ? (
+            <FlatList
+              data={resources}
+              renderItem={renderItem}
+              keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
+              {...flatListProps}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={tabBodyContentStyle}
+              style={tabBodyStyle}
+              ListFooterComponent={
+                showFooterLoader ? (
+                  <ActivityIndicator style={styles.footerActivityIndicator} />
+                ) : null
+              }
+            />
+          ) : showEmptyState ? (
+            renderEmptyComponent()
+          ) : null}
+        </View>
+      </TouchableWithoutFeedback>
     );
   };
 
