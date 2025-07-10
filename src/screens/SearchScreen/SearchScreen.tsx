@@ -126,7 +126,7 @@ export const SearchScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {tabsMeta.length > 0 && (
+        {tabsMeta.length > 0 && resources.length > 0 && (
           <CustomTabs
             tabs={tabsMeta}
             activeTab={activeTabIndex}
