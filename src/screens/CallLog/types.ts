@@ -1,0 +1,20 @@
+export interface CallLog {
+  id: number;
+  startedAt: string;
+  endedAt: string;
+  status: string;
+  details: {
+    summary?: {
+      tags?: {tag?: string; positivity_rating?: number}[];
+      callQuality?: number;
+    };
+    chatId?: number;
+    createdAt?: string;
+    callInfo?: {
+      summaryName?: string;
+    };
+  };
+  client: {
+    name: string;
+  };
+}
