@@ -59,7 +59,6 @@ const getThemedStyles = (colorScheme: string | null) => {
       fontSize: '14@ms',
       lineHeight: '18@ms',
       marginLeft: '8@ms',
-      width: '90%',
       fontWeight: '400',
       color: colors.gray99,
     },
