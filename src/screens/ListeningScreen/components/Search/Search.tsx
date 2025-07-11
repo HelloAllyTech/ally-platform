@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  ScrollView,
   Text,
   TouchableWithoutFeedback,
   View,
@@ -147,27 +148,31 @@ const Search = () => {
       }}>
       <View style={styles.container}>
         {renderSearchInput()}
-        <View style={styles.suggestionsContainer}>
-          <View style={styles.tryContainer}>
-            <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
+        <ScrollView
+          style={styles.suggestionsScrollView}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.suggestionsContainer}>
+            <View style={styles.tryContainer}>
+              <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
+            </View>
+            {trySuggestions.map(suggestion => (
+              <SearchSuggestion
+                key={suggestion.id}
+                text={suggestion.text}
+                icon={
+                  <SearchActiveIcon
+                    width={16}
+                    height={16}
+                    color={colors.darkGray8}
+                  />
+                }
+                onPressSuggestion={() => onPressSuggestion(suggestion.text)}
+                suggestionId={suggestion.id}
+                colorTheme="dark"
+              />
+            ))}
           </View>
-          {trySuggestions.map(suggestion => (
-            <SearchSuggestion
-              key={suggestion.id}
-              text={suggestion.text}
-              icon={
-                <SearchActiveIcon
-                  width={16}
-                  height={16}
-                  color={colors.darkGray8}
-                />
-              }
-              onPressSuggestion={() => onPressSuggestion(suggestion.text)}
-              suggestionId={suggestion.id}
-              colorTheme="dark"
-            />
-          ))}
-        </View>
+        </ScrollView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -184,6 +189,9 @@ const styles = ScaledSheet.create({
   input: {
     marginVertical: '0@mvs',
     borderRadius: '8@ms',
+  },
+  suggestionsScrollView: {
+    maxHeight: '500@vs',
   },
   suggestionsContainer: {
     marginTop: '80@mvs',
