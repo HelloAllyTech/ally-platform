@@ -446,7 +446,7 @@ const styles = ScaledSheet.create({
   },
   focusModeWaveformWrapper: {
     marginVertical: '40@vs',
-    width: '90%',
+    width: '96%',
   },
   nonFocusModeWaveformWrapper: {
     width: '50%',
