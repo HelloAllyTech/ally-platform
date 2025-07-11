@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '90%',
+    width: '100%',
     height: '90%',
   },
   flowerText: {

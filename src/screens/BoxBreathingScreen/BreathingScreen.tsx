@@ -24,16 +24,29 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
 }) => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
-  const [seconds, setSeconds] = useState(0);
+  const [seconds, setSeconds] = useState(1);
   const lottieRef = useRef<LottieView>(null); // <-- Add ref for Lottie
   const [showOverlay, setShowOverlay] = useState(true);
   const {t} = useTranslate();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
       setIsPlaying(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      setSeconds(1);
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     if (showOverlay) {
@@ -65,7 +78,25 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   };
 
   const onPhaseChange = (phase: Phase) => {
-    setSeconds(phase.time);
+    // Only start timer if isPlaying is true
+    if (!isPlaying) {
+      return;
+    }
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    setSeconds(1);
+    let count = 1;
+    timerRef.current = setInterval(() => {
+      count += 1;
+      if (count > 4) {
+        // You can use phase.time if you want to use the phase's duration
+        clearInterval(timerRef.current!);
+        return;
+      }
+      setSeconds(count);
+    }, 1000);
   };
 
   return (
