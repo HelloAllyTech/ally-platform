@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
-import {StatusBar, Text, View} from 'react-native';
+import {AppState, StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {env} from '@/config/env';
@@ -14,7 +14,10 @@ import {useSocketConnection} from '@/hooks/useSocketConnection';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {RootStackParamList} from '@/navigation/types';
-import {useEndCallMutation} from '@/services/chatApi';
+import {
+  useEndCallMutation,
+  useLazyGetCounsellorChatQuery,
+} from '@/services/chatApi';
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
@@ -69,9 +72,7 @@ export const ListeningScreen = ({
     () => (chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now()),
     [chat?.startedAt],
   );
-  const callProvider = useAppSelector(
-    state => state.chat.currentChat?.provider,
-  );
+  const callProvider = chat?.provider;
   const isConferenceCall = callProvider === ChatProvider.EXOTEL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +86,7 @@ export const ListeningScreen = ({
   const [amplitudes, setAmplitudes] = useState<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
+  const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
@@ -330,6 +332,21 @@ export const ListeningScreen = ({
     handlePlayPauseCallPress,
     isFocusMode,
   ]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        getCounsellorChat().then(res => {
+          if (!res.data?.length) {
+            navigation.navigate('Home');
+          }
+        });
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [getCounsellorChat, navigation]);
 
   return (
     <View style={styles.container}>
