@@ -83,6 +83,8 @@ export const ListeningScreen = ({
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
+  const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
+    useState(false);
   const [amplitudes, setAmplitudes] = useState<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
@@ -100,8 +102,6 @@ export const ListeningScreen = ({
     route.params?.isMicrophoneMode ||
     chatData?.provider === ChatProvider.MICROPHONE;
 
-  /** Show timer for webrtc/exotel call and in case of microphone mode when chat has started */
-  const showTimer = !isMicrophoneMode || chatData?.chatId;
   const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
   const onCallEndSuccess = useCallback(() => {
@@ -133,10 +133,15 @@ export const ListeningScreen = ({
 
   const handleEndCall = () => {
     if (chatData?.chatId) {
-      if (isMicrophoneMode) {
-        handleStopStreaming();
+      if (isConferenceCall || isMicrophoneMode) {
+        if (isMicrophoneMode) {
+          handleStopStreaming();
+        }
+        emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {});
+        onCallEndSuccess();
+      } else {
+        endCall({chatId: chatData.chatId});
       }
-      endCall({chatId: chatData.chatId});
     }
   };
 
@@ -168,6 +173,9 @@ export const ListeningScreen = ({
 
   const socketEventCallbacks = useMemo(
     () => ({
+      [SocketEvent.SESSION_CREATED]: () => {
+        setIsMicrophoneModeSessionCreated(true);
+      },
       [SocketEvent.CHAT_ENDED]: () => {
         onCallEndSuccess();
       },
@@ -260,15 +268,17 @@ export const ListeningScreen = ({
   }, [startStreaming, isPermissionGranted]);
 
   useEffect(() => {
-    if (isMicrophoneMode && !chatData?.chatId && isPermissionGranted) {
+    if (
+      isMicrophoneMode &&
+      isPermissionGranted &&
+      isMicrophoneModeSessionCreated
+    ) {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
         platform: AllyPlatforms.MOBILE,
+        ...(chatData?.chatId && {activeChatId: chatData.chatId}),
       });
-      setTimeout(() => {
-        // TODO: Need to change this workaround
-        handleStartStreaming();
-      }, 2000);
+      handleStartStreaming();
     }
   }, [
     chatData?.chatId,
@@ -276,6 +286,7 @@ export const ListeningScreen = ({
     isMicrophoneMode,
     isPermissionGranted,
     handleStartStreaming,
+    isMicrophoneModeSessionCreated,
   ]);
 
   const handleStopStreaming = useCallback(() => {
@@ -368,7 +379,7 @@ export const ListeningScreen = ({
           <Text style={styles.takingNotesText}>
             {t('ListeningScreen.takingNotes')}
           </Text>
-          {showTimer && <Timer startTime={startTime} />}
+          {<Timer startTime={startTime} />}
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveform
               amplitudes={isCallPaused ? null : amplitudes}
@@ -412,6 +423,7 @@ export const ListeningScreen = ({
           onFocusModeButtonPress={toggleNudgeVisibility}
           isFocusMode={isFocusMode}
           onCallEndPress={() => setShowCallEndConfirmation(true)}
+          isCallEndDisabled={!chatData?.chatId}
         />
       </View>
     </View>

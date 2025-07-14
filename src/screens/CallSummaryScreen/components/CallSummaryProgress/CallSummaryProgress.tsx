@@ -88,7 +88,7 @@ const StepItem: React.FC<{
       ) : (
         <>
           <View style={styles.iconContainer}>
-            <ActivityIndicator style={styles.loader} />
+            <ActivityIndicator color={colors.darkSlate} style={styles.loader} />
           </View>
           <ShinyText style={styles.stepLabel}>{item.label}</ShinyText>
         </>
