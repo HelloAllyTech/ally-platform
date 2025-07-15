@@ -142,7 +142,10 @@ export const ListeningScreen = ({
           stopStreaming();
         }
         emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {});
-        onCallEndSuccess();
+        if (!isMicrophoneMode) {
+          // TODO: check if this is needed for conference call
+          onCallEndSuccess();
+        }
       } else {
         endCall({chatId: chatData.chatId});
       }
