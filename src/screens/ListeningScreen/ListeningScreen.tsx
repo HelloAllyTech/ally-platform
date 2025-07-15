@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
-import {AppState, StatusBar, Text, View} from 'react-native';
+import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {env} from '@/config/env';
@@ -66,19 +66,24 @@ export const ListeningScreen = ({
   const navigation = useAppNavigation();
 
   const [isFocusMode, setIsFocusMode] = useState(true);
-  const chat = useAppSelector(state => state.chat.currentChat);
+  const chatData = useAppSelector(state => state.chat.currentChat);
 
   const startTime = useMemo(
-    () => (chat?.startedAt ? new Date(chat.startedAt).getTime() : Date.now()),
-    [chat?.startedAt],
+    () =>
+      chatData?.startedAt
+        ? new Date(chatData?.startedAt).getTime()
+        : Date.now(),
+    [chatData?.startedAt],
   );
-  const callProvider = chat?.provider;
+  const callProvider = chatData?.provider;
   const isConferenceCall = callProvider === ChatProvider.EXOTEL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCallPaused, setIsCallPaused] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
+  const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
+
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
@@ -97,7 +102,6 @@ export const ListeningScreen = ({
 
   // Current chat won't be available initially for microphone mode flow
   // as the new chat is created only on emitting the event START_AUDIO_CHAT
-  const chatData = useAppSelector(state => state.chat.currentChat);
   const isMicrophoneMode =
     route.params?.isMicrophoneMode ||
     chatData?.provider === ChatProvider.MICROPHONE;
@@ -135,7 +139,7 @@ export const ListeningScreen = ({
     if (chatData?.chatId) {
       if (isConferenceCall || isMicrophoneMode) {
         if (isMicrophoneMode) {
-          handleStopStreaming();
+          stopStreaming();
         }
         emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {});
         onCallEndSuccess();
@@ -180,7 +184,9 @@ export const ListeningScreen = ({
         onCallEndSuccess();
       },
       [SocketEvent.USER_DISCONNECTED]: () => {
-        onCallEndSuccess();
+        if (!isMicrophoneMode) {
+          onCallEndSuccess(); // TODO: check if this is needed
+        }
       },
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
@@ -225,7 +231,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall],
+    [onCallEndSuccess, isAudioActive, isConferenceCall, isMicrophoneMode],
   );
 
   const {userData} = useUser();
@@ -271,27 +277,26 @@ export const ListeningScreen = ({
     if (
       isMicrophoneMode &&
       isPermissionGranted &&
-      isMicrophoneModeSessionCreated
+      isMicrophoneModeSessionCreated &&
+      !isAudioChatEmitted
     ) {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
         platform: AllyPlatforms.MOBILE,
         ...(chatData?.chatId && {activeChatId: chatData.chatId}),
       });
+      setIsAudioChatEmitted(true);
       handleStartStreaming();
     }
   }, [
     chatData?.chatId,
+    isAudioChatEmitted,
     emitSocketEvent,
     isMicrophoneMode,
     isPermissionGranted,
     handleStartStreaming,
     isMicrophoneModeSessionCreated,
   ]);
-
-  const handleStopStreaming = useCallback(() => {
-    stopStreaming();
-  }, [stopStreaming]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
@@ -317,7 +322,7 @@ export const ListeningScreen = ({
           isCallPaused
             ? SocketEvent.AUDIO_CHAT_RESUMED
             : SocketEvent.AUDIO_CHAT_PAUSED,
-          {chatId: chat?.chatId},
+          {chatId: chatData?.chatId},
         );
       }
       setIsCallPaused(prev => !prev);
@@ -348,7 +353,7 @@ export const ListeningScreen = ({
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         getCounsellorChat().then(res => {
-          if (!res.data?.length) {
+          if (!res.data) {
             navigation.navigate('Home');
           }
         });
@@ -358,6 +363,17 @@ export const ListeningScreen = ({
       subscription.remove();
     };
   }, [getCounsellorChat, navigation]);
+
+  if (!chatData?.chatId) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.white} />
+        <Text style={styles.loadingText}>
+          {t('ListeningScreen.connecting')}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -379,7 +395,7 @@ export const ListeningScreen = ({
           <Text style={styles.takingNotesText}>
             {t('ListeningScreen.takingNotes')}
           </Text>
-          {<Timer startTime={startTime} />}
+          <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveform
               amplitudes={isCallPaused ? null : amplitudes}
@@ -434,6 +450,18 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkGray7,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.darkGray7,
+  },
+  loadingText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    color: colors.white,
+    marginTop: '10@vs',
   },
   controlButtonsContainer: {
     justifyContent: 'center',
