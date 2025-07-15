@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import LottieView from 'lottie-react-native';
-import {ImageBackground, StyleSheet, Text, View} from 'react-native';
+import {AppState, ImageBackground, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -31,8 +31,14 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'inactive') {
+        setIsPlaying(false);
+      }
+    });
     return () => {
       setIsPlaying(false);
+      subscription.remove();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }

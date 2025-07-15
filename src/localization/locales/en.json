@@ -44,7 +44,8 @@
     "callEndConfirmation": "Are you sure you want to end this call?",
     "microphoneModeEndConfirmation": "Are you sure you want to end this session?",
     "endCall": "End Call",
-    "endSession": "End Session"
+    "endSession": "End Session",
+    "connecting": "Connecting..."
   },
   "SplashScreen": {
     "hey": "Hey,",

@@ -142,7 +142,7 @@ export const useSocket = ({
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [disconnect]);
+  }, []);
 
   return {
     connect,
