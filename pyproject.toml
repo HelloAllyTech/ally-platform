@@ -1,0 +1,20 @@
+[project]
+name = "ally-learn-core"
+version = "0.1.0"
+description = "Core service for Ally Learn POC - A learning platform designed for mental health counselors and organizations, providing training content management, professional development tracking, and therapeutic resource delivery."
+authors = [
+    {name = "risal-kv",email = "119860563+risal-kv@users.noreply.github.com"}
+]
+license = {text = "Proprietary"}
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi (>=0.116.1,<0.117.0)",
+    "pydantic-settings (>=2.10.1,<3.0.0)",
+    "uvicorn (>=0.35.0,<0.36.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

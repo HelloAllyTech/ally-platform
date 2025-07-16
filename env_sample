@@ -1,0 +1,5 @@
+# Application settings
+PROJECT_NAME=Ally Learn Core
+BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
+
+# Add other environment variables as needed
