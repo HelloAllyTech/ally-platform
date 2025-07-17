@@ -132,6 +132,9 @@ jobs:
     needs: [prepare-env, build-push-image]
     steps:
       - uses: actions/checkout@v4
+      - name: Notify migration skipped
+        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
+        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
       - name: Run migration
         if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
         id: run_db_migration
