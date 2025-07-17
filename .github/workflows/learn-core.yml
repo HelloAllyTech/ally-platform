@@ -22,7 +22,7 @@ on:
       - master
 
 env:
-  ENABLE_DB_MIGRATION: false
+  ENABLE_DB_MIGRATION: "false"
   S3_ENV_FILES: ''
   BUILD_PLATFORM: linux/amd64
   BUILD_PATH: dockerfile
@@ -123,7 +123,7 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
 
   run-db-migration:
-    if:  env.ENABLE_DB_MIGRATION == "true"
+    if: ${{ env.ENABLE_DB_MIGRATION == "true" }}
     name: Run the DB migration
     runs-on: ubuntu-22.04
     permissions:
