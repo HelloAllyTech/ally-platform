@@ -23,7 +23,7 @@ on:
 
 env:
   ENABLE_DB_MIGRATION: false
-  S3_ENV_FILES: ""
+  S3_ENV_FILES: ''
   BUILD_PLATFORM: linux/amd64
   BUILD_PATH: dockerfile
   SUBNETS: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
@@ -143,8 +143,8 @@ jobs:
           container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
           ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
           image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
-          subnets: "["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]"
-          security-groups: "["sg-05f0c1b5ae75e1320"]"
+          subnets: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
+          security-groups: '["sg-05f0c1b5ae75e1320"]'
 
   deploy-to-ecs-service:
     name: Deploy to ECS service
