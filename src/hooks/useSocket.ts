@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useRef} from 'react';
 import {io, Socket} from 'socket.io-client';
 
 import {env} from '@/config/env';
@@ -136,12 +136,6 @@ export const useSocket = ({
       return;
     }
     socketRef.current.off(socketEvent);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      socketRef.current?.disconnect();
-    };
   }, []);
 
   return {

@@ -67,6 +67,9 @@
   },
   "CallSummaryProgress": {
     "generatingSummary": "Generating summary",
+    "generatingSessionSummary": "Generating your session summary",
+    "generatingSubtitle": "This may take some time. You can find the summary in the call logs screen.",
+    "reloadPage": "Reload the page for the latest updates.",
     "steps": {
       "understandingContext": "Understanding context...",
       "analysingConversation": "Analysing conversation...",

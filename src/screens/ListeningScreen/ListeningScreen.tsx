@@ -141,12 +141,12 @@ export const ListeningScreen = ({
         if (isMicrophoneMode) {
           stopStreaming();
         }
-        emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {});
-        if (!isMicrophoneMode) {
-          // TODO: check if this is needed for conference call
-          onCallEndSuccess();
-        }
+        emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
+          ...(chatData?.chatId &&
+            isConferenceCall && {chatId: chatData.chatId}),
+        });
       } else {
+        // Webrtc call
         endCall({chatId: chatData.chatId});
       }
     }
@@ -185,11 +185,6 @@ export const ListeningScreen = ({
       },
       [SocketEvent.CHAT_ENDED]: () => {
         onCallEndSuccess();
-      },
-      [SocketEvent.USER_DISCONNECTED]: () => {
-        if (!isMicrophoneMode) {
-          onCallEndSuccess(); // TODO: check if this is needed
-        }
       },
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
@@ -234,7 +229,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall, isMicrophoneMode],
+    [onCallEndSuccess, isAudioActive, isConferenceCall],
   );
 
   const {userData} = useUser();
