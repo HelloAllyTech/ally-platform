@@ -123,7 +123,7 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
 
   run-db-migration:
-    if: ${{ env.ENABLE_DB_MIGRATION == true }}
+    if:  env.ENABLE_DB_MIGRATION == "true"
     name: Run the DB migration
     runs-on: ubuntu-22.04
     permissions:
