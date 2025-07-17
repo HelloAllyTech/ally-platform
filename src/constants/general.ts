@@ -1,5 +1,7 @@
 import {Dimensions, Platform} from 'react-native';
 
+export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
+
 export const DEFAULT_HIT_SLOP = {
   top: 10,
   bottom: 10,
