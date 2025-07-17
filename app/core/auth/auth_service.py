@@ -36,23 +36,35 @@ class AuthService:
             bool: True if the secret key is valid, False otherwise.
         """
         return secret_key == settings.SECRET_KEY
+
+    @staticmethod
+    def generate_session_id() -> str:
+        """
+        Generate a new session ID.
+
+        Returns:
+            str: The generated session ID.
+        """
+        return str(uuid.uuid4())
     
     @staticmethod
-    def create_access_token(data: Dict[str, Any], expires_delta: timedelta = ACCESS_TOKEN_EXPIRE_MINUTES) -> str:
+    def create_access_token(
+        session_id: str,
+        data: Dict[str, Any], 
+        expires_delta: timedelta = ACCESS_TOKEN_EXPIRE_MINUTES
+    ) -> str:
         """
         Create a JWT access token.
         
         Args:
             data: The data to encode in the token.
             expires_delta: Optional expiration time delta.
+            session_id: Optional session ID. If not provided, a new one will be generated.
             
         Returns:
             str: The encoded JWT token.
         """
         to_encode = data.copy()
-        
-        # Generate a session ID
-        session_id = str(uuid.uuid4())
         
         # Store the session
         store_session(session_id)
