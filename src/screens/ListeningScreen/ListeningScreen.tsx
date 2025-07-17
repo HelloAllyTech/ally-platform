@@ -5,7 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms} from '@/constants/general';
+import {AllyPlatforms, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -281,6 +281,7 @@ export const ListeningScreen = ({
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
         platform: AllyPlatforms.MOBILE,
+        sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
         ...(chatData?.chatId && {activeChatId: chatData.chatId}),
       });
       setIsAudioChatEmitted(true);

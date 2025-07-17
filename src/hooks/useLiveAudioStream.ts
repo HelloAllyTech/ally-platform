@@ -9,7 +9,7 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 
-import {isIOS} from '@/constants/general';
+import {isIOS, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 
 import {useAppNavigation} from './useAppNavigation';
@@ -36,7 +36,7 @@ export const useLiveAudioStream = ({
 
   const initAudioStream = useCallback(() => {
     LiveAudioStream?.init?.({
-      sampleRate: 16000,
+      sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
       channels: 1,
       bitsPerSample: 16,
       audioSource: isIOS ? 1 : 7,
