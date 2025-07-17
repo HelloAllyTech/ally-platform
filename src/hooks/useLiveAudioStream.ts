@@ -9,6 +9,7 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 
+import {isIOS} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 
 import {useAppNavigation} from './useAppNavigation';
@@ -38,7 +39,7 @@ export const useLiveAudioStream = ({
       sampleRate: 16000,
       channels: 1,
       bitsPerSample: 16,
-      audioSource: Platform.OS === 'ios' ? 1 : 7,
+      audioSource: isIOS ? 1 : 7,
       bufferSize: 1024,
       wavFile: 'audio.wav',
     });
