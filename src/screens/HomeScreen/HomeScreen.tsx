@@ -14,13 +14,17 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {DrawerMenuIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {env} from '@/config/env';
+import {CHAT_TYPES} from '@/constants/chat';
 import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
-import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {
+  useGetSummaryFieldsQuery,
+  useGetVisibleChatTypesQuery,
+} from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
@@ -38,6 +42,11 @@ export const HomeScreen: React.FC = () => {
   const {userData} = useUser();
   const dispatch = useAppDispatch();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
+  const {
+    data: visibleChatTypes,
+    isLoading: isLoadingChatTypes,
+    isError: isErrorChatTypes,
+  } = useGetVisibleChatTypesQuery();
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -88,18 +97,30 @@ export const HomeScreen: React.FC = () => {
           </Text>
           <View style={styles.buttonContainerWrapper}>
             <View style={styles.buttonContainer}>
-              <StartCallCard
-                image={images.joinCall}
-                header={t('Home.joinCall')}
-                subtitle={t('Home.allyWillJoinOngoingCall')}
-                onPressCard={handleThirdPartyCall}
-              />
-              <StartCallCard
-                image={images.listenLive}
-                header={t('Home.listenLive')}
-                subtitle={t('Home.allyWillHearAudio')}
-                onPressCard={handleVoiceRecording}
-              />
+              {Array.isArray(visibleChatTypes) &&
+                !isLoadingChatTypes &&
+                !isErrorChatTypes && (
+                  <>
+                    {visibleChatTypes.includes(
+                      CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+                    ) && (
+                      <StartCallCard
+                        image={images.joinCall}
+                        header={t('Home.joinCall')}
+                        subtitle={t('Home.allyWillJoinOngoingCall')}
+                        onPressCard={handleThirdPartyCall}
+                      />
+                    )}
+                    {visibleChatTypes.includes(CHAT_TYPES.MICROPHONE_CHAT) && (
+                      <StartCallCard
+                        image={images.listenLive}
+                        header={t('Home.listenLive')}
+                        subtitle={t('Home.allyWillHearAudio')}
+                        onPressCard={handleVoiceRecording}
+                      />
+                    )}
+                  </>
+                )}
             </View>
             <Text style={styles.consentNotice}>{t('Home.consentNotice')}</Text>
           </View>
