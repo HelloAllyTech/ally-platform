@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {Dimensions, View} from 'react-native';
+import MaskedView from '@react-native-masked-view/masked-view';
+import {StyleProp, View, ViewStyle} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   useAnimatedStyle,
@@ -8,22 +9,20 @@ import Animated, {
 } from 'react-native-reanimated';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
+import {SCREEN_WIDTH} from '@/constants/general';
 import {colors} from '@/theme/colors';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-
-const BAR_WIDTH = 2.5;
-const BAR_MARGIN = 2;
 const MAX_HEIGHT = 50;
-const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
 const TINY_BAR_HEIGHT = 0.08; // Tiny bar height for no audio case
 
 const WaveformBar = ({
   amplitude,
   maxHeight,
+  customStyle,
 }: {
   amplitude: number;
   maxHeight: number;
+  customStyle?: StyleProp<ViewStyle>;
 }) => {
   const height = useSharedValue(0);
 
@@ -36,7 +35,7 @@ const WaveformBar = ({
     height: height.value,
   }));
 
-  return <Animated.View style={[styles.bar, animatedStyle]} />;
+  return <Animated.View style={[styles.bar, customStyle, animatedStyle]} />;
 };
 
 interface WaveformProps {
@@ -48,54 +47,85 @@ export const AudioWaveform: React.FC<WaveformProps> = ({
   amplitudes,
   isFocusMode = true,
 }) => {
+  const BAR_WIDTH = isFocusMode ? 2.5 : 1;
+  const BAR_MARGIN = isFocusMode ? 2 : 1.2;
+  const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
+
   // Show tiny bars if no audio or all amplitudes are near zero
   const isSilent =
     !amplitudes ||
     amplitudes.length === 0 ||
     amplitudes.every(a => Math.abs(a) < 0.001);
 
+  // Helper to shape the waveform as per requirements
+  const processAmplitudes = (amps: number[]): number[] => {
+    const totalBars = amps.length;
+    if (totalBars === 0) return amps;
+    const middle = Math.floor(totalBars / 2);
+    const processed = amps.map((amp, i) => {
+      if (i < middle) {
+        return (amp * (i + 1) * 2) / totalBars;
+      } else if (i >= middle) {
+        return (amp * (totalBars - i) * 1.5) / totalBars;
+      } else {
+        return amp;
+      }
+    });
+    return processed;
+  };
+
   const displayAmplitudes = isSilent
     ? new Array(NUM_BARS).fill(TINY_BAR_HEIGHT)
-    : amplitudes;
+    : processAmplitudes(amplitudes);
+
+  const renderBars = () => {
+    return (
+      <View style={styles.container}>
+        {displayAmplitudes.map((amp, index) => (
+          <WaveformBar
+            key={index}
+            amplitude={amp}
+            maxHeight={isFocusMode ? MAX_HEIGHT * 1.4 : MAX_HEIGHT / 1.4}
+            customStyle={{
+              width: moderateScale(BAR_WIDTH),
+              marginHorizontal: moderateScale(BAR_MARGIN / 2),
+            }}
+          />
+        ))}
+      </View>
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      {displayAmplitudes.map((amp, index) => (
-        <WaveformBar
-          key={index}
-          amplitude={amp}
-          maxHeight={isFocusMode ? MAX_HEIGHT * 1.4 : MAX_HEIGHT / 1.7}
-        />
-      ))}
+    <MaskedView maskElement={renderBars()}>
+      {renderBars()}
       <LinearGradient
         colors={[
-          colors.gunMetal90,
+          colors.darkGray7,
           'transparent',
           'transparent',
-          colors.gunMetal90,
+          'transparent',
+          colors.darkGray7,
         ]}
         start={{x: 0, y: 0}}
         end={{x: 1, y: 0}}
         style={styles.fadeOverlay}
       />
-    </View>
+    </MaskedView>
   );
 };
 
 const styles = ScaledSheet.create({
   container: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     height: moderateScale(MAX_HEIGHT),
     overflow: 'hidden',
-    backgroundColor: colors.darkGray7,
     paddingVertical: '10@vs',
     position: 'relative',
   },
   bar: {
-    width: moderateScale(BAR_WIDTH),
-    marginHorizontal: moderateScale(BAR_MARGIN / 2),
     backgroundColor: colors.white,
     borderRadius: 2,
   },
@@ -106,5 +136,6 @@ const styles = ScaledSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
+    backgroundColor: 'transparent',
   },
 });

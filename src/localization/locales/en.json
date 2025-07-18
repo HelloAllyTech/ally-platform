@@ -44,7 +44,8 @@
     "callEndConfirmation": "Are you sure you want to end this call?",
     "microphoneModeEndConfirmation": "Are you sure you want to end this session?",
     "endCall": "End Call",
-    "endSession": "End Session"
+    "endSession": "End Session",
+    "connecting": "Connecting..."
   },
   "SplashScreen": {
     "hey": "Hey,",
@@ -66,6 +67,9 @@
   },
   "CallSummaryProgress": {
     "generatingSummary": "Generating summary",
+    "generatingSessionSummary": "Generating your session summary",
+    "generatingSubtitle": "This may take some time. You can find the summary in the call logs screen.",
+    "reloadPage": "Reload the page for the latest updates.",
     "steps": {
       "understandingContext": "Understanding context...",
       "analysingConversation": "Analysing conversation...",

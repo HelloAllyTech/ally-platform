@@ -15,7 +15,9 @@ export const Timer: React.FC<TimerProps> = ({startTime}) => {
   useEffect(() => {
     const calculateInitialElapsed = () => {
       const now = Date.now();
-      return Math.floor((now - startTime) / 1000);
+      return Math.floor(
+        ((now > startTime ? now : startTime) - startTime) / 1000,
+      );
     };
 
     setElapsedSeconds(calculateInitialElapsed());
