@@ -25,7 +25,7 @@ export const SummaryGenerationProgress: React.FC<
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }>
-      <View style={styles.container}>
+      <View style={[styles.container, !currentChat && styles.paddingTop40]}>
         <View style={styles.infoRow}>
           <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
           <Text style={styles.infoText}>
@@ -55,6 +55,9 @@ const styles = ScaledSheet.create({
     paddingBottom: '400@ms',
     backgroundColor: colors.white,
     height: '100%',
+  },
+  paddingTop40: {
+    paddingTop: '70@ms',
   },
   infoRow: {
     flexDirection: 'row',
