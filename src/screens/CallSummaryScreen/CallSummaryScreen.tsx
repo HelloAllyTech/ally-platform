@@ -271,6 +271,7 @@ export const CallSummaryScreen: React.FC<
         {showSummary ? (
           <ScrollView
             ref={scrollViewRef}
+            scrollEnabled={isSummaryAvailable}
             onScroll={handleScroll}
             scrollEventThrottle={8}
             onLayout={handleLayout}
