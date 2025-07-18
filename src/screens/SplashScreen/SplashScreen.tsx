@@ -19,6 +19,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
 import {RootStackScreenProps} from '@/navigation/types';
@@ -57,6 +58,14 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('EMAIL');
   const [email, setEmail] = useState('');
+
+  useHardwareBackPressHandler(() => {
+    if (currentStep === 'OTP') {
+      setCurrentStep('EMAIL');
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     StatusBar.setHidden(true); // Hide status bar
