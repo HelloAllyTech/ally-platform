@@ -94,7 +94,7 @@ jobs:
           echo "ECS_SERVICE=$PREFIX-svc-${{ env.SERVICE_NAME }}"         >> $GITHUB_OUTPUT
           echo "TASK_DEFINITION=$PREFIX-td-${{ env.SERVICE_NAME }}"      >> $GITHUB_OUTPUT
           echo "CONTAINER_NAME=$PREFIX-cntr-${{ env.SERVICE_NAME }}"     >> $GITHUB_OUTPUT
-          echo "ECR_REPOSITORY=$ECR/$PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY=$PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
           echo "ENVIRONMENT_BUCKET=$PREFIX-s3-environment"                >> $GITHUB_OUTPUT
           echo ":seedling: Branch is ${GITHUB_REF#refs/heads/}"          >> $GITHUB_STEP_SUMMARY
 
