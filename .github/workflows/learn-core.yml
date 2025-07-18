@@ -59,8 +59,8 @@ jobs:
 
           if [ -z "$ENV" ]; then
             case "$BRANCH" in
-              "dev")  ENV="dev" ;;
-              "main") ENV="prd" ;;
+              "dev"|"develop")  ENV="dev" ;;
+              "main"|"master") ENV="prd" ;;
               *) echo "ENV not configured" && exit 1 ;;
             esac
           fi
