@@ -50,6 +50,5 @@ export const styles = ScaledSheet.create({
   },
   height100: {
     height: '100%',
-    backgroundColor: 'aqua',
   },
 });

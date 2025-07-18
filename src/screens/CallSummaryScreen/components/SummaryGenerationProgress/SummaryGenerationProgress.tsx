@@ -4,6 +4,7 @@ import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {BarsIcon, InfoIcon} from '@/assets/icons';
 import useTranslate from '@/hooks/useTranslate';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -16,6 +17,7 @@ export const SummaryGenerationProgress: React.FC<
   SummaryGenerationProgressProps
 > = ({refreshing, onRefresh}) => {
   const {t} = useTranslate();
+  const currentChat = useAppSelector(state => state.chat.currentChat);
 
   return (
     <ScrollView
@@ -37,7 +39,7 @@ export const SummaryGenerationProgress: React.FC<
           {t('CallSummaryProgress.generatingSessionSummary')}
         </Text>
         <Text style={styles.subtitle}>
-          {t('CallSummaryProgress.generatingSubtitle')}
+          {t(`CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`)}
         </Text>
       </View>
     </ScrollView>
