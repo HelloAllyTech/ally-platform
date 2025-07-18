@@ -12,7 +12,6 @@ import {fontFamily} from '@/theme/fonts';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';
-import Badge from '../Badge/Badge';
 import Tag from '../Tag/Tag';
 
 /**
@@ -76,7 +75,7 @@ const CallLogItem = ({
           </Text>
         </View>
         <View style={styles.rightContainer}>
-          <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge>
+          {/* <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge> */}
           {!disabled && (
             <EyeIcon width={16} height={16} style={styles.eyeIcon} />
           )}

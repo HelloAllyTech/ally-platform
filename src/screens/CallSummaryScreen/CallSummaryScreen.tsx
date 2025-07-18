@@ -27,12 +27,12 @@ import {clearSummaryStates, selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 
 import {CallSummaryDetails} from './components/CallSummaryDetails/CallSummaryDetails';
-import {CallSummaryProgress} from './components/CallSummaryProgress/CallSummaryProgress';
 import CallTranscript from './components/CallTranscript/CallTranscript';
 import CustomMenuModal from './components/CustomMenuModal/CustomMenuModal';
 import {DeleteRenameModal} from './components/DeleteRenameModal/DeleteRenameModal';
 import {Header} from './components/Header/Header';
 import SummaryDropdown from './components/Header/SummaryDropdown';
+import {SummaryGenerationProgress} from './components/SummaryGenerationProgress/SummaryGenerationProgress';
 import {styles} from './styles';
 
 /**
@@ -54,7 +54,8 @@ export const CallSummaryScreen: React.FC<
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callInfo = useAppSelector(selectCallInfo);
   const dispatch = useAppDispatch();
-  const [fetchCallSummary, {isLoading}] = useLazyGetCallSummaryQuery();
+  const [fetchCallSummary, {isLoading, data: summaryData}] =
+    useLazyGetCallSummaryQuery();
   const {hasChanges} = useCallSummaryForm();
 
   const callId = route.params?.callId;
@@ -62,13 +63,13 @@ export const CallSummaryScreen: React.FC<
   const scrollViewRef = useRef<ScrollView>(null);
   const showTranscript = Boolean(callId);
 
-  const [summaryProgressComplete, setSummaryProgressComplete] = useState(false);
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [editedName, setEditedName] = useState(callInfo.summaryName);
   const [showAnimation, setShowAnimation] = useState(!callId);
+  const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
   const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
   /**
    * React Native bug workaround:
@@ -78,7 +79,9 @@ export const CallSummaryScreen: React.FC<
    * preventing touch issues on section headers after scrolling.
    */
   const [forceRemountKey, setForceRemountKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Restore useCallSummaryActions destructure
   const {
     handleSummaryNameChange,
     onUpdateSummary,
@@ -104,13 +107,38 @@ export const CallSummaryScreen: React.FC<
     setEditedName(summaryName);
   }, [summaryName]);
 
+  // Initial polling logic
   useEffect(() => {
-    if (chatId) {
-      fetchCallSummary(chatId);
-    }
-  }, [chatId, fetchCallSummary]);
+    let pollTimeout: NodeJS.Timeout | null = null;
 
-  // Cleanup function to clear summary state when component unmounts
+    const poll = async () => {
+      if (!chatId) return;
+      await fetchCallSummary(chatId);
+      // Do not check summaryData here; let the summaryData watcher handle it
+    };
+
+    // On mount, fetch summary
+    poll();
+
+    // Poll again after 5 seconds
+    pollTimeout = setTimeout(() => {
+      poll();
+    }, 5000);
+
+    return () => {
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  // Watch for summaryData changes
+  useEffect(() => {
+    if (summaryData?.details?.summary) {
+      setIsSummaryAvailable(true);
+    }
+  }, [summaryData]);
+
+  // Cleanup summary state on unmount
   useEffect(() => {
     return () => {
       dispatch(clearSummaryStates());
@@ -177,9 +205,13 @@ export const CallSummaryScreen: React.FC<
     };
   });
 
-  const isShowCallSummary = Boolean(
-    callId || (summaryProgressComplete && currentChat?.chatId),
-  );
+  // Pull to refresh handler
+  const handleRefresh = useCallback(async () => {
+    if (!chatId) return;
+    setRefreshing(true);
+    await fetchCallSummary(chatId);
+    setRefreshing(false);
+  }, [chatId, fetchCallSummary]);
 
   const scrollToBottom = () => {
     scrollViewRef.current?.scrollToEnd({animated: true});
@@ -239,14 +271,16 @@ export const CallSummaryScreen: React.FC<
         {showSummary ? (
           <ScrollView
             ref={scrollViewRef}
-            scrollEnabled={isShowCallSummary}
             onScroll={handleScroll}
             scrollEventThrottle={8}
             onLayout={handleLayout}
-            contentContainerStyle={
-              !isFullyExpanded || !showAnimation ? styles.contentContainer : {}
-            }>
-            {isShowCallSummary ? (
+            contentContainerStyle={[
+              !isSummaryAvailable && styles.height100,
+              (!isFullyExpanded || !showAnimation) && isSummaryAvailable
+                ? styles.contentContainer
+                : {},
+            ]}>
+            {isSummaryAvailable ? (
               <CallSummaryDetails
                 isLoading={isLoading}
                 onSubmit={onUpdateSummary}
@@ -254,11 +288,9 @@ export const CallSummaryScreen: React.FC<
                 showSubmitButton={callId ? hasChanges : true}
               />
             ) : (
-              <CallSummaryProgress
-                onProgressComplete={() => {
-                  setSummaryProgressComplete(true);
-                }}
-                animationDuration={300}
+              <SummaryGenerationProgress
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
               />
             )}
           </ScrollView>
@@ -266,7 +298,7 @@ export const CallSummaryScreen: React.FC<
           <CallTranscript chatId={chatId || 0} />
         )}
       </Animated.View>
-      {isShowCallSummary && showScrollToBottom && showSummary && (
+      {isSummaryAvailable && showScrollToBottom && showSummary && (
         <TouchableOpacity
           style={styles.scrollToBottomButton}
           onPress={scrollToBottom}>
