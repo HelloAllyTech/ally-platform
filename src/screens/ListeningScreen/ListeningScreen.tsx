@@ -79,7 +79,10 @@ export const ListeningScreen = ({
   const isConferenceCall = callProvider === ChatProvider.EXOTEL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCallPaused, setIsCallPaused] = useState(false);
+  const isWebMicrophoneMode =
+    callProvider === ChatProvider.MICROPHONE &&
+    chatData?.platform === AllyPlatforms.WEB;
+  const [isCallPaused, setIsCallPaused] = useState(isWebMicrophoneMode);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
@@ -243,14 +246,14 @@ export const ListeningScreen = ({
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
-      if (!isCallPausedRef.current) {
+      if (!isCallPausedRef.current && !isWebMicrophoneMode) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
           chatId: chatData?.chatId,
         });
       }
     },
-    [emitSocketEvent, chatData?.chatId],
+    [emitSocketEvent, chatData?.chatId, isWebMicrophoneMode],
   );
 
   const {startStreaming, stopStreaming, isPermissionGranted} =
@@ -330,22 +333,19 @@ export const ListeningScreen = ({
   );
 
   const playPauseButton = useMemo(() => {
-    if (isMicrophoneMode && chatData?.platform === AllyPlatforms.WEB) {
-      return null;
-    }
     return (
       <PlayPauseOverlay
         isPlaying={!isCallPaused}
         onPress={handlePlayPauseCallPress}
         isFocusMode={isFocusMode}
+        isDisabled={isWebMicrophoneMode}
       />
     );
   }, [
-    isMicrophoneMode,
-    chatData?.platform,
     isCallPaused,
     handlePlayPauseCallPress,
     isFocusMode,
+    isWebMicrophoneMode,
   ]);
 
   useEffect(() => {
@@ -362,6 +362,11 @@ export const ListeningScreen = ({
       subscription.remove();
     };
   }, [getCounsellorChat, navigation]);
+
+  const isCallEndDisabled = useMemo(
+    () => !chatData?.chatId || isWebMicrophoneMode,
+    [chatData?.chatId, isWebMicrophoneMode],
+  );
 
   if (!chatData?.chatId) {
     return (
@@ -402,6 +407,11 @@ export const ListeningScreen = ({
             />
           </View>
           {playPauseButton}
+          {isWebMicrophoneMode && (
+            <Text style={styles.microphoneModeInDifferentPlatform}>
+              {t('ListeningScreen.microphoneModeInDifferentPlatform')}
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
@@ -438,7 +448,7 @@ export const ListeningScreen = ({
           onFocusModeButtonPress={toggleNudgeVisibility}
           isFocusMode={isFocusMode}
           onCallEndPress={() => setShowCallEndConfirmation(true)}
-          isCallEndDisabled={!chatData?.chatId}
+          isCallEndDisabled={isCallEndDisabled}
         />
       </View>
     </View>
@@ -495,5 +505,13 @@ const styles = ScaledSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: '20@s',
     marginTop: '40@vs',
+  },
+  microphoneModeInDifferentPlatform: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    color: colors.white,
+    textAlign: 'center',
+    marginTop: '20@vs',
+    marginHorizontal: '20@s',
   },
 });

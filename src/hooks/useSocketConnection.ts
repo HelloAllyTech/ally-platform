@@ -40,8 +40,8 @@ interface UseSocketConnectionOptions {
  *     eventCallbacks: {
  *       [SocketEvent.MESSAGE_RECEIVED]: (data) => console.log('Message:', data),
  *     },
- *     onConnect: () => console.log('Connected'),
- *     onDisconnect: () => console.log('Disconnected'),
+ *     onConnect: () => logger.log('Connected'),
+ *     onDisconnect: () => logger.log('Disconnected'),
  *   });
  *
  *   return <View>...</View>;
