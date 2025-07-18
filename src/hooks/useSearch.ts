@@ -4,6 +4,7 @@ import {Keyboard} from 'react-native';
 import {PAGE_SIZE, trySuggestions} from '@/screens/SearchScreen/searchConfig';
 import {ResourceArticle} from '@/screens/SearchScreen/types';
 import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
+import {logger} from '@/utils/logger';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
@@ -60,7 +61,7 @@ export const useSearch = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching search results:', error);
+        logger.error(`Error fetching search results: ${error}`);
       }
     },
     [searchDocuments],
@@ -102,7 +103,7 @@ export const useSearch = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching remaining resources:', error);
+      logger.error(`Error fetching remaining resources: ${error}`);
     }
   }, [
     isLoading,
