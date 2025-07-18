@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 40,
     marginHorizontal: 40,
-    marginBottom: 20,
+    marginBottom: 30,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',

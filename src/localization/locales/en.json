@@ -22,8 +22,7 @@
     "consentNotice": "By starting, you confirm everyone being transcribed has given consent",
     "client": {
       "oops": "Oops!",
-      "appCurrentlyFor": "This app is currently for",
-      "counselorsOnly": "counsellors only.",
+      "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
       "learnMore": "Learn more"
     },
     "logout": {
@@ -36,7 +35,8 @@
   "HomeScreen": {
     "start": "Start",
     "listening": "listening",
-    "tapToBegin": "Tap to begin"
+    "tapToBegin": "Tap to begin",
+    "noAccessToCallFeatures": "You don't have access to call features right now."
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
@@ -45,7 +45,8 @@
     "microphoneModeEndConfirmation": "Are you sure you want to end this session?",
     "endCall": "End Call",
     "endSession": "End Session",
-    "connecting": "Connecting..."
+    "connecting": "Connecting...",
+    "microphoneModeInDifferentPlatform": "Note: This call was initiated from a different platform. You can listen but cannot control the call (end/unmute)."
   },
   "SplashScreen": {
     "hey": "Hey,",
@@ -69,6 +70,7 @@
     "generatingSummary": "Generating summary",
     "generatingSessionSummary": "Generating your session summary",
     "generatingSubtitle": "This may take some time. You can find the summary in the call logs screen.",
+    "generatingSubtitle2": "This process may take some time. Please feel free to check back later.",
     "reloadPage": "Reload the page for the latest updates.",
     "steps": {
       "understandingContext": "Understanding context...",
