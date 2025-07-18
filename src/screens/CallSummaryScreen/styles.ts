@@ -48,4 +48,8 @@ export const styles = ScaledSheet.create({
   downArrow: {
     transform: [{rotate: '270deg'}],
   },
+  height100: {
+    height: '100%',
+    backgroundColor: 'aqua',
+  },
 });

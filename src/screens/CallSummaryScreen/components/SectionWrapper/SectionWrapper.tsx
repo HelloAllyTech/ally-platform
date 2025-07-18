@@ -135,7 +135,6 @@ export const SectionWrapper = memo(SectionWrapperComponent);
 
 const styles = ScaledSheet.create({
   sectionBox: {
-    marginTop: '8@ms',
     borderBottomColor: colors.lightGray5,
     borderBottomWidth: 0.5,
   },

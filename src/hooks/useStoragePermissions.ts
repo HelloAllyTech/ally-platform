@@ -10,27 +10,6 @@ import {
 
 import useTranslate from './useTranslate';
 
-const checkAndRequestMediaPermissions = async (): Promise<boolean> => {
-  const mediaPermissions = [
-    PERMISSIONS.ANDROID.READ_MEDIA_IMAGES,
-    PERMISSIONS.ANDROID.READ_MEDIA_VIDEO,
-    PERMISSIONS.ANDROID.READ_MEDIA_AUDIO,
-  ];
-
-  for (const permission of mediaPermissions) {
-    const result = await check(permission);
-    if (result === RESULTS.DENIED) {
-      const requestResult = await request(permission);
-      if (requestResult === RESULTS.GRANTED) {
-        return true;
-      }
-    } else if (result === RESULTS.GRANTED) {
-      return true;
-    }
-  }
-  return false;
-};
-
 const checkAndRequestStoragePermission = async (
   permission: (typeof PERMISSIONS.ANDROID)[keyof typeof PERMISSIONS.ANDROID],
 ): Promise<boolean> => {
@@ -57,15 +36,9 @@ export const useStoragePermissions = (
     }
 
     const androidVersion = Number(Platform.Version);
-    let hasPermission = false;
+    let hasPermission = true;
 
-    if (androidVersion >= 33) {
-      hasPermission = await checkAndRequestMediaPermissions();
-    } else if (androidVersion >= 29) {
-      hasPermission = await checkAndRequestStoragePermission(
-        PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
-      );
-    } else {
+    if (androidVersion < 33) {
       hasPermission = await checkAndRequestStoragePermission(
         PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
       );

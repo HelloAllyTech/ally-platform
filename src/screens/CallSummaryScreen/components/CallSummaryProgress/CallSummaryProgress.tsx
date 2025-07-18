@@ -1,20 +1,14 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Animated, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {TickRoundIcon} from '@/assets/icons';
+import ShinyText from '@/components/ShinyText';
 import {WINDOW_HEIGHT} from '@/constants/general';
 import useTranslate from '@/hooks/useTranslate';
 import {TranslationType} from '@/localization/locales/type';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-
-const ANIMATION = {
-  FADE_DURATION: 300,
-  SEQUENCE_REPEAT: 3,
-  INITIAL_OPACITY: 0,
-  FINAL_OPACITY: 1,
-} as const;
 
 type CallSummaryProgressProps = {
   onProgressComplete: () => void;
@@ -72,61 +66,34 @@ const getSteps = (t: (key: TranslationType) => string): Step[] => [
  */
 const StepItem: React.FC<{
   item: Step;
-  onAnimationComplete: () => void;
   animationDuration?: number;
-}> = ({
-  item,
-  onAnimationComplete,
-  animationDuration = ANIMATION.FADE_DURATION,
-}) => {
-  const opacity = useMemo(
-    () => new Animated.Value(ANIMATION.INITIAL_OPACITY),
-    [],
-  );
-  const hasAnimated = useRef(false);
-
-  const runAnimationSequence = useCallback(() => {
-    if (hasAnimated.current) return;
-
-    hasAnimated.current = true;
-    const fadeInOutAnimation = [
-      Animated.timing(opacity, {
-        toValue: ANIMATION.INITIAL_OPACITY,
-        duration: animationDuration,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: ANIMATION.FINAL_OPACITY,
-        duration: animationDuration,
-        useNativeDriver: true,
-      }),
-    ];
-    Animated.sequence(
-      Array(ANIMATION.SEQUENCE_REPEAT).fill(fadeInOutAnimation).flat(),
-    ).start(() => {
-      onAnimationComplete();
-    });
-  }, [opacity, onAnimationComplete, animationDuration]);
-
+  onAnimationComplete: () => void;
+}> = ({item, animationDuration, onAnimationComplete}) => {
   useEffect(() => {
-    runAnimationSequence();
-    return () => {
-      opacity.stopAnimation();
-    };
+    setTimeout(() => {
+      onAnimationComplete();
+    }, animationDuration);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runAnimationSequence]);
+  }, []);
 
   return (
-    <Animated.View style={[styles.stepItem, {opacity}]}>
-      <View style={styles.iconContainer}>
-        {item.completed ? (
-          <TickRoundIcon width={20} height={20} />
-        ) : (
-          <ActivityIndicator style={styles.loader} />
-        )}
-      </View>
-      <Text style={styles.stepLabel}>{item.label}</Text>
-    </Animated.View>
+    <View style={styles.stepItem}>
+      {item.completed ? (
+        <>
+          <View style={styles.iconContainer}>
+            <TickRoundIcon width={20} height={20} />
+          </View>
+          <Text style={styles.stepLabel}>{item.label}</Text>
+        </>
+      ) : (
+        <>
+          <View style={styles.iconContainer}>
+            <ActivityIndicator color={colors.darkSlate} style={styles.loader} />
+          </View>
+          <ShinyText style={styles.stepLabel}>{item.label}</ShinyText>
+        </>
+      )}
+    </View>
   );
 };
 

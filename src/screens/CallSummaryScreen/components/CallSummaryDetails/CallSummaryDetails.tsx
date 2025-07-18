@@ -169,6 +169,7 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@s',
     backgroundColor: colors.white,
     marginBottom: '20@ms',
+    paddingTop: '8@ms',
   },
   sectionContent: {
     paddingLeft: '30@ms',
