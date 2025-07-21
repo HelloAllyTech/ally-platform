@@ -22,6 +22,24 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = Field(...)
     LIVEKIT_API_SECRET: str = Field(...)
     LIVEKIT_URL: str = Field(...)
+    OPENAI_API_KEY: str = Field(...)
+
+    DEEPGRAM_API_KEY: str = Field(default="")
+    CARTESIA_API_KEY: str = Field(default="")
+
+    # Agent behavior settings (with sensible defaults)
+    AI_AGENT_INSTRUCTIONS: str = Field(
+        default="""You are a helpful voice AI assistant in a LiveKit room. 
+        You can hear and speak with participants in real-time. 
+        Be conversational, helpful, and engaging. 
+        Keep your responses concise but informative.
+        Introduce yourself when you first join the room."""
+    )
+
+    # Auto-join settings
+    AUTO_JOIN_ENABLED: bool = Field(default=True)
+    AUTO_LEAVE_WHEN_EMPTY: bool = Field(default=False)
+
 
 
 

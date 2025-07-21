@@ -1,6 +1,7 @@
 """
 Main application module.
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
@@ -8,12 +9,12 @@ from app.api.v1.api import api_router
 from app.core.config import settings
 from app.middleware import setup_middleware
 
-# Create FastAPI app
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=None,
-    redoc_url=None,
+    redoc_url=None
 )
 
 # Set up middleware

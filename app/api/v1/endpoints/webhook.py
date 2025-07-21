@@ -7,11 +7,16 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from livekit.api import TokenVerifier
 from livekit.api.webhook import WebhookReceiver
-
+from livekit.api import LiveKitAPI, CreateAgentDispatchRequest
 from app.core.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,  # Or DEBUG for even more details
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
 
 
 @router.post("/livekit", status_code=status.HTTP_200_OK)
@@ -63,7 +68,23 @@ async def livekit_webhook(request: Request) -> Response:
             elif event_type == "room_finished":
                 logger.info(f"Room finished: {event.room.name} (sid: {event.room.sid})")
             elif event_type == "participant_joined":
-                logger.info(f"Participant joined: {event.participant.identity} (name: {event.participant.name}) in room {event.room.name}")
+                logger.info(
+                    f"Participant joined: {event.participant.identity} (name: {event.participant.name}) in room {event.room.name}")
+
+                # ✅ Dispatch the AI agent (Jarvis) using API
+                try:
+                    api = LiveKitAPI(url=settings.LIVEKIT_URL,api_key=settings.LIVEKIT_API_KEY)
+                    dispatch_result = await api.agent_dispatch.create_dispatch(
+                        CreateAgentDispatchRequest(
+                            agent_name="jarvis",  # Must match your agent's name from the Worker
+                            room=event.room.name,
+                            metadata=f'{{"user_id": "{event.participant.identity}"}}'
+                        )
+                    )
+                    await api.aclose()
+                    logger.info(f"✅ Jarvis dispatched successfully to room: {event.room.name}")
+                except Exception as dispatch_error:
+                    logger.exception(f"❌ Failed to dispatch Jarvis: {str(dispatch_error)}")
             elif event_type == "participant_left":
                 logger.info(f"Participant left: {event.participant.identity} (name: {event.participant.name}) from room {event.room.name}")
             elif event_type == "track_published":

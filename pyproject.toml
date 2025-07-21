@@ -1,21 +1,23 @@
-[project]
+[tool.poetry]
 name = "ally-learn-core"
 version = "0.1.0"
 description = "Core service for Ally Learn POC - A learning platform designed for mental health counselors and organizations, providing training content management, professional development tracking, and therapeutic resource delivery."
-authors = [
-    {name = "risal-kv",email = "119860563+risal-kv@users.noreply.github.com"}
-]
-license = {text = "Proprietary"}
+authors = ["risal-kv <119860563+risal-kv@users.noreply.github.com>"]
+license = "Proprietary"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi (>=0.116.1,<0.117.0)",
-    "pydantic-settings (>=2.10.1,<3.0.0)",
-    "uvicorn (>=0.35.0,<0.36.0)",
-    "livekit-api (>=1.0.3,<2.0.0)",
-    "python-jose (>=3.5.0,<4.0.0)",
-    "livekit (>=1.0.11,<2.0.0)",
-]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.12"
+fastapi = ">=0.116.1,<0.117.0"
+pydantic-settings = ">=2.10.1,<3.0.0"
+uvicorn = ">=0.35.0,<0.36.0"
+livekit-api = ">=1.0.3,<2.0.0"
+python-jose = ">=3.5.0,<4.0.0"
+livekit = ">=1.0.11,<2.0.0"
+livekit-agents = {version = ">=1.0,<2.0", extras = ["cartesia", "deepgram", "openai", "silero", "turn-detector"]}
+livekit-plugins-noise-cancellation = ">=0.2,<1.0"
+python-dotenv = "^1.1.1"
 
 
 [build-system]
