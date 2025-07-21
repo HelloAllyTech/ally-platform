@@ -24,6 +24,7 @@ export const useSearch = () => {
   }>({});
 
   const [hasMore, setHasMore] = useState(true);
+  const [initialTotal, setInitialTotal] = useState<number | null>(null);
 
   const [searchDocuments, {isLoading, isFetching}] =
     useLazyGetSearchResultsQuery();
@@ -53,6 +54,7 @@ export const useSearch = () => {
         if (response.data) {
           const documents = response.data.documents || [];
           setResources(documents);
+          setInitialTotal(response.data.total);
           setHasMore(response.data.total > documents.length);
 
           // Only set category count list for "All" category or initial search
@@ -99,7 +101,9 @@ export const useSearch = () => {
         const newDocuments = response.data.documents || [];
         setResources(prevResources => [...prevResources, ...newDocuments]);
         setHasMore(
-          response.data.total > resources.length + newDocuments.length,
+          initialTotal !== null
+            ? initialTotal > resources.length + newDocuments.length
+            : true,
         );
       }
     } catch (error) {
@@ -113,6 +117,7 @@ export const useSearch = () => {
     lastSearchedText,
     resources,
     searchDocuments,
+    initialTotal,
   ]);
 
   // Search handler matching web implementation
@@ -121,6 +126,7 @@ export const useSearch = () => {
       setSearchText(query);
       setLastSearchedText(query);
       setSelectedCategory('All');
+      setInitialTotal(null);
 
       if (query.trim()) {
         await triggerSearch(query);
