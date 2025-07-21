@@ -165,7 +165,7 @@ export const ListeningScreen = ({
   }, []);
 
   useHardwareBackPressHandler(() => {
-    if (isMicrophoneMode) {
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
       setShowCallEndConfirmation(true);
       return true;
     }
@@ -259,7 +259,7 @@ export const ListeningScreen = ({
   const {startStreaming, stopStreaming, isPermissionGranted} =
     useLiveAudioStream({
       onAudioData: handleAudioData,
-      enableLiveAudio: isMicrophoneMode,
+      enableLiveAudio: isMicrophoneMode && !isWebMicrophoneMode,
     });
 
   const handleStartStreaming = useCallback(async () => {
@@ -279,7 +279,8 @@ export const ListeningScreen = ({
       isMicrophoneMode &&
       isPermissionGranted &&
       isMicrophoneModeSessionCreated &&
-      !isAudioChatEmitted
+      !isAudioChatEmitted &&
+      !isWebMicrophoneMode
     ) {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
@@ -298,6 +299,7 @@ export const ListeningScreen = ({
     isPermissionGranted,
     handleStartStreaming,
     isMicrophoneModeSessionCreated,
+    isWebMicrophoneMode,
   ]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
@@ -338,15 +340,9 @@ export const ListeningScreen = ({
         isPlaying={!isCallPaused}
         onPress={handlePlayPauseCallPress}
         isFocusMode={isFocusMode}
-        isDisabled={isWebMicrophoneMode}
       />
     );
-  }, [
-    isCallPaused,
-    handlePlayPauseCallPress,
-    isFocusMode,
-    isWebMicrophoneMode,
-  ]);
+  }, [isCallPaused, handlePlayPauseCallPress, isFocusMode]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -363,10 +359,18 @@ export const ListeningScreen = ({
     };
   }, [getCounsellorChat, navigation]);
 
-  const isCallEndDisabled = useMemo(
-    () => !chatData?.chatId || isWebMicrophoneMode,
-    [chatData?.chatId, isWebMicrophoneMode],
-  );
+  if (isWebMicrophoneMode) {
+    return (
+      <View style={styles.micInDifferentPlatformContainer}>
+        <Text style={styles.micInDifferentPlatformTitle}>
+          {t('ListeningScreen.microphoneModeInDifferentPlatformTitle')}
+        </Text>
+        <Text style={styles.micInDifferentPlatformDescription}>
+          {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
+        </Text>
+      </View>
+    );
+  }
 
   if (!chatData?.chatId) {
     return (
@@ -407,11 +411,6 @@ export const ListeningScreen = ({
             />
           </View>
           {playPauseButton}
-          {isWebMicrophoneMode && (
-            <Text style={styles.microphoneModeInDifferentPlatform}>
-              {t('ListeningScreen.microphoneModeInDifferentPlatform')}
-            </Text>
-          )}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
@@ -448,7 +447,6 @@ export const ListeningScreen = ({
           onFocusModeButtonPress={toggleNudgeVisibility}
           isFocusMode={isFocusMode}
           onCallEndPress={() => setShowCallEndConfirmation(true)}
-          isCallEndDisabled={isCallEndDisabled}
         />
       </View>
     </View>
@@ -506,12 +504,24 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '20@s',
     marginTop: '40@vs',
   },
-  microphoneModeInDifferentPlatform: {
+  micInDifferentPlatformContainer: {
+    flex: 1,
+    backgroundColor: colors.darkGray7,
+    justifyContent: 'center',
+    paddingHorizontal: '30@s',
+    textAlign: 'center',
+  },
+  micInDifferentPlatformTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '18@ms',
+    color: colors.white,
+    textAlign: 'center',
+  },
+  micInDifferentPlatformDescription: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     color: colors.white,
     textAlign: 'center',
-    marginTop: '20@vs',
-    marginHorizontal: '20@s',
+    marginTop: '10@vs',
   },
 });
