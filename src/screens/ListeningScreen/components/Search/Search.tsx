@@ -1,6 +1,9 @@
+import {useMemo} from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Keyboard,
+  ScrollView,
   Text,
   TouchableWithoutFeedback,
   View,
@@ -9,6 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon} from '@/assets/icons';
 import CustomTabs from '@/components/CustomTabs/CustomTabs';
+import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
 import useTranslate from '@/hooks/useTranslate';
@@ -27,22 +31,29 @@ const Search = () => {
     focused,
     onChangeText,
     handleSuggestionPress,
-    triggerSearch,
+    triggerSearchOnSubmit,
     filteredSuggestions,
     setShowSuggestions,
     onSearchFocus,
     setFocused,
-    dynamicTabs,
-    tabsState,
-    setActiveTab,
-    activeTab,
     onPressSuggestion,
-    loading,
-    handleEndReached,
     lastSearchedText,
+    resources,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
+    selectedCategory,
+    handleEndReached,
   } = useSearch();
 
   const {t} = useTranslate();
+  const {tabBody: tabBodyStyle, tabBodyContent: tabBodyContentStyle} = useMemo(
+    () => getThemedStyles('dark'),
+    [],
+  );
   const onFocus = () => {
     onSearchFocus();
     if (searchText.trim() !== '') setShowSuggestions(true);
@@ -70,34 +81,40 @@ const Search = () => {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
     ListEmptyComponent: renderEmptyComponent(),
-    ListFooterComponent:
-      tabsState[activeTab]?.loading && tabsState[activeTab]?.data.length > 0 ? (
-        <ActivityIndicator style={styles.footerActivityIndicator} />
-      ) : null,
   };
 
   const renderDetailSearch = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {loading ? (
-          <ActivityIndicator style={styles.activityIndicator} />
-        ) : (
-          dynamicTabs.length > 0 && (
-            <CustomTabs
-              tabs={dynamicTabs.map((tab, idx) => ({
-                ...tab,
-                title: tab.label,
-                data: tabsState[idx]?.data || [],
-              }))}
-              onTabChange={setActiveTab}
-              renderItem={renderItem}
-              initialTab={activeTab}
-              flatListProps={flatListProps}
-              colorScheme="dark"
-            />
-          )
+        {tabsMeta.length > 0 && (
+          <CustomTabs
+            tabs={tabsMeta}
+            activeTab={activeTabIndex}
+            onTabChange={handleTabChange}
+            colorScheme="dark"
+          />
         )}
+        {showInitialLoader ? (
+          <ActivityIndicator style={styles.activityIndicator} />
+        ) : resources.length > 0 ? (
+          <FlatList
+            data={resources}
+            renderItem={renderItem}
+            keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
+            {...flatListProps}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={tabBodyContentStyle}
+            style={tabBodyStyle}
+            ListFooterComponent={
+              showFooterLoader ? (
+                <ActivityIndicator style={styles.footerActivityIndicator} />
+              ) : null
+            }
+          />
+        ) : showEmptyState ? (
+          renderEmptyComponent()
+        ) : null}
       </View>
     );
   };
@@ -115,7 +132,7 @@ const Search = () => {
         suggestions={filteredSuggestions}
         showSuggestions={false}
         onSuggestionPress={handleSuggestionPress}
-        onSubmitEditing={triggerSearch}
+        onSubmitEditing={triggerSearchOnSubmit}
         colorTheme="dark"
         customStyles={styles.input}
       />
@@ -131,27 +148,31 @@ const Search = () => {
       }}>
       <View style={styles.container}>
         {renderSearchInput()}
-        <View style={styles.suggestionsContainer}>
-          <View style={styles.tryContainer}>
-            <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
+        <ScrollView
+          style={styles.suggestionsScrollView}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.suggestionsContainer}>
+            <View style={styles.tryContainer}>
+              <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
+            </View>
+            {trySuggestions.map(suggestion => (
+              <SearchSuggestion
+                key={suggestion.id}
+                text={suggestion.text}
+                icon={
+                  <SearchActiveIcon
+                    width={16}
+                    height={16}
+                    color={colors.darkGray8}
+                  />
+                }
+                onPressSuggestion={() => onPressSuggestion(suggestion.text)}
+                suggestionId={suggestion.id}
+                colorTheme="dark"
+              />
+            ))}
           </View>
-          {trySuggestions.map(suggestion => (
-            <SearchSuggestion
-              key={suggestion.id}
-              text={suggestion.text}
-              icon={
-                <SearchActiveIcon
-                  width={16}
-                  height={16}
-                  color={colors.darkGray8}
-                />
-              }
-              onPressSuggestion={() => onPressSuggestion(suggestion.text)}
-              suggestionId={suggestion.id}
-              colorTheme="dark"
-            />
-          ))}
-        </View>
+        </ScrollView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -168,6 +189,9 @@ const styles = ScaledSheet.create({
   input: {
     marginVertical: '0@mvs',
     borderRadius: '8@ms',
+  },
+  suggestionsScrollView: {
+    maxHeight: '500@vs',
   },
   suggestionsContainer: {
     marginTop: '80@mvs',

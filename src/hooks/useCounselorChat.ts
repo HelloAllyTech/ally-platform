@@ -3,7 +3,7 @@ import {AppState, AppStateStatus} from 'react-native';
 
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setCurrentChat} from '@/store/slices/chatSlice';
+import {clearCurrentChat, setCurrentChat} from '@/store/slices/chatSlice';
 import {Chat} from '@/types/message';
 import {UserRole} from '@/types/user';
 
@@ -37,6 +37,7 @@ export const useCounselorChat = ({
         dispatch(setCurrentChat(data));
         onActiveChatFound?.(data);
       } else {
+        dispatch(clearCurrentChat());
         onNoActiveChatFound?.(error);
       }
     } catch (error) {

@@ -28,7 +28,9 @@ export const SearchSuggestion: React.FC<SearchSuggestionProps> = ({
       onPress={() => onPressSuggestion(suggestionId)}>
       <View style={themedStyles.textContainer}>
         {icon}
-        <Text style={themedStyles.text}>{text}</Text>
+        <Text numberOfLines={3} style={themedStyles.text}>
+          {text}
+        </Text>
       </View>
     </TouchableOpacity>
   );

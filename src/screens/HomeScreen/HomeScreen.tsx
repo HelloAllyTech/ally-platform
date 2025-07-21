@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useCallback, useEffect} from 'react';
 import {
   Alert,
   BackHandler,
@@ -14,13 +14,17 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {DrawerMenuIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {env} from '@/config/env';
+import {CHAT_TYPES} from '@/constants/chat';
 import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useUser} from '@/hooks/useUser';
-import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {
+  useGetSummaryFieldsQuery,
+  useGetVisibleChatTypesQuery,
+} from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
@@ -38,6 +42,11 @@ export const HomeScreen: React.FC = () => {
   const {userData} = useUser();
   const dispatch = useAppDispatch();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
+  const {
+    data: visibleChatTypes,
+    isLoading: isLoadingChatTypes,
+    isError: isErrorChatTypes,
+  } = useGetVisibleChatTypesQuery();
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -65,6 +74,15 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
+  const handleLearnMorePress = useCallback(async () => {
+    try {
+      await Linking.openURL(env.ALLY_WEB_URL);
+    } catch (error) {
+      logger.error(`Error opening learn more URL: ${error}`);
+      Alert.alert('Error', 'Unable to open the link');
+    }
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -74,35 +92,75 @@ export const HomeScreen: React.FC = () => {
         <DrawerMenuIcon />
       </TouchableOpacity>
       {userData?.role !== UserRole.COUNSELOR ? (
-        <FeatureNotAvailable />
+        <FeatureNotAvailable
+          description={t('Home.client.appCurrentlyForCounsellors')}
+          ctaText={t('Home.client.learnMore')}
+          onCtaPress={handleLearnMorePress}
+        />
       ) : (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           bounces={false}>
-          <Text style={styles.title}>{t('Home.start')}</Text>
-          <Text style={styles.subtitle}>{t('Home.session')}</Text>
-          <Text style={styles.chooseListening}>
-            {t('Home.chooseListening')}
-          </Text>
-          <View style={styles.buttonContainerWrapper}>
-            <View style={styles.buttonContainer}>
-              <StartCallCard
-                image={images.joinCall}
-                header={t('Home.joinCall')}
-                subtitle={t('Home.allyWillJoinOngoingCall')}
-                onPressCard={handleThirdPartyCall}
-              />
-              <StartCallCard
-                image={images.listenLive}
-                header={t('Home.listenLive')}
-                subtitle={t('Home.allyWillHearAudio')}
-                onPressCard={handleVoiceRecording}
-              />
-            </View>
-            <Text style={styles.consentNotice}>{t('Home.consentNotice')}</Text>
-          </View>
+          {/* If no listening options, show only the message */}
+          {!visibleChatTypes?.length ? (
+            <FeatureNotAvailable
+              description={t('HomeScreen.noAccessToCallFeatures')}
+              containerStyle={styles.noAccessToCallFeaturesContainer}
+            />
+          ) : (
+            <>
+              <Text style={styles.title}>{t('Home.start')}</Text>
+              <Text style={styles.subtitle}>{t('Home.session')}</Text>
+              <Text style={styles.chooseListening}>
+                {t('Home.chooseListening')}
+              </Text>
+              <View style={styles.buttonContainerWrapper}>
+                <View style={styles.buttonContainer}>
+                  {Array.isArray(visibleChatTypes) &&
+                    !isLoadingChatTypes &&
+                    !isErrorChatTypes && (
+                      <>
+                        {visibleChatTypes.includes(
+                          CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+                        ) && (
+                          <StartCallCard
+                            image={images.joinCall}
+                            header={t('Home.joinCall')}
+                            subtitle={t('Home.allyWillJoinOngoingCall')}
+                            onPressCard={handleThirdPartyCall}
+                            customStyles={
+                              visibleChatTypes.length === 1
+                                ? styles.stretchCard
+                                : {}
+                            }
+                          />
+                        )}
+                        {visibleChatTypes.includes(
+                          CHAT_TYPES.MICROPHONE_CHAT,
+                        ) && (
+                          <StartCallCard
+                            image={images.listenLive}
+                            header={t('Home.listenLive')}
+                            subtitle={t('Home.allyWillHearAudio')}
+                            onPressCard={handleVoiceRecording}
+                            customStyles={
+                              visibleChatTypes.length === 1
+                                ? styles.stretchCard
+                                : {}
+                            }
+                          />
+                        )}
+                      </>
+                    )}
+                </View>
+                <Text style={styles.consentNotice}>
+                  {t('Home.consentNotice')}
+                </Text>
+              </View>
+            </>
+          )}
         </ScrollView>
       )}
     </View>
@@ -158,8 +216,9 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: '60@mvs',
     paddingBottom: '80@vs',
+    justifyContent: 'center',
+    height: '100%',
   },
   consentNotice: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -167,5 +226,11 @@ const styles = ScaledSheet.create({
     fontSize: '12@ms',
     marginTop: '10@mvs',
     marginBottom: '13@mvs',
+  },
+  stretchCard: {
+    flex: 1,
+  },
+  noAccessToCallFeaturesContainer: {
+    paddingHorizontal: '5@s',
   },
 });

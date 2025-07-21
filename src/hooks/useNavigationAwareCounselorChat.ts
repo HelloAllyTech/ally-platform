@@ -41,16 +41,7 @@ export const useNavigationAwareCounselorChat = (
           // Already in chat flow, no navigation needed
           logger.info('Active chat found but already in chat flow');
           break;
-        case 'Home':
-        case 'HomeTab':
-        case 'CallSummary':
-        case 'CallLog':
-          navigation.navigate('Listening');
-          break;
         default:
-          logger.warn(
-            `Unexpected route for active chat: ${currentRouteName.current}`,
-          );
           navigation.navigate('Listening');
           break;
       }

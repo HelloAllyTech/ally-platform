@@ -11,7 +11,6 @@ import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {isEmptyObject} from '@/utils/common';
 
 import {CallLogHeader} from './components/CallLogHeader/CallLogHeader';
 import CallLogItem from './components/CallLogItem/CallLogItem';
@@ -119,7 +118,6 @@ export const CallLogScreen: React.FC = () => {
   const renderItem = ({item, index}: {item: CallLog; index: number}) => (
     <CallLogItem
       item={item}
-      disabled={isEmptyObject(item.details?.summary)}
       expanded={expandedIdx === index}
       onToggle={() => handleToggle(index)}
       onItemPress={() => handleItemPress(item)}

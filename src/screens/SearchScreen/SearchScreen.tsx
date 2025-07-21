@@ -1,6 +1,7 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Keyboard,
   ScrollView,
   StatusBar,
@@ -18,6 +19,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchIcon} from '@/assets/icons';
 import CustomTabs from '@/components/CustomTabs/CustomTabs';
+import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
 import useTranslate from '@/hooks/useTranslate';
@@ -42,18 +44,27 @@ export const SearchScreen: React.FC = () => {
     setFocused,
     onChangeText,
     handleEndReached,
-    tabsState,
-    activeTab,
-    dynamicTabs,
-    setActiveTab,
-    loading,
-    triggerSearch,
     onPressSuggestion,
     lastSearchedText,
+    resources,
+    triggerSearchOnSubmit,
+    selectedCategory,
+    showSuggestions,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
   } = useSearch();
   const {t} = useTranslate();
 
   const anim = useSharedValue(0);
+
+  const {tabBody: tabBodyStyle, tabBodyContent: tabBodyContentStyle} = useMemo(
+    () => getThemedStyles('light'),
+    [],
+  );
 
   useEffect(() => {
     anim.value = withTiming(focused ? 1 : 0, {duration: 300});
@@ -106,7 +117,7 @@ export const SearchScreen: React.FC = () => {
     onEndReached: handleEndReached,
     onEndReachedThreshold: 0.5,
     ListFooterComponent:
-      tabsState[activeTab]?.loading && tabsState[activeTab]?.data.length > 0 ? (
+      showFooterLoader && resources.length > 0 ? (
         <ActivityIndicator style={styles.footerActivityIndicator} />
       ) : null,
   };
@@ -114,33 +125,46 @@ export const SearchScreen: React.FC = () => {
   const renderDetailSearch = () => {
     return (
       <View style={styles.container}>
-        {renderSearchInput()}
-        {loading ? (
-          <ActivityIndicator style={styles.activityIndicator} />
-        ) : dynamicTabs.length > 0 ? (
+        <TouchableWithoutFeedback
+          onPress={() => {
+            Keyboard.dismiss();
+            setFocused(false);
+          }}>
+          <View>{renderSearchInput()}</View>
+        </TouchableWithoutFeedback>
+        {tabsMeta.length > 0 && resources.length > 0 && (
           <CustomTabs
-            tabs={dynamicTabs.map((tab, idx) => ({
-              ...tab,
-              title: tab.label,
-              data: tabsState[idx]?.data || [],
-            }))}
-            onTabChange={setActiveTab}
-            renderItem={renderItem}
-            initialTab={activeTab}
-            flatListProps={flatListProps}
+            tabs={tabsMeta}
+            activeTab={activeTabIndex}
+            onTabChange={handleTabChange}
           />
-        ) : (
-          renderEmptyComponent()
         )}
+        {showInitialLoader ? (
+          <ActivityIndicator style={styles.footerActivityIndicator} />
+        ) : resources.length > 0 ? (
+          <FlatList
+            data={resources}
+            renderItem={renderItem}
+            keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
+            {...flatListProps}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={tabBodyContentStyle}
+            style={tabBodyStyle}
+            ListFooterComponent={
+              showFooterLoader ? (
+                <ActivityIndicator style={styles.footerActivityIndicator} />
+              ) : null
+            }
+          />
+        ) : showEmptyState ? (
+          renderEmptyComponent()
+        ) : null}
       </View>
     );
   };
 
   // const isShowSuggestions =
-  //   !showSearchResults &&
-  //   showSuggestions &&
-  //   focused &&
-  //   searchText.trim() !== '';
+  //   showSearchResults && showSuggestions && focused && searchText.trim() !== '';
 
   const renderSearchInput = () => {
     return (
@@ -155,7 +179,7 @@ export const SearchScreen: React.FC = () => {
         suggestions={filteredSuggestions}
         showSuggestions={false}
         onSuggestionPress={handleSuggestionPress}
-        onSubmitEditing={triggerSearch}
+        onSubmitEditing={triggerSearchOnSubmit}
       />
     );
   };
