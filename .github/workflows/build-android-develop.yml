@@ -78,28 +78,28 @@ jobs:
           path: android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
-      # - name: Send Slack notification
-      #   if: success()
-      #   uses: tokorom/action-slack-incoming-webhook@main
-      #   env:
-      #     INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #   with:
-      #     text: 'Android Development Build #${{ github.run_number }} Successful!'
-      #     attachments: |
-      #       [
-      #         {
-      #           "color": "good",
-      #           "author_name": "${{ github.actor }}",
-      #           "author_icon": "${{ github.event.sender.avatar_url }}",
-      #           "fields": [
-      #             {
-      #               "title": "What's New",
-      #               "value": "${{ github.event.head_commit.message }}"
-      #             },
-      #             {
-      #               "title": "Download Develop APK",
-      #               "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
-      #             }
-      #           ]
-      #         }
-      #       ]
+      - name: Send Slack notification
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Android Development Build #${{ github.run_number }} Successful!'
+          attachments: |
+            [
+              {
+                "color": "good",
+                "author_name": "${{ github.actor }}",
+                "author_icon": "${{ github.event.sender.avatar_url }}",
+                "fields": [
+                  {
+                    "title": "What's New",
+                    "value": "${{ github.event.head_commit.message }}"
+                  },
+                  {
+                    "title": "Download Develop APK",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+                  }
+                ]
+              }
+            ]
