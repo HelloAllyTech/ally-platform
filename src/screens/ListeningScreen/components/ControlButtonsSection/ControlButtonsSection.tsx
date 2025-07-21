@@ -12,6 +12,7 @@ interface ControlButtonsSectionProps {
   isFocusMode: boolean;
   onToggleMaximized: () => void;
   onCallEndPress: () => void;
+  isCallEndDisabled?: boolean;
 }
 
 export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
@@ -20,6 +21,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
   isFocusMode,
   onCallEndPress,
   onFocusModeButtonPress,
+  isCallEndDisabled = false,
 }) => {
   const translateY = React.useRef(new Animated.Value(0)).current;
 
@@ -59,6 +61,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
             <TouchableOpacity
               style={[styles.buttonContainer, styles.callEndButton]}
               onPress={onCallEndPress}
+              disabled={isCallEndDisabled}
               activeOpacity={0.85}>
               <CallEndIcon width={35} height={35} color={colors.white} />
             </TouchableOpacity>

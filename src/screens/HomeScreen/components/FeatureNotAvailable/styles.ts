@@ -22,7 +22,7 @@ export const styles = ScaledSheet.create({
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   messageContainer: {
-    marginBottom: '30@mvs',
+    marginBottom: '15@mvs',
     alignItems: 'center',
   },
   messageText: {

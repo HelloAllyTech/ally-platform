@@ -1,13 +1,10 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Keyboard} from 'react-native';
 
-import {searchSuggestions} from '@/screens/SearchScreen/searchConfig';
-import {
-  ResourceArticle,
-  TabDefinition,
-  TabState,
-} from '@/screens/SearchScreen/types';
+import {PAGE_SIZE, trySuggestions} from '@/screens/SearchScreen/searchConfig';
+import {ResourceArticle} from '@/screens/SearchScreen/types';
 import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
+import {logger} from '@/utils/logger';
 
 export const useSearch = () => {
   const [searchText, setSearchText] = useState('');
@@ -15,124 +12,124 @@ export const useSearch = () => {
   const [focused, setFocused] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] =
-    useState(searchSuggestions);
+    useState(trySuggestions);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [dynamicTabs, setDynamicTabs] = useState<TabDefinition[]>([]);
-  const [tabsState, setTabsState] = useState<TabState[]>([]);
 
-  const [searchDocuments, {data: searchResults, isLoading, isFetching}] =
+  // State management matching web implementation
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [resources, setResources] = useState<ResourceArticle[]>([]);
+  const [categoryCountList, setCategoryCountList] = useState<{
+    [key: string]: number;
+  }>({});
+
+  const [hasMore, setHasMore] = useState(true);
+
+  const [searchDocuments, {isLoading, isFetching}] =
     useLazyGetSearchResultsQuery();
 
+  // Reset pagination when search query changes
   useEffect(() => {
-    if (searchResults?.documents) {
-      if (searchResults.documents.length > 0) {
-        const allTabs: TabDefinition[] = [
-          {
-            key: 'all',
-            label: `All (${searchResults.documents.length})`,
-            data: searchResults.documents,
-          },
-        ];
-
-        if (searchResults.categories) {
-          Object.entries(searchResults.categories).forEach(
-            ([category, count]) => {
-              const categoryDocs = searchResults.documents.filter(
-                (result: ResourceArticle) => result.category === category,
-              );
-              allTabs.push({
-                key: category.toLowerCase(),
-                label: `${category} (${count})`,
-                data: categoryDocs,
-              });
-            },
-          );
-        }
-
-        setDynamicTabs(allTabs);
-        setTabsState(
-          allTabs.map(tab => ({
-            data: tab.data || [],
-            page: 0,
-            hasMore: false,
-            loading: false,
-            error: null,
-          })),
-        );
-      } else {
-        // No search results, show no tabs
-        setDynamicTabs([]);
-        setTabsState([]);
-      }
+    if (lastSearchedText !== searchText && searchText.trim() !== '') {
+      setSelectedCategory('All');
     }
-  }, [searchResults]);
+  }, [searchText, lastSearchedText]);
 
-  const loadTabData = useCallback(
-    (tabIdx: number = 0, nextPage: number = 0, append = false) => {
-      const currentTab = dynamicTabs[tabIdx];
-      if (!currentTab?.data) return;
-
-      setTabsState(prev => {
-        const newState = [...prev];
-        newState[tabIdx] = {...newState[tabIdx], loading: true, error: null};
-        return newState;
-      });
+  // Main search function
+  const triggerSearch = useCallback(
+    async (query: string, category?: string) => {
+      let filters;
+      if (category && category !== 'All') {
+        filters = {category};
+      }
 
       try {
-        const data = currentTab.data;
-        setTabsState(prev => {
-          const newState = [...prev];
-          newState[tabIdx] = {
-            ...newState[tabIdx],
-            data: append ? [...newState[tabIdx].data, ...data] : data,
-            page: nextPage,
-            hasMore: false,
-            loading: false,
-            error: null,
-          };
-          return newState;
+        const response = await searchDocuments({
+          query,
+          limit: PAGE_SIZE,
+          filters,
         });
-      } catch (e) {
-        setTabsState(prev => {
-          const newState = [...prev];
-          newState[tabIdx] = {
-            ...newState[tabIdx],
-            loading: false,
-            error: 'Failed to load data',
-          };
-          return newState;
-        });
+
+        if (response.data) {
+          const documents = response.data.documents || [];
+          setResources(documents);
+          setHasMore(response.data.total > documents.length);
+
+          // Only set category count list for "All" category or initial search
+          if (!(category && category !== 'All')) {
+            setCategoryCountList(response.data.categories || {});
+          }
+        }
+      } catch (error) {
+        logger.error(`Error fetching search results: ${error}`);
       }
     },
-    [dynamicTabs],
+    [searchDocuments],
   );
 
-  // Load data when tab changes
-  useEffect(() => {
-    if (dynamicTabs.length > 0) {
-      loadTabData(activeTab, 0, false);
-    }
-  }, [activeTab, dynamicTabs, loadTabData]);
+  // Category change handler
+  const onCategoryChange = useCallback(
+    async (category: string) => {
+      setSelectedCategory(category);
+      if (lastSearchedText) {
+        await triggerSearch(lastSearchedText, category);
+      }
+    },
+    [lastSearchedText, triggerSearch],
+  );
 
-  // Handler for loading more data
-  const handleEndReached = () => {
-    const tab = tabsState[activeTab];
-    if (!tab.loading && tab.hasMore) {
-      loadTabData(activeTab, tab.page + 1, true);
-    }
-  };
+  // Infinite scroll handler
+  const fetchRemainingResources = useCallback(async () => {
+    if (isLoading || isFetching || !hasMore) return;
 
-  // Only call this to trigger a search
-  const triggerSearch = useCallback(() => {
-    setLastSearchedText(searchText);
-    if (searchText.trim() !== '') {
-      searchDocuments({query: searchText});
-      setShowSearchResults(true);
-      setShowSuggestions(false);
+    let filters;
+    if (selectedCategory && selectedCategory !== 'All') {
+      filters = {category: selectedCategory};
     }
-  }, [searchText, searchDocuments]);
+
+    try {
+      const response = await searchDocuments({
+        query: lastSearchedText,
+        limit: PAGE_SIZE,
+        filters,
+        excludedIds: resources.map(resource => resource.id),
+      });
+
+      if (response.data) {
+        const newDocuments = response.data.documents || [];
+        setResources(prevResources => [...prevResources, ...newDocuments]);
+        setHasMore(
+          response.data.total > resources.length + newDocuments.length,
+        );
+      }
+    } catch (error) {
+      logger.error(`Error fetching remaining resources: ${error}`);
+    }
+  }, [
+    isLoading,
+    isFetching,
+    hasMore,
+    selectedCategory,
+    lastSearchedText,
+    resources,
+    searchDocuments,
+  ]);
+
+  // Search handler matching web implementation
+  const onSearch = useCallback(
+    async (query: string) => {
+      setSearchText(query);
+      setLastSearchedText(query);
+      setSelectedCategory('All');
+
+      if (query.trim()) {
+        await triggerSearch(query);
+        setShowSearchResults(true);
+        setShowSuggestions(false);
+      }
+    },
+    [triggerSearch],
+  );
 
   // Debounce for suggestions only
   const debounceSearch = useCallback(() => {
@@ -144,22 +141,24 @@ export const useSearch = () => {
     setShowSuggestions(true);
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      const filtered = searchSuggestions.filter(s =>
+      const filtered = trySuggestions.filter(s =>
         s.text.toLowerCase().includes(searchText.toLowerCase()),
       );
       setFilteredSuggestions(filtered);
     }, 250);
   }, [searchText]);
 
-  const handleSuggestionPress = (suggestion: {id: number; text: string}) => {
-    setLastSearchedText(suggestion.text);
-    setSearchText(suggestion.text);
-    setShowSuggestions(false);
-    setFocused(false);
-    Keyboard.dismiss();
-    searchDocuments({query: suggestion.text});
-    setShowSearchResults(true);
-  };
+  const handleSuggestionPress = useCallback(
+    (suggestion: {id: number; text: string}) => {
+      setLastSearchedText(suggestion.text);
+      setSearchText(suggestion.text);
+      setShowSuggestions(false);
+      setFocused(false);
+      Keyboard.dismiss();
+      onSearch(suggestion.text);
+    },
+    [onSearch],
+  );
 
   const onSearchFocus = () => {
     setFocused(true);
@@ -175,14 +174,60 @@ export const useSearch = () => {
     else setShowSuggestions(false);
   };
 
-  const onPressSuggestion = (suggestion: string) => {
-    setSearchText(suggestion);
-    setLastSearchedText(suggestion);
-    searchDocuments({query: suggestion});
-    setShowSearchResults(true);
-  };
+  const onPressSuggestion = useCallback(
+    (suggestion: string) => {
+      setShowSearchResults(true);
+      onSearch(suggestion);
+    },
+    [onSearch],
+  );
+
+  // Trigger search on submit
+  const triggerSearchOnSubmit = useCallback(() => {
+    if (searchText.trim()) {
+      onSearch(searchText);
+    }
+  }, [searchText, onSearch]);
 
   const loading = isLoading || isFetching;
+
+  // --- Centralized tab meta and active tab logic ---
+  const tabsMeta = useMemo(
+    () => [
+      {
+        key: 'all',
+        title: `All (${Object.values(categoryCountList).reduce((acc, curr) => acc + curr, 0)})`,
+      },
+      ...Object.entries(categoryCountList).map(([category, count]) => ({
+        key: category.toLowerCase(),
+        title: `${category} (${count})`,
+      })),
+    ],
+    [categoryCountList],
+  );
+
+  const normalizedSelectedCategory = selectedCategory.toLowerCase();
+  const activeTabIndex = tabsMeta.findIndex(
+    tab => tab.key === normalizedSelectedCategory,
+  );
+
+  // Centralized loader/empty state logic
+  const showInitialLoader = resources.length === 0 && loading;
+  const showFooterLoader = resources.length > 0 && loading;
+  const showEmptyState = resources.length === 0 && !loading;
+
+  // Centralized tab change handler
+  const handleTabChange = useCallback(
+    (tabIndex: number) => {
+      const tabKey = tabsMeta[tabIndex].key;
+      if (tabKey === 'all') {
+        onCategoryChange('All');
+      } else {
+        onCategoryChange(tabKey);
+      }
+    },
+    [tabsMeta, onCategoryChange],
+  );
 
   return {
     searchText,
@@ -199,16 +244,22 @@ export const useSearch = () => {
     setShowSuggestions,
     setFocused,
     onChangeText,
-    searchResults,
     loading,
-    triggerSearch,
+    triggerSearchOnSubmit,
     searchDocuments,
-    setActiveTab,
-    handleEndReached,
-    tabsState,
-    activeTab,
-    dynamicTabs,
+    handleEndReached: fetchRemainingResources,
     onPressSuggestion,
     lastSearchedText,
+    selectedCategory,
+    onCategoryChange,
+    resources,
+    categoryCountList,
+    hasMore,
+    tabsMeta,
+    activeTabIndex,
+    handleTabChange,
+    showInitialLoader,
+    showFooterLoader,
+    showEmptyState,
   };
 };

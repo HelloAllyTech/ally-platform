@@ -3,6 +3,7 @@ import AnalyticsActiveIcon from './analyticsActive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
+import BarsIcon from './bars.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import CallIcon from './call.svg';
 import CallDetailsIcon from './callDetails.svg';
@@ -66,6 +67,7 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  BarsIcon,
   TickIcon,
   ProfileIcon,
   DrawerMenuIcon,

@@ -47,6 +47,12 @@ const NavigationContent = ({
         });
       }
     },
+    onNoActiveChatFound: () => {
+      navigationRef.reset({
+        index: 0,
+        routes: [{name: 'Home'}],
+      });
+    },
   });
 
   // Single subscription that's aware of the current screen

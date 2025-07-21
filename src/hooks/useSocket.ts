@@ -1,8 +1,10 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useRef} from 'react';
 import {io, Socket} from 'socket.io-client';
 
 import {env} from '@/config/env';
+import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {SocketEvent} from '@/types/message';
+import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
 interface UseSocketOptions {
@@ -22,20 +24,23 @@ export const useSocket = ({
   const baseUrl = env.API_BASE_URL;
 
   const connect = useCallback(
-    () => {
+    async () => {
       if (!userId || connectionAttemptsRef.current >= maxAttempts) {
         logger.error('Max connection attempts reached');
         return;
       }
 
       try {
+        const accessToken = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
+        if (!accessToken) {
+          logger.error('No access token found for socket connection');
+          return;
+        }
         socketRef.current = io(`${baseUrl}${path}`, {
           path: '',
           transports: ['polling', 'websocket'],
           auth: {
-            user: {
-              userId,
-            },
+            token: accessToken,
           },
           reconnection: true,
           reconnectionAttempts: 5,
@@ -132,12 +137,6 @@ export const useSocket = ({
     }
     socketRef.current.off(socketEvent);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      socketRef.current?.disconnect();
-    };
-  }, [disconnect]);
 
   return {
     connect,
