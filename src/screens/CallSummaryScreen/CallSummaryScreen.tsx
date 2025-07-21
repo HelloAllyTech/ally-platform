@@ -137,6 +137,10 @@ export const CallSummaryScreen: React.FC<
       setIsSummaryAvailable(true);
     }
   }, [summaryData]);
+  console.log(
+    '🚀 ~ useEffect ~ summaryData?.details?.summary:',
+    summaryData?.details?.summary,
+  );
 
   // Cleanup summary state on unmount
   useEffect(() => {
