@@ -23,7 +23,7 @@ on:
 
 env:
   ENABLE_DB_MIGRATION: "false"
-  S3_ENV_FILES: '/learn-core/.env'
+  S3_ENV_FILES: 'learn-core/.env'
   BUILD_PLATFORM: linux/amd64
   BUILD_PATH: dockerfile
   SUBNETS: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
