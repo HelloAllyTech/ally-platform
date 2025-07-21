@@ -66,15 +66,16 @@ jobs:
           ./gradlew clean
           ./gradlew assembleRelease --stacktrace
 
-      - name: Rename APK with build number and env
+      - name: Rename APK with build number, date, and env
         run: |
-          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}.apk
+          DATETIME=$(date +'%Y%m%d-%H%M')
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}-${DATETIME}.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-develop-release-${{ github.run_number }}
-          path: android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}.apk
+          path: android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
       # - name: Send Slack notification
