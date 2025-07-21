@@ -1,18 +1,15 @@
-from dotenv import load_dotenv
-
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
 from livekit.plugins import (
     openai,
-    cartesia,
     deepgram,
     noise_cancellation,
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-from app.utils.prompt import AI_AGENT_PROMPT
 
-load_dotenv()
+from app.core.config import settings
+from app.utils.prompt import AI_AGENT_PROMPT
 
 
 class Assistant(Agent):
@@ -22,9 +19,10 @@ class Assistant(Agent):
 
 async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3", language="multi"),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=cartesia.TTS(model="sonic-2", voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
+        stt=deepgram.STT(model="nova-3", language="multi", api_key=settings.DEEPGRAM_API_KEY),
+        llm=openai.LLM(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY),
+        tts=deepgram.TTS(model="aura-asteria-en", encoding="linear16", sample_rate=24000,
+                         api_key=settings.DEEPGRAM_API_KEY),
         vad=silero.VAD.load(),
         turn_detection=MultilingualModel(),
     )
@@ -48,4 +46,5 @@ async def entrypoint(ctx: agents.JobContext):
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint, api_key=settings.LIVEKIT_API_KEY,
+                                            api_secret=settings.LIVEKIT_API_SECRET, ws_url=settings.LIVEKIT_URL))

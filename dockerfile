@@ -17,8 +17,17 @@ RUN poetry install --no-interaction --no-ansi
 # Copy application code
 COPY . /app/
 
+# Run the download command to get all required files
+# This runs after dependencies are installed and code is copied
+RUN poetry run python -m app.worker download-files
+
 # Expose port
 EXPOSE 8000
 
 # Command to run the application
-CMD ["poetry", "run", "uvicorn", "ally_learn_core.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# This uses 'sh -c' to execute multiple commands:
+# 1. Starts uvicorn in the background (&)
+# 2. Starts the worker in the background (&)
+# 3. 'wait -n' waits for any background process to exit, ensuring the container stays alive
+#    as long as at least one of the main processes (uvicorn or worker) is running.
+CMD ["bash", "-c", "poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 & poetry run python -m app.worker dev & wait -n"]
