@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {CustomDropdown} from '@/components/Dropdown/Dropdown';
 import {SearchableLocationDropdown} from '@/components/SearchableLocationDropdown/SearchableLocationDropdown';
 import commonStyles from '@/components/styles';
+import {LanguageMap} from '@/constants/general';
 import {
   FIELD_LABELS,
   SUMMARY_FIELDS,
@@ -107,7 +108,7 @@ const DemographicsSectionComponent: React.FC<DemographicsSectionProps> = ({
           summary?.[SUMMARY_FIELDS.LANGUAGES]
             ?.map(
               (language: {language: string; percentage: number}) =>
-                `${language.language} (${language.percentage}%)`,
+                `${LanguageMap[language.language as keyof typeof LanguageMap]} (${language.percentage}%)`,
             )
             .join(', ') || '-',
       },
