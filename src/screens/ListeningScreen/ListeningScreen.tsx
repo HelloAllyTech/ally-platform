@@ -1,11 +1,23 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
-import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrowIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
+import {
+  AllyPlatforms,
+  DEFAULT_HIT_SLOP,
+  MICROPHONE_AUDIO_SAMPLE_RATE,
+} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -368,6 +380,16 @@ export const ListeningScreen = ({
         <Text style={styles.micInDifferentPlatformDescription}>
           {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
         </Text>
+        <TouchableOpacity
+          onPress={navigation.goBack}
+          style={styles.micInDifferentPlatformGoBackButton}
+          activeOpacity={0.85}
+          hitSlop={DEFAULT_HIT_SLOP}>
+          <LeftArrowIcon color={colors.darkGray7} />
+          <Text style={styles.micInDifferentPlatformGoBackText}>
+            {t('ListeningScreen.microphoneModeGoBack')}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -523,5 +545,21 @@ const styles = ScaledSheet.create({
     color: colors.white,
     textAlign: 'center',
     marginTop: '10@vs',
+  },
+  micInDifferentPlatformGoBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.white,
+    borderRadius: '32@s',
+    paddingVertical: '5@vs',
+    paddingLeft: '10@s',
+    paddingRight: '17@s',
+    marginTop: '40@vs',
+  },
+  micInDifferentPlatformGoBackText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.black,
+    fontSize: '16@ms',
   },
 });
