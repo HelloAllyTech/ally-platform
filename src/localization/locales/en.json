@@ -46,7 +46,9 @@
     "endCall": "End Call",
     "endSession": "End Session",
     "connecting": "Connecting...",
-    "microphoneModeInDifferentPlatform": "Note: This call was initiated from a different platform. You can listen but cannot control the call (end/unmute)."
+    "microphoneModeInDifferentPlatformTitle": "Active Microphone Session on Another Platform",
+    "microphoneModeInDifferentPlatformDescription": "You have an active microphone session on another platform. Please end the call there first, or continue using that session if you prefer.",
+    "microphoneModeGoBack": "Go back"
   },
   "SplashScreen": {
     "hey": "Hey,",

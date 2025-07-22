@@ -43,10 +43,17 @@ export const HomeScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {
-    data: visibleChatTypes,
+    data: enabledChatTypes,
     isLoading: isLoadingChatTypes,
     isError: isErrorChatTypes,
   } = useGetVisibleChatTypesQuery();
+
+  const visibleChatTypes = [
+    CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+    CHAT_TYPES.MICROPHONE_CHAT,
+  ].filter(type => enabledChatTypes?.includes(type));
+
+  const isSingleCallType = visibleChatTypes.length === 1;
 
   // Use the custom hook for back press handling
   useHardwareBackPressHandler(() => {
@@ -118,42 +125,36 @@ export const HomeScreen: React.FC = () => {
               </Text>
               <View style={styles.buttonContainerWrapper}>
                 <View style={styles.buttonContainer}>
-                  {Array.isArray(visibleChatTypes) &&
-                    !isLoadingChatTypes &&
-                    !isErrorChatTypes && (
-                      <>
-                        {visibleChatTypes.includes(
-                          CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
-                        ) && (
-                          <StartCallCard
-                            image={images.joinCall}
-                            header={t('Home.joinCall')}
-                            subtitle={t('Home.allyWillJoinOngoingCall')}
-                            onPressCard={handleThirdPartyCall}
-                            customStyles={
-                              visibleChatTypes.length === 1
-                                ? styles.stretchCard
-                                : {}
-                            }
-                          />
-                        )}
-                        {visibleChatTypes.includes(
-                          CHAT_TYPES.MICROPHONE_CHAT,
-                        ) && (
-                          <StartCallCard
-                            image={images.listenLive}
-                            header={t('Home.listenLive')}
-                            subtitle={t('Home.allyWillHearAudio')}
-                            onPressCard={handleVoiceRecording}
-                            customStyles={
-                              visibleChatTypes.length === 1
-                                ? styles.stretchCard
-                                : {}
-                            }
-                          />
-                        )}
-                      </>
-                    )}
+                  {!isLoadingChatTypes && !isErrorChatTypes && (
+                    <>
+                      {visibleChatTypes.includes(
+                        CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+                      ) && (
+                        <StartCallCard
+                          image={images.joinCall}
+                          header={t('Home.joinCall')}
+                          subtitle={t('Home.allyWillJoinOngoingCall')}
+                          onPressCard={handleThirdPartyCall}
+                          customStyles={
+                            isSingleCallType ? styles.stretchCard : {}
+                          }
+                        />
+                      )}
+                      {visibleChatTypes.includes(
+                        CHAT_TYPES.MICROPHONE_CHAT,
+                      ) && (
+                        <StartCallCard
+                          image={images.listenLive}
+                          header={t('Home.listenLive')}
+                          subtitle={t('Home.allyWillHearAudio')}
+                          onPressCard={handleVoiceRecording}
+                          customStyles={
+                            isSingleCallType ? styles.stretchCard : {}
+                          }
+                        />
+                      )}
+                    </>
+                  )}
                 </View>
                 <Text style={styles.consentNotice}>
                   {t('Home.consentNotice')}
