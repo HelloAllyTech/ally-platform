@@ -9,12 +9,14 @@ interface PlayPauseOverlayProps {
   isPlaying: boolean;
   onPress: () => void;
   isFocusMode?: boolean;
+  isDisabled?: boolean;
 }
 
 export const PlayPauseOverlay: React.FC<PlayPauseOverlayProps> = ({
   isPlaying,
   onPress,
   isFocusMode = true,
+  isDisabled = false,
 }) => {
   const size = isFocusMode ? 40 : 32;
   const iconWidth = isFocusMode ? 16 : 11;
@@ -32,6 +34,7 @@ export const PlayPauseOverlay: React.FC<PlayPauseOverlayProps> = ({
         },
       ]}
       onPress={onPress}
+      disabled={isDisabled}
       activeOpacity={0.8}>
       {isPlaying ? (
         <PauseIcon
