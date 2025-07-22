@@ -2,16 +2,6 @@ name: 'Build Android app - Production'
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - development
-          - staging
-          - production
 
 permissions:
   id-token: write
@@ -76,11 +66,16 @@ jobs:
           ./gradlew clean
           ./gradlew assembleRelease --stacktrace
 
+      - name: Rename APK with build number, date, and env
+        run: |
+          DATETIME=$(date +'%Y%m%d-%H%M')
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-production-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: app-production-release-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-production-release-${{ github.run_number }}-*.apk
           retention-days: 30
 
       - name: Send Slack notification (Production)
@@ -89,7 +84,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: Android Production Build Successful!
+          text: 'Android Production Build #${{ github.run_number }} Successful!'
           attachments: |
             [
               {
