@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=ScenarioList)
-async def get_scenarios(
-    session_id: str = Depends(auth_service.get_current_session_id)
-) -> ScenarioList:
+async def get_scenarios() -> ScenarioList:
     """
     Get all available scenarios.
     
