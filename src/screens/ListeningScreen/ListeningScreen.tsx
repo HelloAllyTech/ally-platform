@@ -50,13 +50,9 @@ import {
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
 } from './audioUtils';
-import {
-  CallEndModal,
-  ControlButtonsSection,
-  NudgeSection,
-  Timer,
-} from './components';
+import {ControlButtonsSection, NudgeSection, Timer} from './components';
 import {AudioWaveform} from './components/AudioWaveform';
+import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
 import Search from './components/Search/Search';
 
@@ -151,20 +147,27 @@ export const ListeningScreen = ({
   }, [isMicrophoneMode, navigation]);
 
   const handleEndCall = () => {
-    if (chatData?.chatId) {
-      if (isConferenceCall || isMicrophoneMode) {
-        if (isMicrophoneMode) {
-          stopStreaming();
-        }
-        emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
-          ...(chatData?.chatId &&
-            isConferenceCall && {chatId: chatData.chatId}),
-        });
-      } else {
-        // Webrtc call
-        endCall({chatId: chatData.chatId});
-      }
+    if (!chatData?.chatId) return;
+
+    // 1. Microphone mode on web: just go back, don't emit or stop streaming
+    if (isMicrophoneMode && isWebMicrophoneMode) {
+      navigation.goBack();
+      return;
     }
+
+    // 2. Conference call or microphone mode (not on web): stop streaming if mic, then emit end event
+    if (isConferenceCall || isMicrophoneMode) {
+      if (isMicrophoneMode) {
+        stopStreaming();
+      }
+      emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
+        ...(isConferenceCall ? {chatId: chatData.chatId} : {}),
+      });
+      return;
+    }
+
+    // 3. WebRTC call: use endCall mutation
+    endCall({chatId: chatData.chatId});
   };
 
   // Clear timeout on unmount
@@ -177,7 +180,7 @@ export const ListeningScreen = ({
   }, []);
 
   useHardwareBackPressHandler(() => {
-    if (isMicrophoneMode && !isWebMicrophoneMode) {
+    if (isMicrophoneMode) {
       setShowCallEndConfirmation(true);
       return true;
     }
@@ -371,9 +374,20 @@ export const ListeningScreen = ({
     };
   }, [getCounsellorChat, navigation]);
 
+  const callEndModalElement = (
+    <CallEndConfirmationModal
+      visible={showCallEndConfirmation}
+      onClose={() => setShowCallEndConfirmation(false)}
+      onConfirm={handleEndCall}
+      isMicrophoneMode={isMicrophoneMode}
+      isWebMicrophoneMode={isWebMicrophoneMode}
+    />
+  );
+
   if (isWebMicrophoneMode) {
     return (
       <View style={styles.micInDifferentPlatformContainer}>
+        {showCallEndConfirmation && callEndModalElement}
         <Text style={styles.micInDifferentPlatformTitle}>
           {t('ListeningScreen.microphoneModeInDifferentPlatformTitle')}
         </Text>
@@ -381,7 +395,7 @@ export const ListeningScreen = ({
           {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
         </Text>
         <TouchableOpacity
-          onPress={navigation.goBack}
+          onPress={() => setShowCallEndConfirmation(true)}
           style={styles.micInDifferentPlatformGoBackButton}
           activeOpacity={0.85}
           hitSlop={DEFAULT_HIT_SLOP}>
@@ -407,14 +421,7 @@ export const ListeningScreen = ({
 
   return (
     <View style={styles.container}>
-      {showCallEndConfirmation && (
-        <CallEndModal
-          showCallEndConfirmation={showCallEndConfirmation}
-          setShowCallEndConfirmation={setShowCallEndConfirmation}
-          handleEndCall={handleEndCall}
-          isMicrophoneMode={!!isMicrophoneMode}
-        />
-      )}
+      {showCallEndConfirmation && callEndModalElement}
       <StatusBar
         backgroundColor="transparent"
         translucent
