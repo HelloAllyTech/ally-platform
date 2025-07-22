@@ -47,6 +47,12 @@ class RoomUpdate(BaseModel):
     metadata: str = Field(..., description="New metadata for the room")
 
 
+class RoomCreate(BaseModel):
+    """Schema for creating a room."""
+    
+    script_type: str = Field(default="burnout", description="Type of script to use for the agent (burnout, anxiety, writing)")
+
+
 class RoomDelete(BaseModel):
     """Schema for deleting a room."""
     

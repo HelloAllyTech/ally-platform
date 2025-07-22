@@ -12,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from app.core.auth.auth_service import auth_service
 from app.core.livekit.room_service import room_service
 from app.core.livekit.token_service import token_service
-from app.schemas.room import RoomResponse, RoomUpdate, RoomCreationResponse, RoomListResponse
+from app.schemas.room import RoomResponse, RoomUpdate, RoomCreationResponse, RoomListResponse, RoomCreate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -20,29 +20,36 @@ logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=RoomCreationResponse, status_code=status.HTTP_201_CREATED)
 async def create_room(
+    room_data: RoomCreate,
     session_id: str = Depends(auth_service.get_current_session_id)
 ) -> RoomCreationResponse:
     """
     Create a new LiveKit room using the session ID from the JWT token.
     
     Args:
+        room_data: Room creation data including optional script_type.
         session_id: The session ID from the JWT token.
         
     Returns:
         RoomCreationResponse: The created room with room ID, participant ID, access token and creation time.
     """
     try:
+        # TODO: script_type is currently passed due to Livekit not returning metadata
         # Format room name and participant identity
-        room_id = f"room_{session_id}"
+        # Include script_type in the room name since metadata isn't being passed back
+        room_id = f"room_{room_data.script_type}_{session_id}"
         participant_id = f"user_{session_id}"
         
-        # Create metadata JSON with the session_id
-        metadata = json.dumps({"session_id": session_id})
+        # Create metadata JSON with the session_id and script_type
+        metadata = json.dumps({
+            "session_id": session_id,
+            "script_type": room_data.script_type
+        })
         
         # Create the room with the formatted room ID
         room = await room_service.create_room(
-            name=room_id,  # Use formatted room ID as name
-            metadata=metadata  # Store session_id in metadata
+            name=room_id,  # Use formatted room ID as name with script_type included
+            metadata=metadata  # Store session_id and script_type in metadata
         )
         
         # Generate access token for the participant
@@ -56,7 +63,7 @@ async def create_room(
         # This ensures we have the correct current time in ISO format
         created_at = datetime.utcfromtimestamp(room.creation_time).isoformat() + "Z"
         
-        logger.info(f"Room created: {room_id}, creation time: {created_at}")
+        logger.info(f"Room created: {room_id}, script_type: {room_data.script_type}, creation time: {created_at}")
         
         # Return response with room ID, participant ID, access token and creation time
         return RoomCreationResponse(

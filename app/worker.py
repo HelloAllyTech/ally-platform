@@ -7,17 +7,41 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+import json
+import logging
 
 from app.core.config import settings
-from app.utils.prompt import AI_AGENT_PROMPT
+from app.utils.prompt import PROMPT_TEMPLATES, AI_AGENT_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions=AI_AGENT_PROMPT)
+    def __init__(self, instructions: str = AI_AGENT_PROMPT) -> None:
+        super().__init__(instructions=instructions)
 
 
 async def entrypoint(ctx: agents.JobContext):
+    # Extract script_type from room name
+    script_type = "burnout"  # Default script type
+    
+    try:
+        # TODO: script_type is currently passed due to Livekit not returning metadata
+        # Simply get the second part of the room name (index 1)
+        room_name_parts = ctx.room.name.split('_')
+        if len(room_name_parts) > 1:
+            extracted_script_type = room_name_parts[1]
+            if extracted_script_type in PROMPT_TEMPLATES:
+                script_type = extracted_script_type
+                logger.info(f"Using script type from room name: {script_type}")
+            else:
+                logger.warning(f"Invalid script type in room name: {extracted_script_type}, using default: {script_type}")
+    except Exception as e:
+        logger.error(f"Error extracting script type: {str(e)}")
+    
+    # Get the appropriate prompt from the templates
+    selected_prompt = PROMPT_TEMPLATES.get(script_type, AI_AGENT_PROMPT)
+
     session = AgentSession(
         stt=deepgram.STT(model="nova-3", language="multi", api_key=settings.DEEPGRAM_API_KEY),
         llm=openai.LLM(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY),
@@ -29,7 +53,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     await session.start(
         room=ctx.room,
-        agent=Assistant(),
+        agent=Assistant(instructions=selected_prompt),
         room_input_options=RoomInputOptions(
             # LiveKit Cloud enhanced noise cancellation
             # - If self-hosting, omit this parameter
@@ -47,4 +71,4 @@ async def entrypoint(ctx: agents.JobContext):
 
 if __name__ == "__main__":
     agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint, api_key=settings.LIVEKIT_API_KEY,
-                                            api_secret=settings.LIVEKIT_API_SECRET, ws_url=settings.LIVEKIT_URL))
+                                           api_secret=settings.LIVEKIT_API_SECRET, ws_url=settings.LIVEKIT_URL))
