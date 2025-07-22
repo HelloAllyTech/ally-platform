@@ -12,6 +12,7 @@ import logging
 
 from app.core.config import settings
 from app.utils.prompt import PROMPT_TEMPLATES, AI_AGENT_PROMPT
+from app.core.scenario.scenario_types import ScenarioType
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class Assistant(Agent):
 
 async def entrypoint(ctx: agents.JobContext):
     # Extract script_type from room name
-    script_type = "burnout"  # Default script type
+    script_type = ScenarioType.HOPELESS_MALE  # Default script type
     
     try:
         # TODO: script_type is currently passed due to Livekit not returning metadata
@@ -31,10 +32,15 @@ async def entrypoint(ctx: agents.JobContext):
         room_name_parts = ctx.room.name.split('_')
         if len(room_name_parts) > 1:
             extracted_script_type = room_name_parts[1]
-            if extracted_script_type in PROMPT_TEMPLATES:
-                script_type = extracted_script_type
-                logger.info(f"Using script type from room name: {script_type}")
-            else:
+            # Check if the extracted value matches any ScenarioType enum value
+            try:
+                scenario_type = ScenarioType(extracted_script_type)
+                if scenario_type in PROMPT_TEMPLATES:
+                    script_type = scenario_type
+                    logger.info(f"Using script type from room name: {script_type}")
+                else:
+                    logger.warning(f"Script type not in PROMPT_TEMPLATES: {scenario_type}, using default: {script_type}")
+            except ValueError:
                 logger.warning(f"Invalid script type in room name: {extracted_script_type}, using default: {script_type}")
     except Exception as e:
         logger.error(f"Error extracting script type: {str(e)}")
@@ -63,10 +69,6 @@ async def entrypoint(ctx: agents.JobContext):
     )
 
     await ctx.connect()
-
-    await session.generate_reply(
-        instructions="Greet the user and offer your assistance."
-    )
 
 
 if __name__ == "__main__":
