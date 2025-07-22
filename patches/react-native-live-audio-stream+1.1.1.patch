@@ -17,18 +17,3 @@ index 20f454f..71ef72d 100644
 +        // Required for RN 0.65+ event emitter compatibility
 +    }
  }
-diff --git a/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m b/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
-index a6f2317..b5703d6 100644
---- a/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
-+++ b/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
-@@ -95,6 +95,10 @@ void HandleInputBuffer(void *inUserData,
-     return @[@"data"];
- }
- 
-+// Required for RN 0.65+ event emitter compatibility
-+RCT_EXPORT_METHOD(addListener:(NSString *)eventName) { }
-+RCT_EXPORT_METHOD(removeListeners:(double)count) { }
-+
- - (void)dealloc {
-     RCTLogInfo(@"[RNLiveAudioStream] dealloc");
-     AudioQueueDispose(_recordState.mQueue, true);
