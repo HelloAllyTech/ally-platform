@@ -2,6 +2,7 @@
   "Common": {
     "comingSoon": "Coming Soon",
     "ok": "OK",
+    "yes": "Yes",
     "cancel": "Cancel",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
@@ -48,7 +49,9 @@
     "connecting": "Connecting...",
     "microphoneModeInDifferentPlatformTitle": "Active Microphone Session on Another Platform",
     "microphoneModeInDifferentPlatformDescription": "You have an active microphone session on another platform. Please end the call there first, or continue using that session if you prefer.",
-    "microphoneModeGoBack": "Go back"
+    "microphoneModeGoBack": "Go back",
+    "exitSessionTitle": "Are you sure you want to exit?",
+    "exitSessionDescription": "You will leave the call. Do you want to continue?"
   },
   "SplashScreen": {
     "hey": "Hey,",
