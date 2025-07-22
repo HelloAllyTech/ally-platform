@@ -141,9 +141,9 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				D4D3906A6DB01E9FEB0A1145 /* [CP] Embed Pods Frameworks */,
 				280F9B5F220E2ACE9E4EE0B7 /* [CP] Copy Pods Resources */,
-				BDAEC9822E1D0F94008EFC84 /* ShellScript */,
 				C7766F762F12F58B0F96F707 /* [CP-User] [RNFB] Core Configuration */,
 				A7C464CADC5FB7FB5AE85F9F /* [CP-User] [RNFB] Crashlytics Configuration */,
+				BDAEC9822E1D0F94008EFC84 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -283,6 +283,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH) $(DWARF_DSYM_FOLDER_PATH)/$(DWARF_DSYM_FILE_NAME)",
 			);
 			outputFileListPaths = (
 			);
@@ -466,10 +467,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -538,10 +536,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
