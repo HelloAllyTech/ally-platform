@@ -46,6 +46,6 @@ export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
 const styles = StyleSheet.create({
   drawerContent: {
     backgroundColor: colors.white,
-    width: '75%',
+    width: '85%',
   },
 });
