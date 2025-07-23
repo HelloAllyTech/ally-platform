@@ -1,5 +1,12 @@
 import React from 'react';
-import {Image, ImageSourcePropType, Text, TouchableOpacity} from 'react-native';
+import {
+  Image,
+  ImageSourcePropType,
+  StyleProp,
+  Text,
+  TouchableOpacity,
+  ViewStyle,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
@@ -10,6 +17,7 @@ interface StartCallCardProps {
   header: string;
   subtitle: string;
   onPressCard: () => void;
+  customStyles?: StyleProp<ViewStyle>;
 }
 
 const StartCallCard: React.FC<StartCallCardProps> = ({
@@ -17,10 +25,11 @@ const StartCallCard: React.FC<StartCallCardProps> = ({
   header,
   subtitle,
   onPressCard,
+  customStyles,
 }) => {
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, customStyles]}
       onPress={onPressCard}
       activeOpacity={1}>
       <Text style={styles.header}>{header}</Text>

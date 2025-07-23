@@ -1,11 +1,23 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
-import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrowIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
+import {
+  AllyPlatforms,
+  DEFAULT_HIT_SLOP,
+  MICROPHONE_AUDIO_SAMPLE_RATE,
+} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -38,13 +50,9 @@ import {
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
 } from './audioUtils';
-import {
-  CallEndModal,
-  ControlButtonsSection,
-  NudgeSection,
-  Timer,
-} from './components';
+import {ControlButtonsSection, NudgeSection, Timer} from './components';
 import {AudioWaveform} from './components/AudioWaveform';
+import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
 import Search from './components/Search/Search';
 
@@ -79,7 +87,10 @@ export const ListeningScreen = ({
   const isConferenceCall = callProvider === ChatProvider.EXOTEL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCallPaused, setIsCallPaused] = useState(false);
+  const isWebMicrophoneMode =
+    callProvider === ChatProvider.MICROPHONE &&
+    chatData?.platform === AllyPlatforms.WEB;
+  const [isCallPaused, setIsCallPaused] = useState(isWebMicrophoneMode);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
@@ -136,20 +147,27 @@ export const ListeningScreen = ({
   }, [isMicrophoneMode, navigation]);
 
   const handleEndCall = () => {
-    if (chatData?.chatId) {
-      if (isConferenceCall || isMicrophoneMode) {
-        if (isMicrophoneMode) {
-          stopStreaming();
-        }
-        emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
-          ...(chatData?.chatId &&
-            isConferenceCall && {chatId: chatData.chatId}),
-        });
-      } else {
-        // Webrtc call
-        endCall({chatId: chatData.chatId});
-      }
+    if (!chatData?.chatId) return;
+
+    // 1. Microphone mode on web: just go back, don't emit or stop streaming
+    if (isMicrophoneMode && isWebMicrophoneMode) {
+      navigation.goBack();
+      return;
     }
+
+    // 2. Conference call or microphone mode (not on web): stop streaming if mic, then emit end event
+    if (isConferenceCall || isMicrophoneMode) {
+      if (isMicrophoneMode) {
+        stopStreaming();
+      }
+      emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
+        ...(isConferenceCall ? {chatId: chatData.chatId} : {}),
+      });
+      return;
+    }
+
+    // 3. WebRTC call: use endCall mutation
+    endCall({chatId: chatData.chatId});
   };
 
   // Clear timeout on unmount
@@ -243,20 +261,20 @@ export const ListeningScreen = ({
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
-      if (!isCallPausedRef.current) {
+      if (!isCallPausedRef.current && !isWebMicrophoneMode) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
           chatId: chatData?.chatId,
         });
       }
     },
-    [emitSocketEvent, chatData?.chatId],
+    [emitSocketEvent, chatData?.chatId, isWebMicrophoneMode],
   );
 
   const {startStreaming, stopStreaming, isPermissionGranted} =
     useLiveAudioStream({
       onAudioData: handleAudioData,
-      enableLiveAudio: isMicrophoneMode,
+      enableLiveAudio: isMicrophoneMode && !isWebMicrophoneMode,
     });
 
   const handleStartStreaming = useCallback(async () => {
@@ -276,7 +294,8 @@ export const ListeningScreen = ({
       isMicrophoneMode &&
       isPermissionGranted &&
       isMicrophoneModeSessionCreated &&
-      !isAudioChatEmitted
+      !isAudioChatEmitted &&
+      !isWebMicrophoneMode
     ) {
       emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
         isLinear16Encoded: true,
@@ -295,6 +314,7 @@ export const ListeningScreen = ({
     isPermissionGranted,
     handleStartStreaming,
     isMicrophoneModeSessionCreated,
+    isWebMicrophoneMode,
   ]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
@@ -330,9 +350,6 @@ export const ListeningScreen = ({
   );
 
   const playPauseButton = useMemo(() => {
-    if (isMicrophoneMode && chatData?.platform === AllyPlatforms.WEB) {
-      return null;
-    }
     return (
       <PlayPauseOverlay
         isPlaying={!isCallPaused}
@@ -340,13 +357,7 @@ export const ListeningScreen = ({
         isFocusMode={isFocusMode}
       />
     );
-  }, [
-    isMicrophoneMode,
-    chatData?.platform,
-    isCallPaused,
-    handlePlayPauseCallPress,
-    isFocusMode,
-  ]);
+  }, [isCallPaused, handlePlayPauseCallPress, isFocusMode]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -363,6 +374,40 @@ export const ListeningScreen = ({
     };
   }, [getCounsellorChat, navigation]);
 
+  const callEndModalElement = (
+    <CallEndConfirmationModal
+      visible={showCallEndConfirmation}
+      onClose={() => setShowCallEndConfirmation(false)}
+      onConfirm={handleEndCall}
+      isMicrophoneMode={isMicrophoneMode}
+      isWebMicrophoneMode={isWebMicrophoneMode}
+    />
+  );
+
+  if (isWebMicrophoneMode) {
+    return (
+      <View style={styles.micInDifferentPlatformContainer}>
+        {showCallEndConfirmation && callEndModalElement}
+        <Text style={styles.micInDifferentPlatformTitle}>
+          {t('ListeningScreen.microphoneModeInDifferentPlatformTitle')}
+        </Text>
+        <Text style={styles.micInDifferentPlatformDescription}>
+          {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setShowCallEndConfirmation(true)}
+          style={styles.micInDifferentPlatformGoBackButton}
+          activeOpacity={0.85}
+          hitSlop={DEFAULT_HIT_SLOP}>
+          <LeftArrowIcon color={colors.darkGray7} />
+          <Text style={styles.micInDifferentPlatformGoBackText}>
+            {t('ListeningScreen.microphoneModeGoBack')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!chatData?.chatId) {
     return (
       <View style={styles.loadingContainer}>
@@ -376,14 +421,7 @@ export const ListeningScreen = ({
 
   return (
     <View style={styles.container}>
-      {showCallEndConfirmation && (
-        <CallEndModal
-          showCallEndConfirmation={showCallEndConfirmation}
-          setShowCallEndConfirmation={setShowCallEndConfirmation}
-          handleEndCall={handleEndCall}
-          isMicrophoneMode={!!isMicrophoneMode}
-        />
-      )}
+      {showCallEndConfirmation && callEndModalElement}
       <StatusBar
         backgroundColor="transparent"
         translucent
@@ -438,7 +476,6 @@ export const ListeningScreen = ({
           onFocusModeButtonPress={toggleNudgeVisibility}
           isFocusMode={isFocusMode}
           onCallEndPress={() => setShowCallEndConfirmation(true)}
-          isCallEndDisabled={!chatData?.chatId}
         />
       </View>
     </View>
@@ -495,5 +532,41 @@ const styles = ScaledSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: '20@s',
     marginTop: '40@vs',
+  },
+  micInDifferentPlatformContainer: {
+    flex: 1,
+    backgroundColor: colors.darkGray7,
+    justifyContent: 'center',
+    paddingHorizontal: '30@s',
+    textAlign: 'center',
+  },
+  micInDifferentPlatformTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '18@ms',
+    color: colors.white,
+    textAlign: 'center',
+  },
+  micInDifferentPlatformDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    color: colors.white,
+    textAlign: 'center',
+    marginTop: '10@vs',
+  },
+  micInDifferentPlatformGoBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.white,
+    borderRadius: '32@s',
+    paddingVertical: '5@vs',
+    paddingLeft: '10@s',
+    paddingRight: '17@s',
+    marginTop: '40@vs',
+  },
+  micInDifferentPlatformGoBackText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.black,
+    fontSize: '16@ms',
   },
 });
