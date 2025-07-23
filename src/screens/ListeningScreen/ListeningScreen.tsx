@@ -13,11 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {
-  AllyPlatforms,
-  DEFAULT_HIT_SLOP,
-  MICROPHONE_AUDIO_SAMPLE_RATE,
-} from '@/constants/general';
+import {AllyPlatforms, DEFAULT_HIT_SLOP} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
@@ -46,6 +42,7 @@ import {logger} from '@/utils/logger';
 
 import {
   exotelAudioDataToAmplitudes,
+  getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
@@ -297,12 +294,10 @@ export const ListeningScreen = ({
       !isAudioChatEmitted &&
       !isWebMicrophoneMode
     ) {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
-        isLinear16Encoded: true,
-        platform: AllyPlatforms.MOBILE,
-        sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
-        ...(chatData?.chatId && {activeChatId: chatData.chatId}),
-      });
+      emitSocketEvent(
+        SocketEvent.START_AUDIO_CHAT,
+        getStartAudioChatPayload(chatData?.chatId),
+      );
       setIsAudioChatEmitted(true);
       handleStartStreaming();
     }
@@ -363,8 +358,20 @@ export const ListeningScreen = ({
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         getCounsellorChat().then(res => {
-          if (!res.data || res.data.length === 0) {
+          if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             navigation.navigate('Home');
+          } else {
+            if (
+              !Array.isArray(res.data) &&
+              res.data?.provider === ChatProvider.MICROPHONE &&
+              res.data?.platform === AllyPlatforms.MOBILE &&
+              res.data?.chatId
+            ) {
+              emitSocketEvent(
+                SocketEvent.START_AUDIO_CHAT,
+                getStartAudioChatPayload(chatData?.chatId),
+              );
+            }
           }
         });
       }
@@ -372,7 +379,7 @@ export const ListeningScreen = ({
     return () => {
       subscription.remove();
     };
-  }, [getCounsellorChat, navigation]);
+  }, [chatData?.chatId, emitSocketEvent, getCounsellorChat, navigation]);
 
   const callEndModalElement = (
     <CallEndConfirmationModal

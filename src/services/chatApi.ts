@@ -21,7 +21,7 @@ interface FeedbackInput {
 
 export const chatApi = api.injectEndpoints({
   endpoints: builder => ({
-    getCounsellorChat: builder.query<Chat[], void>({
+    getCounsellorChat: builder.query<[] | Chat, void>({
       query: () => '/chats/counsellor-chat',
     }),
     endCall: builder.mutation<EndCallResponse, {chatId: number}>({
