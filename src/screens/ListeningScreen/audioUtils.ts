@@ -1,13 +1,18 @@
 import {toByteArray} from 'base64-js';
 
-import {isIOS, SCREEN_WIDTH} from '@/constants/general';
+import {
+  AllyPlatforms,
+  isIOS,
+  MICROPHONE_AUDIO_SAMPLE_RATE,
+  SCREEN_WIDTH,
+} from '@/constants/general';
 
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
 export const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
 
 // Decodes base64 to Uint8Array
-function base64ToUint8Array(base64: string): Uint8Array {
+export const base64ToUint8Array = (base64: string): Uint8Array => {
   const binary = globalThis.atob
     ? globalThis.atob(base64)
     : Buffer.from(base64, 'base64').toString('binary');
@@ -17,7 +22,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
+};
 
 // Maps Exotel audio data to normalized amplitudes for the waveform
 export const exotelAudioDataToAmplitudes = (audioData: string): number[] => {
@@ -111,3 +116,10 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
 
   return amplitudes;
 };
+
+export const getStartAudioChatPayload = (activeChatId?: number) => ({
+  isLinear16Encoded: true,
+  platform: AllyPlatforms.MOBILE,
+  sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
+  ...(activeChatId && {activeChatId}),
+});
