@@ -48,9 +48,9 @@ SCENARIOS = [
     ),
     Scenario(
         unique_id=ScenarioType.SUICIDAL_TEEN,
-        title="Suicidal Teen, 17",
-        short_description="A 17-year-old teen expresses suicidal thoughts.",
-        long_description="He feels misunderstood at home, isolated at school, and says life \"feels pointless.\" He hints at not wanting to wake up. Your task is to assess his safety non-judgmentally, build rapport, and identify immediate steps to ensure safety while offering hope and emotional connection.",
+        title="A young girl experiencing suicidal thoughts",
+        short_description="A 17 year old teen expresses suicidal thoughts.",
+        long_description="She feels misunderstood at home, isolated at school, and says life \"feels pointless.\" She hints at not wanting to wake up. Your goal is to assess her safety non-judgmentally, build rapport, and identify immediate steps to ensure safety while offering hope and emotional connection.",
         cover_image=None
     )
 ]
