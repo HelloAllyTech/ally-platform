@@ -20,7 +20,7 @@ SCENARIOS = [
     ),
     Scenario(
         unique_id=ScenarioType.BURNOUT_TECH_PROFESSIONAL,
-        title="Burned-Out Tech Professional, 29",
+        title="A techie’s burnout",
         short_description="A 29-year-old tech worker is showing signs of burnout.",
         long_description="He works long hours under constant pressure and feels emotionally drained. He mentions irritability, sleep problems, and questioning the purpose of his work. Your aim is to validate his exhaustion, explore boundaries and recovery, and help him reconnect with his values and needs.",
         cover_image=None
@@ -41,8 +41,8 @@ SCENARIOS = [
     ),
     Scenario(
         unique_id=ScenarioType.GRIEVING_RETIRED_MALE,
-        title="Grieving Retired Male, 68",
-        short_description="A recently retired 68-year-old man is grieving his spouse.",
+        title="Retired old man grieving after losing partner",
+        short_description="A recently retired 68 year old man is grieving after losing his partner",
         long_description="After losing his partner of 40 years, he feels purposeless and alone. Retirement has further amplified his sense of isolation. He finds it hard to talk to family. Your goal is to hold space for his grief while gently exploring ways to reconnect and find meaning again.",
         cover_image=None
     ),
