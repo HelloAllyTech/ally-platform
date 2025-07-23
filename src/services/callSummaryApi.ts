@@ -1,4 +1,5 @@
 import {setSummaryData} from '@/store/slices/summarySlice';
+import {ChatProvider} from '@/types/message';
 
 import {api} from './api';
 
@@ -9,6 +10,7 @@ interface CallInfo {
   counselorTalkingTime: number;
   clientTalkingPercentage: string;
   counselorTalkingPercentage: string;
+  provider: ChatProvider;
 }
 
 export interface Language {
