@@ -8,6 +8,7 @@ import {
 } from '@/services/callTranscriptApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryData} from '@/store/slices/summarySlice';
+import {ChatProvider} from '@/types/message';
 
 const LIMIT = 20;
 
@@ -30,8 +31,12 @@ export const useCallTranscriptDetails = (chatId: number) => {
       id: chatId,
       limit: LIMIT,
       sortOrder: 'ASC',
+      sortBy:
+        summaryData?.details?.callInfo?.provider === ChatProvider.WEBRTC
+          ? 'createdAt'
+          : 'startSeconds',
     }),
-    [chatId],
+    [chatId, summaryData?.details?.callInfo?.provider],
   );
 
   // Process data only if it's for a new offset
