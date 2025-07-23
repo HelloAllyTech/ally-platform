@@ -1,4 +1,4 @@
-package com.ally
+package com.helloally.app
 
 import android.app.Application
 import com.facebook.react.PackageList
