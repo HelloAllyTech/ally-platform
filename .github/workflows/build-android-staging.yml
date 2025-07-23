@@ -1,9 +1,6 @@
 name: 'Build Android app - Staging'
 
 on:
-  push:
-    branches:
-      - staging
   workflow_dispatch:
 
 permissions:
