@@ -363,7 +363,7 @@ export const ListeningScreen = ({
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         getCounsellorChat().then(res => {
-          if (!res.data) {
+          if (!res.data || res.data.length === 0) {
             navigation.navigate('Home');
           }
         });
