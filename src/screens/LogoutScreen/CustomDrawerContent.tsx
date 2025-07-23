@@ -26,9 +26,14 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
             {name}
           </Text>
-          <Text style={styles.phone} numberOfLines={2} ellipsizeMode="tail">
-            {email}
-          </Text>
+          {!!email && (
+            <Text
+              style={[styles.email, email?.length > 30 && styles.emailSmall]}
+              numberOfLines={1}
+              ellipsizeMode="tail">
+              {email}
+            </Text>
+          )}
         </View>
       </View>
       <TouchableOpacity
@@ -72,11 +77,14 @@ const styles = ScaledSheet.create({
     lineHeight: '24@mvs',
     color: colors.darkGray2,
   },
-  phone: {
+  email: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '12@ms',
     lineHeight: '16@mvs',
     color: colors.darkCharcoal,
+  },
+  emailSmall: {
+    fontSize: '9@ms',
   },
   logoutContainer: {
     flexDirection: 'row',
