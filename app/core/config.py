@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     """Application settings."""
 
     model_config = SettingsConfigDict(env_file=[".env", "./.env", "../.env"])
+
+    # Log settings
+    LOG_LEVEL: str = "INFO"
+    SLACK_ALERTS_ENABLED: bool = False
+    SLACK_ALERTS_API_TOKEN: str = Field(...)
+    SLACK_ALERTS_CHANNEL_ID: str = Field(...)
+    SLACK_ALERTS_LOG_LEVEL: str = "WARNING"
     
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Ally Learn Core"

@@ -13,9 +13,10 @@ from app.core.auth.auth_service import auth_service
 from app.core.livekit.room_service import room_service
 from app.core.livekit.token_service import token_service
 from app.schemas.room import RoomResponse, RoomUpdate, RoomCreationResponse, RoomListResponse, RoomCreate
+from app.utils.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @router.post("", response_model=RoomCreationResponse, status_code=status.HTTP_201_CREATED)

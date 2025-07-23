@@ -30,4 +30,4 @@ EXPOSE 8000
 # 2. Starts the worker in the background (&)
 # 3. 'wait -n' waits for any background process to exit, ensuring the container stays alive
 #    as long as at least one of the main processes (uvicorn or worker) is running.
-CMD ["bash", "-c", "poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 & poetry run python -m app.worker start & wait -n"]
+CMD ["bash", "-c", "poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 & poetry run python -m app.worker start  & wait -n"]

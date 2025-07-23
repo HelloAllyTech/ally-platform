@@ -13,9 +13,9 @@ from livekit.api import (
 )
 
 from app.core.livekit.livekit_client import livekit_client
-import logging
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RoomService:

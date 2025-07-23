@@ -1,13 +1,13 @@
 """
 Service for managing scenarios.
 """
-import logging
+from app.utils.logger import get_logger
 from typing import List
 
 from app.core.scenario.scenario_types import ScenarioType
 from app.schemas.scenario import Scenario
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Hardcoded scenarios with the required fields
 SCENARIOS = [

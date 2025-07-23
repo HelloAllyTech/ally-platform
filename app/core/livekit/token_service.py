@@ -2,14 +2,14 @@
 LiveKit token service.
 """
 from datetime import timedelta
-import logging
 from typing import Optional
 
 from livekit import api
 
 from app.core.config import settings
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TokenService:

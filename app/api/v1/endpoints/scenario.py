@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.auth.auth_service import auth_service
 from app.core.scenario.scenario_service import scenario_service
 from app.schemas.scenario import Scenario, ScenarioList
+from app.utils.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @router.get("", response_model=ScenarioList)

@@ -7,14 +7,14 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-import json
 import logging
 
 from app.core.config import settings
 from app.utils.prompt import PROMPT_TEMPLATES, AI_AGENT_PROMPT
 from app.core.scenario.scenario_types import ScenarioType
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Map scenario types to appropriate TTS voices
 SCENARIO_VOICE_MAPPING = {
