@@ -130,7 +130,7 @@ export const SearchScreen: React.FC = () => {
             Keyboard.dismiss();
             setFocused(false);
           }}>
-          <View>{renderSearchInput()}</View>
+          {renderSearchInput()}
         </TouchableWithoutFeedback>
         {tabsMeta.length > 0 && resources.length > 0 && (
           <CustomTabs
@@ -163,8 +163,8 @@ export const SearchScreen: React.FC = () => {
     );
   };
 
-  // const isShowSuggestions =
-  //   showSearchResults && showSuggestions && focused && searchText.trim() !== '';
+  const isShowSuggestions =
+    showSuggestions && focused && searchText.trim() !== '';
 
   const renderSearchInput = () => {
     return (
@@ -177,7 +177,7 @@ export const SearchScreen: React.FC = () => {
         searchText={searchText}
         setSearchText={onChangeText}
         suggestions={filteredSuggestions}
-        showSuggestions={false}
+        showSuggestions={isShowSuggestions}
         onSuggestionPress={handleSuggestionPress}
         onSubmitEditing={triggerSearchOnSubmit}
       />
@@ -200,7 +200,7 @@ export const SearchScreen: React.FC = () => {
           <Animated.View style={searchAnimStyle}>
             {renderSearchInput()}
           </Animated.View>
-          {!focused && (
+          {(!focused || searchText.trim() === '') && (
             <>
               <View style={styles.tryContainer}>
                 <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
