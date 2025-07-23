@@ -369,7 +369,7 @@ export const ListeningScreen = ({
             ) {
               emitSocketEvent(
                 SocketEvent.START_AUDIO_CHAT,
-                getStartAudioChatPayload(chatData?.chatId),
+                getStartAudioChatPayload(res.data.chatId),
               );
             }
           }
