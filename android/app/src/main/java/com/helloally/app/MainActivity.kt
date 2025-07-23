@@ -1,4 +1,4 @@
-package com.ally
+package com.helloally.app
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
