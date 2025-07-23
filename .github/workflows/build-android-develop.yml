@@ -2,16 +2,6 @@ name: 'Build Android app - Develop'
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - development
-          - staging
-          - production
 
 permissions:
   id-token: write
@@ -20,7 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'development' }}
+    environment: development
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -76,11 +66,16 @@ jobs:
           ./gradlew clean
           ./gradlew assembleRelease --stacktrace
 
+      - name: Rename APK with build number, date, and env
+        run: |
+          DATETIME=$(date +'%Y%m%d-%H%M')
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}-${DATETIME}.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-develop-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: app-develop-release-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
       - name: Send Slack notification
@@ -89,7 +84,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: Android Develop Build Successful!
+          text: 'Android Development Build #${{ github.run_number }} Successful!'
           attachments: |
             [
               {

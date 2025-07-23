@@ -62,6 +62,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       <View
         style={[
           styles.searchBar,
+          showSuggestions && suggestions.length > 0 && styles.noBottomRadius,
           isFocused && !showSearchResults && styles.cardContainer,
           customStyles,
         ]}>
@@ -85,8 +86,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         />
       </View>
       {showSuggestions && suggestions.length > 0 && (
-        <>
-          <View style={styles.divider} />
+        <View style={styles.suggestionsContainer}>
           <View style={styles.suggestionsWrapper}>
             {suggestions.map(suggestion => (
               <TouchableOpacity
@@ -99,7 +99,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
               </TouchableOpacity>
             ))}
           </View>
-        </>
+        </View>
       )}
     </View>
   );
@@ -112,13 +112,17 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       backgroundColor: isDark ? colors.darkGray5 : colors.white,
       borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
       borderWidth: 0.5,
-      borderRadius: '60@ms',
+      borderRadius: '20@ms',
       paddingVertical: '8@mvs',
       paddingHorizontal: '12@ms',
       flexDirection: 'row',
       alignItems: 'center',
       marginVertical: '10@mvs',
       maxHeight: '40@ms',
+    },
+    noBottomRadius: {
+      borderBottomLeftRadius: '0@ms',
+      borderBottomRightRadius: '0@ms',
     },
     searchIconContainer: {
       width: '18@ms',
@@ -131,14 +135,16 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       fontSize: '14@ms',
       marginLeft: '8@ms',
       flex: 1,
+      height: '44@ms',
       color: isDark ? colors.white : colors.darkSlate,
       padding: 0,
     },
     suggestionRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: '12@vs',
-      paddingHorizontal: '20@s',
+      paddingVertical: '10@vs',
+      paddingHorizontal: '16@s',
+      width: '99%',
       backgroundColor: colors.white,
     },
     suggestionText: {
@@ -168,6 +174,19 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
       borderRadius: '12@ms',
       padding: '1@s',
+    },
+    suggestionsContainer: {
+      position: 'absolute',
+      backgroundColor: isDark ? colors.darkGray5 : colors.white,
+      overflow: 'hidden',
+      top: '47@mvs',
+      left: '0@s',
+      right: '0@s',
+      zIndex: 1000,
+      borderBottomLeftRadius: '12@ms',
+      borderBottomRightRadius: '12@ms',
+      borderWidth: 0.5,
+      borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
     },
   });
 };
