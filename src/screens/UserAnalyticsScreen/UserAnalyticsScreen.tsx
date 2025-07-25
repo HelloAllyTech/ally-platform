@@ -7,6 +7,7 @@ import {DateSelector} from '@/components/DateSelector/DateSelector';
 import {LoadingSkeleton} from '@/components/LoadingSkeleton/LoadingSkeleton';
 import {CALENDAR_MODES} from '@/constants/analytics';
 import {isIOS} from '@/constants/general';
+import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useGetCounselorStatsQuery} from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
@@ -81,6 +82,7 @@ const useAnalyticsDateRange = (selectedTab: string) => {
 };
 
 export const UserAnalyticsScreen: React.FC = () => {
+  useTabBackToHomeHandler();
   const {t} = useTranslate();
   const [selectedTab, setSelectedTab] = useState('D');
   const {dateRange, setDateRange} = useAnalyticsDateRange(selectedTab);

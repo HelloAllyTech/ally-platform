@@ -22,6 +22,7 @@ import CustomTabs from '@/components/CustomTabs/CustomTabs';
 import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
+import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -58,6 +59,8 @@ export const SearchScreen: React.FC = () => {
     showEmptyState,
   } = useSearch();
   const {t} = useTranslate();
+
+  useTabBackToHomeHandler();
 
   const anim = useSharedValue(0);
 
