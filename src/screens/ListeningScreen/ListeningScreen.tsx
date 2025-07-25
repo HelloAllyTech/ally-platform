@@ -81,7 +81,7 @@ export const ListeningScreen = ({
     [chatData?.startedAt],
   );
   const callProvider = chatData?.provider;
-  const isConferenceCall = callProvider === ChatProvider.EXOTEL;
+  const isConferenceCall = callProvider === ChatProvider.EXOTEL_CONFERENCE_CALL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isWebMicrophoneMode =
@@ -158,7 +158,9 @@ export const ListeningScreen = ({
         stopStreaming();
       }
       emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
-        ...(isConferenceCall ? {chatId: chatData.chatId} : {}),
+        ...(isConferenceCall || isMicrophoneMode
+          ? {chatId: chatData.chatId}
+          : {}),
       });
       return;
     }
