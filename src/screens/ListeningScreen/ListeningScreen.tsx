@@ -15,6 +15,7 @@ import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
 import {AllyPlatforms, DEFAULT_HIT_SLOP} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
@@ -38,7 +39,6 @@ import {
   SocketMessage,
 } from '@/types/message';
 import {Maybe} from '@/utils/common';
-import {logger} from '@/utils/logger';
 
 import {
   exotelAudioDataToAmplitudes,
@@ -144,29 +144,19 @@ export const ListeningScreen = ({
   }, [isMicrophoneMode, navigation]);
 
   const handleEndCall = () => {
-    if (!chatData?.chatId) return;
+    const {chatId} = chatData || {};
 
-    // 1. Microphone mode on web: just go back, don't emit or stop streaming
-    if (isMicrophoneMode && isWebMicrophoneMode) {
-      navigation.goBack();
-      return;
-    }
+    if (!chatId) return;
 
-    // 2. Conference call or microphone mode (not on web): stop streaming if mic, then emit end event
-    if (isConferenceCall || isMicrophoneMode) {
-      if (isMicrophoneMode) {
-        stopStreaming();
+    if (isMicrophoneMode) {
+      if (isWebMicrophoneMode) {
+        navigation.goBack();
+        return;
       }
-      emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
-        ...(isConferenceCall || isMicrophoneMode
-          ? {chatId: chatData.chatId}
-          : {}),
-      });
-      return;
+      stopStreaming();
     }
 
-    // 3. WebRTC call: use endCall mutation
-    endCall({chatId: chatData.chatId});
+    endCall({chatId});
   };
 
   // Clear timeout on unmount
@@ -195,6 +185,8 @@ export const ListeningScreen = ({
     return () => clearInterval(interval);
   }, []);
 
+  const {checkCounselorChat} = useCounselorChat();
+
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.SESSION_CREATED]: () => {
@@ -218,6 +210,9 @@ export const ListeningScreen = ({
             setIsLoading(false);
           }, 500);
         }
+      },
+      [SocketEvent.USER_JOINED]: async () => {
+        await checkCounselorChat();
       },
       [SocketEvent.AUDIO_STREAM]: (data: SocketMessage) => {
         if (!isAudioActive) {
@@ -246,7 +241,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall],
+    [onCallEndSuccess, isAudioActive, isConferenceCall, checkCounselorChat],
   );
 
   const {userData} = useUser();
@@ -257,17 +252,23 @@ export const ListeningScreen = ({
     eventCallbacks: socketEventCallbacks,
   });
 
+  const chatIdRef = useRef(chatData?.chatId);
+
+  useEffect(() => {
+    chatIdRef.current = chatData?.chatId;
+  }, [chatData?.chatId]);
+
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (!isCallPausedRef.current && !isWebMicrophoneMode) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
-          chatId: chatData?.chatId,
+          chatId: chatIdRef.current,
         });
       }
     },
-    [emitSocketEvent, chatData?.chatId, isWebMicrophoneMode],
+    [emitSocketEvent, isWebMicrophoneMode],
   );
 
   const {startStreaming, stopStreaming, isPermissionGranted} =
@@ -276,43 +277,32 @@ export const ListeningScreen = ({
       enableLiveAudio: isMicrophoneMode && !isWebMicrophoneMode,
     });
 
-  const handleStartStreaming = useCallback(async () => {
-    try {
-      if (!isPermissionGranted) {
-        logger.warn('Cannot start streaming: permission not granted');
-        return;
-      }
-      await startStreaming();
-    } catch (error) {
-      logger.error(`Error starting stream: ${error}`);
-    }
-  }, [startStreaming, isPermissionGranted]);
-
-  useEffect(() => {
-    if (
+  const isAudioSessionReady = useMemo(() => {
+    return (
       isMicrophoneMode &&
       isPermissionGranted &&
       isMicrophoneModeSessionCreated &&
-      !isAudioChatEmitted &&
       !isWebMicrophoneMode
-    ) {
-      emitSocketEvent(
-        SocketEvent.START_AUDIO_CHAT,
-        getStartAudioChatPayload(chatData?.chatId),
-      );
-      setIsAudioChatEmitted(true);
-      handleStartStreaming();
-    }
+    );
   }, [
-    chatData?.chatId,
-    isAudioChatEmitted,
-    emitSocketEvent,
     isMicrophoneMode,
     isPermissionGranted,
-    handleStartStreaming,
     isMicrophoneModeSessionCreated,
     isWebMicrophoneMode,
   ]);
+
+  useEffect(() => {
+    if (isAudioSessionReady && chatData?.chatId) {
+      startStreaming();
+    }
+  }, [isAudioSessionReady, chatData?.chatId, startStreaming]);
+
+  useEffect(() => {
+    if (isAudioSessionReady && !isAudioChatEmitted) {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, getStartAudioChatPayload());
+      setIsAudioChatEmitted(true);
+    }
+  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
@@ -327,6 +317,7 @@ export const ListeningScreen = ({
       });
     }
   };
+
   const toggleNudgeVisibility = () => {
     setIsFocusMode(prev => !prev);
   };
@@ -362,18 +353,6 @@ export const ListeningScreen = ({
         getCounsellorChat().then(res => {
           if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             navigation.navigate('Home');
-          } else {
-            if (
-              !Array.isArray(res.data) &&
-              res.data?.provider === ChatProvider.MICROPHONE &&
-              res.data?.platform === AllyPlatforms.MOBILE &&
-              res.data?.chatId
-            ) {
-              emitSocketEvent(
-                SocketEvent.START_AUDIO_CHAT,
-                getStartAudioChatPayload(res.data.chatId),
-              );
-            }
           }
         });
       }
