@@ -10,7 +10,8 @@
     "test": "jest --passWithNoTests",
     "lint-staged": "lint-staged",
     "prepare": "husky install",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

@@ -1,5 +1,4 @@
-import React from 'react';
-import {RefreshControl, ScrollView, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {BarsIcon, InfoIcon} from '@/assets/icons';
@@ -8,41 +7,28 @@ import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-interface SummaryGenerationProgressProps {
-  refreshing: boolean;
-  onRefresh: () => void;
-}
-
-export const SummaryGenerationProgress: React.FC<
-  SummaryGenerationProgressProps
-> = ({refreshing, onRefresh}) => {
+export const SummaryGenerationProgress = () => {
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.height100}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }>
-      <View style={[styles.container, !currentChat && styles.paddingTop40]}>
-        <View style={styles.infoRow}>
-          <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
-          <Text style={styles.infoText}>
-            {t('CallSummaryProgress.reloadPage')}
-          </Text>
-        </View>
-        <View style={styles.iconWrapper}>
-          <BarsIcon width={moderateScale(89)} height={moderateScale(66)} />
-        </View>
-        <Text style={styles.title}>
-          {t('CallSummaryProgress.generatingSessionSummary')}
-        </Text>
-        <Text style={styles.subtitle}>
-          {t(`CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`)}
+    <View style={styles.container}>
+      <View style={styles.infoRow}>
+        <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
+        <Text style={styles.infoText}>
+          {t('CallSummaryProgress.reloadPage')}
         </Text>
       </View>
-    </ScrollView>
+      <View style={styles.iconWrapper}>
+        <BarsIcon width={moderateScale(89)} height={moderateScale(66)} />
+      </View>
+      <Text style={styles.title}>
+        {t('CallSummaryProgress.generatingSessionSummary')}
+      </Text>
+      <Text style={styles.subtitle}>
+        {t(`CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`)}
+      </Text>
+    </View>
   );
 };
 
@@ -51,13 +37,8 @@ const styles = ScaledSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: '32@ms',
-    paddingBottom: '400@ms',
+    paddingTop: '20@ms',
     backgroundColor: colors.white,
-    height: '100%',
-  },
-  paddingTop40: {
-    paddingTop: '70@ms',
   },
   infoRow: {
     flexDirection: 'row',
@@ -94,9 +75,9 @@ const styles = ScaledSheet.create({
     opacity: 0.7,
     textAlign: 'center',
     marginHorizontal: '24@ms',
+    paddingBottom: '36@ms',
     marginBottom: '16@ms',
-  },
-  height100: {
-    height: '100%',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.lightGray4,
   },
 });
