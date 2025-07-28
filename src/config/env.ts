@@ -8,6 +8,7 @@ export interface Env {
   THIRD_PARTY_CALL_NUMBER: string;
   WEBRTC_SOCKET_PATH: string;
   MICROPHONE_SOCKET_PATH: string;
+  CLOUD_TELEPHONY_PATH: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -36,5 +37,9 @@ export const env: Env = {
   MICROPHONE_SOCKET_PATH: assertEnvVar(
     Config.MICROPHONE_SOCKET_PATH,
     'MICROPHONE_SOCKET_PATH',
+  ),
+  CLOUD_TELEPHONY_PATH: assertEnvVar(
+    Config.CLOUD_TELEPHONY_PATH,
+    'CLOUD_TELEPHONY_PATH',
   ),
 };
