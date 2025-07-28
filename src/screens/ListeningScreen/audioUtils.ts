@@ -117,9 +117,8 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
   return amplitudes;
 };
 
-export const getStartAudioChatPayload = (activeChatId?: number) => ({
+export const getStartAudioChatPayload = () => ({
   isLinear16Encoded: true,
   platform: AllyPlatforms.MOBILE,
   sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
-  ...(activeChatId && {activeChatId}),
 });
