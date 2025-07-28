@@ -80,7 +80,7 @@ const NavigationContent = ({
   });
 
   useSocketConnection({
-    path: env.MICROPHONE_SOCKET_PATH,
+    path: env.CLOUD_TELEPHONY_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
   });
