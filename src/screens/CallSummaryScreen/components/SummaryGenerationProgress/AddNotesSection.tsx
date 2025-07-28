@@ -2,7 +2,7 @@ import {useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, InfoIcon} from '@/assets/icons';
+import {ArrowDown, InfoIcon, PageIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -31,6 +31,7 @@ const AddNotesSection = ({
             <ArrowDown
               style={[styles.chevron, isExpanded && styles.chevronExpanded]}
             />
+            <PageIcon />
             <Text style={styles.title}>Add notes (Optional)</Text>
           </View>
         </TouchableOpacity>
@@ -83,6 +84,8 @@ const styles = ScaledSheet.create({
     width: '20@ms',
     height: '20@ms',
     transform: [{rotate: '-90deg'}],
+    marginRight: '10@ms',
+    marginLeft: '4@ms',
   },
   chevronExpanded: {
     transform: [{rotate: '0deg'}],

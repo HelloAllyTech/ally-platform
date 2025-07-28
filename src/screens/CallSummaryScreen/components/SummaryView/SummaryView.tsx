@@ -94,12 +94,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         onScroll={handleScroll}
         scrollEventThrottle={8}
         onLayout={handleLayout}
-        contentContainerStyle={[
-          !isSummaryAvailable && styles.height100,
-          (!isFullyExpanded || !showAnimation) && isSummaryAvailable
-            ? styles.contentContainer
-            : {},
-        ]}>
+        contentContainerStyle={styles.contentContainer}>
         {children}
       </ScrollView>
     </Animated.View>

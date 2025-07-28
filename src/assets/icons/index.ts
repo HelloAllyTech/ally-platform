@@ -43,6 +43,7 @@ import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
+import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
 import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
@@ -134,4 +135,5 @@ export {
   CallIcon,
   TranscriptIcon,
   EmptyTranscriptIcon,
+  PageIcon,
 };
