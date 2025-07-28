@@ -7,26 +7,38 @@ import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-export const SummaryGenerationProgress = () => {
+export const SummaryGenerationProgress = ({
+  isSummaryGenerated,
+}: {
+  isSummaryGenerated: boolean;
+}) => {
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
 
   return (
     <View style={styles.container}>
-      <View style={styles.infoRow}>
-        <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
-        <Text style={styles.infoText}>
-          {t('CallSummaryProgress.reloadPage')}
-        </Text>
-      </View>
+      {!isSummaryGenerated && (
+        <View style={styles.infoRow}>
+          <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
+          <Text style={styles.infoText}>
+            {t('CallSummaryProgress.reloadPage')}
+          </Text>
+        </View>
+      )}
       <View style={styles.iconWrapper}>
         <BarsIcon width={moderateScale(89)} height={moderateScale(66)} />
       </View>
       <Text style={styles.title}>
-        {t('CallSummaryProgress.generatingSessionSummary')}
+        {isSummaryGenerated
+          ? t('CallSummaryProgress.generatedSessionSummary')
+          : t('CallSummaryProgress.generatingSessionSummary')}
       </Text>
       <Text style={styles.subtitle}>
-        {t(`CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`)}
+        {isSummaryGenerated
+          ? t(`CallSummaryProgress.generatedSubtitle`)
+          : t(
+              `CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`,
+            )}
       </Text>
     </View>
   );
@@ -37,14 +49,12 @@ const styles = ScaledSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: '20@ms',
+    paddingTop: '28@ms',
     backgroundColor: colors.white,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: '33@vs',
-    marginTop: '8@ms',
   },
   infoText: {
     marginLeft: '8@ms',
@@ -59,6 +69,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: '32@ms',
+    marginTop: '33@vs',
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,

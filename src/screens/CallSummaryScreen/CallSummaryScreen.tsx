@@ -161,7 +161,9 @@ export const CallSummaryScreen: React.FC<
                 onRefresh={handleRefresh}
               />
             }>
-            <SummaryGenerationProgress />
+            <SummaryGenerationProgress
+              isSummaryGenerated={isSummaryAvailable}
+            />
             <View>
               <AddNotesSection
                 onNoteChange={handleNoteChange}

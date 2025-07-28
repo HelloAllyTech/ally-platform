@@ -44,7 +44,7 @@ export const styles = ScaledSheet.create({
     elevation: 5,
   },
   contentContainer: {
-    paddingTop: '80@ms',
+    flex: 1,
   },
   paddingTop: {
     paddingTop: '80@ms',
