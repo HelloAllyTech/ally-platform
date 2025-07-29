@@ -59,7 +59,7 @@ export const chatApi = api.injectEndpoints({
       {chatId: number; notes: UpdateNotesInput}
     >({
       query: ({chatId, notes}) => ({
-        url: `/api/v1/chats/${chatId}/notes`,
+        url: `/chats/${chatId}/notes`,
         method: 'POST',
         body: notes,
       }),
