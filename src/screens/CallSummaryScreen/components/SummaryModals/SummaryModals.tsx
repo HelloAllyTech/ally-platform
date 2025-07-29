@@ -2,9 +2,7 @@ import React from 'react';
 import {Modal, Text, TouchableWithoutFeedback, View} from 'react-native';
 
 import {styles} from '../../styles';
-import CustomMenuModal from '../CustomMenuModal/CustomMenuModal';
-import {DeleteRenameModal} from '../DeleteRenameModal/DeleteRenameModal';
-import SummaryDropdown from '../Header/SummaryDropdown';
+import {CustomMenuModal, DeleteRenameModal, SummaryDropdown} from '../index';
 
 type ModalType = 'rename' | 'delete' | null;
 
