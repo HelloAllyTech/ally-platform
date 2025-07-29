@@ -16,7 +16,7 @@ interface CustomMenuModalProps {
   setModalType: (type: 'rename' | 'delete' | null) => void;
 }
 
-const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
+export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   visible,
   onClose,
   onExport,
@@ -169,5 +169,3 @@ const styles = ScaledSheet.create({
     marginHorizontal: ms(10),
   },
 });
-
-export default CustomMenuModal;
