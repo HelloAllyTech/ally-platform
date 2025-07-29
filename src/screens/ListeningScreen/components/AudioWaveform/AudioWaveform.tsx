@@ -43,7 +43,7 @@ interface WaveformProps {
   isFocusMode: boolean;
 }
 
-export const AudioWaveform: React.FC<WaveformProps> = ({
+const AudioWaveformComponent: React.FC<WaveformProps> = ({
   amplitudes,
   isFocusMode = true,
 }) => {
@@ -114,6 +114,8 @@ export const AudioWaveform: React.FC<WaveformProps> = ({
     </MaskedView>
   );
 };
+
+export const AudioWaveform = React.memo(AudioWaveformComponent);
 
 const styles = ScaledSheet.create({
   container: {

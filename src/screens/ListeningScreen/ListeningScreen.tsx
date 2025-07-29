@@ -48,7 +48,7 @@ import {
   webRTCAudioDataToAmplitudes,
 } from './audioUtils';
 import {ControlButtonsSection, NudgeSection, Timer} from './components';
-import {AudioWaveform} from './components/AudioWaveform';
+import {AudioWaveformContainer} from './components/AudioWaveformContainer/AudioWaveformContainer';
 import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
 import Search from './components/Search/Search';
@@ -98,11 +98,10 @@ export const ListeningScreen = ({
     useState(true);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
-  const [amplitudes, setAmplitudes] = useState<number[] | null>(
+  const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-  const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
@@ -176,14 +175,6 @@ export const ListeningScreen = ({
     navigation.goBack();
     return true;
   });
-
-  // Throttle waveform updates to every 120ms
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAmplitudes(latestAmplitudesRef.current);
-    }, 120);
-    return () => clearInterval(interval);
-  }, []);
 
   const {checkCounselorChat} = useCounselorChat();
 
@@ -422,8 +413,9 @@ export const ListeningScreen = ({
           </Text>
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
-            <AudioWaveform
-              amplitudes={isCallPaused ? null : amplitudes}
+            <AudioWaveformContainer
+              latestAmplitudesRef={latestAmplitudesRef}
+              isCallPaused={isCallPaused}
               isFocusMode
             />
           </View>
@@ -440,8 +432,9 @@ export const ListeningScreen = ({
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveform
-                amplitudes={isCallPaused ? null : amplitudes}
+              <AudioWaveformContainer
+                latestAmplitudesRef={latestAmplitudesRef}
+                isCallPaused={isCallPaused}
                 isFocusMode={false}
               />
             </View>
