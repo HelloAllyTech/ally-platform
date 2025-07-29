@@ -22,7 +22,7 @@ type Message = {
   client: boolean;
 };
 
-const CallTranscript = ({chatId}: {chatId: number}) => {
+export const CallTranscript = ({chatId}: {chatId: number}) => {
   const {formattedMessages, isLoading, listRef, handleEndReached} =
     useCallTranscriptDetails(chatId);
 
@@ -77,8 +77,6 @@ const CallTranscript = ({chatId}: {chatId: number}) => {
     />
   );
 };
-
-export default CallTranscript;
 
 const styles = ScaledSheet.create({
   emptyContainer: {
