@@ -116,7 +116,7 @@ export const ListeningScreen = ({
   const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
   const onCallEndSuccess = useCallback(() => {
-    navigation.navigate('Breathing');
+    navigation.replace('Breathing');
   }, [navigation]);
 
   const getSocketPath = useCallback(() => {
