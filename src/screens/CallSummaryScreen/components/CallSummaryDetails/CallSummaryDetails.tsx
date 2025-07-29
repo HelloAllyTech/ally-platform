@@ -164,6 +164,7 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     paddingBottom: '40@ms',
+    paddingTop: '85@ms',
   },
   card: {
     paddingHorizontal: '16@s',
