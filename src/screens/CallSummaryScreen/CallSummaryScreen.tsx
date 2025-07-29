@@ -177,8 +177,7 @@ export const CallSummaryScreen: React.FC<
         </>
       );
     }
-
-    return <CallTranscript chatId={chatId || 0} />;
+    return null;
   };
 
   return (
@@ -229,6 +228,8 @@ export const CallSummaryScreen: React.FC<
         scrollViewRef={scrollViewRef}>
         {renderContent()}
       </SummaryView>
+
+      {!showSummary && <CallTranscript chatId={chatId || 0} />}
 
       {isSummaryAvailable && showScrollToBottom && showSummary && (
         <TouchableOpacity

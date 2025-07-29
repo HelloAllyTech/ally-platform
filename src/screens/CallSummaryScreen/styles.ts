@@ -78,7 +78,7 @@ export const styles = ScaledSheet.create({
   viewSummaryButtonText: {
     color: colors.white,
     ...fontFamily.ROBOTO.REGULAR,
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: '16@ms',
   },
   viewCallLogsButton: {
@@ -91,7 +91,7 @@ export const styles = ScaledSheet.create({
   viewCallLogsButtonText: {
     color: colors.darkGray10,
     ...fontFamily.ROBOTO.REGULAR,
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: '16@ms',
   },
   infoPopupContainer: {
