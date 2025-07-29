@@ -6,7 +6,7 @@ import {ArrowDown, InfoIcon, PageIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-const AddNotesSection = ({
+export const AddNotesSection = ({
   onPressInfo,
   onNoteChange,
 }: {
@@ -128,5 +128,3 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@ms',
   },
 });
-
-export default AddNotesSection;
