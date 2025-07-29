@@ -67,7 +67,7 @@ export const CallSummaryScreen: React.FC<
     handleScroll,
     handleRefresh,
     handleNoteChange,
-  } = useSummaryState(chatId);
+  } = useSummaryState(chatId, callId);
 
   const {
     handleSummaryNameChange,

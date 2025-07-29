@@ -9,7 +9,10 @@ import {useDebounce} from './useDebounce';
 
 type ModalType = 'rename' | 'delete' | null;
 
-export const useSummaryState = (chatId: number | undefined) => {
+export const useSummaryState = (
+  chatId: number | undefined,
+  callId: number | undefined,
+) => {
   const dispatch = useAppDispatch();
   const [fetchCallSummary, {isLoading, data: summaryData}] =
     useLazyGetCallSummaryQuery();
@@ -18,7 +21,7 @@ export const useSummaryState = (chatId: number | undefined) => {
   const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [canShowSummary, setCanShowSummary] = useState(Boolean(chatId));
+  const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [showAnimation, setShowAnimation] = useState(!chatId);
