@@ -85,6 +85,12 @@ const NavigationContent = ({
     eventCallbacks: socketEventCallbacks,
   });
 
+  useSocketConnection({
+    path: env.MICROPHONE_SOCKET_PATH,
+    userId: userData?.id,
+    eventCallbacks: socketEventCallbacks,
+  });
+
   return (
     <Stack.Navigator
       initialRouteName="Splash"

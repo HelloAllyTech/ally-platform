@@ -1,19 +1,11 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
-import {
-  ActivityIndicator,
-  AppState,
-  StatusBar,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms, DEFAULT_HIT_SLOP} from '@/constants/general';
+import {AllyPlatforms} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useDebounce} from '@/hooks/useDebounce';
@@ -334,9 +326,15 @@ export const ListeningScreen = ({
         isPlaying={!isCallPaused}
         onPress={handlePlayPauseCallPress}
         isFocusMode={isFocusMode}
+        isDisabled={isWebMicrophoneMode}
       />
     );
-  }, [isCallPaused, handlePlayPauseCallPress, isFocusMode]);
+  }, [
+    isCallPaused,
+    handlePlayPauseCallPress,
+    isFocusMode,
+    isWebMicrophoneMode,
+  ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -362,30 +360,6 @@ export const ListeningScreen = ({
       isWebMicrophoneMode={isWebMicrophoneMode}
     />
   );
-
-  if (isWebMicrophoneMode) {
-    return (
-      <View style={styles.micInDifferentPlatformContainer}>
-        {showCallEndConfirmation && callEndModalElement}
-        <Text style={styles.micInDifferentPlatformTitle}>
-          {t('ListeningScreen.microphoneModeInDifferentPlatformTitle')}
-        </Text>
-        <Text style={styles.micInDifferentPlatformDescription}>
-          {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setShowCallEndConfirmation(true)}
-          style={styles.micInDifferentPlatformGoBackButton}
-          activeOpacity={0.85}
-          hitSlop={DEFAULT_HIT_SLOP}>
-          <LeftArrowIcon color={colors.darkGray7} />
-          <Text style={styles.micInDifferentPlatformGoBackText}>
-            {t('ListeningScreen.microphoneModeGoBack')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   if (!chatData?.chatId) {
     return (
