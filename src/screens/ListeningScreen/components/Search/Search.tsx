@@ -1,4 +1,4 @@
-import {useMemo} from 'react';
+import {useMemo, useRef} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,6 +24,8 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
 const Search = () => {
+  const flatListRef = useRef<FlatList>(null);
+
   const {
     searchText,
     showSearchResults,
@@ -47,7 +49,7 @@ const Search = () => {
     showEmptyState,
     selectedCategory,
     handleEndReached,
-  } = useSearch();
+  } = useSearch(flatListRef);
 
   const {t} = useTranslate();
   const {tabBody: tabBodyStyle, tabBodyContent: tabBodyContentStyle} = useMemo(
@@ -99,6 +101,7 @@ const Search = () => {
           <ActivityIndicator style={styles.activityIndicator} />
         ) : resources.length > 0 ? (
           <FlatList
+            ref={flatListRef}
             data={resources}
             renderItem={renderItem}
             keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
