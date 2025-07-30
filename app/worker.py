@@ -1,5 +1,5 @@
 from livekit import agents
-from livekit.agents import AgentSession, Agent, RoomInputOptions
+from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
 from livekit.plugins import (
     openai,
     deepgram,
@@ -7,7 +7,6 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-import logging
 
 from app.core.config import settings
 from app.utils.prompt import PROMPT_TEMPLATES, AI_AGENT_PROMPT
@@ -38,7 +37,7 @@ class Assistant(Agent):
 async def entrypoint(ctx: agents.JobContext):
     # Extract script_type from room name
     script_type = ScenarioType.HOPELESS_MALE  # Default script type
-    
+
     try:
         # TODO: script_type is currently passed due to Livekit not returning metadata
         # Simply get the second part of the room name (index 1)
@@ -57,10 +56,10 @@ async def entrypoint(ctx: agents.JobContext):
                 logger.warning(f"Invalid script type in room name: {extracted_script_type}, using default: {script_type}")
     except Exception as e:
         logger.error(f"Error extracting script type: {str(e)}")
-    
+
     # Get the appropriate prompt from the templates
     selected_prompt = PROMPT_TEMPLATES.get(script_type, AI_AGENT_PROMPT)
-    
+
     # Get the appropriate voice for the scenario
     voice_model = SCENARIO_VOICE_MAPPING.get(script_type, DEFAULT_VOICE)
     logger.info(f"Using voice model for scenario {script_type}: {voice_model}")
@@ -70,7 +69,7 @@ async def entrypoint(ctx: agents.JobContext):
         llm=openai.LLM(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY),
         tts=deepgram.TTS(model=voice_model, encoding="linear16", sample_rate=24000,
                          api_key=settings.DEEPGRAM_API_KEY),
-        vad=silero.VAD.load(),
+        vad = (ctx.proc.userdata["vad"]),
         turn_detection=MultilingualModel(),
     )
 
@@ -88,6 +87,10 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
 
+def prewarm(proc: JobProcess):
+    proc.userdata["vad"] = silero.VAD.load(activation_threshold=0.7)
+
+
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint, api_key=settings.LIVEKIT_API_KEY,
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint,prewarm_fnc=prewarm,num_idle_processes=1,api_key=settings.LIVEKIT_API_KEY,
                                            api_secret=settings.LIVEKIT_API_SECRET, ws_url=settings.LIVEKIT_URL))
