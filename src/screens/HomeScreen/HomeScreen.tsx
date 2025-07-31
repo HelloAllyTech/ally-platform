@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect} from 'react';
 import {
+  ActivityIndicator, // <-- Add this import
   Alert,
   BackHandler,
   Linking,
@@ -110,8 +111,11 @@ export const HomeScreen: React.FC = () => {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           bounces={false}>
-          {/* If no listening options, show only the message */}
-          {!visibleChatTypes?.length ? (
+          {isLoadingChatTypes ? (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="large" />
+            </View>
+          ) : !visibleChatTypes?.length ? (
             <FeatureNotAvailable
               description={t('HomeScreen.noAccessToCallFeatures')}
               containerStyle={styles.noAccessToCallFeaturesContainer}
@@ -233,5 +237,10 @@ const styles = ScaledSheet.create({
   },
   noAccessToCallFeaturesContainer: {
     paddingHorizontal: '5@s',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
