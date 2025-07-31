@@ -184,7 +184,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       position: 'absolute',
       backgroundColor: isDark ? colors.darkGray5 : colors.white,
       overflow: 'hidden',
-      top: '47@mvs',
+      top: '46@mvs',
       left: '0@s',
       right: '0@s',
       zIndex: 1000,

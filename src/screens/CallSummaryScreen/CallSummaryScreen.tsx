@@ -81,6 +81,7 @@ export const CallSummaryScreen: React.FC<
     hideToast,
     toast,
     summaryName,
+    setSummaryName,
     onHeaderPress,
     isSummaryDropdownVisible,
     hideHeaderDropdown,
@@ -194,7 +195,7 @@ export const CallSummaryScreen: React.FC<
         handleDelete={handleDelete}
         handleBlur={handleBlur}
         editedName={summaryName}
-        setEditedName={handleSummaryNameChange}
+        setEditedName={setSummaryName}
         isMenuVisible={isMenuVisible}
         hideMenu={hideMenu}
         handleExport={handleExport}
