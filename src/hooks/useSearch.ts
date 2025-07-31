@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Keyboard} from 'react-native';
+import {FlatList, Keyboard} from 'react-native';
 
 import {PAGE_SIZE, trySuggestions} from '@/screens/SearchScreen/searchConfig';
 import {ResourceArticle} from '@/screens/SearchScreen/types';
 import {useLazyGetSearchResultsQuery} from '@/services/searchApi';
 import {logger} from '@/utils/logger';
 
-export const useSearch = () => {
+export const useSearch = (flatListRef?: React.RefObject<FlatList | null>) => {
   const [searchText, setSearchText] = useState('');
   const [lastSearchedText, setLastSearchedText] = useState('');
   const [focused, setFocused] = useState(false);
@@ -44,6 +44,8 @@ export const useSearch = () => {
         filters = {category};
       }
 
+      flatListRef?.current?.scrollToOffset({offset: 0, animated: true});
+
       try {
         const response = await searchDocuments({
           query,
@@ -66,7 +68,7 @@ export const useSearch = () => {
         logger.error(`Error fetching search results: ${error}`);
       }
     },
-    [searchDocuments],
+    [searchDocuments, flatListRef],
   );
 
   // Category change handler
