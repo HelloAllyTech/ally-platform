@@ -139,11 +139,7 @@ export const ListeningScreen = ({
 
     if (!chatId) return;
 
-    if (isMicrophoneMode) {
-      if (isWebMicrophoneMode) {
-        navigation.goBack();
-        return;
-      }
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
       stopStreaming();
     }
 

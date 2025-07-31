@@ -126,7 +126,8 @@
       "ok": "OK",
       "confirm": "Confirm",
       "rename": "Rename",
-      "endSession": "End Session"
+      "endSession": "End Session",
+      "notesAutoSaveInfo": "Your notes are auto-saved and will appear under 'Additional Notes' after the summary and highlights are generated"
     }
   },
   "CallTranscript": {

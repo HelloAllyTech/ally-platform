@@ -205,6 +205,7 @@ export const CallSummaryScreen: React.FC<
         setShowSummary={setShowSummary}
         showInfoModal={showInfoModal}
         setShowInfoModal={setShowInfoModal}
+        isSummaryAvailable={isSummaryAvailable}
       />
 
       <Header
