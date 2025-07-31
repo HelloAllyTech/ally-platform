@@ -1,11 +1,4 @@
-import {useState} from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscriptIcon} from '@/assets/icons';
@@ -25,9 +18,6 @@ type Message = {
 export const CallTranscript = ({chatId}: {chatId: number}) => {
   const {formattedMessages, isLoading, listRef, handleEndReached} =
     useCallTranscriptDetails(chatId);
-
-  const [isContentShort, setIsContentShort] = useState(false);
-  const {height: screenHeight} = useWindowDimensions();
 
   const {t} = useTranslate();
 
@@ -59,18 +49,12 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
   return (
     <FlatList
       style={styles.container}
-      contentContainerStyle={[
-        styles.contentContainer,
-        isContentShort && styles.reducedTopPadding,
-      ]}
+      contentContainerStyle={styles.contentContainer}
       ref={listRef}
       data={formattedMessages as Message[]}
       keyExtractor={item => item.id.toString()}
       renderItem={renderItem}
       ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
-      onContentSizeChange={(w, h) => {
-        setIsContentShort(h < screenHeight);
-      }}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.1}
       ListEmptyComponent={renderEmptyComponent}
@@ -125,10 +109,6 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: '90@mvs',
     paddingBottom: '48@mvs',
-  },
-  reducedTopPadding: {
-    paddingTop: '0@mvs',
   },
 });
