@@ -14,6 +14,7 @@ interface CustomMenuModalProps {
   onClose: () => void;
   onExport: () => void;
   setModalType: (type: 'rename' | 'delete' | null) => void;
+  showExportOption?: boolean;
 }
 
 export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
@@ -21,6 +22,7 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   onClose,
   onExport,
   setModalType,
+  showExportOption = false,
 }) => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
@@ -92,12 +94,14 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           <EditIcon width={16} height={16} />
         </TouchableOpacity>
         <View style={styles.menuDivider} />
-        <TouchableOpacity style={styles.menuItem} onPress={onExport}>
-          <Text style={styles.menuText}>
-            {t('CallSummary.customMenu.export')}
-          </Text>
-          <ExportIcon width={16} height={16} />
-        </TouchableOpacity>
+        {showExportOption && (
+          <TouchableOpacity style={styles.menuItem} onPress={onExport}>
+            <Text style={styles.menuText}>
+              {t('CallSummary.customMenu.export')}
+            </Text>
+            <ExportIcon width={16} height={16} />
+          </TouchableOpacity>
+        )}
         {/* <View style={styles.menuDivider} /> */}
         {/* Hiding delete option for now */}
         {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>

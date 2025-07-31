@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {Modal, Text, TouchableWithoutFeedback, View} from 'react-native';
 
 import {styles} from '../../styles';
@@ -23,6 +24,7 @@ interface SummaryModalsProps {
   setShowSummary: (show: boolean) => void;
   showInfoModal: boolean;
   setShowInfoModal: (show: boolean) => void;
+  isSummaryAvailable?: boolean;
 }
 
 export const SummaryModals: React.FC<SummaryModalsProps> = ({
@@ -42,7 +44,9 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   setShowSummary,
   showInfoModal,
   setShowInfoModal,
+  isSummaryAvailable = false,
 }) => {
+  const {t} = useTranslation();
   return (
     <>
       <DeleteRenameModal
@@ -65,6 +69,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         onClose={hideMenu}
         onExport={handleExport}
         setModalType={setActiveModal}
+        showExportOption={isSummaryAvailable}
       />
       <Modal
         visible={showInfoModal}
@@ -76,8 +81,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
             <TouchableWithoutFeedback>
               <View style={styles.infoPopupContainer}>
                 <Text style={styles.infoPopupText}>
-                  Your notes are auto-saved and will appear under 'Additional
-                  Notes' after the summary and highlights are generated
+                  {t('CallSummary.info.notesAutoSaveInfo')}
                 </Text>
               </View>
             </TouchableWithoutFeedback>
