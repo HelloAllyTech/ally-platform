@@ -86,7 +86,13 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         />
       </View>
       {showSuggestions && suggestions.length > 0 && (
-        <View style={styles.suggestionsContainer}>
+        <View
+          style={[
+            styles.suggestionsContainer,
+            isFocused &&
+              !showSearchResults &&
+              styles.suggestionsContainerOffset,
+          ]}>
           <View style={styles.suggestionsWrapper}>
             {suggestions.map(suggestion => (
               <TouchableOpacity
@@ -156,7 +162,7 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
     cardContainer: {
       backgroundColor: isDark ? colors.darkGray5 : colors.white,
       borderRadius: '12@ms',
-      marginVertical: '0@mvs',
+      marginTop: '4@mvs',
       borderWidth: 0,
     },
     divider: {
@@ -173,7 +179,6 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       borderWidth: 0.5,
       borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
       borderRadius: '12@ms',
-      padding: '1@s',
     },
     suggestionsContainer: {
       position: 'absolute',
@@ -187,6 +192,11 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       borderBottomRightRadius: '12@ms',
       borderWidth: 0.5,
       borderColor: isDark ? colors.darkGray11 : colors.lightGray4,
+    },
+    suggestionsContainerOffset: {
+      left: -0.5,
+      right: -0.5,
+      top: '44@mvs',
     },
   });
 };

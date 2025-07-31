@@ -192,6 +192,7 @@ const styles = ScaledSheet.create({
   input: {
     marginVertical: '0@mvs',
     borderRadius: '8@ms',
+    marginTop: '0@mvs',
   },
   suggestionsScrollView: {
     maxHeight: '500@vs',

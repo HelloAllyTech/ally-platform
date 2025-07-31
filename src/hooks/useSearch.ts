@@ -143,10 +143,8 @@ export const useSearch = (flatListRef?: React.RefObject<FlatList | null>) => {
   const debounceSearch = useCallback(() => {
     if (searchText.trim() === '') {
       setFilteredSuggestions([]);
-      setShowSuggestions(false);
       return;
     }
-    setShowSuggestions(true);
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
       const filtered = trySuggestions.filter(s =>
@@ -178,8 +176,7 @@ export const useSearch = (flatListRef?: React.RefObject<FlatList | null>) => {
 
   const onChangeText = (text: string) => {
     setSearchText(text);
-    if (text.trim() !== '') setShowSuggestions(true);
-    else setShowSuggestions(false);
+    setShowSuggestions(true);
   };
 
   const onPressSuggestion = useCallback(

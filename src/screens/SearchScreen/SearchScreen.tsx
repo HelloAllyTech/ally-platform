@@ -97,7 +97,7 @@ export const SearchScreen: React.FC = () => {
 
   const onFocus = () => {
     onSearchFocus();
-    if (searchText.trim() !== '') setShowSuggestions(true);
+    setShowSuggestions(true);
   };
 
   const renderItem = ({item}: {item: ResourceArticle}) => {
@@ -169,8 +169,7 @@ export const SearchScreen: React.FC = () => {
     );
   };
 
-  const isShowSuggestions =
-    showSuggestions && focused && searchText.trim() !== '';
+  const isShowSuggestions = showSuggestions && focused;
 
   const renderSearchInput = () => {
     return (
@@ -206,7 +205,7 @@ export const SearchScreen: React.FC = () => {
           <Animated.View style={searchAnimStyle}>
             {renderSearchInput()}
           </Animated.View>
-          {(!focused || searchText.trim() === '') && (
+          {!focused && (
             <>
               <View style={styles.tryContainer}>
                 <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
