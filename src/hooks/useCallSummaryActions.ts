@@ -7,7 +7,6 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {Chat} from '@/types/message';
 import {saveFile} from '@/utils/fileOperations';
 import {logger} from '@/utils/logger';
 
@@ -23,12 +22,12 @@ interface ToastState {
 
 const useCallSummaryActions = ({
   chatId,
-  currentChat,
   name,
+  isCallLogSummaryFlow,
 }: {
   chatId: number;
-  currentChat: Chat;
   name: string;
+  isCallLogSummaryFlow: boolean;
 }) => {
   const [updateCallInfo] = useUpdateCallInfoMutation();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
@@ -165,16 +164,16 @@ const useCallSummaryActions = ({
 
   // Go back to home screen
   const handleGoBack = useCallback(() => {
-    if (currentChat) {
+    if (isCallLogSummaryFlow) {
+      navigation.goBack();
+    } else {
       navigation.reset({
         index: 0,
         routes: [{name: 'Home'}],
       });
       dispatch(clearCurrentChat());
-    } else {
-      navigation.goBack();
     }
-  }, [currentChat, navigation, dispatch]);
+  }, [isCallLogSummaryFlow, navigation, dispatch]);
 
   // Update call summary
   const onUpdateSummary = useCallback(

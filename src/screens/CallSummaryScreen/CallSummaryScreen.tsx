@@ -86,8 +86,8 @@ export const CallSummaryScreen: React.FC<
     hideHeaderDropdown,
   } = useCallSummaryActions({
     chatId: chatId || 0,
-    currentChat: currentChat!,
     name: callInfo.summaryName || '',
+    isCallLogSummaryFlow: Boolean(callId),
   });
 
   useHardwareBackPressHandler(() => {
