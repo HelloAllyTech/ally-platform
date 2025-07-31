@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -33,6 +33,8 @@ import {trySuggestions} from './searchConfig';
 import {ResourceArticle} from './types';
 
 export const SearchScreen: React.FC = () => {
+  const flatListRef = useRef<FlatList>(null);
+
   const {
     searchText,
     filteredSuggestions,
@@ -57,7 +59,7 @@ export const SearchScreen: React.FC = () => {
     showInitialLoader,
     showFooterLoader,
     showEmptyState,
-  } = useSearch();
+  } = useSearch(flatListRef);
   const {t} = useTranslate();
 
   useTabBackToHomeHandler();
@@ -146,6 +148,7 @@ export const SearchScreen: React.FC = () => {
           <ActivityIndicator style={styles.footerActivityIndicator} />
         ) : resources.length > 0 ? (
           <FlatList
+            ref={flatListRef}
             data={resources}
             renderItem={renderItem}
             keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
