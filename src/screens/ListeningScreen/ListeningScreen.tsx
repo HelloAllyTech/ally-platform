@@ -335,6 +335,11 @@ export const ListeningScreen = ({
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
+        // Skip chat validation in microphone mode without permission to prevent navigation to Home
+        // after returning from permission dialog (chat session isn't ready yet)
+        if (isMicrophoneMode && !isWebMicrophoneMode && !isPermissionGranted) {
+          return;
+        }
         getCounsellorChat().then(res => {
           if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             navigation.navigate('Home');
@@ -345,7 +350,15 @@ export const ListeningScreen = ({
     return () => {
       subscription.remove();
     };
-  }, [chatData?.chatId, emitSocketEvent, getCounsellorChat, navigation]);
+  }, [
+    chatData?.chatId,
+    emitSocketEvent,
+    getCounsellorChat,
+    isMicrophoneMode,
+    isPermissionGranted,
+    isWebMicrophoneMode,
+    navigation,
+  ]);
 
   const callEndModalElement = (
     <CallEndConfirmationModal
