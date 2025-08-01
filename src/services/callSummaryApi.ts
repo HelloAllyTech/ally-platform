@@ -11,6 +11,7 @@ interface CallInfo {
   clientTalkingPercentage: string;
   counselorTalkingPercentage: string;
   provider: ChatProvider;
+  notes: string | null;
 }
 
 export interface Language {
@@ -101,6 +102,7 @@ export interface SummaryDetails {
   emotionalStateChange: string | null;
   therapeuticInterventions: string | null;
   callQuality: number | null;
+  additionalNotes: string | null;
 }
 
 interface CallDetails {

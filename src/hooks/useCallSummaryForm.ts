@@ -38,12 +38,15 @@ export const useCallSummaryForm = () => {
 
   useEffect(() => {
     if (summary) {
-      const transformedData = transformSummaryToFormData(summary);
+      const transformedData = transformSummaryToFormData(
+        summary,
+        summaryData?.details?.callInfo,
+      );
       dispatch(setFormData(transformedData));
       // Store the original form data for comparison
       originalFormDataRef.current = transformedData;
     }
-  }, [dispatch, summary]);
+  }, [dispatch, summary, summaryData?.details?.callInfo]);
 
   const handleFieldChange =
     (field: SummaryFieldKey) => (value: string | null) => {

@@ -17,8 +17,10 @@ import useCallSummaryActions from '@/hooks/useCallSummaryActions';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useSummaryState} from '@/hooks/useSummaryState';
+import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
-import {useAppSelector} from '@/store/hooks';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 
@@ -36,6 +38,7 @@ import {styles} from './styles';
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
 > = ({route}) => {
+  const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const currentChat = useAppSelector(state => state.chat.currentChat);
@@ -50,6 +53,7 @@ export const CallSummaryScreen: React.FC<
 
   const {
     isLoading,
+    summaryData,
     isFullyExpanded,
     showSummary,
     setShowSummary,
@@ -68,6 +72,8 @@ export const CallSummaryScreen: React.FC<
     handleRefresh,
     handleNoteChange,
   } = useSummaryState(chatId, callId);
+
+  const dispatch = useAppDispatch();
 
   const {
     handleSummaryNameChange,
@@ -107,6 +113,7 @@ export const CallSummaryScreen: React.FC<
   };
 
   const onViewCallLogs = () => {
+    dispatch(clearCurrentChat());
     navigation.reset({
       index: 1,
       routes: [{name: 'Home'}, {name: 'CallLog'}],
@@ -118,7 +125,7 @@ export const CallSummaryScreen: React.FC<
       <View style={styles.summaryButtonsContainer}>
         {isSummaryAvailable && (
           <PrimaryButton
-            label="View Summary"
+            label={t('CallSummary.viewSummary')}
             onPress={() => {
               setCanShowSummary(true);
             }}
@@ -127,7 +134,7 @@ export const CallSummaryScreen: React.FC<
           />
         )}
         <PrimaryButton
-          label="View Call logs"
+          label={t('CallLogs.viewCallLogs')}
           onPress={onViewCallLogs}
           customContainerStyle={styles.viewCallLogsButton}
           customTextStyle={styles.viewCallLogsButtonText}
@@ -167,6 +174,7 @@ export const CallSummaryScreen: React.FC<
             />
             <View>
               <AddNotesSection
+                savedNotes={summaryData?.details?.callInfo?.notes || ''}
                 onNoteChange={handleNoteChange}
                 onPressInfo={() => {
                   setShowInfoModal(true);

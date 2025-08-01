@@ -4,7 +4,12 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components';
-import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
+import {
+  ALWAYS_VISIBLE_SECTIONS,
+  SECTION_LIST,
+  SectionKey,
+  summaryFields,
+} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import useTranslate from '@/hooks/useTranslate';
 import {useAppSelector} from '@/store/hooks';
@@ -96,16 +101,17 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 
   const renderSection = useCallback(
     (sectionConfig: SectionItem, index: number) => {
-      const hasVisibleFields = visibleFields?.some(
-        field =>
-          summaryFields.find(summaryField => summaryField.key === field)
-            ?.sectionKey === sectionConfig.key,
-      );
+      if (!ALWAYS_VISIBLE_SECTIONS.includes(sectionConfig.key)) {
+        const hasVisibleFields = visibleFields?.some(
+          field =>
+            summaryFields.find(summaryField => summaryField.key === field)
+              ?.sectionKey === sectionConfig.key,
+        );
 
-      if (!hasVisibleFields) {
-        return null;
+        if (!hasVisibleFields) {
+          return null;
+        }
       }
-
       const Icon = sectionConfig.icon;
 
       return (
