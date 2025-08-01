@@ -105,6 +105,7 @@
       "delete": "Delete",
       "deleteConfirmation": "Are you sure you want to delete this summary? this action can't be undone"
     },
+    "viewSummary": "View Summary",
     "info": {
       "storagePermissionDenied": "Storage permission denied",
       "fileExportedSuccess": "File exported successfully",
@@ -144,7 +145,8 @@
       "placeholder": "Search"
     },
     "noCallLogs": "No call records found",
-    "noCallLogsDescription": "Your recent calls and insights \n will be listed here."
+    "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
+    "viewCallLogs": "View Call logs  ddd"
   },
   "BreathingScreen": {
     "header": {

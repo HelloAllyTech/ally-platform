@@ -34,18 +34,20 @@ export const ListeningTalkingDistribution: React.FC<Props> = ({
         ) : (
           <>
             {listeningPercent > 0 && (
-              <View style={[styles.barListening, {flex: listeningPercent}]}>
+              <>
+                <View style={[styles.barListening, {flex: listeningPercent}]} />
                 <Text style={styles.barText}>
                   {listeningPercent.toFixed(2)}%
                 </Text>
-              </View>
+              </>
             )}
             {talkingPercent > 0 && (
-              <View style={[styles.barTalking, {flex: talkingPercent}]}>
+              <>
+                <View style={[styles.barTalking, {flex: talkingPercent}]} />
                 <Text style={styles.barTextDark}>
                   {talkingPercent.toFixed(2)}%
                 </Text>
-              </View>
+              </>
             )}
             {listeningPercent === 0 && talkingPercent === 0 && (
               <View style={styles.barNoData}>
@@ -107,25 +109,35 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightBlue3,
     justifyContent: 'center',
     alignItems: 'flex-start',
-    paddingLeft: '12@s',
+    paddingLeft: '8@s',
   },
   barTalking: {
     height: '36@s',
     backgroundColor: colors.lightBlue4,
     justifyContent: 'center',
     alignItems: 'flex-end',
-    paddingRight: '12@s',
+    paddingRight: '8@s',
   },
   barText: {
+    position: 'absolute',
+    top: '0@mvs',
+    left: '8@mvs',
+    bottom: '0@mvs',
+    zIndex: 1,
     color: colors.black,
-    fontSize: '16@ms',
-    lineHeight: '32@mvs',
+    fontSize: '14@ms',
+    lineHeight: '36@mvs',
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
   },
   barTextDark: {
+    position: 'absolute',
+    top: '0@mvs',
+    right: '8@mvs',
+    bottom: '0@mvs',
+    zIndex: 1,
     color: colors.white,
-    fontSize: '16@ms',
-    lineHeight: '32@mvs',
+    fontSize: '14@ms',
+    lineHeight: '36@mvs',
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
   },
   legendRow: {
