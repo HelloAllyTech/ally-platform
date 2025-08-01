@@ -132,7 +132,7 @@ export const CallLogScreen: React.FC = () => {
    * when fetching more data
    */
   const renderFooter = () => {
-    if (!isFetching) return null;
+    if (!isFetching || allLogs?.length === 0) return null;
     return (
       <ActivityIndicator
         size="small"
