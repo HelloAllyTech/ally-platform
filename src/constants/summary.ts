@@ -9,6 +9,7 @@ import {
   KeyConcernIcon,
   MagnifyEyeIcon,
   NewsStandIcon,
+  NotesIcon,
   PrescriptionsIcon,
   SessionSummaryIcon,
   SmileIcon,
@@ -36,6 +37,7 @@ export enum SectionKey {
   PlanForNextCall = 'planForNextCall',
   Tags = 'tags',
   Metrics = 'metrics',
+  AdditionalNotes = 'additionalNotes',
 }
 
 // Field names as constants to prevent typos (keys are identical to UI field labels)
@@ -99,6 +101,9 @@ export const SUMMARY_FIELDS = {
   LISTENING_RATIO: 'listeningShare',
   EMOTIONAL_LIFT: 'emotionalLift',
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked',
+
+  // Additional Notes
+  ADDITIONAL_NOTES: 'additionalNotes',
 } as const;
 
 // Derive the type from the object values
@@ -226,6 +231,13 @@ export const SECTION_LIST: SectionItem[] = [
     key: SectionKey.Metrics,
     label: 'Metrics',
     icon: DatabaseIcon,
+    canEdit: false,
+    canEnhance: false,
+  },
+  {
+    key: SectionKey.AdditionalNotes,
+    label: 'Additional Notes',
+    icon: NotesIcon,
     canEdit: false,
     canEnhance: false,
   },
@@ -449,6 +461,15 @@ export const summaryFields: SummaryField[] = [
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
   },
+
+  // Additional Notes section
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.ADDITIONAL_NOTES,
+    label: 'Additional Notes',
+    sectionKey: SectionKey.AdditionalNotes,
+    type: FieldType.MultilineTextInput,
+  },
 ];
 
 export const FIELD_LABELS: Record<SummaryFieldKey, string> =
@@ -459,3 +480,5 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> =
     },
     {} as Record<SummaryFieldKey, string>,
   );
+
+export const ALWAYS_VISIBLE_SECTIONS = [SectionKey.AdditionalNotes];

@@ -94,15 +94,23 @@ export const useCallTranscriptDetails = (chatId: number) => {
         id: message.messageId,
         message: message.content,
         time: formatTimeToMMSS(
-          startedTime
-            ? new Date(message.createdAt).getTime() -
+          summaryData?.details?.callInfo?.provider === ChatProvider.WEBRTC
+            ? startedTime
+              ? new Date(message.createdAt).getTime() -
                 new Date(startedTime).getTime()
-            : 0,
+              : 0
+            : (message.startSeconds || 0) * 1000, // For microphone/Exotel, use startSeconds
         ),
         counselor: message.senderId === counselor,
         client: message.senderId === client || message.senderId === -1,
       })),
-    [messages, startedTime, counselor, client],
+    [
+      messages,
+      startedTime,
+      counselor,
+      client,
+      summaryData?.details?.callInfo?.provider,
+    ],
   );
 
   return {

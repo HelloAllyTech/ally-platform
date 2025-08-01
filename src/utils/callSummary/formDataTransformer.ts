@@ -26,10 +26,12 @@ export type FormData = {
   [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: string | null;
   [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: string | null;
   [SUMMARY_FIELDS.TAGS]: string | null;
+  [SUMMARY_FIELDS.ADDITIONAL_NOTES]: string | null;
 };
 
 export const transformSummaryToFormData = (
   summary: CallSummaryResponse['details']['summary'],
+  callInfo?: CallSummaryResponse['details']['callInfo'],
 ): FormData => ({
   [SUMMARY_FIELDS.SESSION_SUMMARY]: summary.sessionSummary || null,
   [SUMMARY_FIELDS.FLOW]: summary.counselingProcessFlow || null,
@@ -55,6 +57,7 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
   [SUMMARY_FIELDS.LOCATION]: summary.location || null,
   [SUMMARY_FIELDS.CONCERN_CODE]: summary.codeOfConcern || null,
+  [SUMMARY_FIELDS.ADDITIONAL_NOTES]: callInfo?.notes || null,
 });
 
 export const transformFormDataForSubmission = (
@@ -95,5 +98,7 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]:
       formData?.[SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL] ?? null,
     [SUMMARY_FIELDS.TAGS]: tags,
+    [SUMMARY_FIELDS.ADDITIONAL_NOTES]:
+      formData?.[SUMMARY_FIELDS.ADDITIONAL_NOTES] ?? null,
   };
 };

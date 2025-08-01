@@ -1,10 +1,19 @@
 import React from 'react';
 import {SvgProps} from 'react-native-svg';
 
-import {FIELD_LABELS, SectionKey, summaryFields} from '@/constants/summary';
+import {
+  FIELD_LABELS,
+  SectionKey,
+  SUMMARY_FIELDS,
+  summaryFields,
+} from '@/constants/summary';
 import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
 import {useAppSelector} from '@/store/hooks';
-import {selectMetrics, selectSummary} from '@/store/slices/summarySlice';
+import {
+  selectMetrics,
+  selectSummary,
+  selectSummaryData,
+} from '@/store/slices/summarySlice';
 import {EditableFieldKey, SummaryField} from '@/types/callSummary';
 
 import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
@@ -29,6 +38,7 @@ export const SectionContent: React.FC<SectionContentProps> = ({
   isEnhancing,
 }) => {
   const summary = useAppSelector(selectSummary);
+  const summaryData = useAppSelector(selectSummaryData);
   const metrics = useAppSelector(selectMetrics);
 
   const sectionFields = summaryFields.filter(
@@ -41,6 +51,9 @@ export const SectionContent: React.FC<SectionContentProps> = ({
     const getValue = () => {
       if (field.isEditable && formData && field.key in formData) {
         return formData[field.key as EditableFieldKey] ?? null;
+      }
+      if (field.key === SUMMARY_FIELDS.ADDITIONAL_NOTES) {
+        return summaryData?.details?.callInfo?.notes ?? null;
       }
       return summary?.[field.key] as string | null;
     };

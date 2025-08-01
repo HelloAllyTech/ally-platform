@@ -8,6 +8,7 @@ export interface ChatMessage {
   createdAt: string;
   feedback: string | null;
   senderId: number;
+  startSeconds: number | null;
 }
 
 type ChatMessagesResponse = {
