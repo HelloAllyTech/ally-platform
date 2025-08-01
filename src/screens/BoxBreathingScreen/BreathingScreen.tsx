@@ -50,8 +50,9 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   }, []);
 
   useHardwareBackPressHandler(() => {
-    navigation.navigate('Home');
     dispatch(clearCurrentChat());
+    setIsPlaying(false);
+    navigation.navigate('Home');
     return true;
   });
 
