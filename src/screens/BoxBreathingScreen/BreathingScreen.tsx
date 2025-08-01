@@ -7,8 +7,11 @@ import {ScaledSheet} from 'react-native-size-matters';
 import images from '@/assets/images';
 import {PrimaryButton} from '@/components';
 import {isIOS} from '@/constants/general';
+import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation/types';
+import {useAppDispatch} from '@/store/hooks';
+import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
@@ -29,6 +32,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   const [showOverlay, setShowOverlay] = useState(true);
   const {t} = useTranslate();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -44,6 +48,12 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
       }
     };
   }, []);
+
+  useHardwareBackPressHandler(() => {
+    navigation.navigate('Home');
+    dispatch(clearCurrentChat());
+    return true;
+  });
 
   useEffect(() => {
     if (!isPlaying) {
