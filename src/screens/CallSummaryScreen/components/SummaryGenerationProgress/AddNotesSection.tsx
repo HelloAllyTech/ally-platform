@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -7,14 +7,20 @@ import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
 export const AddNotesSection = ({
+  savedNotes,
   onPressInfo,
   onNoteChange,
 }: {
+  savedNotes: string;
   onPressInfo: () => void;
   onNoteChange: (text: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [note, setNote] = useState<string>('');
+  const [note, setNote] = useState<string>();
+
+  useEffect(() => {
+    setNote(savedNotes);
+  }, [savedNotes]);
 
   const handleNoteChange = (text: string) => {
     onNoteChange?.(text);
