@@ -366,7 +366,6 @@ export const ListeningScreen = ({
       onClose={() => setShowCallEndConfirmation(false)}
       onConfirm={handleEndCall}
       isMicrophoneMode={isMicrophoneMode}
-      isWebMicrophoneMode={isWebMicrophoneMode}
     />
   );
 
