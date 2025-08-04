@@ -442,6 +442,11 @@ export const ListeningScreen = ({
             />
           </View>
           {playPauseButton}
+          {isMicrophoneMode && (
+            <Text style={styles.microphoneModeNote}>
+              {t('ListeningScreen.microphoneModeNote')}
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
