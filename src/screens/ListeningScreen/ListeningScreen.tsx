@@ -248,17 +248,10 @@ export const ListeningScreen = ({
         !isWebMicrophoneMode &&
         chatIdRef.current
       ) {
-        try {
-          emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
-            audioData: base64Wav,
-            chatId: chatIdRef.current,
-          });
-        } catch (error) {
-          console.error(
-            '[ListeningScreen] Error emitting audio message:',
-            error,
-          );
-        }
+        emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
+          audioData: base64Wav,
+          chatId: chatIdRef.current,
+        });
       }
     },
     [emitSocketEvent, isWebMicrophoneMode],
