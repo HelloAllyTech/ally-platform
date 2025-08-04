@@ -1,5 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
+import {
+  activateKeepAwake,
+  deactivateKeepAwake,
+} from '@sayem314/react-native-keep-awake';
 import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 
 import {env} from '@/config/env';
@@ -295,6 +299,26 @@ export const ListeningScreen = ({
       setIsAudioChatEmitted(true);
     }
   }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+
+  // Keep screen awake during microphone mode calls
+  useEffect(() => {
+    if (isMicrophoneMode) {
+      try {
+        activateKeepAwake();
+      } catch (error) {
+        console.warn('Failed to activate keep awake:', error);
+      }
+    }
+
+    // Cleanup function to deactivate keep awake when component unmounts or mode changes
+    return () => {
+      try {
+        deactivateKeepAwake();
+      } catch (error) {
+        console.warn('Failed to deactivate keep awake:', error);
+      }
+    };
+  }, [isMicrophoneMode]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
