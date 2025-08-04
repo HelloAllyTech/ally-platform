@@ -7,7 +7,6 @@ interface CallEndConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   isMicrophoneMode: boolean;
-  isWebMicrophoneMode: boolean;
 }
 
 export const CallEndConfirmationModal = ({
@@ -15,16 +14,11 @@ export const CallEndConfirmationModal = ({
   onClose,
   onConfirm,
   isMicrophoneMode,
-  isWebMicrophoneMode,
 }: CallEndConfirmationModalProps) => {
   const {t} = useTranslate();
 
   let title: string, description: string, primaryButtonText: string;
-  if (isWebMicrophoneMode) {
-    title = t('ListeningScreen.exitSessionTitle');
-    description = t('ListeningScreen.exitSessionDescription');
-    primaryButtonText = t('Common.yes');
-  } else if (isMicrophoneMode) {
+  if (isMicrophoneMode) {
     title = t('ListeningScreen.endSession');
     description = t('ListeningScreen.microphoneModeEndConfirmation');
     primaryButtonText = t('ListeningScreen.endSession');
