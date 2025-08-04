@@ -90,4 +90,12 @@ export const styles = ScaledSheet.create({
     color: colors.black,
     fontSize: '16@ms',
   },
+  microphoneModeNote: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.white,
+    fontSize: '14@ms',
+    textAlign: 'center',
+    marginTop: '15@vs',
+    marginHorizontal: '25@s',
+  },
 });
