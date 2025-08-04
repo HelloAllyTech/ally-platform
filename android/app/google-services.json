@@ -7,26 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:386925974714:android:488b1960adca76418e1e83",
-        "android_client_info": {
-          "package_name": "com.ally"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCk6akxYYhLvwrngmHRNizVm856mRMLkIY"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:386925974714:android:76f925dac40b37b08e1e83",
+        "mobilesdk_app_id": "1:386925974714:android:79dbcd55f00af2668e1e83",
         "android_client_info": {
           "package_name": "com.helloally.app"
         }
