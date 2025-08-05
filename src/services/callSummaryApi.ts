@@ -1,4 +1,5 @@
 import {setSummaryData} from '@/store/slices/summarySlice';
+import {ChatProvider} from '@/types/message';
 
 import {api} from './api';
 
@@ -9,6 +10,8 @@ interface CallInfo {
   counselorTalkingTime: number;
   clientTalkingPercentage: string;
   counselorTalkingPercentage: string;
+  provider: ChatProvider;
+  notes: string | null;
 }
 
 export interface Language {
@@ -99,6 +102,7 @@ export interface SummaryDetails {
   emotionalStateChange: string | null;
   therapeuticInterventions: string | null;
   callQuality: number | null;
+  additionalNotes: string | null;
 }
 
 interface CallDetails {

@@ -12,6 +12,7 @@ interface UseSocketConnectionOptions {
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
   onConnect?: () => void;
   onDisconnect?: () => void;
+  enabled?: boolean;
 }
 
 /**
@@ -54,6 +55,7 @@ export const useSocketConnection = ({
   eventCallbacks,
   onConnect,
   onDisconnect,
+  enabled = true,
 }: UseSocketConnectionOptions) => {
   const appState = useRef(AppState.currentState);
 
@@ -66,6 +68,7 @@ export const useSocketConnection = ({
   // Handle screen focus/blur
   useFocusEffect(
     useCallback(() => {
+      if (!enabled) return;
       if (userId) {
         connect();
         onConnect?.();
@@ -96,7 +99,7 @@ export const useSocketConnection = ({
           subscription.remove();
         };
       }
-    }, [connect, disconnect, onConnect, onDisconnect, userId]),
+    }, [connect, disconnect, onConnect, onDisconnect, userId, enabled]),
   );
 
   return {
