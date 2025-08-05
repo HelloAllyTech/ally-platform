@@ -19,9 +19,13 @@ interface FeedbackInput {
   rating?: number;
 }
 
+interface UpdateNotesInput {
+  content: string;
+}
+
 export const chatApi = api.injectEndpoints({
   endpoints: builder => ({
-    getCounsellorChat: builder.query<Chat[], void>({
+    getCounsellorChat: builder.query<[] | Chat, void>({
       query: () => '/chats/counsellor-chat',
     }),
     endCall: builder.mutation<EndCallResponse, {chatId: number}>({
@@ -50,6 +54,16 @@ export const chatApi = api.injectEndpoints({
         body: feedback,
       }),
     }),
+    updateNotes: builder.mutation<
+      void,
+      {chatId: number; notes: UpdateNotesInput}
+    >({
+      query: ({chatId, notes}) => ({
+        url: `/chats/${chatId}/notes`,
+        method: 'POST',
+        body: notes,
+      }),
+    }),
   }),
 });
 
@@ -58,4 +72,5 @@ export const {
   useEndCallMutation,
   useAddFeedbackMutation,
   useUpdateFeedbackMutation,
+  useUpdateNotesMutation,
 } = chatApi;

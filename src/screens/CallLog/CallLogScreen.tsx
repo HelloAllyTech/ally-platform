@@ -6,6 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon} from '@/assets/icons';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -64,6 +65,8 @@ export const CallLogScreen: React.FC = () => {
       fetchInitialData();
     }, [fetchInitialData]),
   );
+
+  useTabBackToHomeHandler();
 
   /**
    * Handles loading more call logs when user scrolls to the bottom
@@ -129,7 +132,7 @@ export const CallLogScreen: React.FC = () => {
    * when fetching more data
    */
   const renderFooter = () => {
-    if (!isFetching) return null;
+    if (!isFetching || allLogs?.length === 0) return null;
     return (
       <ActivityIndicator
         size="small"
