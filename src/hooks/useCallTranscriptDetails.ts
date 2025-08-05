@@ -8,6 +8,7 @@ import {
 } from '@/services/callTranscriptApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryData} from '@/store/slices/summarySlice';
+import {ChatProvider} from '@/types/message';
 
 const LIMIT = 20;
 
@@ -30,8 +31,12 @@ export const useCallTranscriptDetails = (chatId: number) => {
       id: chatId,
       limit: LIMIT,
       sortOrder: 'ASC',
+      sortBy:
+        summaryData?.details?.callInfo?.provider === ChatProvider.WEBRTC
+          ? 'createdAt'
+          : 'startSeconds',
     }),
-    [chatId],
+    [chatId, summaryData?.details?.callInfo?.provider],
   );
 
   // Process data only if it's for a new offset
@@ -89,15 +94,23 @@ export const useCallTranscriptDetails = (chatId: number) => {
         id: message.messageId,
         message: message.content,
         time: formatTimeToMMSS(
-          startedTime
-            ? new Date(message.createdAt).getTime() -
+          summaryData?.details?.callInfo?.provider === ChatProvider.WEBRTC
+            ? startedTime
+              ? new Date(message.createdAt).getTime() -
                 new Date(startedTime).getTime()
-            : 0,
+              : 0
+            : (message.startSeconds || 0) * 1000, // For microphone/Exotel, use startSeconds
         ),
         counselor: message.senderId === counselor,
         client: message.senderId === client || message.senderId === -1,
       })),
-    [messages, startedTime, counselor, client],
+    [
+      messages,
+      startedTime,
+      counselor,
+      client,
+      summaryData?.details?.callInfo?.provider,
+    ],
   );
 
   return {

@@ -3,10 +3,12 @@ import {useFocusEffect} from '@react-navigation/native';
 import {Linking, Text, View} from 'react-native';
 
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
 
 const url = 'https://community.helloally.ai/';
 
 export const CommunityScreen: React.FC = () => {
+  useTabBackToHomeHandler();
   const navigation = useAppNavigation();
   useFocusEffect(
     useCallback(() => {

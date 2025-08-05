@@ -17,7 +17,7 @@ interface SummaryDropdownProps {
   setShowSummary: (show: boolean) => void;
 }
 
-const SummaryDropdown: React.FC<SummaryDropdownProps> = ({
+export const SummaryDropdown: React.FC<SummaryDropdownProps> = ({
   visible,
   onClose,
   isFullyExpanded = true,
@@ -178,5 +178,3 @@ const styles = ScaledSheet.create({
     borderColor: colors.lightGray4,
   },
 });
-
-export default SummaryDropdown;

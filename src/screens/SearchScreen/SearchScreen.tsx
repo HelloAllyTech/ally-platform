@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -22,6 +22,7 @@ import CustomTabs from '@/components/CustomTabs/CustomTabs';
 import getThemedStyles from '@/components/CustomTabs/styles';
 import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
 import {useSearch} from '@/hooks/useSearch';
+import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
 import useTranslate from '@/hooks/useTranslate';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
@@ -32,6 +33,8 @@ import {trySuggestions} from './searchConfig';
 import {ResourceArticle} from './types';
 
 export const SearchScreen: React.FC = () => {
+  const flatListRef = useRef<FlatList>(null);
+
   const {
     searchText,
     filteredSuggestions,
@@ -56,8 +59,10 @@ export const SearchScreen: React.FC = () => {
     showInitialLoader,
     showFooterLoader,
     showEmptyState,
-  } = useSearch();
+  } = useSearch(flatListRef);
   const {t} = useTranslate();
+
+  useTabBackToHomeHandler();
 
   const anim = useSharedValue(0);
 
@@ -92,7 +97,7 @@ export const SearchScreen: React.FC = () => {
 
   const onFocus = () => {
     onSearchFocus();
-    if (searchText.trim() !== '') setShowSuggestions(true);
+    setShowSuggestions(true);
   };
 
   const renderItem = ({item}: {item: ResourceArticle}) => {
@@ -143,6 +148,7 @@ export const SearchScreen: React.FC = () => {
           <ActivityIndicator style={styles.footerActivityIndicator} />
         ) : resources.length > 0 ? (
           <FlatList
+            ref={flatListRef}
             data={resources}
             renderItem={renderItem}
             keyExtractor={(_, i) => `${selectedCategory}-resource-${i}`}
@@ -163,8 +169,7 @@ export const SearchScreen: React.FC = () => {
     );
   };
 
-  const isShowSuggestions =
-    showSuggestions && focused && searchText.trim() !== '';
+  const isShowSuggestions = showSuggestions && focused;
 
   const renderSearchInput = () => {
     return (
@@ -200,7 +205,7 @@ export const SearchScreen: React.FC = () => {
           <Animated.View style={searchAnimStyle}>
             {renderSearchInput()}
           </Animated.View>
-          {(!focused || searchText.trim() === '') && (
+          {!focused && (
             <>
               <View style={styles.tryContainer}>
                 <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>

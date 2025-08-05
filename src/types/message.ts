@@ -20,7 +20,7 @@ export enum ChatStatus {
 }
 
 export enum ChatProvider {
-  EXOTEL = 'EXOTEL',
+  EXOTEL_CONFERENCE_CALL = 'EXOTEL_CONFERENCE_CALL',
   MICROPHONE = 'MICROPHONE',
   WEBRTC = 'WEBRTC',
 }

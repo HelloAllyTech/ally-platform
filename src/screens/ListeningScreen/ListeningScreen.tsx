@@ -1,24 +1,16 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {RouteProp} from '@react-navigation/native';
 import {
-  ActivityIndicator,
-  AppState,
-  StatusBar,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+  activateKeepAwake,
+  deactivateKeepAwake,
+} from '@sayem314/react-native-keep-awake';
+import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 
-import {LeftArrowIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {
-  AllyPlatforms,
-  DEFAULT_HIT_SLOP,
-  MICROPHONE_AUDIO_SAMPLE_RATE,
-} from '@/constants/general';
+import {AllyPlatforms} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useDebounce} from '@/hooks/useDebounce';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
@@ -31,9 +23,9 @@ import {
   useLazyGetCounsellorChatQuery,
 } from '@/services/chatApi';
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
-import {useAppSelector} from '@/store/hooks';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
 import {globalStyles} from '@/theme/helpers';
 import {
   ChatProvider,
@@ -42,19 +34,20 @@ import {
   SocketMessage,
 } from '@/types/message';
 import {Maybe} from '@/utils/common';
-import {logger} from '@/utils/logger';
 
 import {
   exotelAudioDataToAmplitudes,
+  getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
 } from './audioUtils';
 import {ControlButtonsSection, NudgeSection, Timer} from './components';
-import {AudioWaveform} from './components/AudioWaveform';
+import {AudioWaveformContainer} from './components/AudioWaveformContainer/AudioWaveformContainer';
 import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
 import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
 import Search from './components/Search/Search';
+import {styles} from './styles';
 
 export interface Nudge {
   id: number;
@@ -72,6 +65,7 @@ export const ListeningScreen = ({
 }) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
+  const dispatch = useAppDispatch();
 
   const [isFocusMode, setIsFocusMode] = useState(true);
   const chatData = useAppSelector(state => state.chat.currentChat);
@@ -84,7 +78,7 @@ export const ListeningScreen = ({
     [chatData?.startedAt],
   );
   const callProvider = chatData?.provider;
-  const isConferenceCall = callProvider === ChatProvider.EXOTEL;
+  const isConferenceCall = callProvider === ChatProvider.EXOTEL_CONFERENCE_CALL;
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isWebMicrophoneMode =
@@ -94,6 +88,7 @@ export const ListeningScreen = ({
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
+  const streamingInitialized = useRef(false);
 
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -101,11 +96,10 @@ export const ListeningScreen = ({
     useState(true);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
-  const [amplitudes, setAmplitudes] = useState<number[] | null>(
+  const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-  const latestAmplitudesRef = useRef<number[] | null>(amplitudes);
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
@@ -120,7 +114,7 @@ export const ListeningScreen = ({
   const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
   const onCallEndSuccess = useCallback(() => {
-    navigation.navigate('Breathing');
+    navigation.replace('Breathing');
   }, [navigation]);
 
   const getSocketPath = useCallback(() => {
@@ -147,27 +141,16 @@ export const ListeningScreen = ({
   }, [isMicrophoneMode, navigation]);
 
   const handleEndCall = () => {
-    if (!chatData?.chatId) return;
+    const {chatId} = chatData || {};
 
-    // 1. Microphone mode on web: just go back, don't emit or stop streaming
-    if (isMicrophoneMode && isWebMicrophoneMode) {
-      navigation.goBack();
-      return;
+    if (!chatId) return;
+
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
+      stopStreaming();
+      streamingInitialized.current = false;
     }
 
-    // 2. Conference call or microphone mode (not on web): stop streaming if mic, then emit end event
-    if (isConferenceCall || isMicrophoneMode) {
-      if (isMicrophoneMode) {
-        stopStreaming();
-      }
-      emitSocketEvent(SocketEvent.AUDIO_CHAT_ENDED, {
-        ...(isConferenceCall ? {chatId: chatData.chatId} : {}),
-      });
-      return;
-    }
-
-    // 3. WebRTC call: use endCall mutation
-    endCall({chatId: chatData.chatId});
+    endCall({chatId});
   };
 
   // Clear timeout on unmount
@@ -188,13 +171,7 @@ export const ListeningScreen = ({
     return true;
   });
 
-  // Throttle waveform updates to every 120ms
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAmplitudes(latestAmplitudesRef.current);
-    }, 120);
-    return () => clearInterval(interval);
-  }, []);
+  const {checkCounselorChat} = useCounselorChat();
 
   const socketEventCallbacks = useMemo(
     () => ({
@@ -219,6 +196,9 @@ export const ListeningScreen = ({
             setIsLoading(false);
           }, 500);
         }
+      },
+      [SocketEvent.USER_JOINED]: async () => {
+        await checkCounselorChat();
       },
       [SocketEvent.AUDIO_STREAM]: (data: SocketMessage) => {
         if (!isAudioActive) {
@@ -247,7 +227,7 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall],
+    [onCallEndSuccess, isAudioActive, isConferenceCall, checkCounselorChat],
   );
 
   const {userData} = useUser();
@@ -258,17 +238,27 @@ export const ListeningScreen = ({
     eventCallbacks: socketEventCallbacks,
   });
 
+  const chatIdRef = useRef(chatData?.chatId);
+
+  useEffect(() => {
+    chatIdRef.current = chatData?.chatId;
+  }, [chatData?.chatId]);
+
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
-      if (!isCallPausedRef.current && !isWebMicrophoneMode) {
+      if (
+        !isCallPausedRef.current &&
+        !isWebMicrophoneMode &&
+        chatIdRef.current
+      ) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
-          chatId: chatData?.chatId,
+          chatId: chatIdRef.current,
         });
       }
     },
-    [emitSocketEvent, chatData?.chatId, isWebMicrophoneMode],
+    [emitSocketEvent, isWebMicrophoneMode],
   );
 
   const {startStreaming, stopStreaming, isPermissionGranted} =
@@ -277,45 +267,58 @@ export const ListeningScreen = ({
       enableLiveAudio: isMicrophoneMode && !isWebMicrophoneMode,
     });
 
-  const handleStartStreaming = useCallback(async () => {
-    try {
-      if (!isPermissionGranted) {
-        logger.warn('Cannot start streaming: permission not granted');
-        return;
-      }
-      await startStreaming();
-    } catch (error) {
-      logger.error(`Error starting stream: ${error}`);
-    }
-  }, [startStreaming, isPermissionGranted]);
-
-  useEffect(() => {
-    if (
+  const isAudioSessionReady = useMemo(() => {
+    return (
       isMicrophoneMode &&
       isPermissionGranted &&
       isMicrophoneModeSessionCreated &&
-      !isAudioChatEmitted &&
       !isWebMicrophoneMode
-    ) {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, {
-        isLinear16Encoded: true,
-        platform: AllyPlatforms.MOBILE,
-        sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
-        ...(chatData?.chatId && {activeChatId: chatData.chatId}),
-      });
-      setIsAudioChatEmitted(true);
-      handleStartStreaming();
-    }
+    );
   }, [
-    chatData?.chatId,
-    isAudioChatEmitted,
-    emitSocketEvent,
     isMicrophoneMode,
     isPermissionGranted,
-    handleStartStreaming,
     isMicrophoneModeSessionCreated,
     isWebMicrophoneMode,
   ]);
+
+  useEffect(() => {
+    if (
+      isAudioSessionReady &&
+      chatData?.chatId &&
+      !streamingInitialized.current
+    ) {
+      streamingInitialized.current = true;
+      startStreaming();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAudioSessionReady, chatData?.chatId]);
+
+  useEffect(() => {
+    if (isAudioSessionReady && !isAudioChatEmitted) {
+      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, getStartAudioChatPayload());
+      setIsAudioChatEmitted(true);
+    }
+  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+
+  // Keep screen awake during microphone mode calls
+  useEffect(() => {
+    if (isMicrophoneMode) {
+      try {
+        activateKeepAwake();
+      } catch (error) {
+        console.warn('Failed to activate keep awake:', error);
+      }
+    }
+
+    // Cleanup function to deactivate keep awake when component unmounts or mode changes
+    return () => {
+      try {
+        deactivateKeepAwake();
+      } catch (error) {
+        console.warn('Failed to deactivate keep awake:', error);
+      }
+    };
+  }, [isMicrophoneMode]);
 
   const handleNudgeFeedbackSuccess = (feedback: FeedbackResponse) => {
     if (currentNudge) {
@@ -330,6 +333,7 @@ export const ListeningScreen = ({
       });
     }
   };
+
   const toggleNudgeVisibility = () => {
     setIsFocusMode(prev => !prev);
   };
@@ -355,15 +359,28 @@ export const ListeningScreen = ({
         isPlaying={!isCallPaused}
         onPress={handlePlayPauseCallPress}
         isFocusMode={isFocusMode}
+        isDisabled={isWebMicrophoneMode}
       />
     );
-  }, [isCallPaused, handlePlayPauseCallPress, isFocusMode]);
+  }, [
+    isCallPaused,
+    handlePlayPauseCallPress,
+    isFocusMode,
+    isWebMicrophoneMode,
+  ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
+        // Skip chat validation in microphone mode without permission to prevent navigation to Home
+        // after returning from permission dialog (chat session isn't ready yet)
+        if (isMicrophoneMode && !isWebMicrophoneMode && !isPermissionGranted) {
+          return;
+        }
         getCounsellorChat().then(res => {
-          if (!res.data) {
+          if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
+            // Clear chat state before navigation
+            dispatch(clearCurrentChat());
             navigation.navigate('Home');
           }
         });
@@ -372,7 +389,16 @@ export const ListeningScreen = ({
     return () => {
       subscription.remove();
     };
-  }, [getCounsellorChat, navigation]);
+  }, [
+    chatData?.chatId,
+    emitSocketEvent,
+    getCounsellorChat,
+    isMicrophoneMode,
+    isPermissionGranted,
+    isWebMicrophoneMode,
+    navigation,
+    dispatch,
+  ]);
 
   const callEndModalElement = (
     <CallEndConfirmationModal
@@ -380,33 +406,8 @@ export const ListeningScreen = ({
       onClose={() => setShowCallEndConfirmation(false)}
       onConfirm={handleEndCall}
       isMicrophoneMode={isMicrophoneMode}
-      isWebMicrophoneMode={isWebMicrophoneMode}
     />
   );
-
-  if (isWebMicrophoneMode) {
-    return (
-      <View style={styles.micInDifferentPlatformContainer}>
-        {showCallEndConfirmation && callEndModalElement}
-        <Text style={styles.micInDifferentPlatformTitle}>
-          {t('ListeningScreen.microphoneModeInDifferentPlatformTitle')}
-        </Text>
-        <Text style={styles.micInDifferentPlatformDescription}>
-          {t('ListeningScreen.microphoneModeInDifferentPlatformDescription')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setShowCallEndConfirmation(true)}
-          style={styles.micInDifferentPlatformGoBackButton}
-          activeOpacity={0.85}
-          hitSlop={DEFAULT_HIT_SLOP}>
-          <LeftArrowIcon color={colors.darkGray7} />
-          <Text style={styles.micInDifferentPlatformGoBackText}>
-            {t('ListeningScreen.microphoneModeGoBack')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   if (!chatData?.chatId) {
     return (
@@ -434,12 +435,18 @@ export const ListeningScreen = ({
           </Text>
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
-            <AudioWaveform
-              amplitudes={isCallPaused ? null : amplitudes}
+            <AudioWaveformContainer
+              latestAmplitudesRef={latestAmplitudesRef}
+              isCallPaused={isCallPaused}
               isFocusMode
             />
           </View>
           {playPauseButton}
+          {isMicrophoneMode && (
+            <Text style={styles.microphoneModeNote}>
+              {t('ListeningScreen.microphoneModeNote')}
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.nonFocusModeLayout}>
@@ -452,8 +459,9 @@ export const ListeningScreen = ({
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveform
-                amplitudes={isCallPaused ? null : amplitudes}
+              <AudioWaveformContainer
+                latestAmplitudesRef={latestAmplitudesRef}
+                isCallPaused={isCallPaused}
                 isFocusMode={false}
               />
             </View>
@@ -481,92 +489,3 @@ export const ListeningScreen = ({
     </View>
   );
 };
-
-const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkGray7,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.darkGray7,
-  },
-  loadingText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.white,
-    marginTop: '10@vs',
-  },
-  controlButtonsContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  focusModeLayout: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: '40@vs',
-  },
-  takingNotesText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.white,
-    textAlign: 'left',
-  },
-  nonFocusLabelBlock: {
-    alignItems: 'flex-start',
-    flex: 1,
-    marginLeft: '10@s',
-  },
-  focusModeWaveformWrapper: {
-    marginVertical: '40@vs',
-    width: '96%',
-  },
-  nonFocusModeWaveformWrapper: {
-    width: '50%',
-  },
-  nonFocusModeLayout: {
-    flex: 1,
-    alignItems: 'flex-start',
-    paddingHorizontal: '20@s',
-    marginTop: '40@vs',
-  },
-  micInDifferentPlatformContainer: {
-    flex: 1,
-    backgroundColor: colors.darkGray7,
-    justifyContent: 'center',
-    paddingHorizontal: '30@s',
-    textAlign: 'center',
-  },
-  micInDifferentPlatformTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '18@ms',
-    color: colors.white,
-    textAlign: 'center',
-  },
-  micInDifferentPlatformDescription: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.white,
-    textAlign: 'center',
-    marginTop: '10@vs',
-  },
-  micInDifferentPlatformGoBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: colors.white,
-    borderRadius: '32@s',
-    paddingVertical: '5@vs',
-    paddingLeft: '10@s',
-    paddingRight: '17@s',
-    marginTop: '40@vs',
-  },
-  micInDifferentPlatformGoBackText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.black,
-    fontSize: '16@ms',
-  },
-});
