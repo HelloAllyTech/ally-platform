@@ -115,7 +115,6 @@ const CallLogItem = ({
 const styles = ScaledSheet.create({
   logItemContainer: {
     backgroundColor: colors.white,
-    borderRadius: '12@ms',
     marginHorizontal: '14@ms',
     paddingHorizontal: '10@ms',
     paddingVertical: '10@ms',

@@ -66,8 +66,8 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
           <View style={themedStyles.contentRow}>
             <Text
               style={themedStyles.content}
-              numberOfLines={MAX_LINES}
-              ellipsizeMode="tail">
+              ellipsizeMode="head"
+              numberOfLines={MAX_LINES}>
               {content}
             </Text>
             <TouchableOpacity
