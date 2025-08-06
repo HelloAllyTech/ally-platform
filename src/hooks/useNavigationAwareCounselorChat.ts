@@ -26,6 +26,7 @@ export const useNavigationAwareCounselorChat = (
   }, [navigationRef]);
 
   return useCounselorChat({
+    getCurrentRoute: () => currentRouteName.current as RouteNames | undefined,
     onActiveChatFound: () => {
       // Handle active chat found based on current screen
       switch (currentRouteName.current) {

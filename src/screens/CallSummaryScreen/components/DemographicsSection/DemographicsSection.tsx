@@ -75,8 +75,14 @@ const DemographicsSectionComponent: React.FC<DemographicsSectionProps> = ({
       },
       {
         field: SUMMARY_FIELDS.CALLER_ID,
-        value:
-          callDetails?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID] || '-',
+        value: (() => {
+          const callerId =
+            callDetails?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID];
+          if (callerId === -1) {
+            return 'N/A';
+          }
+          return callerId || '-';
+        })(),
       },
       {
         field: SUMMARY_FIELDS.COUNSELOR_NAME,

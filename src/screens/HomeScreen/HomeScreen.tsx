@@ -31,6 +31,7 @@ import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
+import {Chat} from '@/types/message';
 import {UserRole} from '@/types/user';
 import {logger} from '@/utils/logger';
 
@@ -72,13 +73,25 @@ export const HomeScreen: React.FC = () => {
   }, [visibleFields, dispatch]);
 
   const handleThirdPartyCall = async () => {
-    const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
-    try {
-      await Linking.openURL(url);
-    } catch (error) {
-      logger.error(`Error opening phone call URL: ${error}`);
-      Alert.alert('Error', "Can't handle phone call", [{text: t('Common.ok')}]);
-    }
+    checkCounselorChat().then(data => {
+      const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
+      if ((data as Chat)?.chatId) {
+        Alert.alert(
+          'Already in a call',
+          'You are already in a call. Please end the current call to make a new one.',
+          [{text: t('Common.ok')}],
+        );
+        return;
+      }
+      try {
+        Linking.openURL(url);
+      } catch (error) {
+        logger.error(`Error opening phone call URL: ${error}`);
+        Alert.alert('Error', "Can't handle phone call", [
+          {text: t('Common.ok')},
+        ]);
+      }
+    });
   };
 
   const handleVoiceRecording = async () => {
