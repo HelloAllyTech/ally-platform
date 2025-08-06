@@ -51,8 +51,10 @@ export const useCounselorChat = ({
         }
         onNoActiveChatFound?.(error);
       }
+      return data;
     } catch (error) {
       onNoActiveChatFound?.(error);
+      return error;
     } finally {
       isCheckingRef.current = false;
     }
