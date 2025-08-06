@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {RouteProp} from '@react-navigation/native';
+import {RouteProp, useIsFocused} from '@react-navigation/native';
 import {
   activateKeepAwake,
   deactivateKeepAwake,
@@ -66,6 +66,7 @@ export const ListeningScreen = ({
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
+  const isFocused = useIsFocused();
 
   const [isFocusMode, setIsFocusMode] = useState(true);
   const chatData = useAppSelector(state => state.chat.currentChat);
@@ -114,8 +115,11 @@ export const ListeningScreen = ({
   const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
   const onCallEndSuccess = useCallback(() => {
-    navigation.replace('Breathing');
-  }, [navigation]);
+    // Only navigate if the ListeningScreen is still focused
+    if (isFocused) {
+      navigation.replace('Breathing');
+    }
+  }, [navigation, isFocused]);
 
   const getSocketPath = useCallback(() => {
     if (isConferenceCall || isMicrophoneMode) {
@@ -164,7 +168,12 @@ export const ListeningScreen = ({
 
   useHardwareBackPressHandler(() => {
     if (isMicrophoneMode) {
-      setShowCallEndConfirmation(true);
+      if (isWebMicrophoneMode) {
+        dispatch(clearCurrentChat());
+        navigation.goBack();
+      } else if (chatData?.chatId) {
+        setShowCallEndConfirmation(true);
+      }
       return true;
     }
     navigation.goBack();
@@ -295,10 +304,22 @@ export const ListeningScreen = ({
 
   useEffect(() => {
     if (isAudioSessionReady && !isAudioChatEmitted) {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, getStartAudioChatPayload());
-      setIsAudioChatEmitted(true);
+      // This is to prevent socket event from being emitted before the
+      // socket connection is established (Flow: permission denied and then granted from settings)
+      setTimeout(() => {
+        emitSocketEvent(
+          SocketEvent.START_AUDIO_CHAT,
+          getStartAudioChatPayload(),
+        );
+        setIsAudioChatEmitted(true);
+      });
     }
-  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+  }, [
+    isAudioSessionReady,
+    emitSocketEvent,
+    isAudioChatEmitted,
+    isPermissionGranted,
+  ]);
 
   // Keep screen awake during microphone mode calls
   useEffect(() => {
@@ -442,7 +463,7 @@ export const ListeningScreen = ({
             />
           </View>
           {playPauseButton}
-          {isMicrophoneMode && (
+          {isMicrophoneMode && !isWebMicrophoneMode && (
             <Text style={styles.microphoneModeNote}>
               {t('ListeningScreen.microphoneModeNote')}
             </Text>
