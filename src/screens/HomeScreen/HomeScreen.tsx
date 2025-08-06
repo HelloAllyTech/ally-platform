@@ -18,6 +18,7 @@ import {env} from '@/config/env';
 import {CHAT_TYPES} from '@/constants/chat';
 import {isIOS} from '@/constants/general';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {useCounselorChat} from '@/hooks/useCounselorChat';
 import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
 import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
 import useTranslate from '@/hooks/useTranslate';
@@ -49,6 +50,8 @@ export const HomeScreen: React.FC = () => {
     isError: isErrorChatTypes,
   } = useGetVisibleChatTypesQuery();
 
+  const {checkCounselorChat} = useCounselorChat();
+
   const visibleChatTypes = [
     CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
     CHAT_TYPES.MICROPHONE_CHAT,
@@ -79,6 +82,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleVoiceRecording = async () => {
+    checkCounselorChat();
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
