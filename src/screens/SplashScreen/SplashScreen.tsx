@@ -50,7 +50,6 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     onNoActiveChatFound: () => {
       navigation.replace('Home');
     },
-    shouldSubscribeToAppState: false,
   });
   const {t} = useTranslate();
 
