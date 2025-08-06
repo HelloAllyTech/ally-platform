@@ -53,6 +53,7 @@ const NavigationContent = ({
         routes: [{name: 'Home'}],
       });
     },
+    getCurrentRoute: () => navigationRef?.getCurrentRoute()?.name,
   });
 
   // Single subscription that's aware of the current screen

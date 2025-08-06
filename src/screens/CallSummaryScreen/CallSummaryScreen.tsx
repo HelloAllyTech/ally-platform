@@ -68,6 +68,7 @@ export const CallSummaryScreen: React.FC<
     isSummaryAvailable,
     forceRemountKey,
     refreshing,
+    isPollingComplete,
     handleScroll,
     handleRefresh,
     handleNoteChange,
@@ -171,6 +172,7 @@ export const CallSummaryScreen: React.FC<
             }>
             <SummaryGenerationProgress
               isSummaryGenerated={isSummaryAvailable}
+              isPollingComplete={isPollingComplete}
             />
             <View>
               <AddNotesSection

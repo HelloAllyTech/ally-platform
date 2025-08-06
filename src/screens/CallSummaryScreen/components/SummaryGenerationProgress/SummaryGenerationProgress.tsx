@@ -9,15 +9,17 @@ import {fontFamily} from '@/theme/fonts';
 
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,
+  isPollingComplete = false,
 }: {
   isSummaryGenerated: boolean;
+  isPollingComplete?: boolean;
 }) => {
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
 
   return (
     <View style={styles.container}>
-      {!isSummaryGenerated && (
+      {!isSummaryGenerated && isPollingComplete && (
         <View style={styles.infoRow}>
           <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
           <Text style={styles.infoText}>
