@@ -105,8 +105,10 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
     <View style={styles.container}>
       <Tab.Navigator
         tabBar={renderCustomTabBar}
+        detachInactiveScreens
         screenOptions={{
           headerShown: false,
+          lazy: true,
         }}
         initialRouteName="HomeTab">
         {TAB_NAMES.map((name, idx) => (

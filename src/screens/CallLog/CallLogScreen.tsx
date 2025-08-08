@@ -170,6 +170,11 @@ export const CallLogScreen: React.FC = () => {
           ListFooterComponent={renderFooter}
           refreshing={false}
           onRefresh={handleRefresh}
+          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
         />
       )}
     </View>
