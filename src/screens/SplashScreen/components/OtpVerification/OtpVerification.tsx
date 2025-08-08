@@ -3,7 +3,7 @@ import {Alert, Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services/authApi';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';

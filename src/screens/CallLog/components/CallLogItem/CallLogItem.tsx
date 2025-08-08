@@ -6,13 +6,13 @@ import {
   DoubleRightArrowIcon,
   EyeIcon,
 } from '@/assets/icons';
-import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants/general';
+import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';
-import Tag from '../Tag/Tag';
+import {Tag} from '../Tag/Tag';
 
 /**
  * Props interface for the CallLogItem component
@@ -36,7 +36,7 @@ interface CallLogItemProps {
  * The component displays client information, call quality score, and when expanded,
  * shows the call duration and associated tags with color-coded positivity ratings.
  */
-const CallLogItem = ({
+export const CallLogItem = ({
   item,
   expanded,
   disabled = false,
@@ -190,5 +190,3 @@ const styles = ScaledSheet.create({
     marginLeft: '10@ms',
   },
 });
-
-export default CallLogItem;

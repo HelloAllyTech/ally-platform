@@ -11,10 +11,10 @@ import NetworkLogger, {startNetworkLogging} from 'react-native-network-logger';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseCircle} from '@/assets/icons';
-import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants/general';
+import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants';
 import {colors} from '@/theme/colors';
 
-const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
+const NetworkLogsComponent = ({onPress}: {onPress?: () => void}) => {
   const {t} = useTranslation();
   const [isNetworkModalVisible, setIsNetworkVIsible] = useState(false);
   const pan = useRef(new Animated.ValueXY()).current;
@@ -143,4 +143,4 @@ const styles = ScaledSheet.create({
   },
 });
 
-export default memo(NetworkLogs);
+export const NetworkLogs = memo(NetworkLogsComponent);

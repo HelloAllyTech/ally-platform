@@ -1,12 +1,11 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
 
-import {RouteNames} from '@/navigation/types';
+import {RouteNames} from '@/navigation';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat, setCurrentChat} from '@/store/slices/chatSlice';
-import {Chat} from '@/types/message';
-import {UserRole} from '@/types/user';
+import {Chat, UserRole} from '@/types';
 
 interface UseCounselorChatProps {
   onActiveChatFound?: (data: Chat) => void;

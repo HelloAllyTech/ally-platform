@@ -5,7 +5,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {EditIcon, ExportIcon} from '@/assets/icons';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

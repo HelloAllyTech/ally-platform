@@ -1,6 +1,6 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 
-import {Chat} from '@/types/message';
+import {Chat} from '@/types';
 
 interface ChatState {
   currentChat: Chat | null;

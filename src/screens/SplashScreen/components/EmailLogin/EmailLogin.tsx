@@ -13,7 +13,7 @@ import {
 
 import {PrimaryButton} from '@/components';
 import {isValidEmail} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme/colors';
 import {getErrorMessage} from '@/utils/error';

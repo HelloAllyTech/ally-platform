@@ -6,7 +6,7 @@ interface FlowerPetalProps {
   size?: number;
 }
 
-const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
+export const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
   const centerX = size / 2;
   const centerY = size / 2;
   const angles = [0, -65, -35, 65, 35];
@@ -71,5 +71,3 @@ const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
     </View>
   );
 };
-
-export default FlowerPetal;

@@ -5,16 +5,13 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon} from '@/assets/icons';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
-import useTranslate from '@/hooks/useTranslate';
+import {useAppNavigation, useTabBackToHomeHandler, useTranslate} from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-import {CallLogHeader} from './components/CallLogHeader/CallLogHeader';
-import CallLogItem from './components/CallLogItem/CallLogItem';
+import {CallLogHeader, CallLogItem} from './components';
 import {CallLog} from './types';
 
 // Number of items to fetch per page for pagination

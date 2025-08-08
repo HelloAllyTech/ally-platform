@@ -9,7 +9,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

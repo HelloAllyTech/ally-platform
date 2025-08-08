@@ -20,7 +20,7 @@ interface StartCallCardProps {
   customStyles?: StyleProp<ViewStyle>;
 }
 
-const StartCallCard: React.FC<StartCallCardProps> = ({
+export const StartCallCard: React.FC<StartCallCardProps> = ({
   image,
   header,
   subtitle,
@@ -89,5 +89,3 @@ const styles = ScaledSheet.create({
     alignItems: 'flex-end',
   },
 });
-
-export default StartCallCard;

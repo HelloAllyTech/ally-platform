@@ -9,11 +9,11 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-const CallEndOverlay = () => {
+export const CallEndOverlay = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const opacity = useSharedValue(1);
   const {t} = useTranslate();
@@ -63,8 +63,6 @@ const CallEndOverlay = () => {
     </LinearGradient>
   );
 };
-
-export default CallEndOverlay;
 
 const styles = ScaledSheet.create({
   container: {

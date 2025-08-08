@@ -7,7 +7,7 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

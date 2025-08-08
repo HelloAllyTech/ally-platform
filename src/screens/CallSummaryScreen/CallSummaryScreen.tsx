@@ -10,15 +10,16 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {PrimaryButton} from '@/components/Button/PrimaryButton';
-import {Toast} from '@/components/Toast/Toast';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import useCallSummaryActions from '@/hooks/useCallSummaryActions';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import {useSummaryState} from '@/hooks/useSummaryState';
-import useTranslate from '@/hooks/useTranslate';
-import {RootStackScreenProps} from '@/navigation/types';
+import {PrimaryButton, Toast} from '@/components';
+import {
+  useAppNavigation,
+  useCallSummaryActions,
+  useCallSummaryForm,
+  useHardwareBackPressHandler,
+  useSummaryState,
+  useTranslate,
+} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';

@@ -2,8 +2,7 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LogoutIcon, ProfileIcon} from '@/assets/icons';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
+import {useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

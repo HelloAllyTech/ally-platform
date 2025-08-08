@@ -7,7 +7,7 @@ import {
 } from '@reduxjs/toolkit/query/react';
 
 import {env} from '@/config/env';
-import {AsyncStorageKeys} from '@/constants/asyncStorage';
+import {AsyncStorageKeys} from '@/constants';
 import {handleLogout, storeTokens} from '@/store/slices/userSlice';
 import {store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';

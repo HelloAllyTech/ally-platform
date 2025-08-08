@@ -7,11 +7,12 @@ import {
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import {env} from '@/config/env';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useNavigationAwareCounselorChat} from '@/hooks/useNavigationAwareCounselorChat';
-import {useSocketConnection} from '@/hooks/useSocketConnection';
-import {useUser} from '@/hooks/useUser';
-import type {RootStackParamList, RouteNames} from '@/navigation/types';
+import {
+  useCounselorChat,
+  useNavigationAwareCounselorChat,
+  useSocketConnection,
+  useUser,
+} from '@/hooks';
 import {
   BreathingScreen,
   CallLogScreen,
@@ -19,11 +20,11 @@ import {
   ListeningScreen,
   SplashScreen,
 } from '@/screens';
-import {SocketEvent} from '@/types/message';
-import {UserRole} from '@/types/user';
+import {SocketEvent, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {DrawerNavigator} from './DrawerNavigator';
+import type {RootStackParamList, RouteNames} from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

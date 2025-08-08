@@ -10,7 +10,7 @@ import {
 } from 'react-native-permissions';
 
 import {isIOS, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {logger} from '@/utils/logger';
 
 import {useAppNavigation} from './useAppNavigation';

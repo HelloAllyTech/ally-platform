@@ -12,7 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {ThemeMode} from '@/types/general';
+import {ThemeMode} from '@/types';
 
 interface SearchInputProps {
   onFocus: () => void;

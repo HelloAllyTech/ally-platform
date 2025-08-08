@@ -2,7 +2,7 @@ import {useCallback, useRef} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {AppState} from 'react-native';
 
-import {SocketEvent} from '@/types/message';
+import {SocketEvent} from '@/types';
 
 import {useSocket} from './useSocket';
 

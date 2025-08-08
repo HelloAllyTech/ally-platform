@@ -18,12 +18,9 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchIcon} from '@/assets/icons';
-import CustomTabs from '@/components/CustomTabs/CustomTabs';
-import getThemedStyles from '@/components/CustomTabs/styles';
-import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
-import {useSearch} from '@/hooks/useSearch';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
-import useTranslate from '@/hooks/useTranslate';
+import {CustomTabs, ResourceArticleCard} from '@/components';
+import {getThemedStyles} from '@/components/CustomTabs/styles';
+import {useSearch, useTabBackToHomeHandler, useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

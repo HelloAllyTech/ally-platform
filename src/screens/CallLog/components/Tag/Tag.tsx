@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-const Tag = ({
+export const Tag = ({
   label,
   color,
   textColor,
@@ -36,5 +36,3 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
   },
 });
-
-export default Tag;

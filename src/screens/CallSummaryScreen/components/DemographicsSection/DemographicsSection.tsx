@@ -2,18 +2,16 @@ import React, {memo, useCallback, useMemo, useState} from 'react';
 import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CustomDropdown} from '@/components/Dropdown/Dropdown';
-import {SearchableLocationDropdown} from '@/components/SearchableLocationDropdown/SearchableLocationDropdown';
+import {CustomDropdown, SearchableLocationDropdown} from '@/components';
 import commonStyles from '@/components/styles';
-import {LanguageMap} from '@/constants/general';
 import {
   FIELD_LABELS,
+  LanguageMap,
   SUMMARY_FIELDS,
   SummaryFieldKey,
   summaryFields,
-} from '@/constants/summary';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
-import useTranslate from '@/hooks/useTranslate';
+} from '@/constants';
+import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {
   selectCallDetails,
@@ -21,7 +19,7 @@ import {
   selectSummaryVisibleFields,
 } from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
-import {EditableFieldKey, FieldConfig, FieldType} from '@/types/callSummary';
+import {EditableFieldKey, FieldConfig, FieldType} from '@/types';
 import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
 
 import {FieldRow} from '../FieldRow/FieldRow';

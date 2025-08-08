@@ -16,7 +16,7 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
-import {FieldType, SectionItem, SummaryField} from '@/types/callSummary';
+import {FieldType, SectionItem, SummaryField} from '@/types';
 
 export const PLACES_PER_PAGE = 50;
 

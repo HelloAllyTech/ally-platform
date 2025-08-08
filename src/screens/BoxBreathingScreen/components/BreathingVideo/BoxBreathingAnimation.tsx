@@ -5,7 +5,7 @@ import SoundPlayer from 'react-native-sound-player';
 import {SCREEN_WIDTH} from '@/constants/general';
 import {colors} from '@/theme/colors';
 
-import FlowerPetal from './FlowerPetal';
+import {FlowerPetal} from './FlowerPetal';
 
 export interface Phase {
   time: number;
@@ -69,7 +69,7 @@ const phases: Phase[] = [
   },
 ];
 
-const BoxBreathingAnimation = ({
+export const BoxBreathingAnimation = ({
   isMuted = false,
   isPlaying,
   onPhaseChange,
@@ -303,5 +303,3 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
 });
-
-export default BoxBreathingAnimation;

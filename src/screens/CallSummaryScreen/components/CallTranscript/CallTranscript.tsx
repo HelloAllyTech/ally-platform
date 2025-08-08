@@ -2,8 +2,7 @@ import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscriptIcon} from '@/assets/icons';
-import {useCallTranscriptDetails} from '@/hooks/useCallTranscriptDetails';
-import useTranslate from '@/hooks/useTranslate';
+import {useCallTranscriptDetails, useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 

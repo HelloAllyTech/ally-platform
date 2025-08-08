@@ -2,7 +2,7 @@ import {useTranslation} from 'react-i18next';
 
 import {TranslationType} from '@/localization/locales/type';
 
-const useTranslate = () => {
+export const useTranslate = () => {
   const {t} = useTranslation();
   const translate = (
     key: TranslationType,
@@ -17,5 +17,3 @@ const useTranslate = () => {
     tVariable: t,
   };
 };
-
-export default useTranslate;

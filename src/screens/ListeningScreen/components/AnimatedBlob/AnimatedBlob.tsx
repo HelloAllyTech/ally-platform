@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import ListeningAnimation from '../ListeningAnimation/ListeningAnimation';
+import {ListeningAnimation} from '../ListeningAnimation/ListeningAnimation';
 import {PlayPauseOverlay} from '../PlayPauseOverlay';
 
 interface AnimatedBlobProps {

@@ -1,5 +1,5 @@
 import {setSummaryData} from '@/store/slices/summarySlice';
-import {ChatProvider} from '@/types/message';
+import {ChatProvider} from '@/types';
 
 import {api} from './api';
 

@@ -9,7 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import type {ThemeMode} from '@/types/general';
+import type {ThemeMode} from '@/types';
 
 import {getThemedStyles} from './styles';
 
@@ -34,7 +34,7 @@ export interface CustomTabsProps {
   ) => React.ReactNode;
 }
 
-function CustomTabs({
+export const CustomTabs = ({
   tabs,
   colorScheme = 'light',
   initialTab = 0,
@@ -43,7 +43,7 @@ function CustomTabs({
   tabHeaderProps,
   renderTabHeader,
   containerStyle,
-}: CustomTabsProps) {
+}: CustomTabsProps) => {
   const [internalActiveTab, setInternalActiveTab] = useState(initialTab);
   const activeTab =
     controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
@@ -108,6 +108,4 @@ function CustomTabs({
       </ScrollView>
     </View>
   );
-}
-
-export default CustomTabs;
+};
