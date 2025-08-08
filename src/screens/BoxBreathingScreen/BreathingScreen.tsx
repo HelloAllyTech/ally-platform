@@ -7,9 +7,8 @@ import {ScaledSheet} from 'react-native-size-matters';
 import images from '@/assets/images';
 import {PrimaryButton} from '@/components';
 import {isIOS} from '@/constants/general';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {RootStackScreenProps} from '@/navigation/types';
+import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors} from '@/theme/colors';
@@ -18,9 +17,9 @@ import {fontFamily} from '@/theme/fonts';
 import {
   BoxBreathingAnimation,
   BreathingControls,
-} from './components/BreathingVideo';
-import {Phase} from './components/BreathingVideo/BoxBreathingAnimation';
-import {CallEndOverlay} from './components/CallEndOverlay';
+  CallEndOverlay,
+  Phase,
+} from './components';
 
 export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   navigation,

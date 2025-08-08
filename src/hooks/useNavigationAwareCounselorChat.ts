@@ -1,7 +1,7 @@
 import {useEffect, useRef} from 'react';
 import {NavigationContainerRef} from '@react-navigation/native';
 
-import {RootStackParamList, RouteNames} from '@/navigation/types';
+import {RootStackParamList, RouteNames} from '@/navigation';
 import {logger} from '@/utils/logger';
 
 import {useAppNavigation} from './useAppNavigation';

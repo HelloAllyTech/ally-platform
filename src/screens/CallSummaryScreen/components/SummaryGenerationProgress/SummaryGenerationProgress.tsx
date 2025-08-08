@@ -2,7 +2,7 @@ import {Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {BarsIcon, InfoIcon} from '@/assets/icons';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';

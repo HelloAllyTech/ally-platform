@@ -8,7 +8,7 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 
-import useTranslate from './useTranslate';
+import {useTranslate} from './useTranslate';
 
 const checkAndRequestStoragePermission = async (
   permission: (typeof PERMISSIONS.ANDROID)[keyof typeof PERMISSIONS.ANDROID],

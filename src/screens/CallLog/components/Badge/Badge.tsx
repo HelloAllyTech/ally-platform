@@ -5,7 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 
-const Badge = ({children}: {children: React.ReactNode}) => (
+export const Badge = ({children}: {children: React.ReactNode}) => (
   <View style={styles.badge}>
     <Text style={styles.badgeText}>{children}</Text>
   </View>
@@ -29,5 +29,3 @@ const styles = ScaledSheet.create({
     fontSize: '12@ms',
   },
 });
-
-export default Badge;

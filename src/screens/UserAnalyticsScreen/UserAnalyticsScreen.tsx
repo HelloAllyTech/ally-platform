@@ -3,12 +3,10 @@ import {ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {DateSelector} from '@/components/DateSelector/DateSelector';
-import {LoadingSkeleton} from '@/components/LoadingSkeleton/LoadingSkeleton';
+import {DateSelector, LoadingSkeleton} from '@/components';
 import {CALENDAR_MODES} from '@/constants/analytics';
 import {isIOS} from '@/constants/general';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
-import useTranslate from '@/hooks/useTranslate';
+import {useTabBackToHomeHandler, useTranslate} from '@/hooks';
 import {useGetCounselorStatsQuery} from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';

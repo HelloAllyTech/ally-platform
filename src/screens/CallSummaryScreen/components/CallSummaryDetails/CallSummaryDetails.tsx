@@ -9,14 +9,13 @@ import {
   SECTION_LIST,
   SectionKey,
   summaryFields,
-} from '@/constants/summary';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
-import useTranslate from '@/hooks/useTranslate';
+} from '@/constants';
+import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {typography} from '@/theme/typography';
-import {SectionItem} from '@/types/callSummary';
+import {SectionItem} from '@/types';
 
 import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
 

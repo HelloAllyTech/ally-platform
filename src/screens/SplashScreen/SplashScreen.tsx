@@ -18,12 +18,14 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
-import {RootStackScreenProps} from '@/navigation/types';
-import {UserRole} from '@/types/user';
+import {
+  useCounselorChat,
+  useHardwareBackPressHandler,
+  useTranslate,
+  useUser,
+} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
+import {UserRole} from '@/types';
 
 import {EmailLogin, OtpVerification} from './components';
 import {styles} from './styles';

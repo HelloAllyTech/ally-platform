@@ -7,3 +7,4 @@ export {UserAnalyticsScreen} from './UserAnalyticsScreen/UserAnalyticsScreen';
 export {BreathingScreen} from './BoxBreathingScreen/BreathingScreen';
 export {CommunityScreen} from './CommunityScreen/CommunityScreen';
 export {SearchScreen} from './SearchScreen/SearchScreen';
+export {DrawerContent} from './LogoutScreen/components/CustomDrawerContent';

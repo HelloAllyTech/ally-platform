@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import type {ThemeMode} from '@/types/general';
+import type {ThemeMode} from '@/types';
 
 interface SearchSuggestionProps {
   colorTheme?: ThemeMode;

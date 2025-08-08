@@ -3,7 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
-import type {ThemeMode} from '@/types/general';
+import type {ThemeMode} from '@/types';
 
 export const getThemedStyles = (colorScheme: ThemeMode | null) => {
   const isDark = colorScheme === 'dark';
@@ -67,5 +67,3 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
     },
   });
 };
-
-export default getThemedStyles;

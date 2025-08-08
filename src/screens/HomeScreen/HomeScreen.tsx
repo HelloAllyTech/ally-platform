@@ -15,14 +15,15 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {DrawerMenuIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {env} from '@/config/env';
-import {CHAT_TYPES} from '@/constants/chat';
-import {isIOS} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useDrawerNavigation} from '@/hooks/useDrawerNavigation';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
+import {CHAT_TYPES, isIOS} from '@/constants';
+import {
+  useAppNavigation,
+  useCounselorChat,
+  useDrawerNavigation,
+  useHardwareBackPressHandler,
+  useTranslate,
+  useUser,
+} from '@/hooks';
 import {
   useGetSummaryFieldsQuery,
   useGetVisibleChatTypesQuery,
@@ -31,12 +32,11 @@ import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {Chat} from '@/types/message';
-import {UserRole} from '@/types/user';
+import {Chat, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
-import StartCallCard from './components/StartCallCard/StartCallCard';
+import {StartCallCard} from './components/StartCallCard/StartCallCard';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();

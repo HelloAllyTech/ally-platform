@@ -1,4 +1,4 @@
-import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants/dates';
+import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants';
 
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);

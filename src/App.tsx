@@ -6,7 +6,7 @@ import {Provider} from 'react-redux';
 
 import {env} from '@/config/env';
 
-import NetworkLogs from './components/NetworkLogs/NetworkLogs';
+import {NetworkLogs} from './components/NetworkLogs/NetworkLogs';
 import {RootNavigator} from './navigation/RootNavigator';
 import {store} from './store/store';
 

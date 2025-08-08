@@ -26,7 +26,7 @@ const GRADIENT_COLORS = [
   'rgba(255,255,255,0)',
 ];
 
-const ShinyText: React.FC<ShinyTextProps> = ({
+const ShinyTextComponent: React.FC<ShinyTextProps> = ({
   children,
   disabled = false,
   speed = 5,
@@ -88,4 +88,4 @@ const styles = ScaledSheet.create({
   },
 });
 
-export default React.memo(ShinyText);
+export const ShinyText = React.memo(ShinyTextComponent);

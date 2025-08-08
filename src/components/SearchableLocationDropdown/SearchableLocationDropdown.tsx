@@ -14,11 +14,8 @@ import {ms} from 'react-native-size-matters';
 
 import {ArrowDown, SearchIcon} from '@/assets/icons';
 import commonStyles from '@/components/styles';
-import {WINDOW_HEIGHT} from '@/constants/general';
-import {PLACES_PER_PAGE} from '@/constants/summary';
-import {useDebounce} from '@/hooks/useDebounce';
-import {useKeyboardState} from '@/hooks/useKeyboardState';
-import useTranslate from '@/hooks/useTranslate';
+import {PLACES_PER_PAGE, WINDOW_HEIGHT} from '@/constants';
+import {useDebounce, useKeyboardState, useTranslate} from '@/hooks';
 import {
   Place,
   useGetPlacesQuery,

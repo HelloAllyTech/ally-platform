@@ -2,11 +2,11 @@ import {useState} from 'react';
 import {createDrawerNavigator} from '@react-navigation/drawer';
 import {StyleSheet} from 'react-native';
 
-import {LogoutModal} from '@/screens/LogoutScreen/components/LogoutModal';
+import {DrawerContent} from '@/screens';
+import {LogoutModal} from '@/screens/LogoutScreen';
 import {colors} from '@/theme/colors';
 
-import {DrawerContent} from '../screens/LogoutScreen/CustomDrawerContent';
-import {BottomTabs} from './tabNavigator';
+import {BottomTabs} from './TabNavigator';
 
 const Drawer = createDrawerNavigator();
 

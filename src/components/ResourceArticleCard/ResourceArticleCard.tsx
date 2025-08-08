@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 
 import {getThemedStyles} from './styles';
 
@@ -22,7 +22,7 @@ interface ResourceArticleCardProps {
 
 const MAX_LINES = 3;
 
-const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
+export const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
   category,
   tags = [],
   heading,
@@ -90,5 +90,3 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
     </View>
   );
 };
-
-export default ResourceArticleCard;

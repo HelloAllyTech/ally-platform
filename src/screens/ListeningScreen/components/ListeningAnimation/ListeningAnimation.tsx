@@ -222,7 +222,7 @@ interface ListeningAnimationProps {
   maxAmplitude?: number;
 }
 
-const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
+export const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
   isAnimating = true,
   maxAmplitude = 110,
 }) => {
@@ -255,5 +255,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
-export default ListeningAnimation;

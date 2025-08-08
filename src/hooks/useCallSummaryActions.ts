@@ -12,7 +12,7 @@ import {logger} from '@/utils/logger';
 
 import {useAppNavigation} from './useAppNavigation';
 import {useStoragePermissions} from './useStoragePermissions';
-import useTranslate from './useTranslate';
+import {useTranslate} from './useTranslate';
 
 interface ToastState {
   visible: boolean;
@@ -20,7 +20,7 @@ interface ToastState {
   type: 'success' | 'error' | 'info';
 }
 
-const useCallSummaryActions = ({
+export const useCallSummaryActions = ({
   chatId,
   name,
   isCallLogSummaryFlow,
@@ -219,5 +219,3 @@ const useCallSummaryActions = ({
     hideHeaderDropdown,
   };
 };
-
-export default useCallSummaryActions;

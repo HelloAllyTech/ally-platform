@@ -1,5 +1,5 @@
-import {CustomModal} from '@/components/Modal/CustomModal';
-import useTranslate from '@/hooks/useTranslate';
+import {CustomModal} from '@/components';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 
 interface DeleteRenameModalProps {

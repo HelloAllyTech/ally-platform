@@ -7,17 +7,18 @@ import {
 import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 
 import {env} from '@/config/env';
-import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useDebounce} from '@/hooks/useDebounce';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
-import {useSocketConnection} from '@/hooks/useSocketConnection';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
-import {RootStackParamList} from '@/navigation/types';
+import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT} from '@/constants';
+import {
+  useAppNavigation,
+  useCounselorChat,
+  useDebounce,
+  useHardwareBackPressHandler,
+  useLiveAudioStream,
+  useSocketConnection,
+  useTranslate,
+  useUser,
+} from '@/hooks';
+import {RootStackParamList} from '@/navigation';
 import {
   useEndCallMutation,
   useLazyGetCounsellorChatQuery,
@@ -32,22 +33,26 @@ import {
   FeedbackResponse,
   SocketEvent,
   SocketMessage,
-} from '@/types/message';
+} from '@/types';
 import {Maybe} from '@/utils/common';
 
+import {
+  AudioWaveformContainer,
+  CallEndConfirmationModal,
+  ControlButtonsSection,
+  NudgeSection,
+  PlayPauseOverlay,
+  Search,
+  Timer,
+} from './components';
+import {styles} from './styles';
 import {
   exotelAudioDataToAmplitudes,
   getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
-} from './audioUtils';
-import {ControlButtonsSection, NudgeSection, Timer} from './components';
-import {AudioWaveformContainer} from './components/AudioWaveformContainer/AudioWaveformContainer';
-import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
-import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
-import Search from './components/Search/Search';
-import {styles} from './styles';
+} from './utils';
 
 export interface Nudge {
   id: number;

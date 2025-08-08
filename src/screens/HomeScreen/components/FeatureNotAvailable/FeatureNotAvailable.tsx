@@ -1,7 +1,7 @@
 import {StyleProp, Text, TextStyle, TouchableOpacity, View} from 'react-native';
 
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {useTranslate} from '@/hooks';
 
 import {styles} from './styles';
 

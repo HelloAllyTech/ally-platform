@@ -3,9 +3,8 @@ import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {Calendar, LocaleConfig} from 'react-native-calendars';
 
 import {LeftArrow, RightArrow} from '@/assets/icons';
-import {CALENDAR_MODES, MONTHS} from '@/constants/analytics';
-import {DEFAULT_HIT_SLOP} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
+import {CALENDAR_MODES, DEFAULT_HIT_SLOP, MONTHS} from '@/constants';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme/colors';
 
 import {calendarTheme, localeConfig} from './calendarConfig';
