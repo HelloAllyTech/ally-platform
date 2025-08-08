@@ -19,7 +19,7 @@ export const App = () => {
         <SafeAreaProvider style={styles.container}>
           <StatusBar translucent backgroundColor="transparent" />
           <RootNavigator />
-          {env.ENVIRONMENT === 'development' && <NetworkLogs />}
+          {__DEV__ && env.ENVIRONMENT === 'development' && <NetworkLogs />}
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>
