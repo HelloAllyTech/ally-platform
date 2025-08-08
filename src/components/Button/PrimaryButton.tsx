@@ -14,9 +14,11 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   onPress,
   customContainerStyle,
   customTextStyle,
+  ...rest
 }) => {
   return (
     <TouchableOpacity
+      {...rest}
       style={[
         styles.button,
         isDisabled && styles.buttonDisabled,
