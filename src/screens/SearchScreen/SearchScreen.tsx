@@ -21,11 +21,14 @@ import {SearchIcon} from '@/assets/icons';
 import {CustomTabs, ResourceArticleCard} from '@/components';
 import {getThemedStyles} from '@/components/CustomTabs/styles';
 import {useSearch, useTabBackToHomeHandler, useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
-import {SearchHeader, SearchInput, SearchSuggestion} from './components';
-import {SearchEmpty} from './components/SearchEmpty';
+import {
+  SearchEmpty,
+  SearchHeader,
+  SearchInput,
+  SearchSuggestion,
+} from './components';
 import {trySuggestions} from './searchConfig';
 import {ResourceArticle} from './types';
 

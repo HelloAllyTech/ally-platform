@@ -2,8 +2,7 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const Badge = ({children}: {children: React.ReactNode}) => (
   <View style={styles.badge}>

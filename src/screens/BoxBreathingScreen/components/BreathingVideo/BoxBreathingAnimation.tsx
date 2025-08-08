@@ -4,7 +4,7 @@ import {useSharedValue, withTiming} from 'react-native-reanimated';
 import SoundPlayer from 'react-native-sound-player';
 
 import {SCREEN_WIDTH} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 import {FlowerPetal} from './FlowerPetal';
 

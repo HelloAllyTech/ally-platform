@@ -10,8 +10,7 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SummaryFieldKey} from '@/constants/summary';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface EditableFieldProps {
   fieldKey: SummaryFieldKey;

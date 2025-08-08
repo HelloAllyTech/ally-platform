@@ -13,8 +13,7 @@ import {
 import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
-import {typography} from '@/theme/typography';
+import {colors, typography} from '@/theme';
 import {SectionItem} from '@/types';
 
 import {SectionWrapper} from '../SectionWrapper/SectionWrapper';

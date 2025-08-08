@@ -7,8 +7,7 @@ import {
   EyeIcon,
 } from '@/assets/icons';
 import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';

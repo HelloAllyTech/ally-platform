@@ -7,6 +7,10 @@ import {
   summaryFields,
 } from '@/constants/summary';
 import {
+  transformFormDataForSubmission,
+  transformSummaryToFormData,
+} from '@/screens/CallSummaryScreen/utils/formDataTransformer';
+import {
   useGetTagsMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
@@ -17,16 +21,12 @@ import {
   selectSummaryData,
   setFormData,
 } from '@/store/slices/summarySlice';
+import {SummaryFormData} from '@/types';
 import {mapTagsToString} from '@/utils/callSummary';
-import {
-  FormData,
-  transformFormDataForSubmission,
-  transformSummaryToFormData,
-} from '@/utils/callSummary/formDataTransformer';
 
 export const useCallSummaryForm = () => {
   const dispatch = useAppDispatch();
-  const originalFormDataRef = useRef<FormData | null>(null);
+  const originalFormDataRef = useRef<SummaryFormData | null>(null);
 
   const summaryData = useAppSelector(selectSummaryData);
   const formData = useAppSelector(selectFormData);
@@ -71,7 +71,7 @@ export const useCallSummaryForm = () => {
         (acc as any)[field.key] = summary[field.key] ?? null;
       }
       return acc;
-    }, {} as Partial<FormData>);
+    }, {} as Partial<SummaryFormData>);
 
     dispatch(setFormData(sectionData));
   };
@@ -110,7 +110,7 @@ export const useCallSummaryForm = () => {
 
     // Compare all fields in the form data
     return Object.keys(current).some(key => {
-      const fieldKey = key as keyof FormData;
+      const fieldKey = key as keyof SummaryFormData;
       return original[fieldKey] !== current[fieldKey];
     });
   }, [formData]);

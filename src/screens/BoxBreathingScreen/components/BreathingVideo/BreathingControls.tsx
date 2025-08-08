@@ -9,7 +9,7 @@ import {
   VolumeIcon,
   VolumeOffIcon,
 } from '@/assets/icons';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 type Props = {
   isMuted: boolean;

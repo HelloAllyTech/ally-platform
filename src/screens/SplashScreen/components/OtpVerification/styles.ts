@@ -1,9 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {globalStyles} from '@/theme/helpers';
-import {typography} from '@/theme/typography';
+import {colors, fontFamily, globalStyles, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {

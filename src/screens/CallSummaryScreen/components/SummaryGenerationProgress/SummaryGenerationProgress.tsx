@@ -4,8 +4,7 @@ import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import {BarsIcon, InfoIcon} from '@/assets/icons';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,

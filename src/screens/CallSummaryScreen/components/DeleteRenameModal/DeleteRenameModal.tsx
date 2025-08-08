@@ -1,6 +1,6 @@
 import {CustomModal} from '@/components';
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 interface DeleteRenameModalProps {
   activeModal: string;

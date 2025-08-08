@@ -16,8 +16,7 @@ import {
   EditSquareIcon,
   WandStarsIcon,
 } from '@/assets/icons';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface SectionHeaderProps {
   label: string;

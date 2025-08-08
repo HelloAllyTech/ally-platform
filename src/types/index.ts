@@ -9,6 +9,7 @@ export {
   type SummaryFieldValueTypes,
   type EditableFieldKey,
   type SectionItem,
+  type SummaryFormData,
 } from './callSummary';
 
 // General types

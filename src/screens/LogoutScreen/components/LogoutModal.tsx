@@ -1,6 +1,6 @@
 import {CustomModal} from '@/components';
 import {useTranslate, useUser} from '@/hooks';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 interface LogoutModalProps {
   isLogoutModalVisible: boolean;

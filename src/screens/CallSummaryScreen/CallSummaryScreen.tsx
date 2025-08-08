@@ -23,7 +23,7 @@ import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 import {
   AddNotesSection,

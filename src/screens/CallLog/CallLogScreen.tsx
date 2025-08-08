@@ -8,8 +8,7 @@ import {NoCallLogsIcon} from '@/assets/icons';
 import {useAppNavigation, useTabBackToHomeHandler, useTranslate} from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {useAppSelector} from '@/store/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 import {CallLogHeader, CallLogItem} from './components';
 import {CallLog} from './types';

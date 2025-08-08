@@ -3,7 +3,7 @@ import {TouchableOpacity} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {PauseIcon, PlayIcon} from '@/assets/icons';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 interface PlayPauseOverlayProps {
   isPlaying: boolean;

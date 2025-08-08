@@ -2,8 +2,7 @@ import React from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface NotesSectionProps {
   notes: string;

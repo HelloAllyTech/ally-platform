@@ -30,13 +30,11 @@ import {
 } from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 import {Chat, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
 
-import {FeatureNotAvailable} from './components/FeatureNotAvailable/FeatureNotAvailable';
-import {StartCallCard} from './components/StartCallCard/StartCallCard';
+import {FeatureNotAvailable, StartCallCard} from './components';
 
 export const HomeScreen: React.FC = () => {
   const {t} = useTranslate();

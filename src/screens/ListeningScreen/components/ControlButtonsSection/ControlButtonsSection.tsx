@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {CallEndIcon, ChevronDown, MicIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 interface ControlButtonsSectionProps {
   onFocusModeButtonPress: () => void;

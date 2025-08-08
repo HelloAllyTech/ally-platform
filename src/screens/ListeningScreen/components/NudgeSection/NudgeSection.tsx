@@ -7,7 +7,7 @@ import {
   useAddFeedbackMutation,
   useUpdateFeedbackMutation,
 } from '@/services/chatApi';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 import {FeedbackResponse} from '@/types';
 import {logger} from '@/utils/logger';
 

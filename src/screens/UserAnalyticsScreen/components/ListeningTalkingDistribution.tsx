@@ -3,8 +3,7 @@ import {ActivityIndicator, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface ListeningTalkingStats {
   listeningPercent?: number;
