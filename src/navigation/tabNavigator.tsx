@@ -25,7 +25,7 @@ import {
   SearchScreen,
   UserAnalyticsScreen,
 } from '@/screens';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 const Tab = createBottomTabNavigator();
 

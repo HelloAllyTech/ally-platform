@@ -26,8 +26,7 @@ import {
 import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {colors} from '@/theme/colors';
-import {globalStyles} from '@/theme/helpers';
+import {colors, globalStyles} from '@/theme';
 import {
   ChatProvider,
   FeedbackResponse,

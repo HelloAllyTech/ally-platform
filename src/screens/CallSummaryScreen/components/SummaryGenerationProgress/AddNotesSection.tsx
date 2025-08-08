@@ -3,8 +3,7 @@ import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, InfoIcon, PageIcon} from '@/assets/icons';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const AddNotesSection = ({
   savedNotes,

@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
 
-import {colors as globalColors} from '@/theme/colors';
+import {colors as globalColors} from '@/theme';
 
 const DEFAULT_WAVE_CONFIGS = [
   {

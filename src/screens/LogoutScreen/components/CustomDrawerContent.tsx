@@ -3,8 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {LogoutIcon, ProfileIcon} from '@/assets/icons';
 import {useTranslate, useUser} from '@/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface DrawerContentProps {
   openLogoutModal: () => void;

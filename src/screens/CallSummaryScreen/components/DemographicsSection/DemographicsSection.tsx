@@ -18,7 +18,7 @@ import {
   selectSummary,
   selectSummaryVisibleFields,
 } from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 import {EditableFieldKey, FieldConfig, FieldType} from '@/types';
 import {formatDateWithOrdinal, formatTimeHHmm} from '@/utils/date';
 

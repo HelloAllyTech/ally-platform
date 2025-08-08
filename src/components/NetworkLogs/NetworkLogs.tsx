@@ -15,7 +15,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseCircle} from '@/assets/icons';
 import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 const NetworkLogsComponent = ({onPress}: {onPress?: () => void}) => {
   const {t} = useTranslation();

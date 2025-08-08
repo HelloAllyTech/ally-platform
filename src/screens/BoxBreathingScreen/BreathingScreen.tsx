@@ -11,8 +11,7 @@ import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 import {
   BoxBreathingAnimation,

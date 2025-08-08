@@ -18,8 +18,7 @@ import {SearchInput, SearchSuggestion} from '@/screens/SearchScreen/components';
 import {SearchEmpty} from '@/screens/SearchScreen/components/SearchEmpty';
 import {trySuggestions} from '@/screens/SearchScreen/searchConfig';
 import {ResourceArticle} from '@/screens/SearchScreen/types';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const Search = () => {
   const flatListRef = useRef<FlatList>(null);

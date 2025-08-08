@@ -12,8 +12,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown} from '@/assets/icons';
 import commonStyles from '@/components/styles';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface DropdownProps {
   value: string;

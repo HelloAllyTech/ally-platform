@@ -10,8 +10,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 import {ThemeMode} from '@/types';
 
 interface SearchInputProps {

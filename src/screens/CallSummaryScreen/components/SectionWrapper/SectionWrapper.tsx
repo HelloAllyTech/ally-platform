@@ -7,8 +7,7 @@ import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectCallInfo} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 import {EditableFieldKey, SectionItem} from '@/types';
 
 import {SectionContent} from '../CallSummaryDetails/SectionContent';

@@ -1,38 +1,12 @@
 import {SUMMARY_FIELDS} from '@/constants/summary';
-import {AgeRange, CallSummaryResponse, Tag} from '@/services/callSummaryApi';
-
-import {mapTagsToString} from '../callSummary';
-
-export type FormData = {
-  // Demographics - editable fields only
-  [SUMMARY_FIELDS.AGE]: AgeRange | null;
-  [SUMMARY_FIELDS.GENDER]: string | null;
-  [SUMMARY_FIELDS.PROFESSION]: string | null;
-  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: string | null;
-  [SUMMARY_FIELDS.LOCATION]: string | null;
-  [SUMMARY_FIELDS.CONCERN_CODE]: string | null;
-
-  // Text content fields - all editable
-  [SUMMARY_FIELDS.SESSION_SUMMARY]: string | null;
-  [SUMMARY_FIELDS.FLOW]: string | null;
-  [SUMMARY_FIELDS.KEY_CONCERNS]: string | null;
-  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]: string | null;
-  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]: string | null;
-  [SUMMARY_FIELDS.ASSESSMENT]: string | null;
-  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: string | null;
-  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: string | null;
-  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]: string | null;
-  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: string | null;
-  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: string | null;
-  [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: string | null;
-  [SUMMARY_FIELDS.TAGS]: string | null;
-  [SUMMARY_FIELDS.ADDITIONAL_NOTES]: string | null;
-};
+import {CallSummaryResponse, Tag} from '@/services/callSummaryApi';
+import {SummaryFormData} from '@/types';
+import {mapTagsToString} from '@/utils/callSummary';
 
 export const transformSummaryToFormData = (
   summary: CallSummaryResponse['details']['summary'],
   callInfo?: CallSummaryResponse['details']['callInfo'],
-): FormData => ({
+): SummaryFormData => ({
   [SUMMARY_FIELDS.SESSION_SUMMARY]: summary.sessionSummary || null,
   [SUMMARY_FIELDS.FLOW]: summary.counselingProcessFlow || null,
   [SUMMARY_FIELDS.KEY_CONCERNS]: summary.keyConcerns || null,
@@ -61,7 +35,7 @@ export const transformSummaryToFormData = (
 });
 
 export const transformFormDataForSubmission = (
-  formData: FormData | null,
+  formData: SummaryFormData | null,
   summaryData: CallSummaryResponse,
   tags: Tag[],
 ): CallSummaryResponse['details']['summary'] => {

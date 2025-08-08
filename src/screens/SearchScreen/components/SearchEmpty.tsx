@@ -3,8 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface SearchEmptyProps {
   searchText: string;

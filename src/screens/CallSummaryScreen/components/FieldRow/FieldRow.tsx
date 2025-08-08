@@ -3,9 +3,7 @@ import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import commonStyles from '@/components/styles';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface FieldRowProps {
   label: string;

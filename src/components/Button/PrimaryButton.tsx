@@ -2,8 +2,7 @@ import React from 'react';
 import {ActivityIndicator, Text, TouchableOpacity} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {typography} from '@/theme/typography';
+import {colors, typography} from '@/theme';
 
 import type {PrimaryButtonProps} from './types';
 

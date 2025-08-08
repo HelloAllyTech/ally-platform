@@ -15,7 +15,7 @@ import {PrimaryButton} from '@/components';
 import {isValidEmail} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 import {getErrorMessage} from '@/utils/error';
 
 import {styles} from './styles';

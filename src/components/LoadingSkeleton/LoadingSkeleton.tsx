@@ -2,7 +2,7 @@ import React, {useEffect, useMemo} from 'react';
 import {Animated, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 export const LoadingSkeleton: React.FC = () => {
   const shimmerAnimation = useMemo(() => new Animated.Value(0), []);

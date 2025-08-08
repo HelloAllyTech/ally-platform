@@ -5,7 +5,7 @@ import {Calendar, LocaleConfig} from 'react-native-calendars';
 import {LeftArrow, RightArrow} from '@/assets/icons';
 import {CALENDAR_MODES, DEFAULT_HIT_SLOP, MONTHS} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 import {calendarTheme, localeConfig} from './calendarConfig';
 import {formatDate, getDisplayText, getYearRange, isToday} from './dateUtils';

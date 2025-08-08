@@ -4,7 +4,7 @@ import {StyleSheet} from 'react-native';
 
 import {DrawerContent} from '@/screens';
 import {LogoutModal} from '@/screens/LogoutScreen';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 import {BottomTabs} from './TabNavigator';
 

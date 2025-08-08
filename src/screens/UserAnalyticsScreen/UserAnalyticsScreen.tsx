@@ -8,8 +8,7 @@ import {CALENDAR_MODES} from '@/constants/analytics';
 import {isIOS} from '@/constants/general';
 import {useTabBackToHomeHandler, useTranslate} from '@/hooks';
 import {useGetCounselorStatsQuery} from '@/services/analyticsApi';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 import {ListeningTalkingDistribution, TabBar} from './components';
 

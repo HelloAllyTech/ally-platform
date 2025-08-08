@@ -3,8 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscriptIcon} from '@/assets/icons';
 import {useCallTranscriptDetails, useTranslate} from '@/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 type Message = {
   id: number;
