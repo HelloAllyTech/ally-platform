@@ -2,6 +2,7 @@
   "name": "ally",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -64,6 +65,7 @@
     "@react-native/eslint-config": "0.79.1",
     "@react-native/metro-config": "0.79.1",
     "@react-native/typescript-config": "0.79.1",
+    "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.2.0",
     "@types/jest": "^29.5.13",
     "@types/lodash": "^4.17.16",
@@ -81,6 +83,7 @@
     "prettier": "^3.5.3",
     "prettier-plugin-unused-imports-configurable": "^1.14.3",
     "react-native-svg-transformer": "^1.5.1",
+    "react-test-renderer": "^19.0.0",
     "typescript": "^5.0.4"
   },
   "engines": {
