@@ -153,6 +153,11 @@ export const SearchScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={tabBodyContentStyle}
             style={tabBodyStyle}
+            removeClippedSubviews
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
             ListFooterComponent={
               showFooterLoader ? (
                 <ActivityIndicator style={styles.footerActivityIndicator} />
