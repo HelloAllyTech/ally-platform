@@ -1,0 +1,6 @@
+Your Ally Learn Login Code
+
+Use this code to complete your login: {otp_code}
+
+This code will expire in 10 minutes.
+If you didn't request this code, please ignore this email.

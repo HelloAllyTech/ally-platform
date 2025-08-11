@@ -1,16 +1,61 @@
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  postgres:
+    image: postgres:17.4
+    container_name: ally_learn_postgres
+    environment:
+      POSTGRES_DB: ally_learn_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "8000:8000"
+      - "5432:5432"
     volumes:
-      - .:/app
-    env_file:
-      - .env
-    # Remove the command override to use the CMD from the Dockerfile
-    # This will run both the Uvicorn server and LiveKit worker
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ally_learn_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: ally_learn_localstack
+    environment:
+      # LocalStack configuration
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-south-1
+      AWS_DEFAULT_OUTPUT: json
+      SERVICES: ses,s3,lambda,logs
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/ally-learn-data
+      DOCKER_HOST: unix:///var/run/docker.sock
+      HOST_TMP_FOLDER: ${TMPDIR:-/tmp}/localstack
+      # Web UI configuration
+      LOCALSTACK_WEB_UI: 1
+      # SES specific configuration
+      SES_FROM_EMAIL: noreply@localhost.localstack.cloud
+      SES_RETURN_PATH: noreply@localhost.localstack.cloud
+    ports:
+      - "4566:4566"        # LocalStack main port
+      - "4510-4559:4510-4559"  # LocalStack service ports
+      - "8080:8080"        # LocalStack Web UI port
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - localstack_data:/tmp/localstack-ally-learn
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  localstack_data:
+    driver: local

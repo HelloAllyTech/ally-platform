@@ -3,45 +3,186 @@ Authentication endpoints.
 """
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.auth.auth_service import auth_service, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.schemas.auth import Token, LoginRequest
+from app.core.config import settings
+from app.core.dependencies import get_authentication_service, get_current_user, get_user_management_service
+from app.core.services import AuthenticationService, UserManagementService
+from app.core.exceptions import NotFoundException
+from app.core.models import User
+from app.schemas.auth import (
+    SendOTPRequest, SendOTPResponse,  VerifyOTPRequest, VerifyOTPResponse, RefreshTokenRequest,
+    RefreshTokenResponse, LogoutRequest, LogoutResponse
+)
+from app.utils import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
+# Email-OTP Authentication Endpoints
 
-@router.post("/login", response_model=Token)
-async def login(login_request: LoginRequest) -> Any:
+@router.post("/send-otp", response_model=SendOTPResponse)
+async def send_otp(
+    request: SendOTPRequest,
+    auth_service: AuthenticationService = Depends(get_authentication_service),
+    user_service: UserManagementService = Depends(get_user_management_service)
+) -> SendOTPResponse:
     """
-    Login endpoint to get an access token.
+    Send OTP to email address for existing users only.
     
     Args:
-        login_request: The login request containing the secret key.
+        request: Email address to send OTP to
+        auth_service: Authentication service dependency
+        user_service: User management service dependency
         
     Returns:
-        Token: The access token.
+        SendOTPResponse: Confirmation message with expiry info
         
     Raises:
-        HTTPException: If the secret key is invalid.
+        HTTPException: If user doesn't exist or OTP generation fails
     """
-    # Verify the secret key
-    if not auth_service.verify_secret_key(login_request.secret_key):
+    # Validate that user exists in database
+    user = await user_service.get_user_by_email(str(request.email))
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid secret key",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User with this email address does not exist"
         )
 
-    # Generate a session ID
-    session_id = auth_service.generate_session_id()
+    try:
+        success = await auth_service.generate_and_send_otp(str(request.email))
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP. Please try again."
+            )
+        
+        return SendOTPResponse(
+            message="OTP sent successfully",
+            email=str(request.email),
+            expires_in_minutes=10
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error sending OTP to {request.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while sending OTP"
+        )
 
-    # Create access token with the session ID
-    access_token_expires = ACCESS_TOKEN_EXPIRE_MINUTES
-    access_token = auth_service.create_access_token(
-        session_id=session_id,
-        data={"sub": "admin"},  # Since we don't have a user database, we use a fixed username
-        expires_delta=access_token_expires
-    )
+
+@router.post("/verify-otp", response_model=VerifyOTPResponse)
+async def verify_otp(
+    request: VerifyOTPRequest,
+    auth_service: AuthenticationService = Depends(get_authentication_service)
+) -> VerifyOTPResponse:
+    """
+    Verify OTP and complete login for existing users only.
     
-    return Token(access_token=access_token, token_type="bearer")
+    Args:
+        request: Email and OTP code
+        auth_service: Authentication service dependency
+        
+    Returns:
+        VerifyOTPResponse: User info and authentication tokens
+        
+    Raises:
+        HTTPException: If OTP verification fails or user doesn't exist
+    """
+    try:
+        user, tokens = await auth_service.verify_otp_and_login(
+            str(request.email),
+            request.code
+        )
+        
+        if not user or not tokens:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired OTP"
+            )
+        
+        return VerifyOTPResponse(
+            message="Login successful",
+            user_id=user.id,
+            email=user.email,
+            name=user.name,
+            tokens=tokens
+        )
+        
+    except NotFoundException as e:
+        # User doesn't exist
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh_token(
+    request: RefreshTokenRequest,
+    auth_service: AuthenticationService = Depends(get_authentication_service)
+) -> RefreshTokenResponse:
+    """
+    Refresh access token using refresh token.
+    
+    Args:
+        request: Refresh token
+        auth_service: Authentication service dependency
+        
+    Returns:
+        RefreshTokenResponse: New access token
+        
+    Raises:
+        HTTPException: If refresh token is invalid
+    """
+    access_token = await auth_service.refresh_access_token(request.refresh_token)
+    
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    return RefreshTokenResponse(
+        access_token=access_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
+    )
+
+
+@router.post("/logout", response_model=LogoutResponse)
+async def logout(
+    current_user: User = Depends(get_current_user),
+    auth_service: AuthenticationService = Depends(get_authentication_service)
+) -> LogoutResponse:
+    """
+    Logout user by invalidating refresh token.
+    
+    Args:
+        current_user: Current authenticated user from JWT token
+        auth_service: Authentication service dependency
+        
+    Returns:
+        LogoutResponse: Logout confirmation
+        
+    Raises:
+        HTTPException: If logout fails
+    """
+    try:
+        success = await auth_service.logout_user(current_user.id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to logout user"
+            )
+        
+        return LogoutResponse(
+            message="Logged out successfully"
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Logout failed: {str(e)}"
+        )

@@ -3,17 +3,17 @@ LiveKit room endpoints.
 """
 from typing import List
 import json
-import logging
-from datetime import datetime
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.encoders import jsonable_encoder
 
-from app.core.auth.auth_service import auth_service
+from app.core.dependencies import get_current_user, verify_admin_api_key
+from app.core.models import User
 from app.core.livekit.room_service import room_service
 from app.core.livekit.token_service import token_service
 from app.schemas.room import RoomResponse, RoomUpdate, RoomCreationResponse, RoomListResponse, RoomCreate
 from app.utils.logger import get_logger
+from app.utils.datetime_utils import timestamp_to_iso_utc
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -22,35 +22,39 @@ logger = get_logger(__name__)
 @router.post("", response_model=RoomCreationResponse, status_code=status.HTTP_201_CREATED)
 async def create_room(
     room_data: RoomCreate,
-    session_id: str = Depends(auth_service.get_current_session_id)
+    current_user: User = Depends(get_current_user)
 ) -> RoomCreationResponse:
     """
-    Create a new LiveKit room using the session ID from the JWT token.
+    Create a new LiveKit room using the current authenticated user.
     
     Args:
         room_data: Room creation data including optional script_type.
-        session_id: The session ID from the JWT token.
+        current_user: Current authenticated user from JWT token.
         
     Returns:
         RoomCreationResponse: The created room with room ID, participant ID, access token and creation time.
     """
     try:
+        # Generate session-like identifier using user ID
+        session_id = f"user_{current_user.id}"
+        
         # TODO: script_type is currently passed due to Livekit not returning metadata
         # Format room name and participant identity
         # Include script_type in the room name since metadata isn't being passed back
         room_id = f"room_{room_data.script_type}_{session_id}"
-        participant_id = f"user_{session_id}"
+        participant_id = f"user_{current_user.id}"
         
-        # Create metadata JSON with the session_id and script_type
+        # Create metadata JSON with the user info and script_type
         metadata = json.dumps({
-            "session_id": session_id,
+            "user_id": current_user.id,
+            "user_email": current_user.email,
             "script_type": room_data.script_type
         })
         
         # Create the room with the formatted room ID
         room = await room_service.create_room(
             name=room_id,  # Use formatted room ID as name with script_type included
-            metadata=metadata  # Store session_id and script_type in metadata
+            metadata=metadata  # Store user info and script_type in metadata
         )
         
         # Generate access token for the participant
@@ -62,7 +66,7 @@ async def create_room(
         
         # Use current time instead of relying on LiveKit's creation_time
         # This ensures we have the correct current time in ISO format
-        created_at = datetime.utcfromtimestamp(room.creation_time).isoformat() + "Z"
+        created_at = timestamp_to_iso_utc(room.creation_time)
         
         logger.info(f"Room created: {room_id}, script_type: {room_data.script_type}, creation time: {created_at}")
         
@@ -83,13 +87,11 @@ async def create_room(
 
 @router.get("", response_model=List[RoomListResponse])
 async def list_rooms(
-    session_id: str = Depends(auth_service.get_current_session_id)
+    _: bool = Depends(verify_admin_api_key)
 ) -> List[RoomListResponse]:
     """
     List all LiveKit rooms with simplified response (name, SID, and creation time).
-    
-    Args:
-        session_id: The session ID from the token.
+    Requires admin API key authentication.
         
     Returns:
         List[RoomListResponse]: List of rooms with name, SID, and creation time.
@@ -101,7 +103,7 @@ async def list_rooms(
         result = []
         for room in rooms:
             # Convert creation_time from Unix timestamp to ISO format
-            created_at = datetime.utcfromtimestamp(room.creation_time).isoformat() + "Z"
+            created_at = timestamp_to_iso_utc(room.creation_time)
             
             result.append(RoomListResponse(
                 sid=room.sid,
@@ -121,14 +123,14 @@ async def list_rooms(
 @router.delete("/{room_name}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room(
     room_name: str,
-    session_id: str = Depends(auth_service.get_current_session_id)
+    _: User = Depends(get_current_user)
 ) -> None:
     """
     Delete a LiveKit room.
+    Requires user authentication.
     
     Args:
         room_name: The name of the room to delete.
-        session_id: The session ID from the token.
     """
     try:
         await room_service.delete_room(room_name)
@@ -144,15 +146,15 @@ async def delete_room(
 async def update_room_metadata(
     room_name: str,
     room_update: RoomUpdate,
-    session_id: str = Depends(auth_service.get_current_session_id)
+    _: bool = Depends(verify_admin_api_key)
 ) -> RoomResponse:
     """
     Update the metadata of a LiveKit room.
+    Requires admin API key authentication.
     
     Args:
         room_name: The name of the room.
         room_update: The room update data.
-        session_id: The session ID from the token.
         
     Returns:
         RoomResponse: The updated room.
