@@ -159,6 +159,16 @@ export const HomeScreen: React.FC = () => {
                           }
                         />
                       )}
+                      {/* TODO: Remove later: Temporary: LiveKit RN test entry */}
+                      <StartCallCard
+                        image={images.listenLive}
+                        header={'Practice simulations'}
+                        subtitle={'Choose a role and start a session'}
+                        onPressCard={() => navigation.navigate('Simulations')}
+                        customStyles={
+                          isSingleCallType ? styles.stretchCard : {}
+                        }
+                      />
                       {visibleChatTypes.includes(
                         CHAT_TYPES.MICROPHONE_CHAT,
                       ) && (

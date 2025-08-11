@@ -18,6 +18,8 @@ import {
   CallLogScreen,
   CallSummaryScreen,
   ListeningScreen,
+  LiveKitTestScreen,
+  SimulationsScreen,
   SplashScreen,
 } from '@/screens';
 import {SocketEvent, UserRole} from '@/types';
@@ -109,6 +111,8 @@ const NavigationContent = ({
           <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
           <Stack.Screen name="CallLog" component={CallLogScreen} />
           <Stack.Screen name="Breathing" component={BreathingScreen} />
+          <Stack.Screen name="Simulations" component={SimulationsScreen} />
+          <Stack.Screen name="LiveKitTest" component={LiveKitTestScreen} />
           <Stack.Screen name="Splash" component={SplashScreen} />
         </>
       ) : (

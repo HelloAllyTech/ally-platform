@@ -27,6 +27,14 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+const baseQueryForLearn = fetchBaseQuery({
+  baseUrl: 'https://api-learn.dev.helloally.ai' + '/api/' + env.API_VERSION,
+  prepareHeaders: async headers => {
+    return headers;
+  },
+});
+
 const handleUserLogout = () => {
   store.dispatch(handleLogout());
 };
@@ -96,8 +104,81 @@ const baseQueryWithReauth: BaseQueryFn<
   }
 };
 
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+const baseQueryWithReauthForLearn: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, _store, extraOptions) => {
+  try {
+    let result = await baseQueryForLearn(args, _store, extraOptions);
+    if (result.error && result.error.status === 401) {
+      // Try to get a new token
+      const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
+      const refreshToken = await getItem<string>(
+        AsyncStorageKeys.REFRESH_TOKEN,
+      );
+
+      // If there is no access token or refresh token, logout user
+      if (!accessToken || !refreshToken) {
+        handleUserLogout();
+        return result;
+      }
+
+      try {
+        const refreshResult = await baseQuery(
+          {
+            url: '/auth/refresh',
+            method: 'POST',
+            body: {refreshToken},
+          },
+          _store,
+          extraOptions,
+        );
+
+        if (!refreshResult.data) {
+          throw new Error('No refresh data received');
+        }
+
+        const tokens = refreshResult.data as AuthResponse;
+
+        if (tokens) {
+          // Store the new tokens
+          store.dispatch(
+            storeTokens({
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
+            }),
+          );
+
+          // Retry the original query with new access token
+          result = await baseQuery(args, _store, extraOptions);
+        } else {
+          handleUserLogout();
+        }
+      } catch (error) {
+        logger.error(`Error refreshing token: ${error}`);
+        handleUserLogout();
+        return result;
+      }
+    }
+
+    return result;
+  } catch (err) {
+    logger.error(`Error in baseQueryWithReauth: ${err}`);
+    return {error: {status: 401, data: {message: 'Unauthorized'}}};
+  }
+};
+
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  endpoints: () => ({}),
+});
+
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+export const learnApi = createApi({
+  reducerPath: 'learnApi',
+  baseQuery: baseQueryWithReauthForLearn,
   endpoints: () => ({}),
 });
