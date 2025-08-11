@@ -8,6 +8,8 @@ export type RootStackParamList = {
   CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
   Breathing: undefined;
+  LiveKitTest: undefined;
+  Simulations: undefined;
 };
 
 export type DrawerParamList = {
