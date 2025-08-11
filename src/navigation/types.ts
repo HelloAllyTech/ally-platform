@@ -10,6 +10,7 @@ export type RootStackParamList = {
   Breathing: undefined;
   LiveKitTest: undefined;
   Simulations: undefined;
+  SimulationAssistant: undefined;
 };
 
 export type DrawerParamList = {
