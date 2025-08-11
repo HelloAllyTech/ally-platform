@@ -30,7 +30,7 @@ export const SimulationsScreen: React.FC = () => {
     <TouchableOpacity
       activeOpacity={0.8}
       style={styles.card}
-      onPress={() => navigation.navigate('LiveKitTest')}>
+      onPress={() => navigation.navigate('SimulationAssistant')}>
       {!!item.cover_image && (
         <Image
           source={{uri: item.cover_image}}
