@@ -81,14 +81,16 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             <CloseIcon />
           </TouchableOpacity>
           <Text style={styles.title}>
-            {t('Home.start')}{' '}
-            <Text style={styles.titleItalic}>{t('Home.session')}</Text>
+            {t('CallLogs.start')}{' '}
+            <Text style={styles.titleItalic}>{t('CallLogs.session')}</Text>
           </Text>
           <Image source={images.conversation} style={styles.illustration} />
           <Text style={styles.description}>
-            {t('Home.startSessionDescription')}
+            {t('CallLogs.startSessionDescription')}
           </Text>
-          <Text style={styles.sectionLabel}>{t('Home.chooseListening')}</Text>
+          <Text style={styles.sectionLabel}>
+            {t('CallLogs.chooseListening')}
+          </Text>
 
           {allowedTypes.includes(CHAT_TYPES.EXOTEL_CONFERENCE_CHAT) && (
             <TouchableOpacity
@@ -102,9 +104,9 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
                 )}
               </View>
               <View style={styles.optionTextBlock}>
-                <Text style={styles.optionTitle}>{t('Home.joinCall')}</Text>
+                <Text style={styles.optionTitle}>{t('CallLogs.joinCall')}</Text>
                 <Text style={styles.optionSubtitle}>
-                  {t('Home.allyWillJoinOngoingCall')}
+                  {t('CallLogs.allyWillJoinOngoingCall')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -122,9 +124,11 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
                 )}
               </View>
               <View style={styles.optionTextBlock}>
-                <Text style={styles.optionTitle}>{t('Home.listenLive')}</Text>
+                <Text style={styles.optionTitle}>
+                  {t('CallLogs.listenLive')}
+                </Text>
                 <Text style={styles.optionSubtitle}>
-                  {t('Home.allyWillHearAudio')}
+                  {t('CallLogs.allyWillHearAudio')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -133,7 +137,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           <View style={styles.separator} />
 
           <PrimaryButton
-            label={t('Home.startSessionNow')}
+            label={t('CallLogs.startSessionNow')}
             onPress={handleStart}
             customContainerStyle={[
               styles.ctaBtn,
@@ -142,7 +146,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             isDisabled={!selected}
           />
 
-          <Text style={styles.consent}>{t('Home.consentNotice')}</Text>
+          <Text style={styles.consent}>{t('CallLogs.consentNotice')}</Text>
         </View>
       </View>
     </Modal>

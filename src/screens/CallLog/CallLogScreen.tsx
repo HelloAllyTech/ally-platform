@@ -21,7 +21,6 @@ import {
   useTranslate,
   useUser,
 } from '@/hooks';
-import {FeatureNotAvailable} from '@/screens/HomeScreen/components';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
   useGetSummaryFieldsQuery,
@@ -34,6 +33,7 @@ import {Chat, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {CallLogHeader, CallLogItem, StartSessionModal} from './components';
+import {FeatureNotAvailable} from './components/FeatureNotAvailable';
 import {CallLog} from './types';
 
 // Number of items to fetch per page for pagination
@@ -228,14 +228,14 @@ export const CallLogScreen: React.FC = () => {
       />
       {!isCounselor ? (
         <FeatureNotAvailable
-          description={t('Home.client.appCurrentlyForCounsellors')}
-          ctaText={t('Home.client.learnMore')}
+          description={t('CallLogs.appCurrentlyForCounsellors')}
+          ctaText={t('CallLogs.learnMore')}
           onCtaPress={handleLearnMorePress}
           containerStyle={styles.featureNotAvailable}
         />
       ) : !isLoadingChatTypes && !hasAnyCallType ? (
         <FeatureNotAvailable
-          description={t('HomeScreen.noAccessToCallFeatures')}
+          description={t('CallLogs.noAccessToCallFeatures')}
           containerStyle={styles.featureNotAvailable}
         />
       ) : isLoading ? (
