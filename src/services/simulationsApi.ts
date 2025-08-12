@@ -1,4 +1,7 @@
+import {API_METHODS, API_ROUTES} from '@/constants';
 import {
+  FeedbackRequest,
+  FeedbackResponse,
   LoginResponse,
   RoomCreationResponse,
   RoomDeletionResponse,
@@ -8,20 +11,6 @@ import {
 } from '@/types';
 
 import {learnApi} from './api';
-
-// API route constants
-const API_ROUTES = {
-  SEND_OTP: '/auth/send-otp',
-  VERIFY_OTP: '/auth/verify-otp',
-  ROOMS: '/rooms',
-  SCENARIOS: '/scenarios',
-} as const;
-
-const API_METHODS = {
-  GET: 'GET',
-  POST: 'POST',
-  DELETE: 'DELETE',
-} as const;
 
 export const simulationsApi = learnApi.injectEndpoints({
   endpoints: builder => ({
@@ -69,8 +58,20 @@ export const simulationsApi = learnApi.injectEndpoints({
         method: API_METHODS.DELETE,
       }),
     }),
+
     getScenarios: builder.query<ScenariosResponse, void>({
       query: () => '/scenarios',
+    }),
+
+    addFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
+      query: ({rating, comment}) => ({
+        url: API_ROUTES.FEEDBACK,
+        method: API_METHODS.POST,
+        body: {
+          rating: rating?.toString(),
+          comment,
+        },
+      }),
     }),
   }),
 });
@@ -82,4 +83,5 @@ export const {
   useListRoomsQuery,
   useDeleteRoomMutation,
   useGetScenariosQuery,
+  useAddFeedbackMutation,
 } = simulationsApi;

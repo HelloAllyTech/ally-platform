@@ -1,104 +1,135 @@
-import React, {useEffect, useState} from 'react';
-import {LiveKitRoom, RoomContext} from '@livekit/react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {RoomContext} from '@livekit/react-native';
+import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {InfoIcon} from '@/assets/icons';
-import {useAppNavigation, useLiveKitConnection} from '@/hooks';
+import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {useDeleteRoomMutation} from '@/services/simulationsApi';
 import {colors, fontFamily} from '@/theme';
 
-import {
-  AudioWave,
-  ConnectionLoader,
-  ControlButtons,
-  SimulationTimer,
-} from './components';
+import {AudioWave, ControlButtons, SimulationTimer} from './components';
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const {roomData} = route.params;
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
-
-  const {t} = useTranslation();
-  const navigation = useAppNavigation();
-  // Hardcoded LiveKit configuration for now
   const wsUrl = 'wss://ally-learn-poc-dev-lbzgnlp9.livekit.cloud/';
   const token = roomData.access_token;
+  const startTime = roomData?.created_at
+    ? new Date(roomData?.created_at)
+    : new Date();
+  const navigation = useAppNavigation();
+  const {t} = useTranslation();
 
-  const {
-    room,
-    status,
-    isMicEnabled,
-    error,
-    connect,
-    disconnect,
-    toggleMic,
-    shouldRenderRoom,
-  } = useLiveKitConnection({
-    wsUrl,
-    token,
-    onConnected: () => {
-      setStartTime(Date.now());
-      setRetryCount(0); // Reset retry count on successful connection
-    },
-    onDisconnected: () => {
-      setStartTime(null);
-    },
-    onError: errorMessage => {
-      // TODO: Handle error
-    },
-  });
+  const [deleteRoom] = useDeleteRoomMutation();
 
-  // Auto-connect when component mounts and token is available
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
+  const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
+
+  const [room] = useState<Room>(() => new Room());
+
   useEffect(() => {
-    if (token && token.trim()) {
-      connect();
+    if (token) {
+      handleConnect();
     }
-  }, [connect, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleRetry = async () => {
-    if (retryCount < maxRetries) {
-      setRetryCount(prev => prev + 1);
+  const attachRoomListeners = useCallback(() => {
+    const onConnected = () => {
+      setIsConnecting(false);
       try {
-        await connect();
-      } catch (error) {
-        // TODO: Handle error
+        room.localParticipant.setMicrophoneEnabled(true);
+        setIsMicEnabled(true);
+      } catch {
+        // no-op
       }
-    } else {
-      // Max retries reached, show different message or navigate back
+    };
+    const onDisconnected = () => {
+      setIsConnecting(false);
+    };
+    const onTrackPub = () => {
+      // TODO: Handle track publication
+    };
+    room
+      .on(RoomEvent.Connected, onConnected)
+      .on(RoomEvent.Disconnected, onDisconnected)
+      .on(RoomEvent.TrackPublished, onTrackPub);
+    return () => {
+      room
+        .off(RoomEvent.Connected, onConnected)
+        .off(RoomEvent.Disconnected, onDisconnected)
+        .off(RoomEvent.TrackPublished, onTrackPub);
+    };
+  }, [room]);
+
+  useEffect(() => attachRoomListeners(), [attachRoomListeners]);
+
+  const handleConnect = useCallback(async () => {
+    try {
+      setIsConnecting(true);
+      await room.connect(wsUrl, token);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to connect';
+      console.error('handleConnect error', message);
+    }
+  }, [token, wsUrl]);
+
+  const handleDisconnect = async () => {
+    try {
+      setIsDisconnecting(true);
+      await room.disconnect();
+      const response = await deleteRoom(room?.name);
+      if (!response.error) {
+        navigation.replace('SimulationFeedback');
+      }
+    } finally {
+      setIsMicEnabled(false);
+      setIsDisconnecting(false);
     }
   };
 
-  const handleGoBack = () => {
-    navigation.pop();
+  const handleToggleMic = async () => {
+    try {
+      const next = !isMicEnabled;
+      await room.localParticipant.setMicrophoneEnabled(next);
+      setIsMicEnabled(next);
+    } catch (e) {
+      console.error('handleToggleMic error', e);
+    }
   };
 
-  const handleMicPress = () => {
-    toggleMic();
+  const renderConnectionLoader = () => {
+    return (
+      <View style={styles.connectionLoaderContainer}>
+        <Text>Connecting...</Text>
+      </View>
+    );
   };
 
-  const handleStopPress = async () => {
-    await disconnect();
-    navigation.navigate('SimulationFeedback');
+  const renderDisconnectionLoader = () => {
+    return (
+      <View style={styles.connectionLoaderContainer}>
+        <Text>Disconnecting...</Text>
+      </View>
+    );
   };
-
-  const isConnected = status === 'connected';
 
   return (
     <SafeAreaView style={styles.container}>
       <RoomContext.Provider value={room}>
-        {startTime && (
-          <SimulationTimer startTime={startTime} isConnected={isConnected} />
-        )}
+        {isConnecting && renderConnectionLoader()}
+        {isDisconnecting && renderDisconnectionLoader()}
+        {startTime && <SimulationTimer startTime={startTime} />}
         <AudioWave />
         <ControlButtons
-          onMicPress={handleMicPress}
-          onStopPress={handleStopPress}
+          onMicPress={handleToggleMic}
+          onStopPress={handleDisconnect}
           isMuted={!isMicEnabled}
         />
         <View style={styles.securityContainer}>
@@ -107,22 +138,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             {t('SimulationScreen.encryptionInfo')}
           </Text>
         </View>
-
-        {/* LiveKit Room */}
-        {shouldRenderRoom && token && (
-          <LiveKitRoom room={room} serverUrl={wsUrl} token={token}>
-            {/* LiveKit room content can be added here if needed */}
-          </LiveKitRoom>
-        )}
-
-        {/* Connection Loader */}
-        <ConnectionLoader
-          status={status}
-          error={error}
-          onRetry={retryCount < maxRetries ? handleRetry : undefined}
-          onGoBack={handleGoBack}
-          maxRetriesReached={retryCount >= maxRetries}
-        />
       </RoomContext.Provider>
     </SafeAreaView>
   );
@@ -149,5 +164,16 @@ const styles = ScaledSheet.create({
     ...fontFamily.ROBOTO.REGULAR,
     fontSize: '12@ms',
     color: colors.lightGray3,
+  },
+  connectionLoaderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
   },
 });

@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
+import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetScenariosQuery} from '@/services/simulationsApi';
@@ -15,6 +17,7 @@ import {colors, fontFamily} from '@/theme';
 import type {Scenario} from '@/types/simulations';
 
 export const SimulationsScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation = useAppNavigation();
   const {data, isFetching, refetch} = useGetScenariosQuery();
   const scenarios = data?.scenarios ?? [];
@@ -67,7 +70,13 @@ export const SimulationsScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.pageTitle}>
+        {t('Simulations.chooseYour')}{' '}
+        <Text style={styles.pageTitleItalic}>
+          {t('Simulations.scenarioWord')}
+        </Text>
+      </Text>
       <FlatList
         contentContainerStyle={styles.list}
         data={scenarios}
@@ -78,7 +87,7 @@ export const SimulationsScreen: React.FC = () => {
           <RefreshControl refreshing={isFetching} onRefresh={refetch} />
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -101,8 +110,8 @@ const styles = ScaledSheet.create({
     marginBottom: '12@ms',
   },
   cover: {
-    width: '400@ms',
-    height: '160@ms',
+    width: '100%',
+    height: '120@ms',
     backgroundColor: colors.lightGray4,
   },
   cardBody: {
@@ -132,5 +141,14 @@ const styles = ScaledSheet.create({
   emptyDesc: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkGray14,
+  },
+  pageTitle: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    color: colors.darkGray12,
+    fontSize: '28@ms',
+    paddingHorizontal: '16@ms',
+  },
+  pageTitleItalic: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
 });

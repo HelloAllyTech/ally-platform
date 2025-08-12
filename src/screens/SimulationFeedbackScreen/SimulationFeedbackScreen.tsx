@@ -1,5 +1,4 @@
 import React, {useState} from 'react';
-import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
   ScrollView,
@@ -13,6 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {StarIcon} from '@/assets/icons';
 import {PrimaryButton} from '@/components/Button';
 import {useAppNavigation} from '@/hooks';
+import {useAddFeedbackMutation} from '@/services/simulationsApi';
 import {colors, fontFamily, typography} from '@/theme';
 
 export const SimulationFeedbackScreen: React.FC = () => {
@@ -20,8 +20,8 @@ export const SimulationFeedbackScreen: React.FC = () => {
   const [feedbackText, setFeedbackText] = useState<string>('Nice Experience!');
   const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
 
-  const {t} = useTranslation();
   const navigation = useAppNavigation();
+  const [addFeedback, {isLoading}] = useAddFeedbackMutation();
 
   const handleStarPress = (starIndex: number) => {
     setRating(starIndex + 1);
@@ -36,9 +36,19 @@ export const SimulationFeedbackScreen: React.FC = () => {
     setFeedbackText(feedbackOptions[starIndex]);
   };
 
-  const handleSubmit = () => {
-    // TODO: Submit feedback to backend
-    navigation.pop();
+  const handleSubmit = async () => {
+    try {
+      await addFeedback({
+        rating,
+        comment: additionalFeedback || feedbackText,
+      });
+
+      // Navigate back on success
+      navigation.pop();
+    } catch (error) {
+      // Handle error - you might want to show a toast or alert
+      console.error('Failed to submit feedback:', error);
+    }
   };
 
   const renderStars = () => {
@@ -99,9 +109,10 @@ export const SimulationFeedbackScreen: React.FC = () => {
         {/* Submit Button */}
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            label="Submit Feedback"
+            label={isLoading ? 'Submitting...' : 'Submit Feedback'}
             onPress={handleSubmit}
             customContainerStyle={styles.submitButton}
+            disabled={isLoading}
           />
         </View>
       </ScrollView>
