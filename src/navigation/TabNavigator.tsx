@@ -13,15 +13,12 @@ import {
   CallLogInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
-  HomeActiveIcon,
-  HomeInactiveIcon,
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets/icons';
 import {
   CallLogScreen,
   CommunityScreen,
-  HomeScreen,
   SearchScreen,
   UserAnalyticsScreen,
 } from '@/screens';
@@ -29,16 +26,9 @@ import {colors} from '@/theme';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = [
-  'HomeTab',
-  'CallLog',
-  'UserAnalytics',
-  'Search',
-  'Community',
-];
+const TAB_NAMES = ['CallLog', 'UserAnalytics', 'Search', 'Community'];
 
 const TAB_COMPONENTS = [
-  HomeScreen,
   CallLogScreen,
   UserAnalyticsScreen,
   SearchScreen,
@@ -58,20 +48,18 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      HomeTab: <HomeActiveIcon width={18} height={18} />,
       CallLog: <CallLogActiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
       Community: <CommunityActiveIcon width={20} height={20} />,
       Search: <SearchActiveIcon width={20} height={20} color={colors.blue} />,
-    };
+    } as const;
 
     const unfocusedIcons = {
-      HomeTab: <HomeInactiveIcon width={18} height={18} />,
       CallLog: <CallLogInactiveIcon width={18} height={18} />,
       UserAnalytics: <AnalyticsInactiveIcon width={18} height={18} />,
       Community: <CommunityInactiveIcon width={20} height={20} />,
       Search: <SearchInactiveIcon width={20} height={20} />,
-    };
+    } as const;
 
     return focused
       ? focusedIcons[route as keyof typeof focusedIcons]
@@ -110,7 +98,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
           headerShown: false,
           lazy: true,
         }}
-        initialRouteName="HomeTab">
+        initialRouteName="CallLog">
         {TAB_NAMES.map((name, idx) => (
           <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
         ))}

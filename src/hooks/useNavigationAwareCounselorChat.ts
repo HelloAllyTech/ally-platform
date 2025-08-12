@@ -31,11 +31,8 @@ export const useNavigationAwareCounselorChat = (
       // Handle active chat found based on current screen
       switch (currentRouteName.current) {
         case 'Splash':
-          // From splash, reset stack to Home -> Listening
-          navigation.reset({
-            index: 1,
-            routes: [{name: 'Home'}, {name: 'Listening'}],
-          });
+          // From splash, go directly to Listening
+          navigation.reset({index: 0, routes: [{name: 'Listening'}]});
           break;
 
         case 'Listening':
