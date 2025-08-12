@@ -1,1 +1,0 @@
-export {StartCallCard} from './StartCallCard';
