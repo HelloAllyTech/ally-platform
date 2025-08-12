@@ -1,4 +1,5 @@
 // Audio types
+export type {CircleConfig, AudioTrackRef, CircleProps} from './audio';
 
 // Call Summary types
 export {

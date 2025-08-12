@@ -13,6 +13,9 @@ export {AsyncStorageKeys} from './asyncStorage';
 // Chat constants
 export {AUDIO_INACTIVE_TIMEOUT, CHAT_TYPES} from './chat';
 
+// Audio constants
+export {AUDIO, CIRCLE, CIRCLE_CONFIGS} from './audio';
+
 // Date constants
 export {MONTH_NAMES_SHORT, MONTH_NAMES_FULL} from './dates';
 
