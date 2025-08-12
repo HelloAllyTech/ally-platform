@@ -1,6 +1,8 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
+import {Scenario} from '@/types/scenarios';
+
 export type RootStackParamList = {
   Splash: undefined;
   Home: {screen?: string; params?: {screen?: string}} | undefined;
@@ -10,6 +12,7 @@ export type RootStackParamList = {
   Breathing: undefined;
   LiveKitTest: undefined;
   Simulations: undefined;
+  SimulationDetails: {scenario: Scenario};
 };
 
 export type DrawerParamList = {

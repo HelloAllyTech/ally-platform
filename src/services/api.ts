@@ -112,56 +112,58 @@ const baseQueryWithReauthForLearn: BaseQueryFn<
 > = async (args, _store, extraOptions) => {
   try {
     let result = await baseQueryForLearn(args, _store, extraOptions);
-    if (result.error && result.error.status === 401) {
-      // Try to get a new token
-      const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
-      const refreshToken = await getItem<string>(
-        AsyncStorageKeys.REFRESH_TOKEN,
-      );
+    // if (result.error && result.error.status === 401) {
+    //   // Try to get a new token
+    //   // const accessToken = await getItem<string>(
+    //   //   AsyncStorageKeys.LEARN_ACCESS_TOKEN,
+    //   // );
+    //   // const tokenType = await getItem<string>(
+    //   //   AsyncStorageKeys.LEARN_TOKEN_TYPE,
+    //   // );
 
-      // If there is no access token or refresh token, logout user
-      if (!accessToken || !refreshToken) {
-        handleUserLogout();
-        return result;
-      }
+    //   // If there is no access token or refresh token, logout user
+    //   // if (!accessToken || !tokenType) {
+    //   //   // handleUserLogout();
+    //   //   // return result;
+    //   // }
 
-      try {
-        const refreshResult = await baseQuery(
-          {
-            url: '/auth/refresh',
-            method: 'POST',
-            body: {refreshToken},
-          },
-          _store,
-          extraOptions,
-        );
+    //   result = await baseQuery(args, _store, extraOptions);
 
-        if (!refreshResult.data) {
-          throw new Error('No refresh data received');
-        }
+    //   try {
+    //     const refreshResult = await baseQuery(
+    //       {
+    //         url: '/auth/refresh',
+    //         method: 'POST',
+    //         body: {tokenType},
+    //       },
+    //       _store,
+    //       extraOptions,
+    //     );
 
-        const tokens = refreshResult.data as AuthResponse;
+    //     if (!refreshResult.data) {
+    //       throw new Error('No refresh data received');
+    //     }
 
-        if (tokens) {
-          // Store the new tokens
-          store.dispatch(
-            storeTokens({
-              accessToken: tokens.accessToken,
-              refreshToken: tokens.refreshToken,
-            }),
-          );
+    //     const tokens = refreshResult.data as {
+    //       access_token: string;
+    //       token_type: string;
+    //     };
 
-          // Retry the original query with new access token
-          result = await baseQuery(args, _store, extraOptions);
-        } else {
-          handleUserLogout();
-        }
-      } catch (error) {
-        logger.error(`Error refreshing token: ${error}`);
-        handleUserLogout();
-        return result;
-      }
-    }
+    //     result = await baseQuery(args, _store, extraOptions);
+
+    //     if (tokens) {
+    //       // Store the new tokens
+    //       // Retry the original query with new access token
+    //       result = await baseQuery(args, _store, extraOptions);
+    //     } else {
+    //       handleUserLogout();
+    //     }
+    //   } catch (error) {
+    //     logger.error(`Error refreshing token: ${error}`);
+    //     handleUserLogout();
+    //     return result;
+    //   }
+    // }
 
     return result;
   } catch (err) {

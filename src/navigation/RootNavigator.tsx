@@ -19,6 +19,7 @@ import {
   CallSummaryScreen,
   ListeningScreen,
   LiveKitTestScreen,
+  SimulationDetailsScreen,
   SimulationsScreen,
   SplashScreen,
 } from '@/screens';
@@ -112,6 +113,10 @@ const NavigationContent = ({
           <Stack.Screen name="CallLog" component={CallLogScreen} />
           <Stack.Screen name="Breathing" component={BreathingScreen} />
           <Stack.Screen name="Simulations" component={SimulationsScreen} />
+          <Stack.Screen
+            name="SimulationDetails"
+            component={SimulationDetailsScreen}
+          />
           <Stack.Screen name="LiveKitTest" component={LiveKitTestScreen} />
           <Stack.Screen name="Splash" component={SplashScreen} />
         </>

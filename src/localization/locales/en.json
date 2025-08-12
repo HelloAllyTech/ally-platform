@@ -207,5 +207,13 @@
   "submit": "Submit",
   "ResourceArticleCard": {
     "more": "more"
+  },
+  "Simulations": {
+    "chooseYour": "Choose your",
+    "scenarioWord": "Scenario",
+    "scenariosCaps": "SCENARIOS",
+    "scenarioLabel": "Scenario:",
+    "descriptionLabel": "Description:",
+    "startSimulation": "Start Simulation"
   }
 }
