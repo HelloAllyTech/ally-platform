@@ -11,7 +11,7 @@ import {colors, fontFamily} from '@/theme';
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
-  useAppNavigation();
+  const navigation = useAppNavigation();
   const {scenario} = route.params;
   const {t} = useTranslate();
 
@@ -53,7 +53,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         <View style={styles.ctaWrapper}>
           <PrimaryButton
             label={t('Simulations.startSimulation')}
-            onPress={() => {}}
+            onPress={() => navigation.navigate('SimulationAssistant')}
           />
         </View>
       </ScrollView>
