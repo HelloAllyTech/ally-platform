@@ -3,6 +3,7 @@ User model for the application.
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.core.models.base import Base
@@ -36,6 +37,9 @@ class User(Base):
         onupdate=func.timezone('UTC', func.now())
     )
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    feedback = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}', name='{self.name}')>"

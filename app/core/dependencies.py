@@ -13,6 +13,7 @@ from app.core.database.manager import get_db_session
 from app.core.models.user import User
 from app.core.services.user_management import UserManagementService
 from app.core.services.authentication import AuthenticationService
+from app.core.services.feedback import FeedbackService
 
 # Security scheme for JWT tokens
 security = HTTPBearer()
@@ -50,6 +51,21 @@ def get_authentication_service(
         AuthenticationService instance with injected database session
     """
     return AuthenticationService(session)
+
+
+def get_feedback_service(
+    session: AsyncSession = Depends(get_database_session)
+) -> FeedbackService:
+    """
+    FastAPI dependency for getting FeedbackService instance.
+    
+    Args:
+        session: Database session from dependency injection
+        
+    Returns:
+        FeedbackService instance with injected database session
+    """
+    return FeedbackService(session)
 
 
 # Authentication Dependencies 
