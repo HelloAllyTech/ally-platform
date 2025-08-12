@@ -63,6 +63,7 @@ import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
 import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
+import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
@@ -138,4 +139,5 @@ export {
   EmptyTranscriptIcon,
   PageIcon,
   NotesIcon,
+  TranscribeIcon,
 };
