@@ -26,11 +26,15 @@ export const SimulationsScreen: React.FC = () => {
     return true;
   });
 
+  const handleStart = (scenario: Scenario) => {
+    navigation.navigate('SimulationDetails', {scenario});
+  };
+
   const renderItem = ({item}: {item: Scenario}) => (
     <TouchableOpacity
       activeOpacity={0.8}
       style={styles.card}
-      onPress={() => navigation.navigate('LiveKitTest')}>
+      onPress={() => handleStart(item)}>
       {!!item.cover_image && (
         <Image
           source={{uri: item.cover_image}}
