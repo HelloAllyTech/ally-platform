@@ -406,7 +406,7 @@ export const ListeningScreen = ({
           if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             // Clear chat state before navigation
             dispatch(clearCurrentChat());
-            navigation.navigate('Home');
+            navigation.navigate('CallLog');
           }
         });
       }

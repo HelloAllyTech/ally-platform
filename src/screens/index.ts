@@ -1,5 +1,4 @@
 export {CallLogScreen} from './CallLog';
-export {HomeScreen} from './HomeScreen';
 export {ListeningScreen} from './ListeningScreen';
 export {SplashScreen} from './SplashScreen';
 export {CallSummaryScreen} from './CallSummaryScreen';

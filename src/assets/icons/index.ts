@@ -13,6 +13,7 @@ import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
 import ChevronDown from './chevronDown.svg';
+import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
 import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
@@ -51,6 +52,7 @@ import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
+import ReplayIcon from './replay.svg';
 import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
@@ -140,4 +142,6 @@ export {
   PageIcon,
   NotesIcon,
   TranscribeIcon,
+  ReplayIcon,
+  CloseIcon,
 };

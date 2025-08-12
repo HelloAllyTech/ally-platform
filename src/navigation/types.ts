@@ -3,7 +3,6 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
   Splash: undefined;
-  Home: {screen?: string; params?: {screen?: string}} | undefined;
   Listening: {isMicrophoneMode?: boolean} | undefined;
   CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
@@ -17,9 +16,10 @@ export type DrawerParamList = {
 };
 
 export type TabParamList = {
-  HomeTab: undefined;
   CallLog: undefined;
   Community: undefined;
+  UserAnalytics: undefined;
+  Search: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

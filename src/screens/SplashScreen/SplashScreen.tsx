@@ -43,14 +43,14 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
-      // Reset the navigation stack to have Home and Listening screens
+      // Go directly to Listening
       navigation.reset({
         index: 1,
-        routes: [{name: 'Home'}, {name: 'Listening'}],
+        routes: [{name: 'CallLog'}, {name: 'Listening'}],
       });
     },
     onNoActiveChatFound: () => {
-      navigation.replace('Home');
+      navigation.replace('CallLog');
     },
   });
   const {t} = useTranslate();
@@ -87,7 +87,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
         if (userData?.role === UserRole.COUNSELOR) {
           checkCounselorChat();
         } else {
-          navigation.replace('Home');
+          navigation.replace('CallLog');
         }
       }
     }

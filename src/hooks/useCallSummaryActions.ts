@@ -167,10 +167,7 @@ export const useCallSummaryActions = ({
     if (isCallLogSummaryFlow) {
       navigation.goBack();
     } else {
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'Home'}],
-      });
+      navigation.reset({index: 0, routes: [{name: 'CallLog'}]});
       dispatch(clearCurrentChat());
     }
   }, [isCallLogSummaryFlow, navigation, dispatch]);

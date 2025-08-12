@@ -117,8 +117,8 @@ export const CallSummaryScreen: React.FC<
   const onViewCallLogs = () => {
     dispatch(clearCurrentChat());
     navigation.reset({
-      index: 1,
-      routes: [{name: 'Home'}, {name: 'CallLog'}],
+      index: 0,
+      routes: [{name: 'CallLog'}],
     });
   };
 

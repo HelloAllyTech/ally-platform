@@ -50,7 +50,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   useHardwareBackPressHandler(() => {
     dispatch(clearCurrentChat());
     setIsPlaying(false);
-    navigation.navigate('Home');
+    navigation.reset({index: 0, routes: [{name: 'CallLog'}]});
     return true;
   });
 

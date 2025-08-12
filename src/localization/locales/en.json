@@ -11,8 +11,6 @@
     }
   },
   "Home": {
-    "callConnectionNotImplemented": "Call connection feature is not yet implemented",
-    "noFeaturesAvailable": "No features are currently available for your account.",
     "start": "Start",
     "session": "Session",
     "chooseListening": "Choose your listening mode",
@@ -20,7 +18,13 @@
     "listenLive": "Listen Live",
     "allyWillJoinOngoingCall": "Ally will join your ongoing call",
     "allyWillHearAudio": "Ally will hear audio alongside you",
-    "consentNotice": "By starting, you confirm everyone being transcribed has given consent",
+    "consentNotice": "By starting, you confirm everyone being transcribed has given consent.",
+    "startSessionDescription": "Ally’s mental health AI scribe safely listens, transcribes and writes session notes for you.",
+    "startSessionNow": "Start session now",
+    "alreadyInCallTitle": "Already in a call",
+    "alreadyInCallMessage": "You are already in a call. Please end the current call to make a new one.",
+    "unableOpenLink": "Unable to open the link",
+    "cantHandlePhoneCall": "Can't handle phone call",
     "client": {
       "oops": "Oops!",
       "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
@@ -129,7 +133,7 @@
   },
   "CallLogs": {
     "header": {
-      "title": "Call",
+      "title": "Session",
       "subtitle": "Logs"
     },
     "search": {

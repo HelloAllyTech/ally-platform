@@ -15,7 +15,6 @@ import {
 } from '@/hooks';
 import {
   BreathingScreen,
-  CallLogScreen,
   CallSummaryScreen,
   ListeningScreen,
   SplashScreen,
@@ -43,15 +42,15 @@ const NavigationContent = ({
         (navigationRef?.getCurrentRoute()?.name as RouteNames) !== 'Listening'
       ) {
         navigationRef.reset({
-          index: 1,
-          routes: [{name: 'Home'}, {name: 'Listening'}],
+          index: 0,
+          routes: [{name: 'Listening'}],
         });
       }
     },
     onNoActiveChatFound: () => {
       navigationRef.reset({
         index: 0,
-        routes: [{name: 'Home'}],
+        routes: [{name: 'CallLog'}],
       });
     },
     getCurrentRoute: () => navigationRef?.getCurrentRoute()?.name,
@@ -102,12 +101,11 @@ const NavigationContent = ({
       {isAuthenticated ? (
         <>
           <Stack.Screen
-            name="Home"
+            name="CallLog"
             children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
           />
           <Stack.Screen name="Listening" component={ListeningScreen} />
           <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
-          <Stack.Screen name="CallLog" component={CallLogScreen} />
           <Stack.Screen name="Breathing" component={BreathingScreen} />
           <Stack.Screen name="Splash" component={SplashScreen} />
         </>
