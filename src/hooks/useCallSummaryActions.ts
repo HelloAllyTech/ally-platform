@@ -162,7 +162,7 @@ export const useCallSummaryActions = ({
     }
   };
 
-  // Go back to home screen
+  // Go back to Call Logs screen
   const handleGoBack = useCallback(() => {
     if (isCallLogSummaryFlow) {
       navigation.goBack();
