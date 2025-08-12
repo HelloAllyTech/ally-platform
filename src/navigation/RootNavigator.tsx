@@ -21,6 +21,7 @@ import {
   LiveKitTestScreen,
   SimulationAssistantScreen,
   SimulationDetailsScreen,
+  SimulationFeedbackScreen,
   SimulationsScreen,
   SplashScreen,
 } from '@/screens';
@@ -123,6 +124,10 @@ const NavigationContent = ({
           <Stack.Screen
             name="SimulationAssistant"
             component={SimulationAssistantScreen}
+          />
+          <Stack.Screen
+            name="SimulationFeedback"
+            component={SimulationFeedbackScreen}
           />
         </>
       ) : (

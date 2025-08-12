@@ -94,7 +94,7 @@ export const SimulationAssistantScreen: React.FC = () => {
 
   const handleStopPress = async () => {
     await disconnect();
-    navigation.pop();
+    navigation.navigate('SimulationFeedback');
   };
 
   const isConnected = status === 'connected';

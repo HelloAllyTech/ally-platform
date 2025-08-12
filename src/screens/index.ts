@@ -12,3 +12,4 @@ export {LiveKitTestScreen} from './LiveKitTest/LiveKitTestScreen';
 export {SimulationsScreen} from './SimulationsScreen';
 export {SimulationDetailsScreen} from './SimulationDetailsScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
+export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
