@@ -13,6 +13,7 @@ export type RootStackParamList = {
   LiveKitTest: undefined;
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
+  SimulationAssistant: undefined;
 };
 
 export type DrawerParamList = {

@@ -201,6 +201,9 @@
     "try": "Try:",
     "noData": "No results found for"
   },
+  "SimulationScreen": {
+    "encryptionInfo": "Your sessions are secured with end-to-end encryption."
+  },
   "NetworkLogs": {
     "logs": "Logs"
   },
