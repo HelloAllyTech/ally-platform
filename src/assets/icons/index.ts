@@ -33,8 +33,6 @@ import FlowIcon from './flow.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
-import HomeInactiveIcon from './home.svg';
-import HomeActiveIcon from './homeActive.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
@@ -101,8 +99,6 @@ export {
   EyeIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
-  HomeActiveIcon,
-  HomeInactiveIcon,
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
   PauseWhiteIcon,
