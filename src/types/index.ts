@@ -33,3 +33,6 @@ export type {
 // User types
 export {UserRole, UserStatus} from './user';
 export type {User} from './user';
+
+// Simulations types
+export * from './simulations';

@@ -6,6 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {InfoIcon} from '@/assets/icons';
 import {useAppNavigation, useLiveKitConnection} from '@/hooks';
+import type {RootStackScreenProps} from '@/navigation/types';
 import {colors, fontFamily} from '@/theme';
 
 import {
@@ -13,20 +14,21 @@ import {
   ConnectionLoader,
   ControlButtons,
   SimulationTimer,
-  TokenInputModal,
 } from './components';
 
-export const SimulationAssistantScreen: React.FC = () => {
+type Props = RootStackScreenProps<'SimulationAssistant'>;
+
+export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
+  const {roomData} = route.params;
   const [startTime, setStartTime] = useState<number | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [token, setToken] = useState<string>('');
-  const [showTokenModal, setShowTokenModal] = useState<boolean>(true);
   const maxRetries = 3;
 
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   // Hardcoded LiveKit configuration for now
   const wsUrl = 'wss://ally-learn-poc-dev-lbzgnlp9.livekit.cloud/';
+  const token = roomData.access_token;
 
   const {
     room,
@@ -43,7 +45,6 @@ export const SimulationAssistantScreen: React.FC = () => {
     onConnected: () => {
       setStartTime(Date.now());
       setRetryCount(0); // Reset retry count on successful connection
-      setShowTokenModal(false); // Hide modal on successful connection
     },
     onDisconnected: () => {
       setStartTime(null);
@@ -59,17 +60,6 @@ export const SimulationAssistantScreen: React.FC = () => {
       connect();
     }
   }, [connect, token]);
-
-  const handleTokenSubmit = (submittedToken: string) => {
-    setToken(submittedToken);
-    setShowTokenModal(false);
-    setRetryCount(0); // Reset retry count when new token is provided
-  };
-
-  const handleTokenModalCancel = () => {
-    // If user cancels token input, navigate back
-    navigation.pop();
-  };
 
   const handleRetry = async () => {
     if (retryCount < maxRetries) {
@@ -98,9 +88,6 @@ export const SimulationAssistantScreen: React.FC = () => {
   };
 
   const isConnected = status === 'connected';
-
-  // Show token modal again if we have an invalid token error
-  const shouldShowTokenModal = showTokenModal || (!!error && !isConnected);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -135,13 +122,6 @@ export const SimulationAssistantScreen: React.FC = () => {
           onRetry={retryCount < maxRetries ? handleRetry : undefined}
           onGoBack={handleGoBack}
           maxRetriesReached={retryCount >= maxRetries}
-        />
-
-        {/* Token Input Modal */}
-        <TokenInputModal
-          visible={shouldShowTokenModal}
-          onTokenSubmit={handleTokenSubmit}
-          onCancel={handleTokenModalCancel}
         />
       </RoomContext.Provider>
     </SafeAreaView>

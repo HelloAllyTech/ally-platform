@@ -10,9 +10,9 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
-import {useGetScenariosQuery} from '@/services/scenariosApi';
+import {useGetScenariosQuery} from '@/services/simulationsApi';
 import {colors, fontFamily} from '@/theme';
-import type {Scenario} from '@/types/scenarios';
+import type {Scenario} from '@/types/simulations';
 
 export const SimulationsScreen: React.FC = () => {
   const navigation = useAppNavigation();
