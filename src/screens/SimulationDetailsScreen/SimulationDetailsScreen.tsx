@@ -1,12 +1,18 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {Image, SafeAreaView, ScrollView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {PrimaryButton} from '@/components/Button/PrimaryButton';
+import {OtpModal, PrimaryButton} from '@/components';
+import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {useTranslate} from '@/hooks';
 import {useAppNavigation} from '@/hooks/useAppNavigation';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {
+  useCreateRoomMutation,
+  useSendOtpMutation,
+} from '@/services/simulationsApi';
 import {colors, fontFamily} from '@/theme';
+import {getItem} from '@/utils/asyncStorage';
 
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
@@ -14,6 +20,56 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const navigation = useAppNavigation();
   const {scenario} = route.params;
   const {t} = useTranslate();
+  const [sendOtp] = useSendOtpMutation();
+  const [createRoom] = useCreateRoomMutation();
+
+  const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
+
+  const userEmail = 'abhay@keyvalue.systems'; // Use your registered(ally learn) email
+
+  const getRoomData = async () => {
+    try {
+      const token = await getItem(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
+      if (token) {
+        const response = await createRoom({scenarioId: scenario.unique_id});
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating room:', error);
+      return null;
+    }
+  };
+
+  const startSimulationPress = async () => {
+    try {
+      const roomData = await getRoomData();
+      if (roomData) {
+        navigation.navigate('SimulationAssistant', {roomData: roomData});
+      } else {
+        await sendOtp({email: userEmail});
+        setIsOtpModalVisible(true);
+      }
+    } catch (error) {
+      // Handle error - could show a toast or alert
+      console.error('Failed to send OTP:', error);
+    }
+  };
+
+  const handleOtpVerificationSuccess = async () => {
+    try {
+      const roomData = await getRoomData();
+      if (roomData) {
+        navigation.navigate('SimulationAssistant', {roomData: roomData});
+      }
+    } catch (error) {
+      console.error('Error navigating to simulation assistant:', error);
+    }
+  };
+
+  const closeOtpModal = () => {
+    setIsOtpModalVisible(false);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -53,10 +109,17 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         <View style={styles.ctaWrapper}>
           <PrimaryButton
             label={t('Simulations.startSimulation')}
-            onPress={() => navigation.navigate('SimulationAssistant')}
+            onPress={startSimulationPress}
           />
         </View>
       </ScrollView>
+
+      <OtpModal
+        visible={isOtpModalVisible}
+        onClose={closeOtpModal}
+        email={userEmail}
+        onOtpVerificationSuccess={handleOtpVerificationSuccess}
+      />
     </SafeAreaView>
   );
 };

@@ -217,6 +217,10 @@
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Scenario:",
     "descriptionLabel": "Description:",
-    "startSimulation": "Start Simulation"
+    "startSimulation": "Start Simulation",
+    "verifyOtp": "Verify OTP",
+    "enterTheCodeSentTo": "Enter the code sent to",
+    "didNotReceiveTheCode": "Did not receive the code?",
+    "resend": "Resend"
   }
 }

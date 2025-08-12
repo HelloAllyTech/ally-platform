@@ -31,6 +31,10 @@ const baseQuery = fetchBaseQuery({
 const baseQueryForLearn = fetchBaseQuery({
   baseUrl: 'https://api-learn.dev.helloally.ai' + '/api/' + env.API_VERSION,
   prepareHeaders: async headers => {
+    const token = await getItem<string>(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
+    if (token) {
+      headers.set('authorization', `Bearer ${token}`);
+    }
     return headers;
   },
 });
