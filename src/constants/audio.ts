@@ -7,7 +7,7 @@ const AUDIO = {
 } as const;
 
 const CIRCLE = {
-  BASE_SIZE: 60,
+  BASE_SIZE: 35,
   TRANSITION_MS: 200,
   MIN_SCALE: 1,
   BORDER: {

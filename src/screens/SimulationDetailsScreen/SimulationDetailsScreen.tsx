@@ -24,20 +24,25 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const [createRoom] = useCreateRoomMutation();
 
   const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   const userEmail = 'abhay@keyvalue.systems'; // Use your registered(ally learn) email
 
   const getRoomData = async () => {
     try {
+      setIsCreatingRoom(true);
       const token = await getItem(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
       if (token) {
         const response = await createRoom({scenarioId: scenario.unique_id});
+        closeOtpModal();
         return response.data;
       }
       return null;
     } catch (error) {
       console.error('Error creating room:', error);
       return null;
+    } finally {
+      setIsCreatingRoom(false);
     }
   };
 
@@ -71,16 +76,19 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     setIsOtpModalVisible(false);
   };
 
+  const renderLoadingOverlay = () => {
+    return (
+      <View style={styles.loadingOverlay}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Creating room...</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        <Text style={styles.pageTitle}>
-          {t('Simulations.chooseYour')}{' '}
-          <Text style={styles.pageTitleItalic}>
-            {t('Simulations.scenarioWord')}
-          </Text>
-        </Text>
-
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>
             {t('Simulations.scenariosCaps')}
@@ -105,14 +113,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         {!!scenario.long_description && (
           <Text style={styles.fieldValue}>{scenario.long_description}</Text>
         )}
-
-        <View style={styles.ctaWrapper}>
-          <PrimaryButton
-            label={t('Simulations.startSimulation')}
-            onPress={startSimulationPress}
-          />
-        </View>
       </ScrollView>
+
+      {isCreatingRoom && renderLoadingOverlay()}
 
       <OtpModal
         visible={isOtpModalVisible}
@@ -120,6 +123,13 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         email={userEmail}
         onOtpVerificationSuccess={handleOtpVerificationSuccess}
       />
+      <View style={styles.ctaWrapper}>
+        <PrimaryButton
+          label={t('Simulations.startSimulation')}
+          onPress={startSimulationPress}
+          isLoading={isCreatingRoom}
+        />
+      </View>
     </SafeAreaView>
   );
 };
@@ -135,14 +145,6 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@ms',
     paddingBottom: '16@ms',
     gap: '12@ms',
-  },
-  pageTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.darkGray12,
-    fontSize: '28@ms',
-  },
-  pageTitleItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -190,7 +192,34 @@ const styles = ScaledSheet.create({
     marginTop: '4@ms',
   },
   ctaWrapper: {
-    marginTop: '60@ms',
+    marginTop: '20@ms',
     marginHorizontal: '24@ms',
+    position: 'absolute',
+    bottom: '40@ms',
+    left: 0,
+    right: 0,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: colors.white,
+    paddingHorizontal: '24@ms',
+    paddingVertical: '16@mvs',
+    borderRadius: '8@ms',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.black,
+    fontSize: '16@ms',
   },
 });

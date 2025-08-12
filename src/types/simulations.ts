@@ -44,3 +44,14 @@ export interface RoomDeletionResponse {
   success: boolean;
   message?: string;
 }
+
+export interface FeedbackRequest {
+  rating?: number;
+  comment?: string;
+}
+
+export interface FeedbackResponse {
+  success: boolean;
+  message?: string;
+  feedbackId?: number;
+}

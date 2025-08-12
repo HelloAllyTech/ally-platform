@@ -38,13 +38,12 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(30);
   const [isResendDisabled, setIsResendDisabled] = useState(true);
+  const [isProcessingSuccess, setIsProcessingSuccess] = useState(false);
   const otpInputRef = useRef<OtpInputRef>(null);
   const {t} = useTranslate();
 
-  const [
-    verifyOtp,
-    {isLoading: isVerifying, isSuccess, isError, error: apiError},
-  ] = useVerifyOtpMutation();
+  const [verifyOtp, {isLoading: isVerifying, isError, error: apiError}] =
+    useVerifyOtpMutation();
   const [sendOtp, {isLoading: isResending}] = useSendOtpMutation();
 
   const isOtpComplete = otpValue.every(v => v !== '');
@@ -60,14 +59,6 @@ export const OtpModal: React.FC<OtpModalProps> = ({
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // Handle OTP verification success
-  useEffect(() => {
-    if (isSuccess) {
-      onOtpVerificationSuccess();
-      onClose();
-    }
-  }, [isSuccess, onOtpVerificationSuccess, onClose]);
-
   // Handle OTP verification error
   useEffect(() => {
     if (isError && apiError) {
@@ -80,17 +71,23 @@ export const OtpModal: React.FC<OtpModalProps> = ({
     setError('');
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (isOtpComplete) {
       const response = await verifyOtp({email, otp});
       if (response.data?.tokens?.access_token) {
-        await setItem(
-          AsyncStorageKeys.LEARN_ACCESS_TOKEN,
-          response.data.tokens.access_token as string,
-        );
+        setIsProcessingSuccess(true);
+        try {
+          await setItem(
+            AsyncStorageKeys.LEARN_ACCESS_TOKEN,
+            response.data.tokens.access_token as string,
+          );
+          onOtpVerificationSuccess();
+        } finally {
+          setIsProcessingSuccess(false);
+        }
       }
     }
-  }, [email, otp, verifyOtp, isOtpComplete]);
+  };
 
   const resetOtpState = useCallback(() => {
     setOtpValue(DEFAULT_OTP);
@@ -99,7 +96,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
     setIsResendDisabled(true);
   }, []);
 
-  const handleResendOtp = useCallback(async () => {
+  const handleResendOtp = async () => {
     try {
       await sendOtp({email});
       resetOtpState();
@@ -107,7 +104,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     }
-  }, [email, sendOtp, resetOtpState]);
+  };
 
   const handleClose = useCallback(() => {
     setOtpValue(DEFAULT_OTP);
@@ -116,6 +113,16 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   }, [onClose]);
 
   if (!visible) return null;
+
+  const renderProcessingOverlay = () => {
+    return (
+      <View style={styles.processingOverlay}>
+        <View style={styles.processingContainer}>
+          <Text style={styles.processingText}>Creating room...</Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.overlay}>
@@ -185,6 +192,8 @@ export const OtpModal: React.FC<OtpModalProps> = ({
           </View>
         </KeyboardAwareScrollView>
       </View>
+
+      {isProcessingSuccess && renderProcessingOverlay()}
     </View>
   );
 };
@@ -283,5 +292,28 @@ const styles = ScaledSheet.create({
   },
   buttonContainer: {
     marginTop: '8@mvs',
+  },
+  processingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  processingContainer: {
+    backgroundColor: colors.white,
+    paddingHorizontal: '24@ms',
+    paddingVertical: '16@mvs',
+    borderRadius: '8@ms',
+    alignItems: 'center',
+  },
+  processingText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.black,
+    fontSize: '16@ms',
   },
 });

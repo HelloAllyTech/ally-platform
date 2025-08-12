@@ -5,26 +5,20 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily} from '@/theme';
 
 interface SimulationTimerProps {
-  startTime: number;
-  isConnected: boolean;
+  startTime: Date;
 }
 
 export const SimulationTimer: React.FC<SimulationTimerProps> = ({
   startTime,
-  isConnected,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    if (!isConnected) {
-      setElapsedSeconds(0);
-      return;
-    }
-
     const calculateInitialElapsed = () => {
-      const now = Date.now();
+      const now = new Date();
       return Math.floor(
-        ((now > startTime ? now : startTime) - startTime) / 1000,
+        ((now > startTime ? now : startTime).getTime() - startTime.getTime()) /
+          1000,
       );
     };
 
@@ -35,7 +29,7 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime, isConnected]);
+  }, [startTime]);
 
   const formatTime = (totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);
