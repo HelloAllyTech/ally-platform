@@ -14,6 +14,7 @@ export type RootStackParamList = {
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
   SimulationAssistant: undefined;
+  SimulationFeedback: undefined;
 };
 
 export type DrawerParamList = {
