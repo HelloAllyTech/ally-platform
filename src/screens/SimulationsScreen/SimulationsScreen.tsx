@@ -1,4 +1,5 @@
 import React, {useMemo} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   FlatList,
   Image,
@@ -7,14 +8,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
-import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
-import {useGetScenariosQuery} from '@/services/simulationsApi';
+import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
-import type {Scenario} from '@/types/simulations';
+import type {Scenario} from '@/types';
 
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
@@ -30,7 +31,7 @@ export const SimulationsScreen: React.FC = () => {
   });
 
   const handleStart = (scenario: Scenario) => {
-    navigation.navigate('SimulationDetails', {scenario});
+    navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario});
   };
 
   const renderItem = ({item}: {item: Scenario}) => (
@@ -62,10 +63,10 @@ export const SimulationsScreen: React.FC = () => {
   const empty = useMemo(
     () => (
       <View style={styles.empty}>
-        <Text style={styles.emptyTitle}>No simulations</Text>
-        <Text style={styles.emptyDesc}>Pull to refresh</Text>
+        <Text style={styles.emptyTitle}>{t('Simulations.noSimulations')}</Text>
       </View>
     ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

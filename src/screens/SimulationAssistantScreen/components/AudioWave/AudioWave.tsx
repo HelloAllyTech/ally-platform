@@ -1,12 +1,12 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useLocalParticipant} from '@livekit/react-native';
 import {Track} from 'livekit-client';
 import {Animated, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {AUDIO, CIRCLE, CIRCLE_CONFIGS} from '@/constants/audio';
-import type {AudioTrackRef, CircleProps} from '@/types';
+import {AUDIO, CIRCLE, CIRCLE_CONFIGS} from '@/constants';
+import type {CircleProps, CircleWaveVisualizerProps} from '@/types';
 
 const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
   const isActive = audioLevel > AUDIO.THRESHOLD;
@@ -15,9 +15,9 @@ const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
     (config.isStatic ? 1 : CIRCLE.MIN_SCALE + (audioLevel * circleNumber) / 3);
   const intensity = 1 / config.scale;
 
-  const animatedScale = React.useRef(new Animated.Value(scale)).current;
+  const animatedScale = useRef(new Animated.Value(scale)).current;
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(animatedScale, {
       toValue: scale,
       duration: CIRCLE.TRANSITION_MS,
@@ -60,10 +60,6 @@ const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
     </Animated.View>
   );
 };
-
-interface CircleWaveVisualizerProps {
-  trackRef: AudioTrackRef;
-}
 
 const CircleWaveVisualizer: React.FC<CircleWaveVisualizerProps> = ({
   trackRef,

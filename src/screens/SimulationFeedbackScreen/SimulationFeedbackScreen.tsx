@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
   ScrollView,
@@ -9,14 +10,16 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {StarIcon} from '@/assets/icons';
-import {PrimaryButton} from '@/components/Button';
+import {StarIcon} from '@/assets';
+import {PrimaryButton} from '@/components';
+import {FEEDBACK_OPTIONS} from '@/constants';
 import {useAppNavigation} from '@/hooks';
-import {useAddFeedbackMutation} from '@/services/simulationsApi';
+import {useAddFeedbackMutation} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 
 export const SimulationFeedbackScreen: React.FC = () => {
-  const [rating, setRating] = useState<number>(4);
+  const {t} = useTranslation();
+  const [rating, setRating] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState<string>('Nice Experience!');
   const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
 
@@ -24,16 +27,12 @@ export const SimulationFeedbackScreen: React.FC = () => {
   const [addFeedback, {isLoading}] = useAddFeedbackMutation();
 
   const handleStarPress = (starIndex: number) => {
-    setRating(starIndex + 1);
-    // Update feedback text based on rating
-    const feedbackOptions = [
-      'Poor Experience',
-      'Below Average',
-      'Average',
-      'Nice Experience!',
-      'Excellent Experience!',
-    ];
-    setFeedbackText(feedbackOptions[starIndex]);
+    const feedback = starIndex + 1;
+    setRating(feedback);
+
+    setFeedbackText(
+      FEEDBACK_OPTIONS[feedback as keyof typeof FEEDBACK_OPTIONS],
+    );
   };
 
   const handleSubmit = async () => {
@@ -42,11 +41,8 @@ export const SimulationFeedbackScreen: React.FC = () => {
         rating,
         comment: additionalFeedback || feedbackText,
       });
-
-      // Navigate back on success
       navigation.pop();
     } catch (error) {
-      // Handle error - you might want to show a toast or alert
       console.error('Failed to submit feedback:', error);
     }
   };
@@ -66,55 +62,65 @@ export const SimulationFeedbackScreen: React.FC = () => {
     ));
   };
 
+  const renderFeedbackCard = () => {
+    return (
+      <View style={styles.feedbackCard}>
+        <Text style={styles.questionText}>
+          {t('SimulationFeedback.questionText')}
+        </Text>
+        <View style={styles.starsContainer}>{renderStars()}</View>
+        <Text style={styles.feedbackText}>{feedbackText}</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder={t('SimulationFeedback.placeholderText')}
+          placeholderTextColor={colors.lightGray3}
+          value={additionalFeedback}
+          onChangeText={setAdditionalFeedback}
+          multiline
+          textAlignVertical="top"
+        />
+      </View>
+    );
+  };
+
+  const renderButtonContainer = () => {
+    return (
+      <View style={styles.buttonContainer}>
+        <PrimaryButton
+          label={
+            isLoading
+              ? t('SimulationFeedback.submittingButton')
+              : t('SimulationFeedback.submitButton')
+          }
+          onPress={handleSubmit}
+          customContainerStyle={styles.submitButton}
+          disabled={isLoading}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Title Section */}
         <View style={styles.titleSection}>
           <Text style={styles.title}>
-            Simulation <Text style={styles.titleItalic}>Ended</Text>
+            {t('SimulationFeedback.title')}{' '}
+            <Text style={styles.titleItalic}>
+              {t('SimulationFeedback.titleEnded')}
+            </Text>
           </Text>
         </View>
-
-        {/* Header Section */}
         <View style={styles.headerSection}>
-          <Text style={styles.headerText}>REVIEW AND RATING</Text>
+          <Text style={styles.headerText}>
+            {t('SimulationFeedback.headerText')}
+          </Text>
           <View style={styles.headerLine} />
         </View>
-
-        {/* Feedback Card */}
-        <View style={styles.feedbackCard}>
-          <Text style={styles.questionText}>How was your experience?</Text>
-
-          {/* Star Rating */}
-          <View style={styles.starsContainer}>{renderStars()}</View>
-
-          {/* Pre-filled Feedback */}
-          <Text style={styles.feedbackText}>{feedbackText}</Text>
-
-          {/* Text Input */}
-          <TextInput
-            style={styles.textInput}
-            placeholder="How was your Experience ?"
-            placeholderTextColor={colors.lightGray3}
-            value={additionalFeedback}
-            onChangeText={setAdditionalFeedback}
-            multiline
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Submit Button */}
-        <View style={styles.buttonContainer}>
-          <PrimaryButton
-            label={isLoading ? 'Submitting...' : 'Submit Feedback'}
-            onPress={handleSubmit}
-            customContainerStyle={styles.submitButton}
-            disabled={isLoading}
-          />
-        </View>
+        {renderFeedbackCard()}
+        {renderButtonContainer()}
       </ScrollView>
     </SafeAreaView>
   );

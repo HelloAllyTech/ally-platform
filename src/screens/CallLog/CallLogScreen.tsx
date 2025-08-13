@@ -4,9 +4,10 @@ import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {NoCallLogsIcon} from '@/assets/icons';
+import {NoCallLogsIcon} from '@/assets';
+import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTabBackToHomeHandler, useTranslate} from '@/hooks';
-import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {useLazyGetCallLogsQuery} from '@/services';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
 
@@ -96,7 +97,7 @@ export const CallLogScreen: React.FC = () => {
   };
 
   const handleItemPress = (item: CallLog) => {
-    navigation.navigate('CallSummary', {
+    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
       callId: item?.details?.chatId,
     });
   };

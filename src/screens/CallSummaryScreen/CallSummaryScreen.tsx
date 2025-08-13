@@ -9,8 +9,9 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets/icons';
+import {LeftArrowIcon} from '@/assets';
 import {PrimaryButton, Toast} from '@/components';
+import {SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -118,7 +119,7 @@ export const CallSummaryScreen: React.FC<
     dispatch(clearCurrentChat());
     navigation.reset({
       index: 1,
-      routes: [{name: 'Home'}, {name: 'CallLog'}],
+      routes: [{name: SCREEN_NAMES.HOME}, {name: SCREEN_NAMES.CALL_LOG}],
     });
   };
 

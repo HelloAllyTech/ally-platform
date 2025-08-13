@@ -2,14 +2,9 @@ import React from 'react';
 import {TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CallEndIcon, MicIcon} from '@/assets/icons';
+import {CallEndIcon, MicIcon} from '@/assets';
 import {colors} from '@/theme';
-
-interface ControlButtonsProps {
-  onMicPress: () => void;
-  onStopPress: () => void;
-  isMuted: boolean;
-}
+import {ControlButtonsProps} from '@/types';
 
 export const ControlButtons: React.FC<ControlButtonsProps> = ({
   onMicPress,
