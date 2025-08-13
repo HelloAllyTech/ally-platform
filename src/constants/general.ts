@@ -48,3 +48,18 @@ export enum LanguageMap {
   ta = 'Tamil',
   te = 'Telugu',
 }
+
+// API route constants
+export const API_ROUTES = {
+  SEND_OTP: '/auth/send-otp',
+  VERIFY_OTP: '/auth/verify-otp',
+  ROOMS: '/rooms',
+  SCENARIOS: '/scenarios',
+  FEEDBACK: '/feedback',
+} as const;
+
+export const API_METHODS = {
+  GET: 'GET',
+  POST: 'POST',
+  DELETE: 'DELETE',
+} as const;

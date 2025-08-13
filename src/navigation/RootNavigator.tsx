@@ -7,6 +7,7 @@ import {
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import {env} from '@/config/env';
+import {SCREEN_NAMES} from '@/constants';
 import {
   useCounselorChat,
   useNavigationAwareCounselorChat,
@@ -15,13 +16,16 @@ import {
 } from '@/hooks';
 import {
   BreathingScreen,
-  CallLogScreen,
   CallSummaryScreen,
   ListeningScreen,
+  SimulationAssistantScreen,
+  SimulationDetailsScreen,
+  SimulationFeedbackScreen,
+  SimulationsScreen,
   SplashScreen,
 } from '@/screens';
 import {SocketEvent, UserRole} from '@/types';
-import {logger} from '@/utils/logger';
+import {logger} from '@/utils';
 
 import {DrawerNavigator} from './DrawerNavigator';
 import type {RootStackParamList, RouteNames} from './types';
@@ -40,18 +44,22 @@ const NavigationContent = ({
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       if (
-        (navigationRef?.getCurrentRoute()?.name as RouteNames) !== 'Listening'
+        (navigationRef?.getCurrentRoute()?.name as RouteNames) !==
+        SCREEN_NAMES.LISTENING
       ) {
         navigationRef.reset({
           index: 1,
-          routes: [{name: 'Home'}, {name: 'Listening'}],
+          routes: [
+            {name: SCREEN_NAMES.CALL_LOG},
+            {name: SCREEN_NAMES.LISTENING},
+          ],
         });
       }
     },
     onNoActiveChatFound: () => {
       navigationRef.reset({
         index: 0,
-        routes: [{name: 'Home'}],
+        routes: [{name: SCREEN_NAMES.CALL_LOG}],
       });
     },
     getCurrentRoute: () => navigationRef?.getCurrentRoute()?.name,
@@ -95,24 +103,48 @@ const NavigationContent = ({
 
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
+      initialRouteName={SCREEN_NAMES.SPLASH}
       screenOptions={{
         headerShown: false,
       }}>
       {isAuthenticated ? (
         <>
           <Stack.Screen
-            name="Home"
+            name={SCREEN_NAMES.CALL_LOG}
             children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
           />
-          <Stack.Screen name="Listening" component={ListeningScreen} />
-          <Stack.Screen name="CallSummary" component={CallSummaryScreen} />
-          <Stack.Screen name="CallLog" component={CallLogScreen} />
-          <Stack.Screen name="Breathing" component={BreathingScreen} />
-          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen
+            name={SCREEN_NAMES.LISTENING}
+            component={ListeningScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.CALL_SUMMARY}
+            component={CallSummaryScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.BREATHING}
+            component={BreathingScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SIMULATIONS}
+            component={SimulationsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SIMULATION_DETAILS}
+            component={SimulationDetailsScreen}
+          />
+          <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
+          <Stack.Screen
+            name={SCREEN_NAMES.SIMULATION_ASSISTANT}
+            component={SimulationAssistantScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SIMULATION_FEEDBACK}
+            component={SimulationFeedbackScreen}
+          />
         </>
       ) : (
-        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
       )}
     </Stack.Navigator>
   );

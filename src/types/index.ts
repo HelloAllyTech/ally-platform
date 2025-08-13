@@ -1,4 +1,5 @@
 // Audio types
+export type {CircleConfig, AudioTrackRef, CircleProps} from './audio';
 
 // Call Summary types
 export {
@@ -32,3 +33,6 @@ export type {
 // User types
 export {UserRole, UserStatus} from './user';
 export type {User} from './user';
+
+// Simulations types
+export * from './simulations';

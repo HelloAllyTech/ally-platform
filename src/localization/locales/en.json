@@ -10,9 +10,11 @@
       "openSettings": "Open Settings"
     }
   },
-  "Home": {
-    "callConnectionNotImplemented": "Call connection feature is not yet implemented",
-    "noFeaturesAvailable": "No features are currently available for your account.",
+  "CallLogs": {
+    "header": {
+      "title": "Session",
+      "subtitle": "Logs"
+    },
     "start": "Start",
     "session": "Session",
     "chooseListening": "Choose your listening mode",
@@ -20,24 +22,27 @@
     "listenLive": "Listen Live",
     "allyWillJoinOngoingCall": "Ally will join your ongoing call",
     "allyWillHearAudio": "Ally will hear audio alongside you",
-    "consentNotice": "By starting, you confirm everyone being transcribed has given consent",
-    "client": {
-      "oops": "Oops!",
-      "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
-      "learnMore": "Learn more"
+    "consentNotice": "By starting, you confirm everyone being transcribed has given consent.",
+    "startSessionDescription": "Ally’s mental health AI scribe safely listens, transcribes and writes session notes for you.",
+    "startSessionNow": "Start session now",
+    "learn": "Learn",
+    "learnDescription": "Engage in AI-powered role plays",
+    "noAccessToCallFeatures": "You don't have access to call features right now.",
+    "search": {
+      "placeholder": "Search"
     },
-    "logout": {
-      "logout": "Logout",
-      "logoutDescription": "Are you sure you want to logout?",
-      "cancel": "Cancel",
-      "confirm": "Confirm Logout"
-    }
+    "noCallLogs": "No call records found",
+    "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
+    "viewCallLogs": "View Call logs",
+    "oops": "Oops!",
+    "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
+    "learnMore": "Learn more"
   },
-  "HomeScreen": {
-    "start": "Start",
-    "listening": "listening",
-    "tapToBegin": "Tap to begin",
-    "noAccessToCallFeatures": "You don't have access to call features right now."
+  "Logout": {
+    "logout": "Logout",
+    "logoutDescription": "Are you sure you want to logout?",
+    "cancel": "Cancel",
+    "confirm": "Confirm Logout"
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
@@ -127,18 +132,6 @@
     "you": "You",
     "client": "Client"
   },
-  "CallLogs": {
-    "header": {
-      "title": "Call",
-      "subtitle": "Logs"
-    },
-    "search": {
-      "placeholder": "Search"
-    },
-    "noCallLogs": "No call records found",
-    "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
-    "viewCallLogs": "View Call logs"
-  },
   "BreathingScreen": {
     "header": {
       "box": "Box",
@@ -201,11 +194,39 @@
     "try": "Try:",
     "noData": "No results found for"
   },
+  "SimulationScreen": {
+    "encryptionInfo": "Your sessions are secured with end-to-end encryption."
+  },
   "NetworkLogs": {
     "logs": "Logs"
   },
   "submit": "Submit",
   "ResourceArticleCard": {
     "more": "more"
+  },
+  "Simulations": {
+    "chooseYour": "Choose your",
+    "scenarioWord": "Scenario",
+    "scenariosCaps": "SCENARIOS",
+    "scenarioLabel": "Scenario:",
+    "descriptionLabel": "Description:",
+    "startSimulation": "Start Simulation",
+    "verifyOtp": "Verify OTP",
+    "enterTheCodeSentTo": "Enter the code sent to",
+    "didNotReceiveTheCode": "Did not receive the code?",
+    "resend": "Resend",
+    "noSimulations": "No simulations",
+    "connecting": "Connecting...",
+    "disconnecting": "Disconnecting...",
+    "creatingRoom": "Creating room..."
+  },
+  "SimulationFeedback": {
+    "title": "Simulation",
+    "titleEnded": "Ended",
+    "headerText": "REVIEW AND RATING",
+    "questionText": "How was your experience?",
+    "placeholderText": "How was your Experience ?",
+    "submitButton": "Submit Feedback",
+    "submittingButton": "Submitting..."
   }
 }

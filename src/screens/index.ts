@@ -1,5 +1,4 @@
 export {CallLogScreen} from './CallLog';
-export {HomeScreen} from './HomeScreen';
 export {ListeningScreen} from './ListeningScreen';
 export {SplashScreen} from './SplashScreen';
 export {CallSummaryScreen} from './CallSummaryScreen';
@@ -8,3 +7,7 @@ export {BreathingScreen} from './BoxBreathingScreen';
 export {CommunityScreen} from './CommunityScreen';
 export {SearchScreen} from './SearchScreen';
 export {DrawerContent} from './LogoutScreen/components/CustomDrawerContent';
+export {SimulationsScreen} from './SimulationsScreen';
+export {SimulationDetailsScreen} from './SimulationDetailsScreen';
+export {SimulationAssistantScreen} from './SimulationAssistantScreen';
+export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';

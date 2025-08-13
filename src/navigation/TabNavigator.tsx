@@ -13,15 +13,13 @@ import {
   CallLogInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
-  HomeActiveIcon,
-  HomeInactiveIcon,
   SearchActiveIcon,
   SearchInactiveIcon,
-} from '@/assets/icons';
+} from '@/assets';
+import {SCREEN_NAMES} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
-  HomeScreen,
   SearchScreen,
   UserAnalyticsScreen,
 } from '@/screens';
@@ -30,15 +28,13 @@ import {colors} from '@/theme';
 const Tab = createBottomTabNavigator();
 
 const TAB_NAMES = [
-  'HomeTab',
-  'CallLog',
-  'UserAnalytics',
-  'Search',
-  'Community',
+  SCREEN_NAMES.CALL_LOG,
+  SCREEN_NAMES.USER_ANALYTICS,
+  SCREEN_NAMES.SEARCH,
+  SCREEN_NAMES.COMMUNITY,
 ];
 
 const TAB_COMPONENTS = [
-  HomeScreen,
   CallLogScreen,
   UserAnalyticsScreen,
   SearchScreen,
@@ -58,19 +54,25 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      HomeTab: <HomeActiveIcon width={18} height={18} />,
-      CallLog: <CallLogActiveIcon width={18} height={18} />,
-      UserAnalytics: <AnalyticsActiveIcon width={18} height={18} />,
-      Community: <CommunityActiveIcon width={20} height={20} />,
-      Search: <SearchActiveIcon width={20} height={20} color={colors.blue} />,
+      [SCREEN_NAMES.CALL_LOG]: <CallLogActiveIcon width={18} height={18} />,
+      [SCREEN_NAMES.USER_ANALYTICS]: (
+        <AnalyticsActiveIcon width={18} height={18} />
+      ),
+      [SCREEN_NAMES.COMMUNITY]: <CommunityActiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.SEARCH]: (
+        <SearchActiveIcon width={20} height={20} color={colors.blue} />
+      ),
     };
 
     const unfocusedIcons = {
-      HomeTab: <HomeInactiveIcon width={18} height={18} />,
-      CallLog: <CallLogInactiveIcon width={18} height={18} />,
-      UserAnalytics: <AnalyticsInactiveIcon width={18} height={18} />,
-      Community: <CommunityInactiveIcon width={20} height={20} />,
-      Search: <SearchInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.CALL_LOG]: <CallLogInactiveIcon width={18} height={18} />,
+      [SCREEN_NAMES.USER_ANALYTICS]: (
+        <AnalyticsInactiveIcon width={18} height={18} />
+      ),
+      [SCREEN_NAMES.COMMUNITY]: (
+        <CommunityInactiveIcon width={20} height={20} />
+      ),
+      [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
     };
 
     return focused
@@ -110,7 +112,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
           headerShown: false,
           lazy: true,
         }}
-        initialRouteName="HomeTab">
+        initialRouteName={SCREEN_NAMES.CALL_LOG}>
         {TAB_NAMES.map((name, idx) => (
           <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
         ))}

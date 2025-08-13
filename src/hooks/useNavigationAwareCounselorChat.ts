@@ -1,6 +1,7 @@
 import {useEffect, useRef} from 'react';
 import {NavigationContainerRef} from '@react-navigation/native';
 
+import {SCREEN_NAMES} from '@/constants';
 import {RootStackParamList, RouteNames} from '@/navigation';
 import {logger} from '@/utils/logger';
 
@@ -30,20 +31,23 @@ export const useNavigationAwareCounselorChat = (
     onActiveChatFound: () => {
       // Handle active chat found based on current screen
       switch (currentRouteName.current) {
-        case 'Splash':
-          // From splash, reset stack to Home -> Listening
+        case SCREEN_NAMES.SPLASH:
+          // From splash, reset stack to Call Logs -> Listening
           navigation.reset({
             index: 1,
-            routes: [{name: 'Home'}, {name: 'Listening'}],
+            routes: [
+              {name: SCREEN_NAMES.CALL_LOG},
+              {name: SCREEN_NAMES.LISTENING},
+            ],
           });
           break;
 
-        case 'Listening':
+        case SCREEN_NAMES.LISTENING:
           // Already in chat flow, no navigation needed
           logger.info('Active chat found but already in chat flow');
           break;
         default:
-          navigation.navigate('Listening');
+          navigation.navigate(SCREEN_NAMES.LISTENING);
           break;
       }
     },

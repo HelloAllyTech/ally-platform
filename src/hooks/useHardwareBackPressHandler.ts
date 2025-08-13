@@ -10,7 +10,7 @@ type BackHandlerCallback = () => boolean | null | undefined;
  * @returns void
  *
  * @example
- * // Exit app on back press (for Home screen)
+ * // Exit app on back press (for Call Logs screen)
  * useHardwareBackPressHandler(() => {
  *   BackHandler.exitApp();
  *   return true;
