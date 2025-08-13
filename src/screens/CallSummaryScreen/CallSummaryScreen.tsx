@@ -149,11 +149,20 @@ export const CallSummaryScreen: React.FC<
   const renderContent = () => {
     if (showSummary && isSummaryAvailable && canShowSummary) {
       return (
-        <CallSummaryDetails
-          isLoading={isLoading}
-          onSubmit={onUpdateSummary}
-          showSubmitButton={callId ? hasChanges : true}
-        />
+        <SummaryView
+          showAnimation={showAnimation}
+          forceRemountKey={forceRemountKey}
+          insets={insets}
+          onScroll={handleScroll}
+          isSummaryAvailable={isSummaryAvailable}
+          isFullyExpanded={isFullyExpanded}
+          scrollViewRef={scrollViewRef}>
+          <CallSummaryDetails
+            isLoading={isLoading}
+            onSubmit={onUpdateSummary}
+            showSubmitButton={callId ? hasChanges : true}
+          />
+        </SummaryView>
       );
     }
 
@@ -162,6 +171,7 @@ export const CallSummaryScreen: React.FC<
         <>
           <KeyboardAwareScrollView
             style={styles.scrollView}
+            contentContainerStyle={styles.scrollViewContent}
             nestedScrollEnabled
             extraScrollHeight={200}
             keyboardShouldPersistTaps="handled"
@@ -232,16 +242,7 @@ export const CallSummaryScreen: React.FC<
         showTranscript={showTranscript}
       />
 
-      <SummaryView
-        showAnimation={showAnimation}
-        forceRemountKey={forceRemountKey}
-        insets={insets}
-        onScroll={handleScroll}
-        isSummaryAvailable={isSummaryAvailable}
-        isFullyExpanded={isFullyExpanded}
-        scrollViewRef={scrollViewRef}>
-        {renderContent()}
-      </SummaryView>
+      {renderContent()}
 
       {!showSummary && <CallTranscript chatId={chatId || 0} />}
 
