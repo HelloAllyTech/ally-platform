@@ -11,6 +11,9 @@ export const styles = ScaledSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollViewContent: {
+    paddingBottom: '100@ms',
+  },
   card: {
     backgroundColor: colors.white,
     marginTop: 0,
