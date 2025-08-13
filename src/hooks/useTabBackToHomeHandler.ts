@@ -1,8 +1,8 @@
 import {useCallback} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 
 /**
  * Custom hook to handle back press on tab root screens and navigate to Call Logs tab.
@@ -15,7 +15,7 @@ export const useTabBackToHomeHandler = () => {
   useHardwareBackPressHandler(
     useCallback(() => {
       if (isFocused) {
-        navigation.navigate('CallLog');
+        navigation.navigate(SCREEN_NAMES.CALL_LOG);
         return true;
       }
       return false;

@@ -1,12 +1,19 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
+import {RoomCreationResponse, Scenario} from '@/types/simulations';
+
 export type RootStackParamList = {
   Splash: undefined;
   Listening: {isMicrophoneMode?: boolean} | undefined;
   CallSummary: {callId?: number} | undefined;
   CallLog: undefined;
   Breathing: undefined;
+  LiveKitTest: undefined;
+  Simulations: undefined;
+  SimulationDetails: {scenario: Scenario};
+  SimulationAssistant: {roomData: RoomCreationResponse};
+  SimulationFeedback: undefined;
 };
 
 export type DrawerParamList = {

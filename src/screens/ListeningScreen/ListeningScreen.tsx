@@ -7,7 +7,7 @@ import {
 import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
 
 import {env} from '@/config/env';
-import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT} from '@/constants';
+import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -19,11 +19,11 @@ import {
   useUser,
 } from '@/hooks';
 import {RootStackParamList} from '@/navigation';
+import {useGetNudgeStatusQuery} from '@/services';
 import {
   useEndCallMutation,
   useLazyGetCounsellorChatQuery,
 } from '@/services/chatApi';
-import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors, globalStyles} from '@/theme';
@@ -33,7 +33,7 @@ import {
   SocketEvent,
   SocketMessage,
 } from '@/types';
-import {Maybe} from '@/utils/common';
+import {Maybe} from '@/utils';
 
 import {
   AudioWaveformContainer,
@@ -121,7 +121,7 @@ export const ListeningScreen = ({
   const onCallEndSuccess = useCallback(() => {
     // Only navigate if the ListeningScreen is still focused
     if (isFocused) {
-      navigation.replace('Breathing');
+      navigation.replace(SCREEN_NAMES.BREATHING);
     }
   }, [navigation, isFocused]);
 
@@ -406,7 +406,7 @@ export const ListeningScreen = ({
           if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             // Clear chat state before navigation
             dispatch(clearCurrentChat());
-            navigation.navigate('CallLog');
+            navigation.navigate(SCREEN_NAMES.CALL_LOG);
           }
         });
       }
