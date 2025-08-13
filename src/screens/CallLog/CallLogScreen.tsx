@@ -14,7 +14,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {CHAT_TYPES} from '@/constants';
+import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -140,7 +140,7 @@ export const CallLogScreen: React.FC = () => {
   };
 
   const handleItemPress = (item: CallLog) => {
-    navigation.navigate('CallSummary', {
+    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
       callId: item?.details?.chatId,
     });
   };

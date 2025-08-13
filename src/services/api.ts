@@ -27,6 +27,18 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+const baseQueryForLearn = fetchBaseQuery({
+  baseUrl: 'https://api-learn.dev.helloally.ai' + '/api/' + env.API_VERSION,
+  prepareHeaders: async headers => {
+    const token = await getItem<string>(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
+    if (token) {
+      headers.set('authorization', `Bearer ${token}`);
+    }
+    return headers;
+  },
+});
+
 const handleUserLogout = () => {
   store.dispatch(handleLogout());
 };
@@ -96,8 +108,83 @@ const baseQueryWithReauth: BaseQueryFn<
   }
 };
 
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+const baseQueryWithReauthForLearn: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, _store, extraOptions) => {
+  try {
+    let result = await baseQueryForLearn(args, _store, extraOptions);
+    // if (result.error && result.error.status === 401) {
+    //   // Try to get a new token
+    //   // const accessToken = await getItem<string>(
+    //   //   AsyncStorageKeys.LEARN_ACCESS_TOKEN,
+    //   // );
+    //   // const tokenType = await getItem<string>(
+    //   //   AsyncStorageKeys.LEARN_TOKEN_TYPE,
+    //   // );
+
+    //   // If there is no access token or refresh token, logout user
+    //   // if (!accessToken || !tokenType) {
+    //   //   // handleUserLogout();
+    //   //   // return result;
+    //   // }
+
+    //   result = await baseQuery(args, _store, extraOptions);
+
+    //   try {
+    //     const refreshResult = await baseQuery(
+    //       {
+    //         url: '/auth/refresh',
+    //         method: 'POST',
+    //         body: {tokenType},
+    //       },
+    //       _store,
+    //       extraOptions,
+    //     );
+
+    //     if (!refreshResult.data) {
+    //       throw new Error('No refresh data received');
+    //     }
+
+    //     const tokens = refreshResult.data as {
+    //       access_token: string;
+    //       token_type: string;
+    //     };
+
+    //     result = await baseQuery(args, _store, extraOptions);
+
+    //     if (tokens) {
+    //       // Store the new tokens
+    //       // Retry the original query with new access token
+    //       result = await baseQuery(args, _store, extraOptions);
+    //     } else {
+    //       handleUserLogout();
+    //     }
+    //   } catch (error) {
+    //     logger.error(`Error refreshing token: ${error}`);
+    //     handleUserLogout();
+    //     return result;
+    //   }
+    // }
+
+    return result;
+  } catch (err) {
+    logger.error(`Error in baseQueryWithReauth: ${err}`);
+    return {error: {status: 401, data: {message: 'Unauthorized'}}};
+  }
+};
+
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  endpoints: () => ({}),
+});
+
+// TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+export const learnApi = createApi({
+  reducerPath: 'learnApi',
+  baseQuery: baseQueryWithReauthForLearn,
   endpoints: () => ({}),
 });
