@@ -10,7 +10,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
-import {PrimaryButton, Toast} from '@/components';
+import {PrimaryButton} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
@@ -87,8 +87,6 @@ export const CallSummaryScreen: React.FC<
     handleExport,
     handleDelete,
     handleGoBack,
-    hideToast,
-    toast,
     summaryName,
     setSummaryName,
     onHeaderPress,
@@ -252,10 +250,6 @@ export const CallSummaryScreen: React.FC<
           onPress={scrollToBottom}>
           <LeftArrowIcon width={40} height={40} style={styles.downArrow} />
         </TouchableOpacity>
-      )}
-
-      {toast.visible && (
-        <Toast message={toast.message} type={toast.type} onHide={hideToast} />
       )}
     </SafeAreaView>
   );

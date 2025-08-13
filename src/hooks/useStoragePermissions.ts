@@ -8,6 +8,8 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 
+import {useToast} from '@/components';
+
 import {useTranslate} from './useTranslate';
 
 const checkAndRequestStoragePermission = async (
@@ -25,10 +27,9 @@ interface UseStoragePermissionsResult {
   checkAndRequestPermissions: () => Promise<boolean>;
 }
 
-export const useStoragePermissions = (
-  showToast: (message: string, type: 'success' | 'error' | 'info') => void,
-): UseStoragePermissionsResult => {
+export const useStoragePermissions = (): UseStoragePermissionsResult => {
   const {t} = useTranslate();
+  const {showToast} = useToast();
 
   const checkAndRequestPermissions = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === 'ios') {

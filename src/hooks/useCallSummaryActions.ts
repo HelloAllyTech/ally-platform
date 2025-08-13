@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 
+import {useToast} from '@/components';
 import {
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -13,12 +14,6 @@ import {logger} from '@/utils/logger';
 import {useAppNavigation} from './useAppNavigation';
 import {useStoragePermissions} from './useStoragePermissions';
 import {useTranslate} from './useTranslate';
-
-interface ToastState {
-  visible: boolean;
-  message: string;
-  type: 'success' | 'error' | 'info';
-}
 
 export const useCallSummaryActions = ({
   chatId,
@@ -39,29 +34,10 @@ export const useCallSummaryActions = ({
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isSummaryDropdownVisible, setIsSummaryDropdownVisible] =
     useState(false);
-  const [toast, setToast] = useState<ToastState>({
-    visible: false,
-    message: '',
-    type: 'error',
-  });
   const [summaryName, setSummaryName] = useState(name);
 
   const {t} = useTranslate();
-
-  const showToast = useCallback(
-    (message: string, type: 'success' | 'error' | 'info' = 'error') => {
-      setToast({
-        visible: true,
-        message,
-        type,
-      });
-    },
-    [],
-  );
-
-  const hideToast = useCallback(() => {
-    setToast(prev => ({...prev, visible: false}));
-  }, []);
+  const {showToast} = useToast();
 
   useEffect(() => {
     if (name) {
@@ -69,7 +45,7 @@ export const useCallSummaryActions = ({
     }
   }, [name]);
 
-  const {checkAndRequestPermissions} = useStoragePermissions(showToast);
+  const {checkAndRequestPermissions} = useStoragePermissions();
 
   // Hide rename, export, delete menu
   const hideMenu = () => {
@@ -206,9 +182,6 @@ export const useCallSummaryActions = ({
     handleExport,
     handleDelete,
     handleGoBack,
-    hideToast,
-    showToast,
-    toast,
     summaryName,
     setSummaryName,
     onHeaderPress,

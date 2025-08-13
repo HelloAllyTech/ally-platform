@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {OtpModal, PrimaryButton} from '@/components';
+import {EmailInputModal, OtpModal, PrimaryButton} from '@/components';
 import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -27,9 +27,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const [createRoom] = useCreateRoomMutation();
 
   const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
+  const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-
-  const userEmail = 'abhay@keyvalue.systems'; //TODO: Use your registered(ally learn) email
+  const [userEmail, setUserEmail] = useState('');
 
   const getRoomData = async () => {
     try {
@@ -57,11 +57,10 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           roomData: roomData,
         });
       } else {
-        await sendOtp({email: userEmail});
-        setIsOtpModalVisible(true);
+        setIsEmailModalVisible(true);
       }
     } catch (error) {
-      console.error('Failed to send OTP:', error);
+      console.error('Failed to get room data:', error);
     }
   };
 
@@ -80,6 +79,16 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const closeOtpModal = () => {
     setIsOtpModalVisible(false);
+  };
+
+  const closeEmailModal = () => {
+    setIsEmailModalVisible(false);
+  };
+
+  const handleEmailSubmit = (email: string) => {
+    setUserEmail(email);
+    setIsEmailModalVisible(false);
+    setIsOtpModalVisible(true);
   };
 
   const renderLoadingOverlay = () => {
@@ -135,6 +144,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       {isCreatingRoom && renderLoadingOverlay()}
       {renderDetailsSection()}
       {renderCtaSection()}
+      <EmailInputModal
+        visible={isEmailModalVisible}
+        onClose={closeEmailModal}
+        onEmailSubmit={handleEmailSubmit}
+      />
       <OtpModal
         visible={isOtpModalVisible}
         onClose={closeOtpModal}
