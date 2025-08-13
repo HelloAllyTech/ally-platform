@@ -18,7 +18,8 @@ import {styles} from './styles';
 
 type AllowedType =
   | CHAT_TYPES.EXOTEL_CONFERENCE_CHAT
-  | CHAT_TYPES.MICROPHONE_CHAT;
+  | CHAT_TYPES.MICROPHONE_CHAT
+  | CHAT_TYPES.LEARN_CHAT;
 
 interface StartSessionModalProps {
   visible: boolean;
@@ -41,6 +42,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
     return [
       CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
       CHAT_TYPES.MICROPHONE_CHAT,
+      CHAT_TYPES.LEARN_CHAT,
     ].filter(chatType => enabledChatTypes?.includes(chatType)) as AllowedType[];
   }, [enabledChatTypes]);
 
@@ -62,6 +64,11 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
     if (selected === CHAT_TYPES.MICROPHONE_CHAT) {
       onListenLive();
       onClose();
+      return;
+    }
+    if (selected === CHAT_TYPES.LEARN_CHAT) {
+      // TODO: route to learn flow when available
+      return;
     }
   };
 
@@ -133,6 +140,25 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               </View>
             </TouchableOpacity>
           )}
+
+          {/* TODO: Learn option - always visible for now, remove this when backend config is available */}
+          <TouchableOpacity
+            accessibilityRole="radio"
+            style={styles.optionRow}
+            activeOpacity={0.7}
+            onPress={() => setSelected(CHAT_TYPES.LEARN_CHAT)}>
+            <View style={styles.radioOuter}>
+              {selected === CHAT_TYPES.LEARN_CHAT && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <View style={styles.optionTextBlock}>
+              <Text style={styles.optionTitle}>{t('CallLogs.learn')}</Text>
+              <Text style={styles.optionSubtitle}>
+                {t('CallLogs.learnDescription')}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.separator} />
 
