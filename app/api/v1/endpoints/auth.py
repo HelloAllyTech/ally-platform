@@ -131,21 +131,22 @@ async def refresh_token(
         auth_service: Authentication service dependency
         
     Returns:
-        RefreshTokenResponse: New access token
+        RefreshTokenResponse: New access and refresh tokens
         
     Raises:
         HTTPException: If refresh token is invalid
     """
-    access_token = await auth_service.refresh_access_token(request.refresh_token)
+    tokens = await auth_service.refresh_access_token(request.refresh_token)
     
-    if not access_token:
+    if not tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
     
     return RefreshTokenResponse(
-        access_token=access_token,
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
     )
 

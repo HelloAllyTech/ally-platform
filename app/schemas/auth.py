@@ -77,6 +77,7 @@ class RefreshTokenResponse(BaseModel):
     """Response schema for token refresh."""
     
     access_token: str = Field(..., description="New JWT access token")
+    refresh_token: str = Field(..., description="New JWT refresh token")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Access token expiry time in seconds")
 

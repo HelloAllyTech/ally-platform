@@ -119,15 +119,15 @@ class AuthenticationService:
             print(f"Failed to complete login: {e}")
             return None, None
     
-    async def refresh_access_token(self, refresh_token: str) -> Optional[str]:
+    async def refresh_access_token(self, refresh_token: str) -> Optional[TokenPair]:
         """
-        Generate new access token using refresh token.
+        Generate new access token and refresh token using refresh token.
         
         Args:
             refresh_token: Valid refresh token
             
         Returns:
-            New access token or None if refresh token is invalid
+            TokenPair with new access and refresh tokens or None if refresh token is invalid
         """
         try:
             # Decode refresh token to get user info
@@ -146,9 +146,24 @@ class AuthenticationService:
             if not self._verify_token_hash(refresh_token, user.refresh_token):
                 return None
             
-            # Generate new access token
+            # Generate new tokens
             access_token = self._create_access_token(user_id, user.email)
-            return access_token
+            new_refresh_token = self._create_refresh_token(user_id, user.email)
+            
+            # Update refresh token in database
+            hashed_refresh_token = self._hash_token(new_refresh_token)
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(refresh_token=hashed_refresh_token)
+            )
+            await self.session.execute(stmt)
+            
+            return TokenPair(
+                access_token=access_token,
+                refresh_token=new_refresh_token,
+                expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
+            )
             
         except JWTError:
             return None
