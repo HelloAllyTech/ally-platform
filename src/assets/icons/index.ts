@@ -13,6 +13,7 @@ import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
 import ChevronDown from './chevronDown.svg';
+import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
 import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
@@ -32,8 +33,6 @@ import FlowIcon from './flow.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
-import HomeInactiveIcon from './home.svg';
-import HomeActiveIcon from './homeActive.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
@@ -51,18 +50,21 @@ import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
+import ReplayIcon from './replay.svg';
 import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
 import SmileIcon from './smile.svg';
+import StarIcon from './star.svg';
 import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
 import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
+import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
@@ -98,8 +100,6 @@ export {
   EyeIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
-  HomeActiveIcon,
-  HomeInactiveIcon,
   DoubleRightArrowIcon,
   DoubleBottomArrowIcon,
   PauseWhiteIcon,
@@ -138,4 +138,8 @@ export {
   EmptyTranscriptIcon,
   PageIcon,
   NotesIcon,
+  TranscribeIcon,
+  ReplayIcon,
+  CloseIcon,
+  StarIcon,
 };

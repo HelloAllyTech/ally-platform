@@ -97,4 +97,8 @@ export const colors = {
   // Reds
   brightRed: '#F93535',
   vividRed: '#F50004',
+
+  // Yellows
+  yellow: '#FFD700',
+  starYellow: '#FFB800',
 };

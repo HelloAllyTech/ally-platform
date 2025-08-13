@@ -162,15 +162,12 @@ export const useCallSummaryActions = ({
     }
   };
 
-  // Go back to home screen
+  // Go back to Call Logs screen
   const handleGoBack = useCallback(() => {
     if (isCallLogSummaryFlow) {
       navigation.goBack();
     } else {
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'Home'}],
-      });
+      navigation.reset({index: 0, routes: [{name: 'CallLog'}]});
       dispatch(clearCurrentChat());
     }
   }, [isCallLogSummaryFlow, navigation, dispatch]);

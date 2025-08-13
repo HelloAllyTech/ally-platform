@@ -6,7 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import images from '@/assets/images';
 import {PrimaryButton} from '@/components';
-import {isIOS} from '@/constants/general';
+import {isIOS, SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch} from '@/store/hooks';
@@ -50,7 +50,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   useHardwareBackPressHandler(() => {
     dispatch(clearCurrentChat());
     setIsPlaying(false);
-    navigation.navigate('Home');
+    navigation.reset({index: 0, routes: [{name: SCREEN_NAMES.CALL_LOG}]});
     return true;
   });
 
@@ -89,7 +89,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
 
   const onPressSkip = () => {
     setIsPlaying(false);
-    navigation.navigate('CallSummary');
+    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY);
   };
 
   const onPhaseChange = (phase: Phase) => {

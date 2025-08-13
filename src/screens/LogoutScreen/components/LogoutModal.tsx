@@ -27,10 +27,10 @@ export const LogoutModal = ({
       visible={isLogoutModalVisible}
       onSecondaryPress={onPressLogoutCancel}
       onPrimaryPress={onPressLogoutConfirm}
-      primaryButtonText={t('Home.logout.logout')}
-      secondaryButtonText={t('Home.logout.cancel')}
-      title={t('Home.logout.confirm')}
-      description={t('Home.logout.logoutDescription')}
+      primaryButtonText={t('Logout.logout')}
+      secondaryButtonText={t('Logout.cancel')}
+      title={t('Logout.confirm')}
+      description={t('Logout.logoutDescription')}
       onClose={onPressLogoutCancel}
       primaryTextColor={colors.brightRed}
     />

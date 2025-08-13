@@ -40,7 +40,7 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         <View style={styles.logoutIconContainer}>
           <LogoutIcon />
         </View>
-        <Text style={styles.logoutText}>{t('Home.logout.logout')}</Text>
+        <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
       </TouchableOpacity>
     </View>
   );

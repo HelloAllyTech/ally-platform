@@ -111,7 +111,6 @@ export const useSummaryState = (
         },
       }).catch(error => {
         // Handle error if needed
-        console.error('Failed to update notes:', error);
       });
     },
     {delay: 1000},
