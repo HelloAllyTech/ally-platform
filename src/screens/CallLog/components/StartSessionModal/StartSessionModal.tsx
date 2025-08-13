@@ -11,8 +11,8 @@ import {
 import {CloseIcon} from '@/assets/icons';
 import images from '@/assets/images';
 import {PrimaryButton} from '@/components';
-import {CHAT_TYPES} from '@/constants';
-import {useTranslate} from '@/hooks';
+import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useTranslate} from '@/hooks';
 
 import {styles} from './styles';
 
@@ -37,6 +37,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   onListenLive,
 }) => {
   const {t} = useTranslate();
+  const navigation = useAppNavigation();
 
   const allowedTypes = useMemo<AllowedType[]>(() => {
     return [
@@ -56,20 +57,20 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   }, [visible, allowedTypes]);
 
   const handleStart = () => {
-    if (selected === CHAT_TYPES.EXOTEL_CONFERENCE_CHAT) {
-      onJoinCall();
-      onClose();
-      return;
+    switch (selected) {
+      case CHAT_TYPES.EXOTEL_CONFERENCE_CHAT:
+        onJoinCall();
+        break;
+      case CHAT_TYPES.MICROPHONE_CHAT:
+        onListenLive();
+        break;
+      case CHAT_TYPES.LEARN_CHAT:
+        navigation.navigate(SCREEN_NAMES.SIMULATIONS);
+        break;
+      default:
+        break;
     }
-    if (selected === CHAT_TYPES.MICROPHONE_CHAT) {
-      onListenLive();
-      onClose();
-      return;
-    }
-    if (selected === CHAT_TYPES.LEARN_CHAT) {
-      // TODO: route to learn flow when available
-      return;
-    }
+    onClose();
   };
 
   if (!visible) return null;

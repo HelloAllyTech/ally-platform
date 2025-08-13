@@ -218,7 +218,13 @@
     "noSimulations": "No simulations",
     "connecting": "Connecting...",
     "disconnecting": "Disconnecting...",
-    "creatingRoom": "Creating room..."
+    "creatingRoom": "Creating room...",
+    "enterYourEmail": "Enter Your Email",
+    "emailDescription": "Please enter your registered Ally Learn email address to continue with the simulation.",
+    "emailPlaceholder": "Enter your email",
+    "continue": "Continue",
+    "pleaseEnterEmail": "Please enter your email address",
+    "pleaseEnterValidEmail": "Please enter a valid email address"
   },
   "SimulationFeedback": {
     "title": "Simulation",
