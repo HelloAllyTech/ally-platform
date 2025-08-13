@@ -1,1 +1,0 @@
-export {TokenInputModal} from './TokenInputModal';

@@ -24,7 +24,10 @@ export const simulationsApi = learnApi.injectEndpoints({
       }),
     }),
 
-    verifyOtp: builder.mutation<LoginResponse, {email: string; otp: string}>({
+    learnVerifyOtp: builder.mutation<
+      LoginResponse,
+      {email: string; otp: string}
+    >({
       query: ({email, otp}) => ({
         url: API_ROUTES.VERIFY_OTP,
         method: API_METHODS.POST,
@@ -78,7 +81,7 @@ export const simulationsApi = learnApi.injectEndpoints({
 
 export const {
   useSendOtpMutation,
-  useVerifyOtpMutation,
+  useLearnVerifyOtpMutation,
   useCreateRoomMutation,
   useListRoomsQuery,
   useDeleteRoomMutation,

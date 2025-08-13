@@ -7,8 +7,8 @@ import {PrimaryButton} from '@/components/Button/PrimaryButton';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {useTranslate} from '@/hooks';
 import {
+  useLearnVerifyOtpMutation,
   useSendOtpMutation,
-  useVerifyOtpMutation,
 } from '@/services/simulationsApi';
 import {colors, fontFamily, typography} from '@/theme';
 import {setItem} from '@/utils/asyncStorage';
@@ -43,7 +43,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   const {t} = useTranslate();
 
   const [verifyOtp, {isLoading: isVerifying, isError, error: apiError}] =
-    useVerifyOtpMutation();
+    useLearnVerifyOtpMutation();
   const [sendOtp, {isLoading: isResending}] = useSendOtpMutation();
 
   const isOtpComplete = otpValue.every(v => v !== '');

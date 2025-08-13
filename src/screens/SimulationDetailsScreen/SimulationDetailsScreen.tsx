@@ -1,32 +1,35 @@
 import React, {useState} from 'react';
-import {Image, SafeAreaView, ScrollView, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {OtpModal, PrimaryButton} from '@/components';
-import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {useTranslate} from '@/hooks';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
+import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {
-  useCreateRoomMutation,
-  useSendOtpMutation,
-} from '@/services/simulationsApi';
+import {useCreateRoomMutation, useSendOtpMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
-import {getItem} from '@/utils/asyncStorage';
+import {getItem} from '@/utils';
 
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
-  const navigation = useAppNavigation();
   const {scenario} = route.params;
   const {t} = useTranslate();
+  const navigation = useAppNavigation();
   const [sendOtp] = useSendOtpMutation();
   const [createRoom] = useCreateRoomMutation();
 
   const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
-  const userEmail = 'abhay@keyvalue.systems'; // Use your registered(ally learn) email
+  const userEmail = 'abhay@keyvalue.systems'; //TODO: Use your registered(ally learn) email
 
   const getRoomData = async () => {
     try {
@@ -50,13 +53,14 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     try {
       const roomData = await getRoomData();
       if (roomData) {
-        navigation.navigate('SimulationAssistant', {roomData: roomData});
+        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
+          roomData: roomData,
+        });
       } else {
         await sendOtp({email: userEmail});
         setIsOtpModalVisible(true);
       }
     } catch (error) {
-      // Handle error - could show a toast or alert
       console.error('Failed to send OTP:', error);
     }
   };
@@ -65,7 +69,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     try {
       const roomData = await getRoomData();
       if (roomData) {
-        navigation.navigate('SimulationAssistant', {roomData: roomData});
+        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
+          roomData: roomData,
+        });
       }
     } catch (error) {
       console.error('Error navigating to simulation assistant:', error);
@@ -79,15 +85,14 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderLoadingOverlay = () => {
     return (
       <View style={styles.loadingOverlay}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Creating room...</Text>
-        </View>
+        <ActivityIndicator size="large" color={colors.white} />
+        <Text style={styles.loadingText}>{t('Simulations.creatingRoom')}</Text>
       </View>
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safe}>
+  const renderDetailsSection = () => {
+    return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>
@@ -95,18 +100,14 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           </Text>
           <View style={styles.sectionRule} />
         </View>
-
         {!!scenario.cover_image && (
           <Image source={{uri: scenario.cover_image}} style={styles.cover} />
         )}
-
-        <Text style={styles.cardTitle}>{scenario.title || 'Simulation'}</Text>
-
+        <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
         {!!scenario.short_description && (
           <Text style={styles.fieldValue}>{scenario.short_description}</Text>
         )}
-
         <Text style={[styles.fieldLabel, styles.descriptionLabel]}>
           {t('Simulations.descriptionLabel')}
         </Text>
@@ -114,15 +115,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           <Text style={styles.fieldValue}>{scenario.long_description}</Text>
         )}
       </ScrollView>
+    );
+  };
 
-      {isCreatingRoom && renderLoadingOverlay()}
-
-      <OtpModal
-        visible={isOtpModalVisible}
-        onClose={closeOtpModal}
-        email={userEmail}
-        onOtpVerificationSuccess={handleOtpVerificationSuccess}
-      />
+  const renderCtaSection = () => {
+    return (
       <View style={styles.ctaWrapper}>
         <PrimaryButton
           label={t('Simulations.startSimulation')}
@@ -130,6 +127,20 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           isLoading={isCreatingRoom}
         />
       </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      {isCreatingRoom && renderLoadingOverlay()}
+      {renderDetailsSection()}
+      {renderCtaSection()}
+      <OtpModal
+        visible={isOtpModalVisible}
+        onClose={closeOtpModal}
+        email={userEmail}
+        onOtpVerificationSuccess={handleOtpVerificationSuccess}
+      />
     </SafeAreaView>
   );
 };
@@ -211,7 +222,6 @@ const styles = ScaledSheet.create({
     zIndex: 1000,
   },
   loadingContainer: {
-    backgroundColor: colors.white,
     paddingHorizontal: '24@ms',
     paddingVertical: '16@mvs',
     borderRadius: '8@ms',

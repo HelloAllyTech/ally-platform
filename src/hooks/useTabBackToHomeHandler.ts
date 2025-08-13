@@ -1,8 +1,8 @@
 import {useCallback} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
+import {SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 
 /**
  * Custom hook to handle back press on tab root screens and navigate to Home tab.
@@ -15,9 +15,9 @@ export const useTabBackToHomeHandler = () => {
   useHardwareBackPressHandler(
     useCallback(() => {
       if (isFocused) {
-        navigation.navigate('Home', {
-          screen: 'BottomTabs',
-          params: {screen: 'HomeTab'},
+        navigation.navigate(SCREEN_NAMES.HOME, {
+          screen: SCREEN_NAMES.BOTTOM_TABS,
+          params: {screen: SCREEN_NAMES.HOME_TAB},
         });
         return true;
       }

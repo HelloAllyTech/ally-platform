@@ -221,6 +221,19 @@
     "verifyOtp": "Verify OTP",
     "enterTheCodeSentTo": "Enter the code sent to",
     "didNotReceiveTheCode": "Did not receive the code?",
-    "resend": "Resend"
+    "resend": "Resend",
+    "noSimulations": "No simulations",
+    "connecting": "Connecting...",
+    "disconnecting": "Disconnecting...",
+    "creatingRoom": "Creating room..."
+  },
+  "SimulationFeedback": {
+    "title": "Simulation",
+    "titleEnded": "Ended",
+    "headerText": "REVIEW AND RATING",
+    "questionText": "How was your experience?",
+    "placeholderText": "How was your Experience ?",
+    "submitButton": "Submit Feedback",
+    "submittingButton": "Submitting..."
   }
 }

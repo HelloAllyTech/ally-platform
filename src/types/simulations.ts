@@ -1,3 +1,5 @@
+import {AudioTrackRef} from './audio';
+
 export interface Scenario {
   unique_id: string;
   title?: string;
@@ -54,4 +56,18 @@ export interface FeedbackResponse {
   success: boolean;
   message?: string;
   feedbackId?: number;
+}
+
+export interface CircleWaveVisualizerProps {
+  trackRef: AudioTrackRef;
+}
+
+export interface ControlButtonsProps {
+  onMicPress: () => void;
+  onStopPress: () => void;
+  isMuted: boolean;
+}
+
+export interface SimulationTimerProps {
+  startTime: Date;
 }

@@ -12,10 +12,10 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {DrawerMenuIcon} from '@/assets/icons';
+import {DrawerMenuIcon} from '@/assets';
 import images from '@/assets/images';
 import {env} from '@/config/env';
-import {CHAT_TYPES, isIOS} from '@/constants';
+import {CHAT_TYPES, isIOS, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -27,12 +27,12 @@ import {
 import {
   useGetSummaryFieldsQuery,
   useGetVisibleChatTypesQuery,
-} from '@/services/settingsApi';
+} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors, fontFamily} from '@/theme';
 import {Chat, UserRole} from '@/types';
-import {logger} from '@/utils/logger';
+import {logger} from '@/utils';
 
 import {FeatureNotAvailable, StartCallCard} from './components';
 
@@ -94,7 +94,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleVoiceRecording = async () => {
     checkCounselorChat();
-    navigation.navigate('Listening', {isMicrophoneMode: true});
+    navigation.navigate(SCREEN_NAMES.LISTENING, {isMicrophoneMode: true});
   };
 
   const handleLearnMorePress = useCallback(async () => {
@@ -164,7 +164,9 @@ export const HomeScreen: React.FC = () => {
                         image={images.listenLive}
                         header={'Practice simulations'}
                         subtitle={'Choose a role and start a session'}
-                        onPressCard={() => navigation.navigate('Simulations')}
+                        onPressCard={() =>
+                          navigation.navigate(SCREEN_NAMES.SIMULATIONS)
+                        }
                         customStyles={
                           isSingleCallType ? styles.stretchCard : {}
                         }

@@ -17,7 +17,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets/icons';
+import {LeftArrowIcon} from '@/assets';
+import {SCREEN_NAMES} from '@/constants';
 import {
   useCounselorChat,
   useHardwareBackPressHandler,
@@ -46,11 +47,11 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
       // Reset the navigation stack to have Home and Listening screens
       navigation.reset({
         index: 1,
-        routes: [{name: 'Home'}, {name: 'Listening'}],
+        routes: [{name: SCREEN_NAMES.HOME}, {name: SCREEN_NAMES.LISTENING}],
       });
     },
     onNoActiveChatFound: () => {
-      navigation.replace('Home');
+      navigation.replace(SCREEN_NAMES.HOME);
     },
   });
   const {t} = useTranslate();
@@ -87,7 +88,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
         if (userData?.role === UserRole.COUNSELOR) {
           checkCounselorChat();
         } else {
-          navigation.replace('Home');
+          navigation.replace(SCREEN_NAMES.HOME);
         }
       }
     }

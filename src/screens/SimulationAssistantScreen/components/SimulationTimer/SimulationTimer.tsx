@@ -3,10 +3,7 @@ import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
-
-interface SimulationTimerProps {
-  startTime: Date;
-}
+import {SimulationTimerProps} from '@/types';
 
 export const SimulationTimer: React.FC<SimulationTimerProps> = ({
   startTime,

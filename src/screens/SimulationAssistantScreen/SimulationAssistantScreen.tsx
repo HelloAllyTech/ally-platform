@@ -2,13 +2,14 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {RoomContext} from '@livekit/react-native';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {SafeAreaView, Text, View} from 'react-native';
+import {ActivityIndicator, SafeAreaView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {InfoIcon} from '@/assets/icons';
+import {InfoIcon} from '@/assets';
+import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useDeleteRoomMutation} from '@/services/simulationsApi';
+import {useDeleteRoomMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 
 import {AudioWave, ControlButtons, SimulationTimer} from './components';
@@ -24,13 +25,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     : new Date();
   const navigation = useAppNavigation();
   const {t} = useTranslation();
-
   const [deleteRoom] = useDeleteRoomMutation();
 
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
-
   const [room] = useState<Room>(() => new Room());
 
   useEffect(() => {
@@ -47,7 +46,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
       } catch {
-        // no-op
+        console.error('Error attaching room listeners');
       }
     };
     const onDisconnected = () => {
@@ -78,6 +77,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       const message = e instanceof Error ? e.message : 'Failed to connect';
       console.error('handleConnect error', message);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, wsUrl]);
 
   const handleDisconnect = async () => {
@@ -86,7 +86,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       await room.disconnect();
       const response = await deleteRoom(room?.name);
       if (!response.error) {
-        navigation.replace('SimulationFeedback');
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK);
       }
     } finally {
       setIsMicEnabled(false);
@@ -104,18 +104,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     }
   };
 
-  const renderConnectionLoader = () => {
+  const renderLoader = (message: string) => {
     return (
       <View style={styles.connectionLoaderContainer}>
-        <Text>Connecting...</Text>
-      </View>
-    );
-  };
-
-  const renderDisconnectionLoader = () => {
-    return (
-      <View style={styles.connectionLoaderContainer}>
-        <Text>Disconnecting...</Text>
+        <ActivityIndicator size="large" color={colors.white} />
+        <Text>{message}</Text>
       </View>
     );
   };
@@ -123,8 +116,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   return (
     <SafeAreaView style={styles.container}>
       <RoomContext.Provider value={room}>
-        {isConnecting && renderConnectionLoader()}
-        {isDisconnecting && renderDisconnectionLoader()}
+        {(isConnecting || isDisconnecting) &&
+          renderLoader(
+            isConnecting
+              ? t('SimulationAssistant.connecting')
+              : t('SimulationAssistant.disconnecting'),
+          )}
         {startTime && <SimulationTimer startTime={startTime} />}
         <AudioWave />
         <ControlButtons
@@ -151,8 +148,6 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '20@ms',
     paddingVertical: '40@mvs',
   },
-
-  // Security Message Styles
   securityContainer: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -28,4 +28,12 @@ const CIRCLE_CONFIGS: CircleConfig[] = [
   {scale: 4, isStatic: false},
 ];
 
-export {AUDIO, CIRCLE, CIRCLE_CONFIGS};
+const FEEDBACK_OPTIONS = {
+  1: 'Poor Experience',
+  2: 'Below Average',
+  3: 'Average',
+  4: 'Nice Experience!',
+  5: 'Excellent Experience!',
+};
+
+export {AUDIO, CIRCLE, CIRCLE_CONFIGS, FEEDBACK_OPTIONS};

@@ -8,7 +8,6 @@ export {BreathingScreen} from './BoxBreathingScreen';
 export {CommunityScreen} from './CommunityScreen';
 export {SearchScreen} from './SearchScreen';
 export {DrawerContent} from './LogoutScreen/components/CustomDrawerContent';
-export {LiveKitTestScreen} from './LiveKitTest/LiveKitTestScreen';
 export {SimulationsScreen} from './SimulationsScreen';
 export {SimulationDetailsScreen} from './SimulationDetailsScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
