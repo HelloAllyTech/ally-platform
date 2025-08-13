@@ -1,4 +1,4 @@
-const breathingBackground = require('./breathing_background.png');
+const breathingBackground = require('./breathingBackground.png');
 const listenLive = require('./listenLive.png');
 const joinCall = require('./joinCall.png');
 const conversation = require('./conversation.png');
