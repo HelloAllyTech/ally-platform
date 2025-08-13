@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -16,9 +16,13 @@ export const AddNotesSection = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [note, setNote] = useState<string>();
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    setNote(savedNotes);
+    // Only sync from savedNotes when the input is not focused
+    if (!inputRef.current?.isFocused()) {
+      setNote(savedNotes);
+    }
   }, [savedNotes]);
 
   const handleNoteChange = (text: string) => {
@@ -50,6 +54,7 @@ export const AddNotesSection = ({
           <View style={styles.noteContainer}>
             <Text style={styles.bullet}>•</Text>
             <TextInput
+              ref={inputRef}
               style={styles.input}
               value={note}
               onChangeText={text => handleNoteChange(text)}
