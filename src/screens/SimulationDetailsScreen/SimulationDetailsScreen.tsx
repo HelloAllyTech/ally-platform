@@ -11,7 +11,12 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
-import {EmailInputModal, OtpModal, PrimaryButton} from '@/components';
+import {
+  EmailInputModal,
+  OtpModal,
+  PrimaryButton,
+  useErrorToast,
+} from '@/components';
 import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -26,6 +31,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const [createRoom] = useCreateRoomMutation();
+  const {showErrorToast} = useErrorToast();
 
   const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
   const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
@@ -43,7 +49,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       }
       return null;
     } catch (error) {
-      console.error('Error creating room:', error);
+      showErrorToast(error, 'Errors.createRoom');
       return null;
     } finally {
       setIsCreatingRoom(false);
@@ -61,7 +67,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         setIsEmailModalVisible(true);
       }
     } catch (error) {
-      console.error('Failed to get room data:', error);
+      showErrorToast(error, 'Errors.sendOtp');
     }
   };
 
@@ -74,7 +80,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         });
       }
     } catch (error) {
-      console.error('Error navigating to simulation assistant:', error);
+      showErrorToast(error, 'Errors.navigateAssistant');
     }
   };
 

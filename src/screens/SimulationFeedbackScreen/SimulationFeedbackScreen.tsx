@@ -11,7 +11,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {StarIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {PrimaryButton, useErrorToast} from '@/components';
 import {FEEDBACK_OPTIONS, SCREEN_NAMES, WINDOW_HEIGHT} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import {useAddFeedbackMutation} from '@/services';
@@ -25,6 +25,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
 
   const navigation = useAppNavigation();
   const [addFeedback, {isLoading}] = useAddFeedbackMutation();
+  const {showErrorToast} = useErrorToast();
 
   const handleStarPress = (starIndex: number) => {
     const feedback = starIndex + 1;
@@ -49,7 +50,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
         ],
       });
     } catch (error) {
-      console.error('Failed to submit feedback:', error);
+      showErrorToast(error, 'Errors.submitFeedback');
     }
   };
 

@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 
-import {useToast} from '@/components';
+import {useErrorToast, useToast} from '@/components';
 import {
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -38,7 +38,7 @@ export const useCallSummaryActions = ({
 
   const {t} = useTranslate();
   const {showToast} = useToast();
-
+  const {showErrorToast} = useErrorToast();
   useEffect(() => {
     if (name) {
       setSummaryName(name);
@@ -67,13 +67,8 @@ export const useCallSummaryActions = ({
         }).unwrap();
         setSummaryName(newName);
         showToast(t('CallSummary.info.summaryNameUpdateSuccess'), 'success');
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : t('CallSummary.info.summaryNameUpdateFailed');
-        logger.error(errorMessage);
-        showToast(errorMessage);
+      } catch (error) {
+        showErrorToast(error, 'CallSummary.info.summaryNameUpdateFailed');
       }
     }
   };
@@ -100,13 +95,8 @@ export const useCallSummaryActions = ({
 
       showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
       setIsMenuVisible(false);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : t('CallSummary.info.fileExportFailed');
-      logger.error(errorMessage);
-      showToast(errorMessage);
+    } catch (error) {
+      showErrorToast(error, 'CallSummary.info.fileExportFailed');
     }
   };
 
