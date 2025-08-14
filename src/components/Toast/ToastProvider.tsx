@@ -7,6 +7,9 @@ import React, {
   useState,
 } from 'react';
 
+import {useTranslate} from '@/hooks';
+import {TranslationType} from '@/localization/locales/type';
+
 import {Toast} from './Toast';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -102,11 +105,11 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({
 };
 
 export const useToast = (): ToastContextValue => {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
+  const context = useContext(ToastContext);
+  if (!context) {
     throw new Error('useToast must be used within a ToastProvider');
   }
-  return ctx;
+  return context;
 };
 
 export const showToast = (
@@ -118,4 +121,22 @@ export const showToast = (
 
 export const hideToast = () => {
   externalHideRef?.();
+};
+
+// Hook for error toasts that automatically handles translation
+export const useErrorToast = () => {
+  const {t} = useTranslate();
+
+  const showErrorToast = useCallback(
+    (error: unknown, fallbackKey: string) => {
+      const message =
+        error instanceof Error && error.message?.trim()
+          ? error.message
+          : t(fallbackKey as TranslationType);
+      showToast(message, 'error');
+    },
+    [t],
+  );
+
+  return {showErrorToast};
 };

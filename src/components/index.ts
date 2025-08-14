@@ -8,6 +8,7 @@ export {
   useToast,
   showToast as showGlobalToast,
   hideToast as hideGlobalToast,
+  useErrorToast,
 } from './Toast/ToastProvider';
 export {LoadingSkeleton} from './LoadingSkeleton';
 export {NetworkLogs} from './NetworkLogs';

@@ -237,5 +237,14 @@
     "placeholderText": "How was your Experience ?",
     "submitButton": "Submit Feedback",
     "submittingButton": "Submitting..."
+  },
+  "Errors": {
+    "createRoom": "Failed to create room",
+    "sendOtp": "Failed to send OTP",
+    "navigateAssistant": "Failed to open simulation assistant",
+    "attachListeners": "Failed to attach room listeners",
+    "connect": "Failed to connect to the room",
+    "toggleMic": "Failed to toggle microphone",
+    "submitFeedback": "Failed to submit feedback"
   }
 }

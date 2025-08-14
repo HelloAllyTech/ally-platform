@@ -6,6 +6,7 @@ import {ActivityIndicator, SafeAreaView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {InfoIcon} from '@/assets';
+import {useErrorToast} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -26,7 +27,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const [deleteRoom] = useDeleteRoomMutation();
-
+  const {showErrorToast} = useErrorToast();
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
@@ -45,8 +46,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
-      } catch {
-        console.error('Error attaching room listeners');
+      } catch (error) {
+        showErrorToast(error, 'Errors.attachListeners');
       }
     };
     const onDisconnected = () => {
@@ -65,7 +66,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.TrackPublished, onTrackPub);
     };
-  }, [room]);
+  }, [room, showErrorToast]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
@@ -73,9 +74,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       setIsConnecting(true);
       await room.connect(wsUrl, token);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to connect';
-      console.error('handleConnect error', message);
+    } catch (error) {
+      showErrorToast(error, 'Errors.connect');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, wsUrl]);
@@ -99,8 +99,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       const next = !isMicEnabled;
       await room.localParticipant.setMicrophoneEnabled(next);
       setIsMicEnabled(next);
-    } catch (e) {
-      console.error('handleToggleMic error', e);
+    } catch (error) {
+      showErrorToast(error, 'Errors.toggleMic');
     }
   };
 
