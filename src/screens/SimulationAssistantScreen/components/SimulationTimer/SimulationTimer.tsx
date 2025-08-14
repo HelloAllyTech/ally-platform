@@ -53,18 +53,18 @@ const styles = ScaledSheet.create({
   },
   sessionText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '18@ms',
+    fontSize: '22@ms',
     color: colors.black,
     marginBottom: '8@mvs',
   },
   italicText: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontSize: '18@ms',
+    fontSize: '22@ms',
     color: colors.black,
   },
   timerText: {
     ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '16@ms',
+    fontSize: '26@ms',
     color: colors.lightGray3,
   },
 });

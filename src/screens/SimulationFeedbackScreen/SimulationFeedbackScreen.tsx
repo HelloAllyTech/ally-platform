@@ -12,7 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {StarIcon} from '@/assets';
 import {PrimaryButton} from '@/components';
-import {FEEDBACK_OPTIONS} from '@/constants';
+import {FEEDBACK_OPTIONS, SCREEN_NAMES, WINDOW_HEIGHT} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import {useAddFeedbackMutation} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
@@ -41,7 +41,13 @@ export const SimulationFeedbackScreen: React.FC = () => {
         rating,
         comment: additionalFeedback || feedbackText,
       });
-      navigation.pop();
+      navigation.reset({
+        index: 1,
+        routes: [
+          {name: SCREEN_NAMES.CALL_LOG},
+          {name: SCREEN_NAMES.SIMULATIONS},
+        ],
+      });
     } catch (error) {
       console.error('Failed to submit feedback:', error);
     }
@@ -134,18 +140,17 @@ const styles = ScaledSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: '20@ms',
-    paddingTop: '40@vs',
+    paddingTop: WINDOW_HEIGHT * 0.12,
     paddingBottom: '40@vs',
   },
   titleSection: {
-    alignItems: 'center',
-    marginBottom: '40@vs',
+    marginBottom: '10@vs',
   },
   title: {
     ...typography.headline.large,
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,
-    textAlign: 'center',
+    fontSize: '22@ms',
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -153,7 +158,7 @@ const styles = ScaledSheet.create({
   headerSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: '30@vs',
+    marginBottom: '16@vs',
   },
   headerText: {
     ...typography.label.medium,
@@ -167,24 +172,24 @@ const styles = ScaledSheet.create({
     marginLeft: '10@ms',
   },
   feedbackCard: {
-    backgroundColor: colors.lightGray8,
     borderRadius: '12@ms',
-    padding: '24@ms',
-    marginBottom: '40@vs',
-    borderWidth: 1,
+    padding: '16@ms',
+    marginBottom: '20@vs',
+    borderWidth: 0.5,
     borderColor: colors.lightGray4,
   },
   questionText: {
     ...typography.headline.small,
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
+    color: colors.darkGray12,
+    fontSize: '18@ms',
     textAlign: 'center',
-    marginBottom: '20@vs',
+    marginBottom: '12@vs',
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: '16@vs',
+    marginBottom: '8@vs',
   },
   starContainer: {
     marginHorizontal: '4@ms',
@@ -193,17 +198,18 @@ const styles = ScaledSheet.create({
     ...typography.body.large,
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,
+    fontSize: '15@ms',
     textAlign: 'center',
-    marginBottom: '24@vs',
+    marginBottom: '12@vs',
   },
   textInput: {
     backgroundColor: colors.white,
     borderRadius: '8@ms',
-    padding: '16@ms',
+    padding: '12@ms',
     minHeight: '120@vs',
     ...typography.body.medium,
     color: colors.darkGray2,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.lightGray4,
   },
   buttonContainer: {

@@ -108,7 +108,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.connectionLoaderContainer}>
         <ActivityIndicator size="large" color={colors.white} />
-        <Text>{message}</Text>
+        <Text style={styles.connectionLoaderText}>{message}</Text>
       </View>
     );
   };
@@ -119,8 +119,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         {(isConnecting || isDisconnecting) &&
           renderLoader(
             isConnecting
-              ? t('SimulationAssistant.connecting')
-              : t('SimulationAssistant.disconnecting'),
+              ? t('SimulationScreen.connecting')
+              : t('SimulationScreen.disconnecting'),
           )}
         {startTime && <SimulationTimer startTime={startTime} />}
         <AudioWave />
@@ -170,5 +170,11 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1000,
+  },
+  connectionLoaderText: {
+    ...fontFamily.ROBOTO.REGULAR,
+    paddingTop: '6@ms',
+    fontSize: '14@ms',
+    color: colors.white,
   },
 });

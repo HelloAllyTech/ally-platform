@@ -5,15 +5,17 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrowIcon} from '@/assets';
 import {EmailInputModal, OtpModal, PrimaryButton} from '@/components';
 import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useCreateRoomMutation, useSendOtpMutation} from '@/services';
+import {useCreateRoomMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import {getItem} from '@/utils';
 
@@ -23,7 +25,6 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {scenario} = route.params;
   const {t} = useTranslate();
   const navigation = useAppNavigation();
-  const [sendOtp] = useSendOtpMutation();
   const [createRoom] = useCreateRoomMutation();
 
   const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
@@ -103,12 +104,6 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderDetailsSection = () => {
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>
-            {t('Simulations.scenariosCaps')}
-          </Text>
-          <View style={styles.sectionRule} />
-        </View>
         {!!scenario.cover_image && (
           <Image source={{uri: scenario.cover_image}} style={styles.cover} />
         )}
@@ -131,7 +126,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.ctaWrapper}>
         <PrimaryButton
-          label={t('Simulations.startSimulation')}
+          label={t('Simulations.audioSimulation')}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
         />
@@ -139,9 +134,36 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     );
   };
 
+  const renderHeader = () => {
+    return (
+      <>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.headerLeft}>
+            <LeftArrowIcon color={colors.black} />
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>
+            {t('Simulations.chooseYour')}{' '}
+            <Text style={styles.pageTitleItalic}>
+              {t('Simulations.scenarioWord')}
+            </Text>
+          </Text>
+        </View>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>
+            {t('Simulations.scenariosCaps')}
+          </Text>
+          <View style={styles.sectionRule} />
+        </View>
+      </>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       {isCreatingRoom && renderLoadingOverlay()}
+      {renderHeader()}
       {renderDetailsSection()}
       {renderCtaSection()}
       <EmailInputModal
@@ -163,30 +185,29 @@ const styles = ScaledSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingTop: '50@ms',
-    paddingBottom: '20@ms',
   },
   container: {
     paddingHorizontal: '16@ms',
     paddingBottom: '16@ms',
-    gap: '12@ms',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: '8@ms',
-    marginTop: '8@ms',
-    marginBottom: '8@ms',
+    gap: '4@ms',
+    marginBottom: '12@ms',
+    marginHorizontal: '16@ms',
   },
   sectionLabel: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkGray8,
+    fontSize: '12@ms',
     letterSpacing: 2,
   },
   sectionRule: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.lightGray6,
+    marginRight: '4@ms',
+    backgroundColor: colors.lightGray10,
   },
   cover: {
     width: '100%',
@@ -197,24 +218,28 @@ const styles = ScaledSheet.create({
   cardTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.black,
-    fontSize: '22@ms',
-    marginTop: '12@ms',
-    marginBottom: '6@ms',
+    fontWeight: '700',
+    fontSize: '20@ms',
+    marginTop: '18@ms',
+    marginBottom: '16@ms',
   },
   fieldLabel: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.black,
     fontSize: '16@ms',
+    marginBottom: '2@ms',
+    fontWeight: '500',
   },
   descriptionLabel: {
     marginTop: '12@ms',
+    marginBottom: '2@ms',
   },
   fieldValue: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkCharcoal,
     fontSize: '14@ms',
     lineHeight: '22@ms',
-    marginTop: '4@ms',
+    marginBottom: '6@ms',
   },
   ctaWrapper: {
     marginTop: '20@ms',
@@ -243,7 +268,27 @@ const styles = ScaledSheet.create({
   },
   loadingText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.black,
-    fontSize: '16@ms',
+    color: colors.white,
+    paddingTop: '4@ms',
+    fontSize: '14@ms',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+    marginBottom: '8@ms',
+    marginHorizontal: '10@ms',
+  },
+  headerLeft: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pageTitle: {
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    color: colors.darkGray12,
+    fontSize: '22@ms',
+  },
+  pageTitleItalic: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
 });
