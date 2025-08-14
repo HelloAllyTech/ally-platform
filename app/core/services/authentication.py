@@ -245,12 +245,11 @@ class AuthenticationService:
         return f"{secrets.randbelow(10000):04d}"
     
     async def _cleanup_expired_otps(self, email: str) -> None:
-        """Clean up expired or used OTPs for email."""
+        """Clean up expired or previously active OTPs for email."""
         cutoff_time = datetime.now(timezone.utc)
         
         stmt = delete(OTP).where(
-            OTP.email == email,
-            (OTP.expires_at < cutoff_time) | (OTP.is_verified == True)
+            OTP.email == email
         )
         await self.session.execute(stmt)
     
