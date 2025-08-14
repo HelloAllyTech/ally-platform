@@ -20,7 +20,7 @@ import {colors, fontFamily, typography} from '@/theme';
 export const SimulationFeedbackScreen: React.FC = () => {
   const {t} = useTranslation();
   const [rating, setRating] = useState<number>(0);
-  const [feedbackText, setFeedbackText] = useState<string>('Nice Experience!');
+  const [feedbackText, setFeedbackText] = useState<string>('');
   const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
 
   const navigation = useAppNavigation();
@@ -101,7 +101,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
           }
           onPress={handleSubmit}
           customContainerStyle={styles.submitButton}
-          disabled={isLoading}
+          isDisabled={isLoading}
         />
       </View>
     );

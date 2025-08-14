@@ -9,6 +9,7 @@ import {
 } from 'react-native-permissions';
 
 import {useToast} from '@/components';
+import {isIOS} from '@/constants';
 
 import {useTranslate} from './useTranslate';
 
@@ -32,7 +33,7 @@ export const useStoragePermissions = (): UseStoragePermissionsResult => {
   const {showToast} = useToast();
 
   const checkAndRequestPermissions = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === 'ios') {
+    if (isIOS) {
       return true;
     }
 

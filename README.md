@@ -18,7 +18,6 @@ A React Native mobile application designed to facilitate communication between m
 - **State Management:** Redux Toolkit
 - **Navigation:** React Navigation v7
 - **Styling:** React Native Size Matters
-- **Animations:** React Native Reanimated, Lottie
 - **Storage:** AsyncStorage
 - **Network:** Socket.IO Client
 - **Code Quality:**

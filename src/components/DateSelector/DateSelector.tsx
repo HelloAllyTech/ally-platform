@@ -1,11 +1,12 @@
-import React, {useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {Calendar, LocaleConfig} from 'react-native-calendars';
 
-import {LeftArrow, RightArrow} from '@/assets/icons';
+import {LeftArrow, RightArrow} from '@/assets';
 import {CALENDAR_MODES, DEFAULT_HIT_SLOP, MONTHS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
+import {DateSelectorProps, MarkedDates} from '@/types';
 
 import {calendarTheme, localeConfig} from './calendarConfig';
 import {formatDate, getDisplayText, getYearRange, isToday} from './dateUtils';
@@ -15,36 +16,6 @@ import {useDateSelection} from './useDateSelection';
 // Configure calendar locale
 LocaleConfig.locales.shortDays = localeConfig;
 LocaleConfig.defaultLocale = 'shortDays';
-
-/**
- * Props for the DateSelector component
- */
-interface DateSelectorProps {
-  pickerMode: string;
-  dateRange: {
-    startDate: string;
-    endDate: string;
-  };
-  setDateRange: ({
-    startDate,
-    endDate,
-  }: {
-    startDate: string;
-    endDate: string;
-  }) => void;
-}
-
-/**
- * Interface for calendar day marking
- */
-interface MarkedDates {
-  [key: string]: {
-    color: string;
-    startingDay?: boolean;
-    endingDay?: boolean;
-    selected?: boolean;
-  };
-}
 
 /**
  * DateSelector component for selecting dates in different modes (day, week, month, year)
@@ -82,37 +53,63 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
     pickerMode,
   });
 
-  const getMarkedDates = (): MarkedDates => {
-    if (pickerMode === CALENDAR_MODES.W) {
-      return getWeekMarkedDates();
-    }
+  // Convert date strings to Date objects once for reuse
+  const startDateObj = useMemo(
+    () =>
+      tempSelectedDate.startDate ? new Date(tempSelectedDate.startDate) : null,
+    [tempSelectedDate.startDate],
+  );
+  const endDateObj = useMemo(
+    () =>
+      tempSelectedDate.endDate ? new Date(tempSelectedDate.endDate) : null,
+    [tempSelectedDate.endDate],
+  );
 
+  // Get current date info for reuse
+  const currentDateInfo = useMemo(() => {
+    if (!startDateObj) return {month: 0, year: new Date().getFullYear()};
     return {
-      [tempSelectedDate.startDate]: {
-        selected: true,
-        color: colors.blue,
-      },
+      month: startDateObj.getMonth(),
+      year: startDateObj.getFullYear(),
     };
-  };
+  }, [startDateObj]);
 
-  const getWeekMarkedDates = (): MarkedDates => {
+  // Get today's date info for reuse
+  const todayInfo = useMemo(() => {
+    const today = new Date();
+    return {
+      year: today.getFullYear(),
+      month: today.getMonth(),
+      dateString: today.toISOString().split('T')[0],
+    };
+  }, []);
+
+  const closeModal = useCallback(() => {
+    handleCancel();
+    setModalVisible(false);
+  }, [handleCancel]);
+
+  const openDatePicker = useCallback(() => {
+    setTempSelectedDate(selectedDate);
+    setModalVisible(true);
+  }, [selectedDate, setTempSelectedDate]);
+
+  const getWeekMarkedDates = useCallback((): MarkedDates => {
     const markedDates: MarkedDates = {};
 
-    if (tempSelectedDate.startDate && tempSelectedDate.endDate) {
-      const start = new Date(tempSelectedDate.startDate);
-      const end = new Date(tempSelectedDate.endDate);
-      const current = new Date(start);
+    if (startDateObj && endDateObj) {
+      const current = new Date(startDateObj);
 
-      while (current <= end) {
+      while (current <= endDateObj) {
         const dateString = current.toISOString().split('T')[0];
+        const isStartDate = dateString === tempSelectedDate.startDate;
+        const isEndDate = dateString === tempSelectedDate.endDate;
+        const isBoundaryDate = isStartDate || isEndDate;
+
         markedDates[dateString] = {
-          color:
-            dateString === tempSelectedDate.startDate ||
-            dateString === tempSelectedDate.endDate
-              ? colors.azureBlue
-              : colors.lightBlue3,
-          startingDay: dateString === tempSelectedDate.startDate,
-          endingDay: dateString === tempSelectedDate.endDate,
+          color: isBoundaryDate ? colors.azureBlue : colors.lightBlue3,
+          startingDay: isStartDate,
+          endingDay: isEndDate,
         };
         current.setDate(current.getDate() + 1);
       }
@@ -130,23 +127,60 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
       };
     }
     return markedDates;
-  };
+  }, [
+    startDateObj,
+    endDateObj,
+    tempSelectedDate.startDate,
+    tempSelectedDate.endDate,
+  ]);
 
-  const openDatePicker = () => {
-    setTempSelectedDate(selectedDate);
-    setModalVisible(true);
-  };
+  const getMarkedDates = useCallback((): MarkedDates => {
+    if (pickerMode === CALENDAR_MODES.W) {
+      return getWeekMarkedDates();
+    }
 
-  const renderMonthGrid = () => {
-    const currentDate = new Date(tempSelectedDate.startDate);
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+    return {
+      [tempSelectedDate.startDate]: {
+        selected: true,
+        color: colors.blue,
+      },
+    };
+  }, [pickerMode, tempSelectedDate.startDate, getWeekMarkedDates]);
 
-    const today = new Date();
-    const thisYear = today.getFullYear();
-    const thisMonth = today.getMonth();
+  const handleMonthPress = useCallback(
+    (monthIndex: number, isDisabled: boolean) => {
+      if (!isDisabled) {
+        setMonthRange(currentDateInfo.year, monthIndex);
+      }
+    },
+    [currentDateInfo.year, setMonthRange],
+  );
 
-    const isNextYearDisabled = currentYear >= thisYear;
+  const handleYearPress = useCallback(
+    (year: number) => {
+      setYearRange(year);
+    },
+    [setYearRange],
+  );
+
+  const handleLeftArrowPress = useCallback(() => {
+    setMonthRange(currentDateInfo.year - 1, currentDateInfo.month);
+  }, [currentDateInfo.year, currentDateInfo.month, setMonthRange]);
+
+  const handleRightArrowPress = useCallback(() => {
+    const isNextYearDisabled = currentDateInfo.year >= todayInfo.year;
+    if (!isNextYearDisabled) {
+      setMonthRange(currentDateInfo.year + 1, currentDateInfo.month);
+    }
+  }, [
+    currentDateInfo.year,
+    currentDateInfo.month,
+    todayInfo.year,
+    setMonthRange,
+  ]);
+
+  const renderMonthGrid = useCallback(() => {
+    const isNextYearDisabled = currentDateInfo.year >= todayInfo.year;
 
     return (
       <View style={styles.monthGridContainer}>
@@ -157,22 +191,16 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           <View style={styles.yearRow}>
             <TouchableOpacity
               hitSlop={DEFAULT_HIT_SLOP}
-              onPress={() => {
-                setMonthRange(currentYear - 1, currentMonth);
-              }}>
+              onPress={handleLeftArrowPress}>
               <LeftArrow width={12} height={12} />
             </TouchableOpacity>
             <View style={styles.yearWrapper}>
-              <Text style={styles.yearText}>{currentYear}</Text>
+              <Text style={styles.yearText}>{currentDateInfo.year}</Text>
             </View>
             <TouchableOpacity
               hitSlop={DEFAULT_HIT_SLOP}
               disabled={isNextYearDisabled}
-              onPress={() => {
-                if (!isNextYearDisabled) {
-                  setMonthRange(currentYear + 1, currentMonth);
-                }
-              }}>
+              onPress={handleRightArrowPress}>
               <RightArrow
                 width={12}
                 height={12}
@@ -182,28 +210,28 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           </View>
         </View>
         <View style={styles.monthGrid}>
-          {MONTHS.map((m, idx) => {
-            const isDisabled = currentYear === thisYear && idx > thisMonth;
+          {MONTHS.map((monthName, monthIndex) => {
+            const isDisabled =
+              currentDateInfo.year === todayInfo.year &&
+              monthIndex > todayInfo.month;
             return (
               <TouchableOpacity
-                key={m}
+                key={monthName}
                 style={[
                   styles.monthCell,
-                  currentMonth === idx && styles.monthCellSelected,
+                  currentDateInfo.month === monthIndex &&
+                    styles.monthCellSelected,
                 ]}
                 disabled={isDisabled}
-                onPress={() => {
-                  if (!isDisabled) {
-                    setMonthRange(currentYear, idx);
-                  }
-                }}>
+                onPress={() => handleMonthPress(monthIndex, isDisabled)}>
                 <Text
                   style={[
                     styles.monthCellText,
-                    currentMonth === idx && styles.monthCellTextSelected,
+                    currentDateInfo.month === monthIndex &&
+                      styles.monthCellTextSelected,
                     isDisabled && {color: colors.lightGray4},
                   ]}>
-                  {m}
+                  {monthName}
                 </Text>
               </TouchableOpacity>
             );
@@ -211,11 +239,17 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
         </View>
       </View>
     );
-  };
+  }, [
+    currentDateInfo,
+    todayInfo,
+    t,
+    handleLeftArrowPress,
+    handleRightArrowPress,
+    handleMonthPress,
+  ]);
 
-  const renderYearGrid = () => {
-    const currentYear = new Date(tempSelectedDate.startDate).getFullYear();
-    const years = getYearRange(currentYear);
+  const renderYearGrid = useCallback(() => {
+    const years = getYearRange(currentDateInfo.year);
 
     return (
       <View style={styles.yearGridContainer}>
@@ -223,42 +257,45 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
           {t('analytics.dateSelector.selectYear')}
         </Text>
         <View style={styles.yearGrid}>
-          {years.map(y => (
-            <TouchableOpacity
-              key={y}
-              style={[
-                styles.yearCell,
-                currentYear === y && styles.yearCellSelected,
-              ]}
-              disabled={y > new Date().getFullYear()}
-              onPress={() => {
-                setYearRange(y);
-              }}>
-              <Text
+          {years.map(year => {
+            const isDisabled = year > todayInfo.year;
+            return (
+              <TouchableOpacity
+                key={year}
                 style={[
-                  styles.yearCellText,
-                  currentYear === y && styles.yearCellTextSelected,
-                  y > new Date().getFullYear() && styles.disabledYear,
-                ]}>
-                {y}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                  styles.yearCell,
+                  currentDateInfo.year === year && styles.yearCellSelected,
+                ]}
+                disabled={isDisabled}
+                onPress={() => handleYearPress(year)}>
+                <Text
+                  style={[
+                    styles.yearCellText,
+                    currentDateInfo.year === year &&
+                      styles.yearCellTextSelected,
+                    isDisabled && styles.disabledYear,
+                  ]}>
+                  {year}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     );
-  };
+  }, [currentDateInfo.year, todayInfo.year, t, handleYearPress]);
 
-  const renderDayHeader = () => {
-    const date = new Date(tempSelectedDate.startDate);
-    const month = date.toLocaleString('default', {month: 'short'});
-    const year = date.getFullYear();
+  const renderDayHeader = useCallback(() => {
+    if (!startDateObj) return null;
 
+    const month = startDateObj.toLocaleString('default', {month: 'short'});
+    const year = startDateObj.getFullYear();
     const headerDay = `${month} ${year}`;
 
-    const startDate = new Date(tempSelectedDate.startDate);
-    const endDateObj = new Date(tempSelectedDate.endDate);
-    const headerWeek = `${formatDate(startDate)} - ${formatDate(endDateObj)}`;
+    const headerWeek =
+      startDateObj && endDateObj
+        ? `${formatDate(startDateObj)} - ${formatDate(endDateObj)}`
+        : '';
 
     const header = pickerMode === CALENDAR_MODES.D ? headerDay : headerWeek;
 
@@ -294,9 +331,18 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
         </View>
       </View>
     );
-  };
+  }, [
+    startDateObj,
+    endDateObj,
+    pickerMode,
+    goToPrevMonthWeek,
+    goToPrevMonth,
+    goToNextMonthWeek,
+    goToNextMonth,
+    isNextMonthDisabled,
+  ]);
 
-  const renderAllGrid = () => {
+  const renderAllGrid = useCallback(() => {
     const formatDateToDisplay = (dateString: string): string => {
       const date = new Date(dateString);
       const day = date.getDate().toString().padStart(2, '0');
@@ -315,72 +361,88 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
         </Text>
       </View>
     );
-  };
+  }, [dateRange.startDate, dateRange.endDate]);
 
-  const renderPickerModal = () => (
-    <Modal
-      visible={modalVisible}
-      transparent
-      animationType="fade"
-      onRequestClose={() => {
-        handleCancel();
-        setModalVisible(false);
-      }}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalContent}>
-          {(pickerMode === CALENDAR_MODES.W ||
-            pickerMode === CALENDAR_MODES.D) && (
-            <View style={styles.modalHeader}>
-              {(pickerMode === CALENDAR_MODES.D ||
-                pickerMode === CALENDAR_MODES.W) &&
-                renderDayHeader()}
-              <Calendar
-                key={tempSelectedDate.startDate.slice(0, 7)}
-                markingType={
-                  pickerMode === CALENDAR_MODES.W ? 'period' : 'custom'
-                }
-                current={tempSelectedDate.startDate}
-                onDayPress={handleDayPress}
-                markedDates={getMarkedDates()}
-                theme={calendarTheme}
-                style={styles.calendarContainer}
-                maxDate={new Date().toISOString().split('T')[0]}
-              />
+  const renderPickerModal = useCallback(
+    () => (
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            {(pickerMode === CALENDAR_MODES.W ||
+              pickerMode === CALENDAR_MODES.D) && (
+              <View style={styles.modalHeader}>
+                {renderDayHeader()}
+                <Calendar
+                  key={tempSelectedDate.startDate.slice(0, 7)}
+                  markingType={
+                    pickerMode === CALENDAR_MODES.W ? 'period' : 'custom'
+                  }
+                  current={tempSelectedDate.startDate}
+                  onDayPress={handleDayPress}
+                  markedDates={getMarkedDates()}
+                  theme={calendarTheme}
+                  style={styles.calendarContainer}
+                  maxDate={todayInfo.dateString}
+                />
+              </View>
+            )}
+            {pickerMode === CALENDAR_MODES.M && renderMonthGrid()}
+            {pickerMode === CALENDAR_MODES.Y && renderYearGrid()}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                hitSlop={DEFAULT_HIT_SLOP}
+                onPress={closeModal}>
+                <Text style={styles.modalCancel}>
+                  {t('analytics.modal.cancel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                hitSlop={DEFAULT_HIT_SLOP}
+                onPress={() => {
+                  handleOk();
+                  setModalVisible(false);
+                }}>
+                <Text style={styles.modalOk}>{t('analytics.modal.ok')}</Text>
+              </TouchableOpacity>
             </View>
-          )}
-          {pickerMode === CALENDAR_MODES.M && renderMonthGrid()}
-          {pickerMode === CALENDAR_MODES.Y && renderYearGrid()}
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.modalButton}
-              hitSlop={DEFAULT_HIT_SLOP}
-              onPress={() => {
-                handleCancel();
-                setModalVisible(false);
-              }}>
-              <Text style={styles.modalCancel}>
-                {t('analytics.modal.cancel')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalButton}
-              hitSlop={DEFAULT_HIT_SLOP}
-              onPress={() => {
-                handleOk();
-                setModalVisible(false);
-              }}>
-              <Text style={styles.modalOk}>{t('analytics.modal.ok')}</Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+    ),
+    [
+      modalVisible,
+      closeModal,
+      pickerMode,
+      renderDayHeader,
+      tempSelectedDate.startDate,
+      handleDayPress,
+      getMarkedDates,
+      todayInfo.dateString,
+      renderMonthGrid,
+      renderYearGrid,
+      t,
+      handleOk,
+    ],
+  );
+
+  const isAllMode = pickerMode === CALENDAR_MODES.A;
+  const isTodaySelected = useMemo(
+    () =>
+      isToday(new Date(selectedDate.startDate)) &&
+      pickerMode === CALENDAR_MODES.D,
+    [selectedDate.startDate, pickerMode],
   );
 
   return (
     <>
-      {pickerMode === CALENDAR_MODES.A && renderAllGrid()}
-      {pickerMode !== CALENDAR_MODES.A && (
+      {isAllMode && renderAllGrid()}
+      {!isAllMode && (
         <>
           {renderPickerModal()}
           <View style={styles.dateSelector}>
@@ -392,12 +454,11 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
             <TouchableOpacity
               onPress={openDatePicker}
               style={styles.monthSelector}>
-              {isToday(new Date(selectedDate.startDate)) &&
-                pickerMode === CALENDAR_MODES.D && (
-                  <Text style={styles.todayText}>
-                    {t('analytics.dateSelector.today')}
-                  </Text>
-                )}
+              {isTodaySelected && (
+                <Text style={styles.todayText}>
+                  {t('analytics.dateSelector.today')}
+                </Text>
+              )}
               <Text style={styles.monthText}>
                 {getDisplayText(
                   pickerMode,

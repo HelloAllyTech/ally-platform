@@ -36,3 +36,6 @@ export type {User} from './user';
 
 // Simulations types
 export * from './simulations';
+export * from './components';
+export * from './general';
+export * from './message';

@@ -7,12 +7,14 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
-    "start": "react-native start",
+    "start": "npx react-native start --reset-cache",
     "test": "jest --passWithNoTests",
     "lint-staged": "lint-staged",
     "prepare": "husky install",
     "postinstall": "patch-package",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
+    "bundle:ios": "react-native bundle --platform ios --dev false --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios"
   },
   "dependencies": {
     "@livekit/react-native": "^2.9.1",

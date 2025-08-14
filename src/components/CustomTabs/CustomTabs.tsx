@@ -1,6 +1,5 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {
-  AccessibilityRole,
   ScrollView,
   ScrollViewProps,
   Text,
@@ -28,7 +27,7 @@ export interface CustomTabsProps {
   onTabChange?: (tabIndex: number) => void;
   renderTabHeader?: (
     tab: TabMeta,
-    idx: number,
+    tabIndex: number,
     isActive: boolean,
     onPress: () => void,
   ) => React.ReactNode;
@@ -45,30 +44,29 @@ export const CustomTabs = ({
   containerStyle,
 }: CustomTabsProps) => {
   const [internalActiveTab, setInternalActiveTab] = useState(initialTab);
-  const activeTab =
-    controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
+  const activeTab = controlledActiveTab ?? internalActiveTab;
   const themedStyles = useMemo(
     () => getThemedStyles(colorScheme),
     [colorScheme],
   );
 
   const handleTabPress = useCallback(
-    (idx: number) => {
-      setInternalActiveTab(idx);
-      if (onTabChange) onTabChange(idx);
+    (tabIndex: number) => {
+      setInternalActiveTab(tabIndex);
+      if (onTabChange) onTabChange(tabIndex);
     },
     [onTabChange],
   );
 
   const tabHeaders = useMemo(
     () =>
-      tabs.map((tab, idx) => {
-        const isActive = activeTab === idx;
-        const onPress = () => handleTabPress(idx);
+      tabs.map((tab, tabIndex) => {
+        const isActive = activeTab === tabIndex;
+        const onPress = () => handleTabPress(tabIndex);
         if (renderTabHeader) {
           return (
             <React.Fragment key={tab.key}>
-              {renderTabHeader(tab, idx, isActive, onPress)}
+              {renderTabHeader(tab, tabIndex, isActive, onPress)}
             </React.Fragment>
           );
         }
@@ -80,7 +78,7 @@ export const CustomTabs = ({
               isActive && themedStyles.activeTabButton,
             ]}
             onPress={onPress}
-            accessibilityRole={'tab' as AccessibilityRole}
+            accessibilityRole="tab"
             accessibilityState={{selected: isActive}}
             accessibilityLabel={tab.title}>
             <Text

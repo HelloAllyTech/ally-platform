@@ -144,6 +144,9 @@ export const styles = ScaledSheet.create({
     color: colors.white,
     fontWeight: 'bold',
   },
+  disabledMonth: {
+    color: colors.lightGray4,
+  },
   yearRow: {
     flexDirection: 'row',
     alignItems: 'center',
