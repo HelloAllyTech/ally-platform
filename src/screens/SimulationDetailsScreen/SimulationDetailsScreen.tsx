@@ -211,7 +211,7 @@ const styles = ScaledSheet.create({
   },
   sectionRule: {
     flex: 1,
-    height: 1,
+    height: 0.6,
     marginRight: '4@ms',
     backgroundColor: colors.lightGray10,
   },

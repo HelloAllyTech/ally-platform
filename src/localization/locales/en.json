@@ -4,6 +4,7 @@
     "ok": "OK",
     "yes": "Yes",
     "cancel": "Cancel",
+    "somethingWentWrong": "Something went wrong. Please try again.",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",

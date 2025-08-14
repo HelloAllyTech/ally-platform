@@ -126,7 +126,6 @@ const styles = ScaledSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.white,
-    borderWidth: 0.5,
     borderColor: colors.lightGray5,
     borderRadius: '8@ms',
     width: '100%',
@@ -209,7 +208,7 @@ const styles = ScaledSheet.create({
   },
   sectionRule: {
     flex: 1,
-    height: 1,
+    height: 0.6,
     marginRight: '4@ms',
     backgroundColor: colors.lightGray10,
   },

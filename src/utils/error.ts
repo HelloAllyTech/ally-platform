@@ -1,3 +1,5 @@
+import {t} from 'i18next';
+
 interface ApiError {
   status?: number;
   data?: {
@@ -13,5 +15,5 @@ export const getErrorMessage = (error: unknown): string => {
   if (apiError.data?.message) return apiError.data.message;
   if (apiError.data?.error) return apiError.data.error;
 
-  return 'Something went wrong. Please try again.';
+  return t('Common.somethingWentWrong');
 };
