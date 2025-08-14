@@ -11,6 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrowIcon} from '@/assets';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
@@ -70,14 +71,35 @@ export const SimulationsScreen: React.FC = () => {
     [],
   );
 
+  const renderHeader = () => {
+    return (
+      <>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerLeft}
+            onPress={() => navigation.goBack()}>
+            <LeftArrowIcon color={colors.black} />
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>
+            {t('Simulations.chooseYour')}{' '}
+            <Text style={styles.pageTitleItalic}>
+              {t('Simulations.scenarioWord')}
+            </Text>
+          </Text>
+        </View>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>
+            {t('Simulations.scenariosCaps')}
+          </Text>
+          <View style={styles.sectionRule} />
+        </View>
+      </>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.pageTitle}>
-        {t('Simulations.chooseYour')}{' '}
-        <Text style={styles.pageTitleItalic}>
-          {t('Simulations.scenarioWord')}
-        </Text>
-      </Text>
+      {renderHeader()}
       <FlatList
         contentContainerStyle={styles.list}
         data={scenarios}
@@ -96,38 +118,49 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingTop: '20@ms',
   },
   list: {
     padding: '16@ms',
     gap: '12@ms',
   },
   card: {
+    flexDirection: 'row',
     backgroundColor: colors.white,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.lightGray5,
     borderRadius: '8@ms',
-    overflow: 'hidden',
-    marginBottom: '12@ms',
+    width: '100%',
+    shadowColor: colors.darkGray12,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   cover: {
-    width: '100%',
+    width: '35%',
+    minWidth: '130@ms',
     height: '120@ms',
+    borderTopLeftRadius: '8@ms',
+    borderBottomLeftRadius: '8@ms',
     backgroundColor: colors.lightGray4,
   },
   cardBody: {
-    padding: '12@ms',
+    margin: '12@ms',
+    width: '55%',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   cardTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray12,
-    fontSize: '18@ms',
+    fontSize: '15@ms',
+    fontWeight: '700',
     marginBottom: '6@ms',
   },
   cardDesc: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkCharcoal,
-    fontSize: '13@ms',
+    fontSize: '12@ms',
   },
   empty: {
     alignItems: 'center',
@@ -146,10 +179,38 @@ const styles = ScaledSheet.create({
   pageTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray12,
-    fontSize: '28@ms',
-    paddingHorizontal: '16@ms',
+    fontSize: '22@ms',
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+  },
+  header: {
+    paddingHorizontal: '6@ms',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: '8@ms',
+    marginHorizontal: '6@ms',
+  },
+  headerLeft: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+    marginHorizontal: '16@ms',
+  },
+  sectionLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.darkGray8,
+    fontSize: '12@ms',
+    letterSpacing: 2,
+  },
+  sectionRule: {
+    flex: 1,
+    height: 1,
+    marginRight: '4@ms',
+    backgroundColor: colors.lightGray10,
   },
 });
