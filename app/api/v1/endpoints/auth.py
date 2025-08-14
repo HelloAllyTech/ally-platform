@@ -98,7 +98,7 @@ async def verify_otp(
         
         if not user or not tokens:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired OTP"
             )
         
