@@ -2,12 +2,12 @@ import React, {useState} from 'react';
 import {
   ActivityIndicator,
   Image,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
@@ -30,6 +30,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {scenario} = route.params;
   const {t} = useTranslate();
   const navigation = useAppNavigation();
+  const insets = useSafeAreaInsets();
   const [createRoom] = useCreateRoomMutation();
   const {showErrorToast} = useErrorToast();
 
@@ -167,7 +168,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View
+      style={[
+        styles.safe,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
       {isCreatingRoom && renderLoadingOverlay()}
       {renderHeader()}
       {renderDetailsSection()}
@@ -183,7 +188,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         email={userEmail}
         onOtpVerificationSuccess={handleOtpVerificationSuccess}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

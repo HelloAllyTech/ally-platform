@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
@@ -21,6 +21,7 @@ import type {Scenario} from '@/types';
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
+  const insets = useSafeAreaInsets();
   const {data, isFetching, refetch} = useGetScenariosQuery();
   const scenarios = data?.scenarios ?? [];
 
@@ -98,7 +99,11 @@ export const SimulationsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
       {renderHeader()}
       <FlatList
         contentContainerStyle={styles.list}
@@ -110,7 +115,7 @@ export const SimulationsScreen: React.FC = () => {
           <RefreshControl refreshing={isFetching} onRefresh={refetch} />
         }
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -121,6 +126,7 @@ const styles = ScaledSheet.create({
   },
   list: {
     padding: '16@ms',
+    paddingTop: '10@ms',
     gap: '12@ms',
   },
   card: {
@@ -199,6 +205,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     gap: '4@ms',
     marginHorizontal: '16@ms',
+    paddingBottom: '6@ms',
   },
   sectionLabel: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

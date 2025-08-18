@@ -1,5 +1,9 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {RoomContext} from '@livekit/react-native';
+import {
+  AndroidAudioTypePresets,
+  AudioSession,
+  RoomContext,
+} from '@livekit/react-native';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {ActivityIndicator, SafeAreaView, Text, View} from 'react-native';
@@ -70,8 +74,23 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
+  const configureAudioSession = async () => {
+    try {
+      await AudioSession.configureAudio({
+        // This configures the audio session to route to speaker first instead of phone speaker
+        android: {
+          preferredOutputList: ['speaker'],
+          audioTypeOptions: AndroidAudioTypePresets.media,
+        },
+      });
+    } catch (error) {
+      showErrorToast(error, 'Errors.audioSession');
+    }
+  };
+
   const handleConnect = useCallback(async () => {
     try {
+      await configureAudioSession();
       setIsConnecting(true);
       await room.connect(wsUrl, token);
     } catch (error) {
