@@ -55,7 +55,7 @@ export const API_ROUTES = {
   VERIFY_OTP: '/auth/verify-otp',
   ROOMS: '/rooms',
   SCENARIOS: '/scenarios',
-  FEEDBACK: '/feedback',
+  FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
 } as const;
 
 export const API_METHODS = {

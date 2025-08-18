@@ -36,7 +36,7 @@ const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
   );
 
   return (
-    <Animated.View style={[animatedStyle, styles.circle]}>
+    <Animated.View style={[styles.circle, animatedStyle]}>
       <LinearGradient
         colors={[
           `rgba(${CIRCLE.GRADIENT.START_COLOR}, ${intensity})`,

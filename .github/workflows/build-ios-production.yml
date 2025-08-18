@@ -101,9 +101,10 @@ jobs:
       - name: Build archive (Production)
         run: |
           cd ios
+          # Use a supported iOS SDK version (17.4 is available on GitHub-hosted runners)
           xcodebuild -workspace ally.xcworkspace \
             -scheme ally \
-            -sdk iphoneos \
+            -sdk iphoneos17.4 \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/ally.xcarchive \

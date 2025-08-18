@@ -1,6 +1,5 @@
 import React, {useCallback, useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
-import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
+import {Animated, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components';
@@ -69,13 +68,13 @@ export const EmailInputModal: React.FC<EmailInputModalProps> = ({
 
   return (
     <View style={styles.overlay}>
-      <View style={styles.modalContainer}>
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.scrollContent}
-          enableOnAndroid
-          extraScrollHeight={0}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
+      <TouchableOpacity
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={handleClose}
+      />
+      <Animated.View style={styles.modalContainer}>
+        <View style={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.title}>{t('Simulations.enterYourEmail')}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -115,8 +114,8 @@ export const EmailInputModal: React.FC<EmailInputModalProps> = ({
               isLoading={isSubmitting || isSendingOtp}
             />
           </View>
-        </KeyboardAwareScrollView>
-      </View>
+        </View>
+      </Animated.View>
     </View>
   );
 };
@@ -134,12 +133,28 @@ const styles = ScaledSheet.create({
     left: 0,
     zIndex: 9999,
   },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+  },
   modalContainer: {
     backgroundColor: colors.white,
     borderRadius: '12@ms',
     maxWidth: '90%',
     maxHeight: '80%',
     width: '320@ms',
+    elevation: 5,
+    shadowColor: colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   scrollContent: {
     padding: '20@ms',

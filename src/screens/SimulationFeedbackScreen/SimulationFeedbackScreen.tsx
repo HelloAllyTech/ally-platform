@@ -38,17 +38,21 @@ export const SimulationFeedbackScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      await addFeedback({
+      const response = await addFeedback({
         rating,
         comment: additionalFeedback || feedbackText,
       });
-      navigation.reset({
-        index: 1,
-        routes: [
-          {name: SCREEN_NAMES.CALL_LOG},
-          {name: SCREEN_NAMES.SIMULATIONS},
-        ],
-      });
+      if (response.data) {
+        navigation.reset({
+          index: 1,
+          routes: [
+            {name: SCREEN_NAMES.CALL_LOG},
+            {name: SCREEN_NAMES.SIMULATIONS},
+          ],
+        });
+      } else {
+        showErrorToast(response.error, 'Errors.submitFeedback');
+      }
     } catch (error) {
       showErrorToast(error, 'Errors.submitFeedback');
     }
