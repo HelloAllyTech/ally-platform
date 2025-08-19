@@ -250,7 +250,6 @@ export const SplashScreen: React.FC<
             onPress={onLoginPress}
             customContainerStyle={styles.loginButtonContainer}
             customTextStyle={styles.loginButtonText}
-            activeOpacity={0.9}
           />
         )}
 
