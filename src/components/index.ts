@@ -1,6 +1,7 @@
 export {PrimaryButton} from './Button';
 export type {PrimaryButtonProps} from './Button';
-export {CustomModal} from './Modal';
+export {CustomModal} from './CustomModal';
+export {IllustratedModal} from './IllustratedModal';
 export {CustomDropdown} from './Dropdown';
 export {Toast} from './Toast';
 export {

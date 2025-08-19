@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 
 import {PrimaryButton} from '@/components';
-import {isValidEmail} from '@/constants/general';
+import {
+  isValidEmail,
+  PRIVACY_POLICY_URL,
+  TERMS_AND_CONDITIONS_URL,
+} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme';
@@ -107,13 +111,13 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               {t('SplashScreen.byTappingNext')}{' '}
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL('https://example.com/terms')}>
+                onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
                 {t('SplashScreen.termsAndConditions')}
               </Text>{' '}
               {t('SplashScreen.andAcknowledge')}{' '}
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL('https://example.com/privacy')}>
+                onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
                 {t('SplashScreen.privacyPolicy')}
               </Text>
               .

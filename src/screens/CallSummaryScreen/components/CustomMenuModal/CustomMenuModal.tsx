@@ -1,10 +1,10 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, Text, TouchableOpacity, View} from 'react-native';
+import {Animated, Linking, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {EditIcon, ExportIcon} from '@/assets/icons';
-import {isIOS, SCREEN_WIDTH} from '@/constants/general';
+import {ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
+import {isIOS, PRIVACY_POLICY_URL, SCREEN_WIDTH} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 
@@ -30,6 +30,10 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   const onRename = () => {
     setModalType('rename');
     onClose();
+  };
+
+  const onDataPolicyPress = () => {
+    Linking.openURL(PRIVACY_POLICY_URL);
   };
 
   useEffect(() => {
@@ -101,6 +105,13 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
             <ExportIcon width={16} height={16} />
           </TouchableOpacity>
         )}
+        <View style={styles.menuDivider} />
+        <TouchableOpacity style={styles.menuItem} onPress={onDataPolicyPress}>
+          <Text style={styles.menuText}>
+            {t('CallSummary.customMenu.dataPolicy')}
+          </Text>
+          <ContractIcon width={16} height={16} />
+        </TouchableOpacity>
         {/* <View style={styles.menuDivider} /> */}
         {/* Hiding delete option for now */}
         {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>

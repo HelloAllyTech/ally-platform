@@ -10,3 +10,4 @@ export {PlayPauseOverlay} from './PlayPauseOverlay';
 export {Search} from './Search';
 export {SkeletonLoader} from './SkeletonLoader';
 export {Timer} from './Timer';
+export {DismissableBanner} from './DismissableBanner';

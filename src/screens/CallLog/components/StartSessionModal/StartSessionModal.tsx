@@ -29,6 +29,13 @@ interface StartSessionModalProps {
   onListenLive: () => void;
 }
 
+// TODO: Remove once backend config is available
+const DUMMY_ENABLED_CHAT_TYPES = [
+  CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+  CHAT_TYPES.MICROPHONE_CHAT,
+  CHAT_TYPES.LEARN_CHAT,
+];
+
 export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   visible,
   onClose,
@@ -39,22 +46,27 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   const {t} = useTranslate();
   const navigation = useAppNavigation();
 
-  const allowedTypes = useMemo<AllowedType[]>(() => {
+  const allowedListeningTypes = useMemo<AllowedType[]>(() => {
     return [
       CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
       CHAT_TYPES.MICROPHONE_CHAT,
       CHAT_TYPES.LEARN_CHAT,
-    ].filter(chatType => enabledChatTypes?.includes(chatType)) as AllowedType[];
-  }, [enabledChatTypes]);
+    ].filter(chatType =>
+      // TODO: Remove and replace with enabledChatTypes once backend config is available
+      DUMMY_ENABLED_CHAT_TYPES?.includes(chatType),
+    ) as AllowedType[];
+  }, []);
 
   const [selected, setSelected] = useState<AllowedType | null>(null);
 
   useEffect(() => {
     if (visible) {
       // preselect when only one option is available
-      setSelected(allowedTypes.length === 1 ? allowedTypes[0] : null);
+      setSelected(
+        allowedListeningTypes.length === 1 ? allowedListeningTypes[0] : null,
+      );
     }
-  }, [visible, allowedTypes]);
+  }, [visible, allowedListeningTypes]);
 
   const handleStart = () => {
     switch (selected) {
@@ -96,22 +108,40 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           <Text style={styles.description}>
             {t('CallLogs.startSessionDescription')}
           </Text>
-          <Text style={styles.sectionLabel}>
-            {t('CallLogs.chooseListening')}
-          </Text>
+          {allowedListeningTypes.length > 1 && (
+            <Text style={styles.sectionLabel}>
+              {t('CallLogs.chooseListening')}
+            </Text>
+          )}
 
-          {allowedTypes.includes(CHAT_TYPES.EXOTEL_CONFERENCE_CHAT) && (
+          {allowedListeningTypes.length === 1 && (
+            <View style={styles.separator} />
+          )}
+
+          {allowedListeningTypes.includes(
+            CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+          ) && (
             <TouchableOpacity
               accessibilityRole="radio"
-              style={styles.optionRow}
+              style={[
+                styles.optionRow,
+                allowedListeningTypes.length === 1 && styles.singleOptionRow,
+              ]}
               activeOpacity={0.7}
               onPress={() => setSelected(CHAT_TYPES.EXOTEL_CONFERENCE_CHAT)}>
-              <View style={styles.radioOuter}>
-                {selected === CHAT_TYPES.EXOTEL_CONFERENCE_CHAT && (
-                  <View style={styles.radioInner} />
-                )}
-              </View>
-              <View style={styles.optionTextBlock}>
+              {allowedListeningTypes.length > 1 && (
+                <View style={styles.radioOuter}>
+                  {selected === CHAT_TYPES.EXOTEL_CONFERENCE_CHAT && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
+              )}
+              <View
+                style={[
+                  styles.optionTextBlock,
+                  allowedListeningTypes.length === 1 &&
+                    styles.singleOptionTextBlock,
+                ]}>
                 <Text style={styles.optionTitle}>{t('CallLogs.joinCall')}</Text>
                 <Text style={styles.optionSubtitle}>
                   {t('CallLogs.allyWillJoinOngoingCall')}
@@ -120,18 +150,28 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             </TouchableOpacity>
           )}
 
-          {allowedTypes.includes(CHAT_TYPES.MICROPHONE_CHAT) && (
+          {allowedListeningTypes.includes(CHAT_TYPES.MICROPHONE_CHAT) && (
             <TouchableOpacity
               accessibilityRole="radio"
-              style={styles.optionRow}
+              style={[
+                styles.optionRow,
+                allowedListeningTypes.length === 1 && styles.singleOptionRow,
+              ]}
               activeOpacity={0.7}
               onPress={() => setSelected(CHAT_TYPES.MICROPHONE_CHAT)}>
-              <View style={styles.radioOuter}>
-                {selected === CHAT_TYPES.MICROPHONE_CHAT && (
-                  <View style={styles.radioInner} />
-                )}
-              </View>
-              <View style={styles.optionTextBlock}>
+              {allowedListeningTypes.length > 1 && (
+                <View style={styles.radioOuter}>
+                  {selected === CHAT_TYPES.MICROPHONE_CHAT && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
+              )}
+              <View
+                style={[
+                  styles.optionTextBlock,
+                  allowedListeningTypes.length === 1 &&
+                    styles.singleOptionTextBlock,
+                ]}>
                 <Text style={styles.optionTitle}>
                   {t('CallLogs.listenLive')}
                 </Text>
@@ -143,25 +183,37 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           )}
 
           {/* TODO: Learn option - always visible for now, remove this when backend config is available */}
-          <TouchableOpacity
-            accessibilityRole="radio"
-            style={styles.optionRow}
-            activeOpacity={0.7}
-            onPress={() => setSelected(CHAT_TYPES.LEARN_CHAT)}>
-            <View style={styles.radioOuter}>
-              {selected === CHAT_TYPES.LEARN_CHAT && (
-                <View style={styles.radioInner} />
+          {allowedListeningTypes.includes(CHAT_TYPES.LEARN_CHAT) && (
+            <TouchableOpacity
+              accessibilityRole="radio"
+              style={[
+                styles.optionRow,
+                allowedListeningTypes.length === 1 && styles.singleOptionRow,
+              ]}
+              activeOpacity={0.7}
+              onPress={() => setSelected(CHAT_TYPES.LEARN_CHAT)}>
+              {allowedListeningTypes.length > 1 && (
+                <View style={styles.radioOuter}>
+                  {selected === CHAT_TYPES.LEARN_CHAT && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
               )}
-            </View>
-            <View style={styles.optionTextBlock}>
-              <Text style={styles.optionTitle}>{t('CallLogs.learn')}</Text>
-              <Text style={styles.optionSubtitle}>
-                {t('CallLogs.learnDescription')}
-              </Text>
-            </View>
-          </TouchableOpacity>
+              <View
+                style={[
+                  styles.optionTextBlock,
+                  allowedListeningTypes.length === 1 &&
+                    styles.singleOptionTextBlock,
+                ]}>
+                <Text style={styles.optionTitle}>{t('CallLogs.learn')}</Text>
+                <Text style={styles.optionSubtitle}>
+                  {t('CallLogs.learnDescription')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
-          <View style={styles.separator} />
+          <View style={[styles.separator, styles.marginB16]} />
 
           <PrimaryButton
             label={t('CallLogs.startSessionNow')}

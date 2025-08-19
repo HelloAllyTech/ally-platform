@@ -4,8 +4,16 @@ import {
   activateKeepAwake,
   deactivateKeepAwake,
 } from '@sayem314/react-native-keep-awake';
-import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
+import {LockIcon} from '@/assets/icons';
 import {env} from '@/config/env';
 import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
 import {
@@ -39,6 +47,7 @@ import {
   AudioWaveformContainer,
   CallEndConfirmationModal,
   ControlButtonsSection,
+  DismissableBanner,
   NudgeSection,
   PlayPauseOverlay,
   Search,
@@ -99,6 +108,7 @@ export const ListeningScreen = ({
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
   const latestAmplitudesRef = useRef<number[] | null>(
@@ -378,6 +388,10 @@ export const ListeningScreen = ({
     {delay: 500},
   );
 
+  const handleLockIconPress = useCallback(() => {
+    // TODO: Implement lock icon press tooltip
+  }, []);
+
   const playPauseButton = useMemo(() => {
     return (
       <PlayPauseOverlay
@@ -433,6 +447,12 @@ export const ListeningScreen = ({
       isMicrophoneMode={isMicrophoneMode}
     />
   );
+  const isWebrtcOrMicrophoneMode = useMemo(
+    () =>
+      callProvider &&
+      [ChatProvider.WEBRTC, ChatProvider.MICROPHONE].includes(callProvider),
+    [callProvider],
+  );
 
   if (!chatData?.chatId) {
     return (
@@ -453,11 +473,19 @@ export const ListeningScreen = ({
         translucent
         barStyle="light-content"
       />
+      {isFocusMode && isConferenceCall && !isBannerDismissed && (
+        <DismissableBanner onClose={() => setIsBannerDismissed(true)} />
+      )}
       {isFocusMode ? (
         <View style={styles.focusModeLayout}>
-          <Text style={styles.takingNotesText}>
-            {t('ListeningScreen.takingNotes')}
-          </Text>
+          <View style={styles.takingNotesContainer}>
+            <TouchableOpacity onPress={handleLockIconPress} activeOpacity={0.8}>
+              <LockIcon width={16} height={16} color={colors.lightGrayD9} />
+            </TouchableOpacity>
+            <Text style={styles.takingNotesText}>
+              {t('ListeningScreen.takingNotes')}
+            </Text>
+          </View>
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveformContainer
@@ -478,9 +506,12 @@ export const ListeningScreen = ({
           <View style={globalStyles.rowCenter}>
             {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
-              <Text style={styles.takingNotesText}>
-                {t('ListeningScreen.takingNotes')}
-              </Text>
+              <View style={styles.takingNotesContainer}>
+                <LockIcon width={16} height={16} color={colors.lightGrayD9} />
+                <Text style={styles.takingNotesText}>
+                  {t('ListeningScreen.takingNotes')}
+                </Text>
+              </View>
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
@@ -502,15 +533,17 @@ export const ListeningScreen = ({
         </View>
       )}
 
-      <View style={styles.controlButtonsContainer}>
-        <ControlButtonsSection
-          isMaximized={isControlSectionMaximized}
-          onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
-          onFocusModeButtonPress={toggleNudgeVisibility}
-          isFocusMode={isFocusMode}
-          onCallEndPress={() => setShowCallEndConfirmation(true)}
-        />
-      </View>
+      <ControlButtonsSection
+        isMaximized={isControlSectionMaximized}
+        onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
+        onFocusModeButtonPress={toggleNudgeVisibility}
+        isFocusMode={isFocusMode}
+        onCallEndPress={() => setShowCallEndConfirmation(true)}
+        isCallPaused={isCallPaused}
+        onPauseResumePress={handlePlayPauseCallPress}
+        showPauseResumeButton={isWebrtcOrMicrophoneMode}
+        showEndSessionButton={isWebrtcOrMicrophoneMode}
+      />
     </View>
   );
 };

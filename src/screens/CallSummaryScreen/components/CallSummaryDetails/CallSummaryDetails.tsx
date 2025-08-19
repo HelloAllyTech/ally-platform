@@ -1,8 +1,9 @@
 import React, {memo, useCallback, useState} from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {GoldenShieldIcon} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
@@ -146,6 +147,14 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       extraScrollHeight={150}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid>
+      <View style={styles.alertContainer}>
+        <View style={styles.alertIconContainer}>
+          <GoldenShieldIcon />
+        </View>
+        <Text style={styles.alertText}>
+          {t('CallSummary.aiGeneratedWarning')}
+        </Text>
+      </View>
       <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
       {showSubmitButton && (
         <View style={styles.buttonContainer}>
@@ -191,5 +200,32 @@ const styles = ScaledSheet.create({
   },
   submitButtonText: {
     ...typography.label.large,
+  },
+  alertContainer: {
+    paddingHorizontal: '10@s',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: '20@ms',
+    marginHorizontal: '10@s',
+    alignSelf: 'center',
+    backgroundColor: colors.floralWhite,
+    borderRadius: '8@s',
+    padding: '10@s',
+  },
+  alertIconContainer: {
+    width: '32@s',
+    height: '32@s',
+    borderColor: colors.carrotOrange,
+    borderWidth: '1@s',
+    borderRadius: '16@s',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: '10@s',
+  },
+  alertText: {
+    ...typography.body.medium,
+    color: colors.russetBrown,
+    flex: 1,
+    width: '100%',
   },
 });

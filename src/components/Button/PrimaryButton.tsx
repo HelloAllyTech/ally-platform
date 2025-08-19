@@ -17,6 +17,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 }) => {
   return (
     <TouchableOpacity
+      activeOpacity={0.8}
       {...rest}
       style={[
         styles.button,
@@ -25,7 +26,6 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         customContainerStyle,
       ]}
       disabled={isDisabled || isLoading}
-      activeOpacity={0.8}
       onPress={onPress}>
       {isLoading ? (
         <ActivityIndicator color={colors.white} />

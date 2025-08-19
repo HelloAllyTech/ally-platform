@@ -65,6 +65,7 @@ export const colors = {
   gunMetal90: 'rgba(23, 24, 26, 0.9)',
   darkSlate: '#292929',
   smokyBlack: 'rgba(19, 19, 19, 0.55)',
+  charcoalGray: '#47464F',
 
   // Blues - Light to Dark
   paleBlue: '#EAFEFE',
@@ -87,6 +88,7 @@ export const colors = {
   deepNavy: '#0D0E2A',
   darkNavy: '#03051F',
   nudgeBackground: '#0A1729',
+  iceBlue: '#EEF8FF',
 
   // Greens/Teals
   lightGreen: '#EAFEFE',
@@ -97,8 +99,19 @@ export const colors = {
   // Reds
   brightRed: '#F93535',
   vividRed: '#F50004',
+  coralRed: '#FB6767',
 
   // Yellows
   yellow: '#FFD700',
   starYellow: '#FFB800',
+  floralWhite: '#FDF8E4',
+
+  // Orange
+  carrotOrange: '#EC930F',
+
+  // Browns
+  russetBrown: '#873200',
+
+  // Warning/Alert colors
+  warning: '#FFF3CD',
 };

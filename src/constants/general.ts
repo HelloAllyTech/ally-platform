@@ -63,3 +63,6 @@ export const API_METHODS = {
   POST: 'POST',
   DELETE: 'DELETE',
 } as const;
+
+export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
+export const PRIVACY_POLICY_URL = 'https://helloally.ai/privacy';

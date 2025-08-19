@@ -1,4 +1,8 @@
-import {CustomModal} from '@/components';
+import {Image} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import images from '@/assets/images';
+import {IllustratedModal} from '@/components';
 import {useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
 
@@ -22,17 +26,28 @@ export const LogoutModal = ({
     setIsLogoutModalVisible(false);
   };
 
+  const illustration = (
+    <Image source={images.logOut} style={styles.illustration} />
+  );
+
   return (
-    <CustomModal
+    <IllustratedModal
       visible={isLogoutModalVisible}
-      onSecondaryPress={onPressLogoutCancel}
-      onPrimaryPress={onPressLogoutConfirm}
-      primaryButtonText={t('Logout.logout')}
-      secondaryButtonText={t('Logout.cancel')}
-      title={t('Logout.confirm')}
-      description={t('Logout.logoutDescription')}
       onClose={onPressLogoutCancel}
-      primaryTextColor={colors.brightRed}
+      description={t('Logout.logoutConfirmation')}
+      actionButtonText={t('Logout.logoutActionButton')}
+      onActionPress={onPressLogoutConfirm}
+      actionButtonColor={colors.brightRed}
+      illustration={illustration}
+      titleMain={t('Logout.safeguardTitle')}
+      titleItalic={t('Logout.account')}
     />
   );
 };
+
+const styles = ScaledSheet.create({
+  illustration: {
+    width: '151.97@ms',
+    height: '135.33@ms',
+  },
+});
