@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
+import {CloseIcon, SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {colors, fontFamily} from '@/theme';
 import {ThemeMode} from '@/types';
 
@@ -83,6 +83,17 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           onChangeText={setSearchText}
           onSubmitEditing={onSubmitEditing}
         />
+        {searchText.length > 0 && (
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setSearchText('')}>
+            <CloseIcon
+              width={16}
+              height={16}
+              color={isDark ? colors.white : colors.black}
+            />
+          </TouchableOpacity>
+        )}
       </View>
       {showSuggestions && suggestions.length > 0 && (
         <View
@@ -134,6 +145,13 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       height: '18@ms',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    closeButton: {
+      width: '18@ms',
+      height: '18@ms',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: '8@ms',
     },
     input: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,

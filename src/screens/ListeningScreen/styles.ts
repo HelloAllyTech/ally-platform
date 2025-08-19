@@ -19,15 +19,17 @@ export const styles = ScaledSheet.create({
     color: colors.white,
     marginTop: '10@vs',
   },
-  controlButtonsContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   focusModeLayout: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: '40@vs',
+  },
+  takingNotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@s',
+    marginBottom: '8@vs',
   },
   takingNotesText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

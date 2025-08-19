@@ -77,4 +77,20 @@ export const styles = ScaledSheet.create({
     left: '30@s',
     zIndex: 200,
   },
+  loginButtonContainer: {
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: '50@vs',
+    width: '80%',
+    marginLeft: '36@ms',
+    marginRight: '36@ms',
+    zIndex: 200,
+  },
+  loginButtonText: {
+    ...fontFamily.ROBOTO.REGULAR,
+    fontSize: '14@ms',
+    color: colors.charcoalGray,
+  },
 });

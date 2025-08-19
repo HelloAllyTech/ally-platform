@@ -120,6 +120,15 @@ export const styles = ScaledSheet.create({
     height: 0.7,
     backgroundColor: colors.lightGray5,
     marginTop: '7@mvs',
+  },
+  marginB16: {
     marginBottom: '16@mvs',
+  },
+  singleOptionRow: {
+    paddingVertical: '16@mvs',
+    justifyContent: 'center',
+  },
+  singleOptionTextBlock: {
+    alignItems: 'center',
   },
 });

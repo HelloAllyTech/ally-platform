@@ -87,7 +87,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
     lottieRef.current?.play();
   };
 
-  const onPressSkip = () => {
+  const onPressViewSessionSummary = () => {
     setIsPlaying(false);
     navigation.navigate(SCREEN_NAMES.CALL_SUMMARY);
   };
@@ -129,9 +129,9 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           />
           <View style={styles.content}>
             <Text style={styles.heading}>
-              {t('BreathingScreen.header.box')}{' '}
+              {t('BreathingScreen.header.returnTo')}{' '}
               <Text style={styles.headingItalic}>
-                {t('BreathingScreen.header.breathing')}
+                {t('BreathingScreen.header.self')}
               </Text>
             </Text>
             <BoxBreathingAnimation
@@ -151,8 +151,8 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           </View>
 
           <PrimaryButton
-            label={t('BreathingScreen.skip')}
-            onPress={onPressSkip}
+            label={t('BreathingScreen.viewSessionSummary')}
+            onPress={onPressViewSessionSummary}
             customContainerStyle={styles.skipButton}
           />
         </ImageBackground>
@@ -176,6 +176,7 @@ const styles = ScaledSheet.create({
     fontSize: '32@ms',
     ...fontFamily.REPLAY_PRO.HEADLINE,
     marginBottom: '20@vs',
+    paddingHorizontal: '20@s',
   },
   headingItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

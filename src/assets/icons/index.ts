@@ -4,6 +4,7 @@ import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
+import BlueWarningIcon from './blueWarning.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import CallIcon from './call.svg';
 import CallDetailsIcon from './callDetails.svg';
@@ -17,6 +18,7 @@ import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
 import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
+import ContractIcon from './contract.svg';
 import DatabaseIcon from './database.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
@@ -30,6 +32,7 @@ import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
+import GoldenShieldIcon from './goldenShield.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
@@ -37,6 +40,7 @@ import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
+import LockIcon from './lock.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
@@ -51,11 +55,13 @@ import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
 import ReplayIcon from './replay.svg';
+import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
+import ShieldIcon from './shield.svg';
 import SmileIcon from './smile.svg';
 import StarIcon from './star.svg';
 import TableEyeIcon from './tableEye.svg';
@@ -142,4 +148,10 @@ export {
   ReplayIcon,
   CloseIcon,
   StarIcon,
+  ShieldIcon,
+  LockIcon,
+  GoldenShieldIcon,
+  ContractIcon,
+  ResumeIcon,
+  BlueWarningIcon,
 };

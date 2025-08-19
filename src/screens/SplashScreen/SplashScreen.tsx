@@ -18,6 +18,7 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
+import {PrimaryButton} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {
   useCounselorChat,
@@ -34,11 +35,12 @@ import {AuthStep} from './types';
 
 const {height} = Dimensions.get('screen');
 
-export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
-  navigation,
-}) => {
+export const SplashScreen: React.FC<
+  RootStackScreenProps<typeof SCREEN_NAMES.SPLASH>
+> = ({navigation}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const [isLoginButtonVisible, setIsLoginButtonVisible] = useState(false);
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
@@ -77,29 +79,38 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const onLoginPress = () => {
+    setIsLoginButtonVisible(false);
+    setIsBottomSheetVisible(true);
+    animationTranslateY.value = withTiming(-height * 0.6, {
+      duration: 1000,
+    });
+  };
+
   useEffect(() => {
-    if (isAnimationEnded) {
-      if (!isUserLoading && !isAuthenticated) {
-        setIsBottomSheetVisible(true);
-        animationTranslateY.value = withTiming(-height * 0.6, {
-          duration: 1000,
-        });
-      } else if (isAuthenticated) {
-        if (userData?.role === UserRole.COUNSELOR) {
-          checkCounselorChat();
-        } else {
-          navigation.replace(SCREEN_NAMES.CALL_LOG);
-        }
+    if (!isAnimationEnded) {
+      return;
+    }
+
+    if (!isUserLoading && !isAuthenticated) {
+      // Show the login button only when the bottom sheet is NOT visible
+      if (!isBottomSheetVisible) {
+        setIsLoginButtonVisible(true);
+      }
+    } else if (isAuthenticated) {
+      if (userData?.role === UserRole.COUNSELOR) {
+        checkCounselorChat();
+      } else {
+        navigation.replace(SCREEN_NAMES.CALL_LOG);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isAnimationEnded,
     isAuthenticated,
     isUserLoading,
-    animationTranslateY,
-    checkCounselorChat,
+    isBottomSheetVisible,
     userData?.role,
-    navigation,
   ]);
 
   const handleOtpGenerationSuccess = async (emailAddress: string) => {
@@ -232,6 +243,16 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
             </Text>
           )}
         </Animated.View>
+
+        {isLoginButtonVisible && (
+          <PrimaryButton
+            label={t('SplashScreen.login')}
+            onPress={onLoginPress}
+            customContainerStyle={styles.loginButtonContainer}
+            customTextStyle={styles.loginButtonText}
+            activeOpacity={0.9}
+          />
+        )}
 
         {isBottomSheetVisible && (
           <Animated.View style={[styles.authContainer, authContentStyle]}>
