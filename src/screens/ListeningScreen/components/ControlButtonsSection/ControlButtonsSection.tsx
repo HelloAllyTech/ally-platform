@@ -142,6 +142,10 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
 
 const styles = ScaledSheet.create({
   sectionContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     width: '100%',
     alignItems: 'center',
     backgroundColor: colors.darkGray3,
@@ -159,9 +163,9 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: '20@vs',
+    paddingVertical: '16@vs',
     backgroundColor: colors.darkGray10,
-    gap: '12@s',
+    gap: '10@s',
     borderRadius: '8@ms',
   },
   buttonText: {
@@ -180,7 +184,7 @@ const styles = ScaledSheet.create({
     height: '32@mvs',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: '20@mvs',
+    marginBottom: '12@mvs',
   },
   securityText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

@@ -19,3 +19,4 @@ export {CustomTabs} from './CustomTabs';
 export {DateSelector, useDateSelection} from './DateSelector';
 export {OtpModal} from './OtpModal';
 export {EmailInputModal} from './EmailInputModal';
+export {PrivacyTooltip} from './PrivacyTooltip';

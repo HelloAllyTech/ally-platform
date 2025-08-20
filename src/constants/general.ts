@@ -1,3 +1,4 @@
+import {t} from 'i18next';
 import {Dimensions, Platform} from 'react-native';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
@@ -66,3 +67,17 @@ export const API_METHODS = {
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
 export const PRIVACY_POLICY_URL = 'https://helloally.ai/privacy';
+
+export const tooltipDisplayInsets = {
+  bottom: 10,
+  left: 40,
+  right: 40,
+  top: 10,
+};
+
+export const tooltipContentList = [
+  t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
+  t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
+  t('ListeningScreen.dataSafeTooltip.noTrainingData'),
+  t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
+];
