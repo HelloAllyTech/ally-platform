@@ -1,7 +1,7 @@
 import {Image} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import images from '@/assets/images';
+import {endSession} from '@/assets';
 import {IllustratedModal} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
@@ -38,7 +38,7 @@ export const CallEndConfirmationModal = ({
   }
 
   const illustration = (
-    <Image source={images.endSession} style={styles.illustration} />
+    <Image source={endSession} style={styles.illustration} />
   );
 
   return (

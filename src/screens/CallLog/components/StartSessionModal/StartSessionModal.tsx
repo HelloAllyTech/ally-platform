@@ -8,8 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import {CloseIcon} from '@/assets/icons';
-import images from '@/assets/images';
+import {CloseIcon, conversation} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
@@ -104,7 +103,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             {t('CallLogs.start')}{' '}
             <Text style={styles.titleItalic}>{t('CallLogs.session')}</Text>
           </Text>
-          <Image source={images.conversation} style={styles.illustration} />
+          <Image source={conversation} style={styles.illustration} />
           <Text style={styles.description}>
             {t('CallLogs.startSessionDescription')}
           </Text>

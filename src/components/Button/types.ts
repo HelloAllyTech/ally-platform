@@ -7,5 +7,6 @@ export interface PrimaryButtonProps {
   isLoading?: boolean;
   customContainerStyle?: StyleProp<ViewStyle>;
   customTextStyle?: StyleProp<TextStyle>;
+  activeOpacity?: number;
   testID?: string;
 }

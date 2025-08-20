@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Dimensions,
@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -18,7 +19,7 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {PrimaryButton, SecurityCarousel} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {
   useCounselorChat,
@@ -27,6 +28,7 @@ import {
   useUser,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {colors} from '@/theme';
 import {UserRole} from '@/types';
 
 import {EmailLogin, OtpVerification} from './components';
@@ -206,6 +208,25 @@ export const SplashScreen: React.FC<
     }, 1000);
   };
 
+  const renderLottieAnimation = useMemo(() => {
+    return (
+      <Animated.View style={[styles.animationContainer, animationStyle]}>
+        <LottieView
+          ref={lottieRef}
+          source={require('@/assets/animations/splashAnimation.json')}
+          style={styles.animation}
+          resizeMode="cover"
+          autoPlay={!isAnimationEnded}
+          loop={false}
+          speed={1}
+          progress={isAnimationEnded ? 0.99 : 0}
+          onAnimationFinish={onAnimationFinish}
+        />
+      </Animated.View>
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAnimationEnded]);
+
   return (
     <TouchableWithoutFeedback
       style={{paddingBottom: insets.bottom + 10}}
@@ -216,18 +237,7 @@ export const SplashScreen: React.FC<
             <LeftArrowIcon width={44} height={44} color="black" />
           </TouchableOpacity>
         )}
-        <Animated.View style={[styles.animationContainer, animationStyle]}>
-          <LottieView
-            ref={lottieRef}
-            source={require('@/assets/animations/splashAnimation.json')}
-            style={styles.animation}
-            resizeMode="cover"
-            autoPlay
-            loop={false}
-            speed={1}
-            onAnimationFinish={onAnimationFinish}
-          />
-        </Animated.View>
+        {renderLottieAnimation}
         <Animated.View style={[styles.titleContainer, textStyle]}>
           {currentStep === 'EMAIL' ? (
             <>
@@ -245,12 +255,18 @@ export const SplashScreen: React.FC<
         </Animated.View>
 
         {isLoginButtonVisible && (
-          <PrimaryButton
-            label={t('SplashScreen.login')}
-            onPress={onLoginPress}
-            customContainerStyle={styles.loginButtonContainer}
-            customTextStyle={styles.loginButtonText}
-          />
+          <LinearGradient
+            colors={[colors.black, colors.lightGray18]}
+            locations={[0.2, 0.85]}
+            style={styles.bottomAbsoluteContainer}>
+            <SecurityCarousel />
+            <PrimaryButton
+              label={t('SplashScreen.login')}
+              onPress={onLoginPress}
+              customContainerStyle={styles.loginButtonContainer}
+              customTextStyle={styles.loginButtonText}
+            />
+          </LinearGradient>
         )}
 
         {isBottomSheetVisible && (

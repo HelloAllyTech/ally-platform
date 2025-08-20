@@ -1,6 +1,10 @@
 import {t} from 'i18next';
 import {Dimensions, Platform} from 'react-native';
 
+import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
+import {CarouselItem} from '@/components';
+import {colors} from '@/theme';
+
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 
 export const DEFAULT_HIT_SLOP = {
@@ -67,6 +71,36 @@ export const API_METHODS = {
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
 export const PRIVACY_POLICY_URL = 'https://helloally.ai/privacy';
+
+export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
+  {image: carousel1, textKey: 'Carousel.slide1'},
+  {image: carousel2, textKey: 'Carousel.slide2'},
+  {image: carousel3, textKey: 'Carousel.slide3'},
+  {image: carousel4, textKey: 'Carousel.slide4'},
+];
+
+export enum CarouselVariant {
+  DRAWER = 'drawer',
+  DEFAULT = 'default',
+}
+
+export const drawerConfig = {
+  width: SCREEN_WIDTH - 80,
+  isBlurView: false,
+  textColor: colors.darkGray2,
+  paginationActiveDotStyle: {
+    backgroundColor: colors.black,
+  },
+};
+
+export const defaultConfig = {
+  width: SCREEN_WIDTH,
+  isBlurView: true,
+  textColor: colors.white,
+  paginationActiveDotStyle: {
+    backgroundColor: colors.white,
+  },
+};
 
 export const tooltipDisplayInsets = {
   bottom: 10,
