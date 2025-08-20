@@ -101,6 +101,7 @@ export const styles = ScaledSheet.create({
   },
   tooltipContent: {
     borderRadius: 8,
+    minWidth: 250,
   },
   tooltipText: {
     color: colors.black,

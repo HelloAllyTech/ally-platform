@@ -28,13 +28,6 @@ interface StartSessionModalProps {
   onListenLive: () => void;
 }
 
-// TODO: Remove once backend config is available
-const DUMMY_ENABLED_CHAT_TYPES = [
-  CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
-  CHAT_TYPES.MICROPHONE_CHAT,
-  CHAT_TYPES.LEARN_CHAT,
-];
-
 export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   visible,
   onClose,
@@ -50,11 +43,8 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
       CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
       CHAT_TYPES.MICROPHONE_CHAT,
       CHAT_TYPES.LEARN_CHAT,
-    ].filter(chatType =>
-      // TODO: Remove and replace with enabledChatTypes once backend config is available
-      DUMMY_ENABLED_CHAT_TYPES?.includes(chatType),
-    ) as AllowedType[];
-  }, []);
+    ].filter(chatType => enabledChatTypes?.includes(chatType)) as AllowedType[];
+  }, [enabledChatTypes]);
 
   const [selected, setSelected] = useState<AllowedType | null>(null);
 

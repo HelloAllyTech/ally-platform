@@ -1,4 +1,3 @@
-import {t} from 'i18next';
 import {Dimensions, Platform} from 'react-native';
 
 import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
@@ -108,10 +107,3 @@ export const tooltipDisplayInsets = {
   right: 40,
   top: 10,
 };
-
-export const tooltipContentList = [
-  t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
-  t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
-  t('ListeningScreen.dataSafeTooltip.noTrainingData'),
-  t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
-];

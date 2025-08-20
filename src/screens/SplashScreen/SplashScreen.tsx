@@ -256,7 +256,7 @@ export const SplashScreen: React.FC<
 
         {isLoginButtonVisible && (
           <LinearGradient
-            colors={[colors.black, colors.lightGray18]}
+            colors={['transparent', colors.lightGray18]}
             locations={[0.2, 0.85]}
             style={styles.bottomAbsoluteContainer}>
             <SecurityCarousel />
