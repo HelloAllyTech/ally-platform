@@ -60,8 +60,7 @@ export const CallLogScreen: React.FC = () => {
   const {t} = useTranslate();
   const dispatch = useAppDispatch();
   const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
-  const {data: enabledChatTypes, isLoading: isLoadingChatTypes} =
-    useGetVisibleChatTypesQuery();
+  const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
 
@@ -273,7 +272,7 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            hasAnyCallType && styles.bgAshGray,
+            !hasAnyCallType && styles.bgAshGray,
           ]}
           disabled={!hasAnyCallType}
           activeOpacity={0.9}

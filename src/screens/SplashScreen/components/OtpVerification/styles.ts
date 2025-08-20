@@ -3,11 +3,15 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily, globalStyles, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
+  contentContainer: {
+    flex: 1,
+    paddingTop: '40@ms',
+  },
   container: {
     flex: 1,
     justifyContent: 'space-between',
   },
-  contentContainer: {
+  containerWrapper: {
     flex: 1,
   },
   headerText: {

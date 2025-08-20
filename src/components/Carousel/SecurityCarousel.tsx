@@ -1,5 +1,4 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {BlurView} from '@react-native-community/blur';
 import {Animated, Image, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -68,14 +67,11 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
 
   return (
     <View style={[styles.container, {width: carouseConfig.width}]}>
-      {carouseConfig.isBlurView && (
-        <BlurView
-          blurType="light"
-          blurAmount={2}
-          style={styles.blurContainer}
-        />
-      )}
-      <View style={styles.carouselView}>
+      <View
+        style={[
+          styles.carouselView,
+          carouseConfig.isBlurView && styles.carouselViewBlur,
+        ]}>
         <Carousel
           ref={carouselRef}
           data={SECURITY_CAROUSEL_SLIDES}
@@ -92,24 +88,27 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
 const styles = ScaledSheet.create({
   container: {
     position: 'relative',
-    height: '340@ms',
+    height: '330@ms',
     width: SCREEN_WIDTH,
-  },
-  blurContainer: {
-    paddingHorizontal: '40@ms',
-    width: '100%',
-    height: '100%',
-    borderRadius: '12@ms',
-    borderWidth: 0.5,
-    borderColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   carouselView: {
-    position: 'absolute',
+    width: SCREEN_WIDTH - 80,
     paddingTop: '2@ms',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    borderRadius: '12@ms',
+    height: '100%',
+  },
+  carouselViewBlur: {
+    backgroundColor: colors.whiteTransparent10,
+    zIndex: 2,
+    shadowColor: colors.black,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 2,
+    borderWidth: 0.5,
+    borderColor: colors.white,
   },
   heading: {
     ...typography.headline.medium,
@@ -138,7 +137,7 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
   },
   slideTitle: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    ...fontFamily.REPLAY_PRO.BOLD,
     minHeight: '46@ms',
     fontSize: '22@ms',
     marginHorizontal: '10@ms',

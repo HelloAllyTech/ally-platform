@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
 
+import {SCREEN_NAMES} from '@/constants';
 import {RouteNames} from '@/navigation';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
@@ -42,7 +43,8 @@ export const useCounselorChat = ({
         // Check if we should preserve chat based on current route
         const currentRoute = getCurrentRoute?.() as RouteNames;
         const shouldPreserveChat =
-          currentRoute === 'Breathing' || currentRoute === 'CallSummary';
+          currentRoute === SCREEN_NAMES.BREATHING ||
+          currentRoute === SCREEN_NAMES.CALL_SUMMARY;
 
         // Only clear current chat if preservation is not enabled
         if (!shouldPreserveChat) {
