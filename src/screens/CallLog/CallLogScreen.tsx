@@ -121,8 +121,8 @@ export const CallLogScreen: React.FC = () => {
       offset: newOffset,
     });
 
-    if (result.data?.data) {
-      setAllLogs(prev => [...prev, ...result.data.data]);
+    if (result?.data?.data) {
+      setAllLogs(prev => [...prev, ...(result?.data?.data || [])]);
       setOffset(newOffset);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
     }

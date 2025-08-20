@@ -20,8 +20,6 @@ interface SummaryViewProps {
   forceRemountKey: number;
   insets: {top: number};
   onScroll: (isFullyExpanded: boolean) => void;
-  isSummaryAvailable: boolean;
-  isFullyExpanded: boolean;
   scrollViewRef: React.RefObject<ScrollView | null>;
 }
 
@@ -31,8 +29,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   forceRemountKey,
   insets,
   onScroll,
-  isSummaryAvailable,
-  isFullyExpanded,
   scrollViewRef,
 }) => {
   const scrollY = useSharedValue(0);
@@ -90,7 +86,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       ]}>
       <ScrollView
         ref={scrollViewRef}
-        scrollEnabled={isSummaryAvailable}
         onScroll={handleScroll}
         scrollEventThrottle={8}
         onLayout={handleLayout}

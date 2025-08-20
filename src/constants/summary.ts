@@ -16,7 +16,61 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
+import {colors} from '@/theme';
 import {FieldType, SectionItem, SummaryField} from '@/types';
+
+export enum ChatSummaryStatus {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+}
+
+export const SUMMARY_STATUS_CONFIG: Record<
+  ChatSummaryStatus,
+  {
+    backgroundColor: string;
+    dotColor: string;
+    label: string;
+  }
+> = {
+  [ChatSummaryStatus.PENDING]: {
+    backgroundColor: colors.creamYellow,
+    dotColor: colors.amberOrange,
+    label: 'Processing',
+  },
+  [ChatSummaryStatus.IN_PROGRESS]: {
+    backgroundColor: colors.creamYellow,
+    dotColor: colors.amberOrange,
+    label: 'Processing',
+  },
+  [ChatSummaryStatus.SUCCESS]: {
+    backgroundColor: colors.mintGreen,
+    dotColor: colors.emeraldGreen,
+    label: 'Generated',
+  },
+  [ChatSummaryStatus.FAILED]: {
+    backgroundColor: colors.coralPink,
+    dotColor: colors.brickRed,
+    label: 'Error',
+  },
+};
+
+export enum SummaryGenerationStep {
+  GENERATING_TRANSCRIPTION = 'Generating transcription',
+  DELETING_AUDIO = 'Deleting audio',
+  SEGREGATING_UTTERANCES = 'Segregating utterances',
+  UNDERSTANDING_CONVERSATION = 'Understanding conversation',
+  CHARTING_FLOW = 'Charting flow',
+  EXTRACTING_KEY_POINTS = 'Extracting key points',
+  IDENTIFYING_THEMES = 'Identifying themes',
+  ANALYSING = 'Analysing',
+  GENERATING_SUMMARY = 'Generating summary',
+  ENRICHING_SUMMARY = 'Enriching summary',
+  VALIDATING_SUMMARY = 'Validating summary',
+}
+
+export const SUMMARY_GENERATION_STEPS = Object.values(SummaryGenerationStep);
 
 export const PLACES_PER_PAGE = 50;
 
