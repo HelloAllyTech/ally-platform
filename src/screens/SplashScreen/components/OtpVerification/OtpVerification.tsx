@@ -94,12 +94,12 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   return (
     <View style={styles.container}>
       <KeyboardAwareScrollView
-        contentContainerStyle={{flex: 1}}
+        contentContainerStyle={styles.contentContainer}
         enableOnAndroid
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        <View style={styles.contentContainer}>
+        <View style={styles.containerWrapper}>
           <Text style={styles.headerText}>
             {t('SplashScreen.enterTheCodeSentTo')}
             {'\n'}

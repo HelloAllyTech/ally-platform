@@ -94,7 +94,8 @@
     "didNotReceiveTheCode": "Did not receive the code?",
     "resend": "Resend",
     "verifyOtp": "Verify OTP",
-    "login": "Login"
+    "login": "Login",
+    "email": "Email"
   },
   "Carousel": {
     "slide1": "We do not save audio recordings",

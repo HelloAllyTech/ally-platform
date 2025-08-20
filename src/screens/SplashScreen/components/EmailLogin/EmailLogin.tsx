@@ -1,15 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {SerializedError} from '@reduxjs/toolkit';
 import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
-import {
-  Alert,
-  Keyboard,
-  Linking,
-  Text,
-  TextInput,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import {Alert, Linking, Text, TextInput, View} from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
 import {
@@ -72,19 +65,21 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
     }
   }, [email, generateOtp]);
 
-  const dismissKeyboard = useCallback(() => {
-    Keyboard.dismiss();
-    setIsFocused(false);
-  }, []);
-
   return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <View style={styles.container}>
+    <View style={styles.container}>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={0}
+        showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
           <Text style={styles.headerText}>
             {t('SplashScreen.enterYourEmail')}
           </Text>
           <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>{t('SplashScreen.email')}</Text>
             <TextInput
               style={[
                 styles.input,
@@ -98,40 +93,38 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               autoCorrect={false}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder={t('SplashScreen.emailPlaceholder')}
               editable={!isLoading}
               placeholderTextColor={colors.mediumGray}
             />
           </View>
         </View>
-
-        <View style={styles.bottomContainer}>
-          <View style={styles.termsContainer}>
-            <Text style={styles.termsText}>
-              {t('SplashScreen.byTappingNext')}{' '}
-              <Text
-                style={styles.termsLink}
-                onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
-                {t('SplashScreen.termsAndConditions')}
-              </Text>{' '}
-              {t('SplashScreen.andAcknowledge')}{' '}
-              <Text
-                style={styles.termsLink}
-                onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-                {t('SplashScreen.privacyPolicy')}
-              </Text>
-              .
+      </KeyboardAwareScrollView>
+      <View style={styles.bottomContainer}>
+        <View style={styles.termsContainer}>
+          <Text style={styles.termsText}>
+            {t('SplashScreen.byTappingNext')}{' '}
+            <Text
+              style={styles.termsLink}
+              onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
+              {t('SplashScreen.termsAndConditions')}
+            </Text>{' '}
+            {t('SplashScreen.andAcknowledge')}{' '}
+            <Text
+              style={styles.termsLink}
+              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+              {t('SplashScreen.privacyPolicy')}
             </Text>
-          </View>
-
-          <PrimaryButton
-            label={t('SplashScreen.next')}
-            onPress={handleSubmit}
-            isDisabled={!isValidEmail(email)}
-            isLoading={isLoading}
-          />
+            .
+          </Text>
         </View>
+
+        <PrimaryButton
+          label={t('SplashScreen.next')}
+          onPress={handleSubmit}
+          isDisabled={!isValidEmail(email)}
+          isLoading={isLoading}
+        />
       </View>
-    </TouchableWithoutFeedback>
+    </View>
   );
 };

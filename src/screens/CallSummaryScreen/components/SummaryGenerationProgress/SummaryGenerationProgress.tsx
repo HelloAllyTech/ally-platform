@@ -91,7 +91,6 @@ const styles = ScaledSheet.create({
     width: '100%',
     aspectRatio: 16 / 9,
     paddingHorizontal: '16@ms',
-    marginTop: '16@vs',
   },
   video: {
     width: '100%',

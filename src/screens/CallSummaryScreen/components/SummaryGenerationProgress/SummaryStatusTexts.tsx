@@ -29,12 +29,12 @@ export const SummaryStatusTexts: React.FC = () => {
     Animated.sequence([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 500,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 200,
+        duration: 500,
         useNativeDriver: true,
       }),
     ]).start();
@@ -97,7 +97,8 @@ const styles = ScaledSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: '16@ms',
+    marginTop: '8@ms',
+    marginBottom: '24@ms',
   },
   text: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -108,7 +109,7 @@ const styles = ScaledSheet.create({
   generatedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: '16@ms',
+    marginTop: '16@ms',
   },
   generatedText: {
     marginLeft: '8@ms',

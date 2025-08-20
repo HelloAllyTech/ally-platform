@@ -57,7 +57,6 @@ export const styles = ScaledSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: '24@ms',
     borderTopRightRadius: '24@ms',
-    paddingTop: '50@ms',
     paddingHorizontal: '32@ms',
     paddingBottom: '54@vs',
     height: '65%',
