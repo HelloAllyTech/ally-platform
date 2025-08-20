@@ -1,10 +1,14 @@
-import {Text, View} from 'react-native';
+import {Image, Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
+import Video from 'react-native-video';
 
-import {BarsIcon, InfoIcon} from '@/assets/icons';
+import {InfoIcon} from '@/assets';
+import images from '@/assets/images';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
+
+import {SummaryStatusTexts} from './SummaryStatusTexts';
 
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,
@@ -26,9 +30,23 @@ export const SummaryGenerationProgress = ({
           </Text>
         </View>
       )}
-      <View style={styles.iconWrapper}>
-        <BarsIcon width={moderateScale(89)} height={moderateScale(66)} />
-      </View>
+
+      {isSummaryGenerated ? (
+        <Image source={images.summaryGenerated} style={styles.marginV40} />
+      ) : (
+        <View style={styles.videoContainer}>
+          <Video
+            source={require('@/assets/videos/summaryLoading.mp4')}
+            style={styles.video}
+            repeat
+            muted
+            resizeMode="contain"
+          />
+        </View>
+      )}
+
+      {!isSummaryGenerated && <SummaryStatusTexts />}
+
       <Text style={styles.title}>
         {isSummaryGenerated
           ? t('CallSummaryProgress.generatedSessionSummary')
@@ -41,6 +59,12 @@ export const SummaryGenerationProgress = ({
               `CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`,
             )}
       </Text>
+      {!isSummaryGenerated && (
+        <Text style={styles.etaText}>
+          {t('CallSummaryProgress.estimatedTime')}
+        </Text>
+      )}
+      <View style={styles.separator} />
     </View>
   );
 };
@@ -64,13 +88,15 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     opacity: 0.6,
   },
-  iconWrapper: {
-    width: '89@ms',
-    height: '66@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '32@ms',
-    marginTop: '33@vs',
+  videoContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    paddingHorizontal: '16@ms',
+    marginTop: '16@vs',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
@@ -86,10 +112,21 @@ const styles = ScaledSheet.create({
     color: colors.darkSlate,
     opacity: 0.7,
     textAlign: 'center',
-    marginHorizontal: '24@ms',
-    paddingBottom: '36@ms',
-    marginBottom: '16@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray4,
+    marginHorizontal: '20@ms',
   },
+  etaText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    color: colors.mediumGray2,
+    opacity: 0.8,
+    marginTop: '16@ms',
+  },
+  separator: {
+    width: '85%',
+    height: 0.5,
+    backgroundColor: colors.lightGray4,
+    marginTop: '56@ms',
+    marginBottom: '16@ms',
+  },
+  marginV40: {marginVertical: 40},
 });

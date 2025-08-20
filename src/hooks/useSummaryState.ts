@@ -4,6 +4,7 @@ import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
 import {useUpdateNotesMutation} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {clearSummaryStates} from '@/store/slices/summarySlice';
+import {logger} from '@/utils';
 
 import {useDebounce} from './useDebounce';
 
@@ -61,14 +62,12 @@ export const useSummaryState = (
     };
   }, [chatId, fetchCallSummary]);
 
-  // Watch for summaryData changes
   useEffect(() => {
     if (summaryData?.details?.summary) {
       setIsSummaryAvailable(true);
     }
   }, [summaryData]);
 
-  // Cleanup summary state on unmount
   useEffect(() => {
     return () => {
       dispatch(clearSummaryStates());
@@ -110,7 +109,7 @@ export const useSummaryState = (
           content: text,
         },
       }).catch(error => {
-        // Handle error if needed
+        logger.error(`Error updating notes: ${error}`);
       });
     },
     {delay: 1000},

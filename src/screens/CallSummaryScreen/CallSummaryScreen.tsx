@@ -152,8 +152,6 @@ export const CallSummaryScreen: React.FC<
           forceRemountKey={forceRemountKey}
           insets={insets}
           onScroll={handleScroll}
-          isSummaryAvailable={isSummaryAvailable}
-          isFullyExpanded={isFullyExpanded}
           scrollViewRef={scrollViewRef}>
           <CallSummaryDetails
             isLoading={isLoading}

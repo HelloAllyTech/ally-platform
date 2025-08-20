@@ -62,6 +62,7 @@ import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
 import ShieldIcon from './shield.svg';
+import ShieldWithTickIcon from './shieldWithTick.svg';
 import SmileIcon from './smile.svg';
 import StarIcon from './star.svg';
 import TableEyeIcon from './tableEye.svg';
@@ -154,4 +155,5 @@ export {
   ContractIcon,
   ResumeIcon,
   BlueWarningIcon,
+  ShieldWithTickIcon,
 };

@@ -127,13 +127,13 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
             colors={[colors.darkGray, colors.black0]}
             style={StyleSheet.absoluteFillObject}
           />
-          <View style={styles.content}>
-            <Text style={styles.heading}>
-              {t('BreathingScreen.header.returnTo')}{' '}
-              <Text style={styles.headingItalic}>
-                {t('BreathingScreen.header.self')}
-              </Text>
+          <Text style={styles.heading}>
+            {t('BreathingScreen.header.returnTo')}{' '}
+            <Text style={styles.headingItalic}>
+              {t('BreathingScreen.header.self')}
             </Text>
+          </Text>
+          <View style={styles.content}>
             <BoxBreathingAnimation
               isPlaying={isPlaying}
               isMuted={isMuted}
@@ -153,7 +153,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           <PrimaryButton
             label={t('BreathingScreen.viewSessionSummary')}
             onPress={onPressViewSessionSummary}
-            customContainerStyle={styles.skipButton}
+            customContainerStyle={styles.viewSummaryButton}
           />
         </ImageBackground>
       )}
@@ -169,14 +169,15 @@ const styles = ScaledSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: '60@vs',
   },
   heading: {
+    textAlign: 'center',
     color: colors.white,
     fontSize: '32@ms',
     ...fontFamily.REPLAY_PRO.HEADLINE,
     marginBottom: '20@vs',
     paddingHorizontal: '20@s',
+    marginTop: '60@vs',
   },
   headingItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -189,9 +190,9 @@ const styles = ScaledSheet.create({
     marginBottom: '12@vs',
     ...fontFamily.ROBOTO.REGULAR,
   },
-  skipButton: {
+  viewSummaryButton: {
     alignSelf: 'center',
     marginBottom: '40@vs',
-    width: '30%',
+    width: '70%',
   },
 });

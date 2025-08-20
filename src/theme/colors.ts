@@ -95,16 +95,22 @@ export const colors = {
   teal: '#4D8779',
   deepTeal: '#1b424f',
   darkGreen: '#1B282F',
+  mintGreen: '#DCEBDD',
+  emeraldGreen: '#47B881',
 
   // Reds
   brightRed: '#F93535',
   vividRed: '#F50004',
   coralRed: '#FB6767',
+  coralPink: '#FBDED9',
+  brickRed: '#E5675A',
 
   // Yellows
   yellow: '#FFD700',
   starYellow: '#FFB800',
   floralWhite: '#FDF8E4',
+  creamYellow: '#F8E6BA',
+  amberOrange: '#FFAD0D',
 
   // Orange
   carrotOrange: '#EC930F',
