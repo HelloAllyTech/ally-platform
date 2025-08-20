@@ -24,11 +24,10 @@
     "allyWillJoinOngoingCall": "Ally will join your ongoing call",
     "allyWillHearAudio": "Ally will hear audio alongside you",
     "consentNotice": "By starting, you confirm everyone being transcribed has given consent.",
-    "startSessionDescription": "Ally’s mental health AI scribe safely listens, transcribes and writes session notes for you.",
+    "startSessionDescription": "Ally's mental health AI scribe safely listens, transcribes and writes session notes for you.",
     "startSessionNow": "Start session now",
     "learn": "Learn",
     "learnDescription": "Engage in AI-powered role plays",
-    "noAccessToCallFeatures": "You don't have access to call features right now.",
     "search": {
       "placeholder": "Search"
     },

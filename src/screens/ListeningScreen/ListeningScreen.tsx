@@ -16,12 +16,7 @@ import {
 import {LockIcon} from '@/assets/icons';
 import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
-import {
-  AllyPlatforms,
-  AUDIO_INACTIVE_TIMEOUT,
-  SCREEN_NAMES,
-  tooltipContentList,
-} from '@/constants';
+import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -122,6 +117,13 @@ export const ListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
+
+  const tooltipContentList = [
+    t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
+    t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
+    t('ListeningScreen.dataSafeTooltip.noTrainingData'),
+    t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
+  ];
 
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe

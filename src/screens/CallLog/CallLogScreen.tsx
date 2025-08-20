@@ -233,11 +233,6 @@ export const CallLogScreen: React.FC = () => {
           onCtaPress={handleLearnMorePress}
           containerStyle={styles.featureNotAvailable}
         />
-      ) : !isLoadingChatTypes && !hasAnyCallType ? (
-        <FeatureNotAvailable
-          description={t('CallLogs.noAccessToCallFeatures')}
-          containerStyle={styles.featureNotAvailable}
-        />
       ) : isLoading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.darkSlate} />
@@ -275,7 +270,12 @@ export const CallLogScreen: React.FC = () => {
       )}
       {isCounselor && !currentChat?.chatId && (
         <TouchableOpacity
-          style={[styles.fab, {bottom: insets.bottom + ms(100)}]}
+          style={[
+            styles.fab,
+            {bottom: insets.bottom + ms(100)},
+            hasAnyCallType && styles.bgAshGray,
+          ]}
+          disabled={!hasAnyCallType}
           activeOpacity={0.9}
           onPress={() => {
             setShowStartSession(true);
@@ -345,7 +345,7 @@ const styles = ScaledSheet.create({
     position: 'absolute',
     right: '20@ms',
     padding: '20@ms',
-    borderRadius: '40%',
+    borderRadius: '30%',
     backgroundColor: colors.azureBlue,
     alignItems: 'center',
     justifyContent: 'center',
@@ -354,5 +354,8 @@ const styles = ScaledSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  bgAshGray: {
+    backgroundColor: colors.ashGray,
   },
 });
