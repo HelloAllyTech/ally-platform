@@ -99,4 +99,12 @@ export const styles = ScaledSheet.create({
     marginTop: '15@vs',
     marginHorizontal: '25@s',
   },
+  tooltipContent: {
+    borderRadius: 8,
+  },
+  tooltipText: {
+    color: colors.black,
+    fontSize: 14,
+    lineHeight: 20,
+  },
 });

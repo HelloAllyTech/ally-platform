@@ -14,8 +14,14 @@ import {
 } from 'react-native';
 
 import {LockIcon} from '@/assets/icons';
+import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
-import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
+import {
+  AllyPlatforms,
+  AUDIO_INACTIVE_TIMEOUT,
+  SCREEN_NAMES,
+  tooltipContentList,
+} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -111,10 +117,12 @@ export const ListeningScreen = ({
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
+  const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
   const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
+
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
@@ -389,7 +397,11 @@ export const ListeningScreen = ({
   );
 
   const handleLockIconPress = useCallback(() => {
-    // TODO: Implement lock icon press tooltip
+    setIsPrivacyTooltipVisible(prev => !prev);
+  }, []);
+
+  const handlePrivacyTooltipClose = useCallback(() => {
+    setIsPrivacyTooltipVisible(false);
   }, []);
 
   const playPauseButton = useMemo(() => {
@@ -465,6 +477,34 @@ export const ListeningScreen = ({
     );
   }
 
+  const tooltipContent = (
+    <View style={styles.tooltipContent}>
+      {tooltipContentList.map((item, index) => (
+        <Text key={index} style={styles.tooltipText}>
+          • {item}
+        </Text>
+      ))}
+    </View>
+  );
+
+  const renderTakingNotes = () => {
+    return (
+      <View style={styles.takingNotesContainer}>
+        <PrivacyTooltip
+          tooltipContent={tooltipContent}
+          isVisible={isPrivacyTooltipVisible}
+          onClose={handlePrivacyTooltipClose}>
+          <TouchableOpacity onPress={handleLockIconPress} activeOpacity={0.8}>
+            <LockIcon width={16} height={16} color={colors.lightGrayD9} />
+          </TouchableOpacity>
+        </PrivacyTooltip>
+        <Text style={styles.takingNotesText}>
+          {t('ListeningScreen.takingNotes')}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {showCallEndConfirmation && callEndModalElement}
@@ -478,14 +518,7 @@ export const ListeningScreen = ({
       )}
       {isFocusMode ? (
         <View style={styles.focusModeLayout}>
-          <View style={styles.takingNotesContainer}>
-            <TouchableOpacity onPress={handleLockIconPress} activeOpacity={0.8}>
-              <LockIcon width={16} height={16} color={colors.lightGrayD9} />
-            </TouchableOpacity>
-            <Text style={styles.takingNotesText}>
-              {t('ListeningScreen.takingNotes')}
-            </Text>
-          </View>
+          {renderTakingNotes()}
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveformContainer
@@ -506,12 +539,7 @@ export const ListeningScreen = ({
           <View style={globalStyles.rowCenter}>
             {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
-              <View style={styles.takingNotesContainer}>
-                <LockIcon width={16} height={16} color={colors.lightGrayD9} />
-                <Text style={styles.takingNotesText}>
-                  {t('ListeningScreen.takingNotes')}
-                </Text>
-              </View>
+              {renderTakingNotes()}
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
