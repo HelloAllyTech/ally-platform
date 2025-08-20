@@ -4,7 +4,7 @@ import {AppState, ImageBackground, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import images from '@/assets/images';
+import {breathingBackground} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {isIOS, SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
@@ -120,7 +120,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
         <CallEndOverlay />
       ) : (
         <ImageBackground
-          source={images.breathingBackground}
+          source={breathingBackground}
           style={styles.container}
           resizeMode="cover">
           <LinearGradient

@@ -1,7 +1,7 @@
 import {Image} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import images from '@/assets/images';
+import {logOut} from '@/assets';
 import {IllustratedModal} from '@/components';
 import {useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
@@ -26,9 +26,7 @@ export const LogoutModal = ({
     setIsLogoutModalVisible(false);
   };
 
-  const illustration = (
-    <Image source={images.logOut} style={styles.illustration} />
-  );
+  const illustration = <Image source={logOut} style={styles.illustration} />;
 
   return (
     <IllustratedModal

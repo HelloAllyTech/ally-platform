@@ -2,8 +2,7 @@ import {Image, Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {InfoIcon} from '@/assets';
-import images from '@/assets/images';
+import {InfoIcon, summaryGenerated} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -32,7 +31,7 @@ export const SummaryGenerationProgress = ({
       )}
 
       {isSummaryGenerated ? (
-        <Image source={images.summaryGenerated} style={styles.marginV40} />
+        <Image source={summaryGenerated} style={styles.marginV40} />
       ) : (
         <View style={styles.videoContainer}>
           <Video

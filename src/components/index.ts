@@ -19,4 +19,12 @@ export {CustomTabs} from './CustomTabs';
 export {DateSelector, useDateSelection} from './DateSelector';
 export {OtpModal} from './OtpModal';
 export {EmailInputModal} from './EmailInputModal';
+export {Carousel, Pagination, SecurityCarousel} from './Carousel';
+export type {
+  CarouselProps,
+  CarouselRef,
+  CarouselItem,
+  PaginationProps,
+  NavigationProps,
+} from './Carousel';
 export {PrivacyTooltip} from './PrivacyTooltip';
