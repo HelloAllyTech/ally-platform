@@ -1,13 +1,14 @@
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {Image, Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {InfoIcon, summaryGenerated} from '@/assets';
+import {LeftArrowIcon, ShieldWithTickIcon, summaryGenerated} from '@/assets';
+import {ShinyText} from '@/components';
+import {SUMMARY_GENERATION_STEPS, SummaryGenerationStep} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
-
-import {SummaryStatusTexts} from './SummaryStatusTexts';
 
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,
@@ -18,18 +19,81 @@ export const SummaryGenerationProgress = ({
 }) => {
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [hasCompletedAllSteps, setHasCompletedAllSteps] = useState(false);
+  const [shouldShowGeneratedRow, setShouldShowGeneratedRow] = useState(false);
+
+  const filteredSteps = useMemo(() => {
+    return currentChat
+      ? SUMMARY_GENERATION_STEPS
+      : [...SUMMARY_GENERATION_STEPS.slice(8, SUMMARY_GENERATION_STEPS.length)];
+  }, [currentChat]);
+
+  const changeStep = useCallback(() => {
+    if (currentStepIndex === filteredSteps.length - 1) {
+      setHasCompletedAllSteps(true);
+      return;
+    }
+    setCurrentStepIndex(prev => prev + 1);
+  }, [currentStepIndex, filteredSteps]);
+
+  useEffect(() => {
+    const targetIndex = filteredSteps.findIndex(
+      step => step === SummaryGenerationStep.SEGREGATING_UTTERANCES,
+    );
+    if (currentStepIndex === targetIndex && !shouldShowGeneratedRow)
+      setShouldShowGeneratedRow(true);
+  }, [currentStepIndex, filteredSteps, shouldShowGeneratedRow]);
+
+  useEffect(() => {
+    if (!shouldShowGeneratedRow) return;
+    const id = setTimeout(() => setShouldShowGeneratedRow(false), 5000);
+
+    return () => clearTimeout(id);
+  }, [shouldShowGeneratedRow]);
+
+  useEffect(() => {
+    const stepInterval = setInterval(() => {
+      if (!hasCompletedAllSteps) changeStep();
+    }, 3000);
+
+    return () => {
+      clearInterval(stepInterval);
+    };
+  }, [changeStep, hasCompletedAllSteps]);
+
+  const renderNotificationInfo = () => {
+    if (isSummaryGenerated) return null;
+
+    if (isPollingComplete) {
+      return (
+        <View style={styles.infoRow}>
+          <LeftArrowIcon
+            color={colors.darkGray}
+            width={moderateScale(16)}
+            height={moderateScale(16)}
+            style={styles.arrowIcon}
+          />
+          <Text style={styles.infoText}>
+            {t('CallSummaryProgress.pullDown')}
+          </Text>
+        </View>
+      );
+    } else if (shouldShowGeneratedRow) {
+      return (
+        <View style={styles.generatedRow}>
+          <ShieldWithTickIcon />
+          <Text style={styles.generatedText}>
+            {t('CallSummaryProgress.transcriptionGeneratedAudioDeleted')}
+          </Text>
+        </View>
+      );
+    }
+  };
 
   return (
     <View style={styles.container}>
-      {!isSummaryGenerated && isPollingComplete && (
-        <View style={styles.infoRow}>
-          <InfoIcon width={moderateScale(16)} height={moderateScale(16)} />
-          <Text style={styles.infoText}>
-            {t('CallSummaryProgress.reloadPage')}
-          </Text>
-        </View>
-      )}
-
+      {renderNotificationInfo()}
       {isSummaryGenerated ? (
         <Image source={summaryGenerated} style={styles.marginV40} />
       ) : (
@@ -44,13 +108,18 @@ export const SummaryGenerationProgress = ({
         </View>
       )}
 
-      {!isSummaryGenerated && <SummaryStatusTexts />}
+      {!isSummaryGenerated ? (
+        <View style={styles.statusContainer}>
+          <ShinyText style={styles.title}>
+            {filteredSteps[currentStepIndex]}...
+          </ShinyText>
+        </View>
+      ) : (
+        <Text style={styles.title}>
+          {t('CallSummaryProgress.generatedSessionSummary')}
+        </Text>
+      )}
 
-      <Text style={styles.title}>
-        {isSummaryGenerated
-          ? t('CallSummaryProgress.generatedSessionSummary')
-          : t('CallSummaryProgress.generatingSessionSummary')}
-      </Text>
       <Text style={styles.subtitle}>
         {isSummaryGenerated
           ? t(`CallSummaryProgress.generatedSubtitle`)
@@ -77,7 +146,13 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   infoRow: {
+    position: 'absolute',
+    zIndex: 2,
+    top: '18@ms',
+    left: '16@ms',
+    right: '16@ms',
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   infoText: {
@@ -126,4 +201,34 @@ const styles = ScaledSheet.create({
     marginBottom: '16@ms',
   },
   marginV40: {marginVertical: 40},
+  statusContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: '8@ms',
+    marginBottom: '24@ms',
+  },
+  generatedRow: {
+    position: 'absolute',
+    zIndex: 2,
+    top: '2@ms',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: '16@ms',
+    paddingVertical: '4@vs',
+    backgroundColor: colors.iceBlue,
+    paddingHorizontal: '8@ms',
+    borderWidth: 0.4,
+    borderColor: colors.azureBlue,
+    borderRadius: '16@s',
+  },
+  generatedText: {
+    marginLeft: '8@ms',
+    color: colors.azureBlue,
+    fontSize: '14@ms',
+    ...fontFamily.ROBOTO.REGULAR,
+  },
+  arrowIcon: {
+    transform: [{rotate: '270deg'}],
+  },
 });
