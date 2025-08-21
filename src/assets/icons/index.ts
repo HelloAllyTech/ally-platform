@@ -24,6 +24,7 @@ import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
 import DoubleRightArrowIcon from './doubleRightArrow.svg';
+import DownArrowIcon from './downArrow.svg';
 import DrawerMenuIcon from './drawerMenu.svg';
 import EditIcon from './edit.svg';
 import EditSquareIcon from './editSquare.svg';
@@ -156,4 +157,5 @@ export {
   ResumeIcon,
   BlueWarningIcon,
   ShieldWithTickIcon,
+  DownArrowIcon,
 };
