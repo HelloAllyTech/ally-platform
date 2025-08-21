@@ -1,22 +1,18 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {Animated, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ShieldWithTickIcon} from '@/assets';
-import {
-  SUMMARY_GENERATION_STEPS,
-  SummaryGenerationStep,
-} from '@/constants/summary';
+import {ShinyText} from '@/components';
+import {SUMMARY_GENERATION_STEPS, SummaryGenerationStep} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
 
 export const SummaryStatusTexts: React.FC = () => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [blinkCount, setBlinkCount] = useState(0);
   const [hasCompletedAllSteps, setHasCompletedAllSteps] = useState(false);
 
-  const fadeAnim = useMemo(() => new Animated.Value(1), []);
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const filteredSteps = useMemo(() => {
@@ -25,49 +21,25 @@ export const SummaryStatusTexts: React.FC = () => {
       : [...SUMMARY_GENERATION_STEPS.slice(8, SUMMARY_GENERATION_STEPS.length)];
   }, [currentChat]);
 
-  const animateBlink = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim]);
-
   const changeStep = useCallback(() => {
     if (currentStepIndex === filteredSteps.length - 1) {
       setHasCompletedAllSteps(true);
       return;
     }
     setCurrentStepIndex(prev => prev + 1);
-    setBlinkCount(0);
   }, [currentStepIndex, filteredSteps]);
 
   useEffect(() => {
-    const blinkInterval = setInterval(() => {
-      animateBlink();
-      if (!hasCompletedAllSteps) {
-        setBlinkCount(prev => prev + 1);
-      }
-    }, 1000);
-
     const stepInterval = setInterval(() => {
-      if (!hasCompletedAllSteps && blinkCount >= 1) {
+      if (!hasCompletedAllSteps) {
         changeStep();
       }
-    }, 1000);
+    }, 3000);
 
     return () => {
-      clearInterval(blinkInterval);
       clearInterval(stepInterval);
     };
-  }, [blinkCount, animateBlink, changeStep, hasCompletedAllSteps]);
+  }, [changeStep, hasCompletedAllSteps]);
 
   const shouldShowGeneratedRow =
     currentStepIndex >=
@@ -77,9 +49,9 @@ export const SummaryStatusTexts: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Animated.Text style={[styles.text, {opacity: fadeAnim}]}>
+      <ShinyText style={styles.text}>
         {filteredSteps[currentStepIndex]}...
-      </Animated.Text>
+      </ShinyText>
 
       {shouldShowGeneratedRow && (
         <View style={styles.generatedRow}>
@@ -103,7 +75,7 @@ const styles = ScaledSheet.create({
   text: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '16@ms',
-    color: colors.darkSlate,
+    color: colors.black,
     textAlign: 'center',
   },
   generatedRow: {

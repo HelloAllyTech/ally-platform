@@ -97,10 +97,9 @@ const styles = ScaledSheet.create({
     height: '100%',
   },
   title: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.REPLAY_PRO.BOLD,
     fontSize: '20@ms',
     color: colors.darkSlate,
-    fontWeight: '700',
     marginBottom: '12@ms',
     textAlign: 'center',
   },

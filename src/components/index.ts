@@ -28,3 +28,4 @@ export type {
   NavigationProps,
 } from './Carousel';
 export {PrivacyTooltip} from './PrivacyTooltip';
+export {ShinyText} from './ShinyText';
