@@ -138,7 +138,7 @@ export const CallSummaryScreen: React.FC<
           />
         )}
         <PrimaryButton
-          label={t('CallLogs.viewCallLogs')}
+          label={t('CallLogs.viewSessionLogs')}
           onPress={onViewCallLogs}
           customContainerStyle={styles.viewCallLogsButton}
           customTextStyle={styles.viewCallLogsButtonText}

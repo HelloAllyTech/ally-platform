@@ -57,10 +57,17 @@ const NavigationContent = ({
       }
     },
     onNoActiveChatFound: () => {
-      navigationRef.reset({
-        index: 0,
-        routes: [{name: SCREEN_NAMES.CALL_LOG}],
-      });
+      const currentRoute = navigationRef?.getCurrentRoute()?.name as RouteNames;
+      const shouldPreserveScreen =
+        currentRoute === SCREEN_NAMES.CALL_SUMMARY ||
+        currentRoute === SCREEN_NAMES.BREATHING;
+
+      if (!shouldPreserveScreen) {
+        navigationRef.reset({
+          index: 0,
+          routes: [{name: SCREEN_NAMES.CALL_LOG}],
+        });
+      }
     },
     getCurrentRoute: () => navigationRef?.getCurrentRoute()?.name,
   });
