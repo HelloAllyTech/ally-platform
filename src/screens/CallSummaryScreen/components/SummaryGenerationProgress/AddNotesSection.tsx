@@ -76,6 +76,7 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
     marginBottom: '16@ms',
     paddingHorizontal: '8@ms',
+    paddingBottom: '200@ms',
   },
   header: {
     paddingVertical: '12@ms',

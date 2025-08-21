@@ -121,15 +121,18 @@ export const CallSummaryScreen: React.FC<
     });
   };
 
+  const onPressViewSummary = () => {
+    handleRefresh();
+    setCanShowSummary(true);
+  };
+
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
         {isSummaryAvailable && (
           <PrimaryButton
             label={t('CallSummary.viewSummary')}
-            onPress={() => {
-              setCanShowSummary(true);
-            }}
+            onPress={onPressViewSummary}
             customContainerStyle={styles.viewSummaryButton}
             customTextStyle={styles.viewSummaryButtonText}
           />
@@ -167,9 +170,10 @@ export const CallSummaryScreen: React.FC<
         <>
           <KeyboardAwareScrollView
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollViewContent}
             nestedScrollEnabled
-            extraScrollHeight={200}
+            extraScrollHeight={100}
+            contentOffset={{x: 0, y: 100}}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
             enableOnAndroid
             refreshControl={
@@ -182,15 +186,13 @@ export const CallSummaryScreen: React.FC<
               isSummaryGenerated={isSummaryAvailable}
               isPollingComplete={isPollingComplete}
             />
-            <View>
-              <AddNotesSection
-                savedNotes={summaryData?.details?.callInfo?.notes || ''}
-                onNoteChange={handleNoteChange}
-                onPressInfo={() => {
-                  setShowInfoModal(true);
-                }}
-              />
-            </View>
+            <AddNotesSection
+              savedNotes={summaryData?.details?.callInfo?.notes || ''}
+              onNoteChange={handleNoteChange}
+              onPressInfo={() => {
+                setShowInfoModal(true);
+              }}
+            />
           </KeyboardAwareScrollView>
           {renderSummaryButtons()}
         </>
