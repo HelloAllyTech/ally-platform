@@ -6,6 +6,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
 import {
+  isIOS,
   isValidEmail,
   PRIVACY_POLICY_URL,
   TERMS_AND_CONDITIONS_URL,
@@ -72,6 +73,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
         enableOnAndroid
+        enableAutomaticScroll={!isIOS}
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>

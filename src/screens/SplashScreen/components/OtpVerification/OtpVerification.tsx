@@ -3,11 +3,12 @@ import {Alert, Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
+import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services/authApi';
+import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
-import {getErrorMessage} from '@/utils/error';
+import {getErrorMessage} from '@/utils';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
 import {styles} from './styles';
@@ -98,6 +99,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         enableOnAndroid
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}
+        enableAutomaticScroll={!isIOS}
         keyboardShouldPersistTaps="handled">
         <View style={styles.containerWrapper}>
           <Text style={styles.headerText}>

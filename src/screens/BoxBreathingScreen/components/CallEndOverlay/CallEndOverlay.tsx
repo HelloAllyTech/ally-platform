@@ -106,7 +106,7 @@ const styles = ScaledSheet.create({
     fontStyle: isIOS ? 'italic' : 'normal',
     backgroundColor: colors.brightBlue,
     paddingHorizontal: '12@s',
-    paddingVertical: '4@vs',
+    paddingVertical: '2@vs',
     borderRadius: '40@s',
     overflow: 'hidden',
     includeFontPadding: false,
