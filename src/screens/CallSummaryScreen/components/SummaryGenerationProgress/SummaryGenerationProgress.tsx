@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {Image, Text, View} from 'react-native';
+import {ActivityIndicator, Image, Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
@@ -63,7 +63,15 @@ export const SummaryGenerationProgress = ({
   }, [changeStep, hasCompletedAllSteps]);
 
   const renderNotificationInfo = () => {
-    if (isSummaryGenerated) return null;
+    if (isSummaryGenerated)
+      return (
+        <View style={styles.infoRow}>
+          <ActivityIndicator size="small" color={colors.azureBlue} />
+          <Text style={[styles.infoText, styles.settingUpText]}>
+            {t('CallSummaryProgress.settingUpSummaryScreen')}
+          </Text>
+        </View>
+      );
 
     if (isPollingComplete) {
       return (
@@ -230,5 +238,9 @@ const styles = ScaledSheet.create({
   },
   arrowIcon: {
     transform: [{rotate: '270deg'}],
+  },
+  settingUpText: {
+    color: colors.black,
+    opacity: 1,
   },
 });

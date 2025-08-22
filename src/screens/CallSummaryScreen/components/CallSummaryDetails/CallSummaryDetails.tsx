@@ -22,13 +22,13 @@ import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
 interface Props {
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
-  showSubmitButton: boolean;
+  showSaveButton: boolean;
 }
 
 const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
-  showSubmitButton,
+  showSaveButton,
 }) => {
   const {t} = useTranslate();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
@@ -156,10 +156,10 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         </Text>
       </View>
       <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
-      {showSubmitButton && (
+      {showSaveButton && (
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            label={t('submit')}
+            label={t('save')}
             onPress={onSubmitButtonPress}
             isLoading={isUpdating}
             customContainerStyle={styles.submitButton}

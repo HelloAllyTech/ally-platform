@@ -33,7 +33,7 @@
     },
     "noCallLogs": "No call records found",
     "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
-    "viewSessionLogs": "View Session logs",
+    "willCheckLater": "I’ll check later",
     "oops": "Oops!",
     "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
     "learnMore": "Learn more",
@@ -108,6 +108,7 @@
     "generatingSubtitle2": "This process may take some time. Please feel free to check back later.",
     "generatedSessionSummary": "Summary is generated",
     "generatedSubtitle": "The summary has been generated successfully. You can review the session now.",
+    "settingUpSummaryScreen": "Setting up your summary screen",
     "pullDown": "Pull down to see if its ready",
     "transcriptionGeneratedAudioDeleted": "Transcription generated & audio deleted",
     "estimatedTime": "Estimated time: ~10 minutes"
@@ -234,6 +235,7 @@
     "logs": "Logs"
   },
   "submit": "Submit",
+  "save": "Save",
   "ResourceArticleCard": {
     "viewMore": "View more"
   },
