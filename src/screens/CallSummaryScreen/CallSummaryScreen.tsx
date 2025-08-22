@@ -1,7 +1,7 @@
-import React, {useRef} from 'react';
-import {RefreshControl, ScrollView, StatusBar, View} from 'react-native';
+import React from 'react';
+import {RefreshControl, StatusBar, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PrimaryButton} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
@@ -17,7 +17,6 @@ import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
-import {colors} from '@/theme';
 
 import {
   AddNotesSection,
@@ -26,7 +25,6 @@ import {
   Header,
   SummaryGenerationProgress,
   SummaryModals,
-  SummaryView,
 } from './components';
 import {styles} from './styles';
 
@@ -34,8 +32,6 @@ export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
 > = ({route}) => {
   const {t} = useTranslate();
-  const insets = useSafeAreaInsets();
-  const scrollViewRef = useRef<ScrollView>(null);
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callInfo = useAppSelector(selectCallInfo);
   const {hasChanges} = useCallSummaryForm();
@@ -49,7 +45,6 @@ export const CallSummaryScreen: React.FC<
   const {
     isLoading,
     summaryData,
-    isFullyExpanded,
     showSummary,
     setShowSummary,
     showInfoModal,
@@ -57,12 +52,9 @@ export const CallSummaryScreen: React.FC<
     canShowSummary,
     activeModal,
     setActiveModal,
-    showAnimation,
     isSummaryAvailable,
-    forceRemountKey,
     refreshing,
     isPollingComplete,
-    handleScroll,
     handleRefresh,
     handleNoteChange,
   } = useSummaryState(chatId, callId);
@@ -123,19 +115,13 @@ export const CallSummaryScreen: React.FC<
 
   const renderContent = () => {
     if (showSummary && isSummaryAvailable && canShowSummary) {
+      const shouldShowSaveButton = !callId || hasChanges;
       return (
-        <SummaryView
-          showAnimation={showAnimation}
-          forceRemountKey={forceRemountKey}
-          insets={insets}
-          onScroll={handleScroll}
-          scrollViewRef={scrollViewRef}>
-          <CallSummaryDetails
-            isLoading={isLoading}
-            onSubmit={onUpdateSummary}
-            showSaveButton={callId ? hasChanges : true}
-          />
-        </SummaryView>
+        <CallSummaryDetails
+          isLoading={isLoading}
+          onSubmit={onUpdateSummary}
+          showSaveButton={shouldShowSaveButton}
+        />
       );
     }
 
@@ -176,12 +162,8 @@ export const CallSummaryScreen: React.FC<
   };
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {backgroundColor: !showAnimation ? colors.white : colors.black},
-      ]}>
-      <StatusBar barStyle={!showAnimation ? 'dark-content' : 'light-content'} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar />
 
       <SummaryModals
         activeModal={activeModal}
@@ -195,7 +177,6 @@ export const CallSummaryScreen: React.FC<
         handleExport={handleExport}
         isSummaryDropdownVisible={isSummaryDropdownVisible}
         hideHeaderDropdown={hideHeaderDropdown}
-        isFullyExpanded={isFullyExpanded}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
         showInfoModal={showInfoModal}
@@ -204,11 +185,9 @@ export const CallSummaryScreen: React.FC<
       />
 
       <Header
-        isFullyExpanded={isFullyExpanded}
         onBackPress={handleGoBack}
         onMenuPress={showMenu}
         summaryName={summaryName}
-        showAnimation={showAnimation}
         showSummary={showSummary}
         onHeaderPress={onHeaderPress}
         showTranscript={showTranscript}

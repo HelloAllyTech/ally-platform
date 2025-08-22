@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -11,15 +11,38 @@ import {colors, fontFamily} from '@/theme';
 interface SummaryDropdownProps {
   visible: boolean;
   onClose: () => void;
-  isFullyExpanded?: boolean;
   showSummary: boolean;
   setShowSummary: (show: boolean) => void;
 }
 
+interface MenuItemProps {
+  icon: React.ReactNode;
+  text: string;
+  isSelected: boolean;
+  onPress: () => void;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({
+  icon,
+  text,
+  isSelected,
+  onPress,
+}) => (
+  <TouchableOpacity
+    style={styles.menuItem}
+    onPress={onPress}
+    activeOpacity={0.8}>
+    <View style={styles.textContainer}>
+      {icon}
+      <Text style={styles.menuText}>{text}</Text>
+    </View>
+    {isSelected && <TickIcon width={24} height={24} />}
+  </TouchableOpacity>
+);
+
 export const SummaryDropdown: React.FC<SummaryDropdownProps> = ({
   visible,
   onClose,
-  isFullyExpanded = true,
   showSummary,
   setShowSummary,
 }) => {
@@ -27,93 +50,85 @@ export const SummaryDropdown: React.FC<SummaryDropdownProps> = ({
   const {t} = useTranslate();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const onSummary = () => {
+  const handleSummaryPress = () => {
     setShowSummary(true);
     onClose();
   };
 
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible, fadeAnim]);
-
-  const onTranscript = () => {
+  const handleTranscriptPress = () => {
     setShowSummary(false);
     onClose();
   };
+
+  useEffect(() => {
+    const animation = Animated.timing(fadeAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    });
+    animation.start();
+
+    return () => animation.stop();
+  }, [visible, fadeAnim]);
+
+  const menuContainerStyle = useMemo(() => {
+    const menuWidth = Math.min(250, SCREEN_WIDTH * 0.7);
+    const translateX = -Math.min(SCREEN_WIDTH * 0.32, 125);
+    const marginTop = insets.top + 70;
+
+    return [
+      styles.menuContainer,
+      {
+        marginTop,
+        width: menuWidth,
+        opacity: fadeAnim,
+        transform: [
+          {
+            translateY: fadeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-10, 0],
+            }),
+          },
+          {translateX},
+        ],
+      },
+      !isIOS && styles.androidShadow,
+    ];
+  }, [fadeAnim, insets.top]);
+
+  const overlayStyle = useMemo(
+    () => [styles.overlay, {opacity: fadeAnim}],
+    [fadeAnim],
+  );
 
   if (!visible) return null;
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.overlay,
-          {
-            opacity: fadeAnim,
-          },
-        ]}>
+      <Animated.View style={overlayStyle}>
         <TouchableOpacity
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={onClose}
         />
       </Animated.View>
-      <Animated.View
-        style={[
-          styles.menuContainer,
-          {
-            marginTop: insets.top + (isFullyExpanded ? 55 : 70),
-            width: Math.min(250, SCREEN_WIDTH * 0.7),
-            opacity: fadeAnim,
-            transform: [
-              {
-                translateY: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-10, 0],
-                }),
-              },
-              {translateX: -Math.min(SCREEN_WIDTH * 0.32, 125)},
-            ],
-          },
-          !isIOS && styles.androidShadow,
-        ]}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={onSummary}
-          activeOpacity={0.8}>
-          <View style={styles.textContainer}>
-            <CallIcon width={24} height={24} />
-            <Text style={styles.menuText}>
-              {t('CallSummary.header.callSummary')}
-            </Text>
-          </View>
-          {showSummary && <TickIcon width={24} height={24} />}
-        </TouchableOpacity>
+
+      <Animated.View style={menuContainerStyle}>
+        <MenuItem
+          icon={<CallIcon width={24} height={24} />}
+          text={t('CallSummary.header.callSummary')}
+          isSelected={showSummary}
+          onPress={handleSummaryPress}
+        />
+
         <View style={styles.menuDivider} />
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={onTranscript}
-          activeOpacity={0.8}>
-          <View style={styles.textContainer}>
-            <TranscriptIcon width={24} height={24} />
-            <Text style={styles.menuText}>
-              {t('CallSummary.header.callTranscript')}
-            </Text>
-          </View>
-          {!showSummary && <TickIcon width={24} height={24} />}
-        </TouchableOpacity>
+
+        <MenuItem
+          icon={<TranscriptIcon width={24} height={24} />}
+          text={t('CallSummary.header.callTranscript')}
+          isSelected={!showSummary}
+          onPress={handleTranscriptPress}
+        />
       </Animated.View>
     </View>
   );

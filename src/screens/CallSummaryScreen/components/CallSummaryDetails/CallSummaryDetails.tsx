@@ -141,21 +141,24 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   }
 
   return (
-    <KeyboardAwareScrollView
-      style={styles.container}
-      nestedScrollEnabled
-      extraScrollHeight={150}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid>
-      <View style={styles.alertContainer}>
-        <View style={styles.alertIconContainer}>
-          <GoldenShieldIcon />
+    <>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        nestedScrollEnabled
+        extraScrollHeight={150}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid>
+        <View style={styles.alertContainer}>
+          <View style={styles.alertIconContainer}>
+            <GoldenShieldIcon />
+          </View>
+          <Text style={styles.alertText}>
+            {t('CallSummary.aiGeneratedWarning')}
+          </Text>
         </View>
-        <Text style={styles.alertText}>
-          {t('CallSummary.aiGeneratedWarning')}
-        </Text>
-      </View>
-      <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
+        <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
+      </KeyboardAwareScrollView>
       {showSaveButton && (
         <View style={styles.buttonContainer}>
           <PrimaryButton
@@ -167,7 +170,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
           />
         </View>
       )}
-    </KeyboardAwareScrollView>
+    </>
   );
 };
 
@@ -176,8 +179,10 @@ export const CallSummaryDetails = memo(CallSummaryDetailsComponent);
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingBottom: '40@ms',
-    paddingTop: '85@ms',
+    backgroundColor: colors.white,
+  },
+  contentContainer: {
+    paddingBottom: '70@ms',
   },
   card: {
     paddingHorizontal: '16@s',
@@ -189,8 +194,15 @@ const styles = ScaledSheet.create({
     paddingLeft: '30@ms',
   },
   buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     alignItems: 'center',
     paddingTop: '20@ms',
+    paddingBottom: '20@ms',
+    backgroundColor: colors.white,
     borderTopWidth: '1@ms',
     borderColor: colors.lightGray5,
   },
@@ -205,7 +217,7 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '10@s',
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: '20@ms',
+    marginTop: '10@ms',
     marginHorizontal: '10@s',
     alignSelf: 'center',
     backgroundColor: colors.floralWhite,

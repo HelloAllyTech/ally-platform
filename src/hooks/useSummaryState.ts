@@ -19,15 +19,12 @@ export const useSummaryState = (
     useLazyGetCallSummaryQuery();
   const [updateNotes] = useUpdateNotesMutation();
 
-  const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [showAnimation, setShowAnimation] = useState(!chatId);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
-  const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
-  const [forceRemountKey, setForceRemountKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isPollingComplete, setIsPollingComplete] = useState(false);
 
@@ -81,24 +78,6 @@ export const useSummaryState = (
     };
   }, [dispatch]);
 
-  useEffect(() => {
-    if (hasCollapsedBeenShown && showAnimation) {
-      setShowAnimation(false);
-      setForceRemountKey(prev => prev + 1);
-    }
-  }, [hasCollapsedBeenShown, showAnimation]);
-
-  const handleScroll = useCallback(
-    (isExpanded: boolean) => {
-      setIsFullyExpanded(isExpanded);
-      if (showAnimation && !isExpanded && !hasCollapsedBeenShown) {
-        setHasCollapsedBeenShown(true);
-      }
-      return !isExpanded;
-    },
-    [showAnimation, hasCollapsedBeenShown],
-  );
-
   const handleRefresh = useCallback(async () => {
     if (!chatId) return;
     setRefreshing(true);
@@ -125,7 +104,6 @@ export const useSummaryState = (
   return {
     isLoading,
     summaryData,
-    isFullyExpanded,
     showSummary,
     setShowSummary,
     showInfoModal,
@@ -134,12 +112,11 @@ export const useSummaryState = (
     setCanShowSummary,
     activeModal,
     setActiveModal,
-    showAnimation,
+    showScrollToBottom,
+    setShowScrollToBottom,
     isSummaryAvailable,
-    forceRemountKey,
     refreshing,
     isPollingComplete,
-    handleScroll,
     handleRefresh,
     handleNoteChange,
   };
