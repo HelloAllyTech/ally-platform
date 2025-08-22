@@ -1,15 +1,8 @@
 import React, {useRef} from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {RefreshControl, ScrollView, StatusBar, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {
@@ -64,7 +57,6 @@ export const CallSummaryScreen: React.FC<
     canShowSummary,
     activeModal,
     setActiveModal,
-    showScrollToBottom,
     showAnimation,
     isSummaryAvailable,
     forceRemountKey,
@@ -101,10 +93,6 @@ export const CallSummaryScreen: React.FC<
     handleGoBack();
     return true;
   });
-
-  const scrollToBottom = () => {
-    scrollViewRef.current?.scrollToEnd({animated: true});
-  };
 
   const handleBlur = () => {
     if (handleSummaryNameChange) {
@@ -145,7 +133,7 @@ export const CallSummaryScreen: React.FC<
           <CallSummaryDetails
             isLoading={isLoading}
             onSubmit={onUpdateSummary}
-            showSubmitButton={callId ? hasChanges : true}
+            showSaveButton={callId ? hasChanges : true}
           />
         </SummaryView>
       );
@@ -229,14 +217,6 @@ export const CallSummaryScreen: React.FC<
       {renderContent()}
 
       {!showSummary && <CallTranscript chatId={chatId || 0} />}
-
-      {isSummaryAvailable && showScrollToBottom && showSummary && (
-        <TouchableOpacity
-          style={styles.scrollToBottomButton}
-          onPress={scrollToBottom}>
-          <LeftArrowIcon width={40} height={40} style={styles.downArrow} />
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   );
 };
