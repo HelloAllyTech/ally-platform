@@ -68,6 +68,14 @@ export const useSummaryState = (
     }
   }, [summaryData]);
 
+  // After the summary becomes available, keep showing loader for 3 seconds,
+  // then reveal the summary content automatically.
+  useEffect(() => {
+    if (!isSummaryAvailable || canShowSummary) return;
+    const id = setTimeout(() => setCanShowSummary(true), 3000);
+    return () => clearTimeout(id);
+  }, [isSummaryAvailable, canShowSummary]);
+
   useEffect(() => {
     return () => {
       dispatch(clearSummaryStates());
