@@ -19,7 +19,6 @@ interface SummaryModalsProps {
   handleExport: () => void;
   isSummaryDropdownVisible: boolean;
   hideHeaderDropdown: () => void;
-  isFullyExpanded: boolean;
   showSummary: boolean;
   setShowSummary: (show: boolean) => void;
   showInfoModal: boolean;
@@ -39,7 +38,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   handleExport,
   isSummaryDropdownVisible,
   hideHeaderDropdown,
-  isFullyExpanded,
   showSummary,
   setShowSummary,
   showInfoModal,
@@ -60,7 +58,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
       <SummaryDropdown
         visible={isSummaryDropdownVisible}
         onClose={hideHeaderDropdown}
-        isFullyExpanded={isFullyExpanded}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
       />

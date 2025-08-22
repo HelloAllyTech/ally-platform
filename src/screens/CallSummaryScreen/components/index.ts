@@ -15,4 +15,3 @@ export {
   SummaryGenerationProgress,
 } from './SummaryGenerationProgress';
 export {SummaryModals} from './SummaryModals';
-export {SummaryView} from './SummaryView';
