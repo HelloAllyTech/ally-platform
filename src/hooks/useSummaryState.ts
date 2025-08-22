@@ -24,7 +24,6 @@ export const useSummaryState = (
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [showAnimation, setShowAnimation] = useState(!chatId);
   const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
   const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
@@ -135,8 +134,6 @@ export const useSummaryState = (
     setCanShowSummary,
     activeModal,
     setActiveModal,
-    showScrollToBottom,
-    setShowScrollToBottom,
     showAnimation,
     isSummaryAvailable,
     forceRemountKey,
