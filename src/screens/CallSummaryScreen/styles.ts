@@ -21,35 +21,11 @@ export const styles = ScaledSheet.create({
     left: 0,
     right: 0,
   },
-  scrollToBottomButton: {
-    position: 'absolute',
-    bottom: '60@vs',
-    left: '50%',
-    // To take into account the width of the arrow button
-    marginLeft: '-20@s',
-    width: '40@s',
-    height: '40@s',
-    borderRadius: '20@s',
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
   contentContainer: {
     flex: 1,
   },
   paddingTop: {
     paddingTop: '80@ms',
-  },
-  downArrow: {
-    transform: [{rotate: '270deg'}],
   },
   height100: {
     height: '100%',

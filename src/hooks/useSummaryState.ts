@@ -24,7 +24,6 @@ export const useSummaryState = (
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [showAnimation, setShowAnimation] = useState(!chatId);
   const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
   const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
@@ -67,6 +66,14 @@ export const useSummaryState = (
       setIsSummaryAvailable(true);
     }
   }, [summaryData]);
+
+  // After the summary becomes available, keep showing loader for 3 seconds,
+  // then reveal the summary content automatically.
+  useEffect(() => {
+    if (!isSummaryAvailable || canShowSummary) return;
+    const id = setTimeout(() => setCanShowSummary(true), 3000);
+    return () => clearTimeout(id);
+  }, [isSummaryAvailable, canShowSummary]);
 
   useEffect(() => {
     return () => {
@@ -127,8 +134,6 @@ export const useSummaryState = (
     setCanShowSummary,
     activeModal,
     setActiveModal,
-    showScrollToBottom,
-    setShowScrollToBottom,
     showAnimation,
     isSummaryAvailable,
     forceRemountKey,
