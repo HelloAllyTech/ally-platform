@@ -2,7 +2,9 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {HexagonCloseIcon} from '@/assets';
 import {ChatSummaryStatus, SUMMARY_STATUS_CONFIG} from '@/constants';
+import {useTranslate} from '@/hooks';
 import {fontFamily} from '@/theme';
 
 interface StatusBadgeProps {
@@ -10,6 +12,16 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({status}) => {
+  const {t} = useTranslate();
+
+  if (status === ChatSummaryStatus.NO_AUDIO) {
+    return (
+      <View style={styles.statusContainer}>
+        <HexagonCloseIcon />
+        <Text style={styles.statusText}>{t('CallLogs.noAudioDetected')}</Text>
+      </View>
+    );
+  }
   const config = SUMMARY_STATUS_CONFIG[status];
 
   return (

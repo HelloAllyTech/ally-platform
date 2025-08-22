@@ -37,6 +37,7 @@ import GoldenShieldIcon from './goldenShield.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
+import HexagonCloseIcon from './hexagonClose.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import LeftArrow from './leftArrow.svg';
@@ -158,4 +159,5 @@ export {
   BlueWarningIcon,
   ShieldWithTickIcon,
   DownArrowIcon,
+  HexagonCloseIcon,
 };

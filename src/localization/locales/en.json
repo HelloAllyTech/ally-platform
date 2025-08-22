@@ -37,7 +37,8 @@
     "oops": "Oops!",
     "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
     "learnMore": "Learn more",
-    "duration": "Duration"
+    "duration": "Duration",
+    "noAudioDetected": "No audio detected"
   },
   "Logout": {
     "logout": "Logout",

@@ -24,10 +24,11 @@ export enum ChatSummaryStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
+  NO_AUDIO = 'NO_AUDIO',
 }
 
 export const SUMMARY_STATUS_CONFIG: Record<
-  ChatSummaryStatus,
+  Exclude<ChatSummaryStatus, ChatSummaryStatus.NO_AUDIO>,
   {
     backgroundColor: string;
     dotColor: string;
