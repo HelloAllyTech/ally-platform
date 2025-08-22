@@ -62,7 +62,6 @@ export const CallSummaryScreen: React.FC<
     showInfoModal,
     setShowInfoModal,
     canShowSummary,
-    setCanShowSummary,
     activeModal,
     setActiveModal,
     showScrollToBottom,
@@ -121,24 +120,11 @@ export const CallSummaryScreen: React.FC<
     });
   };
 
-  const onPressViewSummary = () => {
-    handleRefresh();
-    setCanShowSummary(true);
-  };
-
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
-        {isSummaryAvailable && (
-          <PrimaryButton
-            label={t('CallSummary.viewSummary')}
-            onPress={onPressViewSummary}
-            customContainerStyle={styles.viewSummaryButton}
-            customTextStyle={styles.viewSummaryButtonText}
-          />
-        )}
         <PrimaryButton
-          label={t('CallLogs.viewSessionLogs')}
+          label={t('CallLogs.willCheckLater')}
           onPress={onViewCallLogs}
           customContainerStyle={styles.viewCallLogsButton}
           customTextStyle={styles.viewCallLogsButtonText}
