@@ -1,4 +1,3 @@
-export {AnimatedBlob} from './AnimatedBlob';
 export {AudioWaveform} from './AudioWaveform';
 export {AudioWaveformContainer} from './AudioWaveformContainer';
 export {CallEndConfirmationModal} from './CallEndConfirmationModal';
@@ -6,7 +5,6 @@ export {ControlButtonsSection} from './ControlButtonsSection';
 export {CustomMarkdown} from './CustomMarkdown';
 export {ListeningAnimation} from './ListeningAnimation';
 export {NudgeSection} from './NudgeSection';
-export {PlayPauseOverlay} from './PlayPauseOverlay';
 export {Search} from './Search';
 export {SkeletonLoader} from './SkeletonLoader';
 export {Timer} from './Timer';

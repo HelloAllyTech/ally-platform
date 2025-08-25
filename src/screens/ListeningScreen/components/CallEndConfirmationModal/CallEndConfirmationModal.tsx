@@ -1,7 +1,6 @@
-import {Image} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {endSession} from '@/assets';
+import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
@@ -37,9 +36,7 @@ export const CallEndConfirmationModal = ({
     actionButtonText = t('ListeningScreen.endCall');
   }
 
-  const illustration = (
-    <Image source={endSession} style={styles.illustration} />
-  );
+  const illustration = <EndSessionIcon />;
 
   return (
     <IllustratedModal

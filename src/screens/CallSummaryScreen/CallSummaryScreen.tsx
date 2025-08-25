@@ -47,8 +47,6 @@ export const CallSummaryScreen: React.FC<
     summaryData,
     showSummary,
     setShowSummary,
-    showInfoModal,
-    setShowInfoModal,
     canShowSummary,
     activeModal,
     setActiveModal,
@@ -149,9 +147,6 @@ export const CallSummaryScreen: React.FC<
             <AddNotesSection
               savedNotes={summaryData?.details?.callInfo?.notes || ''}
               onNoteChange={handleNoteChange}
-              onPressInfo={() => {
-                setShowInfoModal(true);
-              }}
             />
           </KeyboardAwareScrollView>
           {renderSummaryButtons()}
@@ -179,8 +174,6 @@ export const CallSummaryScreen: React.FC<
         hideHeaderDropdown={hideHeaderDropdown}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
-        showInfoModal={showInfoModal}
-        setShowInfoModal={setShowInfoModal}
         isSummaryAvailable={isSummaryAvailable}
       />
 

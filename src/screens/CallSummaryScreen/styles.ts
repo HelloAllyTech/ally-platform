@@ -6,7 +6,7 @@ import {colors, fontFamily} from '@/theme';
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
+    backgroundColor: colors.white,
   },
   scrollView: {
     flex: 1,
@@ -32,11 +32,11 @@ export const styles = ScaledSheet.create({
   },
   summaryButtonsContainer: {
     position: 'absolute',
-    bottom: '30@ms',
+    paddingBottom: '46@ms',
+    bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: '24@ms',
-    paddingBottom: '16@ms',
     flexDirection: 'column',
     gap: '10@ms',
     alignItems: 'center',

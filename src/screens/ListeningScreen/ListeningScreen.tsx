@@ -50,7 +50,6 @@ import {
   ControlButtonsSection,
   DismissableBanner,
   NudgeSection,
-  PlayPauseOverlay,
   Search,
   Timer,
 } from './components';
@@ -406,22 +405,6 @@ export const ListeningScreen = ({
     setIsPrivacyTooltipVisible(false);
   }, []);
 
-  const playPauseButton = useMemo(() => {
-    return (
-      <PlayPauseOverlay
-        isPlaying={!isCallPaused}
-        onPress={handlePlayPauseCallPress}
-        isFocusMode={isFocusMode}
-        isDisabled={isWebMicrophoneMode}
-      />
-    );
-  }, [
-    isCallPaused,
-    handlePlayPauseCallPress,
-    isFocusMode,
-    isWebMicrophoneMode,
-  ]);
-
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
@@ -529,7 +512,6 @@ export const ListeningScreen = ({
               isFocusMode
             />
           </View>
-          {playPauseButton}
           {isMicrophoneMode && !isWebMicrophoneMode && (
             <Text style={styles.microphoneModeNote}>
               {t('ListeningScreen.microphoneModeNote')}
@@ -539,7 +521,6 @@ export const ListeningScreen = ({
       ) : (
         <View style={styles.nonFocusModeLayout}>
           <View style={globalStyles.rowCenter}>
-            {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
               {renderTakingNotes()}
               <Timer startTime={startTime} />
