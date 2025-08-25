@@ -28,10 +28,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({status}) => {
     <View
       style={[
         styles.statusContainer,
-        {backgroundColor: config.backgroundColor},
+        {backgroundColor: config?.backgroundColor},
       ]}>
-      <View style={[styles.statusDot, {backgroundColor: config.dotColor}]} />
-      <Text style={styles.statusText}>{config.label}</Text>
+      <View style={[styles.statusDot, {backgroundColor: config?.dotColor}]} />
+      <Text style={styles.statusText}>{config?.label}</Text>
     </View>
   );
 };
