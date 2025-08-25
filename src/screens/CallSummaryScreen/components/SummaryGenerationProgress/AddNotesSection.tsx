@@ -1,21 +1,24 @@
 import {useEffect, useRef, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, InfoIcon, PageIcon} from '@/assets/icons';
+import {ArrowDown, InfoIcon, PageIcon} from '@/assets';
+import {PrivacyTooltip} from '@/components';
 import {colors, fontFamily} from '@/theme';
 
 export const AddNotesSection = ({
   savedNotes,
-  onPressInfo,
   onNoteChange,
 }: {
   savedNotes: string;
-  onPressInfo: () => void;
   onNoteChange: (text: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [note, setNote] = useState<string>();
+
+  const {t} = useTranslation();
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -30,6 +33,14 @@ export const AddNotesSection = ({
     setNote(text);
   };
 
+  const renderTooltip = () => {
+    return (
+      <View style={styles.tooltipContainer}>
+        <Text>{t('CallSummary.info.notesAutoSaveInfo')}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
@@ -41,12 +52,19 @@ export const AddNotesSection = ({
               style={[styles.chevron, isExpanded && styles.chevronExpanded]}
             />
             <PageIcon />
-            <Text style={styles.title}>Add notes (Optional)</Text>
+            <Text style={styles.title}>
+              {t('CallSummaryProgress.addNotes')}
+            </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={20} onPress={onPressInfo}>
-          <InfoIcon />
-        </TouchableOpacity>
+        <PrivacyTooltip
+          tooltipContent={renderTooltip()}
+          isVisible={showTooltip}
+          onClose={() => setShowTooltip(false)}>
+          <TouchableOpacity hitSlop={20} onPress={() => setShowTooltip(true)}>
+            <InfoIcon />
+          </TouchableOpacity>
+        </PrivacyTooltip>
       </View>
 
       {isExpanded && (
@@ -137,5 +155,10 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: '16@ms',
+  },
+  tooltipContainer: {
+    backgroundColor: colors.white,
+    minWidth: '280@ms',
+    minHeight: '50@ms',
   },
 });

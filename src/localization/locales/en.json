@@ -112,7 +112,8 @@
     "settingUpSummaryScreen": "Setting up your summary screen",
     "pullDown": "Pull down to see if its ready",
     "transcriptionGeneratedAudioDeleted": "Transcription generated & audio deleted",
-    "estimatedTime": "Estimated time: ~10 minutes"
+    "estimatedTime": "Estimated time: ~10 minutes",
+    "addNotes": "Add notes (Optional)"
   },
   "CallSummary": {
     "enterDetail": "Enter detail",

@@ -20,7 +20,6 @@ export const useSummaryState = (
   const [updateNotes] = useUpdateNotesMutation();
 
   const [showSummary, setShowSummary] = useState(true);
-  const [showInfoModal, setShowInfoModal] = useState(false);
   const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -106,8 +105,6 @@ export const useSummaryState = (
     summaryData,
     showSummary,
     setShowSummary,
-    showInfoModal,
-    setShowInfoModal,
     canShowSummary,
     setCanShowSummary,
     activeModal,

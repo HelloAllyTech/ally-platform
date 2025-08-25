@@ -2,7 +2,6 @@ const breathingBackground = require('./breathingBackground.png');
 const listenLive = require('./listenLive.png');
 const joinCall = require('./joinCall.png');
 const conversation = require('./conversation.png');
-const endSession = require('./endSession.png');
 const logOut = require('./logOut.png');
 const carousel1 = require('./carousel1.png');
 // TODO: Add images for carousel
@@ -16,7 +15,6 @@ export {
   listenLive,
   joinCall,
   conversation,
-  endSession,
   logOut,
   carousel1,
   carousel2,

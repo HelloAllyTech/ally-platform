@@ -43,7 +43,7 @@ export const styles = ScaledSheet.create({
     marginLeft: '10@s',
   },
   focusModeWaveformWrapper: {
-    marginVertical: '40@vs',
+    marginTop: '40@vs',
     width: '96%',
   },
   nonFocusModeWaveformWrapper: {
@@ -102,6 +102,7 @@ export const styles = ScaledSheet.create({
   tooltipContent: {
     borderRadius: 8,
     minWidth: 250,
+    minHeight: 120,
   },
   tooltipText: {
     color: colors.black,
