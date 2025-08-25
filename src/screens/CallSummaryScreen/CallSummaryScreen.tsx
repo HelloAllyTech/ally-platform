@@ -1,5 +1,11 @@
 import React from 'react';
-import {RefreshControl, StatusBar, View} from 'react-native';
+import {
+  ActivityIndicator,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
@@ -17,6 +23,7 @@ import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
+import {colors} from '@/theme';
 
 import {
   AddNotesSection,
@@ -44,6 +51,7 @@ export const CallSummaryScreen: React.FC<
 
   const {
     isLoading,
+    refreshing,
     summaryData,
     showSummary,
     setShowSummary,
@@ -51,8 +59,6 @@ export const CallSummaryScreen: React.FC<
     activeModal,
     setActiveModal,
     isSummaryAvailable,
-    refreshing,
-    isPollingComplete,
     handleRefresh,
     handleNoteChange,
     summaryStatus,
@@ -99,9 +105,25 @@ export const CallSummaryScreen: React.FC<
     });
   };
 
+  const showSummaryButtonLoader =
+    (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
+
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          style={[styles.marginB8, styles.seeIfReadyButton]}
+          disabled={showSummaryButtonLoader}>
+          {showSummaryButtonLoader && (
+            <ActivityIndicator color={colors.white} />
+          )}
+          <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
+            {isSummaryAvailable && !canShowSummary
+              ? t('CallSummaryProgress.settingUpSummaryScreen')
+              : t('CallLogs.seeIfItIsReady')}
+          </Text>
+        </TouchableOpacity>
         <PrimaryButton
           label={t('CallLogs.willCheckLater')}
           onPress={onViewCallLogs}
@@ -134,16 +156,9 @@ export const CallSummaryScreen: React.FC<
             contentOffset={{x: 0, y: 100}}
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
-            enableOnAndroid
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }>
+            enableOnAndroid>
             <SummaryGenerationProgress
               isSummaryGenerated={isSummaryAvailable}
-              isPollingComplete={isPollingComplete}
               summaryStatus={summaryStatus}
             />
             <AddNotesSection
