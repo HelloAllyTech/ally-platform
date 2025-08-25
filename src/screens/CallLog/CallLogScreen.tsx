@@ -14,7 +14,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {CHAT_TYPES, ChatSummaryStatus, SCREEN_NAMES} from '@/constants';
+import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -158,16 +158,12 @@ export const CallLogScreen: React.FC = () => {
    * @param index - Index of the item in the list
    */
   const renderItem = ({item, index}: {item: CallLog; index: number}) => {
-    const isDisabled =
-      item.summaryStatus === ChatSummaryStatus.NO_AUDIO ||
-      item.summaryStatus === ChatSummaryStatus.FAILED;
     return (
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
         onToggle={() => handleToggle(index)}
-        onItemPress={() => !isDisabled && handleItemPress(item)}
-        disabled={isDisabled}
+        onItemPress={() => handleItemPress(item)}
       />
     );
   };

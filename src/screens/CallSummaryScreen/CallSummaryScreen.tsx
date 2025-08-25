@@ -123,17 +123,19 @@ export const CallSummaryScreen: React.FC<
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
-        <TouchableOpacity
-          onPress={handleRefresh}
-          style={[styles.marginB8, styles.seeIfReadyButton]}
-          disabled={showSummaryButtonLoader}>
-          {showSummaryButtonLoader && (
-            <ActivityIndicator color={colors.white} />
-          )}
-          <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
-            {summaryActionButtonText}
-          </Text>
-        </TouchableOpacity>
+        {summaryStatus !== ChatSummaryStatus.NO_AUDIO && (
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={[styles.marginB8, styles.seeIfReadyButton]}
+            disabled={showSummaryButtonLoader}>
+            {showSummaryButtonLoader && (
+              <ActivityIndicator color={colors.white} />
+            )}
+            <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
+              {summaryActionButtonText}
+            </Text>
+          </TouchableOpacity>
+        )}
         <PrimaryButton
           label={t('CallLogs.willCheckLater')}
           onPress={onViewCallLogs}
@@ -167,10 +169,7 @@ export const CallSummaryScreen: React.FC<
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
             enableOnAndroid>
-            <SummaryGenerationProgress
-              isSummaryGenerated={isSummaryAvailable}
-              summaryStatus={summaryStatus}
-            />
+            <SummaryGenerationProgress summaryStatus={summaryStatus} />
             <AddNotesSection
               savedNotes={summaryData?.details?.callInfo?.notes || ''}
               onNoteChange={handleNoteChange}
