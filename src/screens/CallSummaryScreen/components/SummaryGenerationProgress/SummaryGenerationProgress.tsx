@@ -1,14 +1,9 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Image, Text, View} from 'react-native';
-import {moderateScale, ScaledSheet} from 'react-native-size-matters';
+import {Image, Text, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {
-  LeftArrowIcon,
-  ShieldWithTickIcon,
-  summaryFailed,
-  summaryGenerated,
-} from '@/assets';
+import {ShieldWithTickIcon, summaryFailed, summaryGenerated} from '@/assets';
 import {ShinyText} from '@/components';
 import {
   ChatSummaryStatus,
@@ -21,11 +16,9 @@ import {colors, fontFamily} from '@/theme';
 
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,
-  isPollingComplete = false,
   summaryStatus,
 }: {
   isSummaryGenerated: boolean;
-  isPollingComplete?: boolean;
   summaryStatus?: ChatSummaryStatus;
 }) => {
   const {t} = useTranslate();
@@ -73,43 +66,6 @@ export const SummaryGenerationProgress = ({
     };
   }, [changeStep, hasCompletedAllSteps]);
 
-  const renderNotificationInfo = () => {
-    if (isSummaryGenerated)
-      return (
-        <View style={styles.infoRow}>
-          <ActivityIndicator size="small" color={colors.azureBlue} />
-          <Text style={[styles.infoText, styles.settingUpText]}>
-            {t('CallSummaryProgress.settingUpSummaryScreen')}
-          </Text>
-        </View>
-      );
-
-    if (isPollingComplete) {
-      return (
-        <View style={styles.infoRow}>
-          <LeftArrowIcon
-            color={colors.darkGray}
-            width={moderateScale(16)}
-            height={moderateScale(16)}
-            style={styles.arrowIcon}
-          />
-          <Text style={styles.infoText}>
-            {t('CallSummaryProgress.pullDown')}
-          </Text>
-        </View>
-      );
-    } else if (shouldShowGeneratedRow) {
-      return (
-        <View style={styles.generatedRow}>
-          <ShieldWithTickIcon />
-          <Text style={styles.generatedText}>
-            {t('CallSummaryProgress.transcriptionGeneratedAudioDeleted')}
-          </Text>
-        </View>
-      );
-    }
-  };
-
   if (summaryStatus && summaryStatus === ChatSummaryStatus.FAILED) {
     return (
       <View style={styles.container}>
@@ -124,7 +80,14 @@ export const SummaryGenerationProgress = ({
 
   return (
     <View style={styles.container}>
-      {renderNotificationInfo()}
+      {shouldShowGeneratedRow && (
+        <View style={styles.generatedRow}>
+          <ShieldWithTickIcon />
+          <Text style={styles.generatedText}>
+            {t('CallSummaryProgress.transcriptionGeneratedAudioDeleted')}
+          </Text>
+        </View>
+      )}
       {isSummaryGenerated ? (
         <Image source={summaryGenerated} style={styles.marginV40} />
       ) : (
