@@ -56,12 +56,28 @@ export const styles = ScaledSheet.create({
     fontWeight: '600',
     fontSize: '16@ms',
   },
+  seeIfReadyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10@ms',
+    backgroundColor: colors.azureBlue,
+    paddingVertical: '14@ms',
+    width: '100%',
+    borderRadius: '24@ms',
+    justifyContent: 'center',
+  },
   viewCallLogsButton: {
     backgroundColor: colors.white,
-    paddingVertical: '7@ms',
+    paddingVertical: '10@ms',
     borderWidth: 1,
     borderColor: colors.lightGray4,
     marginBottom: '4@ms',
+  },
+  colorWhite: {
+    color: colors.white,
+  },
+  marginB8: {
+    marginBottom: '8@ms',
   },
   viewCallLogsButtonText: {
     color: colors.darkGray10,

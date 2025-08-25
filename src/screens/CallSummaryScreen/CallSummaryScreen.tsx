@@ -1,10 +1,16 @@
-import React from 'react';
-import {RefreshControl, StatusBar, View} from 'react-native';
+import React, {useMemo} from 'react';
+import {
+  ActivityIndicator,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PrimaryButton} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {ChatSummaryStatus, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -17,6 +23,7 @@ import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
+import {colors} from '@/theme';
 
 import {
   AddNotesSection,
@@ -44,6 +51,7 @@ export const CallSummaryScreen: React.FC<
 
   const {
     isLoading,
+    refreshing,
     summaryData,
     showSummary,
     setShowSummary,
@@ -51,10 +59,9 @@ export const CallSummaryScreen: React.FC<
     activeModal,
     setActiveModal,
     isSummaryAvailable,
-    refreshing,
-    isPollingComplete,
     handleRefresh,
     handleNoteChange,
+    summaryStatus,
   } = useSummaryState(chatId, callId);
 
   const dispatch = useAppDispatch();
@@ -79,6 +86,8 @@ export const CallSummaryScreen: React.FC<
     isCallLogSummaryFlow: Boolean(callId),
   });
 
+  const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
+
   useHardwareBackPressHandler(() => {
     handleGoBack();
     return true;
@@ -98,9 +107,35 @@ export const CallSummaryScreen: React.FC<
     });
   };
 
+  const showSummaryButtonLoader =
+    (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
+
+  const summaryActionButtonText = useMemo(
+    () =>
+      isSummaryAvailable && !canShowSummary
+        ? t('CallSummaryProgress.settingUpSummaryScreen')
+        : hasSummaryFailed
+          ? t('CallSummaryProgress.retry')
+          : t('CallLogs.seeIfItIsReady'),
+    [isSummaryAvailable, canShowSummary, hasSummaryFailed, t],
+  );
+
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
+        {summaryStatus !== ChatSummaryStatus.NO_AUDIO && (
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={[styles.marginB8, styles.seeIfReadyButton]}
+            disabled={showSummaryButtonLoader}>
+            {showSummaryButtonLoader && (
+              <ActivityIndicator color={colors.white} />
+            )}
+            <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
+              {summaryActionButtonText}
+            </Text>
+          </TouchableOpacity>
+        )}
         <PrimaryButton
           label={t('CallLogs.willCheckLater')}
           onPress={onViewCallLogs}
@@ -133,17 +168,8 @@ export const CallSummaryScreen: React.FC<
             contentOffset={{x: 0, y: 100}}
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
-            enableOnAndroid
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }>
-            <SummaryGenerationProgress
-              isSummaryGenerated={isSummaryAvailable}
-              isPollingComplete={isPollingComplete}
-            />
+            enableOnAndroid>
+            <SummaryGenerationProgress summaryStatus={summaryStatus} />
             <AddNotesSection
               savedNotes={summaryData?.details?.callInfo?.notes || ''}
               onNoteChange={handleNoteChange}

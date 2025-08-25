@@ -1,22 +1,25 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Image, Text, View} from 'react-native';
-import {moderateScale, ScaledSheet} from 'react-native-size-matters';
+import {Image, Text, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {LeftArrowIcon, ShieldWithTickIcon, summaryGenerated} from '@/assets';
+import {ShieldWithTickIcon, summaryFailed, summaryGenerated} from '@/assets';
 import {ShinyText} from '@/components';
-import {SUMMARY_GENERATION_STEPS, SummaryGenerationStep} from '@/constants';
+import {
+  ChatSummaryStatus,
+  SUMMARY_GENERATION_STEPS,
+  SummaryGenerationStep,
+} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
 
 export const SummaryGenerationProgress = ({
-  isSummaryGenerated,
-  isPollingComplete = false,
+  summaryStatus,
 }: {
-  isSummaryGenerated: boolean;
-  isPollingComplete?: boolean;
+  summaryStatus?: ChatSummaryStatus;
 }) => {
+  const isSummaryGenerated = summaryStatus === ChatSummaryStatus.SUCCESS;
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -62,46 +65,33 @@ export const SummaryGenerationProgress = ({
     };
   }, [changeStep, hasCompletedAllSteps]);
 
-  const renderNotificationInfo = () => {
-    if (isSummaryGenerated)
-      return (
-        <View style={styles.infoRow}>
-          <ActivityIndicator size="small" color={colors.azureBlue} />
-          <Text style={[styles.infoText, styles.settingUpText]}>
-            {t('CallSummaryProgress.settingUpSummaryScreen')}
-          </Text>
-        </View>
-      );
+  if (
+    summaryStatus &&
+    [ChatSummaryStatus.FAILED, ChatSummaryStatus.NO_AUDIO].includes(
+      summaryStatus,
+    )
+  ) {
+    return (
+      <View style={styles.container}>
+        <Image source={summaryFailed} style={styles.marginV40} />
+        <Text style={[styles.title, styles.width80]}>
+          {t('CallSummaryProgress.summaryGenerationFailed')}
+        </Text>
+        <View style={styles.separator} />
+      </View>
+    );
+  }
 
-    if (isPollingComplete) {
-      return (
-        <View style={styles.infoRow}>
-          <LeftArrowIcon
-            color={colors.darkGray}
-            width={moderateScale(16)}
-            height={moderateScale(16)}
-            style={styles.arrowIcon}
-          />
-          <Text style={styles.infoText}>
-            {t('CallSummaryProgress.pullDown')}
-          </Text>
-        </View>
-      );
-    } else if (shouldShowGeneratedRow) {
-      return (
+  return (
+    <View style={styles.container}>
+      {shouldShowGeneratedRow && (
         <View style={styles.generatedRow}>
           <ShieldWithTickIcon />
           <Text style={styles.generatedText}>
             {t('CallSummaryProgress.transcriptionGeneratedAudioDeleted')}
           </Text>
         </View>
-      );
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      {renderNotificationInfo()}
+      )}
       {isSummaryGenerated ? (
         <Image source={summaryGenerated} style={styles.marginV40} />
       ) : (
@@ -242,5 +232,8 @@ const styles = ScaledSheet.create({
   settingUpText: {
     color: colors.black,
     opacity: 1,
+  },
+  width80: {
+    width: '80%',
   },
 });
