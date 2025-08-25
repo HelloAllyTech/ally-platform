@@ -299,7 +299,6 @@ export const CallLogScreen: React.FC = () => {
   );
 };
 
-// Styles for the component
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
