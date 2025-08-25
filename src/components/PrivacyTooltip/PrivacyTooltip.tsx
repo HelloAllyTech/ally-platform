@@ -1,5 +1,6 @@
 import React from 'react';
 import {View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
 import Tooltip, {TooltipProps} from 'react-native-walkthrough-tooltip';
 
 import {tooltipDisplayInsets} from '@/constants';
@@ -25,11 +26,15 @@ export const PrivacyTooltip: React.FC<PrivacyTooltipProps> = ({
       placement="top"
       showChildInTooltip={false}
       displayInsets={tooltipDisplayInsets}
-      contentStyle={{
-        paddingBottom: 10,
-        marginRight: 10,
-      }}>
+      contentStyle={styles.content}>
       {children}
     </Tooltip>
   );
 };
+
+const styles = ScaledSheet.create({
+  content: {
+    paddingBottom: 10,
+    marginRight: 10,
+  },
+});
