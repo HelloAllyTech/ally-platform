@@ -15,12 +15,11 @@ import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
 
 export const SummaryGenerationProgress = ({
-  isSummaryGenerated,
   summaryStatus,
 }: {
-  isSummaryGenerated: boolean;
   summaryStatus?: ChatSummaryStatus;
 }) => {
+  const isSummaryGenerated = summaryStatus === ChatSummaryStatus.SUCCESS;
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -66,7 +65,12 @@ export const SummaryGenerationProgress = ({
     };
   }, [changeStep, hasCompletedAllSteps]);
 
-  if (summaryStatus && summaryStatus === ChatSummaryStatus.FAILED) {
+  if (
+    summaryStatus &&
+    [ChatSummaryStatus.FAILED, ChatSummaryStatus.NO_AUDIO].includes(
+      summaryStatus,
+    )
+  ) {
     return (
       <View style={styles.container}>
         <Image source={summaryFailed} style={styles.marginV40} />
