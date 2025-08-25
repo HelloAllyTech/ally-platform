@@ -114,7 +114,8 @@
     "transcriptionGeneratedAudioDeleted": "Transcription generated & audio deleted",
     "estimatedTime": "Estimated time: ~10 minutes",
     "addNotes": "Add notes (Optional)",
-    "summaryGenerationFailed": "Failed to generate session summary"
+    "summaryGenerationFailed": "Failed to generate session summary",
+    "retry": "Retry"
   },
   "CallSummary": {
     "enterDetail": "Enter detail",

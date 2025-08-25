@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {
   ActivityIndicator,
   StatusBar,
@@ -10,7 +10,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PrimaryButton} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {ChatSummaryStatus, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -86,6 +86,8 @@ export const CallSummaryScreen: React.FC<
     isCallLogSummaryFlow: Boolean(callId),
   });
 
+  const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
+
   useHardwareBackPressHandler(() => {
     handleGoBack();
     return true;
@@ -108,6 +110,16 @@ export const CallSummaryScreen: React.FC<
   const showSummaryButtonLoader =
     (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
 
+  const summaryActionButtonText = useMemo(
+    () =>
+      isSummaryAvailable && !canShowSummary
+        ? t('CallSummaryProgress.settingUpSummaryScreen')
+        : hasSummaryFailed
+          ? t('CallSummaryProgress.retry')
+          : t('CallLogs.seeIfItIsReady'),
+    [isSummaryAvailable, canShowSummary, hasSummaryFailed, t],
+  );
+
   const renderSummaryButtons = () => {
     return (
       <View style={styles.summaryButtonsContainer}>
@@ -119,9 +131,7 @@ export const CallSummaryScreen: React.FC<
             <ActivityIndicator color={colors.white} />
           )}
           <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
-            {isSummaryAvailable && !canShowSummary
-              ? t('CallSummaryProgress.settingUpSummaryScreen')
-              : t('CallLogs.seeIfItIsReady')}
+            {summaryActionButtonText}
           </Text>
         </TouchableOpacity>
         <PrimaryButton
