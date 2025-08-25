@@ -3,9 +3,18 @@ import {ActivityIndicator, Image, Text, View} from 'react-native';
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {LeftArrowIcon, ShieldWithTickIcon, summaryGenerated} from '@/assets';
+import {
+  LeftArrowIcon,
+  ShieldWithTickIcon,
+  summaryFailed,
+  summaryGenerated,
+} from '@/assets';
 import {ShinyText} from '@/components';
-import {SUMMARY_GENERATION_STEPS, SummaryGenerationStep} from '@/constants';
+import {
+  ChatSummaryStatus,
+  SUMMARY_GENERATION_STEPS,
+  SummaryGenerationStep,
+} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -13,9 +22,11 @@ import {colors, fontFamily} from '@/theme';
 export const SummaryGenerationProgress = ({
   isSummaryGenerated,
   isPollingComplete = false,
+  summaryStatus,
 }: {
   isSummaryGenerated: boolean;
   isPollingComplete?: boolean;
+  summaryStatus?: ChatSummaryStatus;
 }) => {
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
@@ -98,6 +109,18 @@ export const SummaryGenerationProgress = ({
       );
     }
   };
+
+  if (summaryStatus && summaryStatus === ChatSummaryStatus.FAILED) {
+    return (
+      <View style={styles.container}>
+        <Image source={summaryFailed} style={styles.marginV40} />
+        <Text style={[styles.title, styles.width80]}>
+          {t('CallSummaryProgress.summaryGenerationFailed')}
+        </Text>
+        <View style={styles.separator} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -242,5 +265,8 @@ const styles = ScaledSheet.create({
   settingUpText: {
     color: colors.black,
     opacity: 1,
+  },
+  width80: {
+    width: '80%',
   },
 });

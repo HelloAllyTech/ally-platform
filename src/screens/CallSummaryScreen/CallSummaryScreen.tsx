@@ -55,6 +55,7 @@ export const CallSummaryScreen: React.FC<
     isPollingComplete,
     handleRefresh,
     handleNoteChange,
+    summaryStatus,
   } = useSummaryState(chatId, callId);
 
   const dispatch = useAppDispatch();
@@ -143,6 +144,7 @@ export const CallSummaryScreen: React.FC<
             <SummaryGenerationProgress
               isSummaryGenerated={isSummaryAvailable}
               isPollingComplete={isPollingComplete}
+              summaryStatus={summaryStatus}
             />
             <AddNotesSection
               savedNotes={summaryData?.details?.callInfo?.notes || ''}

@@ -9,6 +9,7 @@ const carousel2 = require('./carousel2.png');
 const carousel3 = require('./carousel3.png');
 const carousel4 = require('./carousel4.png');
 const summaryGenerated = require('./summaryGenerated.png');
+const summaryFailed = require('./summaryFailed.png');
 
 export {
   breathingBackground,
@@ -21,4 +22,5 @@ export {
   carousel3,
   carousel4,
   summaryGenerated,
+  summaryFailed,
 };

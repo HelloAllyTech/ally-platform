@@ -113,7 +113,8 @@
     "pullDown": "Pull down to see if its ready",
     "transcriptionGeneratedAudioDeleted": "Transcription generated & audio deleted",
     "estimatedTime": "Estimated time: ~10 minutes",
-    "addNotes": "Add notes (Optional)"
+    "addNotes": "Add notes (Optional)",
+    "summaryGenerationFailed": "Failed to generate session summary"
   },
   "CallSummary": {
     "enterDetail": "Enter detail",

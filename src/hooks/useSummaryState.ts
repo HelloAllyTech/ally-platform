@@ -116,5 +116,6 @@ export const useSummaryState = (
     isPollingComplete,
     handleRefresh,
     handleNoteChange,
+    summaryStatus: summaryData?.summaryStatus,
   };
 };
