@@ -2,14 +2,13 @@ import React, {memo, useEffect} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SECTION_LIST, SectionKey, summaryFields} from '@/constants/summary';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
+import {SECTION_LIST, SectionKey, summaryFields} from '@/constants';
+import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectCallInfo} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {EditableFieldKey, SectionItem} from '@/types/callSummary';
+import {colors, fontFamily} from '@/theme';
+import {EditableFieldKey, SectionItem} from '@/types';
 
 import {SectionContent} from '../CallSummaryDetails/SectionContent';
 import {SectionHeader} from '../CallSummaryDetails/SectionHeader';

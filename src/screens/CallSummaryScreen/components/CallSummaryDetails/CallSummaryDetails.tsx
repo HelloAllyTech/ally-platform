@@ -1,35 +1,34 @@
 import React, {memo, useCallback, useState} from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {GoldenShieldIcon} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
   SECTION_LIST,
   SectionKey,
   summaryFields,
-} from '@/constants/summary';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
-import useTranslate from '@/hooks/useTranslate';
+} from '@/constants';
+import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
-import {colors} from '@/theme/colors';
-import {typography} from '@/theme/typography';
-import {SectionItem} from '@/types/callSummary';
+import {colors, typography} from '@/theme';
+import {SectionItem} from '@/types';
 
 import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
 
 interface Props {
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
-  showSubmitButton: boolean;
+  showSaveButton: boolean;
 }
 
 const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
-  showSubmitButton,
+  showSaveButton,
 }) => {
   const {t} = useTranslate();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
@@ -142,17 +141,28 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   }
 
   return (
-    <KeyboardAwareScrollView
-      style={styles.container}
-      nestedScrollEnabled
-      extraScrollHeight={150}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid>
-      <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
-      {showSubmitButton && (
+    <>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        nestedScrollEnabled
+        extraScrollHeight={150}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid>
+        <View style={styles.alertContainer}>
+          <View style={styles.alertIconContainer}>
+            <GoldenShieldIcon />
+          </View>
+          <Text style={styles.alertText}>
+            {t('CallSummary.aiGeneratedWarning')}
+          </Text>
+        </View>
+        <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
+      </KeyboardAwareScrollView>
+      {showSaveButton && (
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            label={t('submit')}
+            label={t('save')}
             onPress={onSubmitButtonPress}
             isLoading={isUpdating}
             customContainerStyle={styles.submitButton}
@@ -160,7 +170,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
           />
         </View>
       )}
-    </KeyboardAwareScrollView>
+    </>
   );
 };
 
@@ -169,8 +179,10 @@ export const CallSummaryDetails = memo(CallSummaryDetailsComponent);
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingBottom: '40@ms',
-    paddingTop: '85@ms',
+    backgroundColor: colors.white,
+  },
+  contentContainer: {
+    paddingBottom: '70@ms',
   },
   card: {
     paddingHorizontal: '16@s',
@@ -182,16 +194,50 @@ const styles = ScaledSheet.create({
     paddingLeft: '30@ms',
   },
   buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     alignItems: 'center',
     paddingTop: '20@ms',
+    paddingBottom: '20@ms',
+    backgroundColor: colors.white,
     borderTopWidth: '1@ms',
     borderColor: colors.lightGray5,
   },
   submitButton: {
-    width: '30%',
+    width: '80%',
     paddingVertical: '10@vs',
   },
   submitButtonText: {
     ...typography.label.large,
+  },
+  alertContainer: {
+    paddingHorizontal: '10@s',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: '10@ms',
+    marginHorizontal: '10@s',
+    alignSelf: 'center',
+    backgroundColor: colors.floralWhite,
+    borderRadius: '8@s',
+    padding: '10@s',
+  },
+  alertIconContainer: {
+    width: '32@s',
+    height: '32@s',
+    borderColor: colors.carrotOrange,
+    borderWidth: '1@s',
+    borderRadius: '16@s',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: '10@s',
+  },
+  alertText: {
+    ...typography.body.medium,
+    color: colors.russetBrown,
+    flex: 1,
+    width: '100%',
   },
 });

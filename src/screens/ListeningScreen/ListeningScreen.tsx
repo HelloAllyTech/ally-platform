@@ -1,53 +1,68 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {RouteProp} from '@react-navigation/native';
+import {RouteProp, useIsFocused} from '@react-navigation/native';
 import {
   activateKeepAwake,
   deactivateKeepAwake,
 } from '@sayem314/react-native-keep-awake';
-import {ActivityIndicator, AppState, StatusBar, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
+import {LockIcon} from '@/assets/icons';
+import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
-import {AUDIO_INACTIVE_TIMEOUT} from '@/constants/chat';
-import {AllyPlatforms} from '@/constants/general';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useDebounce} from '@/hooks/useDebounce';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import {useLiveAudioStream} from '@/hooks/useLiveAudioStream';
-import {useSocketConnection} from '@/hooks/useSocketConnection';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
-import {RootStackParamList} from '@/navigation/types';
+import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useCounselorChat,
+  useDebounce,
+  useHardwareBackPressHandler,
+  useLiveAudioStream,
+  useNetworkConnectivity,
+  useSocketConnection,
+  useTranslate,
+  useUser,
+} from '@/hooks';
+import {RootStackParamList} from '@/navigation';
+import {useGetNudgeStatusQuery} from '@/services';
 import {
   useEndCallMutation,
   useLazyGetCounsellorChatQuery,
 } from '@/services/chatApi';
-import {useGetNudgeStatusQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {colors} from '@/theme/colors';
-import {globalStyles} from '@/theme/helpers';
+import {colors, globalStyles} from '@/theme';
 import {
   ChatProvider,
   FeedbackResponse,
   SocketEvent,
   SocketMessage,
-} from '@/types/message';
-import {Maybe} from '@/utils/common';
+} from '@/types';
+import {Maybe} from '@/utils';
 
+import {
+  AudioWaveformContainer,
+  CallEndConfirmationModal,
+  ControlButtonsSection,
+  DismissableBanner,
+  NetworkDisconnected,
+  NudgeSection,
+  Search,
+  Timer,
+} from './components';
+import {styles} from './styles';
 import {
   exotelAudioDataToAmplitudes,
   getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
   webRTCAudioDataToAmplitudes,
-} from './audioUtils';
-import {ControlButtonsSection, NudgeSection, Timer} from './components';
-import {AudioWaveformContainer} from './components/AudioWaveformContainer/AudioWaveformContainer';
-import {CallEndConfirmationModal} from './components/CallEndConfirmationModal';
-import {PlayPauseOverlay} from './components/PlayPauseOverlay/PlayPauseOverlay';
-import Search from './components/Search/Search';
-import {styles} from './styles';
+} from './utils';
 
 export interface Nudge {
   id: number;
@@ -66,6 +81,7 @@ export const ListeningScreen = ({
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
+  const isFocused = useIsFocused();
 
   const [isFocusMode, setIsFocusMode] = useState(true);
   const chatData = useAppSelector(state => state.chat.currentChat);
@@ -94,12 +110,23 @@ export const ListeningScreen = ({
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
+  const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
   const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
+  const [showNetworkDisconnected, setShowNetworkDisconnected] = useState(false);
+  const {isOffline} = useNetworkConnectivity();
+  const tooltipContentList = [
+    t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
+    t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
+    t('ListeningScreen.dataSafeTooltip.noTrainingData'),
+    t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
+  ];
+
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
@@ -114,8 +141,11 @@ export const ListeningScreen = ({
   const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
 
   const onCallEndSuccess = useCallback(() => {
-    navigation.replace('Breathing');
-  }, [navigation]);
+    // Only navigate if the ListeningScreen is still focused
+    if (isFocused) {
+      navigation.replace(SCREEN_NAMES.BREATHING);
+    }
+  }, [navigation, isFocused]);
 
   const getSocketPath = useCallback(() => {
     if (isConferenceCall || isMicrophoneMode) {
@@ -123,6 +153,12 @@ export const ListeningScreen = ({
     }
     return env.WEBRTC_SOCKET_PATH;
   }, [isConferenceCall, isMicrophoneMode]);
+
+  useEffect(() => {
+    if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
+      setShowNetworkDisconnected(true);
+    }
+  }, [isOffline, isMicrophoneMode, isWebMicrophoneMode]);
 
   useEffect(() => {
     if (isEndCallSuccess) {
@@ -164,7 +200,12 @@ export const ListeningScreen = ({
 
   useHardwareBackPressHandler(() => {
     if (isMicrophoneMode) {
-      setShowCallEndConfirmation(true);
+      if (isWebMicrophoneMode) {
+        dispatch(clearCurrentChat());
+        navigation.goBack();
+      } else if (chatData?.chatId) {
+        setShowCallEndConfirmation(true);
+      }
       return true;
     }
     navigation.goBack();
@@ -295,10 +336,22 @@ export const ListeningScreen = ({
 
   useEffect(() => {
     if (isAudioSessionReady && !isAudioChatEmitted) {
-      emitSocketEvent(SocketEvent.START_AUDIO_CHAT, getStartAudioChatPayload());
-      setIsAudioChatEmitted(true);
+      // This is to prevent socket event from being emitted before the
+      // socket connection is established (Flow: permission denied and then granted from settings)
+      setTimeout(() => {
+        emitSocketEvent(
+          SocketEvent.START_AUDIO_CHAT,
+          getStartAudioChatPayload(),
+        );
+        setIsAudioChatEmitted(true);
+      });
     }
-  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+  }, [
+    isAudioSessionReady,
+    emitSocketEvent,
+    isAudioChatEmitted,
+    isPermissionGranted,
+  ]);
 
   // Keep screen awake during microphone mode calls
   useEffect(() => {
@@ -353,21 +406,13 @@ export const ListeningScreen = ({
     {delay: 500},
   );
 
-  const playPauseButton = useMemo(() => {
-    return (
-      <PlayPauseOverlay
-        isPlaying={!isCallPaused}
-        onPress={handlePlayPauseCallPress}
-        isFocusMode={isFocusMode}
-        isDisabled={isWebMicrophoneMode}
-      />
-    );
-  }, [
-    isCallPaused,
-    handlePlayPauseCallPress,
-    isFocusMode,
-    isWebMicrophoneMode,
-  ]);
+  const handleLockIconPress = useCallback(() => {
+    setIsPrivacyTooltipVisible(prev => !prev);
+  }, []);
+
+  const handlePrivacyTooltipClose = useCallback(() => {
+    setIsPrivacyTooltipVisible(false);
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -381,7 +426,7 @@ export const ListeningScreen = ({
           if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
             // Clear chat state before navigation
             dispatch(clearCurrentChat());
-            navigation.navigate('Home');
+            navigation.navigate(SCREEN_NAMES.CALL_LOG);
           }
         });
       }
@@ -408,6 +453,23 @@ export const ListeningScreen = ({
       isMicrophoneMode={isMicrophoneMode}
     />
   );
+  const isWebrtcOrMicrophoneMode = useMemo(
+    () =>
+      callProvider &&
+      [ChatProvider.WEBRTC, ChatProvider.MICROPHONE].includes(callProvider),
+    [callProvider],
+  );
+
+  const handleTryAgain = useCallback(() => {
+    dispatch(clearCurrentChat());
+    setShowNetworkDisconnected(false);
+    navigation.replace(SCREEN_NAMES.LISTENING, route.params);
+  }, [navigation, route.params, dispatch]);
+
+  const handleNetworkDisconnectedGoBack = useCallback(() => {
+    dispatch(clearCurrentChat());
+    navigation.goBack();
+  }, [navigation, dispatch]);
 
   if (!chatData?.chatId) {
     return (
@@ -420,6 +482,57 @@ export const ListeningScreen = ({
     );
   }
 
+  const tooltipContent = (
+    <View style={styles.tooltipContent}>
+      {tooltipContentList.map((item, index) => (
+        <Text key={index} style={styles.tooltipText}>
+          • {item}
+        </Text>
+      ))}
+    </View>
+  );
+
+  const tooltipDisplayInsets = {
+    left: isFocusMode ? 40 : 10,
+    right: isFocusMode ? 40 : 10,
+    top: 10,
+    bottom: 10,
+  };
+
+  if (showNetworkDisconnected) {
+    return (
+      <View style={styles.container}>
+        <NetworkDisconnected
+          onRetry={handleTryAgain}
+          onGoBack={handleNetworkDisconnectedGoBack}
+        />
+      </View>
+    );
+  }
+
+  const renderTakingNotes = () => {
+    return (
+      <View style={styles.takingNotesContainer}>
+        <PrivacyTooltip
+          tooltipContent={tooltipContent}
+          isVisible={isPrivacyTooltipVisible}
+          onClose={handlePrivacyTooltipClose}
+          placement={isFocusMode ? 'top' : 'bottom'}
+          displayInsets={tooltipDisplayInsets}>
+          <TouchableOpacity
+            onPress={handleLockIconPress}
+            disabled={!isFocusMode}
+            activeOpacity={0.8}>
+            <LockIcon width={16} height={16} color={colors.lightGrayD9} />
+          </TouchableOpacity>
+        </PrivacyTooltip>
+        <Text style={styles.takingNotesText}>
+          {t('ListeningScreen.takingNotes')}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {showCallEndConfirmation && callEndModalElement}
@@ -428,11 +541,12 @@ export const ListeningScreen = ({
         translucent
         barStyle="light-content"
       />
+      {isFocusMode && isConferenceCall && !isBannerDismissed && (
+        <DismissableBanner onClose={() => setIsBannerDismissed(true)} />
+      )}
       {isFocusMode ? (
         <View style={styles.focusModeLayout}>
-          <Text style={styles.takingNotesText}>
-            {t('ListeningScreen.takingNotes')}
-          </Text>
+          {renderTakingNotes()}
           <Timer startTime={startTime} />
           <View style={styles.focusModeWaveformWrapper}>
             <AudioWaveformContainer
@@ -441,8 +555,7 @@ export const ListeningScreen = ({
               isFocusMode
             />
           </View>
-          {playPauseButton}
-          {isMicrophoneMode && (
+          {isMicrophoneMode && !isWebMicrophoneMode && (
             <Text style={styles.microphoneModeNote}>
               {t('ListeningScreen.microphoneModeNote')}
             </Text>
@@ -451,11 +564,8 @@ export const ListeningScreen = ({
       ) : (
         <View style={styles.nonFocusModeLayout}>
           <View style={globalStyles.rowCenter}>
-            {playPauseButton}
             <View style={styles.nonFocusLabelBlock}>
-              <Text style={styles.takingNotesText}>
-                {t('ListeningScreen.takingNotes')}
-              </Text>
+              {renderTakingNotes()}
               <Timer startTime={startTime} />
             </View>
             <View style={styles.nonFocusModeWaveformWrapper}>
@@ -477,15 +587,18 @@ export const ListeningScreen = ({
         </View>
       )}
 
-      <View style={styles.controlButtonsContainer}>
-        <ControlButtonsSection
-          isMaximized={isControlSectionMaximized}
-          onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
-          onFocusModeButtonPress={toggleNudgeVisibility}
-          isFocusMode={isFocusMode}
-          onCallEndPress={() => setShowCallEndConfirmation(true)}
-        />
-      </View>
+      <ControlButtonsSection
+        isMaximized={isControlSectionMaximized}
+        onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
+        onFocusModeButtonPress={toggleNudgeVisibility}
+        isFocusMode={isFocusMode}
+        onCallEndPress={() => setShowCallEndConfirmation(true)}
+        isCallPaused={isCallPaused}
+        onPauseResumePress={handlePlayPauseCallPress}
+        showPauseResumeButton={isWebrtcOrMicrophoneMode}
+        showEndSessionButton={isWebrtcOrMicrophoneMode}
+        isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
+      />
     </View>
   );
 };

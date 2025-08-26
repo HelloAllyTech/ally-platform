@@ -2,14 +2,13 @@ import React from 'react';
 import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 
 import {ThumbIcon} from '@/assets/icons';
-import {useDebounce} from '@/hooks/useDebounce';
-import useTranslate from '@/hooks/useTranslate';
+import {useDebounce, useTranslate} from '@/hooks';
 import {
   useAddFeedbackMutation,
   useUpdateFeedbackMutation,
 } from '@/services/chatApi';
-import {colors} from '@/theme/colors';
-import {FeedbackResponse} from '@/types/message';
+import {colors} from '@/theme';
+import {FeedbackResponse} from '@/types';
 import {logger} from '@/utils/logger';
 
 import type {Nudge} from '../../ListeningScreen';

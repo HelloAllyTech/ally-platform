@@ -1,5 +1,4 @@
-import {CHAT_TYPES} from '@/constants/chat';
-import {SummaryFieldKey} from '@/constants/summary';
+import {CHAT_TYPES, SummaryFieldKey} from '@/constants';
 
 import {api} from './api';
 

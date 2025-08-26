@@ -7,9 +7,8 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 
 export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
   const {t} = useTranslate();

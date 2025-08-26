@@ -1,4 +1,4 @@
-import BoxBreathingAnimation from './BoxBreathingAnimation';
-import {BreathingControls} from './BreathingControls';
-
-export {BreathingControls, BoxBreathingAnimation};
+export {BoxBreathingAnimation} from './BoxBreathingAnimation';
+export type {Phase} from './BoxBreathingAnimation';
+export {BreathingControls} from './BreathingControls';
+export {FlowerPetal} from './FlowerPetal';

@@ -7,20 +7,31 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
-import NetworkLogger, {startNetworkLogging} from 'react-native-network-logger';
+import NetworkLogger, {
+  startNetworkLogging,
+  stopNetworkLogging,
+} from 'react-native-network-logger';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseCircle} from '@/assets/icons';
-import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {SCREEN_WIDTH, WINDOW_HEIGHT} from '@/constants';
+import {colors} from '@/theme';
 
-const NetworkLogs = ({onPress}: {onPress?: () => void}) => {
+const NetworkLogsComponent = ({onPress}: {onPress?: () => void}) => {
   const {t} = useTranslation();
   const [isNetworkModalVisible, setIsNetworkVIsible] = useState(false);
   const pan = useRef(new Animated.ValueXY()).current;
 
   useEffect(() => {
-    startNetworkLogging({forceEnable: true});
+    if (__DEV__) {
+      // Start logging only in development to avoid memory growth in prod
+      startNetworkLogging();
+    }
+    return () => {
+      if (__DEV__) {
+        stopNetworkLogging?.();
+      }
+    };
   }, []);
 
   const themeStyle = {
@@ -143,4 +154,4 @@ const styles = ScaledSheet.create({
   },
 });
 
-export default memo(NetworkLogs);
+export const NetworkLogs = memo(NetworkLogsComponent);

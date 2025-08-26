@@ -1,3 +1,3 @@
-import CallEndOverlay from './CallEndOverlay';
+import {CallEndOverlay} from './CallEndOverlay';
 
 export {CallEndOverlay};

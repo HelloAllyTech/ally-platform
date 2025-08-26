@@ -1,30 +1,51 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, InfoIcon, PageIcon} from '@/assets/icons';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {ArrowDown, InfoIcon, PageIcon} from '@/assets';
+import {PrivacyTooltip} from '@/components';
+import {colors, fontFamily} from '@/theme';
+
+const tooltipDisplayInsets = {
+  left: 40,
+  right: 40,
+  top: 10,
+  bottom: 10,
+};
 
 export const AddNotesSection = ({
   savedNotes,
-  onPressInfo,
   onNoteChange,
 }: {
   savedNotes: string;
-  onPressInfo: () => void;
   onNoteChange: (text: string) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [note, setNote] = useState<string>();
 
+  const {t} = useTranslation();
+  const inputRef = useRef<TextInput>(null);
+
   useEffect(() => {
-    setNote(savedNotes);
+    // Only sync from savedNotes when the input is not focused
+    if (!inputRef.current?.isFocused()) {
+      setNote(savedNotes);
+    }
   }, [savedNotes]);
 
   const handleNoteChange = (text: string) => {
     onNoteChange?.(text);
     setNote(text);
+  };
+
+  const renderTooltip = () => {
+    return (
+      <View style={styles.tooltipContainer}>
+        <Text>{t('CallSummary.info.notesAutoSaveInfo')}</Text>
+      </View>
+    );
   };
 
   return (
@@ -38,12 +59,20 @@ export const AddNotesSection = ({
               style={[styles.chevron, isExpanded && styles.chevronExpanded]}
             />
             <PageIcon />
-            <Text style={styles.title}>Add notes (Optional)</Text>
+            <Text style={styles.title}>
+              {t('CallSummaryProgress.addNotes')}
+            </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={20} onPress={onPressInfo}>
-          <InfoIcon />
-        </TouchableOpacity>
+        <PrivacyTooltip
+          tooltipContent={renderTooltip()}
+          isVisible={showTooltip}
+          onClose={() => setShowTooltip(false)}
+          displayInsets={tooltipDisplayInsets}>
+          <TouchableOpacity hitSlop={20} onPress={() => setShowTooltip(true)}>
+            <InfoIcon />
+          </TouchableOpacity>
+        </PrivacyTooltip>
       </View>
 
       {isExpanded && (
@@ -51,6 +80,7 @@ export const AddNotesSection = ({
           <View style={styles.noteContainer}>
             <Text style={styles.bullet}>•</Text>
             <TextInput
+              ref={inputRef}
               style={styles.input}
               value={note}
               onChangeText={text => handleNoteChange(text)}
@@ -72,6 +102,7 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
     marginBottom: '16@ms',
     paddingHorizontal: '8@ms',
+    paddingBottom: '200@ms',
   },
   header: {
     paddingVertical: '12@ms',
@@ -132,5 +163,10 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: '16@ms',
+  },
+  tooltipContainer: {
+    backgroundColor: colors.white,
+    minWidth: '280@ms',
+    minHeight: '50@ms',
   },
 });

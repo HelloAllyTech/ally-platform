@@ -8,8 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface ToastProps {
   message: string;

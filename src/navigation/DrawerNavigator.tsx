@@ -2,11 +2,12 @@ import {useState} from 'react';
 import {createDrawerNavigator} from '@react-navigation/drawer';
 import {StyleSheet} from 'react-native';
 
-import {LogoutModal} from '@/screens/LogoutScreen/components/LogoutModal';
-import {colors} from '@/theme/colors';
+import {SCREEN_NAMES} from '@/constants';
+import {DrawerContent} from '@/screens';
+import {LogoutModal} from '@/screens/LogoutScreen';
+import {colors} from '@/theme';
 
-import {DrawerContent} from '../screens/LogoutScreen/CustomDrawerContent';
-import {BottomTabs} from './tabNavigator';
+import {BottomTabs} from './TabNavigator';
 
 const Drawer = createDrawerNavigator();
 
@@ -29,7 +30,7 @@ export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
           drawerType: 'front',
         }}>
         <Drawer.Screen
-          name="BottomTabs"
+          name={SCREEN_NAMES.BOTTOM_TABS}
           children={() => <BottomTabs hideTabBar={hideTabBar} />}
         />
       </Drawer.Navigator>

@@ -1,5 +1,6 @@
 import {AllyPlatforms} from '@/constants/general';
-import {User} from '@/types/user';
+
+import {User} from './user';
 
 export type ChatMessage = {
   chatId: number;

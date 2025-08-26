@@ -2,9 +2,8 @@ import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import type {ThemeMode} from '@/types/general';
+import {colors, fontFamily} from '@/theme';
+import type {ThemeMode} from '@/types';
 
 interface SearchSuggestionProps {
   colorTheme?: ThemeMode;
