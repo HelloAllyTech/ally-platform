@@ -1,8 +1,10 @@
 import {Dimensions, Platform} from 'react-native';
+import {ms} from 'react-native-size-matters';
 
 import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
 import {CarouselItem} from '@/components';
-import {colors} from '@/theme';
+import {CarouselConfig} from '@/components/Carousel/types';
+import {colors, fontFamily} from '@/theme';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 
@@ -83,27 +85,31 @@ export enum CarouselVariant {
   DEFAULT = 'default',
 }
 
-export const drawerConfig = {
+export const drawerConfig: CarouselConfig = {
   width: SCREEN_WIDTH - 80,
   isBlurView: false,
-  textColor: colors.darkGray2,
   paginationActiveDotStyle: {
     backgroundColor: colors.black,
   },
-};
-
-export const defaultConfig = {
-  width: SCREEN_WIDTH,
-  isBlurView: true,
-  textColor: colors.white,
-  paginationActiveDotStyle: {
-    backgroundColor: colors.white,
+  imageContainerCustomStyle: {
+    width: '90%',
+    height: ms(250),
+  },
+  titleCustomStyle: {
+    color: colors.darkGray2,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: ms(18),
   },
 };
 
-export const tooltipDisplayInsets = {
-  bottom: 10,
-  left: 40,
-  right: 40,
-  top: 10,
+export const defaultConfig: CarouselConfig = {
+  width: SCREEN_WIDTH,
+  isBlurView: true,
+  paginationActiveDotStyle: {
+    backgroundColor: colors.white,
+  },
+  imageContainerCustomStyle: {},
+  titleCustomStyle: {
+    color: colors.white,
+  },
 };

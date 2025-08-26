@@ -60,7 +60,9 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '10@ms',
-    backgroundColor: colors.azureBlue,
+    backgroundColor: colors.white,
+    borderColor: colors.lightGray4,
+    borderWidth: 1,
     paddingVertical: '14@ms',
     width: '100%',
     borderRadius: '24@ms',
@@ -69,12 +71,7 @@ export const styles = ScaledSheet.create({
   viewCallLogsButton: {
     backgroundColor: colors.white,
     paddingVertical: '10@ms',
-    borderWidth: 1,
-    borderColor: colors.lightGray4,
     marginBottom: '4@ms',
-  },
-  colorWhite: {
-    color: colors.white,
   },
   marginB8: {
     marginBottom: '8@ms',
@@ -102,6 +99,11 @@ export const styles = ScaledSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinnerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

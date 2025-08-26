@@ -20,6 +20,7 @@ interface ControlButtonsSectionProps {
   onToggleMaximized: () => void;
   onCallEndPress: () => void;
   isCallEndDisabled?: boolean;
+  isPauseResumeDisabled?: boolean;
   isCallPaused?: boolean;
   onPauseResumePress: () => void;
   showPauseResumeButton?: boolean;
@@ -33,6 +34,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
   onCallEndPress,
   onFocusModeButtonPress,
   isCallEndDisabled = false,
+  isPauseResumeDisabled = false,
   isCallPaused = false,
   onPauseResumePress,
   showPauseResumeButton = true,
@@ -75,6 +77,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
                   isCallPaused && {backgroundColor: colors.white},
                 ]}
                 onPress={onPauseResumePress}
+                disabled={isPauseResumeDisabled}
                 activeOpacity={0.85}
                 hitSlop={DEFAULT_HIT_SLOP}>
                 {isCallPaused ? (

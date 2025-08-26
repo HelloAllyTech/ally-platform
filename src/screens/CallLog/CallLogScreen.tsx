@@ -3,6 +3,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   Linking,
   Text,
@@ -18,6 +19,7 @@ import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
+  useHardwareBackPressHandler,
   useTranslate,
   useUser,
 } from '@/hooks';
@@ -77,6 +79,11 @@ export const CallLogScreen: React.FC = () => {
       ),
     [enabledChatTypes],
   );
+
+  useHardwareBackPressHandler(() => {
+    BackHandler.exitApp();
+    return true;
+  });
 
   /**
    * Fetches the initial set of call logs

@@ -13,7 +13,12 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 
 import {Carousel} from './Carousel';
-import {CarouselItem, CarouselRef, SecurityCarouselProps} from './types';
+import {
+  CarouselConfig,
+  CarouselItem,
+  CarouselRef,
+  SecurityCarouselProps,
+} from './types';
 
 export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
   variant = CarouselVariant.DEFAULT,
@@ -21,7 +26,7 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
   const {t} = useTranslate();
   const carouselRef = useRef<CarouselRef>(null);
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const carouseConfig =
+  const carouselConfig: CarouselConfig =
     variant === CarouselVariant.DRAWER ? drawerConfig : defaultConfig;
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -45,7 +50,12 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
     };
     return (
       <View style={styles.slide}>
-        <Animated.View style={[styles.imageContainer, opacityStyle]}>
+        <Animated.View
+          style={[
+            styles.imageContainer,
+            carouselConfig.imageContainerCustomStyle,
+            opacityStyle,
+          ]}>
           <Image
             resizeMode="contain"
             source={item.image}
@@ -57,7 +67,9 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
           style={[
             styles.slideTitle,
             opacityStyle,
-            {color: carouseConfig.textColor},
+            {
+              ...carouselConfig.titleCustomStyle,
+            },
           ]}>
           {t(item.textKey)}
         </Animated.Text>
@@ -66,11 +78,11 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
   };
 
   return (
-    <View style={[styles.container, {width: carouseConfig.width}]}>
+    <View style={[styles.container, {width: carouselConfig.width}]}>
       <View
         style={[
           styles.carouselView,
-          carouseConfig.isBlurView && styles.carouselViewBlur,
+          carouselConfig.isBlurView && styles.carouselViewBlur,
         ]}>
         <Carousel
           ref={carouselRef}
@@ -78,7 +90,7 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
           renderItem={renderItem}
           onSnapToItem={handleSnapToItem}
           containerStyle={styles.carouselContainer}
-          paginationActiveDotStyle={carouseConfig.paginationActiveDotStyle}
+          paginationActiveDotStyle={carouselConfig.paginationActiveDotStyle}
         />
       </View>
     </View>
