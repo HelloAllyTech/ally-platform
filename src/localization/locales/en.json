@@ -112,7 +112,7 @@
     "generatedSubtitle": "The summary has been generated successfully. You can review the session now.",
     "settingUpSummaryScreen": "Setting up your summary screen",
     "transcriptionGeneratedAudioDeleted": "Transcription generated & audio deleted",
-    "estimatedTime": "Estimated time: ~10 minutes",
+    "estimatedTime": "Estimated time: ~{{time}} minutes",
     "addNotes": "Add notes (Optional)",
     "summaryGenerationFailed": "Failed to generate session summary",
     "retry": "Retry"

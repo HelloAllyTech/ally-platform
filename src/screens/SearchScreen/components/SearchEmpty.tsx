@@ -23,9 +23,11 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
 
   return (
     <View style={themedStyles.emptyComponent}>
-      <Text style={themedStyles.emptyComponentText}>
-        {`${t('SearchScreen.noData')} "${searchText}"`}
-      </Text>
+      {searchText.length > 0 && (
+        <Text style={themedStyles.emptyComponentText}>
+          {`${t('SearchScreen.noData')} "${searchText}"`}
+        </Text>
+      )}
       <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
       {trySuggestions.map(suggestion => (
         <TouchableOpacity

@@ -3,7 +3,12 @@ import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
 
-import {ShieldWithTickIcon, summaryFailed, summaryGenerated} from '@/assets';
+import {
+  HexagonCloseIcon,
+  ShieldWithTickIcon,
+  summaryFailed,
+  summaryGenerated,
+} from '@/assets';
 import {ShinyText} from '@/components';
 import {
   ChatSummaryStatus,
@@ -13,6 +18,7 @@ import {
 import {useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
+import {getEstimatedSummaryGenerationTime} from '@/utils/callSummary';
 
 export const SummaryGenerationProgress = ({
   summaryStatus,
@@ -25,6 +31,10 @@ export const SummaryGenerationProgress = ({
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [hasCompletedAllSteps, setHasCompletedAllSteps] = useState(false);
   const [shouldShowGeneratedRow, setShouldShowGeneratedRow] = useState(false);
+  const callDuration = useAppSelector(
+    state => state.summary.summaryData?.details?.callDuration,
+  );
+  const estimatedTime = getEstimatedSummaryGenerationTime(callDuration || 0);
 
   const filteredSteps = useMemo(() => {
     return currentChat
@@ -73,8 +83,16 @@ export const SummaryGenerationProgress = ({
   ) {
     return (
       <View style={styles.container}>
+        {summaryStatus === ChatSummaryStatus.NO_AUDIO && (
+          <View style={[styles.noAudioTagWrapper]}>
+            <HexagonCloseIcon />
+            <Text style={[styles.generatedText, styles.colorBrickRed]}>
+              {t('CallLogs.noAudioDetected')}
+            </Text>
+          </View>
+        )}
         <Image source={summaryFailed} style={styles.marginV40} />
-        <Text style={[styles.title, styles.width80]}>
+        <Text style={styles.title}>
           {t('CallSummaryProgress.summaryGenerationFailed')}
         </Text>
         <View style={styles.separator} />
@@ -127,7 +145,7 @@ export const SummaryGenerationProgress = ({
       </Text>
       {!isSummaryGenerated && (
         <Text style={styles.etaText}>
-          {t('CallSummaryProgress.estimatedTime')}
+          {t('CallSummaryProgress.estimatedTime', {time: estimatedTime})}
         </Text>
       )}
       <View style={styles.separator} />
@@ -220,6 +238,16 @@ const styles = ScaledSheet.create({
     borderColor: colors.azureBlue,
     borderRadius: '16@s',
   },
+  noAudioTagWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: '4@vs',
+    paddingHorizontal: '8@ms',
+    borderWidth: 0.4,
+    borderColor: colors.brickRed,
+    borderRadius: '16@s',
+  },
   generatedText: {
     marginLeft: '8@ms',
     color: colors.azureBlue,
@@ -233,7 +261,7 @@ const styles = ScaledSheet.create({
     color: colors.black,
     opacity: 1,
   },
-  width80: {
-    width: '80%',
+  colorBrickRed: {
+    color: colors.brickRed,
   },
 });

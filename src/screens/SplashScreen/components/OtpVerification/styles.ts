@@ -17,14 +17,14 @@ export const styles = ScaledSheet.create({
   headerText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     ...typography.headline.small,
-    fontSize: '22@ms',
+    fontSize: '20@ms',
     color: colors.darkSlate,
     marginBottom: '24@ms',
   },
   emailText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.headline.small,
-    fontSize: '22@ms',
+    fontSize: '20@ms',
   },
   otpContainer: {
     marginBottom: '16@ms',
