@@ -207,7 +207,7 @@ const styles = ScaledSheet.create({
     borderColor: colors.lightGray5,
   },
   submitButton: {
-    width: '30%',
+    width: '80%',
     paddingVertical: '10@vs',
   },
   submitButtonText: {

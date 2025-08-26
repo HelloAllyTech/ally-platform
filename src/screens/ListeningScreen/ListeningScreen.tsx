@@ -472,13 +472,22 @@ export const ListeningScreen = ({
     </View>
   );
 
+  const tooltipDisplayInsets = {
+    left: isFocusMode ? 40 : 10,
+    right: isFocusMode ? 40 : 10,
+    top: 10,
+    bottom: 10,
+  };
+
   const renderTakingNotes = () => {
     return (
       <View style={styles.takingNotesContainer}>
         <PrivacyTooltip
           tooltipContent={tooltipContent}
           isVisible={isPrivacyTooltipVisible}
-          onClose={handlePrivacyTooltipClose}>
+          onClose={handlePrivacyTooltipClose}
+          placement={isFocusMode ? 'top' : 'bottom'}
+          displayInsets={tooltipDisplayInsets}>
           <TouchableOpacity onPress={handleLockIconPress} activeOpacity={0.8}>
             <LockIcon width={16} height={16} color={colors.lightGrayD9} />
           </TouchableOpacity>
@@ -554,6 +563,7 @@ export const ListeningScreen = ({
         onPauseResumePress={handlePlayPauseCallPress}
         showPauseResumeButton={isWebrtcOrMicrophoneMode}
         showEndSessionButton={isWebrtcOrMicrophoneMode}
+        isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
       />
     </View>
   );

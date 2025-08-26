@@ -7,6 +7,13 @@ import {ArrowDown, InfoIcon, PageIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
 import {colors, fontFamily} from '@/theme';
 
+const tooltipDisplayInsets = {
+  left: 40,
+  right: 40,
+  top: 10,
+  bottom: 10,
+};
+
 export const AddNotesSection = ({
   savedNotes,
   onNoteChange,
@@ -60,7 +67,8 @@ export const AddNotesSection = ({
         <PrivacyTooltip
           tooltipContent={renderTooltip()}
           isVisible={showTooltip}
-          onClose={() => setShowTooltip(false)}>
+          onClose={() => setShowTooltip(false)}
+          displayInsets={tooltipDisplayInsets}>
           <TouchableOpacity hitSlop={20} onPress={() => setShowTooltip(true)}>
             <InfoIcon />
           </TouchableOpacity>

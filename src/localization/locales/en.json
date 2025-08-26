@@ -103,7 +103,7 @@
     "slide1": "We do not save audio recordings",
     "slide2": "We do not use your client’s data to train our models",
     "slide3": "Personal information of clients is automatically removed",
-    "slide4": "Data is encrypted"
+    "slide4": "Data is encrypted\n"
   },
   "CallSummaryProgress": {
     "generatingSubtitle": "This may take some time. You can find the summary in the session logs screen.",

@@ -126,12 +126,12 @@ export const CallSummaryScreen: React.FC<
         {summaryStatus !== ChatSummaryStatus.NO_AUDIO && (
           <TouchableOpacity
             onPress={handleRefresh}
-            style={[styles.marginB8, styles.seeIfReadyButton]}
+            style={[styles.seeIfReadyButton, styles.marginB8]}
             disabled={showSummaryButtonLoader}>
             {showSummaryButtonLoader && (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={colors.azureBlue} />
             )}
-            <Text style={[styles.viewCallLogsButtonText, styles.colorWhite]}>
+            <Text style={styles.viewCallLogsButtonText}>
               {summaryActionButtonText}
             </Text>
           </TouchableOpacity>
@@ -158,6 +158,14 @@ export const CallSummaryScreen: React.FC<
       );
     }
 
+    if (isLoading) {
+      return (
+        <View style={styles.spinnerContainer}>
+          <ActivityIndicator color={colors.white} />
+        </View>
+      );
+    }
+
     if (showSummary) {
       return (
         <>
@@ -165,7 +173,6 @@ export const CallSummaryScreen: React.FC<
             style={styles.scrollView}
             nestedScrollEnabled
             extraScrollHeight={100}
-            contentOffset={{x: 0, y: 100}}
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
             enableOnAndroid>

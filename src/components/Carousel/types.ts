@@ -72,3 +72,11 @@ export interface NavigationProps {
 export interface SecurityCarouselProps {
   variant?: CarouselVariant;
 }
+
+export type CarouselConfig = {
+  width: number;
+  isBlurView: boolean;
+  paginationActiveDotStyle: ViewStyle;
+  imageContainerCustomStyle?: ViewStyle;
+  titleCustomStyle?: TextStyle;
+};

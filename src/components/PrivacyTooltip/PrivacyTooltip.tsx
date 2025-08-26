@@ -3,13 +3,13 @@ import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import Tooltip, {TooltipProps} from 'react-native-walkthrough-tooltip';
 
-import {tooltipDisplayInsets} from '@/constants';
-
 interface PrivacyTooltipProps {
   children: React.ReactNode;
   isVisible: boolean;
   tooltipContent: TooltipProps['content'];
+  placement?: 'top' | 'bottom' | 'left' | 'right' | 'center';
   onClose: () => void;
+  displayInsets?: TooltipProps['displayInsets'];
 }
 
 export const PrivacyTooltip: React.FC<PrivacyTooltipProps> = ({
@@ -17,15 +17,17 @@ export const PrivacyTooltip: React.FC<PrivacyTooltipProps> = ({
   isVisible,
   tooltipContent = <View />,
   onClose,
+  placement = 'top',
+  displayInsets,
 }) => {
   return (
     <Tooltip
       isVisible={isVisible}
       content={tooltipContent}
       onClose={onClose}
-      placement="top"
+      placement={placement}
       showChildInTooltip={false}
-      displayInsets={tooltipDisplayInsets}
+      displayInsets={displayInsets}
       contentStyle={styles.content}>
       {children}
     </Tooltip>
