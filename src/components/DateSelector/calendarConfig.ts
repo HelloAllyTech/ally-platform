@@ -1,7 +1,6 @@
 import {moderateScale} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const calendarTheme = {
   calendarBackground: colors.white,

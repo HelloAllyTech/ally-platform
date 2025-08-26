@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 
+import {useErrorToast, useToast} from '@/components';
 import {
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
@@ -12,15 +13,9 @@ import {logger} from '@/utils/logger';
 
 import {useAppNavigation} from './useAppNavigation';
 import {useStoragePermissions} from './useStoragePermissions';
-import useTranslate from './useTranslate';
+import {useTranslate} from './useTranslate';
 
-interface ToastState {
-  visible: boolean;
-  message: string;
-  type: 'success' | 'error' | 'info';
-}
-
-const useCallSummaryActions = ({
+export const useCallSummaryActions = ({
   chatId,
   name,
   isCallLogSummaryFlow,
@@ -39,37 +34,18 @@ const useCallSummaryActions = ({
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isSummaryDropdownVisible, setIsSummaryDropdownVisible] =
     useState(false);
-  const [toast, setToast] = useState<ToastState>({
-    visible: false,
-    message: '',
-    type: 'error',
-  });
   const [summaryName, setSummaryName] = useState(name);
 
   const {t} = useTranslate();
-
-  const showToast = useCallback(
-    (message: string, type: 'success' | 'error' | 'info' = 'error') => {
-      setToast({
-        visible: true,
-        message,
-        type,
-      });
-    },
-    [],
-  );
-
-  const hideToast = useCallback(() => {
-    setToast(prev => ({...prev, visible: false}));
-  }, []);
-
+  const {showToast} = useToast();
+  const {showErrorToast} = useErrorToast();
   useEffect(() => {
     if (name) {
       setSummaryName(name);
     }
   }, [name]);
 
-  const {checkAndRequestPermissions} = useStoragePermissions(showToast);
+  const {checkAndRequestPermissions} = useStoragePermissions();
 
   // Hide rename, export, delete menu
   const hideMenu = () => {
@@ -91,13 +67,8 @@ const useCallSummaryActions = ({
         }).unwrap();
         setSummaryName(newName);
         showToast(t('CallSummary.info.summaryNameUpdateSuccess'), 'success');
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : t('CallSummary.info.summaryNameUpdateFailed');
-        logger.error(errorMessage);
-        showToast(errorMessage);
+      } catch (error) {
+        showErrorToast(error, 'CallSummary.info.summaryNameUpdateFailed');
       }
     }
   };
@@ -124,13 +95,8 @@ const useCallSummaryActions = ({
 
       showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
       setIsMenuVisible(false);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : t('CallSummary.info.fileExportFailed');
-      logger.error(errorMessage);
-      showToast(errorMessage);
+    } catch (error) {
+      showErrorToast(error, 'CallSummary.info.fileExportFailed');
     }
   };
 
@@ -162,15 +128,12 @@ const useCallSummaryActions = ({
     }
   };
 
-  // Go back to home screen
+  // Go back to Call Logs screen
   const handleGoBack = useCallback(() => {
     if (isCallLogSummaryFlow) {
       navigation.goBack();
     } else {
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'Home'}],
-      });
+      navigation.reset({index: 0, routes: [{name: 'CallLog'}]});
       dispatch(clearCurrentChat());
     }
   }, [isCallLogSummaryFlow, navigation, dispatch]);
@@ -209,9 +172,6 @@ const useCallSummaryActions = ({
     handleExport,
     handleDelete,
     handleGoBack,
-    hideToast,
-    showToast,
-    toast,
     summaryName,
     setSummaryName,
     onHeaderPress,
@@ -219,5 +179,3 @@ const useCallSummaryActions = ({
     hideHeaderDropdown,
   };
 };
-
-export default useCallSummaryActions;

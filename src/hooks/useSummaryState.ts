@@ -4,6 +4,7 @@ import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
 import {useUpdateNotesMutation} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
 import {clearSummaryStates} from '@/store/slices/summarySlice';
+import {logger} from '@/utils';
 
 import {useDebounce} from './useDebounce';
 
@@ -18,71 +19,40 @@ export const useSummaryState = (
     useLazyGetCallSummaryQuery();
   const [updateNotes] = useUpdateNotesMutation();
 
-  const [isFullyExpanded, setIsFullyExpanded] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
-  const [showInfoModal, setShowInfoModal] = useState(false);
   const [canShowSummary, setCanShowSummary] = useState(Boolean(callId));
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [showAnimation, setShowAnimation] = useState(!chatId);
   const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
-  const [hasCollapsedBeenShown, setHasCollapsedBeenShown] = useState(false);
-  const [forceRemountKey, setForceRemountKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Initial polling logic
   useEffect(() => {
-    let pollTimeout: NodeJS.Timeout | null = null;
-
-    const poll = async () => {
+    const fetchSummary = async () => {
       if (!chatId) return;
       await fetchCallSummary(chatId);
     };
-
-    // On mount, fetch summary
-    poll();
-
-    // Poll again after 5 seconds
-    pollTimeout = setTimeout(() => {
-      poll();
-    }, 5000);
-
-    return () => {
-      if (pollTimeout) clearTimeout(pollTimeout);
-    };
+    fetchSummary();
   }, [chatId, fetchCallSummary]);
 
-  // Watch for summaryData changes
   useEffect(() => {
     if (summaryData?.details?.summary) {
       setIsSummaryAvailable(true);
     }
   }, [summaryData]);
 
-  // Cleanup summary state on unmount
+  // After the summary becomes available, keep showing loader for 3 seconds,
+  // then reveal the summary content automatically.
+  useEffect(() => {
+    if (!isSummaryAvailable || canShowSummary) return;
+    const id = setTimeout(() => setCanShowSummary(true), 3000);
+    return () => clearTimeout(id);
+  }, [isSummaryAvailable, canShowSummary]);
+
   useEffect(() => {
     return () => {
       dispatch(clearSummaryStates());
     };
   }, [dispatch]);
-
-  useEffect(() => {
-    if (hasCollapsedBeenShown && showAnimation) {
-      setShowAnimation(false);
-      setForceRemountKey(prev => prev + 1);
-    }
-  }, [hasCollapsedBeenShown, showAnimation]);
-
-  const handleScroll = useCallback(
-    (isExpanded: boolean) => {
-      setIsFullyExpanded(isExpanded);
-      if (showAnimation && !isExpanded && !hasCollapsedBeenShown) {
-        setHasCollapsedBeenShown(true);
-      }
-      return !isExpanded;
-    },
-    [showAnimation, hasCollapsedBeenShown],
-  );
 
   const handleRefresh = useCallback(async () => {
     if (!chatId) return;
@@ -101,8 +71,7 @@ export const useSummaryState = (
           content: text,
         },
       }).catch(error => {
-        // Handle error if needed
-        console.error('Failed to update notes:', error);
+        logger.error(`Error updating notes: ${error}`);
       });
     },
     {delay: 1000},
@@ -111,23 +80,18 @@ export const useSummaryState = (
   return {
     isLoading,
     summaryData,
-    isFullyExpanded,
     showSummary,
     setShowSummary,
-    showInfoModal,
-    setShowInfoModal,
     canShowSummary,
     setCanShowSummary,
     activeModal,
     setActiveModal,
     showScrollToBottom,
     setShowScrollToBottom,
-    showAnimation,
     isSummaryAvailable,
-    forceRemountKey,
     refreshing,
-    handleScroll,
     handleRefresh,
     handleNoteChange,
+    summaryStatus: summaryData?.summaryStatus,
   };
 };

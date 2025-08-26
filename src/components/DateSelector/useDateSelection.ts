@@ -22,7 +22,6 @@ interface UseDateSelectionProps {
   pickerMode: string;
 }
 
-// Utility functions for date manipulation
 const formatDate = (date: Date): string => date.toISOString().split('T')[0];
 
 const getNextDayRange = (date: Date): DateRange => {

@@ -18,17 +18,17 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchIcon} from '@/assets/icons';
-import CustomTabs from '@/components/CustomTabs/CustomTabs';
-import getThemedStyles from '@/components/CustomTabs/styles';
-import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
-import {useSearch} from '@/hooks/useSearch';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {CustomTabs, ResourceArticleCard} from '@/components';
+import {getThemedStyles} from '@/components/CustomTabs/styles';
+import {useSearch, useTabBackToHomeHandler, useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 
-import {SearchHeader, SearchInput, SearchSuggestion} from './components';
-import {SearchEmpty} from './components/SearchEmpty';
+import {
+  SearchEmpty,
+  SearchHeader,
+  SearchInput,
+  SearchSuggestion,
+} from './components';
 import {trySuggestions} from './searchConfig';
 import {ResourceArticle} from './types';
 
@@ -59,6 +59,7 @@ export const SearchScreen: React.FC = () => {
     showInitialLoader,
     showFooterLoader,
     showEmptyState,
+    resetSearch,
   } = useSearch(flatListRef);
   const {t} = useTranslate();
 
@@ -156,6 +157,11 @@ export const SearchScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={tabBodyContentStyle}
             style={tabBodyStyle}
+            removeClippedSubviews
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
             ListFooterComponent={
               showFooterLoader ? (
                 <ActivityIndicator style={styles.footerActivityIndicator} />
@@ -185,6 +191,7 @@ export const SearchScreen: React.FC = () => {
         showSuggestions={isShowSuggestions}
         onSuggestionPress={handleSuggestionPress}
         onSubmitEditing={triggerSearchOnSubmit}
+        resetSearch={resetSearch}
       />
     );
   };

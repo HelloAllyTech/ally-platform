@@ -1,7 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const styles = ScaledSheet.create({
   dateSelector: {
@@ -144,6 +143,9 @@ export const styles = ScaledSheet.create({
   monthCellTextSelected: {
     color: colors.white,
     fontWeight: 'bold',
+  },
+  disabledMonth: {
+    color: colors.lightGray4,
   },
   yearRow: {
     flexDirection: 'row',

@@ -4,23 +4,21 @@ import {AppState, ImageBackground, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import images from '@/assets/images';
+import {breathingBackground} from '@/assets';
 import {PrimaryButton} from '@/components';
-import {isIOS} from '@/constants/general';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {RootStackScreenProps} from '@/navigation/types';
+import {isIOS, SCREEN_NAMES} from '@/constants';
+import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {useAppDispatch} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 import {
   BoxBreathingAnimation,
   BreathingControls,
-} from './components/BreathingVideo';
-import {Phase} from './components/BreathingVideo/BoxBreathingAnimation';
-import {CallEndOverlay} from './components/CallEndOverlay';
+  CallEndOverlay,
+  Phase,
+} from './components';
 
 export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   navigation,
@@ -52,7 +50,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
   useHardwareBackPressHandler(() => {
     dispatch(clearCurrentChat());
     setIsPlaying(false);
-    navigation.navigate('Home');
+    navigation.reset({index: 0, routes: [{name: SCREEN_NAMES.CALL_LOG}]});
     return true;
   });
 
@@ -89,9 +87,9 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
     lottieRef.current?.play();
   };
 
-  const onPressSkip = () => {
+  const onPressViewSessionSummary = () => {
     setIsPlaying(false);
-    navigation.navigate('CallSummary');
+    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY);
   };
 
   const onPhaseChange = (phase: Phase) => {
@@ -122,20 +120,20 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
         <CallEndOverlay />
       ) : (
         <ImageBackground
-          source={images.breathingBackground}
+          source={breathingBackground}
           style={styles.container}
           resizeMode="cover">
           <LinearGradient
             colors={[colors.darkGray, colors.black0]}
             style={StyleSheet.absoluteFillObject}
           />
-          <View style={styles.content}>
-            <Text style={styles.heading}>
-              {t('BreathingScreen.header.box')}{' '}
-              <Text style={styles.headingItalic}>
-                {t('BreathingScreen.header.breathing')}
-              </Text>
+          <Text style={styles.heading}>
+            {t('BreathingScreen.header.returnTo')}{' '}
+            <Text style={styles.headingItalic}>
+              {t('BreathingScreen.header.self')}
             </Text>
+          </Text>
+          <View style={styles.content}>
             <BoxBreathingAnimation
               isPlaying={isPlaying}
               isMuted={isMuted}
@@ -153,9 +151,9 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           </View>
 
           <PrimaryButton
-            label={t('BreathingScreen.skip')}
-            onPress={onPressSkip}
-            customContainerStyle={styles.skipButton}
+            label={t('BreathingScreen.viewSessionSummary')}
+            onPress={onPressViewSessionSummary}
+            customContainerStyle={styles.viewSummaryButton}
           />
         </ImageBackground>
       )}
@@ -171,13 +169,15 @@ const styles = ScaledSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: '60@vs',
   },
   heading: {
+    textAlign: 'center',
     color: colors.white,
     fontSize: '32@ms',
     ...fontFamily.REPLAY_PRO.HEADLINE,
     marginBottom: '20@vs',
+    paddingHorizontal: '20@s',
+    marginTop: '60@vs',
   },
   headingItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -190,9 +190,9 @@ const styles = ScaledSheet.create({
     marginBottom: '12@vs',
     ...fontFamily.ROBOTO.REGULAR,
   },
-  skipButton: {
+  viewSummaryButton: {
     alignSelf: 'center',
     marginBottom: '40@vs',
-    width: '30%',
+    width: '70%',
   },
 });

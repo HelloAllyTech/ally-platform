@@ -1,10 +1,17 @@
 import React from 'react';
-import {Animated, Easing, TouchableOpacity, View} from 'react-native';
+import {Animated, Easing, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CallEndIcon, ChevronDown, MicIcon} from '@/assets/icons';
+import {
+  ChevronDown,
+  MicIcon,
+  PauseIcon,
+  ResumeIcon,
+  ShieldIcon,
+} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 
 interface ControlButtonsSectionProps {
   onFocusModeButtonPress: () => void;
@@ -13,6 +20,11 @@ interface ControlButtonsSectionProps {
   onToggleMaximized: () => void;
   onCallEndPress: () => void;
   isCallEndDisabled?: boolean;
+  isPauseResumeDisabled?: boolean;
+  isCallPaused?: boolean;
+  onPauseResumePress: () => void;
+  showPauseResumeButton?: boolean;
+  showEndSessionButton?: boolean;
 }
 
 export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
@@ -22,7 +34,13 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
   onCallEndPress,
   onFocusModeButtonPress,
   isCallEndDisabled = false,
+  isPauseResumeDisabled = false,
+  isCallPaused = false,
+  onPauseResumePress,
+  showPauseResumeButton = true,
+  showEndSessionButton = true,
 }) => {
+  const {t} = useTranslate();
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -50,21 +68,74 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
       </TouchableOpacity>
       {isMaximized && (
         <>
-          <View style={styles.buttonsRow}>
+          <View style={styles.buttonsColumn}>
+            {/* Pause/Resume Transcription Button */}
+            {showPauseResumeButton && (
+              <TouchableOpacity
+                style={[
+                  styles.buttonContainer,
+                  isCallPaused && {backgroundColor: colors.white},
+                ]}
+                onPress={onPauseResumePress}
+                disabled={isPauseResumeDisabled}
+                activeOpacity={0.85}
+                hitSlop={DEFAULT_HIT_SLOP}>
+                {isCallPaused ? (
+                  <ResumeIcon width={24} height={24} />
+                ) : (
+                  <PauseIcon width={24} height={24} color={colors.white} />
+                )}
+                <Text
+                  style={[
+                    styles.buttonText,
+                    isCallPaused && {color: colors.darkGray5},
+                  ]}>
+                  {t(
+                    `ListeningScreen.${isCallPaused ? 'resumeTranscription' : 'pauseTranscription'}`,
+                  )}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Focus Mode Button */}
             <TouchableOpacity
-              style={[styles.buttonContainer, isFocusMode && styles.bgWhite]}
+              style={[
+                styles.buttonContainer,
+                isFocusMode && {backgroundColor: colors.white},
+              ]}
               onPress={onFocusModeButtonPress}
-              activeOpacity={1}
+              activeOpacity={0.85}
               hitSlop={DEFAULT_HIT_SLOP}>
               <MicIcon color={isFocusMode ? colors.black : colors.white} />
+              <Text
+                style={[
+                  styles.buttonText,
+                  isFocusMode && {color: colors.darkGray5},
+                ]}>
+                {t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`)}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.buttonContainer, styles.callEndButton]}
-              onPress={onCallEndPress}
-              disabled={isCallEndDisabled}
-              activeOpacity={0.85}>
-              <CallEndIcon width={35} height={35} color={colors.white} />
-            </TouchableOpacity>
+
+            {/* End Session Button */}
+            {showEndSessionButton && (
+              <TouchableOpacity
+                style={styles.buttonContainer}
+                onPress={onCallEndPress}
+                disabled={isCallEndDisabled}
+                activeOpacity={0.85}
+                hitSlop={DEFAULT_HIT_SLOP}>
+                <View style={styles.redSquareIcon} />
+                <Text style={styles.buttonText}>
+                  {t('ListeningScreen.endSession')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.securityContainer}>
+            <ShieldIcon width={16} height={16} color={colors.lightGrayD9} />
+            <Text style={styles.securityText}>
+              {t('ListeningScreen.dataSafe')}
+            </Text>
           </View>
         </>
       )}
@@ -74,38 +145,60 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
 
 const styles = ScaledSheet.create({
   sectionContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     width: '100%',
     alignItems: 'center',
     backgroundColor: colors.darkGray3,
     borderRadius: '24@ms',
     paddingVertical: '8@mvs',
+    paddingHorizontal: '21@s',
     minHeight: '44@ms',
   },
-  buttonContainer: {
-    width: '56@ms',
-    height: '56@ms',
-    borderRadius: '30@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
+  buttonsColumn: {
+    width: '100%',
+    gap: '8@s',
   },
-  bgWhite: {
-    backgroundColor: colors.white,
+  buttonContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: '16@vs',
+    backgroundColor: colors.darkGray10,
+    gap: '10@s',
+    borderRadius: '8@ms',
+  },
+  buttonText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    color: colors.white,
+  },
+  redSquareIcon: {
+    width: '16@s',
+    height: '16@s',
+    backgroundColor: colors.coralRed,
+    borderRadius: '2@ms',
   },
   toggleIconContainer: {
     width: '48@ms',
     height: '32@mvs',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: '20@mvs',
+    marginBottom: '12@mvs',
   },
-  buttonsRow: {
+  securityText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '12@ms',
+    color: colors.white,
+  },
+  securityContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: '16@s',
-    marginBottom: '50@vs',
-  },
-  callEndButton: {
-    backgroundColor: colors.brightRed,
+    gap: '4@s',
+    marginTop: '24@vs',
+    marginBottom: '16@vs',
   },
 });

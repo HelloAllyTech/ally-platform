@@ -37,6 +37,8 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone for audio streaming</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app may access your camera for video communication features. Camera access is required for live video calls and screen sharing functionality.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReplayPro-BoldItalic.otf</string>

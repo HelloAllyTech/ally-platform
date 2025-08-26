@@ -2,6 +2,15 @@
 
 A React Native mobile application designed to facilitate communication between medical counsellors and their clients.
 
+> This repository is now open source under the MIT License. See `LICENSE`.
+
+## Features
+
+- Secure, privacy-first counselor–client sessions
+- Live audio streaming with transcription
+- Detailed call summaries
+- Conversation analytics and reporting
+
 ## Tech Stack
 
 - **Framework:** React Native 0.79.1
@@ -9,7 +18,6 @@ A React Native mobile application designed to facilitate communication between m
 - **State Management:** Redux Toolkit
 - **Navigation:** React Navigation v7
 - **Styling:** React Native Size Matters
-- **Animations:** React Native Reanimated, Lottie
 - **Storage:** AsyncStorage
 - **Network:** Socket.IO Client
 - **Code Quality:**
@@ -69,10 +77,27 @@ The app uses a robust theming system located in `src/theme/`:
    ```
 
 3. iOS specific setup:
+
    ```bash
    bundle install
    bundle exec pod install
    ```
+
+4. Configure environment variables
+
+   Create an `.env` file in the repository root based on `.env.example`.
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   This app uses `react-native-config`. The variables are documented in `env/.env.example` and consumed from `src/config/env.ts`.
+
+5. Configure platform secrets
+
+   - iOS: Add your Firebase `GoogleService-Info.plist` at `ios/GoogleService-Info.plist` (excluded from git).
+   - Android: Add your Firebase `google-services.json` at `android/app/google-services.json` (excluded from git).
+   - Android release signing: Provide your own keystore and signing configuration locally. Keystores must never be committed.
 
 ### Running the App
 
@@ -258,4 +283,33 @@ To learn more about React Native, take a look at the following resources:
 
 ### Environment Variables
 
-The app uses environment variables for configuration. You'll need to create a `.env` file in the root directory based on the template provided in `env/.env.example`. Copy the example file and fill in the appropriate values:
+The app uses environment variables for configuration. Create a `.env` file in the root directory based on `env/.env.example`. Required variables:
+
+```
+ENVIRONMENT=development|staging|production
+API_BASE_URL=<https-url>
+API_VERSION=v1
+ALLY_WEB_URL=<https-url>
+THIRD_PARTY_CALL_NUMBER=<string>
+WEBRTC_SOCKET_PATH=<path>
+MICROPHONE_SOCKET_PATH=<path>
+CLOUD_TELEPHONY_PATH=<path>
+```
+
+See `src/config/env.ts` for the authoritative list and validation.
+
+## Contributing
+
+Please read `CONTRIBUTING.md` for guidelines on how to propose changes, set up your environment, and follow our coding standards.
+
+## Code of Conduct
+
+This project adheres to a Code of Conduct. By participating, you are expected to uphold it. See `CODE_OF_CONDUCT.md`.
+
+## Security
+
+If you discover a security vulnerability, please follow the steps in `SECURITY.md` and do not open a public issue with sensitive details.
+
+## License
+
+MIT © Ally Contributors. See `LICENSE` for details.

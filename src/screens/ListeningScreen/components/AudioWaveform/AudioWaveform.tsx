@@ -10,7 +10,7 @@ import Animated, {
 import {moderateScale, ScaledSheet} from 'react-native-size-matters';
 
 import {SCREEN_WIDTH} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 const MAX_HEIGHT = 50;
 const TINY_BAR_HEIGHT = 0.08; // Tiny bar height for no audio case

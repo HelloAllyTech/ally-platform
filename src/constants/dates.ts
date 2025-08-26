@@ -1,5 +1,3 @@
-// Date-related constants
-
 export const MONTH_NAMES_SHORT = [
   'Jan',
   'Feb',

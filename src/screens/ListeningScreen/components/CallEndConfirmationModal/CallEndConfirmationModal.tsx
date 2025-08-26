@@ -1,6 +1,9 @@
-import {CustomModal} from '@/components/Modal/CustomModal';
-import useTranslate from '@/hooks/useTranslate';
-import {colors} from '@/theme/colors';
+import {ms, ScaledSheet} from 'react-native-size-matters';
+
+import {EndSessionIcon} from '@/assets/icons';
+import {IllustratedModal} from '@/components';
+import {useTranslate} from '@/hooks';
+import {colors} from '@/theme';
 
 interface CallEndConfirmationModalProps {
   visible: boolean;
@@ -17,28 +20,45 @@ export const CallEndConfirmationModal = ({
 }: CallEndConfirmationModalProps) => {
   const {t} = useTranslate();
 
-  let title: string, description: string, primaryButtonText: string;
+  let titleMain: string,
+    titleItalic: string,
+    description: string,
+    actionButtonText: string;
   if (isMicrophoneMode) {
-    title = t('ListeningScreen.endSession');
+    titleMain = t('ListeningScreen.end');
+    titleItalic = t('ListeningScreen.session');
     description = t('ListeningScreen.microphoneModeEndConfirmation');
-    primaryButtonText = t('ListeningScreen.endSession');
+    actionButtonText = t('ListeningScreen.endSession');
   } else {
-    title = t('ListeningScreen.endCall');
+    titleMain = t('ListeningScreen.end');
+    titleItalic = t('ListeningScreen.call');
     description = t('ListeningScreen.callEndConfirmation');
-    primaryButtonText = t('ListeningScreen.endCall');
+    actionButtonText = t('ListeningScreen.endCall');
   }
 
+  const illustration = <EndSessionIcon />;
+
   return (
-    <CustomModal
+    <IllustratedModal
       visible={visible}
       onClose={onClose}
-      title={title}
       description={description}
-      primaryButtonText={primaryButtonText}
-      secondaryButtonText={t('CallSummary.info.cancel')}
-      onPrimaryPress={onConfirm}
-      onSecondaryPress={onClose}
-      primaryTextColor={colors.brightRed}
+      actionButtonText={actionButtonText}
+      titleMain={titleMain}
+      titleItalic={titleItalic}
+      onActionPress={onConfirm}
+      actionButtonColor={colors.brightRed}
+      illustration={illustration}
+      actionButtonStyle={{
+        paddingHorizontal: ms(40),
+      }}
     />
   );
 };
+
+const styles = ScaledSheet.create({
+  illustration: {
+    width: '171.05@ms',
+    height: '154.99@ms',
+  },
+});

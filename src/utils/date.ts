@@ -1,4 +1,4 @@
-import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants/dates';
+import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants';
 
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -55,7 +55,7 @@ export const formatDateWithOrdinal = (dateString: string | Date): string => {
 
   // Get day with ordinal suffix
   const day = date.getDate();
-  const ordinalSuffix = getOrdinalSuffix(day);
+  const ordinalSuffix = getOrdinalSuffix(date.getDate());
 
   // Get full month name
   const month = MONTH_NAMES_FULL[date.getMonth()];

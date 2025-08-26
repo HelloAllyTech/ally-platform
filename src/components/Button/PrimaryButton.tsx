@@ -2,8 +2,7 @@ import React from 'react';
 import {ActivityIndicator, Text, TouchableOpacity} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {typography} from '@/theme/typography';
+import {colors, typography} from '@/theme';
 
 import type {PrimaryButtonProps} from './types';
 
@@ -14,9 +13,12 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   onPress,
   customContainerStyle,
   customTextStyle,
+  ...rest
 }) => {
   return (
     <TouchableOpacity
+      activeOpacity={0.8}
+      {...rest}
       style={[
         styles.button,
         isDisabled && styles.buttonDisabled,
@@ -24,7 +26,6 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         customContainerStyle,
       ]}
       disabled={isDisabled || isLoading}
-      activeOpacity={0.8}
       onPress={onPress}>
       {isLoading ? (
         <ActivityIndicator color={colors.white} />

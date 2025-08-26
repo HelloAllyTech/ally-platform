@@ -1,8 +1,7 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants/general';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const styles = ScaledSheet.create({
   flex1: {
@@ -58,7 +57,6 @@ export const styles = ScaledSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: '24@ms',
     borderTopRightRadius: '24@ms',
-    paddingTop: '50@ms',
     paddingHorizontal: '32@ms',
     paddingBottom: '54@vs',
     height: '65%',
@@ -76,6 +74,41 @@ export const styles = ScaledSheet.create({
     position: 'absolute',
     top: '62@s',
     left: '30@s',
+    zIndex: 200,
+  },
+  bottomAbsoluteContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 200,
+  },
+  blurBackground: {
+    borderRadius: '20@ms',
+    marginHorizontal: '20@ms',
+    marginBottom: '20@vs',
+    padding: '20@ms',
+  },
+  loginButtonContainer: {
+    marginTop: '20@vs',
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '80%',
+    marginLeft: '36@ms',
+    marginRight: '36@ms',
+    zIndex: 200,
+    marginBottom: '60@vs',
+  },
+  loginButtonText: {
+    ...fontFamily.ROBOTO.REGULAR,
+    fontSize: '14@ms',
+    color: colors.charcoalGray,
+  },
+  carouselContainer: {
+    position: 'absolute',
+    bottom: '100@vs',
+    width: '100%',
     zIndex: 200,
   },
 });

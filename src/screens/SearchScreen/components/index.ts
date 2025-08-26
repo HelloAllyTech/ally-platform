@@ -1,5 +1,4 @@
-import {SearchHeader} from './SearchHeader';
-import {SearchInput} from './SearchInput';
-import {SearchSuggestion} from './SearchSuggestions';
-
-export {SearchInput, SearchHeader, SearchSuggestion};
+export {SearchHeader} from './SearchHeader';
+export {SearchInput} from './SearchInput';
+export {SearchSuggestion} from './SearchSuggestions';
+export {SearchEmpty} from './SearchEmpty';

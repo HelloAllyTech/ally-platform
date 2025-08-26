@@ -6,7 +6,8 @@ import {Provider} from 'react-redux';
 
 import {env} from '@/config/env';
 
-import NetworkLogs from './components/NetworkLogs/NetworkLogs';
+import {NetworkLogs} from './components/NetworkLogs/NetworkLogs';
+import {ToastProvider} from './components/Toast/ToastProvider';
 import {RootNavigator} from './navigation/RootNavigator';
 import {store} from './store/store';
 
@@ -18,8 +19,10 @@ export const App = () => {
       <Provider store={store}>
         <SafeAreaProvider style={styles.container}>
           <StatusBar translucent backgroundColor="transparent" />
-          <RootNavigator />
-          {env.ENVIRONMENT === 'development' && <NetworkLogs />}
+          <ToastProvider>
+            <RootNavigator />
+          </ToastProvider>
+          {__DEV__ && env.ENVIRONMENT === 'development' && <NetworkLogs />}
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>

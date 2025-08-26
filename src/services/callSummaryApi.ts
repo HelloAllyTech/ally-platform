@@ -1,5 +1,6 @@
+import {ChatSummaryStatus} from '@/constants';
 import {setSummaryData} from '@/store/slices/summarySlice';
-import {ChatProvider} from '@/types/message';
+import {ChatProvider} from '@/types';
 
 import {api} from './api';
 
@@ -134,6 +135,7 @@ export interface CallSummaryResponse {
   startedAt: string;
   endedAt: string;
   details: CallDetails;
+  summaryStatus: ChatSummaryStatus;
 }
 
 export interface Tag {
