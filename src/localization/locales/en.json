@@ -9,6 +9,12 @@
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
       "openSettings": "Open Settings"
+    },
+    "offline": {
+      "title": "No internet connection",
+      "description": "Call ended due to network interruption, please check your connection and try again.",
+      "goBack": "Go back",
+      "tryAgain": "Try again"
     }
   },
   "CallLogs": {

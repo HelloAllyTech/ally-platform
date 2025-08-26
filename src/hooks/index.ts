@@ -15,6 +15,7 @@ export {useNavigationAwareCounselorChat} from './useNavigationAwareCounselorChat
 export {useLiveAudioStream} from './useLiveAudioStream';
 export {useSocket} from './useSocket';
 export {useSocketConnection} from './useSocketConnection';
+export {useNetworkConnectivity} from './useNetworkConnectivity';
 
 // UI & State hooks
 export {useKeyboardState} from './useKeyboardState';
