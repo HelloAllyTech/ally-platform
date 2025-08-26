@@ -1,7 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -20,15 +19,17 @@ export const styles = ScaledSheet.create({
     color: colors.white,
     marginTop: '10@vs',
   },
-  controlButtonsContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   focusModeLayout: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: '40@vs',
+  },
+  takingNotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@s',
+    marginBottom: '8@vs',
   },
   takingNotesText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -42,7 +43,7 @@ export const styles = ScaledSheet.create({
     marginLeft: '10@s',
   },
   focusModeWaveformWrapper: {
-    marginVertical: '40@vs',
+    marginTop: '40@vs',
     width: '96%',
   },
   nonFocusModeWaveformWrapper: {
@@ -97,5 +98,15 @@ export const styles = ScaledSheet.create({
     textAlign: 'center',
     marginTop: '15@vs',
     marginHorizontal: '25@s',
+  },
+  tooltipContent: {
+    borderRadius: 8,
+    minWidth: 250,
+    minHeight: 120,
+  },
+  tooltipText: {
+    color: colors.black,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

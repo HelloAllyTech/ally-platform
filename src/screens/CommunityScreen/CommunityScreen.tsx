@@ -2,8 +2,7 @@ import React, {useCallback} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {Linking, Text, View} from 'react-native';
 
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
+import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
 
 const url = 'https://community.helloally.ai/';
 

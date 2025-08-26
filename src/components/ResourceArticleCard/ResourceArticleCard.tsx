@@ -8,7 +8,9 @@ import {
   View,
 } from 'react-native';
 
-import useTranslate from '@/hooks/useTranslate';
+import {DownArrowIcon} from '@/assets';
+import {useTranslate} from '@/hooks';
+import {colors} from '@/theme';
 
 import {getThemedStyles} from './styles';
 
@@ -22,7 +24,7 @@ interface ResourceArticleCardProps {
 
 const MAX_LINES = 3;
 
-const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
+export const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
   category,
   tags = [],
   heading,
@@ -75,8 +77,13 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
               onPress={toggleExpand}
               activeOpacity={0.7}>
               <Text style={themedStyles.moreText}>
-                {`... ${t('ResourceArticleCard.more')}`}
+                {t('ResourceArticleCard.viewMore')}
               </Text>
+              <DownArrowIcon
+                color={colorTheme === 'dark' ? colors.white2 : colors.black}
+                width={24}
+                height={24}
+              />
             </TouchableOpacity>
           </View>
         ) : (
@@ -90,5 +97,3 @@ const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
     </View>
   );
 };
-
-export default ResourceArticleCard;

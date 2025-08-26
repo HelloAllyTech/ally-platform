@@ -3,7 +3,7 @@ import {io, Socket} from 'socket.io-client';
 
 import {env} from '@/config/env';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {SocketEvent} from '@/types/message';
+import {SocketEvent} from '@/types';
 import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 

@@ -1,13 +1,12 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {WINDOW_HEIGHT} from '@/constants/general';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
+    backgroundColor: colors.white,
   },
   scrollView: {
     flex: 1,
@@ -22,46 +21,22 @@ export const styles = ScaledSheet.create({
     left: 0,
     right: 0,
   },
-  scrollToBottomButton: {
-    position: 'absolute',
-    bottom: '60@vs',
-    left: '50%',
-    // To take into account the width of the arrow button
-    marginLeft: '-20@s',
-    width: '40@s',
-    height: '40@s',
-    borderRadius: '20@s',
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
   contentContainer: {
     flex: 1,
   },
   paddingTop: {
     paddingTop: '80@ms',
   },
-  downArrow: {
-    transform: [{rotate: '270deg'}],
-  },
   height100: {
     height: '100%',
   },
   summaryButtonsContainer: {
     position: 'absolute',
-    bottom: '30@ms',
+    paddingBottom: '46@ms',
+    bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: '24@ms',
-    paddingBottom: '16@ms',
     flexDirection: 'column',
     gap: '10@ms',
     alignItems: 'center',
@@ -81,12 +56,30 @@ export const styles = ScaledSheet.create({
     fontWeight: '600',
     fontSize: '16@ms',
   },
+  seeIfReadyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10@ms',
+    backgroundColor: colors.white,
+    borderColor: colors.lightGray4,
+    borderWidth: 1,
+    paddingVertical: '14@ms',
+    width: '100%',
+    borderRadius: '24@ms',
+    justifyContent: 'center',
+  },
   viewCallLogsButton: {
     backgroundColor: colors.white,
-    paddingVertical: '7@ms',
-    borderWidth: 1,
-    borderColor: colors.lightGray4,
+    paddingVertical: '2@ms',
     marginBottom: '4@ms',
+  },
+  viewCallLogsButtonBorder: {
+    borderColor: colors.lightGray4,
+    borderWidth: 1,
+    paddingVertical: '10@ms',
+  },
+  marginB8: {
+    marginBottom: '8@ms',
   },
   viewCallLogsButtonText: {
     color: colors.darkGray10,
@@ -111,6 +104,11 @@ export const styles = ScaledSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinnerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

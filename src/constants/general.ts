@@ -1,4 +1,10 @@
 import {Dimensions, Platform} from 'react-native';
+import {ms} from 'react-native-size-matters';
+
+import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
+import {CarouselItem} from '@/components';
+import {CarouselConfig} from '@/components/Carousel/types';
+import {colors, fontFamily} from '@/theme';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 
@@ -48,3 +54,62 @@ export enum LanguageMap {
   ta = 'Tamil',
   te = 'Telugu',
 }
+
+// API route constants
+export const API_ROUTES = {
+  SEND_OTP: '/auth/send-otp',
+  VERIFY_OTP: '/auth/verify-otp',
+  ROOMS: '/rooms',
+  SCENARIOS: '/scenarios',
+  FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
+} as const;
+
+export const API_METHODS = {
+  GET: 'GET',
+  POST: 'POST',
+  DELETE: 'DELETE',
+} as const;
+
+export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
+export const PRIVACY_POLICY_URL = 'https://helloally.ai/privacy';
+
+export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
+  {image: carousel1, textKey: 'Carousel.slide1'},
+  {image: carousel2, textKey: 'Carousel.slide2'},
+  {image: carousel3, textKey: 'Carousel.slide3'},
+  {image: carousel4, textKey: 'Carousel.slide4'},
+];
+
+export enum CarouselVariant {
+  DRAWER = 'drawer',
+  DEFAULT = 'default',
+}
+
+export const drawerConfig: CarouselConfig = {
+  width: SCREEN_WIDTH - 80,
+  isBlurView: false,
+  paginationActiveDotStyle: {
+    backgroundColor: colors.black,
+  },
+  imageContainerCustomStyle: {
+    width: '90%',
+    height: ms(250),
+  },
+  titleCustomStyle: {
+    color: colors.darkGray2,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: ms(18),
+  },
+};
+
+export const defaultConfig: CarouselConfig = {
+  width: SCREEN_WIDTH,
+  isBlurView: true,
+  paginationActiveDotStyle: {
+    backgroundColor: colors.white,
+  },
+  imageContainerCustomStyle: {},
+  titleCustomStyle: {
+    color: colors.white,
+  },
+};

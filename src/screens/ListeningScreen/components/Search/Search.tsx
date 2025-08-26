@@ -11,19 +11,16 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon} from '@/assets/icons';
-import CustomTabs from '@/components/CustomTabs/CustomTabs';
-import getThemedStyles from '@/components/CustomTabs/styles';
-import ResourceArticleCard from '@/components/ResourceArticleCard/ResourceArticleCard';
-import {useSearch} from '@/hooks/useSearch';
-import useTranslate from '@/hooks/useTranslate';
+import {CustomTabs, ResourceArticleCard} from '@/components';
+import {getThemedStyles} from '@/components/CustomTabs/styles';
+import {useSearch, useTranslate} from '@/hooks';
 import {SearchInput, SearchSuggestion} from '@/screens/SearchScreen/components';
 import {SearchEmpty} from '@/screens/SearchScreen/components/SearchEmpty';
 import {trySuggestions} from '@/screens/SearchScreen/searchConfig';
 import {ResourceArticle} from '@/screens/SearchScreen/types';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
-const Search = () => {
+export const Search = () => {
   const flatListRef = useRef<FlatList>(null);
 
   const {
@@ -49,6 +46,7 @@ const Search = () => {
     showEmptyState,
     selectedCategory,
     handleEndReached,
+    resetSearch,
   } = useSearch(flatListRef);
 
   const {t} = useTranslate();
@@ -89,7 +87,7 @@ const Search = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {tabsMeta.length > 0 && (
+        {resources.length > 0 && tabsMeta.length > 0 && (
           <CustomTabs
             tabs={tabsMeta}
             activeTab={activeTabIndex}
@@ -138,6 +136,7 @@ const Search = () => {
         onSubmitEditing={triggerSearchOnSubmit}
         colorTheme="dark"
         customStyles={styles.input}
+        resetSearch={resetSearch}
       />
     );
   };
@@ -180,8 +179,6 @@ const Search = () => {
     </TouchableWithoutFeedback>
   );
 };
-
-export default Search;
 
 const styles = ScaledSheet.create({
   container: {

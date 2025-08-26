@@ -9,11 +9,10 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants/general';
-import useTranslate from '@/hooks/useTranslate';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 
-const CallEndOverlay = () => {
+export const CallEndOverlay = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const opacity = useSharedValue(1);
   const {t} = useTranslate();
@@ -42,29 +41,39 @@ const CallEndOverlay = () => {
       colors={[colors.black, colors.darkBlue3]}
       style={styles.container}>
       <View style={styles.content}>
-        <Animated.View style={animatedStyle}>
+        <Animated.View style={[styles.block, animatedStyle]}>
           {messageIndex === 0 ? (
-            <Text style={styles.text}>
-              {t('BreathingScreen.youGaveYour')}{' '}
-              <Text style={styles.italic}>{t('BreathingScreen.best')}</Text>
-              {'\n'}
-              {t('BreathingScreen.onThatCall')}
-            </Text>
+            <View style={styles.lineWrap}>
+              {/* Line 1: text + pill */}
+              <View style={styles.inlineRow}>
+                <Text style={styles.text}>
+                  {t('BreathingScreen.youGaveYour')}{' '}
+                </Text>
+                <Text style={[styles.text, styles.pill]}>
+                  {t('BreathingScreen.best')}
+                </Text>
+              </View>
+              {/* Line 2 */}
+              <Text style={styles.text}>{t('BreathingScreen.onThatCall')}</Text>
+            </View>
           ) : (
-            <Text style={styles.text}>
-              {t('BreathingScreen.nowTakeAMoment')}
-              {'\n'}
-              <Text>{t('BreathingScreen.for')}</Text>{' '}
-              <Text style={styles.italic}>{t('BreathingScreen.yourself')}</Text>
-            </Text>
+            <View style={styles.lineWrap}>
+              <Text style={styles.text}>
+                {t('BreathingScreen.nowTakeAMoment')}
+              </Text>
+              <View style={styles.inlineRow}>
+                <Text style={styles.text}>{t('BreathingScreen.for')} </Text>
+                <Text style={[styles.text, styles.pill]}>
+                  {t('BreathingScreen.yourself')}
+                </Text>
+              </View>
+            </View>
           )}
         </Animated.View>
       </View>
     </LinearGradient>
   );
 };
-
-export default CallEndOverlay;
 
 const styles = ScaledSheet.create({
   container: {
@@ -76,15 +85,32 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     paddingHorizontal: '24@ms',
   },
+  block: {
+    width: '100%',
+  },
+  lineWrap: {
+    alignItems: 'center',
+  },
+  inlineRow: {
+    flexDirection: 'row',
+  },
   text: {
     color: colors.white,
     fontSize: '32@ms',
     textAlign: 'center',
-    lineHeight: '34@mvs',
+    lineHeight: '42@mvs',
     ...fontFamily.REPLAY_PRO.HEADLINE,
   },
-  italic: {
+  pill: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: isIOS ? 'italic' : 'normal',
+    backgroundColor: colors.brightBlue,
+    paddingHorizontal: '12@s',
+    paddingTop: '4@vs',
+    paddingBottom: '1@vs',
+    borderRadius: '40@s',
+    overflow: 'hidden',
+    includeFontPadding: false,
+    textAlign: 'center',
   },
 });

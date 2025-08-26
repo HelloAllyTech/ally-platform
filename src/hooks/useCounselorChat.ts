@@ -1,22 +1,25 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
 
+import {SCREEN_NAMES} from '@/constants';
+import {RouteNames} from '@/navigation';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat, setCurrentChat} from '@/store/slices/chatSlice';
-import {Chat} from '@/types/message';
-import {UserRole} from '@/types/user';
+import {Chat, UserRole} from '@/types';
 
 interface UseCounselorChatProps {
   onActiveChatFound?: (data: Chat) => void;
   onNoActiveChatFound?: (error: unknown) => void;
   shouldSubscribeToAppState?: boolean;
+  getCurrentRoute?: () => string | undefined;
 }
 
 export const useCounselorChat = ({
   onActiveChatFound,
   onNoActiveChatFound,
   shouldSubscribeToAppState = false,
+  getCurrentRoute,
 }: UseCounselorChatProps = {}) => {
   const userData = useAppSelector(state => state.user);
   const dispatch = useAppDispatch();
@@ -37,11 +40,22 @@ export const useCounselorChat = ({
         dispatch(setCurrentChat(data));
         onActiveChatFound?.(data);
       } else {
-        dispatch(clearCurrentChat());
+        // Check if we should preserve chat based on current route
+        const currentRoute = getCurrentRoute?.() as RouteNames;
+        const shouldPreserveChat =
+          currentRoute === SCREEN_NAMES.BREATHING ||
+          currentRoute === SCREEN_NAMES.CALL_SUMMARY;
+
+        // Only clear current chat if preservation is not enabled
+        if (!shouldPreserveChat) {
+          dispatch(clearCurrentChat());
+        }
         onNoActiveChatFound?.(error);
       }
+      return data;
     } catch (error) {
       onNoActiveChatFound?.(error);
+      return error;
     } finally {
       isCheckingRef.current = false;
     }
@@ -51,6 +65,7 @@ export const useCounselorChat = ({
     userData?.isAuthenticated,
     onActiveChatFound,
     onNoActiveChatFound,
+    getCurrentRoute,
   ]);
 
   const handleAppStateChange = useCallback(

@@ -1,7 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 export const getThemedStyles = (colorScheme: string | null) => {
   const isDark = colorScheme === 'dark';
@@ -76,20 +75,16 @@ export const getThemedStyles = (colorScheme: string | null) => {
       lineHeight: '18@ms',
     },
     moreButton: {
-      position: 'absolute',
-      right: 0,
-      bottom: 0,
       backgroundColor: isDark ? colors.darkGray5 : colors.white,
-      paddingHorizontal: 0,
-      paddingVertical: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: '4@ms',
     },
     moreText: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
       color: isDark ? colors.white2 : colors.darkGray6,
-      fontSize: '14@ms',
-      textDecorationLine: 'underline',
+      fontSize: '13@ms',
       lineHeight: '18@ms',
-      marginRight: '50%',
     },
   });
 };

@@ -7,14 +7,14 @@ import {
   SUMMARY_FIELDS,
   summaryFields,
 } from '@/constants/summary';
-import {useCallSummaryForm} from '@/hooks/useCallSummaryForm';
+import {useCallSummaryForm} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {
   selectMetrics,
   selectSummary,
   selectSummaryData,
 } from '@/store/slices/summarySlice';
-import {EditableFieldKey, SummaryField} from '@/types/callSummary';
+import {EditableFieldKey, SummaryField} from '@/types';
 
 import {DemographicsSection} from '../DemographicsSection/DemographicsSection';
 import {EditableField} from '../EditableField/EditableField';
@@ -84,5 +84,3 @@ export const SectionContent: React.FC<SectionContentProps> = ({
 
   return <>{sectionFields.map(renderSummaryField)}</>;
 };
-
-export default SectionContent;

@@ -1,0 +1,1 @@
+export {PrivacyTooltip} from './PrivacyTooltip';

@@ -6,13 +6,14 @@ import {
   DoubleRightArrowIcon,
   EyeIcon,
 } from '@/assets/icons';
-import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants/general';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {CallLog} from '../../types';
-import Tag from '../Tag/Tag';
+import {StatusBadge} from '../StatusBadge';
+import {Tag} from '../Tag/Tag';
 
 /**
  * Props interface for the CallLogItem component
@@ -36,13 +37,14 @@ interface CallLogItemProps {
  * The component displays client information, call quality score, and when expanded,
  * shows the call duration and associated tags with color-coded positivity ratings.
  */
-const CallLogItem = ({
+export const CallLogItem = ({
   item,
   expanded,
   disabled = false,
   onToggle,
   onItemPress,
 }: CallLogItemProps) => {
+  const {t} = useTranslate();
   return (
     <TouchableOpacity
       disabled={disabled}
@@ -64,21 +66,21 @@ const CallLogItem = ({
                 <DoubleRightArrowIcon width={16} height={16} />
               )}
             </TouchableOpacity>
-            <View>
-              <Text style={styles.logId}>
+            <View style={styles.titleRow}>
+              <Text style={styles.logId} numberOfLines={1} ellipsizeMode="tail">
                 {item?.details?.callInfo?.summaryName || item?.details?.chatId}
               </Text>
+              <View style={styles.statusAndEyeContainer}>
+                <StatusBadge status={item.summaryStatus} />
+                {!disabled && (
+                  <EyeIcon width={16} height={16} style={styles.eyeIcon} />
+                )}
+              </View>
             </View>
           </View>
           <Text style={styles.logDate}>
             {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
           </Text>
-        </View>
-        <View style={styles.rightContainer}>
-          {/* <Badge>{item.details?.summary?.callQuality || 0} Pts</Badge> */}
-          {!disabled && (
-            <EyeIcon width={16} height={16} style={styles.eyeIcon} />
-          )}
         </View>
       </View>
 
@@ -86,7 +88,7 @@ const CallLogItem = ({
       {expanded && (
         <View style={styles.logDetails}>
           <Text style={styles.duration}>
-            Duration: {calculateDuration(item.startedAt, item.endedAt)}
+            {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
           </Text>
           {/* Render tags if they exist */}
           {(item.details?.summary?.tags?.length ?? 0) > 0 && (
@@ -163,6 +165,8 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
     color: colors.black,
+    flexShrink: 1,
+    marginRight: '3@ms',
   },
   logDate: {
     fontSize: '12@ms',
@@ -189,6 +193,14 @@ const styles = ScaledSheet.create({
   eyeIcon: {
     marginLeft: '10@ms',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  statusAndEyeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 });
-
-export default CallLogItem;

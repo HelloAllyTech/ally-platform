@@ -1,13 +1,11 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {colors, fontFamily, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
+    paddingTop: '20@ms',
   },
   contentContainer: {
     flex: 1,
@@ -15,14 +13,21 @@ export const styles = ScaledSheet.create({
   headerText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     ...typography.headline.small,
+    fontSize: '20@ms',
     color: colors.darkSlate,
     marginBottom: '24@ms',
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: '8@s',
+  },
+  inputLabel: {
+    ...typography.body.small,
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.charcoal2,
   },
   input: {
+    ...fontFamily.ROBOTO.REGULAR,
+    minHeight: '40@vs',
     fontSize: '14@ms',
     letterSpacing: 0.25,
     fontWeight: '400',
@@ -33,6 +38,7 @@ export const styles = ScaledSheet.create({
     borderRadius: '8@ms',
     paddingHorizontal: '16@s',
     paddingVertical: '10@vs',
+    marginRight: '2@s',
   },
   inputEnabled: {
     opacity: 1,
