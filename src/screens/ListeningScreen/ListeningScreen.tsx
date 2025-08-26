@@ -23,6 +23,7 @@ import {
   useDebounce,
   useHardwareBackPressHandler,
   useLiveAudioStream,
+  useNetworkConnectivity,
   useSocketConnection,
   useTranslate,
   useUser,
@@ -49,6 +50,7 @@ import {
   CallEndConfirmationModal,
   ControlButtonsSection,
   DismissableBanner,
+  NetworkDisconnected,
   NudgeSection,
   Search,
   Timer,
@@ -116,7 +118,8 @@ export const ListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-
+  const [showNetworkDisconnected, setShowNetworkDisconnected] = useState(false);
+  const {isOffline} = useNetworkConnectivity();
   const tooltipContentList = [
     t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
     t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
@@ -150,6 +153,12 @@ export const ListeningScreen = ({
     }
     return env.WEBRTC_SOCKET_PATH;
   }, [isConferenceCall, isMicrophoneMode]);
+
+  useEffect(() => {
+    if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
+      setShowNetworkDisconnected(true);
+    }
+  }, [isOffline, isMicrophoneMode, isWebMicrophoneMode]);
 
   useEffect(() => {
     if (isEndCallSuccess) {
@@ -451,6 +460,17 @@ export const ListeningScreen = ({
     [callProvider],
   );
 
+  const handleTryAgain = useCallback(() => {
+    dispatch(clearCurrentChat());
+    setShowNetworkDisconnected(false);
+    navigation.replace(SCREEN_NAMES.LISTENING, route.params);
+  }, [navigation, route.params, dispatch]);
+
+  const handleNetworkDisconnectedGoBack = useCallback(() => {
+    dispatch(clearCurrentChat());
+    navigation.goBack();
+  }, [navigation, dispatch]);
+
   if (!chatData?.chatId) {
     return (
       <View style={styles.loadingContainer}>
@@ -479,6 +499,17 @@ export const ListeningScreen = ({
     bottom: 10,
   };
 
+  if (showNetworkDisconnected) {
+    return (
+      <View style={styles.container}>
+        <NetworkDisconnected
+          onRetry={handleTryAgain}
+          onGoBack={handleNetworkDisconnectedGoBack}
+        />
+      </View>
+    );
+  }
+
   const renderTakingNotes = () => {
     return (
       <View style={styles.takingNotesContainer}>
@@ -488,7 +519,10 @@ export const ListeningScreen = ({
           onClose={handlePrivacyTooltipClose}
           placement={isFocusMode ? 'top' : 'bottom'}
           displayInsets={tooltipDisplayInsets}>
-          <TouchableOpacity onPress={handleLockIconPress} activeOpacity={0.8}>
+          <TouchableOpacity
+            onPress={handleLockIconPress}
+            disabled={!isFocusMode}
+            activeOpacity={0.8}>
             <LockIcon width={16} height={16} color={colors.lightGrayD9} />
           </TouchableOpacity>
         </PrivacyTooltip>

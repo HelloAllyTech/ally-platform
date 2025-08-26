@@ -47,6 +47,7 @@ import LockIcon from './lock.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
+import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
 import NotesIcon from './notes.svg';
@@ -160,6 +161,7 @@ export {
   BlueWarningIcon,
   ShieldWithTickIcon,
   DownArrowIcon,
+  NetworkDisconnectedIcon,
   HexagonCloseIcon,
   EndSessionIcon,
 };

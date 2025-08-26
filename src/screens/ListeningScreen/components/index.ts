@@ -9,3 +9,4 @@ export {Search} from './Search';
 export {SkeletonLoader} from './SkeletonLoader';
 export {Timer} from './Timer';
 export {DismissableBanner} from './DismissableBanner';
+export {NetworkDisconnected} from './NetworkDisconnected';
