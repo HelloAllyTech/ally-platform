@@ -70,8 +70,13 @@ export const styles = ScaledSheet.create({
   },
   viewCallLogsButton: {
     backgroundColor: colors.white,
-    paddingVertical: '10@ms',
+    paddingVertical: '2@ms',
     marginBottom: '4@ms',
+  },
+  viewCallLogsButtonBorder: {
+    borderColor: colors.lightGray4,
+    borderWidth: 1,
+    paddingVertical: '10@ms',
   },
   marginB8: {
     marginBottom: '8@ms',
