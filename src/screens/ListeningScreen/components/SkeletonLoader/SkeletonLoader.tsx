@@ -4,7 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SCREEN_WIDTH} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
 const CONTAINER_WIDTH = SCREEN_WIDTH * 0.75;
 const GRADIENT_COLORS = ['transparent', 'rgba(255,255,255,0.5)', 'transparent'];

@@ -4,8 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ANALYTICS_TABS} from '@/constants/analytics';
 import {DEFAULT_HIT_SLOP} from '@/constants/general';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface Props {
   selectedTab: string;

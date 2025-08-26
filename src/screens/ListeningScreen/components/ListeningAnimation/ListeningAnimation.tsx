@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
 
-import {colors as globalColors} from '@/theme/colors';
+import {colors as globalColors} from '@/theme';
 
 const DEFAULT_WAVE_CONFIGS = [
   {
@@ -222,7 +222,7 @@ interface ListeningAnimationProps {
   maxAmplitude?: number;
 }
 
-const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
+export const ListeningAnimation: React.FC<ListeningAnimationProps> = ({
   isAnimating = true,
   maxAmplitude = 110,
 }) => {
@@ -255,5 +255,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
-export default ListeningAnimation;

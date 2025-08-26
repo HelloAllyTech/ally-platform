@@ -2,8 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {colors, fontFamily} from '@/theme';
 
 interface TimerProps {
   startTime: number; // timestamp in milliseconds

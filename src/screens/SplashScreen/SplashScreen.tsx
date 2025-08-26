@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import LottieView from 'lottie-react-native';
 import {
   Dimensions,
@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -17,13 +18,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets/icons';
-import {useCounselorChat} from '@/hooks/useCounselorChat';
-import {useHardwareBackPressHandler} from '@/hooks/useHardwareBackPressHandler';
-import useTranslate from '@/hooks/useTranslate';
-import {useUser} from '@/hooks/useUser';
-import {RootStackScreenProps} from '@/navigation/types';
-import {UserRole} from '@/types/user';
+import {LeftArrowIcon} from '@/assets';
+import {PrimaryButton, SecurityCarousel} from '@/components';
+import {SCREEN_NAMES} from '@/constants';
+import {
+  useCounselorChat,
+  useHardwareBackPressHandler,
+  useTranslate,
+  useUser,
+} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
+import {colors} from '@/theme';
+import {UserRole} from '@/types';
 
 import {EmailLogin, OtpVerification} from './components';
 import {styles} from './styles';
@@ -31,26 +37,26 @@ import {AuthStep} from './types';
 
 const {height} = Dimensions.get('screen');
 
-export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
-  navigation,
-}) => {
+export const SplashScreen: React.FC<
+  RootStackScreenProps<typeof SCREEN_NAMES.SPLASH>
+> = ({navigation}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const [isLoginButtonVisible, setIsLoginButtonVisible] = useState(false);
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
-      // Reset the navigation stack to have Home and Listening screens
+      // Go directly to Listening
       navigation.reset({
         index: 1,
-        routes: [{name: 'Home'}, {name: 'Listening'}],
+        routes: [{name: SCREEN_NAMES.CALL_LOG}, {name: SCREEN_NAMES.LISTENING}],
       });
     },
     onNoActiveChatFound: () => {
-      navigation.replace('Home');
+      navigation.replace(SCREEN_NAMES.CALL_LOG);
     },
-    shouldSubscribeToAppState: false,
   });
   const {t} = useTranslate();
 
@@ -75,29 +81,38 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const onLoginPress = () => {
+    setIsLoginButtonVisible(false);
+    setIsBottomSheetVisible(true);
+    animationTranslateY.value = withTiming(-height * 0.6, {
+      duration: 1000,
+    });
+  };
+
   useEffect(() => {
-    if (isAnimationEnded) {
-      if (!isUserLoading && !isAuthenticated) {
-        setIsBottomSheetVisible(true);
-        animationTranslateY.value = withTiming(-height * 0.6, {
-          duration: 1000,
-        });
-      } else if (isAuthenticated) {
-        if (userData?.role === UserRole.COUNSELOR) {
-          checkCounselorChat();
-        } else {
-          navigation.replace('Home');
-        }
+    if (!isAnimationEnded) {
+      return;
+    }
+
+    if (!isUserLoading && !isAuthenticated) {
+      // Show the login button only when the bottom sheet is NOT visible
+      if (!isBottomSheetVisible) {
+        setIsLoginButtonVisible(true);
+      }
+    } else if (isAuthenticated) {
+      if (userData?.role === UserRole.COUNSELOR) {
+        checkCounselorChat();
+      } else {
+        navigation.replace(SCREEN_NAMES.CALL_LOG);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isAnimationEnded,
     isAuthenticated,
     isUserLoading,
-    animationTranslateY,
-    checkCounselorChat,
+    isBottomSheetVisible,
     userData?.role,
-    navigation,
   ]);
 
   const handleOtpGenerationSuccess = async (emailAddress: string) => {
@@ -193,6 +208,25 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
     }, 1000);
   };
 
+  const renderLottieAnimation = useMemo(() => {
+    return (
+      <Animated.View style={[styles.animationContainer, animationStyle]}>
+        <LottieView
+          ref={lottieRef}
+          source={require('@/assets/animations/splashAnimation.json')}
+          style={styles.animation}
+          resizeMode="cover"
+          autoPlay={!isAnimationEnded}
+          loop={false}
+          speed={1}
+          progress={isAnimationEnded ? 0.99 : 0}
+          onAnimationFinish={onAnimationFinish}
+        />
+      </Animated.View>
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAnimationEnded]);
+
   return (
     <TouchableWithoutFeedback
       style={{paddingBottom: insets.bottom + 10}}
@@ -203,18 +237,7 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
             <LeftArrowIcon width={44} height={44} color="black" />
           </TouchableOpacity>
         )}
-        <Animated.View style={[styles.animationContainer, animationStyle]}>
-          <LottieView
-            ref={lottieRef}
-            source={require('@/assets/animations/splashAnimation.json')}
-            style={styles.animation}
-            resizeMode="cover"
-            autoPlay
-            loop={false}
-            speed={1}
-            onAnimationFinish={onAnimationFinish}
-          />
-        </Animated.View>
+        {renderLottieAnimation}
         <Animated.View style={[styles.titleContainer, textStyle]}>
           {currentStep === 'EMAIL' ? (
             <>
@@ -230,6 +253,21 @@ export const SplashScreen: React.FC<RootStackScreenProps<'Splash'>> = ({
             </Text>
           )}
         </Animated.View>
+
+        {isLoginButtonVisible && (
+          <LinearGradient
+            colors={['transparent', colors.lightGray18]}
+            locations={[0.2, 0.85]}
+            style={styles.bottomAbsoluteContainer}>
+            <SecurityCarousel />
+            <PrimaryButton
+              label={t('SplashScreen.login')}
+              onPress={onLoginPress}
+              customContainerStyle={styles.loginButtonContainer}
+              customTextStyle={styles.loginButtonText}
+            />
+          </LinearGradient>
+        )}
 
         {isBottomSheetVisible && (
           <Animated.View style={[styles.authContainer, authContentStyle]}>

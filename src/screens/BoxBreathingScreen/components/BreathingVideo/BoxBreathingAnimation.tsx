@@ -1,11 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {Animated, StyleSheet, Text, View} from 'react-native';
+import {Animated as RNAnimated, StyleSheet, Text, View} from 'react-native';
+import {useSharedValue, withTiming} from 'react-native-reanimated';
 import SoundPlayer from 'react-native-sound-player';
 
 import {SCREEN_WIDTH} from '@/constants/general';
-import {colors} from '@/theme/colors';
+import {colors} from '@/theme';
 
-import FlowerPetal from './FlowerPetal';
+import {FlowerPetal} from './FlowerPetal';
 
 export interface Phase {
   time: number;
@@ -69,14 +70,14 @@ const phases: Phase[] = [
   },
 ];
 
-const BoxBreathingAnimation = ({
+export const BoxBreathingAnimation = ({
   isMuted = false,
   isPlaying,
   onPhaseChange,
   animationDuration = 4000,
 }: BoxBreathingAnimationProps) => {
   const [phaseIndex, setPhaseIndex] = useState(0);
-  const [bloomProgress, setBloomProgress] = useState(0);
+  // Use animated value directly for bloom instead of setState-per-frame
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   const dotSize = 14;
@@ -86,12 +87,12 @@ const BoxBreathingAnimation = ({
 
   // Animated values
   const dotPosition = useRef(
-    new Animated.ValueXY({
+    new RNAnimated.ValueXY({
       x: -squareSize * 0.5,
       y: -squareSize * 0.5,
     }),
   ).current;
-  const bloomAnimation = useRef(new Animated.Value(0)).current;
+  const bloomProgress = useSharedValue(0);
 
   // Refs for intervals
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,7 +175,7 @@ const BoxBreathingAnimation = ({
       const currentPhase = phases[phaseIndex];
       const targetPos = getAbsolutePosition(currentPhase.position);
 
-      Animated.timing(dotPosition, {
+      RNAnimated.timing(dotPosition, {
         toValue: targetPos,
         duration: animationDuration,
         useNativeDriver: true,
@@ -185,14 +186,14 @@ const BoxBreathingAnimation = ({
         x: -(squareSize * 0.5),
         y: -(squareSize * 0.5),
       });
-      setBloomProgress(0);
+      bloomProgress.value = 0;
       setPhaseIndex(0);
-      bloomAnimation.setValue(0);
+      // no-op for reanimated value
     }
   }, [
     squareSize,
     dotOffset,
-    bloomAnimation,
+    bloomProgress,
     phaseIndex,
     isPlaying,
     dotPosition,
@@ -216,32 +217,23 @@ const BoxBreathingAnimation = ({
         targetBloom = 0;
       }
 
-      Animated.timing(bloomAnimation, {
-        toValue: targetBloom,
+      bloomProgress.value = withTiming(targetBloom, {
         duration: animationDuration,
-        useNativeDriver: true,
-      }).start();
+      });
     }
-  }, [phaseIndex, isPlaying, bloomAnimation, animationDuration]);
+  }, [phaseIndex, isPlaying, bloomProgress, animationDuration]);
 
   useEffect(() => {
     SoundPlayer.setVolume(isMuted ? 0 : 1);
   }, [isMuted]);
 
-  // Update bloom progress for FlowerPetal component
-  useEffect(() => {
-    const listener = bloomAnimation.addListener(({value}) => {
-      setBloomProgress(value);
-    });
-
-    return () => bloomAnimation.removeListener(listener);
-  }, [bloomAnimation]);
+  // No setState listener — we pass animated value directly to petals
 
   return (
     <View style={styles.container}>
       <View style={[styles.square, {width: squareSize, height: squareSize}]}>
         {/* Animated dot */}
-        <Animated.View
+        <RNAnimated.View
           style={[
             styles.dot,
             {
@@ -303,5 +295,3 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
 });
-
-export default BoxBreathingAnimation;

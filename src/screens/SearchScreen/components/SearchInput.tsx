@@ -9,10 +9,9 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {ThemeMode} from '@/types/general';
+import {CloseIcon, SearchActiveIcon, SearchIcon} from '@/assets/icons';
+import {colors, fontFamily} from '@/theme';
+import {ThemeMode} from '@/types';
 
 interface SearchInputProps {
   onFocus: () => void;
@@ -28,6 +27,7 @@ interface SearchInputProps {
   showSearchResults: boolean;
   colorTheme?: ThemeMode;
   customStyles?: StyleProp<ViewStyle>;
+  resetSearch: () => void;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -44,6 +44,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   showSearchResults,
   customStyles,
   colorTheme = 'light',
+  resetSearch,
 }) => {
   const inputRef = useRef<TextInput>(null);
 
@@ -84,6 +85,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           onChangeText={setSearchText}
           onSubmitEditing={onSubmitEditing}
         />
+        {searchText.length > 0 && (
+          <TouchableOpacity style={styles.closeButton} onPress={resetSearch}>
+            <CloseIcon
+              width={16}
+              height={16}
+              color={isDark ? colors.white : colors.black}
+            />
+          </TouchableOpacity>
+        )}
       </View>
       {showSuggestions && suggestions.length > 0 && (
         <View
@@ -135,6 +145,13 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       height: '18@ms',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    closeButton: {
+      width: '18@ms',
+      height: '18@ms',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: '8@ms',
     },
     input: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,

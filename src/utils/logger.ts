@@ -13,8 +13,8 @@ const logger = {
    * @param message - The log message
    */
   log: (level: LogLevel, message: string) => {
-    const logger_enabled = env.ENVIRONMENT === 'development';
-    if (!logger_enabled) return;
+    const loggerEnabled = env.ENVIRONMENT === 'development';
+    if (!loggerEnabled) return;
 
     const timestamp = new Date().toISOString();
     const levelString = level.toUpperCase();

@@ -1,7 +1,7 @@
 import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
 
-import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {User} from '@/types/user';
+import {AsyncStorageKeys} from '@/constants';
+import {User} from '@/types';
 import {removeItem, setItem} from '@/utils/asyncStorage';
 import {Maybe} from '@/utils/common';
 

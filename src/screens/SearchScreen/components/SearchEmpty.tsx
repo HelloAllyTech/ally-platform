@@ -2,9 +2,8 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
-import useTranslate from '@/hooks/useTranslate';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily} from '@/theme';
 
 interface SearchEmptyProps {
   searchText: string;
@@ -24,9 +23,11 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
 
   return (
     <View style={themedStyles.emptyComponent}>
-      <Text style={themedStyles.emptyComponentText}>
-        {`${t('SearchScreen.noData')} "${searchText}"`}
-      </Text>
+      {searchText.length > 0 && (
+        <Text style={themedStyles.emptyComponentText}>
+          {`${t('SearchScreen.noData')} "${searchText}"`}
+        </Text>
+      )}
       <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
       {trySuggestions.map(suggestion => (
         <TouchableOpacity

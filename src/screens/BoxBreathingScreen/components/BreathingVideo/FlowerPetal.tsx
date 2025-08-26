@@ -1,36 +1,46 @@
+import {useMemo} from 'react';
 import {View} from 'react-native';
+import Animated, {useAnimatedProps} from 'react-native-reanimated';
 import Svg, {Defs, Path, RadialGradient, Stop} from 'react-native-svg';
 
 interface FlowerPetalProps {
-  bloomProgress: number;
+  // Reanimated shared value between 0 and 1
+  bloomProgress: {value: number};
   size?: number;
 }
 
-const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
+export const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
   const centerX = size / 2;
   const centerY = size / 2;
-  const angles = [0, -65, -35, 65, 35];
+  const angles = useMemo(() => [0, -65, -35, 65, 35], []);
+  const AnimatedPath = useMemo(
+    () => Animated.createAnimatedComponent(Path),
+    [],
+  );
 
-  // Create petal path using bezier curves
-  const createPetalPath = (angle: number) => {
-    const radians = (angle * bloomProgress * Math.PI) / 180;
-    const cos = Math.cos(radians);
-    const sin = Math.sin(radians);
+  // Create animated props for each petal path, fully on UI thread
+  const usePetalAnimatedProps = (angle: number) =>
+    useAnimatedProps(() => {
+      'worklet';
+      const progress = bloomProgress.value;
+      const radians = (angle * progress * Math.PI) / 180;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
 
-    // Transform coordinates for rotation
-    const transform = (x: number, y: number) => {
-      const newX = x * cos - y * sin + centerX;
-      const newY = x * sin + y * cos + centerY;
-      return `${newX},${newY}`;
-    };
+      const transform = (x: number, y: number) => {
+        'worklet';
+        const newX = x * cos - y * sin + centerX;
+        const newY = x * sin + y * cos + centerY;
+        return `${newX},${newY}`;
+      };
 
-    return `
-      M ${centerX},${centerY}
-      C ${transform(-35, -40)} ${transform(-35, -100)} ${transform(0, -140)}
-      C ${transform(35, -100)} ${transform(35, -40)} ${centerX},${centerY}
-      Z
-    `;
-  };
+      const d = `M ${centerX},${centerY}
+        C ${transform(-35, -40)} ${transform(-35, -100)} ${transform(0, -140)}
+        C ${transform(35, -100)} ${transform(35, -40)} ${centerX},${centerY}
+        Z`;
+      const opacity = 0.2 + Math.min(progress, 0.6);
+      return {d, opacity} as any;
+    });
 
   // Create stem path
   const stemPath = `
@@ -50,16 +60,19 @@ const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
         </Defs>
 
         {/* Render petals */}
-        {angles.map((angle, index) => (
-          <Path
-            key={index}
-            d={createPetalPath(angle)}
-            fill="url(#petalGradient)"
-            stroke="rgba(0,0,0,0.3)"
-            strokeWidth="0.5"
-            opacity={0.2 + Math.min(bloomProgress, 0.6)}
-          />
-        ))}
+        {angles.map((angle, index) => {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          const animatedProps = usePetalAnimatedProps(angle);
+          return (
+            <AnimatedPath
+              key={index}
+              animatedProps={animatedProps}
+              fill="url(#petalGradient)"
+              stroke="rgba(0,0,0,0.3)"
+              strokeWidth="0.5"
+            />
+          );
+        })}
 
         {/* Render stem */}
         <Path
@@ -71,5 +84,3 @@ const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
     </View>
   );
 };
-
-export default FlowerPetal;

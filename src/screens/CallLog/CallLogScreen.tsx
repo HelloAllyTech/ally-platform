@@ -1,20 +1,41 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
-import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  FlatList,
+  Linking,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {NoCallLogsIcon} from '@/assets/icons';
-import {useAppNavigation} from '@/hooks/useAppNavigation';
-import {useTabBackToHomeHandler} from '@/hooks/useTabBackToHomeHandler';
-import useTranslate from '@/hooks/useTranslate';
+import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
+import {env} from '@/config/env';
+import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useCounselorChat,
+  useHardwareBackPressHandler,
+  useTranslate,
+  useUser,
+} from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
-import {useAppSelector} from '@/store/hooks';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
+import {
+  useGetSummaryFieldsQuery,
+  useGetVisibleChatTypesQuery,
+} from '@/services/settingsApi';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
+import {colors, fontFamily} from '@/theme';
+import {Chat, UserRole} from '@/types';
+import {logger} from '@/utils/logger';
 
-import {CallLogHeader} from './components/CallLogHeader/CallLogHeader';
-import CallLogItem from './components/CallLogItem/CallLogItem';
+import {CallLogHeader, CallLogItem, StartSessionModal} from './components';
+import {FeatureNotAvailable} from './components/FeatureNotAvailable';
 import {CallLog} from './types';
 
 // Number of items to fetch per page for pagination
@@ -33,12 +54,36 @@ export const CallLogScreen: React.FC = () => {
   const [allLogs, setAllLogs] = useState<CallLog[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const currentChat = useAppSelector(state => state.chat.currentChat);
+  const [showStartSession, setShowStartSession] = useState(false);
+  const {userData} = useUser();
 
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
-  // RTK Query hook for fetching call logs
+  const dispatch = useAppDispatch();
   const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
+  const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
+  const {data: visibleFields} = useGetSummaryFieldsQuery();
+  const {checkCounselorChat} = useCounselorChat();
+
+  const isCounselor = userData?.role === UserRole.COUNSELOR;
+  const hasAnyCallType = useMemo(
+    () =>
+      Boolean(
+        enabledChatTypes?.some?.((chatType: CHAT_TYPES) =>
+          [
+            CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
+            CHAT_TYPES.MICROPHONE_CHAT,
+          ].includes(chatType),
+        ),
+      ),
+    [enabledChatTypes],
+  );
+
+  useHardwareBackPressHandler(() => {
+    BackHandler.exitApp();
+    return true;
+  });
 
   /**
    * Fetches the initial set of call logs
@@ -63,10 +108,11 @@ export const CallLogScreen: React.FC = () => {
       setAllLogs([]);
       setHasMore(true);
       fetchInitialData();
-    }, [fetchInitialData]),
+      if (visibleFields) {
+        dispatch(setSummaryVisibleFields(visibleFields));
+      }
+    }, [fetchInitialData, visibleFields, dispatch]),
   );
-
-  useTabBackToHomeHandler();
 
   /**
    * Handles loading more call logs when user scrolls to the bottom
@@ -81,8 +127,8 @@ export const CallLogScreen: React.FC = () => {
       offset: newOffset,
     });
 
-    if (result.data?.data) {
-      setAllLogs(prev => [...prev, ...result.data.data]);
+    if (result?.data?.data) {
+      setAllLogs(prev => [...prev, ...(result?.data?.data || [])]);
       setOffset(newOffset);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
     }
@@ -100,7 +146,7 @@ export const CallLogScreen: React.FC = () => {
   };
 
   const handleItemPress = (item: CallLog) => {
-    navigation.navigate('CallSummary', {
+    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
       callId: item?.details?.chatId,
     });
   };
@@ -118,14 +164,16 @@ export const CallLogScreen: React.FC = () => {
    * @param item - Call log data
    * @param index - Index of the item in the list
    */
-  const renderItem = ({item, index}: {item: CallLog; index: number}) => (
-    <CallLogItem
-      item={item}
-      expanded={expandedIdx === index}
-      onToggle={() => handleToggle(index)}
-      onItemPress={() => handleItemPress(item)}
-    />
-  );
+  const renderItem = ({item, index}: {item: CallLog; index: number}) => {
+    return (
+      <CallLogItem
+        item={item}
+        expanded={expandedIdx === index}
+        onToggle={() => handleToggle(index)}
+        onItemPress={() => handleItemPress(item)}
+      />
+    );
+  };
 
   /**
    * Renders loading indicator at the bottom of the list
@@ -142,10 +190,58 @@ export const CallLogScreen: React.FC = () => {
     );
   };
 
+  const handleLearnMorePress = async () => {
+    try {
+      await Linking.openURL(env.ALLY_WEB_URL);
+    } catch (error) {
+      logger.error(`Error opening learn more URL: ${error}`);
+      Alert.alert('Error', 'Unable to open the link');
+    }
+  };
+
+  const handleThirdPartyCall = async () => {
+    checkCounselorChat().then(data => {
+      const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
+      if ((data as Chat)?.chatId) {
+        Alert.alert(
+          'Already in a call',
+          'You are already in a call. Please end the current call to make a new one.',
+          [{text: t('Common.ok')}],
+        );
+        return;
+      }
+      try {
+        Linking.openURL(url);
+      } catch (error) {
+        logger.error(`Error opening phone call URL: ${error}`);
+        Alert.alert('Error', "Can't handle phone call", [
+          {text: t('Common.ok')},
+        ]);
+      }
+    });
+  };
+
+  const handleVoiceRecording = async () => {
+    checkCounselorChat();
+    navigation.navigate('Listening', {isMicrophoneMode: true});
+  };
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
-      <CallLogHeader search={search} onSearchChange={setSearch} />
-      {isLoading ? (
+      <CallLogHeader
+        search={search}
+        onSearchChange={setSearch}
+        onRefresh={handleRefresh}
+        isCounselor={isCounselor}
+      />
+      {!isCounselor ? (
+        <FeatureNotAvailable
+          description={t('CallLogs.appCurrentlyForCounsellors')}
+          ctaText={t('CallLogs.learnMore')}
+          onCtaPress={handleLearnMorePress}
+          containerStyle={styles.featureNotAvailable}
+        />
+      ) : isLoading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.darkSlate} />
         </View>
@@ -173,17 +269,46 @@ export const CallLogScreen: React.FC = () => {
           ListFooterComponent={renderFooter}
           refreshing={false}
           onRefresh={handleRefresh}
+          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
         />
       )}
+      {isCounselor && !currentChat?.chatId && (
+        <TouchableOpacity
+          style={[
+            styles.fab,
+            {bottom: insets.bottom + ms(100)},
+            !hasAnyCallType && styles.bgAshGray,
+          ]}
+          disabled={!hasAnyCallType}
+          activeOpacity={0.9}
+          onPress={() => {
+            setShowStartSession(true);
+          }}>
+          <TranscribeIcon />
+        </TouchableOpacity>
+      )}
+      <StartSessionModal
+        visible={showStartSession}
+        onClose={() => setShowStartSession(false)}
+        enabledChatTypes={enabledChatTypes}
+        onJoinCall={handleThirdPartyCall}
+        onListenLive={handleVoiceRecording}
+      />
     </View>
   );
 };
 
-// Styles for the component
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  featureNotAvailable: {
+    paddingHorizontal: '20@ms',
   },
   listContent: {
     paddingBottom: '100@ms',
@@ -222,5 +347,22 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
     marginTop: '16@vs',
     marginBottom: '30@vs',
+  },
+  fab: {
+    position: 'absolute',
+    right: '20@ms',
+    padding: '20@ms',
+    borderRadius: '30%',
+    backgroundColor: colors.azureBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.black,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  bgAshGray: {
+    backgroundColor: colors.ashGray,
   },
 });

@@ -1,4 +1,4 @@
-import {Chat, ChatStatus, FeedbackResponse} from '@/types/message';
+import {Chat, ChatStatus, FeedbackResponse} from '@/types';
 
 import {api} from './api';
 

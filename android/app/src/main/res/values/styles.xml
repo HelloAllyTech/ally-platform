@@ -6,4 +6,10 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+    <!-- Launch screen theme to prevent white background flash -->
+    <style name="LaunchTheme" parent="AppTheme">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">@color/launch_background</item>
+    </style>
+
 </resources>

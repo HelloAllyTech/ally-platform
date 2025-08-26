@@ -1,8 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {colors, fontFamily, typography} from '@/theme';
 
 const styles = ScaledSheet.create({
   fieldValueText: {

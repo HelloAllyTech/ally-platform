@@ -1,7 +1,7 @@
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
 import {setupListeners} from '@reduxjs/toolkit/query';
 
-import {api} from '@/services/api';
+import {api, learnApi} from '@/services/api';
 
 import chatReducer from './slices/chatSlice';
 import summaryReducer from './slices/summarySlice';
@@ -12,12 +12,15 @@ const rootReducer = combineReducers({
   chat: chatReducer,
   summary: summaryReducer,
   [api.reducerPath]: api.reducer,
+  // TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+  [learnApi.reducerPath]: learnApi.reducer,
 });
 
 export const store = configureStore({
   reducer: rootReducer,
   middleware: getDefaultMiddleware =>
-    getDefaultMiddleware().concat(api.middleware),
+    // TODO [Simulations]: Remove this once backend changes to merge both APIs are done
+    getDefaultMiddleware().concat(api.middleware, learnApi.middleware),
 });
 
 setupListeners(store.dispatch);

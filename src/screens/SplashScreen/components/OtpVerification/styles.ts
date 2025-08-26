@@ -1,27 +1,30 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {globalStyles} from '@/theme/helpers';
-import {typography} from '@/theme/typography';
+import {colors, fontFamily, globalStyles, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
+  contentContainer: {
+    flex: 1,
+    paddingTop: '40@ms',
+  },
   container: {
     flex: 1,
     justifyContent: 'space-between',
   },
-  contentContainer: {
+  containerWrapper: {
     flex: 1,
   },
   headerText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     ...typography.headline.small,
+    fontSize: '20@ms',
     color: colors.darkSlate,
     marginBottom: '24@ms',
   },
   emailText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.headline.small,
+    fontSize: '20@ms',
   },
   otpContainer: {
     marginBottom: '16@ms',
