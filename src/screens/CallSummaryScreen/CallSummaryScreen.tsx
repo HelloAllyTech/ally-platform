@@ -136,12 +136,18 @@ export const CallSummaryScreen: React.FC<
             </Text>
           </TouchableOpacity>
         )}
-        <PrimaryButton
-          label={t('CallLogs.willCheckLater')}
-          onPress={onViewCallLogs}
-          customContainerStyle={styles.viewCallLogsButton}
-          customTextStyle={styles.viewCallLogsButtonText}
-        />
+        {!showSummaryButtonLoader && (
+          <PrimaryButton
+            label={t('CallLogs.willCheckLater')}
+            onPress={onViewCallLogs}
+            customContainerStyle={[
+              styles.viewCallLogsButton,
+              summaryStatus === ChatSummaryStatus.NO_AUDIO &&
+                styles.viewCallLogsButtonBorder,
+            ]}
+            customTextStyle={styles.viewCallLogsButtonText}
+          />
+        )}
       </View>
     );
   };
