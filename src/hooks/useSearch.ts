@@ -234,6 +234,16 @@ export const useSearch = (flatListRef?: React.RefObject<FlatList | null>) => {
     [tabsMeta, onCategoryChange],
   );
 
+  const resetSearch = () => {
+    setSearchText('');
+    setLastSearchedText('');
+    setResources([]);
+    setCategoryCountList({});
+    setSelectedCategory('All');
+    setInitialTotal(null);
+    setHasMore(true);
+  };
+
   return {
     searchText,
     setSearchText,
@@ -266,5 +276,6 @@ export const useSearch = (flatListRef?: React.RefObject<FlatList | null>) => {
     showInitialLoader,
     showFooterLoader,
     showEmptyState,
+    resetSearch,
   };
 };

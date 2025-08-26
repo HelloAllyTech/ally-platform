@@ -46,6 +46,7 @@ export const Search = () => {
     showEmptyState,
     selectedCategory,
     handleEndReached,
+    resetSearch,
   } = useSearch(flatListRef);
 
   const {t} = useTranslate();
@@ -86,7 +87,7 @@ export const Search = () => {
     return (
       <View style={styles.container}>
         {renderSearchInput()}
-        {tabsMeta.length > 0 && (
+        {resources.length > 0 && tabsMeta.length > 0 && (
           <CustomTabs
             tabs={tabsMeta}
             activeTab={activeTabIndex}
@@ -135,6 +136,7 @@ export const Search = () => {
         onSubmitEditing={triggerSearchOnSubmit}
         colorTheme="dark"
         customStyles={styles.input}
+        resetSearch={resetSearch}
       />
     );
   };

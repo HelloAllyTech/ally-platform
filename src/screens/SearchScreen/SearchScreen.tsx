@@ -59,6 +59,7 @@ export const SearchScreen: React.FC = () => {
     showInitialLoader,
     showFooterLoader,
     showEmptyState,
+    resetSearch,
   } = useSearch(flatListRef);
   const {t} = useTranslate();
 
@@ -190,6 +191,7 @@ export const SearchScreen: React.FC = () => {
         showSuggestions={isShowSuggestions}
         onSuggestionPress={handleSuggestionPress}
         onSubmitEditing={triggerSearchOnSubmit}
+        resetSearch={resetSearch}
       />
     );
   };

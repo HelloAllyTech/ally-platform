@@ -13,6 +13,7 @@ export const styles = ScaledSheet.create({
   headerText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     ...typography.headline.small,
+    fontSize: '20@ms',
     color: colors.darkSlate,
     marginBottom: '24@ms',
   },

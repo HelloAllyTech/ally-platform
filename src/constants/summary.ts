@@ -537,3 +537,8 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> =
   );
 
 export const ALWAYS_VISIBLE_SECTIONS = [SectionKey.AdditionalNotes];
+
+export const CallSummaryGenerationData = {
+  durationInSeconds: 30 * 60, // 30 mins
+  summaryGenerationDurationInSeconds: 5 * 60, // 5 mins
+};

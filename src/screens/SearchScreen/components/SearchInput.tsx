@@ -27,6 +27,7 @@ interface SearchInputProps {
   showSearchResults: boolean;
   colorTheme?: ThemeMode;
   customStyles?: StyleProp<ViewStyle>;
+  resetSearch: () => void;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -43,6 +44,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   showSearchResults,
   customStyles,
   colorTheme = 'light',
+  resetSearch,
 }) => {
   const inputRef = useRef<TextInput>(null);
 
@@ -84,9 +86,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           onSubmitEditing={onSubmitEditing}
         />
         {searchText.length > 0 && (
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setSearchText('')}>
+          <TouchableOpacity style={styles.closeButton} onPress={resetSearch}>
             <CloseIcon
               width={16}
               height={16}
