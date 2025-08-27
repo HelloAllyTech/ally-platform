@@ -24,7 +24,13 @@ export enum ChatProvider {
   EXOTEL_CONFERENCE_CALL = 'EXOTEL_CONFERENCE_CALL',
   MICROPHONE = 'MICROPHONE',
   WEBRTC = 'WEBRTC',
+  OZONETEL = 'OZONETEL',
 }
+
+export const ConferenceCallProviders = [
+  ChatProvider.EXOTEL_CONFERENCE_CALL,
+  ChatProvider.OZONETEL,
+];
 
 export interface Chat {
   chatId: number;
@@ -134,4 +140,18 @@ export interface WaitingClient {
 export interface GetWaitingClientsResponse {
   totalWaiting: number;
   clients: WaitingClient[];
+}
+
+export interface Nudge {
+  id: number;
+  content: string;
+  chatId: number;
+  senderId: number;
+  createdAt: string;
+  feedback?: FeedbackResponse;
+}
+
+export enum DisconnectedType {
+  SOCKET = 'socket',
+  NETWORK = 'network',
 }
