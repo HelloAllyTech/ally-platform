@@ -61,7 +61,7 @@ export const CallLogScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const dispatch = useAppDispatch();
-  const [getCallLogs, {isLoading, isFetching}] = useLazyGetCallLogsQuery();
+  const [getCallLogs, {isFetching}] = useLazyGetCallLogsQuery();
   const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
@@ -98,6 +98,8 @@ export const CallLogScreen: React.FC = () => {
       );
       setAllLogs(filteredCallLogs);
       setHasMore(result.data.data.length === ITEMS_PER_PAGE);
+    } else {
+      setAllLogs([]);
     }
   }, [currentChat?.chatId, getCallLogs]);
 
@@ -105,7 +107,6 @@ export const CallLogScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       setOffset(0);
-      setAllLogs([]);
       setHasMore(true);
       fetchInitialData();
       if (visibleFields) {
@@ -140,7 +141,6 @@ export const CallLogScreen: React.FC = () => {
    */
   const handleRefresh = async () => {
     setOffset(0);
-    setAllLogs([]);
     setHasMore(true);
     await fetchInitialData();
   };
@@ -226,6 +226,14 @@ export const CallLogScreen: React.FC = () => {
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
+  const renderLoader = () => {
+    return (
+      <View style={styles.centerContent}>
+        <ActivityIndicator size="large" color={colors.darkSlate} />
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader
@@ -241,10 +249,6 @@ export const CallLogScreen: React.FC = () => {
           onCtaPress={handleLearnMorePress}
           containerStyle={styles.featureNotAvailable}
         />
-      ) : isLoading ? (
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.darkSlate} />
-        </View>
       ) : allLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
           <NoCallLogsIcon
@@ -258,23 +262,26 @@ export const CallLogScreen: React.FC = () => {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={allLogs}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderItem}
-          style={styles.list}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          refreshing={false}
-          onRefresh={handleRefresh}
-          removeClippedSubviews
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          windowSize={5}
-        />
+        <View style={styles.listContainer}>
+          <FlatList
+            data={allLogs}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            contentContainerStyle={styles.listContent}
+            renderItem={renderItem}
+            style={styles.list}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
+            refreshing={false}
+            onRefresh={handleRefresh}
+            removeClippedSubviews
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
+          />
+          {isFetching && offset === 0 && renderLoader()}
+        </View>
       )}
       {isCounselor && !currentChat?.chatId && (
         <TouchableOpacity
@@ -307,6 +314,9 @@ const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  listContainer: {
+    flex: 1,
+  },
   featureNotAvailable: {
     paddingHorizontal: '20@ms',
   },
@@ -317,9 +327,12 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: '14@ms',
   },
   footerLoader: {
     paddingVertical: '16@ms',
