@@ -75,6 +75,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
                 style={[
                   styles.buttonContainer,
                   isCallPaused && {backgroundColor: colors.white},
+                  isPauseResumeDisabled && styles.disabledOpacity,
                 ]}
                 onPress={onPauseResumePress}
                 disabled={isPauseResumeDisabled}
@@ -170,6 +171,9 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.darkGray10,
     gap: '10@s',
     borderRadius: '8@ms',
+  },
+  disabledOpacity: {
+    opacity: 0.5,
   },
   buttonText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
