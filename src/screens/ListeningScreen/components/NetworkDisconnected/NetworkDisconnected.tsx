@@ -6,15 +6,18 @@ import {NetworkDisconnectedIcon} from '@/assets';
 import {PrimaryButton} from '@/components';
 import {useNetworkConnectivity, useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
+import {DisconnectedType} from '@/types';
 
 interface NetworkDisconnectedProps {
   onRetry: () => void;
   onGoBack: () => void;
+  disconnectedType: DisconnectedType | null;
 }
 
 export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
   onRetry,
   onGoBack,
+  disconnectedType,
 }) => {
   const {t} = useTranslate();
   const {isOffline} = useNetworkConnectivity();
@@ -23,9 +26,15 @@ export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
     <View style={styles.container}>
       <View style={styles.card}>
         <NetworkDisconnectedIcon />
-        <Text style={styles.title}>{t('Common.offline.title')}</Text>
+        <Text style={styles.title}>
+          {disconnectedType === DisconnectedType.SOCKET
+            ? t('Common.offline.socketTitle')
+            : t('Common.offline.networkTitle')}
+        </Text>
         <Text style={styles.description}>
-          {t('Common.offline.description')}
+          {disconnectedType === DisconnectedType.SOCKET
+            ? t('Common.offline.socketDescription')
+            : t('Common.offline.networkDescription')}
         </Text>
         {!isOffline && (
           <PrimaryButton
