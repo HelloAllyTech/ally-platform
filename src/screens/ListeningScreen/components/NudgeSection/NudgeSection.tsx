@@ -8,10 +8,9 @@ import {
   useUpdateFeedbackMutation,
 } from '@/services/chatApi';
 import {colors} from '@/theme';
-import {FeedbackResponse} from '@/types';
+import {FeedbackResponse, Nudge} from '@/types';
 import {logger} from '@/utils/logger';
 
-import type {Nudge} from '../../ListeningScreen';
 import {CustomMarkdown} from '../CustomMarkdown';
 import {SkeletonLoader} from '../SkeletonLoader';
 import {styles} from './styles';
