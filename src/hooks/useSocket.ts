@@ -4,22 +4,28 @@ import {io, Socket} from 'socket.io-client';
 import {env} from '@/config/env';
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {SocketEvent} from '@/types';
-import {getItem} from '@/utils/asyncStorage';
-import {logger} from '@/utils/logger';
+import {getItem, logger} from '@/utils';
 
 interface UseSocketOptions {
   path?: string;
   userId?: number;
   eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
+  onConnect?: () => void;
+  onDisconnect?: (reason?: string) => void;
+  onConnectionError?: (error?: Error) => void;
 }
 
 export const useSocket = ({
   userId,
   eventCallbacks,
   path = '',
+  onConnect,
+  onDisconnect,
+  onConnectionError,
 }: UseSocketOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const connectionAttemptsRef = useRef(0);
+
   const maxAttempts = 5;
   const baseUrl = env.API_BASE_URL;
 
@@ -69,13 +75,16 @@ export const useSocket = ({
 
     socketRef.current.on('connect', () => {
       connectionAttemptsRef.current = 0;
+      onConnect?.();
     });
 
     socketRef.current.on('connect_error', error => {
+      onConnectionError?.(error);
       logger.error(`connect_error: Socket connection error: ${error}`);
     });
 
     socketRef.current.on('disconnect', reason => {
+      onDisconnect?.(reason);
       logger.error(`disconnect: Socket disconnected: ${reason}`);
     });
 
@@ -87,6 +96,7 @@ export const useSocket = ({
     Object.entries(callbacks).forEach(([key, callback]) => {
       socketRef.current?.on(key, callback);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventCallbacks]);
 
   const disconnect = useCallback(() => {

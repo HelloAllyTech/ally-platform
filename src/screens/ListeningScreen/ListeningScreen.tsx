@@ -39,7 +39,10 @@ import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors, globalStyles} from '@/theme';
 import {
   ChatProvider,
+  ConferenceCallProviders,
+  DisconnectedType,
   FeedbackResponse,
+  Nudge,
   SocketEvent,
   SocketMessage,
 } from '@/types';
@@ -64,15 +67,6 @@ import {
   webRTCAudioDataToAmplitudes,
 } from './utils';
 
-export interface Nudge {
-  id: number;
-  content: string;
-  chatId: number;
-  senderId: number;
-  createdAt: string;
-  feedback?: FeedbackResponse;
-}
-
 export const ListeningScreen = ({
   route,
 }: {
@@ -94,7 +88,8 @@ export const ListeningScreen = ({
     [chatData?.startedAt],
   );
   const callProvider = chatData?.provider;
-  const isConferenceCall = callProvider === ChatProvider.EXOTEL_CONFERENCE_CALL;
+  const isConferenceCall =
+    callProvider && ConferenceCallProviders.includes(callProvider);
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isWebMicrophoneMode =
@@ -117,8 +112,9 @@ export const ListeningScreen = ({
   const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
   );
+  const [disconnectedType, setDisconnectedType] =
+    useState<DisconnectedType | null>(null);
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-  const [showNetworkDisconnected, setShowNetworkDisconnected] = useState(false);
   const {isOffline} = useNetworkConnectivity();
   const tooltipContentList = [
     t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
@@ -156,7 +152,7 @@ export const ListeningScreen = ({
 
   useEffect(() => {
     if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
-      setShowNetworkDisconnected(true);
+      setDisconnectedType(DisconnectedType.NETWORK);
     }
   }, [isOffline, isMicrophoneMode, isWebMicrophoneMode]);
 
@@ -272,11 +268,26 @@ export const ListeningScreen = ({
   );
 
   const {userData} = useUser();
+
+  const onDisconnectSocket = (reason?: string) => {
+    if (isMicrophoneMode && chatData?.chatId) {
+      setDisconnectedType(
+        isOffline ? DisconnectedType.NETWORK : DisconnectedType.SOCKET,
+      );
+    }
+  };
+
+  const onConnectionError = () => {
+    setDisconnectedType(DisconnectedType.SOCKET);
+  };
+
   // Automatically manages socket connection based on screen focus and app state
   const {emitSocketEvent} = useSocketConnection({
     path: getSocketPath(),
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
+    onDisconnect: onDisconnectSocket,
+    onConnectionError: onConnectionError,
   });
 
   const chatIdRef = useRef(chatData?.chatId);
@@ -417,18 +428,30 @@ export const ListeningScreen = ({
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
-        // Skip chat validation in microphone mode without permission to prevent navigation to Home
-        // after returning from permission dialog (chat session isn't ready yet)
-        if (isMicrophoneMode && !isWebMicrophoneMode && !isPermissionGranted) {
-          return;
-        }
-        getCounsellorChat().then(res => {
-          if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
-            // Clear chat state before navigation
-            dispatch(clearCurrentChat());
-            navigation.navigate(SCREEN_NAMES.CALL_LOG);
+        // Add delay to allow permission flow to complete and prevent race condition
+        setTimeout(() => {
+          if (
+            isMicrophoneMode &&
+            !isWebMicrophoneMode &&
+            !isPermissionGranted
+          ) {
+            return;
           }
-        });
+
+          getCounsellorChat().then(res => {
+            if (
+              !res.data ||
+              (Array.isArray(res.data) && res.data.length === 0)
+            ) {
+              // Clear chat state before navigation
+              dispatch(clearCurrentChat());
+              navigation.reset({
+                index: 0,
+                routes: [{name: SCREEN_NAMES.CALL_LOG}],
+              });
+            }
+          });
+        }, 500);
       }
     });
     return () => {
@@ -462,8 +485,14 @@ export const ListeningScreen = ({
 
   const handleTryAgain = useCallback(() => {
     dispatch(clearCurrentChat());
-    setShowNetworkDisconnected(false);
-    navigation.replace(SCREEN_NAMES.LISTENING, route.params);
+    setDisconnectedType(null);
+    navigation.reset({
+      index: 1,
+      routes: [
+        {name: SCREEN_NAMES.CALL_LOG},
+        {name: SCREEN_NAMES.LISTENING, params: route.params},
+      ],
+    });
   }, [navigation, route.params, dispatch]);
 
   const handleNetworkDisconnectedGoBack = useCallback(() => {
@@ -499,12 +528,13 @@ export const ListeningScreen = ({
     bottom: 10,
   };
 
-  if (showNetworkDisconnected) {
+  if (disconnectedType) {
     return (
       <View style={styles.container}>
         <NetworkDisconnected
           onRetry={handleTryAgain}
           onGoBack={handleNetworkDisconnectedGoBack}
+          disconnectedType={disconnectedType}
         />
       </View>
     );
