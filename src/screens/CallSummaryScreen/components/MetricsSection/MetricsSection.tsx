@@ -28,14 +28,12 @@ export const MetricsSection: React.FC<MetricsSectionProps> = ({metrics}) => {
               ? `${Math.round(Number(metrics.listeningShare) * 100)}%`
               : '-'
           }
-          showSeparator
         />
       )}
       {visibleFields.includes(SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED) && (
         <FieldRow
           label={FIELD_LABELS[SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]}
           value={metrics.reflectiveQuestionsAsked || '-'}
-          showSeparator
         />
       )}
       {visibleFields.includes(SUMMARY_FIELDS.EMOTIONAL_LIFT) && (

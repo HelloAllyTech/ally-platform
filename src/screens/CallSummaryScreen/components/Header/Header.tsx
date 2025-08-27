@@ -116,8 +116,6 @@ const styles = ScaledSheet.create({
   },
   expandedTitleContainer: {
     backgroundColor: colors.white,
-    paddingTop: '12@ms',
-    height: '90@ms',
     zIndex: 1000,
     borderBottomWidth: 1,
     borderBottomColor: colors.ashGray,
@@ -133,7 +131,7 @@ const styles = ScaledSheet.create({
   nameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: '8@ms',
+    marginTop: isIOS ? '3@ms' : '0@ms',
     marginBottom: '8@ms',
   },
   summaryNameText: {
