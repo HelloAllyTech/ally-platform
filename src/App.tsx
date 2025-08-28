@@ -1,9 +1,7 @@
-import {useEffect} from 'react';
 import {StatusBar} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
-import {requestTrackingPermission} from 'react-native-tracking-transparency';
 import {Provider} from 'react-redux';
 
 import {env} from '@/config/env';
@@ -16,10 +14,6 @@ import {store} from './store/store';
 import './localization/i18n';
 
 export const App = () => {
-  useEffect(() => {
-    requestTrackingPermission();
-  }, []);
-
   return (
     <GestureHandlerRootView style={styles.container}>
       <Provider store={store}>
