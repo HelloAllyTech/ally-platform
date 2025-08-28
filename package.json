@@ -55,6 +55,7 @@
     "react-native-size-matters": "^0.4.2",
     "react-native-sound-player": "^0.14.5",
     "react-native-svg": "^15.11.2",
+    "react-native-tracking-transparency": "^0.1.2",
     "react-native-video": "^6.16.1",
     "react-native-walkthrough-tooltip": "^1.6.0",
     "react-redux": "^9.2.0",
