@@ -39,8 +39,6 @@
 	<string>We need access to your microphone for audio streaming</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app may access your camera for video communication features. Camera access is required for live video calls and screen sharing functionality.</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This app would like to track you across apps and websites to provide you with personalized content and improve your experience. Your data will be used to deliver relevant advertisements and analyze app performance.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReplayPro-BoldItalic.otf</string>
