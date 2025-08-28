@@ -134,21 +134,25 @@ export const ListeningScreen = ({
     route.params?.isMicrophoneMode ||
     chatData?.provider === ChatProvider.MICROPHONE;
 
-  const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
+  const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
+    useEndCallMutation();
 
-  const onCallEndSuccess = useCallback(() => {
+  const handleCallEndRedirection = useCallback(() => {
     // Only navigate if the ListeningScreen is still focused
     if (isFocused) {
       navigation.replace(SCREEN_NAMES.BREATHING);
     }
   }, [navigation, isFocused]);
 
-  const getSocketPath = useCallback(() => {
-    if (isConferenceCall || isMicrophoneMode) {
-      return env.MICROPHONE_SOCKET_PATH;
-    }
-    return env.WEBRTC_SOCKET_PATH;
-  }, [isConferenceCall, isMicrophoneMode]);
+  const getSocketPath = useCallback(
+    () =>
+      isConferenceCall
+        ? env.CLOUD_TELEPHONY_PATH
+        : isMicrophoneMode
+          ? env.MICROPHONE_SOCKET_PATH
+          : env.WEBRTC_SOCKET_PATH,
+    [isConferenceCall, isMicrophoneMode],
+  );
 
   useEffect(() => {
     if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
@@ -157,10 +161,11 @@ export const ListeningScreen = ({
   }, [isOffline, isMicrophoneMode, isWebMicrophoneMode]);
 
   useEffect(() => {
-    if (isEndCallSuccess) {
-      onCallEndSuccess();
+    // Handling redirection for both success and error cases to prevent user getting stuck in the listening screen
+    if (isEndCallSuccess || isEndCallError) {
+      handleCallEndRedirection();
     }
-  }, [isEndCallSuccess, onCallEndSuccess]);
+  }, [isEndCallSuccess, handleCallEndRedirection, isEndCallError]);
 
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
@@ -216,7 +221,7 @@ export const ListeningScreen = ({
         setIsMicrophoneModeSessionCreated(true);
       },
       [SocketEvent.CHAT_ENDED]: () => {
-        onCallEndSuccess();
+        handleCallEndRedirection();
       },
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
@@ -264,7 +269,12 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall, checkCounselorChat],
+    [
+      handleCallEndRedirection,
+      isAudioActive,
+      isConferenceCall,
+      checkCounselorChat,
+    ],
   );
 
   const {userData} = useUser();

@@ -87,7 +87,7 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
   const amplitudes: number[] = [];
 
   const scale = globalMax > 0 ? 1 / (globalMax / 32768) : 1;
-  const PLATFORM_GAIN = isIOS ? 10.0 : 1.0;
+  const PLATFORM_GAIN = isIOS ? 3.0 : 1.0;
 
   for (let i = 0; i < NUM_BARS; i++) {
     let sum = 0;
