@@ -80,7 +80,7 @@ jobs:
           cd ios
           which agvtool
           agvtool what-version
-          build_number="PROD-$(date +%Y%m%d%H%M)"
+          build_number=$(date +%Y%m%d%H%M)
           echo "Production build number: $build_number"
           agvtool new-version -all $build_number
           agvtool what-version
