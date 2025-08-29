@@ -7,3 +7,4 @@ export * from './error';
 export * from './fileOperations';
 export * from './logger';
 export * from './validation';
+export * from './version';
