@@ -6,6 +6,7 @@ import {SecurityCarousel} from '@/components';
 import {CarouselVariant} from '@/constants';
 import {useTranslate, useUser} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
+import {getAppVersion} from '@/utils';
 
 interface DrawerContentProps {
   openLogoutModal: () => void;
@@ -46,6 +47,11 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
       </TouchableOpacity>
       <View style={styles.carouselWrapper}>
         <SecurityCarousel variant={CarouselVariant.DRAWER} />
+      </View>
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>
+          {t('Common.version')}: {getAppVersion()}
+        </Text>
       </View>
     </View>
   );
@@ -112,5 +118,15 @@ const styles = ScaledSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: '16@ms',
+  },
+  versionContainer: {
+    alignItems: 'center',
+    paddingBottom: '16@ms',
+  },
+  versionText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    lineHeight: '16@mvs',
+    color: colors.darkCharcoal,
   },
 });
