@@ -80,7 +80,8 @@ jobs:
           cd ios
           which agvtool
           agvtool what-version
-          build_number=$(date +%Y%m%d%H%M)
+          # Add "0" prefix for production builds to distinguish from develop builds
+          build_number="0$(date +%Y%m%d%H%M)"
           echo "Production build number: $build_number"
           agvtool new-version -all $build_number
           agvtool what-version
