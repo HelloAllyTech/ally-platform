@@ -134,9 +134,10 @@ export const ListeningScreen = ({
     route.params?.isMicrophoneMode ||
     chatData?.provider === ChatProvider.MICROPHONE;
 
-  const [endCall, {isSuccess: isEndCallSuccess}] = useEndCallMutation();
+  const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
+    useEndCallMutation();
 
-  const onCallEndSuccess = useCallback(() => {
+  const handleCallEndRedirection = useCallback(() => {
     // Only navigate if the ListeningScreen is still focused
     if (isFocused) {
       navigation.replace(SCREEN_NAMES.BREATHING);
@@ -144,9 +145,8 @@ export const ListeningScreen = ({
   }, [navigation, isFocused]);
 
   const getSocketPath = useCallback(() => {
-    if (isConferenceCall || isMicrophoneMode) {
-      return env.MICROPHONE_SOCKET_PATH;
-    }
+    if (isConferenceCall) return env.CLOUD_TELEPHONY_PATH;
+    if (isMicrophoneMode) return env.MICROPHONE_SOCKET_PATH;
     return env.WEBRTC_SOCKET_PATH;
   }, [isConferenceCall, isMicrophoneMode]);
 
@@ -157,10 +157,11 @@ export const ListeningScreen = ({
   }, [isOffline, isMicrophoneMode, isWebMicrophoneMode]);
 
   useEffect(() => {
-    if (isEndCallSuccess) {
-      onCallEndSuccess();
+    // Handling redirection for both success and error cases to prevent user getting stuck in the listening screen
+    if (isEndCallSuccess || isEndCallError) {
+      handleCallEndRedirection();
     }
-  }, [isEndCallSuccess, onCallEndSuccess]);
+  }, [isEndCallSuccess, handleCallEndRedirection, isEndCallError]);
 
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
@@ -216,7 +217,7 @@ export const ListeningScreen = ({
         setIsMicrophoneModeSessionCreated(true);
       },
       [SocketEvent.CHAT_ENDED]: () => {
-        onCallEndSuccess();
+        handleCallEndRedirection();
       },
       [SocketEvent.NUDGE]: (data: SocketMessage) => {
         if (data.payload) {
@@ -264,13 +265,18 @@ export const ListeningScreen = ({
         }, AUDIO_INACTIVE_TIMEOUT);
       },
     }),
-    [onCallEndSuccess, isAudioActive, isConferenceCall, checkCounselorChat],
+    [
+      handleCallEndRedirection,
+      isAudioActive,
+      isConferenceCall,
+      checkCounselorChat,
+    ],
   );
 
   const {userData} = useUser();
 
-  const onDisconnectSocket = (reason?: string) => {
-    if (isMicrophoneMode && chatData?.chatId) {
+  const onDisconnectSocket = () => {
+    if (isMicrophoneMode) {
       setDisconnectedType(
         isOffline ? DisconnectedType.NETWORK : DisconnectedType.SOCKET,
       );
@@ -486,6 +492,7 @@ export const ListeningScreen = ({
   const handleTryAgain = useCallback(() => {
     dispatch(clearCurrentChat());
     setDisconnectedType(null);
+    navigation.goBack();
     navigation.reset({
       index: 1,
       routes: [
@@ -499,17 +506,6 @@ export const ListeningScreen = ({
     dispatch(clearCurrentChat());
     navigation.goBack();
   }, [navigation, dispatch]);
-
-  if (!chatData?.chatId) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.white} />
-        <Text style={styles.loadingText}>
-          {t('ListeningScreen.connecting')}
-        </Text>
-      </View>
-    );
-  }
 
   const tooltipContent = (
     <View style={styles.tooltipContent}>
@@ -527,18 +523,6 @@ export const ListeningScreen = ({
     top: 10,
     bottom: 10,
   };
-
-  if (disconnectedType) {
-    return (
-      <View style={styles.container}>
-        <NetworkDisconnected
-          onRetry={handleTryAgain}
-          onGoBack={handleNetworkDisconnectedGoBack}
-          disconnectedType={disconnectedType}
-        />
-      </View>
-    );
-  }
 
   const renderTakingNotes = () => {
     return (
@@ -562,6 +546,29 @@ export const ListeningScreen = ({
       </View>
     );
   };
+
+  if (disconnectedType) {
+    return (
+      <View style={styles.container}>
+        <NetworkDisconnected
+          onRetry={handleTryAgain}
+          onGoBack={handleNetworkDisconnectedGoBack}
+          disconnectedType={disconnectedType}
+        />
+      </View>
+    );
+  }
+
+  if (!chatData?.chatId) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.white} />
+        <Text style={styles.loadingText}>
+          {t('ListeningScreen.connecting')}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

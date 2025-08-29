@@ -63,6 +63,8 @@ const AudioWaveformComponent: React.FC<WaveformProps> = ({
     if (totalBars === 0) return amps;
     const middle = Math.floor(totalBars / 2);
     const processed = amps.map((amp, i) => {
+      if (amp === 0.02) return amp;
+
       if (i < middle) {
         return (amp * (i + 1) * 2) / totalBars;
       } else if (i >= middle) {
@@ -71,6 +73,7 @@ const AudioWaveformComponent: React.FC<WaveformProps> = ({
         return amp;
       }
     });
+
     return processed;
   };
 
