@@ -144,15 +144,11 @@ export const ListeningScreen = ({
     }
   }, [navigation, isFocused]);
 
-  const getSocketPath = useCallback(
-    () =>
-      isConferenceCall
-        ? env.CLOUD_TELEPHONY_PATH
-        : isMicrophoneMode
-          ? env.MICROPHONE_SOCKET_PATH
-          : env.WEBRTC_SOCKET_PATH,
-    [isConferenceCall, isMicrophoneMode],
-  );
+  const getSocketPath = useCallback(() => {
+    if (isConferenceCall) return env.CLOUD_TELEPHONY_PATH;
+    if (isMicrophoneMode) return env.MICROPHONE_SOCKET_PATH;
+    return env.WEBRTC_SOCKET_PATH;
+  }, [isConferenceCall, isMicrophoneMode]);
 
   useEffect(() => {
     if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
