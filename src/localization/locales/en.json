@@ -4,6 +4,7 @@
     "ok": "OK",
     "yes": "Yes",
     "cancel": "Cancel",
+    "version": "Version",
     "somethingWentWrong": "Something went wrong. Please try again.",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
