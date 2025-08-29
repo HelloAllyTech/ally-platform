@@ -279,8 +279,8 @@ export const ListeningScreen = ({
 
   const {userData} = useUser();
 
-  const onDisconnectSocket = (reason?: string) => {
-    if (isMicrophoneMode && chatData?.chatId) {
+  const onDisconnectSocket = () => {
+    if (isMicrophoneMode) {
       setDisconnectedType(
         isOffline ? DisconnectedType.NETWORK : DisconnectedType.SOCKET,
       );
@@ -496,6 +496,7 @@ export const ListeningScreen = ({
   const handleTryAgain = useCallback(() => {
     dispatch(clearCurrentChat());
     setDisconnectedType(null);
+    navigation.goBack();
     navigation.reset({
       index: 1,
       routes: [
@@ -509,17 +510,6 @@ export const ListeningScreen = ({
     dispatch(clearCurrentChat());
     navigation.goBack();
   }, [navigation, dispatch]);
-
-  if (!chatData?.chatId) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.white} />
-        <Text style={styles.loadingText}>
-          {t('ListeningScreen.connecting')}
-        </Text>
-      </View>
-    );
-  }
 
   const tooltipContent = (
     <View style={styles.tooltipContent}>
@@ -537,18 +527,6 @@ export const ListeningScreen = ({
     top: 10,
     bottom: 10,
   };
-
-  if (disconnectedType) {
-    return (
-      <View style={styles.container}>
-        <NetworkDisconnected
-          onRetry={handleTryAgain}
-          onGoBack={handleNetworkDisconnectedGoBack}
-          disconnectedType={disconnectedType}
-        />
-      </View>
-    );
-  }
 
   const renderTakingNotes = () => {
     return (
@@ -572,6 +550,29 @@ export const ListeningScreen = ({
       </View>
     );
   };
+
+  if (disconnectedType) {
+    return (
+      <View style={styles.container}>
+        <NetworkDisconnected
+          onRetry={handleTryAgain}
+          onGoBack={handleNetworkDisconnectedGoBack}
+          disconnectedType={disconnectedType}
+        />
+      </View>
+    );
+  }
+
+  if (!chatData?.chatId) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.white} />
+        <Text style={styles.loadingText}>
+          {t('ListeningScreen.connecting')}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
