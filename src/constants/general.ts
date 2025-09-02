@@ -94,6 +94,9 @@ export const drawerConfig: CarouselConfig = {
   imageContainerCustomStyle: {
     width: '90%',
     height: ms(250),
+    padding: 4,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
   },
   titleCustomStyle: {
     color: colors.darkGray2,
@@ -108,7 +111,12 @@ export const defaultConfig: CarouselConfig = {
   paginationActiveDotStyle: {
     backgroundColor: colors.white,
   },
-  imageContainerCustomStyle: {},
+  imageContainerCustomStyle: {
+    borderWidth: 0,
+    borderRightWidth: 0,
+    borderLeftWidth: 0,
+    overflow: 'hidden',
+  },
   titleCustomStyle: {
     color: colors.white,
   },
