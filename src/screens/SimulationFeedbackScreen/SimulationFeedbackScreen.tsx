@@ -12,10 +12,13 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
-import {FEEDBACK_OPTIONS, SCREEN_NAMES, WINDOW_HEIGHT} from '@/constants';
+import {ChatSummaryStatus, FEEDBACK_OPTIONS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import {useAddFeedbackMutation} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
+
+// To Do: move SummaryGenerationProgress component to common components folder
+import {SummaryGenerationProgress} from '../CallSummaryScreen/components/SummaryGenerationProgress/SummaryGenerationProgress';
 
 export const SimulationFeedbackScreen: React.FC = () => {
   const {t} = useTranslation();
@@ -73,24 +76,51 @@ export const SimulationFeedbackScreen: React.FC = () => {
     ));
   };
 
-  const renderFeedbackCard = () => {
+  const renderSectionHeader = (headerText: string) => {
     return (
-      <View style={styles.feedbackCard}>
-        <Text style={styles.questionText}>
-          {t('SimulationFeedback.questionText')}
-        </Text>
-        <View style={styles.starsContainer}>{renderStars()}</View>
-        <Text style={styles.feedbackText}>{feedbackText}</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder={t('SimulationFeedback.placeholderText')}
-          placeholderTextColor={colors.lightGray3}
-          value={additionalFeedback}
-          onChangeText={setAdditionalFeedback}
-          multiline
-          textAlignVertical="top"
-        />
+      <View style={styles.headerSection}>
+        <Text style={styles.headerText}>{headerText}</Text>
+        <View style={styles.headerLine} />
       </View>
+    );
+  };
+
+  const renderFeedback = () => {
+    return (
+      <>
+        {renderSectionHeader(t('SimulationFeedback.headerText'))}
+        <View style={styles.feedbackCard}>
+          <Text style={styles.questionText}>
+            {t('SimulationFeedback.questionText')}
+          </Text>
+          <View style={styles.starsContainer}>{renderStars()}</View>
+          <Text style={styles.feedbackText}>{feedbackText}</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder={t('SimulationFeedback.placeholderText')}
+            placeholderTextColor={colors.lightGray3}
+            value={additionalFeedback}
+            onChangeText={setAdditionalFeedback}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+      </>
+    );
+  };
+
+  const renderSummary = () => {
+    return (
+      <>
+        {renderSectionHeader(t('SimulationFeedback.sessionSummary'))}
+        {
+          // To Do: Conditionally render this component based on the summary status
+          <SummaryGenerationProgress
+            hideDescription
+            summaryStatus={ChatSummaryStatus.IN_PROGRESS}
+          />
+        }
+      </>
     );
   };
 
@@ -124,13 +154,8 @@ export const SimulationFeedbackScreen: React.FC = () => {
             </Text>
           </Text>
         </View>
-        <View style={styles.headerSection}>
-          <Text style={styles.headerText}>
-            {t('SimulationFeedback.headerText')}
-          </Text>
-          <View style={styles.headerLine} />
-        </View>
-        {renderFeedbackCard()}
+        {renderSummary()}
+        {renderFeedback()}
         {renderButtonContainer()}
       </ScrollView>
     </SafeAreaView>
@@ -145,17 +170,16 @@ const styles = ScaledSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: '20@ms',
-    paddingTop: WINDOW_HEIGHT * 0.12,
     paddingBottom: '40@vs',
   },
   titleSection: {
-    marginBottom: '10@vs',
+    marginBottom: '12@vs',
   },
   title: {
     ...typography.headline.large,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkGray2,
-    fontSize: '22@ms',
+    fontSize: '18@ms',
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -163,7 +187,6 @@ const styles = ScaledSheet.create({
   headerSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: '16@vs',
   },
   headerText: {
     ...typography.label.medium,
@@ -182,6 +205,7 @@ const styles = ScaledSheet.create({
     marginBottom: '20@vs',
     borderWidth: 0.5,
     borderColor: colors.lightGray4,
+    marginTop: '16@vs',
   },
   questionText: {
     ...typography.headline.small,
@@ -208,10 +232,10 @@ const styles = ScaledSheet.create({
     marginBottom: '12@vs',
   },
   textInput: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightGray1,
     borderRadius: '8@ms',
     padding: '12@ms',
-    minHeight: '120@vs',
+    minHeight: '80@vs',
     ...typography.body.medium,
     color: colors.darkGray2,
     borderWidth: 0.5,

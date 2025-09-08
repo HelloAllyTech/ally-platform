@@ -63,6 +63,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       if (roomData) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
           roomData: roomData,
+          scenario,
         });
       } else {
         setIsEmailModalVisible(true);
@@ -78,6 +79,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       if (roomData) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
           roomData: roomData,
+          scenario,
         });
       }
     } catch (error) {

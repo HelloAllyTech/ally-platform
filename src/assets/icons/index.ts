@@ -41,12 +41,16 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
+import LearnInactiveIcon from './learn.svg';
+import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
 import LockIcon from './lock.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
+import MicOffIcon from './micOff.svg';
+import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
@@ -164,4 +168,8 @@ export {
   NetworkDisconnectedIcon,
   HexagonCloseIcon,
   EndSessionIcon,
+  LearnActiveIcon,
+  LearnInactiveIcon,
+  MicOnIcon,
+  MicOffIcon,
 };

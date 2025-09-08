@@ -6,10 +6,10 @@ import {
 } from '@livekit/react-native';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {ActivityIndicator, SafeAreaView, Text, View} from 'react-native';
+import {SafeAreaView, Text, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {InfoIcon} from '@/assets';
 import {useErrorToast} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
@@ -22,7 +22,8 @@ import {AudioWave, ControlButtons, SimulationTimer} from './components';
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
-  const {roomData} = route.params;
+  const insets = useSafeAreaInsets();
+  const {roomData, scenario} = route.params;
   const wsUrl = 'wss://ally-learn-poc-dev-lbzgnlp9.livekit.cloud/';
   const token = roomData.access_token;
   const startTime = roomData?.created_at
@@ -123,37 +124,52 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     }
   };
 
-  const renderLoader = (message: string) => {
+  const renderLoader = () => {
     return (
-      <View style={styles.connectionLoaderContainer}>
-        <ActivityIndicator size="large" color={colors.white} />
-        <Text style={styles.connectionLoaderText}>{message}</Text>
+      <View style={styles.loadingWrapper}>
+        <Text style={styles.loadingTitle}>
+          {t('SimulationAssistant.startingTitle')}
+          <Text style={styles.loadingItalic}>
+            {t('SimulationAssistant.startingEllipsis')}
+          </Text>
+        </Text>
+        <Text style={styles.loadingDescription}>
+          {t('SimulationAssistant.startingSubtitle')}
+        </Text>
       </View>
     );
   };
 
+  const showSimulationLoading = isConnecting || isDisconnecting;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
       <RoomContext.Provider value={room}>
-        {(isConnecting || isDisconnecting) &&
-          renderLoader(
-            isConnecting
-              ? t('SimulationScreen.connecting')
-              : t('SimulationScreen.disconnecting'),
+        {!showSimulationLoading && startTime && (
+          <SimulationTimer startTime={startTime} />
+        )}
+        <View style={styles.centralContainer}>
+          {showSimulationLoading ? (
+            renderLoader()
+          ) : (
+            <>
+              <AudioWave avatarUrl={scenario?.cover_image} />
+              {!!scenario?.title && (
+                <Text style={styles.personaLabel}>{scenario.title}</Text>
+              )}
+            </>
           )}
-        {startTime && <SimulationTimer startTime={startTime} />}
-        <AudioWave />
+        </View>
+
         <ControlButtons
           onMicPress={handleToggleMic}
           onStopPress={handleDisconnect}
           isMuted={!isMicEnabled}
         />
-        <View style={styles.securityContainer}>
-          <InfoIcon width={12} height={12} color={colors.lightGray3} />
-          <Text style={styles.securityText}>
-            {t('SimulationScreen.encryptionInfo')}
-          </Text>
-        </View>
       </RoomContext.Provider>
     </SafeAreaView>
   );
@@ -162,38 +178,47 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.darkGray7,
     justifyContent: 'space-between',
-    paddingHorizontal: '20@ms',
-    paddingVertical: '40@mvs',
+    paddingHorizontal: '16@ms',
   },
-  securityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  centralContainer: {
+    flex: 1,
     justifyContent: 'center',
-    gap: '6@ms',
-    marginBottom: '20@mvs',
+    alignItems: 'center',
+    borderRadius: '8@ms',
+    marginTop: '10@mvs',
+    marginBottom: '16@mvs',
+    backgroundColor: colors.darkGray3,
   },
-  securityText: {
+  loadingWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: '40@ms',
+  },
+  loadingTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '16@ms',
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: '4@mvs',
+  },
+  loadingItalic: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+  },
+  loadingDescription: {
     ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '12@ms',
+    fontSize: '14@ms',
     color: colors.lightGray3,
+    textAlign: 'center',
   },
-  connectionLoaderContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-  },
-  connectionLoaderText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    paddingTop: '6@ms',
+  personaLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     color: colors.white,
+    textAlign: 'left',
+    marginLeft: '16@ms',
+    marginBottom: '16@ms',
+    width: '100%',
   },
 });

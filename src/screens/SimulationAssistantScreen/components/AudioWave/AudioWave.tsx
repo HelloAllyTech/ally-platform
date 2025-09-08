@@ -1,12 +1,16 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useLocalParticipant} from '@livekit/react-native';
 import {Track} from 'livekit-client';
-import {Animated, View} from 'react-native';
+import {Animated, Image, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {AUDIO, CIRCLE, CIRCLE_CONFIGS} from '@/constants';
 import type {CircleProps, CircleWaveVisualizerProps} from '@/types';
+
+type AudioWaveProps = {
+  avatarUrl?: string | null;
+};
 
 const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
   const isActive = audioLevel > AUDIO.THRESHOLD;
@@ -94,7 +98,7 @@ const CircleWaveVisualizer: React.FC<CircleWaveVisualizerProps> = ({
   );
 };
 
-export const AudioWave = () => {
+export const AudioWave: React.FC<AudioWaveProps> = ({avatarUrl}) => {
   const {localParticipant} = useLocalParticipant();
   const audioPublication = localParticipant
     ?.getTrackPublications()
@@ -109,6 +113,17 @@ export const AudioWave = () => {
           publication: audioPublication,
         }}
       />
+      {!!avatarUrl && (
+        <View pointerEvents="none" style={styles.avatarWrapper}>
+          <View style={styles.avatarContainer}>
+            <Image
+              source={{uri: avatarUrl}}
+              style={styles.avatarImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -140,5 +155,25 @@ const styles = ScaledSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: CIRCLE.BASE_SIZE / 2,
+  },
+  avatarWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    height: '100@ms',
+    width: '100@ms',
+    borderRadius: '50@ms',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '50@ms',
+    alignSelf: 'center',
   },
 });

@@ -1,5 +1,13 @@
 import React, {useCallback, useState} from 'react';
-import {Animated, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {
+  Animated,
+  Keyboard,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components';
@@ -71,51 +79,60 @@ export const EmailInputModal: React.FC<EmailInputModalProps> = ({
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
-        onPress={handleClose}
+        onPress={() => {
+          Keyboard.dismiss();
+          handleClose();
+        }}
       />
-      <Animated.View style={styles.modalContainer}>
-        <View style={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{t('Simulations.enterYourEmail')}</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.description}>
-            {t('Simulations.emailDescription')}
-          </Text>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, error && styles.inputError]}
-              placeholder={t('Simulations.emailPlaceholder')}
-              placeholderTextColor={colors.darkGray8}
-              value={email}
-              onChangeText={handleEmailChange}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-            />
-          </View>
-
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <Animated.View style={styles.modalContainer}>
+          <View style={styles.scrollContent}>
+            <View style={styles.header}>
+              <Text style={styles.title}>
+                {t('Simulations.enterYourEmail')}
+              </Text>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
 
-          <View style={styles.buttonContainer}>
-            <PrimaryButton
-              label={t('Simulations.continue')}
-              onPress={handleSubmit}
-              isDisabled={!email.trim() || isSubmitting}
-              isLoading={isSubmitting || isSendingOtp}
-            />
+            <Text style={styles.description}>
+              {t('Simulations.emailDescription')}
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, error && styles.inputError]}
+                placeholder={t('Simulations.emailPlaceholder')}
+                placeholderTextColor={colors.darkGray8}
+                value={email}
+                onChangeText={handleEmailChange}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+              />
+            </View>
+
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.buttonContainer}>
+              <PrimaryButton
+                label={t('Simulations.continue')}
+                onPress={handleSubmit}
+                isDisabled={!email.trim() || isSubmitting}
+                isLoading={isSubmitting || isSendingOtp}
+              />
+            </View>
           </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </TouchableWithoutFeedback>
     </View>
   );
 };

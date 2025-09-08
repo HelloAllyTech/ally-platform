@@ -239,10 +239,14 @@
     "try": "Try:",
     "noData": "No results found for"
   },
-  "SimulationScreen": {
-    "encryptionInfo": "Your sessions are secured with end-to-end encryption.",
-    "connecting": "Connecting...",
-    "disconnecting": "Disconnecting..."
+  "SimulationAssistant": {
+    "startingTitle": "Simulation ",
+    "startingEllipsis": "starting...",
+    "startingSubtitle": "To start the simulation, please allow us to use your microphone.",
+    "sessionDuration": "Session Duration",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "endSession": "End session"
   },
   "NetworkLogs": {
     "logs": "Logs"
@@ -282,7 +286,8 @@
     "questionText": "How was your experience?",
     "placeholderText": "How was your Experience ?",
     "submitButton": "Submit Feedback",
-    "submittingButton": "Submitting..."
+    "submittingButton": "Submitting...",
+    "sessionSummary": "SESSION SUMMARY"
   },
   "Errors": {
     "createRoom": "Failed to create room",

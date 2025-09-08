@@ -240,7 +240,6 @@ export const CallLogScreen: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
-        isCounselor={isCounselor}
       />
       {!isCounselor ? (
         <FeatureNotAvailable

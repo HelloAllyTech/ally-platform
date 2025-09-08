@@ -85,7 +85,7 @@ export enum CarouselVariant {
   DEFAULT = 'default',
 }
 
-export const drawerConfig: CarouselConfig = {
+export const drawerSecurityCarouselConfig: CarouselConfig = {
   width: SCREEN_WIDTH - 80,
   isBlurView: false,
   paginationActiveDotStyle: {
@@ -105,7 +105,7 @@ export const drawerConfig: CarouselConfig = {
   },
 };
 
-export const defaultConfig: CarouselConfig = {
+export const defaultSecurityCarouselConfig: CarouselConfig = {
   width: SCREEN_WIDTH,
   isBlurView: true,
   paginationActiveDotStyle: {
