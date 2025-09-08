@@ -5,6 +5,7 @@ import {
 } from '@react-navigation/bottom-tabs';
 import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useSelector} from 'react-redux';
 
 import {
   AnalyticsActiveIcon,
@@ -13,6 +14,8 @@ import {
   CallLogInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
+  LearnActiveIcon,
+  LearnInactiveIcon,
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
@@ -21,24 +24,41 @@ import {
   CallLogScreen,
   CommunityScreen,
   SearchScreen,
+  SimulationsScreen,
   UserAnalyticsScreen,
 } from '@/screens';
+import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
+import {UserRole} from '@/types';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = [
-  SCREEN_NAMES.CALL_LOG,
-  SCREEN_NAMES.USER_ANALYTICS,
-  SCREEN_NAMES.SEARCH,
-  SCREEN_NAMES.COMMUNITY,
-];
-
-const TAB_COMPONENTS = [
-  CallLogScreen,
-  UserAnalyticsScreen,
-  SearchScreen,
-  CommunityScreen,
+const ALL_TABS = [
+  {
+    name: SCREEN_NAMES.CALL_LOG,
+    component: CallLogScreen,
+    roles: [UserRole.COUNSELOR],
+  },
+  {
+    name: SCREEN_NAMES.USER_ANALYTICS,
+    component: UserAnalyticsScreen,
+    roles: [UserRole.COUNSELOR],
+  },
+  {
+    name: SCREEN_NAMES.SEARCH,
+    component: SearchScreen,
+    roles: [UserRole.COUNSELOR],
+  },
+  {
+    name: SCREEN_NAMES.LEARN,
+    component: SimulationsScreen,
+    roles: [UserRole.COUNSELOR],
+  },
+  {
+    name: SCREEN_NAMES.COMMUNITY,
+    component: CommunityScreen,
+    roles: [UserRole.COUNSELOR],
+  },
 ];
 
 interface BottomTabsProps {
@@ -62,6 +82,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       [SCREEN_NAMES.SEARCH]: (
         <SearchActiveIcon width={20} height={20} color={colors.blue} />
       ),
+      [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
@@ -73,6 +94,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
         <CommunityInactiveIcon width={20} height={20} />
       ),
       [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
     };
 
     return focused
@@ -103,18 +125,33 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
     return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
   };
 
+  const userRole = useSelector((s: AppRootState) => s.user.user?.role);
+  const userLoading = useSelector((s: AppRootState) => s.user.loading);
+
+  if (userLoading || !userRole) {
+    return null;
+  }
+
+  const visibleTabs = ALL_TABS.filter(tab => tab.roles.includes(userRole));
+  const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
+
   return (
     <View style={styles.container}>
       <Tab.Navigator
+        key={`tabs_${userRole}`}
         tabBar={renderCustomTabBar}
         detachInactiveScreens
         screenOptions={{
           headerShown: false,
           lazy: true,
         }}
-        initialRouteName={SCREEN_NAMES.CALL_LOG}>
-        {TAB_NAMES.map((name, idx) => (
-          <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
+        initialRouteName={initial}>
+        {visibleTabs.map(tab => (
+          <Tab.Screen
+            key={tab.name}
+            name={tab.name}
+            component={tab.component}
+          />
         ))}
       </Tab.Navigator>
     </View>

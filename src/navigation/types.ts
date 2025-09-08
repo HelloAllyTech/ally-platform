@@ -12,7 +12,7 @@ export type RootStackParamList = {
   LiveKitTest: undefined;
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
-  SimulationAssistant: {roomData: RoomCreationResponse};
+  SimulationAssistant: {roomData: RoomCreationResponse; scenario?: Scenario};
   SimulationFeedback: undefined;
 };
 
@@ -27,6 +27,7 @@ export type TabParamList = {
   Community: undefined;
   UserAnalytics: undefined;
   Search: undefined;
+  Learn: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

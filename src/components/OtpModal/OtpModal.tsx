@@ -1,5 +1,13 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, Animated, Text, TouchableOpacity, View} from 'react-native';
+import {
+  Alert,
+  Animated,
+  Keyboard,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton} from '@/components/Button/PrimaryButton';
@@ -128,69 +136,76 @@ export const OtpModal: React.FC<OtpModalProps> = ({
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
-        onPress={handleClose}
+        onPress={() => {
+          Keyboard.dismiss();
+          handleClose();
+        }}
       />
-      <Animated.View style={styles.modalContainer}>
-        <View style={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{t('Simulations.verifyOtp')}</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.description}>
-            {t('Simulations.enterTheCodeSentTo')}
-            {'\n'}
-            <Text style={styles.emailText}>{email}</Text>
-          </Text>
-
-          <View style={styles.otpContainer}>
-            <OtpInput
-              ref={otpInputRef}
-              value={otpValue}
-              onChange={handleOtpChange}
-              inputCount={4}
-              hasError={!!error}
-            />
-          </View>
-
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <Animated.View style={styles.modalContainer}>
+          <View style={styles.scrollContent}>
+            <View style={styles.header}>
+              <Text style={styles.title}>{t('Simulations.verifyOtp')}</Text>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
 
-          <View style={styles.resendContainer}>
-            <Text style={styles.helperText}>
-              {t('Simulations.didNotReceiveTheCode')}
+            <Text style={styles.description}>
+              {t('Simulations.enterTheCodeSentTo')}
+              {'\n'}
+              <Text style={styles.emailText}>{email}</Text>
             </Text>
-            <TouchableOpacity
-              style={styles.resendButton}
-              onPress={handleResendOtp}
-              disabled={isResendDisabled || isResending}>
-              <Text
-                style={[
-                  styles.resendButtonText,
-                  (isResendDisabled || isResending) &&
-                    styles.resendButtonDisabled,
-                ]}>
-                {t('Simulations.resend')}{' '}
-                {countdown > 0 ? `(${countdown}s)` : ''}
-              </Text>
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.buttonContainer}>
-            <PrimaryButton
-              label={t('Simulations.verifyOtp')}
-              onPress={handleSubmit}
-              isDisabled={!isOtpComplete}
-              isLoading={isVerifying}
-            />
+            <View style={styles.otpContainer}>
+              <OtpInput
+                ref={otpInputRef}
+                value={otpValue}
+                onChange={handleOtpChange}
+                inputCount={4}
+                hasError={!!error}
+              />
+            </View>
+
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.resendContainer}>
+              <Text style={styles.helperText}>
+                {t('Simulations.didNotReceiveTheCode')}
+              </Text>
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={handleResendOtp}
+                disabled={isResendDisabled || isResending}>
+                <Text
+                  style={[
+                    styles.resendButtonText,
+                    (isResendDisabled || isResending) &&
+                      styles.resendButtonDisabled,
+                  ]}>
+                  {t('Simulations.resend')}{' '}
+                  {countdown > 0 ? `(${countdown}s)` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <PrimaryButton
+                label={t('Simulations.verifyOtp')}
+                onPress={handleSubmit}
+                isDisabled={!isOtpComplete}
+                isLoading={isVerifying}
+              />
+            </View>
           </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </TouchableWithoutFeedback>
 
       {isProcessingSuccess && renderProcessingOverlay()}
     </View>

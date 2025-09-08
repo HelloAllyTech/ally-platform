@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -9,6 +10,7 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
   startTime,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const {t} = useTranslation();
 
   useEffect(() => {
     const calculateInitialElapsed = () => {
@@ -38,10 +40,10 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
 
   return (
     <View style={styles.timerContainer}>
-      <Text style={styles.sessionText}>
-        Session in <Text style={styles.italicText}>progress</Text>
+      <Text style={styles.durationText}>
+        {t('SimulationAssistant.sessionDuration')}: {''}
+        <Text style={styles.durationValue}>{formatTime(elapsedSeconds)}</Text>
       </Text>
-      <Text style={styles.timerText}>{formatTime(elapsedSeconds)}</Text>
     </View>
   );
 };
@@ -49,22 +51,17 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
 const styles = ScaledSheet.create({
   timerContainer: {
     alignItems: 'center',
-    marginTop: '40@mvs',
+    marginTop: '16@mvs',
+    marginBottom: '6@mvs',
   },
-  sessionText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '22@ms',
-    color: colors.black,
-    marginBottom: '8@mvs',
+  durationText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    color: colors.white,
   },
-  italicText: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontSize: '22@ms',
-    color: colors.black,
-  },
-  timerText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '26@ms',
-    color: colors.lightGray3,
+  durationValue: {
+    ...fontFamily.REPLAY_PRO.BOLD,
+    fontSize: '16@ms',
+    color: colors.white,
   },
 });
