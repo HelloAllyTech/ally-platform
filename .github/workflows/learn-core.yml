@@ -18,12 +18,10 @@ on:
       - develop
       - stg
       - staging
-      - main
-      - master
 
 env:
   ENABLE_DB_MIGRATION: "false"
-  S3_ENV_FILES: 'learn-core/.env'
+  S3_ENV_FILES: ''
   BUILD_PLATFORM: linux/amd64
   BUILD_PATH: dockerfile
   SUBNETS: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
@@ -60,12 +58,15 @@ jobs:
           if [ -z "$ENV" ]; then
             case "$BRANCH" in
               "dev"|"develop")  ENV="dev" ;;
-              "main"|"master") ENV="prd" ;;
+              "main"|"master") 
+                echo "Production deployment must be manual via workflow_dispatch" 
+                exit 1 
+                ;;
               *) echo "ENV not configured" && exit 1 ;;
             esac
           fi
 
-          if [[ "$ENV" == "prd" && "$BRANCH" == "main" ]]; then
+          if [[ "$ENV" == "prd" ]]; then
             echo "AWS_ROLE=${{ vars.PRD_AWS_ROLE }}"      >> $GITHUB_OUTPUT
             echo "AWS_REGION=${{ vars.PRD_AWS_REGION }}"  >> $GITHUB_OUTPUT
             echo "ECR_REPOSITORY=${{ vars.PRD_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
