@@ -80,7 +80,7 @@ export const SimulationsScreen: React.FC = () => {
     );
   };
 
-  const empty = useMemo(
+  const ListEmptyElement = useMemo(
     () => (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>{t('Simulations.noSimulations')}</Text>
@@ -145,7 +145,7 @@ export const SimulationsScreen: React.FC = () => {
         data={scenarios}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListEmptyComponent={!isFetching ? empty : null}
+        ListEmptyComponent={!isFetching ? ListEmptyElement : null}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={refetch} />

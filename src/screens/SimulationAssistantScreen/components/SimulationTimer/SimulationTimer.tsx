@@ -60,7 +60,7 @@ const styles = ScaledSheet.create({
     color: colors.white,
   },
   durationValue: {
-    ...fontFamily.REPLAY_PRO.BOLD,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '16@ms',
     color: colors.white,
   },

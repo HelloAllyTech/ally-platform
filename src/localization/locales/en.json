@@ -246,7 +246,8 @@
     "sessionDuration": "Session Duration",
     "mute": "Mute",
     "unmute": "Unmute",
-    "endSession": "End session"
+    "endSession": "End session",
+    "practiceSessionScore": "Practice Session Score"
   },
   "NetworkLogs": {
     "logs": "Logs"
