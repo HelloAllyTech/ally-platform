@@ -19,7 +19,7 @@ import {
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {SCREEN_NAMES} from '@/constants';
+import {Permissions, SCREEN_NAMES} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
@@ -29,7 +29,6 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
-import {UserRole} from '@/types';
 
 const Tab = createBottomTabNavigator();
 
@@ -37,27 +36,30 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
-    roles: [UserRole.COUNSELOR],
+    // TODO: Replace with Permissions.VIEW_NAVBAR_CALLS
+    requiredPermission: '',
   },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
-    roles: [UserRole.COUNSELOR],
+    // TODO: Replace with Permissions.VIEW_NAVBAR_ANALYTICS
+    requiredPermission: '',
   },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
-    roles: [UserRole.COUNSELOR],
+    // TODO: Replace with Permissions.VIEW_NAVBAR_SEARCH
+    requiredPermission: '',
   },
   {
     name: SCREEN_NAMES.LEARN,
     component: SimulationsScreen,
-    roles: [UserRole.COUNSELOR],
+    requiredPermission: Permissions.VIEW_NAVBAR_LEARN,
   },
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
-    roles: [UserRole.COUNSELOR],
+    requiredPermission: '',
   },
 ];
 
@@ -125,20 +127,22 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
     return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
   };
 
-  const userRole = useSelector((s: AppRootState) => s.user.user?.role);
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
+  const permissions = useSelector((s: AppRootState) => s.user.permissions);
 
-  if (userLoading || !userRole) {
+  if (userLoading) {
     return null;
   }
 
-  const visibleTabs = ALL_TABS.filter(tab => tab.roles.includes(userRole));
+  const visibleTabs = ALL_TABS.filter(
+    tab =>
+      !tab.requiredPermission || permissions.includes(tab.requiredPermission),
+  );
   const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
 
   return (
     <View style={styles.container}>
       <Tab.Navigator
-        key={`tabs_${userRole}`}
         tabBar={renderCustomTabBar}
         detachInactiveScreens
         screenOptions={{

@@ -119,13 +119,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
         {!!scenario.short_description && (
-          <Text style={styles.fieldValue}>{scenario.short_description}</Text>
-        )}
-        <Text style={[styles.fieldLabel, styles.descriptionLabel]}>
-          {t('Simulations.descriptionLabel')}
-        </Text>
-        {!!scenario.long_description && (
-          <Text style={styles.fieldValue}>{scenario.long_description}</Text>
+          <Text style={styles.fieldValue}>
+            {scenario.short_description} {scenario.long_description}
+          </Text>
         )}
       </ScrollView>
     );
@@ -135,7 +131,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.ctaWrapper}>
         <PrimaryButton
-          label={t('Simulations.audioSimulation')}
+          label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
         />
@@ -153,17 +149,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
             <LeftArrowIcon color={colors.black} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            {t('Simulations.chooseYour')}{' '}
+            {t('Simulations.start')}{' '}
             <Text style={styles.pageTitleItalic}>
-              {t('Simulations.scenarioWord')}
+              {t('Simulations.simulation')}
             </Text>
           </Text>
-        </View>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>
-            {t('Simulations.scenariosCaps')}
-          </Text>
-          <View style={styles.sectionRule} />
         </View>
       </>
     );
@@ -203,25 +193,6 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@ms',
     paddingBottom: '16@ms',
   },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '4@ms',
-    marginBottom: '12@ms',
-    marginHorizontal: '16@ms',
-  },
-  sectionLabel: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray8,
-    fontSize: '12@ms',
-    letterSpacing: 2,
-  },
-  sectionRule: {
-    flex: 1,
-    height: 0.6,
-    marginRight: '4@ms',
-    backgroundColor: colors.lightGray10,
-  },
   cover: {
     width: '100%',
     height: '180@ms',
@@ -229,23 +200,18 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray4,
   },
   cardTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.black,
-    fontWeight: '700',
     fontSize: '20@ms',
     marginTop: '18@ms',
     marginBottom: '16@ms',
   },
   fieldLabel: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.black,
-    fontSize: '16@ms',
+    fontSize: '14@ms',
     marginBottom: '2@ms',
     fontWeight: '500',
-  },
-  descriptionLabel: {
-    marginTop: '12@ms',
-    marginBottom: '2@ms',
   },
   fieldValue: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -289,7 +255,7 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '8@ms',
-    marginBottom: '8@ms',
+    marginBottom: '18@ms',
     marginHorizontal: '10@ms',
   },
   headerLeft: {
@@ -299,7 +265,7 @@ const styles = ScaledSheet.create({
   pageTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray12,
-    fontSize: '22@ms',
+    fontSize: '18@ms',
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

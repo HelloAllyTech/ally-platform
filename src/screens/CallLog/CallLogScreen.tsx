@@ -67,6 +67,8 @@ export const CallLogScreen: React.FC = () => {
   const {checkCounselorChat} = useCounselorChat();
 
   const isCounselor = userData?.role === UserRole.COUNSELOR;
+  const isLearnUser = userData?.role === UserRole.LEARN;
+  const isCallLogFeatureEnabled = isCounselor || isLearnUser;
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -234,6 +236,17 @@ export const CallLogScreen: React.FC = () => {
     );
   };
 
+  if (!isCallLogFeatureEnabled) {
+    return (
+      <FeatureNotAvailable
+        description={t('CallLogs.appCurrentlyForCounsellors')}
+        ctaText={t('CallLogs.learnMore')}
+        onCtaPress={handleLearnMorePress}
+        containerStyle={styles.featureNotAvailable}
+      />
+    );
+  }
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader
@@ -241,14 +254,7 @@ export const CallLogScreen: React.FC = () => {
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
       />
-      {!isCounselor ? (
-        <FeatureNotAvailable
-          description={t('CallLogs.appCurrentlyForCounsellors')}
-          ctaText={t('CallLogs.learnMore')}
-          onCtaPress={handleLearnMorePress}
-          containerStyle={styles.featureNotAvailable}
-        />
-      ) : allLogs.length === 0 && !isFetching ? (
+      {allLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
           <NoCallLogsIcon
             style={styles.noCallLogsIcon}

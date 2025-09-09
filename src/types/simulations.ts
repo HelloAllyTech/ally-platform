@@ -6,6 +6,8 @@ export interface Scenario {
   short_description?: string;
   long_description?: string;
   cover_image?: string | null;
+  // TODO: Add enum when API is updated
+  status?: string;
 }
 
 export interface ScenariosResponse {

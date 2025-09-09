@@ -257,12 +257,17 @@
     "viewMore": "View more"
   },
   "Simulations": {
+    "header": {
+      "title": "Ally",
+      "subtitle": "Learn"
+    },
     "chooseYour": "Choose your",
     "scenarioWord": "Scenario",
+    "learnIntro": "<ai>AI</ai>-voice based hyper realistic training role plays to help <counsellors>counsellors</counsellors> build <expertise>expertise</expertise>.",
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Scenario:",
-    "descriptionLabel": "Description:",
-    "startSimulation": "Start Simulation",
+    "start": "Start",
+    "simulation": "Simulation",
     "audioSimulation": "Audio Simulation",
     "verifyOtp": "Verify OTP",
     "enterTheCodeSentTo": "Enter the code sent to",
