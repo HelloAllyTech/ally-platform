@@ -34,6 +34,7 @@ export const colors = {
   lightGray16: '#BDBDBD',
   lightGrayD9: '#D9D9D9',
   lightGray18: '#021922',
+  lightGray19: '#F3F3F3',
   lightGraySubtle: 'rgba(229, 231, 235, 0.1)',
   semiTransparentGray: 'rgba(229, 231, 235, 0.6)',
   ashGray: '#EAEAEA',

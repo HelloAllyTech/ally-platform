@@ -1,4 +1,5 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
+import {LogItem} from '@/screens/CallLog/types';
 import {
   FeedbackRequest,
   FeedbackResponse,
@@ -76,6 +77,16 @@ export const simulationsApi = learnApi.injectEndpoints({
         },
       }),
     }),
+
+    getSimulationLogs: builder.query<
+      {data: LogItem[]; count: number},
+      {limit: number; offset: number}
+    >({
+      query: ({limit, offset}) => ({
+        url: '/learn/admin-scenario-sessions',
+        params: {limit, offset},
+      }),
+    }),
   }),
 });
 
@@ -87,4 +98,6 @@ export const {
   useDeleteRoomMutation,
   useGetScenariosQuery,
   useAddFeedbackMutation,
+  useGetSimulationLogsQuery,
+  useLazyGetSimulationLogsQuery,
 } = simulationsApi;

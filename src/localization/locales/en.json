@@ -25,6 +25,8 @@
       "title": "Session",
       "subtitle": "Logs"
     },
+    "realCallLogs": "Real call logs",
+    "simulations": "Simulations",
     "start": "Start",
     "session": "Session",
     "chooseListening": "Choose your listening mode",
@@ -42,6 +44,8 @@
     },
     "noCallLogs": "No call records found",
     "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
+    "noSimulationLogs": "No simulation records found",
+    "noSimulationLogsDescription": "Your recent simulation sessions \n will be listed here.",
     "willCheckLater": "I’ll check later",
     "seeIfItIsReady": "See if it's ready",
     "oops": "Oops!",

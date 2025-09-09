@@ -136,7 +136,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       await room.disconnect();
       const response = await deleteRoom(room?.name);
       if (!response.error) {
-        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK);
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {simulationId: 0});
       }
     } finally {
       setIsMicEnabled(false);

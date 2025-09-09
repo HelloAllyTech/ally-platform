@@ -42,6 +42,11 @@ export enum AllyPlatforms {
   MOBILE = 'MOBILE',
 }
 
+export enum LogType {
+  REAL = 'real',
+  SIMULATION = 'simulation',
+}
+
 export enum LanguageMap {
   bn = 'Bengali',
   en = 'English',
