@@ -67,6 +67,7 @@ export const EmailInputModal: React.FC<EmailInputModalProps> = ({
   };
 
   const handleClose = useCallback(() => {
+    Keyboard.dismiss();
     setEmail('');
     setError('');
     onClose();
@@ -79,10 +80,7 @@ export const EmailInputModal: React.FC<EmailInputModalProps> = ({
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
-        onPress={() => {
-          Keyboard.dismiss();
-          handleClose();
-        }}
+        onPress={handleClose}
       />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={styles.modalContainer}>

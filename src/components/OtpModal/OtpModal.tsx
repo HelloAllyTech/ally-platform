@@ -114,6 +114,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   };
 
   const handleClose = useCallback(() => {
+    Keyboard.dismiss();
     setOtpValue(DEFAULT_OTP);
     setError('');
     onClose();
@@ -136,10 +137,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
-        onPress={() => {
-          Keyboard.dismiss();
-          handleClose();
-        }}
+        onPress={handleClose}
       />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={styles.modalContainer}>

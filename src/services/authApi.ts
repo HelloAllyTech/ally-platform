@@ -35,6 +35,9 @@ export const authApi = api.injectEndpoints({
     getUser: builder.query<User, void>({
       query: () => '/users/me',
     }),
+    getPermissions: builder.query<string[], void>({
+      query: () => '/auth/permissions',
+    }),
   }),
 });
 
@@ -42,4 +45,5 @@ export const {
   useGenerateOtpMutation,
   useVerifyOtpMutation,
   useLazyGetUserQuery,
+  useLazyGetPermissionsQuery,
 } = authApi;
