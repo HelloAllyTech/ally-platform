@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
 from livekit.plugins import (
@@ -7,7 +8,7 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-
+from livekit.agents.vad import VADEventType
 from app.core.config import settings
 from app.utils.prompt import PROMPT_TEMPLATES, AI_AGENT_PROMPT
 from app.core.scenario.scenario_types import ScenarioType
