@@ -73,3 +73,17 @@ export interface ControlButtonsProps {
 export interface SimulationTimerProps {
   startTime: Date;
 }
+
+export interface SimulationEvent {
+  timestamp: string;
+  score: number;
+  description: string;
+}
+
+export interface SimulationSummaryData {
+  sessionDuration: string;
+  totalScore: number;
+  keyEvents: SimulationEvent[];
+  whatWentWell: string[];
+  areasForImprovement: string[];
+}

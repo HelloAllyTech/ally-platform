@@ -5,6 +5,6 @@ export * from './common';
 export * from './date';
 export * from './error';
 export * from './fileOperations';
-export * from './logger';
+export * from './navigation';
 export * from './validation';
 export * from './version';

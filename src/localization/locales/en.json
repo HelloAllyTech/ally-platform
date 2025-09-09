@@ -297,7 +297,8 @@
     "placeholderText": "How was your Experience ?",
     "submitButton": "Submit Feedback",
     "submittingButton": "Submitting...",
-    "sessionSummary": "SESSION SUMMARY"
+    "sessionSummary": "SESSION SUMMARY",
+    "tryAnother": "Try Another Simulation"
   },
   "Errors": {
     "createRoom": "Failed to create room",

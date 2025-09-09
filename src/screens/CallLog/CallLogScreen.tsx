@@ -399,9 +399,7 @@ export const CallLogScreen: React.FC = () => {
           ]}
           disabled={!hasAnyCallType}
           activeOpacity={0.9}
-          onPress={() => {
-            setShowStartSession(true);
-          }}>
+          onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
         </TouchableOpacity>
       )}
