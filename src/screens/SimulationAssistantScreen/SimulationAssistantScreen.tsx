@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -11,20 +11,29 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
+import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useDeleteRoomMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 
-import {AudioWave, ControlButtons, SimulationTimer} from './components';
+import {
+  AudioWave,
+  ControlButtons,
+  LiveFeedback,
+  SessionScoreMeter,
+  SimulationTimer,
+} from './components';
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
+
+type Feedback = {id: number; text: string; emoji?: string} | null;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {roomData, scenario} = route.params;
-  const wsUrl = 'wss://ally-learn-poc-dev-lbzgnlp9.livekit.cloud/';
+  const wsUrl = env.LIVEKIT_SERVER_URL;
   const token = roomData.access_token;
   const startTime = roomData?.created_at
     ? new Date(roomData?.created_at)
@@ -37,6 +46,27 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
   const [room] = useState<Room>(() => new Room());
+
+  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [feedbackKey, setFeedbackKey] = useState<number>(0);
+
+  // TODO: Remove this later
+  const sampleFeedbacks = useMemo(
+    () =>
+      [
+        {
+          text: 'Try asking an open ended question to get client to open up',
+          emoji: '😬',
+        },
+        {text: "Reflect the client's feelings to build rapport", emoji: '🤝'},
+        {text: 'Summarize what you heard and check for accuracy', emoji: '📝'},
+        {
+          text: 'Allow a brief silence to give space for reflection',
+          emoji: '🤫',
+        },
+      ] as Array<{text: string; emoji: string}>,
+    [],
+  );
 
   useEffect(() => {
     if (token) {
@@ -142,6 +172,26 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const showSimulationLoading = isConnecting || isDisconnecting;
 
+  // TODO: Replace with backend stream
+  useEffect(() => {
+    // Initial
+    const firstIndex = Math.floor(Math.random() * sampleFeedbacks.length);
+    const first = sampleFeedbacks[firstIndex];
+    const firstId = Date.now();
+    setFeedback({id: firstId, text: first.text, emoji: first.emoji});
+    setFeedbackKey(firstId);
+
+    const interval = setInterval(() => {
+      const idx = Math.floor(Math.random() * sampleFeedbacks.length);
+      const item = sampleFeedbacks[idx];
+      const id = Date.now();
+      setFeedback({id, text: item.text, emoji: item.emoji});
+      setFeedbackKey(id);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [sampleFeedbacks]);
+
   return (
     <SafeAreaView
       style={[
@@ -149,27 +199,44 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <RoomContext.Provider value={room}>
-        {!showSimulationLoading && startTime && (
-          <SimulationTimer startTime={startTime} />
-        )}
-        <View style={styles.centralContainer}>
-          {showSimulationLoading ? (
-            renderLoader()
-          ) : (
-            <>
-              <AudioWave avatarUrl={scenario?.cover_image} />
-              {!!scenario?.title && (
-                <Text style={styles.personaLabel}>{scenario.title}</Text>
-              )}
-            </>
+        <View style={styles.contentContainer}>
+          {!showSimulationLoading && startTime && (
+            <SimulationTimer startTime={startTime} />
           )}
-        </View>
+          <View style={styles.centralContainer}>
+            {showSimulationLoading ? (
+              renderLoader()
+            ) : (
+              <>
+                <AudioWave avatarUrl={scenario?.cover_image} />
+                {!!scenario?.title && (
+                  <Text style={styles.personaLabel}>{scenario.title}</Text>
+                )}
+                <View style={styles.liveFeedbackWrapper}>
+                  {feedback && (
+                    <LiveFeedback
+                      key={feedbackKey}
+                      message={feedback.text}
+                      emoji={feedback.emoji}
+                    />
+                  )}
+                </View>
+              </>
+            )}
+          </View>
 
-        <ControlButtons
-          onMicPress={handleToggleMic}
-          onStopPress={handleDisconnect}
-          isMuted={!isMicEnabled}
-        />
+          {!showSimulationLoading && (
+            <View style={styles.scoreMeterContainer}>
+              <SessionScoreMeter score={90} />
+            </View>
+          )}
+
+          <ControlButtons
+            onMicPress={handleToggleMic}
+            onStopPress={handleDisconnect}
+            isMuted={!isMicEnabled}
+          />
+        </View>
       </RoomContext.Provider>
     </SafeAreaView>
   );
@@ -179,7 +246,9 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkGray7,
-    justifyContent: 'space-between',
+  },
+  contentContainer: {
+    flex: 1,
     paddingHorizontal: '16@ms',
   },
   centralContainer: {
@@ -190,6 +259,12 @@ const styles = ScaledSheet.create({
     marginTop: '10@mvs',
     marginBottom: '16@mvs',
     backgroundColor: colors.darkGray3,
+  },
+  liveFeedbackWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '81@mvs',
   },
   loadingWrapper: {
     justifyContent: 'center',
@@ -220,5 +295,8 @@ const styles = ScaledSheet.create({
     marginLeft: '16@ms',
     marginBottom: '16@ms',
     width: '100%',
+  },
+  scoreMeterContainer: {
+    marginBottom: '24@mvs',
   },
 });
