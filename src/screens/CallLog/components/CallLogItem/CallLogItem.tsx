@@ -11,19 +11,19 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
-import {CallLog} from '../../types';
+import {LogItem} from '../../types';
 import {StatusBadge} from '../StatusBadge';
 import {Tag} from '../Tag/Tag';
 
 /**
  * Props interface for the CallLogItem component
  * @interface CallLogItemProps
- * @property {CallLog} item - The call log data to display
+ * @property {LogItem} item - The call log or simulation log data to display
  * @property {boolean} expanded - Whether the item is expanded or collapsed
  * @property {() => void} onToggle - Callback function to toggle expanded state
  */
 interface CallLogItemProps {
-  item: CallLog;
+  item: LogItem;
   expanded: boolean;
   disabled?: boolean;
   onToggle: () => void;
@@ -68,10 +68,15 @@ export const CallLogItem = ({
             </TouchableOpacity>
             <View style={styles.titleRow}>
               <Text style={styles.logId} numberOfLines={1} ellipsizeMode="tail">
-                {item?.details?.callInfo?.summaryName || item?.details?.chatId}
+                {item?.details?.callInfo?.summaryName ||
+                  item?.details?.chatId ||
+                  item.scenario?.title ||
+                  `Item ${item.id}`}
               </Text>
               <View style={styles.statusAndEyeContainer}>
-                <StatusBadge status={item.summaryStatus} />
+                <StatusBadge
+                  status={item.summaryStatus || (item.status as any)}
+                />
                 {!disabled && (
                   <EyeIcon width={16} height={16} style={styles.eyeIcon} />
                 )}
