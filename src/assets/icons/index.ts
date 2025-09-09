@@ -6,6 +6,7 @@ import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
+import BulbIcon from './bulb.svg';
 import CallIcon from './call.svg';
 import CallDetailsIcon from './callDetails.svg';
 import CallEndIcon from './callEnd.svg';
@@ -41,6 +42,7 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
+import KeyEventsIcon from './keyEvents.svg';
 import LearnInactiveIcon from './learn.svg';
 import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
@@ -77,6 +79,7 @@ import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
+import ThumbUpIcon from './thumbUp.svg';
 import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
@@ -172,4 +175,7 @@ export {
   LearnInactiveIcon,
   MicOnIcon,
   MicOffIcon,
+  KeyEventsIcon,
+  ThumbUpIcon,
+  BulbIcon,
 };
