@@ -1,7 +1,7 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
-import {RoomCreationResponse, Scenario} from '@/types/simulations';
+import {RoomData, Scenario} from '@/types/simulations';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -12,7 +12,7 @@ export type RootStackParamList = {
   LiveKitTest: undefined;
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
-  SimulationAssistant: {roomData: RoomCreationResponse; scenario?: Scenario};
+  SimulationAssistant: {roomData: RoomData; scenario?: Scenario};
   SimulationFeedback: {simulationId?: number};
 };
 

@@ -2,53 +2,80 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChevronDown, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
 import {FEEDBACK_OPTIONS} from '@/constants';
-import {useAppNavigation} from '@/hooks';
-import {useAddSimulationFeedbackMutation} from '@/services';
+import {useAppNavigation, useDebounce} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation/types';
+import {
+  useAddSimulationFeedbackMutation,
+  useEndScenarioSessionMutation,
+  useLazyGetSimulationDetailsQuery,
+} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 import {navigateToLearnTab} from '@/utils';
 
 import {SimulationSummary, SimulationSummarySkeleton} from './components';
 
-export const SimulationFeedbackScreen: React.FC = () => {
+export const SimulationFeedbackScreen: React.FC<
+  RootStackScreenProps<'SimulationFeedback'>
+> = ({route}) => {
+  const simulationId = route.params?.simulationId;
+
   const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
+
   const [rating, setRating] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState<string>('');
   const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
 
   const navigation = useAppNavigation();
-  const [addFeedback] = useAddSimulationFeedbackMutation();
+  const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
+  const [
+    getSimulationDetails,
+    {data: simulationDetails, isLoading: isSimulationDetailsLoading},
+  ] = useLazyGetSimulationDetailsQuery();
   const {showErrorToast} = useErrorToast();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
+  const [endScenarioSession] = useEndScenarioSessionMutation();
+
+  const debouncedSubmitFeedback = useDebounce(
+    async (feedbackText: string, currentRating: number) => {
+      if (rating === 0) return;
+      try {
+        await addSimulationFeedback({
+          scenarioSessionId: simulationId?.toString() || '',
+          rating: currentRating,
+          comment: feedbackText,
+        });
+      } catch (error) {
+        showErrorToast(error, 'Errors.submitFeedback');
+      }
+    },
+    {delay: 500},
+  );
 
   useEffect(() => {
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
-  }, []);
-
-  const handleSubmitFeedback = async (text: string) => {
-    setAdditionalFeedback(text);
-    try {
-      await addFeedback({
-        rating,
-        comment: additionalFeedback,
-      });
-    } catch (error) {
-      showErrorToast(error, 'Errors.submitFeedback');
+    if (simulationId) {
+      // TODO: Remove this later
+      endScenarioSession({scenarioSessionId: simulationId?.toString()});
+      getSimulationDetails({id: simulationId?.toString()});
     }
+  }, [getSimulationDetails, simulationId, endScenarioSession]);
+
+  const handleTextChange = (text: string) => {
+    debouncedSubmitFeedback(additionalFeedback, rating);
+    setAdditionalFeedback(text);
   };
 
   const handleStarPress = (starIndex: number) => {
@@ -65,7 +92,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
   };
 
   const handleScrollToBottom = useCallback(() => {
-    scrollViewRef.current?.scrollToEnd({animated: true});
+    scrollViewRef.current?.scrollToEnd();
   }, []);
 
   const handleScroll = useCallback((event: any) => {
@@ -114,7 +141,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
             placeholder={t('SimulationFeedback.placeholderText')}
             placeholderTextColor={colors.lightGray3}
             value={additionalFeedback}
-            onChangeText={text => handleSubmitFeedback(text)}
+            onChangeText={handleTextChange}
             multiline
             textAlignVertical="top"
           />
@@ -127,7 +154,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
     return (
       <>
         {renderSectionHeader(t('SimulationFeedback.sessionSummary'))}
-        <SimulationSummary />
+        <SimulationSummary data={simulationDetails} />
       </>
     );
   };
@@ -145,22 +172,29 @@ export const SimulationFeedbackScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
       <View style={styles.titleSection}>
         <Text style={styles.title}>
           {t('SimulationFeedback.title')}{' '}
           <Text style={styles.titleItalic}>
-            {t('SimulationFeedback.titleEnded')}
+            {t('SimulationFeedback.titleDetails')}
           </Text>
         </Text>
       </View>
-      <ScrollView
+      <KeyboardAwareScrollView
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
+        extraScrollHeight={200}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}>
-        {isLoading ? (
+        {isSimulationDetailsLoading ? (
           <SimulationSummarySkeleton />
         ) : (
           <>
@@ -169,8 +203,8 @@ export const SimulationFeedbackScreen: React.FC = () => {
             {renderButtonContainer()}
           </>
         )}
-      </ScrollView>
-      {showScrollButton && !isLoading && (
+      </KeyboardAwareScrollView>
+      {showScrollButton && !isSimulationDetailsLoading && (
         <TouchableOpacity
           onPress={handleScrollToBottom}
           style={styles.scrollToBottomButton}>
@@ -255,7 +289,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray1,
     borderRadius: '8@ms',
     padding: '12@ms',
-    minHeight: '80@vs',
+    height: '120@vs',
     ...typography.body.medium,
     color: colors.darkGray2,
     borderWidth: 0.5,

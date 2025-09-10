@@ -7,59 +7,24 @@ import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
 interface SimulationSummaryProps {
-  data?: SimulationSummaryData;
+  data: SimulationSummaryData;
 }
 
-// Mock data for demonstration - replace with actual data from props
-const mockData: SimulationSummaryData = {
-  sessionDuration: '5:30 Min',
-  totalScore: 84,
-  keyEvents: [
-    {
-      timestamp: '00:30',
-      score: -2,
-      description:
-        'You are eager to help, holding back a little longer will allow the client to express fully.',
-    },
-    {
-      timestamp: '00:50',
-      score: 1,
-      description:
-        'Nice use of encouragers, it shows presence and promotes rapport.',
-    },
-    {
-      timestamp: '01:30',
-      score: 5,
-      description:
-        'Appropriate silence gives space for processing and builds trust. Good job.',
-    },
-    {
-      timestamp: '01:30',
-      score: 5,
-      description:
-        'Appropriate silence gives space for processing and builds trust. Good job.',
-    },
-  ],
-  whatWentWell: [
-    'Explore emotional keywords more deeply instead of moving on.',
-    'Reduce speaking time during emotionally heavy moments.',
-    'Reduce speaking time during emotionally heavy moments.',
-  ],
-  areasForImprovement: [
-    'Explore emotional keywords more deeply instead of moving on.',
-    'Reduce speaking time during emotionally heavy moments.',
-    'Reduce speaking time during emotionally heavy moments.',
-  ],
-};
-
-export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
-  data = mockData,
-}) => {
+export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,
     areasForImprovement: false,
   });
+
+  const getDuration = (startedAt: string, endedAt: string) => {
+    const startedAtDate = new Date(startedAt);
+    const endedAtDate = new Date(endedAt);
+    const duration = endedAtDate.getTime() - startedAtDate.getTime();
+    const minutes = Math.floor(duration / (1000 * 60));
+    const seconds = Math.floor((duration % (1000 * 60)) / 1000);
+    return `${minutes} mins ${seconds} secs`;
+  };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -100,12 +65,12 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
   const renderExpandableSection = (
     title: string,
     icon: React.ReactNode,
-    items: any[],
+    items: any[] = [],
     sectionKey: keyof typeof expandedSections,
     renderItem: (item: any, index: number) => React.ReactNode,
   ) => {
     const isExpanded = expandedSections[sectionKey];
-    const displayItems = isExpanded ? items : items.slice(0, 3);
+    const displayItems = isExpanded ? items : items?.slice(0, 3);
 
     return (
       <View style={styles.section}>
@@ -116,7 +81,11 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           </View>
         </View>
         <View style={styles.sectionContent}>
-          {displayItems.map(renderItem)}
+          {displayItems?.length > 0 ? (
+            displayItems?.map(renderItem)
+          ) : (
+            <Text style={styles.noItemsText}>No Data Available</Text>
+          )}
           {items.length > 3 && (
             <TouchableOpacity
               style={styles.viewMoreButton}
@@ -135,11 +104,16 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
     );
   };
 
+  if (!data) return null;
+
   return (
     <View style={styles.container}>
       <View style={styles.metricsContainer}>
-        {renderMetricCard('Session Duration', data.sessionDuration)}
-        {renderMetricCard('Total Score', data.totalScore)}
+        {renderMetricCard(
+          'Session Duration',
+          getDuration(data.startedAt, data.endedAt),
+        )}
+        {renderMetricCard('Total Score', data.score || '-')}
       </View>
       {renderExpandableSection(
         'Key events',
@@ -294,5 +268,10 @@ const styles = ScaledSheet.create({
     position: 'absolute',
     left: '4@ms',
     top: '35@ms',
+  },
+  noItemsText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    color: colors.darkGray2,
   },
 });

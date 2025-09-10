@@ -11,18 +11,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
-import {
-  EmailInputModal,
-  OtpModal,
-  PrimaryButton,
-  useErrorToast,
-} from '@/components';
-import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
+import {PrimaryButton, useErrorToast} from '@/components';
+import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useCreateRoomMutation} from '@/services';
+import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
-import {getItem} from '@/utils';
 
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
@@ -31,74 +25,33 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const [createRoom] = useCreateRoomMutation();
   const {showErrorToast} = useErrorToast();
 
-  const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
-  const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-
-  const getRoomData = async () => {
-    try {
-      setIsCreatingRoom(true);
-      const token = await getItem(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
-      if (token) {
-        const response = await createRoom({scenarioId: scenario.unique_id});
-        closeOtpModal();
-        return response.data;
-      }
-      return null;
-    } catch (error) {
-      showErrorToast(error, 'Errors.createRoom');
-      return null;
-    } finally {
-      setIsCreatingRoom(false);
-    }
-  };
+  const [startScenarioSession] = useStartScenarioSessionMutation();
 
   const startSimulationPress = async () => {
     try {
-      const roomData = await getRoomData();
-      if (roomData) {
+      setIsCreatingRoom(true);
+      const startResp = await startScenarioSession({
+        scenarioId: Number(scenario.id),
+      }).unwrap();
+      if (startResp) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: roomData,
-          scenario,
-        });
-      } else {
-        setIsEmailModalVisible(true);
-      }
-    } catch (error) {
-      showErrorToast(error, 'Errors.sendOtp');
-    }
-  };
-
-  const handleOtpVerificationSuccess = async () => {
-    try {
-      const roomData = await getRoomData();
-      if (roomData) {
-        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: roomData,
+          roomData: {
+            id: startResp.scenarioSession.id,
+            createdAt: startResp.scenarioSession.createdAt,
+            accessToken: startResp.accessToken.token,
+            liveKitServerUrl: startResp.accessToken.serverUrl,
+          },
           scenario,
         });
       }
     } catch (error) {
-      showErrorToast(error, 'Errors.navigateAssistant');
+      showErrorToast(error, 'Errors.startSimulation');
+    } finally {
+      setIsCreatingRoom(false);
     }
-  };
-
-  const closeOtpModal = () => {
-    setIsOtpModalVisible(false);
-  };
-
-  const closeEmailModal = () => {
-    setIsEmailModalVisible(false);
-  };
-
-  const handleEmailSubmit = (email: string) => {
-    setUserEmail(email);
-    setIsEmailModalVisible(false);
-    setIsOtpModalVisible(true);
   };
 
   const renderLoadingOverlay = () => {
@@ -113,14 +66,14 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderDetailsSection = () => {
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {!!scenario.cover_image && (
-          <Image source={{uri: scenario.cover_image}} style={styles.cover} />
+        {!!scenario.coverImageUrl && (
+          <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
         )}
         <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
-        {!!scenario.short_description && (
+        {!!scenario.scenario && (
           <Text style={styles.fieldValue}>
-            {scenario.short_description} {scenario.long_description}
+            {scenario.scenario}. {scenario.description}
           </Text>
         )}
       </ScrollView>
@@ -169,17 +122,6 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       {renderHeader()}
       {renderDetailsSection()}
       {renderCtaSection()}
-      <EmailInputModal
-        visible={isEmailModalVisible}
-        onClose={closeEmailModal}
-        onEmailSubmit={handleEmailSubmit}
-      />
-      <OtpModal
-        visible={isOtpModalVisible}
-        onClose={closeOtpModal}
-        email={userEmail}
-        onOtpVerificationSuccess={handleOtpVerificationSuccess}
-      />
     </View>
   );
 };

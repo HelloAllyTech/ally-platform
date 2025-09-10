@@ -17,8 +17,7 @@ export {ResourceArticleCard} from './ResourceArticleCard';
 export {SearchableLocationDropdown} from './SearchableLocationDropdown';
 export {CustomTabs} from './CustomTabs';
 export {DateSelector, useDateSelection} from './DateSelector';
-export {OtpModal} from './OtpModal';
-export {EmailInputModal} from './EmailInputModal';
+
 export {Carousel, Pagination, SecurityCarousel} from './Carousel';
 export type {
   CarouselProps,

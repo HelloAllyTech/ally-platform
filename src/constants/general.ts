@@ -62,13 +62,14 @@ export enum LanguageMap {
 
 // API route constants
 export const API_ROUTES = {
-  SEND_OTP: '/auth/send-otp',
-  VERIFY_OTP: '/auth/verify-otp',
   ROOMS: '/rooms',
-  SCENARIOS: '/scenarios',
+  SCENARIOS: '/learn/scenarios',
   FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
   ADMIN_SIMULATION_LOGS: '/learn/admin-scenario-sessions',
   SIMULATION_LOGS: '/learn/scenario-sessions',
+  END_SCENARIO_SESSION: '/learn/scenario-session',
+  SCENARIO_SESSION_START: '/learn/scenario-session-start',
+  SIMULATION_DETAILS: '/learn/scenario-session',
 } as const;
 
 export const API_METHODS = {
@@ -127,4 +128,15 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   titleCustomStyle: {
     color: colors.white,
   },
+};
+
+export const USER_PERMISSIONS = {
+  CALL_LOG: 'view:navbar:calls',
+  CALENDAR: 'view:navbar:calendar',
+  ANALYTICS: 'view:navbar:analytics',
+  LEARN: 'view:navbar:learn',
+  STRESS_BUSTER: 'view:navbar:stress-buster',
+  SETTINGS: 'view:navbar:settings',
+  EDIT_SUMMARY: 'edit:summary',
+  START_CALL: 'view:button:start-call',
 };

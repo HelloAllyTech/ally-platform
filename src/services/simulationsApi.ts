@@ -1,54 +1,19 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
+  EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
-  LoginResponse,
-  RoomCreationResponse,
   RoomDeletionResponse,
   RoomListResponse,
-  ScenariosResponse,
-  SendOtpResponse,
+  Scenario,
+  ScenarioSessionStartResponse,
 } from '@/types';
 
 import {api} from './api';
 
 export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
-    sendOtp: builder.mutation<SendOtpResponse, {email: string}>({
-      query: ({email}) => ({
-        url: API_ROUTES.SEND_OTP,
-        method: API_METHODS.POST,
-        body: {
-          email: email?.trim()?.toLowerCase(),
-        },
-      }),
-    }),
-
-    learnVerifyOtp: builder.mutation<
-      LoginResponse,
-      {email: string; otp: string}
-    >({
-      query: ({email, otp}) => ({
-        url: API_ROUTES.VERIFY_OTP,
-        method: API_METHODS.POST,
-        body: {
-          code: otp,
-          email,
-        },
-      }),
-    }),
-
-    createRoom: builder.mutation<RoomCreationResponse, {scenarioId: string}>({
-      query: ({scenarioId}) => ({
-        url: API_ROUTES.ROOMS,
-        method: API_METHODS.POST,
-        body: {
-          script_type: scenarioId,
-        },
-      }),
-    }),
-
     listRooms: builder.query<RoomListResponse, void>({
       query: () => ({
         url: API_ROUTES.ROOMS,
@@ -63,23 +28,37 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getScenarios: builder.query<ScenariosResponse, void>({
-      query: () => '/scenarios',
+    getScenarios: builder.query<Scenario[], void>({
+      query: () => ({
+        url: API_ROUTES.SCENARIOS,
+        method: API_METHODS.GET,
+      }),
+    }),
+
+    getScenarioById: builder.query<Scenario, {id: string | number}>({
+      query: ({id}) => ({
+        url: `${API_ROUTES.SCENARIOS}/${id}`,
+        method: API_METHODS.GET,
+      }),
     }),
 
     addSimulationFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
-      query: ({rating, comment}) => ({
-        url: API_ROUTES.FEEDBACK,
+      query: ({scenarioSessionId, rating, comment}) => ({
+        url: `/learn/scenario-session/${scenarioSessionId}/feedback`,
         method: API_METHODS.POST,
         body: {
-          rating: rating?.toString(),
-          comment,
+          rating: Number(rating),
+          feedback: comment,
         },
       }),
     }),
 
+    getSimulationDetails: builder.query<any, {id: string | number}>({
+      query: ({id}) => ({url: `${API_ROUTES.SIMULATION_DETAILS}/${id}`}),
+    }),
+
     getSimulationLogs: builder.query<
-      {data: LogItem[]; count: number},
+      LogItem[],
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
@@ -87,17 +66,37 @@ export const simulationsApi = api.injectEndpoints({
         params: {limit, offset, sortBy: 'createdAt', order: 'DESC'},
       }),
     }),
+
+    startScenarioSession: builder.mutation<
+      ScenarioSessionStartResponse,
+      {scenarioId: number}
+    >({
+      query: ({scenarioId}) => ({
+        url: API_ROUTES.SCENARIO_SESSION_START,
+        method: API_METHODS.POST,
+        body: {scenarioId},
+      }),
+    }),
+
+    endScenarioSession: builder.mutation<
+      EndScenarioSessionResponse,
+      {scenarioSessionId: string}
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: `${API_ROUTES.END_SCENARIO_SESSION}/${scenarioSessionId}/end`,
+        method: API_METHODS.POST,
+      }),
+    }),
   }),
 });
 
 export const {
-  useSendOtpMutation,
-  useLearnVerifyOtpMutation,
-  useCreateRoomMutation,
   useListRoomsQuery,
-  useDeleteRoomMutation,
   useGetScenariosQuery,
   useAddSimulationFeedbackMutation,
   useGetSimulationLogsQuery,
   useLazyGetSimulationLogsQuery,
+  useStartScenarioSessionMutation,
+  useEndScenarioSessionMutation,
+  useLazyGetSimulationDetailsQuery,
 } = simulationsApi;

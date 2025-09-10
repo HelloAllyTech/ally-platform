@@ -15,7 +15,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {CHAT_TYPES, LogType, SCREEN_NAMES} from '@/constants';
+import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -31,6 +31,7 @@ import {
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
+import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
@@ -54,7 +55,7 @@ const ITEMS_PER_PAGE = 10;
  * and expandable items. It handles loading states, infinite scroll, and pull-to-refresh.
  */
 export const CallLogScreen: React.FC = () => {
-  const availableLogTypes = [LogType.REAL, LogType.SIMULATION];
+  const {permissions} = useAppSelector((state: AppRootState) => state.user);
 
   const [search, setSearch] = useState('');
   const [expandedIdx, setExpandedIdx] = useState(-1);
@@ -102,6 +103,20 @@ export const CallLogScreen: React.FC = () => {
     [enabledChatTypes],
   );
 
+  const availableLogTypes = useMemo(() => {
+    const logTypes: LogType[] = [];
+
+    if (permissions?.includes(USER_PERMISSIONS.CALL_LOG)) {
+      logTypes.push(LogType.REAL);
+    }
+
+    if (permissions?.includes(USER_PERMISSIONS.LEARN)) {
+      logTypes.push(LogType.SIMULATION);
+    }
+
+    return logTypes;
+  }, [permissions]);
+
   useHardwareBackPressHandler(() => {
     BackHandler.exitApp();
     return true;
@@ -131,9 +146,9 @@ export const CallLogScreen: React.FC = () => {
    */
   const fetchInitialSimulationLogs = useCallback(async () => {
     const result = await getSimulationLogs({limit: ITEMS_PER_PAGE, offset: 0});
-    if (result.data?.data) {
-      setAllSimulationLogs(result.data.data);
-      setHasMoreSimulationLogs(result.data.data.length === ITEMS_PER_PAGE);
+    if (result.data) {
+      setAllSimulationLogs(result.data);
+      setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
     } else {
       setAllSimulationLogs([]);
     }
@@ -195,10 +210,10 @@ export const CallLogScreen: React.FC = () => {
         offset: newOffset,
       });
 
-      if (result?.data?.data) {
-        setAllSimulationLogs(prev => [...prev, ...(result?.data?.data || [])]);
+      if (result?.data) {
+        setAllSimulationLogs(prev => [...prev, ...(result?.data || [])]);
         setSimulationLogsOffset(newOffset);
-        setHasMoreSimulationLogs(result.data.data.length === ITEMS_PER_PAGE);
+        setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
       }
     }
   };
@@ -268,7 +283,7 @@ export const CallLogScreen: React.FC = () => {
     const currentLogs =
       activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
 
-    if (!isFetching || currentLogs?.length === 0) return null;
+    if (!isFetching || currentLogs?.length < 10) return null;
     return (
       <ActivityIndicator
         size="small"

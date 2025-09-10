@@ -96,16 +96,13 @@ export const SessionScoreMeter: React.FC<SessionScoreMeterProps> = ({
 
       <View
         style={[styles.bar, styleOverrides?.bar]}
-        onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
-        accessible
-        accessibilityRole="progressbar"
-        accessibilityValue={{min: minScore, max: maxScore, now: clampedScore}}>
+        onLayout={e => setBarWidth(e.nativeEvent.layout.width)}>
         {Array.from({length: segments}).map((_, i) => (
           <View
             key={i}
             style={[
               styles.segment,
-              {backgroundColor: palette[i] || '#DDD'},
+              {backgroundColor: palette[i] || colors.white},
               styleOverrides?.segment,
               i === 0 ? styles.segmentLeftEdge : undefined,
               i === segments - 1 ? styles.segmentRightEdge : undefined,
@@ -122,8 +119,7 @@ export const SessionScoreMeter: React.FC<SessionScoreMeterProps> = ({
               backgroundColor: activeColor,
               transform: [{translateX: pointerX}],
             },
-          ]}
-          pointerEvents="none">
+          ]}>
           <View style={styles.pointerInnerDot} />
         </Animated.View>
       </View>
