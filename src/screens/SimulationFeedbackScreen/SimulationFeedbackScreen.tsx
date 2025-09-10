@@ -14,7 +14,11 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {ChevronDown, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
 import {FEEDBACK_OPTIONS} from '@/constants';
-import {useAppNavigation, useDebounce} from '@/hooks';
+import {
+  useAppNavigation,
+  useDebounce,
+  useHardwareBackPressHandler,
+} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
@@ -30,6 +34,7 @@ export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
   const simulationId = route.params?.simulationId;
+  const fromLogs = route.params?.fromLogs;
 
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -49,14 +54,19 @@ export const SimulationFeedbackScreen: React.FC<
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const [endScenarioSession] = useEndScenarioSessionMutation();
 
+  useHardwareBackPressHandler(() => {
+    navigateToLearnTab(navigation);
+    return true;
+  });
+
   const debouncedSubmitFeedback = useDebounce(
-    async (feedbackText: string, currentRating: number) => {
+    async (comment: string, currentRating: number) => {
       if (rating === 0) return;
       try {
         await addSimulationFeedback({
           scenarioSessionId: simulationId?.toString() || '',
           rating: currentRating,
-          comment: feedbackText,
+          comment,
         });
       } catch (error) {
         showErrorToast(error, 'Errors.submitFeedback');
@@ -181,7 +191,9 @@ export const SimulationFeedbackScreen: React.FC<
         <Text style={styles.title}>
           {t('SimulationFeedback.title')}{' '}
           <Text style={styles.titleItalic}>
-            {t('SimulationFeedback.titleDetails')}
+            {fromLogs
+              ? t('SimulationFeedback.titleDetails')
+              : t('SimulationFeedback.titleEnded')}
           </Text>
         </Text>
       </View>
@@ -200,7 +212,7 @@ export const SimulationFeedbackScreen: React.FC<
           <>
             {renderSummary()}
             {renderFeedback()}
-            {renderButtonContainer()}
+            {!fromLogs && renderButtonContainer()}
           </>
         )}
       </KeyboardAwareScrollView>
@@ -289,7 +301,8 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray1,
     borderRadius: '8@ms',
     padding: '12@ms',
-    height: '120@vs',
+    minHeight: '90@vs',
+    maxHeight: '120@vs',
     ...typography.body.medium,
     color: colors.darkGray2,
     borderWidth: 0.5,
