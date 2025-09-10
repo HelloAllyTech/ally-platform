@@ -293,6 +293,7 @@
   "SimulationFeedback": {
     "title": "Simulation",
     "titleEnded": "Ended",
+    "titleDetails": "Details",
     "headerText": "REVIEW AND RATING",
     "questionText": "How was your experience?",
     "placeholderText": "How was your Experience ?",
@@ -302,8 +303,7 @@
     "tryAnother": "Try Another Simulation"
   },
   "Errors": {
-    "createRoom": "Failed to create room",
-    "sendOtp": "Failed to send OTP",
+    "startSimulation": "Failed to start simulation",
     "navigateAssistant": "Failed to open simulation assistant",
     "attachListeners": "Failed to attach room listeners",
     "connect": "Failed to connect to the room",

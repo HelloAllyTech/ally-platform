@@ -11,17 +11,15 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
-import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useDeleteRoomMutation} from '@/services';
+import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 
 import {
   AudioWave,
   ControlButtons,
-  LiveFeedback,
   SessionScoreMeter,
   SimulationTimer,
 } from './components';
@@ -33,14 +31,13 @@ type Feedback = {id: number; text: string; emoji?: string} | null;
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {roomData, scenario} = route.params;
-  const wsUrl = env.LIVEKIT_SERVER_URL;
-  const token = roomData.access_token;
-  const startTime = roomData?.created_at
-    ? new Date(roomData?.created_at)
+  const {liveKitServerUrl, accessToken, id: roomId} = roomData;
+  const startTime = roomData?.createdAt
+    ? new Date(roomData?.createdAt)
     : new Date();
   const navigation = useAppNavigation();
   const {t} = useTranslation();
-  const [deleteRoom] = useDeleteRoomMutation();
+  const [endScenarioSession] = useEndScenarioSessionMutation();
   const {showErrorToast} = useErrorToast();
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
@@ -69,7 +66,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
 
   useEffect(() => {
-    if (token) {
+    if (accessToken) {
       handleConnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,18 +85,35 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
     };
-    const onTrackPub = () => {
-      // TODO: Handle track publication
+    const onDataReceived = (
+      payload: any,
+      participant: any,
+      kind: any,
+      topic: any,
+    ) => {
+      const participantIdentity = participant?.identity || 'unknown';
+      // TODO: Remove this later Log the raw data received
+      console.log('DataReceived', {
+        participant: participantIdentity,
+        kind: kind,
+        topic: topic,
+        payload: payload,
+      });
+    };
+    const onTrackPublished = () => {
+      // console.log('TrackPublished');
     };
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
-      .on(RoomEvent.TrackPublished, onTrackPub);
+      .on(RoomEvent.TrackPublished, onTrackPublished)
+      .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
-        .off(RoomEvent.TrackPublished, onTrackPub);
+        .off(RoomEvent.TrackPublished, onTrackPublished)
+        .off(RoomEvent.DataReceived, onDataReceived);
     };
   }, [room, showErrorToast]);
 
@@ -123,18 +137,20 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       await configureAudioSession();
       setIsConnecting(true);
-      await room.connect(wsUrl, token);
+      await room.connect(liveKitServerUrl, accessToken);
     } catch (error) {
       showErrorToast(error, 'Errors.connect');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, wsUrl]);
+  }, [accessToken, liveKitServerUrl]);
 
   const handleDisconnect = async () => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
-      const response = await deleteRoom(room?.name);
+      const response = await endScenarioSession({
+        scenarioSessionId: roomId,
+      });
       if (!response.error) {
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {simulationId: 0});
       }
@@ -212,11 +228,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               renderLoader()
             ) : (
               <>
-                <AudioWave avatarUrl={scenario?.cover_image} />
+                <AudioWave avatarUrl={scenario?.coverImageUrl ?? undefined} />
                 {!!scenario?.title && (
                   <Text style={styles.personaLabel}>{scenario.title}</Text>
                 )}
-                <View style={styles.liveFeedbackWrapper}>
+                {/* <View style={styles.liveFeedbackWrapper}>
                   {feedback && (
                     <LiveFeedback
                       key={feedbackKey}
@@ -224,14 +240,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       emoji={feedback.emoji}
                     />
                   )}
-                </View>
+                </View> */}
               </>
             )}
           </View>
 
           {!showSimulationLoading && (
             <View style={styles.scoreMeterContainer}>
-              <SessionScoreMeter score={90} />
+              {/* TODO: Replace with backend score */}
+              <SessionScoreMeter score={0} />
             </View>
           )}
 

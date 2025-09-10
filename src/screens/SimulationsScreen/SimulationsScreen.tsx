@@ -14,7 +14,7 @@ import {PERMISSIONS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SCREEN_NAMES} from '@/constants';
+import {ScenarioStatus, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
@@ -29,9 +29,20 @@ export const SimulationsScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
   const {data, isFetching, refetch} = useGetScenariosQuery();
-  const scenarios = data?.scenarios ?? [];
 
-  const keyExtractor = (item: Scenario) => item.unique_id;
+  // Show available simulations first, followed by coming soon
+  const sortedScenarios = useMemo(() => {
+    const scenarios = data ?? [];
+    const available = scenarios.filter(
+      scenario => scenario.status !== ScenarioStatus.COMING_SOON,
+    );
+    const comingSoon = scenarios.filter(
+      scenario => scenario.status === ScenarioStatus.COMING_SOON,
+    );
+    return [...available, ...comingSoon];
+  }, [data]);
+
+  const keyExtractor = (item: Scenario) => item.id;
 
   const microphonePermission = Platform.select({
     ios: PERMISSIONS.IOS.MICROPHONE,
@@ -89,7 +100,7 @@ export const SimulationsScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: Scenario}) => {
     // TODO: Move this after the API is updated and add enum
-    const isComingSoon = item.status === 'Coming Soon';
+    const isComingSoon = item.status === ScenarioStatus.COMING_SOON;
 
     return (
       <TouchableOpacity
@@ -97,11 +108,11 @@ export const SimulationsScreen: React.FC = () => {
         style={styles.card}
         onPress={() => handleStart(item)}
         disabled={isComingSoon}>
-        {!!item.cover_image && (
+        {!!item.coverImageUrl && (
           <>
             <View style={isComingSoon && styles.grayscaleWrapper}>
               <Image
-                source={{uri: item.cover_image}}
+                source={{uri: item.coverImageUrl}}
                 style={styles.cover}
                 resizeMode="cover"
                 onError={() => {}}
@@ -122,9 +133,9 @@ export const SimulationsScreen: React.FC = () => {
           <Text style={styles.cardTitle} numberOfLines={2}>
             {item.title || '-'}
           </Text>
-          {!!item.short_description && (
+          {!!item.description && (
             <Text style={styles.cardDesc} numberOfLines={3}>
-              {item.short_description}
+              {item.description}
             </Text>
           )}
         </View>
@@ -194,7 +205,7 @@ export const SimulationsScreen: React.FC = () => {
       {renderHeader()}
       <FlatList
         contentContainerStyle={[styles.list, styles.marginH22]}
-        data={scenarios}
+        data={sortedScenarios}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListEmptyComponent={!isFetching ? ListEmptyElement : null}

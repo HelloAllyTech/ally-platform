@@ -9,7 +9,6 @@ export interface Env {
   WEBRTC_SOCKET_PATH: string;
   MICROPHONE_SOCKET_PATH: string;
   CLOUD_TELEPHONY_PATH: string;
-  LIVEKIT_SERVER_URL: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -42,9 +41,5 @@ export const env: Env = {
   CLOUD_TELEPHONY_PATH: assertEnvVar(
     Config.CLOUD_TELEPHONY_PATH,
     'CLOUD_TELEPHONY_PATH',
-  ),
-  LIVEKIT_SERVER_URL: assertEnvVar(
-    Config.LIVEKIT_SERVER_URL,
-    'LIVEKIT_SERVER_URL',
   ),
 };

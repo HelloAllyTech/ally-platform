@@ -1,1 +1,0 @@
-export {OtpModal} from './OtpModal';

@@ -1,12 +1,12 @@
 import type {CircleConfig} from '@/types';
 
-const AUDIO = {
+export const AUDIO = {
   FFT_SIZE: 256,
   NORMALIZATION_FACTOR: 128,
   THRESHOLD: 0.01,
 } as const;
 
-const CIRCLE = {
+export const CIRCLE = {
   BASE_SIZE: 60,
   TRANSITION_MS: 200,
   MIN_SCALE: 1,
@@ -21,12 +21,12 @@ const CIRCLE = {
   },
 } as const;
 
-const CIRCLE_CONFIGS: CircleConfig[] = [
+export const CIRCLE_CONFIGS: CircleConfig[] = [
   {scale: 3, isStatic: false},
   {scale: 4, isStatic: false},
 ];
 
-const FEEDBACK_OPTIONS = {
+export const FEEDBACK_OPTIONS = {
   1: 'Poor Experience',
   2: 'Below Average',
   3: 'Average',
@@ -34,4 +34,6 @@ const FEEDBACK_OPTIONS = {
   5: 'Excellent Experience!',
 };
 
-export {AUDIO, CIRCLE, CIRCLE_CONFIGS, FEEDBACK_OPTIONS};
+export enum ScenarioStatus {
+  COMING_SOON = 'COMING_SOON',
+}
