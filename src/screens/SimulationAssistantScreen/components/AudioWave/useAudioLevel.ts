@@ -6,7 +6,7 @@ export const useAudioLevel = (trackRef: {
   participant?: any;
   publication?: TrackPublication;
 }) => {
-  const [audioLevel, setAudioLevel] = useState(1);
+  const [audioLevel, setAudioLevel] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const participantRef = useRef<any>(null);
 
@@ -72,7 +72,7 @@ export const useAudioLevel = (trackRef: {
     const participant = trackRef.participant;
 
     if (!participant) {
-      setAudioLevel(1);
+      setAudioLevel(0);
       return;
     }
 

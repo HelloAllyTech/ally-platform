@@ -243,6 +243,7 @@ export const CallLogScreen: React.FC = () => {
       // For simulation logs, navigate to simulation summary or details
       navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         simulationId: item?.id?.toString(),
+        fromLogs: true,
       });
     }
   };
@@ -265,6 +266,7 @@ export const CallLogScreen: React.FC = () => {
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
+        disableExpand={activeTab === LogType.SIMULATION}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
       />

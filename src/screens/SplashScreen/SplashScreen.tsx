@@ -28,6 +28,10 @@ import {
   useUser,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {
+  useEndScenarioSessionMutation,
+  useLazyGetSimulationLogsQuery,
+} from '@/services';
 import {colors} from '@/theme';
 import {UserRole} from '@/types';
 
@@ -46,6 +50,8 @@ export const SplashScreen: React.FC<
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
+  const [getSimulationLogs] = useLazyGetSimulationLogsQuery();
+  const [endScenarioSession] = useEndScenarioSessionMutation();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       // Go directly to Listening
@@ -55,6 +61,14 @@ export const SplashScreen: React.FC<
       });
     },
     onNoActiveChatFound: () => {
+      //TODO: Remove this later (End all active simulations on splash screen)
+      getSimulationLogs({limit: 100, offset: 0}).then(result => {
+        result.data?.map(log => {
+          if (log.status === 'ACTIVE') {
+            endScenarioSession({scenarioSessionId: log.id.toString()});
+          }
+        });
+      });
       navigation.replace(SCREEN_NAMES.CALL_LOG);
     },
   });
