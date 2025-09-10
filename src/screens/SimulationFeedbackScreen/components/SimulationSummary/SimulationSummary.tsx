@@ -7,17 +7,29 @@ import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
 interface SimulationSummaryProps {
-  data: SimulationSummaryData;
+  data: SimulationSummaryData | null;
 }
 
-export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
+const defaultData = {
+  startedAt: '',
+  endedAt: '',
+  score: 0,
+  keyEvents: [],
+  whatWentWell: [],
+  areasForImprovement: [],
+};
+
+export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
+  data = defaultData,
+}) => {
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,
     areasForImprovement: false,
   });
 
-  const getDuration = (startedAt: string, endedAt: string) => {
+  const getDuration = (startedAt?: string, endedAt?: string) => {
+    if (!startedAt || !endedAt) return '-';
     const startedAtDate = new Date(startedAt);
     const endedAtDate = new Date(endedAt);
     const duration = endedAtDate.getTime() - startedAtDate.getTime();
