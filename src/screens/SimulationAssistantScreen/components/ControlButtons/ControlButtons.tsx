@@ -10,6 +10,8 @@ import {ControlButtonsProps} from '@/types';
 export const ControlButtons: React.FC<ControlButtonsProps> = ({
   onMicPress,
   onStopPress,
+  isDisableMic = false,
+  isDisableStop = false,
   isMuted,
 }) => {
   const {t} = useTranslation();
@@ -17,6 +19,7 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
     <View style={styles.controlButtonsContainer}>
       <TouchableOpacity
         onPress={onMicPress}
+        disabled={isDisableMic}
         style={[styles.buttonHalf, isMuted && styles.buttonMuted]}>
         {isMuted ? <MicOffIcon /> : <MicOnIcon />}
         <Text style={[styles.buttonText, isMuted && styles.buttonTextDark]}>
@@ -26,7 +29,10 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={onStopPress} style={styles.buttonHalf}>
+      <TouchableOpacity
+        onPress={onStopPress}
+        disabled={isDisableStop}
+        style={styles.buttonHalf}>
         <View style={styles.stopIcon} />
         <Text style={styles.buttonText}>
           {t('SimulationAssistant.endSession')}
@@ -51,7 +57,7 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: '20@ms',
+    height: '54@ms',
     borderRadius: '8@ms',
     gap: '8@ms',
   },

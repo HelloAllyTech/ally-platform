@@ -1,5 +1,5 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {useLocalParticipant} from '@livekit/react-native';
+import React, {useEffect, useMemo, useRef} from 'react';
+import {useRemoteParticipants} from '@livekit/react-native';
 import {Track} from 'livekit-client';
 import {Animated, Image, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -7,6 +7,8 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {AUDIO, CIRCLE, CIRCLE_CONFIGS} from '@/constants';
 import type {CircleProps, CircleWaveVisualizerProps} from '@/types';
+
+import {useAudioLevel} from './useAudioLevel';
 
 type AudioWaveProps = {
   avatarUrl?: string | null;
@@ -68,21 +70,7 @@ const Circle: React.FC<CircleProps> = ({circleNumber, config, audioLevel}) => {
 const CircleWaveVisualizer: React.FC<CircleWaveVisualizerProps> = ({
   trackRef,
 }) => {
-  const [audioLevel, setAudioLevel] = useState(0);
-
-  useEffect(() => {
-    if (!trackRef.publication?.track?.mediaStreamTrack) {
-      setAudioLevel(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const simulatedLevel = Math.random() * 0.8 + 0.1;
-      setAudioLevel(simulatedLevel);
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [trackRef.publication?.track?.mediaStreamTrack]);
+  const audioLevel = useAudioLevel(trackRef);
 
   return (
     <View style={styles.visualizerContainer}>
@@ -99,8 +87,10 @@ const CircleWaveVisualizer: React.FC<CircleWaveVisualizerProps> = ({
 };
 
 export const AudioWave: React.FC<AudioWaveProps> = ({avatarUrl}) => {
-  const {localParticipant} = useLocalParticipant();
-  const audioPublication = localParticipant
+  const remoteParticipants = useRemoteParticipants();
+  const remoteParticipant =
+    remoteParticipants.length > 0 ? remoteParticipants[0] : null;
+  const audioPublication = remoteParticipant
     ?.getTrackPublications()
     .find(pub => pub.kind === Track.Kind.Audio);
 
@@ -108,7 +98,7 @@ export const AudioWave: React.FC<AudioWaveProps> = ({avatarUrl}) => {
     <View style={styles.audioWaveContainer}>
       <CircleWaveVisualizer
         trackRef={{
-          participant: localParticipant,
+          participant: remoteParticipant,
           source: Track.Source.Microphone,
           publication: audioPublication,
         }}

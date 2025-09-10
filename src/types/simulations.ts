@@ -68,6 +68,8 @@ export interface ControlButtonsProps {
   onMicPress: () => void;
   onStopPress: () => void;
   isMuted: boolean;
+  isDisableMic?: boolean;
+  isDisableStop?: boolean;
 }
 
 export interface SimulationTimerProps {
