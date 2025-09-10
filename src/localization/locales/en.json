@@ -246,6 +246,7 @@
   "SimulationAssistant": {
     "startingTitle": "Simulation ",
     "startingEllipsis": "starting...",
+    "endingEllipsis": "ending...",
     "startingSubtitle": "To start the simulation, please allow us to use your microphone.",
     "sessionDuration": "Session Duration",
     "mute": "Mute",

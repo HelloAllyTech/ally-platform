@@ -160,12 +160,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         <Text style={styles.loadingTitle}>
           {t('SimulationAssistant.startingTitle')}
           <Text style={styles.loadingItalic}>
-            {t('SimulationAssistant.startingEllipsis')}
+            {isDisconnecting
+              ? t('SimulationAssistant.endingEllipsis')
+              : t('SimulationAssistant.startingEllipsis')}
           </Text>
         </Text>
-        <Text style={styles.loadingDescription}>
-          {t('SimulationAssistant.startingSubtitle')}
-        </Text>
+        {isConnecting && (
+          <Text style={styles.loadingDescription}>
+            {t('SimulationAssistant.startingSubtitle')}
+          </Text>
+        )}
       </View>
     );
   };
@@ -234,6 +238,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           <ControlButtons
             onMicPress={handleToggleMic}
             onStopPress={handleDisconnect}
+            isDisableMic={showSimulationLoading}
+            isDisableStop={isDisconnecting}
             isMuted={!isMicEnabled}
           />
         </View>
@@ -292,7 +298,7 @@ const styles = ScaledSheet.create({
     fontSize: '14@ms',
     color: colors.white,
     textAlign: 'left',
-    marginLeft: '16@ms',
+    marginLeft: '20@ms',
     marginBottom: '16@ms',
     width: '100%',
   },

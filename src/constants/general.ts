@@ -67,6 +67,8 @@ export const API_ROUTES = {
   ROOMS: '/rooms',
   SCENARIOS: '/scenarios',
   FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
+  ADMIN_SIMULATION_LOGS: '/learn/admin-scenario-sessions',
+  SIMULATION_LOGS: '/learn/scenario-sessions',
 } as const;
 
 export const API_METHODS = {

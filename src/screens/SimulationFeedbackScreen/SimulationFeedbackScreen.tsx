@@ -14,7 +14,7 @@ import {ChevronDown, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
 import {FEEDBACK_OPTIONS} from '@/constants';
 import {useAppNavigation} from '@/hooks';
-import {useAddFeedbackMutation} from '@/services';
+import {useAddSimulationFeedbackMutation} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 import {navigateToLearnTab} from '@/utils';
 
@@ -29,7 +29,7 @@ export const SimulationFeedbackScreen: React.FC = () => {
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
 
   const navigation = useAppNavigation();
-  const [addFeedback] = useAddFeedbackMutation();
+  const [addFeedback] = useAddSimulationFeedbackMutation();
   const {showErrorToast} = useErrorToast();
   const scrollViewRef = useRef<ScrollView>(null);
 

@@ -1,18 +1,25 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {Trans, useTranslation} from 'react-i18next';
 import {
+  Alert,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SCREEN_NAMES} from '@/constants';
-import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {
+  useAppNavigation,
+  useHardwareBackPressHandler,
+  usePermission,
+} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import type {Scenario} from '@/types';
@@ -25,6 +32,51 @@ export const SimulationsScreen: React.FC = () => {
   const scenarios = data?.scenarios ?? [];
 
   const keyExtractor = (item: Scenario) => item.unique_id;
+
+  const microphonePermission = Platform.select({
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+  });
+
+  const {
+    status: micPermissionStatus,
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicPermissionGranted,
+  } = usePermission(microphonePermission!);
+
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!isMicPermissionGranted) {
+        const permissionResult = await requestMicPermission();
+
+        if (permissionResult === 'blocked') {
+          Alert.alert(
+            t('Common.permissions.microphoneRequired'),
+            t('Common.permissions.microphoneMessage'),
+            [
+              {
+                text: t('Common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('Common.ok'),
+                onPress: openAppSettings,
+              },
+            ],
+          );
+        }
+      }
+    };
+
+    checkPermission();
+  }, [
+    micPermissionStatus,
+    isMicPermissionGranted,
+    requestMicPermission,
+    openAppSettings,
+    t,
+  ]);
 
   useHardwareBackPressHandler(() => {
     navigation.goBack();
@@ -245,7 +297,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
   introWrapper: {
-    marginTop: '38@ms',
+    marginTop: '22@ms',
     marginBottom: '16@ms',
   },
   introText: {

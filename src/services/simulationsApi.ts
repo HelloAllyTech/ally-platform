@@ -11,9 +11,9 @@ import {
   SendOtpResponse,
 } from '@/types';
 
-import {learnApi} from './api';
+import {api} from './api';
 
-export const simulationsApi = learnApi.injectEndpoints({
+export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
     sendOtp: builder.mutation<SendOtpResponse, {email: string}>({
       query: ({email}) => ({
@@ -67,7 +67,7 @@ export const simulationsApi = learnApi.injectEndpoints({
       query: () => '/scenarios',
     }),
 
-    addFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
+    addSimulationFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
       query: ({rating, comment}) => ({
         url: API_ROUTES.FEEDBACK,
         method: API_METHODS.POST,
@@ -83,8 +83,8 @@ export const simulationsApi = learnApi.injectEndpoints({
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
-        url: '/learn/admin-scenario-sessions',
-        params: {limit, offset},
+        url: API_ROUTES.SIMULATION_LOGS,
+        params: {limit, offset, sortBy: 'createdAt', order: 'DESC'},
       }),
     }),
   }),
@@ -97,7 +97,7 @@ export const {
   useListRoomsQuery,
   useDeleteRoomMutation,
   useGetScenariosQuery,
-  useAddFeedbackMutation,
+  useAddSimulationFeedbackMutation,
   useGetSimulationLogsQuery,
   useLazyGetSimulationLogsQuery,
 } = simulationsApi;
