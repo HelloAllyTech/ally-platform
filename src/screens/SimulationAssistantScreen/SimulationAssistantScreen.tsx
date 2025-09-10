@@ -152,7 +152,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         scenarioSessionId: roomId,
       });
       if (!response.error) {
-        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {simulationId: 0});
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          simulationId: roomId,
+        });
       }
     } finally {
       setIsMicEnabled(false);

@@ -242,7 +242,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       // For simulation logs, navigate to simulation summary or details
       navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-        simulationId: item?.id,
+        simulationId: item?.id?.toString(),
       });
     }
   };

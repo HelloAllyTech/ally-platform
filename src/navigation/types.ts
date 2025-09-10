@@ -13,7 +13,7 @@ export type RootStackParamList = {
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
   SimulationAssistant: {roomData: RoomData; scenario?: Scenario};
-  SimulationFeedback: {simulationId?: number};
+  SimulationFeedback: {simulationId?: string};
 };
 
 export type DrawerParamList = {
