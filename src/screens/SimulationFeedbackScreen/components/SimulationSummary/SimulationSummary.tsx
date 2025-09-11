@@ -6,22 +6,16 @@ import {ArrowDown, KeyEventsIcon, ThumbUpIcon} from '@/assets';
 import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
+import {
+  formatSimulationKeyEvents,
+  FormattedEvent,
+} from '../../utils/simulationSummary';
+
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
 }
 
-const defaultData = {
-  startedAt: '',
-  endedAt: '',
-  score: 0,
-  keyEvents: [],
-  whatWentWell: [],
-  areasForImprovement: [],
-};
-
-export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
-  data = defaultData,
-}) => {
+export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,
@@ -52,18 +46,20 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
     </View>
   );
 
-  const renderEventItem = (event: any, index: number) => (
+  const renderEventItem = (item: FormattedEvent, index: number) => (
     <View key={index} style={styles.eventItem}>
       <View style={styles.bulletPoinEvents} />
       <View style={styles.eventHeader}>
-        <Text style={styles.eventTimestamp}>{event.timestamp}</Text>
+        <Text style={styles.eventTimestamp}>{item.time}</Text>
         <View style={styles.dot} />
         <Text style={styles.eventScore}>
-          {event.score >= 0 ? '+' : ''}
-          {event.score}
+          {item.score !== null && item.score !== undefined && item.score >= 0
+            ? '+'
+            : ''}
+          {item.score !== null && item.score !== undefined ? item.score : ''}
         </Text>
       </View>
-      <Text style={styles.eventDescription}>{event.description}</Text>
+      <Text style={styles.eventDescription}>{item.event}</Text>
     </View>
   );
 
@@ -74,12 +70,12 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
     </View>
   );
 
-  const renderExpandableSection = (
+  const renderExpandableSection = <T,>(
     title: string,
     icon: React.ReactNode,
-    items: any[] = [],
+    items: T[] = [],
     sectionKey: keyof typeof expandedSections,
-    renderItem: (item: any, index: number) => React.ReactNode,
+    renderItem: (item: T, index: number) => React.ReactNode,
   ) => {
     const isExpanded = expandedSections[sectionKey];
     const displayItems = isExpanded ? items : items?.slice(0, 3);
@@ -118,6 +114,15 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
 
   if (!data) return null;
 
+  const positives =
+    data?.details?.summary?.feedback?.positives || data?.whatWentWell || [];
+  const improvements =
+    data?.details?.summary?.feedback?.improvements ||
+    data?.areasForImprovement ||
+    [];
+
+  const events: FormattedEvent[] = formatSimulationKeyEvents(data);
+
   return (
     <View style={styles.container}>
       <View style={styles.metricsContainer}>
@@ -130,21 +135,21 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
       {renderExpandableSection(
         'Key events',
         <KeyEventsIcon width={20} height={20} style={styles.sectionIcon} />,
-        data.keyEvents,
+        events,
         'keyEvents',
         renderEventItem,
       )}
       {renderExpandableSection(
         'What went well',
         <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
-        data.whatWentWell,
+        positives,
         'whatWentWell',
         renderFeedbackItem,
       )}
       {renderExpandableSection(
         'Areas for improvement',
         <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
-        data.areasForImprovement,
+        improvements,
         'areasForImprovement',
         renderFeedbackItem,
       )}
@@ -167,7 +172,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
     borderRadius: '8@ms',
     padding: '10@ms',
-    borderWidth: 0.5,
+    borderWidth: '0.5@ms',
     borderColor: colors.lightGray4,
   },
   metricLabel: {
@@ -183,7 +188,7 @@ const styles = ScaledSheet.create({
   section: {
     paddingBottom: '12@vs',
     marginBottom: '16@vs',
-    borderBottomWidth: '0.5@ms',
+    borderBottomWidth: '0.4@ms',
     borderColor: colors.lightGray4,
   },
   sectionHeader: {
@@ -261,6 +266,7 @@ const styles = ScaledSheet.create({
     height: '3@ms',
     backgroundColor: colors.lightGray4,
     borderRadius: '50%',
+    marginTop: '3@ms',
   },
   bulletPoint: {
     width: '4@ms',

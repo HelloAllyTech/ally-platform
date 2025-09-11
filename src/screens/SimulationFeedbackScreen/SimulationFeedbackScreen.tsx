@@ -22,7 +22,6 @@ import {
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
-  useEndScenarioSessionMutation,
   useLazyGetSimulationDetailsQuery,
 } from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
@@ -52,7 +51,6 @@ export const SimulationFeedbackScreen: React.FC<
   ] = useLazyGetSimulationDetailsQuery();
   const {showErrorToast} = useErrorToast();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
-  const [endScenarioSession] = useEndScenarioSessionMutation();
 
   useHardwareBackPressHandler(() => {
     if (fromLogs) {
@@ -81,11 +79,10 @@ export const SimulationFeedbackScreen: React.FC<
 
   useEffect(() => {
     if (simulationId) {
-      // TODO: Remove this later
-      endScenarioSession({scenarioSessionId: simulationId?.toString()});
       getSimulationDetails({id: simulationId?.toString()});
     }
-  }, [getSimulationDetails, simulationId, endScenarioSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simulationId]);
 
   const handleTextChange = (text: string) => {
     debouncedSubmitFeedback(text, rating);
@@ -234,7 +231,8 @@ export const SimulationFeedbackScreen: React.FC<
         ) : (
           <>
             {renderSummary()}
-            {renderFeedback()}
+            {/* TODO: Remove this later. Future enhancement to show added feedback for logs */}
+            {!fromLogs && renderFeedback()}
             {!fromLogs && renderButtonContainer()}
           </>
         )}
@@ -266,9 +264,10 @@ const styles = ScaledSheet.create({
     marginBottom: '10@vs',
     paddingRight: '20@ms',
     paddingLeft: '10@ms',
-    paddingBottom: '10@vs',
-    borderBottomWidth: 0.3,
-    borderBottomColor: colors.lightGray4,
+    paddingBottom: '8@vs',
+    marginTop: '8@vs',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ashGray,
   },
   backButton: {
     paddingRight: '1@ms',
@@ -285,11 +284,14 @@ const styles = ScaledSheet.create({
   headerSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingTop: '5@vs',
   },
   headerText: {
-    ...typography.label.medium,
-    color: colors.lightGray3,
-    letterSpacing: 1,
+    ...fontFamily.ROBOTO.REGULAR,
+    fontSize: '12@ms',
+    color: colors.lightGray12,
+    letterSpacing: '4@ms',
+    fontWeight: '700',
   },
   headerLine: {
     flex: 1,

@@ -95,3 +95,16 @@ export const formatTimeToMMSS = (ms: number): string => {
     .toString()
     .padStart(2, '0')}`;
 };
+
+export const formatDiffAsMMSS = (from?: string, to?: string) => {
+  if (!from || !to) return '00:00';
+  const start = new Date(from).getTime();
+  const end = new Date(to).getTime();
+  const diffMs = Math.max(0, end - start);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = seconds.toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+};
