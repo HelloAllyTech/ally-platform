@@ -12,7 +12,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ScenarioStatus, SCREEN_NAMES} from '@/constants';
-import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import type {Scenario} from '@/types';
@@ -37,10 +37,7 @@ export const SimulationsScreen: React.FC = () => {
 
   const keyExtractor = (item: Scenario) => item.id;
 
-  useHardwareBackPressHandler(() => {
-    navigation.goBack();
-    return true;
-  });
+  useTabBackToHomeHandler();
 
   const handleStart = (scenario: Scenario) => {
     navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario});
@@ -271,7 +268,7 @@ const styles = ScaledSheet.create({
     marginBottom: '16@ms',
   },
   brandHeader: {
-    paddingTop: '8@ms',
+    paddingTop: '18@ms',
     paddingBottom: '8@ms',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray5,

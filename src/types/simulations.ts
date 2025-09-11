@@ -84,14 +84,35 @@ export interface SimulationTimerProps {
   startTime: Date;
 }
 
+export interface SimulationEventDetailsMeta {
+  createdAt?: string;
+  updatedAt?: string;
+  id?: string;
+  name?: string;
+  description?: string;
+  score?: number;
+  emoji?: string;
+  message?: string;
+  branchInstruction?: string;
+}
+
 export interface SimulationEvent {
-  timestamp: string;
-  score: number;
-  description: string;
+  createdAt?: string;
+  updatedAt?: string;
+  tenantId?: string;
+  id?: string;
+  scenarioSessionId?: string;
+  eventId?: string;
+  occurredAt?: string;
+  metadata?: unknown;
+  events?: SimulationEventDetailsMeta | null;
+  timestamp?: string;
+  score?: number | null;
+  description?: string;
 }
 
 export interface SimulationSummaryData {
-  keyEvents?: SimulationEvent[];
+  events?: SimulationEvent[];
   whatWentWell?: string[];
   areasForImprovement?: string[];
   createdAt: string;
@@ -106,6 +127,20 @@ export interface SimulationSummaryData {
   endedAt: string;
   score: number | null;
   metadata: null;
+  details?: {
+    createdAt?: string;
+    updatedAt?: string;
+    tenantId?: string;
+    id?: string;
+    scenarioSessionId?: string;
+    callDuration?: number;
+    summary?: {
+      feedback?: {
+        positives?: string[];
+        improvements?: string[];
+      };
+    };
+  };
 }
 
 export type RoomData = {
