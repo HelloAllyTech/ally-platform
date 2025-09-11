@@ -13,8 +13,12 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon, ShareIcon} from '@/assets';
 import {PrimaryButton, useErrorToast, useToast} from '@/components';
 import {env} from '@/config/env';
-import {SCREEN_NAMES} from '@/constants';
-import {useAppNavigation, useTranslate} from '@/hooks';
+import {isIOS, SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useHardwareBackPressHandler,
+  useTranslate,
+} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
@@ -32,6 +36,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [startScenarioSession] = useStartScenarioSessionMutation();
+
+  useHardwareBackPressHandler(() => {
+    navigation.goBack();
+    return true;
+  });
 
   const linkCopyToClipboard = () => {
     copyToClipboard(`${env.ALLY_WEB_URL}scenario/${scenario.id}`);
@@ -213,6 +222,7 @@ const styles = ScaledSheet.create({
     gap: '8@ms',
     marginBottom: '18@ms',
     marginHorizontal: '10@ms',
+    paddingTop: isIOS ? '0@vs' : '8@vs',
   },
   headerLeft: {
     justifyContent: 'center',
