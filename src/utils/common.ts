@@ -1,4 +1,4 @@
-import Clipboard from '@react-native-community/clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 export type Maybe<T> = T | null;
 
