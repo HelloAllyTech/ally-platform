@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -6,10 +6,12 @@ import {
   BackHandler,
   FlatList,
   Linking,
+  Platform,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
@@ -20,6 +22,7 @@ import {
   useAppNavigation,
   useCounselorChat,
   useHardwareBackPressHandler,
+  usePermission,
   useTranslate,
   useUser,
 } from '@/hooks';
@@ -121,6 +124,51 @@ export const CallLogScreen: React.FC = () => {
     BackHandler.exitApp();
     return true;
   });
+
+  const microphonePermission = Platform.select({
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+  });
+
+  const {
+    status: micPermissionStatus,
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicPermissionGranted,
+  } = usePermission(microphonePermission!);
+
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!isMicPermissionGranted) {
+        const permissionResult = await requestMicPermission();
+
+        if (permissionResult === 'blocked') {
+          Alert.alert(
+            t('Common.permissions.microphoneRequired'),
+            t('Common.permissions.microphoneMessage'),
+            [
+              {
+                text: t('Common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('Common.ok'),
+                onPress: openAppSettings,
+              },
+            ],
+          );
+        }
+      }
+    };
+
+    checkPermission();
+  }, [
+    micPermissionStatus,
+    isMicPermissionGranted,
+    requestMicPermission,
+    openAppSettings,
+    t,
+  ]);
 
   /**
    * Fetches the initial set of real call logs

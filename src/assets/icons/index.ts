@@ -71,6 +71,7 @@ import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
+import ShareIcon from './share.svg';
 import ShieldIcon from './shield.svg';
 import ShieldWithTickIcon from './shieldWithTick.svg';
 import SmileIcon from './smile.svg';
@@ -178,4 +179,5 @@ export {
   KeyEventsIcon,
   ThumbUpIcon,
   BulbIcon,
+  ShareIcon,
 };

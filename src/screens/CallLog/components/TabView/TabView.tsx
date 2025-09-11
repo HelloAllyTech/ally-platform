@@ -60,7 +60,7 @@ const styles = ScaledSheet.create({
     flex: 1,
     paddingVertical: '12@ms',
     paddingHorizontal: '16@ms',
-    borderRadius: '6@ms',
+    borderRadius: '7@ms',
     alignItems: 'center',
     justifyContent: 'center',
   },

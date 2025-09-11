@@ -10,13 +10,15 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon} from '@/assets';
-import {PrimaryButton, useErrorToast} from '@/components';
+import {LeftArrowIcon, ShareIcon} from '@/assets';
+import {PrimaryButton, useErrorToast, useToast} from '@/components';
+import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
+import {copyToClipboard} from '@/utils';
 
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
@@ -26,9 +28,15 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
   const {showErrorToast} = useErrorToast();
+  const {showToast} = useToast();
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [startScenarioSession] = useStartScenarioSessionMutation();
+
+  const linkCopyToClipboard = () => {
+    copyToClipboard(`${env.ALLY_WEB_URL}scenario/${scenario.id}`);
+    showToast(t('SimulationAssistant.linkCopiedToClipboard'), 'success');
+  };
 
   const startSimulationPress = async () => {
     try {
@@ -69,7 +77,12 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         {!!scenario.coverImageUrl && (
           <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
         )}
-        <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
+        <View style={styles.row}>
+          <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
+          <TouchableOpacity onPress={linkCopyToClipboard}>
+            <ShareIcon />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
         {!!scenario.scenario && (
           <Text style={styles.fieldValue}>
@@ -147,6 +160,7 @@ const styles = ScaledSheet.create({
     fontSize: '20@ms',
     marginTop: '18@ms',
     marginBottom: '16@ms',
+    maxWidth: '85%',
   },
   fieldLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -211,5 +225,12 @@ const styles = ScaledSheet.create({
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingRight: '4@ms',
   },
 });

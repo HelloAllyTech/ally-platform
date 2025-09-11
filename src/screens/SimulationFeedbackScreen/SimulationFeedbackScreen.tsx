@@ -84,7 +84,7 @@ export const SimulationFeedbackScreen: React.FC<
   }, [getSimulationDetails, simulationId, endScenarioSession]);
 
   const handleTextChange = (text: string) => {
-    debouncedSubmitFeedback(additionalFeedback, rating);
+    debouncedSubmitFeedback(text, rating);
     setAdditionalFeedback(text);
   };
 
@@ -112,11 +112,12 @@ export const SimulationFeedbackScreen: React.FC<
     setShowScrollButton(!isNearBottom);
   }, []);
 
-  const renderStars = () => {
+  const renderStars = (disabled?: boolean) => {
     return Array.from({length: 5}, (_, index) => (
       <TouchableOpacity
         key={index}
         onPress={() => handleStarPress(index)}
+        disabled={disabled}
         style={styles.starContainer}>
         <StarIcon
           width={24}
@@ -140,32 +141,43 @@ export const SimulationFeedbackScreen: React.FC<
     return (
       <>
         {renderSectionHeader(t('SimulationFeedback.headerText'))}
-        <View style={styles.feedbackCard}>
-          <Text style={styles.questionText}>
-            {t('SimulationFeedback.questionText')}
-          </Text>
-          <View style={styles.starsContainer}>{renderStars()}</View>
-          <Text style={styles.feedbackText}>{feedbackText}</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder={t('SimulationFeedback.placeholderText')}
-            placeholderTextColor={colors.lightGray3}
-            value={additionalFeedback}
-            onChangeText={handleTextChange}
-            multiline
-            textAlignVertical="top"
-          />
-        </View>
+        {fromLogs ? (
+          <View>
+            <View style={styles.disabledStarsContainer}>
+              {renderStars(true)}
+            </View>
+            <Text style={styles.feedbackTextDisabled}>
+              {feedbackText || '-'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.feedbackCard}>
+            <Text style={styles.questionText}>
+              {t('SimulationFeedback.questionText')}
+            </Text>
+            <View style={styles.starsContainer}>{renderStars()}</View>
+            <Text style={styles.feedbackText}>{feedbackText}</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder={t('SimulationFeedback.placeholderText')}
+              placeholderTextColor={colors.lightGray3}
+              value={additionalFeedback}
+              onChangeText={handleTextChange}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        )}
       </>
     );
   };
 
   const renderSummary = () => {
     return (
-      <>
+      <View>
         {renderSectionHeader(t('SimulationFeedback.sessionSummary'))}
         <SimulationSummary data={simulationDetails} />
-      </>
+      </View>
     );
   };
 
@@ -202,7 +214,7 @@ export const SimulationFeedbackScreen: React.FC<
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
-        extraScrollHeight={200}
+        extraScrollHeight={100}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}>
@@ -297,6 +309,14 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
     marginBottom: '12@vs',
   },
+  feedbackTextDisabled: {
+    ...typography.body.large,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.darkGray2,
+    fontSize: '15@ms',
+    marginBottom: '12@vs',
+    paddingLeft: '5@ms',
+  },
   textInput: {
     backgroundColor: colors.lightGray1,
     borderRadius: '8@ms',
@@ -329,5 +349,11 @@ const styles = ScaledSheet.create({
     width: '30@ms',
     height: '30@ms',
     paddingTop: '3@ms',
+  },
+  disabledStarsContainer: {
+    flexDirection: 'row',
+    marginTop: '10@vs',
+    marginLeft: -4,
+    marginBottom: '8@vs',
   },
 });
