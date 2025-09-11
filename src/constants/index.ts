@@ -6,3 +6,4 @@ export * from './chat';
 export * from './dates';
 export * from './summary';
 export * from './navigation';
+export * from './permissions';

@@ -144,6 +144,7 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_ASSISTANT}
             component={SimulationAssistantScreen}
+            options={{gestureEnabled: false}}
           />
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_FEEDBACK}

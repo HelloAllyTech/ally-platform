@@ -11,21 +11,22 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
-import {CallLog} from '../../types';
+import {LogItem} from '../../types';
 import {StatusBadge} from '../StatusBadge';
 import {Tag} from '../Tag/Tag';
 
 /**
  * Props interface for the CallLogItem component
  * @interface CallLogItemProps
- * @property {CallLog} item - The call log data to display
+ * @property {LogItem} item - The call log or simulation log data to display
  * @property {boolean} expanded - Whether the item is expanded or collapsed
  * @property {() => void} onToggle - Callback function to toggle expanded state
  */
 interface CallLogItemProps {
-  item: CallLog;
+  item: LogItem;
   expanded: boolean;
   disabled?: boolean;
+  disableExpand?: boolean;
   onToggle: () => void;
   onItemPress: () => void;
 }
@@ -41,10 +42,13 @@ export const CallLogItem = ({
   item,
   expanded,
   disabled = false,
+  disableExpand = false,
   onToggle,
   onItemPress,
 }: CallLogItemProps) => {
   const {t} = useTranslate();
+  const tags = item.details?.summary?.tags || [];
+  const isExpanded = expanded && !disableExpand;
   return (
     <TouchableOpacity
       disabled={disabled}
@@ -52,15 +56,16 @@ export const CallLogItem = ({
       onPress={onItemPress}
       style={[styles.logItemContainer, disabled && styles.disabled]}>
       {/* Header section with client info and call quality score */}
-      <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
+      <View style={[styles.logHeader, isExpanded && styles.expandedLogHeader]}>
         <View style={styles.leftContainer}>
           <View style={styles.logHeaderContent}>
             <TouchableOpacity
               onPress={onToggle}
               activeOpacity={0.7}
+              disabled={disableExpand}
               hitSlop={DEFAULT_HIT_SLOP}
               style={styles.arrowContainer}>
-              {expanded ? (
+              {isExpanded ? (
                 <DoubleBottomArrowIcon width={16} height={16} />
               ) : (
                 <DoubleRightArrowIcon width={16} height={16} />
@@ -68,10 +73,15 @@ export const CallLogItem = ({
             </TouchableOpacity>
             <View style={styles.titleRow}>
               <Text style={styles.logId} numberOfLines={1} ellipsizeMode="tail">
-                {item?.details?.callInfo?.summaryName || item?.details?.chatId}
+                {item?.details?.callInfo?.summaryName ||
+                  item?.details?.chatId ||
+                  item.scenario?.title ||
+                  `Item ${item.id}`}
               </Text>
               <View style={styles.statusAndEyeContainer}>
-                <StatusBadge status={item.summaryStatus} />
+                <StatusBadge
+                  status={item.summaryStatus || (item.status as any)}
+                />
                 {!disabled && (
                   <EyeIcon width={16} height={16} style={styles.eyeIcon} />
                 )}
@@ -85,15 +95,15 @@ export const CallLogItem = ({
       </View>
 
       {/* Expanded details section */}
-      {expanded && (
+      {isExpanded && (
         <View style={styles.logDetails}>
           <Text style={styles.duration}>
             {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
           </Text>
           {/* Render tags if they exist */}
-          {(item.details?.summary?.tags?.length ?? 0) > 0 && (
+          {(tags?.length ?? 0) > 0 && (
             <View style={styles.tagsRow}>
-              {item.details?.summary?.tags?.map?.((tagItem, idx) => {
+              {tags?.map?.((tagItem, idx) => {
                 const rating = tagItem.positivity_rating ?? 5;
                 const tagColor = TAG_COLORS[rating as keyof typeof TAG_COLORS];
                 return (

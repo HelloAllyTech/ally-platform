@@ -1,8 +1,9 @@
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LogoutIcon, ProfileIcon} from '@/assets/icons';
+import {LogoutIcon, ProfileIcon} from '@/assets';
 import {SecurityCarousel} from '@/components';
+import {env} from '@/config/env';
 import {CarouselVariant} from '@/constants';
 import {useTranslate, useUser} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -50,7 +51,8 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
       </View>
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>
-          {t('Common.version')}: {getAppVersion()}
+          {t('Common.version')}: {getAppVersion()}{' '}
+          {env.ENVIRONMENT === 'development' && '(Dev)'}
         </Text>
       </View>
     </View>
@@ -117,7 +119,7 @@ const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: '16@ms',
+    marginBottom: '4@ms',
   },
   versionContainer: {
     alignItems: 'center',

@@ -25,6 +25,8 @@
       "title": "Session",
       "subtitle": "Logs"
     },
+    "realCallLogs": "Real call logs",
+    "simulations": "Simulations",
     "start": "Start",
     "session": "Session",
     "chooseListening": "Choose your listening mode",
@@ -42,6 +44,8 @@
     },
     "noCallLogs": "No call records found",
     "noCallLogsDescription": "Your recent calls and insights \n will be listed here.",
+    "noSimulationLogs": "No simulation records found",
+    "noSimulationLogsDescription": "Your recent simulation sessions \n will be listed here.",
     "willCheckLater": "I’ll check later",
     "seeIfItIsReady": "See if it's ready",
     "oops": "Oops!",
@@ -239,10 +243,17 @@
     "try": "Try:",
     "noData": "No results found for"
   },
-  "SimulationScreen": {
-    "encryptionInfo": "Your sessions are secured with end-to-end encryption.",
-    "connecting": "Connecting...",
-    "disconnecting": "Disconnecting..."
+  "SimulationAssistant": {
+    "startingTitle": "Simulation ",
+    "startingEllipsis": "starting...",
+    "endingEllipsis": "ending...",
+    "startingSubtitle": "To start the simulation, please allow us to use your microphone.",
+    "sessionDuration": "Session Duration",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "endSession": "End session",
+    "practiceSessionScore": "Practice Session Score",
+    "linkCopiedToClipboard": "Link copied to clipboard"
   },
   "NetworkLogs": {
     "logs": "Logs"
@@ -253,12 +264,17 @@
     "viewMore": "View more"
   },
   "Simulations": {
+    "header": {
+      "title": "Ally",
+      "subtitle": "Learn"
+    },
     "chooseYour": "Choose your",
     "scenarioWord": "Scenario",
+    "learnIntro": "<ai>AI</ai>-voice based hyper realistic training role plays to help <counsellors>counsellors</counsellors> build <expertise>expertise</expertise>.",
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Scenario:",
-    "descriptionLabel": "Description:",
-    "startSimulation": "Start Simulation",
+    "start": "Start",
+    "simulation": "Simulation",
     "audioSimulation": "Audio Simulation",
     "verifyOtp": "Verify OTP",
     "enterTheCodeSentTo": "Enter the code sent to",
@@ -278,15 +294,17 @@
   "SimulationFeedback": {
     "title": "Simulation",
     "titleEnded": "Ended",
+    "titleDetails": "Details",
     "headerText": "REVIEW AND RATING",
     "questionText": "How was your experience?",
     "placeholderText": "How was your Experience ?",
     "submitButton": "Submit Feedback",
-    "submittingButton": "Submitting..."
+    "submittingButton": "Submitting...",
+    "sessionSummary": "SESSION SUMMARY",
+    "tryAnother": "Try Another Simulation"
   },
   "Errors": {
-    "createRoom": "Failed to create room",
-    "sendOtp": "Failed to send OTP",
+    "startSimulation": "Failed to start simulation",
     "navigateAssistant": "Failed to open simulation assistant",
     "attachListeners": "Failed to attach room listeners",
     "connect": "Failed to connect to the room",

@@ -22,8 +22,10 @@ import {getEstimatedSummaryGenerationTime} from '@/utils/callSummary';
 
 export const SummaryGenerationProgress = ({
   summaryStatus,
+  hideDescription = false,
 }: {
   summaryStatus?: ChatSummaryStatus;
+  hideDescription?: boolean;
 }) => {
   const isSummaryGenerated = summaryStatus === ChatSummaryStatus.SUCCESS;
   const {t} = useTranslate();
@@ -136,19 +138,23 @@ export const SummaryGenerationProgress = ({
         </Text>
       )}
 
-      <Text style={styles.subtitle}>
-        {isSummaryGenerated
-          ? t(`CallSummaryProgress.generatedSubtitle`)
-          : t(
-              `CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`,
-            )}
-      </Text>
-      {!isSummaryGenerated && (
-        <Text style={styles.etaText}>
-          {t('CallSummaryProgress.estimatedTime', {time: estimatedTime})}
-        </Text>
+      {!hideDescription && (
+        <>
+          <Text style={styles.subtitle}>
+            {isSummaryGenerated
+              ? t(`CallSummaryProgress.generatedSubtitle`)
+              : t(
+                  `CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`,
+                )}
+          </Text>
+          {!isSummaryGenerated && (
+            <Text style={styles.etaText}>
+              {t('CallSummaryProgress.estimatedTime', {time: estimatedTime})}
+            </Text>
+          )}
+          <View style={styles.separator} />
+        </>
       )}
-      <View style={styles.separator} />
     </View>
   );
 };

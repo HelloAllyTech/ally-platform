@@ -10,6 +10,7 @@ export interface User {
 export enum UserRole {
   CLIENT = 'CLIENT',
   COUNSELOR = 'COUNSELOR',
+  LEARN = 'LEARN',
 }
 
 export enum UserStatus {

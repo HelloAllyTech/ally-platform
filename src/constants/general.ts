@@ -42,6 +42,11 @@ export enum AllyPlatforms {
   MOBILE = 'MOBILE',
 }
 
+export enum LogType {
+  REAL = 'real',
+  SIMULATION = 'simulation',
+}
+
 export enum LanguageMap {
   bn = 'Bengali',
   en = 'English',
@@ -57,11 +62,14 @@ export enum LanguageMap {
 
 // API route constants
 export const API_ROUTES = {
-  SEND_OTP: '/auth/send-otp',
-  VERIFY_OTP: '/auth/verify-otp',
   ROOMS: '/rooms',
-  SCENARIOS: '/scenarios',
+  SCENARIOS: '/learn/scenarios',
   FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
+  ADMIN_SIMULATION_LOGS: '/learn/admin-scenario-sessions',
+  SIMULATION_LOGS: '/learn/scenario-sessions',
+  END_SCENARIO_SESSION: '/learn/scenario-session',
+  SCENARIO_SESSION_START: '/learn/scenario-session-start',
+  SIMULATION_DETAILS: '/learn/scenario-session',
 } as const;
 
 export const API_METHODS = {
@@ -85,7 +93,7 @@ export enum CarouselVariant {
   DEFAULT = 'default',
 }
 
-export const drawerConfig: CarouselConfig = {
+export const drawerSecurityCarouselConfig: CarouselConfig = {
   width: SCREEN_WIDTH - 80,
   isBlurView: false,
   paginationActiveDotStyle: {
@@ -94,6 +102,9 @@ export const drawerConfig: CarouselConfig = {
   imageContainerCustomStyle: {
     width: '90%',
     height: ms(250),
+    padding: 4,
+    borderRightWidth: 1,
+    borderLeftWidth: 1,
   },
   titleCustomStyle: {
     color: colors.darkGray2,
@@ -102,14 +113,30 @@ export const drawerConfig: CarouselConfig = {
   },
 };
 
-export const defaultConfig: CarouselConfig = {
+export const defaultSecurityCarouselConfig: CarouselConfig = {
   width: SCREEN_WIDTH,
   isBlurView: true,
   paginationActiveDotStyle: {
     backgroundColor: colors.white,
   },
-  imageContainerCustomStyle: {},
+  imageContainerCustomStyle: {
+    borderWidth: 0,
+    borderRightWidth: 0,
+    borderLeftWidth: 0,
+    overflow: 'hidden',
+  },
   titleCustomStyle: {
     color: colors.white,
   },
+};
+
+export const USER_PERMISSIONS = {
+  CALL_LOG: 'view:navbar:calls',
+  CALENDAR: 'view:navbar:calendar',
+  ANALYTICS: 'view:navbar:analytics',
+  LEARN: 'view:navbar:learn',
+  STRESS_BUSTER: 'view:navbar:stress-buster',
+  SETTINGS: 'view:navbar:settings',
+  EDIT_SUMMARY: 'edit:summary',
+  START_CALL: 'view:button:start-call',
 };

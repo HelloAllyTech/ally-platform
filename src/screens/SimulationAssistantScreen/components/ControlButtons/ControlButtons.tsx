@@ -1,102 +1,81 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {MicIcon} from '@/assets';
-import {colors} from '@/theme';
+import {MicOffIcon, MicOnIcon} from '@/assets';
+import {colors, fontFamily} from '@/theme';
 import {ControlButtonsProps} from '@/types';
 
 export const ControlButtons: React.FC<ControlButtonsProps> = ({
   onMicPress,
   onStopPress,
+  isDisableMic = false,
+  isDisableStop = false,
   isMuted,
 }) => {
+  const {t} = useTranslation();
   return (
     <View style={styles.controlButtonsContainer}>
-      <View style={styles.controlButton}>
-        <TouchableOpacity
-          onPress={onMicPress}
-          style={[styles.buttonHalf, isMuted && styles.buttonHalfMuted]}>
-          <MicIcon width={20} height={20} color={colors.gray} />
-          <Text style={styles.buttonText}>Mute</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onMicPress}
+        disabled={isDisableMic}
+        style={[styles.buttonHalf, isMuted && styles.buttonMuted]}>
+        {isMuted ? <MicOffIcon /> : <MicOnIcon />}
+        <Text style={[styles.buttonText, isMuted && styles.buttonTextDark]}>
+          {isMuted
+            ? t('SimulationAssistant.unmute')
+            : t('SimulationAssistant.mute')}
+        </Text>
+      </TouchableOpacity>
 
-        <View style={styles.divider} />
-
-        <TouchableOpacity onPress={onStopPress} style={styles.buttonHalf}>
-          <View style={styles.stopIcon}>
-            <View style={styles.stopIconInner} />
-          </View>
-          <Text style={styles.buttonText}>End session</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        onPress={onStopPress}
+        disabled={isDisableStop}
+        style={styles.buttonHalf}>
+        <View style={styles.stopIcon} />
+        <Text style={styles.buttonText}>
+          {t('SimulationAssistant.endSession')}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = ScaledSheet.create({
   controlButtonsContainer: {
+    width: '100%',
     alignItems: 'center',
-    marginBottom: '40@mvs',
-    marginHorizontal: '20@ms',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  controlButton: {
-    backgroundColor: colors.white,
-    borderRadius: '10@ms',
+    marginBottom: '24@mvs',
     flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
+    gap: '8@ms',
+    justifyContent: 'space-between',
   },
   buttonHalf: {
     flex: 1,
+    backgroundColor: colors.darkGray10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: '12@ms',
-    paddingHorizontal: '16@ms',
+    height: '54@ms',
+    borderRadius: '8@ms',
     gap: '8@ms',
   },
-  divider: {
-    width: 1,
-    height: '100%',
-    backgroundColor: colors.lightGray7,
-  },
   buttonText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
-    color: colors.black,
-    fontWeight: '400',
+    color: colors.white,
+  },
+  buttonTextDark: {
+    color: colors.darkGray5,
   },
   stopIcon: {
-    width: 20,
-    height: 20,
-    backgroundColor: colors.brightRed,
-    borderRadius: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '12@s',
+    height: '12@s',
+    backgroundColor: colors.coralRed,
+    borderRadius: '2@ms',
   },
-  stopIconInner: {
-    width: 8,
-    height: 8,
-    backgroundColor: colors.white,
-    borderRadius: 1,
-  },
-  buttonHalfMuted: {
-    opacity: 0.5,
+  buttonMuted: {
+    backgroundColor: colors.white3,
   },
 });
