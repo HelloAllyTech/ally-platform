@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import {LockIcon} from '@/assets/icons';
+import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
 import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
@@ -76,9 +76,59 @@ export const ListeningScreen = ({
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
   const isFocused = useIsFocused();
+  const {isOffline} = useNetworkConnectivity();
+  const {data: nudgeStatus} = useGetNudgeStatusQuery();
+  const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
+  const {checkCounselorChat} = useCounselorChat();
+  const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
+    useEndCallMutation();
+  const {userData} = useUser();
+  const chatData = useAppSelector(state => state.chat.currentChat);
+
+  const callProvider = chatData?.provider;
+
+  const isMicrophoneMode =
+    route.params?.isMicrophoneMode ||
+    chatData?.provider === ChatProvider.MICROPHONE;
+  const isWebMicrophoneMode =
+    callProvider === ChatProvider.MICROPHONE &&
+    chatData?.platform === AllyPlatforms.WEB;
+  const isConferenceCall =
+    callProvider && ConferenceCallProviders.includes(callProvider);
 
   const [isFocusMode, setIsFocusMode] = useState(true);
-  const chatData = useAppSelector(state => state.chat.currentChat);
+  const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCallPaused, setIsCallPaused] = useState(isWebMicrophoneMode);
+  const [isAudioActive, setIsAudioActive] = useState(false);
+  const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
+  const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
+  const [isControlSectionMaximized, setIsControlSectionMaximized] =
+    useState(true);
+  const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
+    useState(false);
+  const [disconnectedType, setDisconnectedType] =
+    useState<DisconnectedType | null>(null);
+
+  const streamingInitialized = useRef(false);
+
+  // Use ref to always access the latest isCallPaused value inside audio event callback,
+  // since react-native-live-audio-stream registers the handler once and won't re-subscribe
+  // on state changes, avoiding unnecessary re-inits of the stream.
+  const isCallPausedRef = useRef(isCallPaused);
+  const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const latestAmplitudesRef = useRef<number[] | null>(
+    new Array(NUM_BARS).fill(0),
+  );
+  const chatIdRef = useRef(chatData?.chatId);
+  const tooltipContentList = [
+    t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
+    t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
+    t('ListeningScreen.dataSafeTooltip.noTrainingData'),
+    t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
+  ];
 
   const startTime = useMemo(
     () =>
@@ -87,55 +137,6 @@ export const ListeningScreen = ({
         : Date.now(),
     [chatData?.startedAt],
   );
-  const callProvider = chatData?.provider;
-  const isConferenceCall =
-    callProvider && ConferenceCallProviders.includes(callProvider);
-  const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const isWebMicrophoneMode =
-    callProvider === ChatProvider.MICROPHONE &&
-    chatData?.platform === AllyPlatforms.WEB;
-  const [isCallPaused, setIsCallPaused] = useState(isWebMicrophoneMode);
-  const [isAudioActive, setIsAudioActive] = useState(false);
-  const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
-  const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
-  const streamingInitialized = useRef(false);
-
-  const {data: nudgeStatus} = useGetNudgeStatusQuery();
-  const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const [isControlSectionMaximized, setIsControlSectionMaximized] =
-    useState(true);
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
-  const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
-    useState(false);
-  const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
-  const latestAmplitudesRef = useRef<number[] | null>(
-    new Array(NUM_BARS).fill(0),
-  );
-  const [disconnectedType, setDisconnectedType] =
-    useState<DisconnectedType | null>(null);
-  const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
-  const {isOffline} = useNetworkConnectivity();
-  const tooltipContentList = [
-    t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
-    t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
-    t('ListeningScreen.dataSafeTooltip.noTrainingData'),
-    t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
-  ];
-
-  // Use ref to always access the latest isCallPaused value inside audio event callback,
-  // since react-native-live-audio-stream registers the handler once and won't re-subscribe
-  // on state changes, avoiding unnecessary re-inits of the stream.
-  const isCallPausedRef = useRef(isCallPaused);
-
-  // Current chat won't be available initially for microphone mode flow
-  // as the new chat is created only on emitting the event START_AUDIO_CHAT
-  const isMicrophoneMode =
-    route.params?.isMicrophoneMode ||
-    chatData?.provider === ChatProvider.MICROPHONE;
-
-  const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
-    useEndCallMutation();
 
   const handleCallEndRedirection = useCallback(() => {
     // Only navigate if the ListeningScreen is still focused
@@ -173,19 +174,6 @@ export const ListeningScreen = ({
     });
   }, [isMicrophoneMode, navigation]);
 
-  const handleEndCall = () => {
-    const {chatId} = chatData || {};
-
-    if (!chatId) return;
-
-    if (isMicrophoneMode && !isWebMicrophoneMode) {
-      stopStreaming();
-      streamingInitialized.current = false;
-    }
-
-    endCall({chatId});
-  };
-
   // Clear timeout on unmount
   useEffect(() => {
     return () => {
@@ -209,7 +197,18 @@ export const ListeningScreen = ({
     return true;
   });
 
-  const {checkCounselorChat} = useCounselorChat();
+  const handleEndCall = () => {
+    const {chatId} = chatData || {};
+
+    if (!chatId) return;
+
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
+      stopStreaming();
+      streamingInitialized.current = false;
+    }
+
+    endCall({chatId});
+  };
 
   const socketEventCallbacks = useMemo(
     () => ({
@@ -273,10 +272,8 @@ export const ListeningScreen = ({
     ],
   );
 
-  const {userData} = useUser();
-
   const onDisconnectSocket = () => {
-    if (isMicrophoneMode) {
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
       setDisconnectedType(
         isOffline ? DisconnectedType.NETWORK : DisconnectedType.SOCKET,
       );
@@ -284,7 +281,9 @@ export const ListeningScreen = ({
   };
 
   const onConnectionError = () => {
-    setDisconnectedType(DisconnectedType.SOCKET);
+    if (isMicrophoneMode && !isWebMicrophoneMode) {
+      setDisconnectedType(DisconnectedType.SOCKET);
+    }
   };
 
   // Automatically manages socket connection based on screen focus and app state
@@ -295,8 +294,6 @@ export const ListeningScreen = ({
     onDisconnect: onDisconnectSocket,
     onConnectionError: onConnectionError,
   });
-
-  const chatIdRef = useRef(chatData?.chatId);
 
   useEffect(() => {
     chatIdRef.current = chatData?.chatId;
@@ -570,18 +567,12 @@ export const ListeningScreen = ({
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {showCallEndConfirmation && callEndModalElement}
-      <StatusBar
-        backgroundColor="transparent"
-        translucent
-        barStyle="light-content"
-      />
-      {isFocusMode && isConferenceCall && !isBannerDismissed && (
-        <DismissableBanner onClose={() => setIsBannerDismissed(true)} />
-      )}
-      {isFocusMode ? (
+  const renderFocusMode = () => {
+    return (
+      <>
+        {isConferenceCall && !isBannerDismissed && (
+          <DismissableBanner onClose={() => setIsBannerDismissed(true)} />
+        )}
         <View style={styles.focusModeLayout}>
           {renderTakingNotes()}
           <Timer startTime={startTime} />
@@ -598,32 +589,47 @@ export const ListeningScreen = ({
             </Text>
           )}
         </View>
-      ) : (
-        <View style={styles.nonFocusModeLayout}>
-          <View style={globalStyles.rowCenter}>
-            <View style={styles.nonFocusLabelBlock}>
-              {renderTakingNotes()}
-              <Timer startTime={startTime} />
-            </View>
-            <View style={styles.nonFocusModeWaveformWrapper}>
-              <AudioWaveformContainer
-                latestAmplitudesRef={latestAmplitudesRef}
-                isCallPaused={isCallPaused}
-                isFocusMode={false}
-              />
-            </View>
-          </View>
-          {!isFocusMode && !!nudgeStatus && currentNudge && (
-            <NudgeSection
-              nudge={currentNudge}
-              isLoading={isLoading}
-              onFeedbackSuccess={handleNudgeFeedbackSuccess}
-            />
-          )}
-          <Search />
-        </View>
-      )}
+      </>
+    );
+  };
 
+  const renderNonFocusMode = () => {
+    return (
+      <View style={styles.nonFocusModeLayout}>
+        <View style={globalStyles.rowCenter}>
+          <View style={styles.nonFocusLabelBlock}>
+            {renderTakingNotes()}
+            <Timer startTime={startTime} />
+          </View>
+          <View style={styles.nonFocusModeWaveformWrapper}>
+            <AudioWaveformContainer
+              latestAmplitudesRef={latestAmplitudesRef}
+              isCallPaused={isCallPaused}
+              isFocusMode={false}
+            />
+          </View>
+        </View>
+        {!!nudgeStatus && currentNudge && (
+          <NudgeSection
+            nudge={currentNudge}
+            isLoading={isLoading}
+            onFeedbackSuccess={handleNudgeFeedbackSuccess}
+          />
+        )}
+        <Search />
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {showCallEndConfirmation && callEndModalElement}
+      <StatusBar
+        backgroundColor="transparent"
+        translucent
+        barStyle="light-content"
+      />
+      {isFocusMode ? renderFocusMode() : renderNonFocusMode()}
       <ControlButtonsSection
         isMaximized={isControlSectionMaximized}
         onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}

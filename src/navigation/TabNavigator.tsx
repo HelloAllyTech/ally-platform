@@ -5,6 +5,7 @@ import {
 } from '@react-navigation/bottom-tabs';
 import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useSelector} from 'react-redux';
 
 import {
   AnalyticsActiveIcon,
@@ -13,32 +14,53 @@ import {
   CallLogInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
+  LearnActiveIcon,
+  LearnInactiveIcon,
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {SCREEN_NAMES} from '@/constants';
+import {Permissions, SCREEN_NAMES} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
   SearchScreen,
+  SimulationsScreen,
   UserAnalyticsScreen,
 } from '@/screens';
+import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_NAMES = [
-  SCREEN_NAMES.CALL_LOG,
-  SCREEN_NAMES.USER_ANALYTICS,
-  SCREEN_NAMES.SEARCH,
-  SCREEN_NAMES.COMMUNITY,
-];
-
-const TAB_COMPONENTS = [
-  CallLogScreen,
-  UserAnalyticsScreen,
-  SearchScreen,
-  CommunityScreen,
+const ALL_TABS = [
+  {
+    name: SCREEN_NAMES.CALL_LOG,
+    component: CallLogScreen,
+    // TODO: Replace with Permissions.VIEW_NAVBAR_CALLS
+    requiredPermission: '',
+  },
+  {
+    name: SCREEN_NAMES.USER_ANALYTICS,
+    component: UserAnalyticsScreen,
+    // TODO: Replace with Permissions.VIEW_NAVBAR_ANALYTICS
+    requiredPermission: '',
+  },
+  {
+    name: SCREEN_NAMES.SEARCH,
+    component: SearchScreen,
+    // TODO: Replace with Permissions.VIEW_NAVBAR_SEARCH
+    requiredPermission: '',
+  },
+  {
+    name: SCREEN_NAMES.LEARN,
+    component: SimulationsScreen,
+    requiredPermission: Permissions.VIEW_NAVBAR_LEARN,
+  },
+  {
+    name: SCREEN_NAMES.COMMUNITY,
+    component: CommunityScreen,
+    requiredPermission: '',
+  },
 ];
 
 interface BottomTabsProps {
@@ -62,6 +84,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
       [SCREEN_NAMES.SEARCH]: (
         <SearchActiveIcon width={20} height={20} color={colors.blue} />
       ),
+      [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
@@ -73,6 +96,7 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
         <CommunityInactiveIcon width={20} height={20} />
       ),
       [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
     };
 
     return focused
@@ -103,6 +127,19 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
     return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
   };
 
+  const userLoading = useSelector((s: AppRootState) => s.user.loading);
+  const permissions = useSelector((s: AppRootState) => s.user.permissions);
+
+  if (userLoading) {
+    return null;
+  }
+
+  const visibleTabs = ALL_TABS.filter(
+    tab =>
+      !tab.requiredPermission || permissions.includes(tab.requiredPermission),
+  );
+  const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
+
   return (
     <View style={styles.container}>
       <Tab.Navigator
@@ -112,9 +149,13 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
           headerShown: false,
           lazy: true,
         }}
-        initialRouteName={SCREEN_NAMES.CALL_LOG}>
-        {TAB_NAMES.map((name, idx) => (
-          <Tab.Screen key={name} name={name} component={TAB_COMPONENTS[idx]} />
+        initialRouteName={initial}>
+        {visibleTabs.map(tab => (
+          <Tab.Screen
+            key={tab.name}
+            name={tab.name}
+            component={tab.component}
+          />
         ))}
       </Tab.Navigator>
     </View>

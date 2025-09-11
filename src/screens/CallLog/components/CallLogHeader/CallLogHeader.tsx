@@ -11,7 +11,6 @@ interface CallLogHeaderProps {
   search: string;
   onSearchChange: (text: string) => void;
   onRefresh: () => void;
-  isCounselor: boolean;
 }
 
 export const CallLogHeader: React.FC<CallLogHeaderProps> = ({

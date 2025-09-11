@@ -10,7 +10,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PrimaryButton} from '@/components';
-import {ChatSummaryStatus, SCREEN_NAMES} from '@/constants';
+import {ChatSummaryStatus} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -24,6 +24,7 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme';
+import {navigateToCallLogTab} from '@/utils';
 
 import {
   AddNotesSection,
@@ -101,10 +102,7 @@ export const CallSummaryScreen: React.FC<
 
   const onViewCallLogs = () => {
     dispatch(clearCurrentChat());
-    navigation.reset({
-      index: 0,
-      routes: [{name: SCREEN_NAMES.CALL_LOG}],
-    });
+    navigateToCallLogTab(navigation);
   };
 
   const showSummaryButtonLoader =

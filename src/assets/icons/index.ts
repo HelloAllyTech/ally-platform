@@ -6,6 +6,7 @@ import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
+import BulbIcon from './bulb.svg';
 import CallIcon from './call.svg';
 import CallDetailsIcon from './callDetails.svg';
 import CallEndIcon from './callEnd.svg';
@@ -41,12 +42,17 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
+import KeyEventsIcon from './keyEvents.svg';
+import LearnInactiveIcon from './learn.svg';
+import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
 import LockIcon from './lock.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
+import MicOffIcon from './micOff.svg';
+import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
@@ -65,6 +71,7 @@ import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
 import SessionSummaryIcon from './sessionSummary.svg';
+import ShareIcon from './share.svg';
 import ShieldIcon from './shield.svg';
 import ShieldWithTickIcon from './shieldWithTick.svg';
 import SmileIcon from './smile.svg';
@@ -73,6 +80,7 @@ import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
 import ThumbIcon from './thumb.svg';
+import ThumbUpIcon from './thumbUp.svg';
 import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
@@ -164,4 +172,12 @@ export {
   NetworkDisconnectedIcon,
   HexagonCloseIcon,
   EndSessionIcon,
+  LearnActiveIcon,
+  LearnInactiveIcon,
+  MicOnIcon,
+  MicOffIcon,
+  KeyEventsIcon,
+  ThumbUpIcon,
+  BulbIcon,
+  ShareIcon,
 };
