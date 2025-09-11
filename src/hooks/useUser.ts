@@ -2,11 +2,15 @@ import {useCallback} from 'react';
 import {useSelector} from 'react-redux';
 
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
-import {useLazyGetUserQuery} from '@/services/authApi';
+import {
+  useLazyGetPermissionsQuery,
+  useLazyGetUserQuery,
+} from '@/services/authApi';
 import {
   handleLogout,
   setAuthenticated,
   setLoading,
+  setPermissions,
   setUser,
 } from '@/store/slices/userSlice';
 import {AppRootState, store} from '@/store/store';
@@ -22,6 +26,7 @@ export const useUser = () => {
     (state: AppRootState) => state.user.loading,
   );
   const [getUser] = useLazyGetUserQuery();
+  const [getPermissions] = useLazyGetPermissionsQuery();
 
   const handleUserLogout = () => {
     store.dispatch(handleLogout());
@@ -32,8 +37,10 @@ export const useUser = () => {
       const token = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
       if (token) {
         const response = await getUser();
+        const perms = await getPermissions();
         if (response?.data) {
           store.dispatch(setUser(response.data));
+          store.dispatch(setPermissions(perms?.data ?? []));
           store.dispatch(setAuthenticated(true));
           return response?.data;
         } else {
@@ -51,7 +58,7 @@ export const useUser = () => {
     } finally {
       store.dispatch(setLoading(false));
     }
-  }, [getUser]);
+  }, [getUser, getPermissions]);
 
   return {
     userData,

@@ -10,19 +10,15 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon} from '@/assets';
-import {
-  EmailInputModal,
-  OtpModal,
-  PrimaryButton,
-  useErrorToast,
-} from '@/components';
-import {AsyncStorageKeys, SCREEN_NAMES} from '@/constants';
+import {LeftArrowIcon, ShareIcon} from '@/assets';
+import {PrimaryButton, useErrorToast, useToast} from '@/components';
+import {env} from '@/config/env';
+import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useCreateRoomMutation} from '@/services';
+import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
-import {getItem} from '@/utils';
+import {copyToClipboard} from '@/utils';
 
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
@@ -31,72 +27,39 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const [createRoom] = useCreateRoomMutation();
   const {showErrorToast} = useErrorToast();
+  const {showToast} = useToast();
 
-  const [isOtpModalVisible, setIsOtpModalVisible] = useState(false);
-  const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const [startScenarioSession] = useStartScenarioSessionMutation();
 
-  const getRoomData = async () => {
-    try {
-      setIsCreatingRoom(true);
-      const token = await getItem(AsyncStorageKeys.LEARN_ACCESS_TOKEN);
-      if (token) {
-        const response = await createRoom({scenarioId: scenario.unique_id});
-        closeOtpModal();
-        return response.data;
-      }
-      return null;
-    } catch (error) {
-      showErrorToast(error, 'Errors.createRoom');
-      return null;
-    } finally {
-      setIsCreatingRoom(false);
-    }
+  const linkCopyToClipboard = () => {
+    copyToClipboard(`${env.ALLY_WEB_URL}scenario/${scenario.id}`);
+    showToast(t('SimulationAssistant.linkCopiedToClipboard'), 'success');
   };
 
   const startSimulationPress = async () => {
     try {
-      const roomData = await getRoomData();
-      if (roomData) {
+      setIsCreatingRoom(true);
+      const startResp = await startScenarioSession({
+        scenarioId: Number(scenario.id),
+      }).unwrap();
+      if (startResp) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: roomData,
-        });
-      } else {
-        setIsEmailModalVisible(true);
-      }
-    } catch (error) {
-      showErrorToast(error, 'Errors.sendOtp');
-    }
-  };
-
-  const handleOtpVerificationSuccess = async () => {
-    try {
-      const roomData = await getRoomData();
-      if (roomData) {
-        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: roomData,
+          roomData: {
+            id: startResp.scenarioSession.id,
+            createdAt: startResp.scenarioSession.createdAt,
+            accessToken: startResp.accessToken.token,
+            liveKitServerUrl: startResp.accessToken.serverUrl,
+          },
+          scenario,
         });
       }
     } catch (error) {
-      showErrorToast(error, 'Errors.navigateAssistant');
+      showErrorToast(error, 'Errors.startSimulation');
+    } finally {
+      setIsCreatingRoom(false);
     }
-  };
-
-  const closeOtpModal = () => {
-    setIsOtpModalVisible(false);
-  };
-
-  const closeEmailModal = () => {
-    setIsEmailModalVisible(false);
-  };
-
-  const handleEmailSubmit = (email: string) => {
-    setUserEmail(email);
-    setIsEmailModalVisible(false);
-    setIsOtpModalVisible(true);
   };
 
   const renderLoadingOverlay = () => {
@@ -111,19 +74,20 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderDetailsSection = () => {
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {!!scenario.cover_image && (
-          <Image source={{uri: scenario.cover_image}} style={styles.cover} />
+        {!!scenario.coverImageUrl && (
+          <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
         )}
-        <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
+        <View style={styles.row}>
+          <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
+          <TouchableOpacity onPress={linkCopyToClipboard}>
+            <ShareIcon />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
-        {!!scenario.short_description && (
-          <Text style={styles.fieldValue}>{scenario.short_description}</Text>
-        )}
-        <Text style={[styles.fieldLabel, styles.descriptionLabel]}>
-          {t('Simulations.descriptionLabel')}
-        </Text>
-        {!!scenario.long_description && (
-          <Text style={styles.fieldValue}>{scenario.long_description}</Text>
+        {!!scenario.scenario && (
+          <Text style={styles.fieldValue}>
+            {scenario.scenario}. {scenario.description}
+          </Text>
         )}
       </ScrollView>
     );
@@ -133,7 +97,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.ctaWrapper}>
         <PrimaryButton
-          label={t('Simulations.audioSimulation')}
+          label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
         />
@@ -151,17 +115,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
             <LeftArrowIcon color={colors.black} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            {t('Simulations.chooseYour')}{' '}
+            {t('Simulations.start')}{' '}
             <Text style={styles.pageTitleItalic}>
-              {t('Simulations.scenarioWord')}
+              {t('Simulations.simulation')}
             </Text>
           </Text>
-        </View>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>
-            {t('Simulations.scenariosCaps')}
-          </Text>
-          <View style={styles.sectionRule} />
         </View>
       </>
     );
@@ -177,17 +135,6 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       {renderHeader()}
       {renderDetailsSection()}
       {renderCtaSection()}
-      <EmailInputModal
-        visible={isEmailModalVisible}
-        onClose={closeEmailModal}
-        onEmailSubmit={handleEmailSubmit}
-      />
-      <OtpModal
-        visible={isOtpModalVisible}
-        onClose={closeOtpModal}
-        email={userEmail}
-        onOtpVerificationSuccess={handleOtpVerificationSuccess}
-      />
     </View>
   );
 };
@@ -201,25 +148,6 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '16@ms',
     paddingBottom: '16@ms',
   },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '4@ms',
-    marginBottom: '12@ms',
-    marginHorizontal: '16@ms',
-  },
-  sectionLabel: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray8,
-    fontSize: '12@ms',
-    letterSpacing: 2,
-  },
-  sectionRule: {
-    flex: 1,
-    height: 0.6,
-    marginRight: '4@ms',
-    backgroundColor: colors.lightGray10,
-  },
   cover: {
     width: '100%',
     height: '180@ms',
@@ -227,23 +155,19 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray4,
   },
   cardTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.black,
-    fontWeight: '700',
     fontSize: '20@ms',
     marginTop: '18@ms',
     marginBottom: '16@ms',
+    maxWidth: '85%',
   },
   fieldLabel: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.black,
-    fontSize: '16@ms',
+    fontSize: '14@ms',
     marginBottom: '2@ms',
     fontWeight: '500',
-  },
-  descriptionLabel: {
-    marginTop: '12@ms',
-    marginBottom: '2@ms',
   },
   fieldValue: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -287,7 +211,7 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '8@ms',
-    marginBottom: '8@ms',
+    marginBottom: '18@ms',
     marginHorizontal: '10@ms',
   },
   headerLeft: {
@@ -297,9 +221,16 @@ const styles = ScaledSheet.create({
   pageTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray12,
-    fontSize: '22@ms',
+    fontSize: '18@ms',
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingRight: '4@ms',
   },
 });

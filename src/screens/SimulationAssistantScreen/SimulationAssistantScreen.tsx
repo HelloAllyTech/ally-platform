@@ -4,44 +4,71 @@ import {
   AudioSession,
   RoomContext,
 } from '@livekit/react-native';
+import {
+  activateKeepAwake,
+  deactivateKeepAwake,
+} from '@sayem314/react-native-keep-awake';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {ActivityIndicator, SafeAreaView, Text, View} from 'react-native';
+import {SafeAreaView, Text, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {InfoIcon} from '@/assets';
 import {useErrorToast} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useDeleteRoomMutation} from '@/services';
+import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
+import {Feedback, LiveEventPayload} from '@/types';
+import {decodeFeedbackPayloadToJson} from '@/utils';
 
-import {AudioWave, ControlButtons, SimulationTimer} from './components';
+import {
+  AudioWave,
+  ControlButtons,
+  LiveFeedback,
+  SessionScoreMeter,
+  SimulationTimer,
+} from './components';
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
-  const {roomData} = route.params;
-  const wsUrl = 'wss://ally-learn-poc-dev-lbzgnlp9.livekit.cloud/';
-  const token = roomData.access_token;
-  const startTime = roomData?.created_at
-    ? new Date(roomData?.created_at)
+  const insets = useSafeAreaInsets();
+  const {roomData, scenario} = route.params;
+  const {liveKitServerUrl, accessToken, id: roomId} = roomData;
+  const startTime = roomData?.createdAt
+    ? new Date(roomData?.createdAt)
     : new Date();
   const navigation = useAppNavigation();
   const {t} = useTranslation();
-  const [deleteRoom] = useDeleteRoomMutation();
+  const [endScenarioSession] = useEndScenarioSessionMutation();
   const {showErrorToast} = useErrorToast();
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
   const [room] = useState<Room>(() => new Room());
 
+  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [feedbackKey, setFeedbackKey] = useState<number>(0);
+  const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
+
+  const clamp = useCallback((val: number, min: number, max: number) => {
+    return Math.min(Math.max(val, min), max);
+  }, []);
+
   useEffect(() => {
-    if (token) {
+    if (accessToken) {
       handleConnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    activateKeepAwake();
+    return () => {
+      deactivateKeepAwake();
+    };
   }, []);
 
   const attachRoomListeners = useCallback(() => {
@@ -57,20 +84,42 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
     };
-    const onTrackPub = () => {
-      // TODO: Handle track publication
+    const onDataReceived = (
+      payload: unknown,
+      _participant: unknown,
+      _kind: unknown,
+      _topic: unknown,
+    ) => {
+      const parsed = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
+      if (!parsed || !parsed.data) return;
+      const {score, emoji, message} = parsed.data;
+
+      if (typeof score === 'number' && !Number.isNaN(score)) {
+        setAccumulatedScore(prev => clamp(prev + score, -100, 100));
+      }
+
+      if (message && typeof message === 'string') {
+        const id = Date.now();
+        setFeedback({id, text: message, emoji: emoji ?? undefined});
+        setFeedbackKey(id);
+      }
+    };
+    const onTrackPublished = () => {
+      // console.log('TrackPublished');
     };
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
-      .on(RoomEvent.TrackPublished, onTrackPub);
+      .on(RoomEvent.TrackPublished, onTrackPublished)
+      .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
-        .off(RoomEvent.TrackPublished, onTrackPub);
+        .off(RoomEvent.TrackPublished, onTrackPublished)
+        .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast]);
+  }, [room, showErrorToast, clamp]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
@@ -92,20 +141,24 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       await configureAudioSession();
       setIsConnecting(true);
-      await room.connect(wsUrl, token);
+      await room.connect(liveKitServerUrl, accessToken);
     } catch (error) {
       showErrorToast(error, 'Errors.connect');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, wsUrl]);
+  }, [accessToken, liveKitServerUrl]);
 
   const handleDisconnect = async () => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
-      const response = await deleteRoom(room?.name);
+      const response = await endScenarioSession({
+        scenarioSessionId: roomId,
+      });
       if (!response.error) {
-        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK);
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          simulationId: roomId,
+        });
       }
     } finally {
       setIsMicEnabled(false);
@@ -123,36 +176,74 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     }
   };
 
-  const renderLoader = (message: string) => {
+  const renderLoader = () => {
     return (
-      <View style={styles.connectionLoaderContainer}>
-        <ActivityIndicator size="large" color={colors.white} />
-        <Text style={styles.connectionLoaderText}>{message}</Text>
+      <View style={styles.loadingWrapper}>
+        <Text style={styles.loadingTitle}>
+          {t('SimulationAssistant.startingTitle')}
+          <Text style={styles.loadingItalic}>
+            {isDisconnecting
+              ? t('SimulationAssistant.endingEllipsis')
+              : t('SimulationAssistant.startingEllipsis')}
+          </Text>
+        </Text>
+        {isConnecting && (
+          <Text style={styles.loadingDescription}>
+            {t('SimulationAssistant.startingSubtitle')}
+          </Text>
+        )}
       </View>
     );
   };
 
+  const showSimulationLoading = isConnecting || isDisconnecting;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
       <RoomContext.Provider value={room}>
-        {(isConnecting || isDisconnecting) &&
-          renderLoader(
-            isConnecting
-              ? t('SimulationScreen.connecting')
-              : t('SimulationScreen.disconnecting'),
+        <View style={styles.contentContainer}>
+          {!showSimulationLoading && startTime && (
+            <SimulationTimer startTime={startTime} />
           )}
-        {startTime && <SimulationTimer startTime={startTime} />}
-        <AudioWave />
-        <ControlButtons
-          onMicPress={handleToggleMic}
-          onStopPress={handleDisconnect}
-          isMuted={!isMicEnabled}
-        />
-        <View style={styles.securityContainer}>
-          <InfoIcon width={12} height={12} color={colors.lightGray3} />
-          <Text style={styles.securityText}>
-            {t('SimulationScreen.encryptionInfo')}
-          </Text>
+          <View style={styles.centralContainer}>
+            {showSimulationLoading ? (
+              renderLoader()
+            ) : (
+              <>
+                <AudioWave avatarUrl={scenario?.coverImageUrl ?? undefined} />
+                {!!scenario?.title && (
+                  <Text style={styles.personaLabel}>{scenario.title}</Text>
+                )}
+                <View style={styles.liveFeedbackWrapper}>
+                  {feedback && (
+                    <LiveFeedback
+                      key={feedbackKey}
+                      message={feedback.text}
+                      emoji={feedback.emoji}
+                    />
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+
+          {!showSimulationLoading && (
+            <View style={styles.scoreMeterContainer}>
+              <SessionScoreMeter score={accumulatedScore} />
+            </View>
+          )}
+
+          <ControlButtons
+            onMicPress={handleToggleMic}
+            onStopPress={handleDisconnect}
+            isDisableMic={showSimulationLoading}
+            isDisableStop={isDisconnecting}
+            isMuted={!isMicEnabled}
+          />
         </View>
       </RoomContext.Provider>
     </SafeAreaView>
@@ -162,38 +253,58 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
-    justifyContent: 'space-between',
-    paddingHorizontal: '20@ms',
-    paddingVertical: '40@mvs',
+    backgroundColor: colors.darkGray7,
   },
-  securityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: '16@ms',
+  },
+  centralContainer: {
+    flex: 1,
     justifyContent: 'center',
-    gap: '6@ms',
-    marginBottom: '20@mvs',
+    alignItems: 'center',
+    borderRadius: '8@ms',
+    marginTop: '10@mvs',
+    marginBottom: '16@mvs',
+    backgroundColor: colors.darkGray3,
   },
-  securityText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '12@ms',
-    color: colors.lightGray3,
-  },
-  connectionLoaderContainer: {
+  liveFeedbackWrapper: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: '81@mvs',
+  },
+  loadingWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
+    marginHorizontal: '40@ms',
   },
-  connectionLoaderText: {
+  loadingTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '16@ms',
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: '4@mvs',
+  },
+  loadingItalic: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+  },
+  loadingDescription: {
     ...fontFamily.ROBOTO.REGULAR,
-    paddingTop: '6@ms',
+    fontSize: '14@ms',
+    color: colors.lightGray3,
+    textAlign: 'center',
+  },
+  personaLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     color: colors.white,
+    textAlign: 'left',
+    marginLeft: '20@ms',
+    marginBottom: '16@ms',
+    width: '100%',
+  },
+  scoreMeterContainer: {
+    marginBottom: '24@mvs',
   },
 });
