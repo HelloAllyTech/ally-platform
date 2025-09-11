@@ -222,10 +222,9 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
   },
   cardTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray12,
     fontSize: '15@ms',
-    fontWeight: '700',
     marginBottom: '6@ms',
   },
   cardDesc: {

@@ -179,7 +179,6 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,
     fontSize: '14@ms',
-    fontWeight: 'bold',
   },
   section: {
     paddingBottom: '12@vs',

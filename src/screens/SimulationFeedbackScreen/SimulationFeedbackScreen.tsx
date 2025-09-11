@@ -11,7 +11,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChevronDown, StarIcon} from '@/assets';
+import {ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
 import {FEEDBACK_OPTIONS} from '@/constants';
 import {
@@ -55,6 +55,10 @@ export const SimulationFeedbackScreen: React.FC<
   const [endScenarioSession] = useEndScenarioSessionMutation();
 
   useHardwareBackPressHandler(() => {
+    if (fromLogs) {
+      navigation.goBack();
+      return true;
+    }
     navigateToLearnTab(navigation);
     return true;
   });
@@ -200,7 +204,14 @@ export const SimulationFeedbackScreen: React.FC<
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <View style={styles.titleSection}>
-        <Text style={styles.title}>
+        {fromLogs && (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}>
+            <LeftArrowIcon />
+          </TouchableOpacity>
+        )}
+        <Text style={[styles.title, !fromLogs && styles.titleExtraPadding]}>
           {t('SimulationFeedback.title')}{' '}
           <Text style={styles.titleItalic}>
             {fromLogs
@@ -250,8 +261,17 @@ const styles = ScaledSheet.create({
     paddingBottom: '40@vs',
   },
   titleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: '10@vs',
-    paddingHorizontal: '20@ms',
+    paddingRight: '20@ms',
+    paddingLeft: '10@ms',
+    paddingBottom: '10@vs',
+    borderBottomWidth: 0.3,
+    borderBottomColor: colors.lightGray4,
+  },
+  backButton: {
+    paddingRight: '1@ms',
   },
   title: {
     ...typography.headline.large,
@@ -355,5 +375,8 @@ const styles = ScaledSheet.create({
     marginTop: '10@vs',
     marginLeft: -4,
     marginBottom: '8@vs',
+  },
+  titleExtraPadding: {
+    paddingLeft: '10@vs',
   },
 });
