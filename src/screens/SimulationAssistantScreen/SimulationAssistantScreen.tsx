@@ -1,9 +1,13 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
   RoomContext,
 } from '@livekit/react-native';
+import {
+  activateKeepAwake,
+  deactivateKeepAwake,
+} from '@sayem314/react-native-keep-awake';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
@@ -16,17 +20,18 @@ import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
+import {Feedback, LiveEventPayload} from '@/types';
+import {decodeFeedbackPayloadToJson} from '@/utils';
 
 import {
   AudioWave,
   ControlButtons,
+  LiveFeedback,
   SessionScoreMeter,
   SimulationTimer,
 } from './components';
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
-
-type Feedback = {id: number; text: string; emoji?: string} | null;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
@@ -46,24 +51,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
+  const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
 
-  // TODO: Remove this later
-  const sampleFeedbacks = useMemo(
-    () =>
-      [
-        {
-          text: 'Try asking an open ended question to get client to open up',
-          emoji: '😬',
-        },
-        {text: "Reflect the client's feelings to build rapport", emoji: '🤝'},
-        {text: 'Summarize what you heard and check for accuracy', emoji: '📝'},
-        {
-          text: 'Allow a brief silence to give space for reflection',
-          emoji: '🤫',
-        },
-      ] as Array<{text: string; emoji: string}>,
-    [],
-  );
+  const clamp = useCallback((val: number, min: number, max: number) => {
+    return Math.min(Math.max(val, min), max);
+  }, []);
 
   useEffect(() => {
     if (accessToken) {
@@ -93,19 +85,24 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       setIsConnecting(false);
     };
     const onDataReceived = (
-      payload: any,
-      participant: any,
-      kind: any,
-      topic: any,
+      payload: unknown,
+      _participant: unknown,
+      _kind: unknown,
+      _topic: unknown,
     ) => {
-      const participantIdentity = participant?.identity || 'unknown';
-      // TODO: Remove this later Log the raw data received
-      console.log('DataReceived', {
-        participant: participantIdentity,
-        kind: kind,
-        topic: topic,
-        payload: payload,
-      });
+      const parsed = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
+      if (!parsed || !parsed.data) return;
+      const {score, emoji, message} = parsed.data;
+
+      if (typeof score === 'number' && !Number.isNaN(score)) {
+        setAccumulatedScore(prev => clamp(prev + score, -100, 100));
+      }
+
+      if (message && typeof message === 'string') {
+        const id = Date.now();
+        setFeedback({id, text: message, emoji: emoji ?? undefined});
+        setFeedbackKey(id);
+      }
     };
     const onTrackPublished = () => {
       // console.log('TrackPublished');
@@ -122,7 +119,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.TrackPublished, onTrackPublished)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast]);
+  }, [room, showErrorToast, clamp]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
@@ -201,26 +198,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const showSimulationLoading = isConnecting || isDisconnecting;
 
-  // TODO: Replace with backend stream
-  useEffect(() => {
-    // Initial
-    const firstIndex = Math.floor(Math.random() * sampleFeedbacks.length);
-    const first = sampleFeedbacks[firstIndex];
-    const firstId = Date.now();
-    setFeedback({id: firstId, text: first.text, emoji: first.emoji});
-    setFeedbackKey(firstId);
-
-    const interval = setInterval(() => {
-      const idx = Math.floor(Math.random() * sampleFeedbacks.length);
-      const item = sampleFeedbacks[idx];
-      const id = Date.now();
-      setFeedback({id, text: item.text, emoji: item.emoji});
-      setFeedbackKey(id);
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [sampleFeedbacks]);
-
   return (
     <SafeAreaView
       style={[
@@ -241,7 +218,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 {!!scenario?.title && (
                   <Text style={styles.personaLabel}>{scenario.title}</Text>
                 )}
-                {/* <View style={styles.liveFeedbackWrapper}>
+                <View style={styles.liveFeedbackWrapper}>
                   {feedback && (
                     <LiveFeedback
                       key={feedbackKey}
@@ -249,15 +226,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       emoji={feedback.emoji}
                     />
                   )}
-                </View> */}
+                </View>
               </>
             )}
           </View>
 
           {!showSimulationLoading && (
             <View style={styles.scoreMeterContainer}>
-              {/* TODO: Replace with backend score */}
-              <SessionScoreMeter score={0} />
+              <SessionScoreMeter score={accumulatedScore} />
             </View>
           )}
 

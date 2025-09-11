@@ -114,3 +114,15 @@ export type RoomData = {
   accessToken: string;
   liveKitServerUrl: string;
 };
+
+export type Feedback = {id: number; text: string; emoji?: string} | null;
+
+export type LiveEventPayload = {
+  version?: string;
+  data?: {
+    score?: number | null;
+    emoji?: string | null;
+    message?: string | null;
+  } | null;
+  time?: string;
+} | null;
