@@ -72,6 +72,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    activateKeepAwake();
+    return () => {
+      deactivateKeepAwake();
+    };
+  }, []);
+
   const attachRoomListeners = useCallback(() => {
     const onConnected = () => {
       setIsConnecting(false);
