@@ -4,8 +4,8 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {
   CarouselVariant,
-  defaultConfig,
-  drawerConfig,
+  defaultSecurityCarouselConfig,
+  drawerSecurityCarouselConfig,
   SCREEN_WIDTH,
   SECURITY_CAROUSEL_SLIDES,
 } from '@/constants';
@@ -27,7 +27,9 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
   const carouselRef = useRef<CarouselRef>(null);
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const carouselConfig: CarouselConfig =
-    variant === CarouselVariant.DRAWER ? drawerConfig : defaultConfig;
+    variant === CarouselVariant.DRAWER
+      ? drawerSecurityCarouselConfig
+      : defaultSecurityCarouselConfig;
 
   const [activeIndex, setActiveIndex] = useState(0);
 

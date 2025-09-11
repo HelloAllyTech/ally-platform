@@ -9,12 +9,14 @@ interface UserState {
   isAuthenticated: boolean;
   user: Maybe<User>;
   loading: boolean;
+  permissions: string[];
 }
 
 const initialState: UserState = {
   isAuthenticated: false,
   user: null,
   loading: true, // Start with loading to check for existing tokens
+  permissions: [],
 };
 
 export const storeTokens = createAsyncThunk(
@@ -38,6 +40,7 @@ export const handleLogout = createAsyncThunk(
     await removeItem(AsyncStorageKeys.REFRESH_TOKEN);
     dispatch(setAuthenticated(false));
     dispatch(clearUser());
+    dispatch(setPermissions([]));
   },
 );
 
@@ -54,13 +57,21 @@ const userSlice = createSlice({
     setUser: (state, action: PayloadAction<Maybe<User>>) => {
       state.user = action.payload;
     },
+    setPermissions: (state, action: PayloadAction<string[]>) => {
+      state.permissions = action.payload ?? [];
+    },
     clearUser: state => {
       state.user = null;
     },
   },
 });
 
-export const {setUser, setAuthenticated, clearUser, setLoading} =
-  userSlice.actions;
+export const {
+  setUser,
+  setAuthenticated,
+  clearUser,
+  setLoading,
+  setPermissions,
+} = userSlice.actions;
 
 export default userSlice.reducer;

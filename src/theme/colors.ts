@@ -34,9 +34,11 @@ export const colors = {
   lightGray16: '#BDBDBD',
   lightGrayD9: '#D9D9D9',
   lightGray18: '#021922',
+  lightGray19: '#F3F3F3',
   lightGraySubtle: 'rgba(229, 231, 235, 0.1)',
   semiTransparentGray: 'rgba(229, 231, 235, 0.6)',
   ashGray: '#EAEAEA',
+  platinumGray: '#E8E8E8',
   paleGray: '#E1E9EE',
   gray: '#7E7E7E',
   gray99: '#999999',
@@ -98,6 +100,8 @@ export const colors = {
   darkGreen: '#1B282F',
   mintGreen: '#DCEBDD',
   emeraldGreen: '#47B881',
+  sageGreen: '#BAD4B8',
+  jadeGreen: '#26AF6C',
 
   // Reds
   brightRed: '#F93535',
@@ -105,6 +109,8 @@ export const colors = {
   coralRed: '#FB6767',
   coralPink: '#FBDED9',
   brickRed: '#E5675A',
+  tomatoRed: '#FF5454',
+  salmonRed: '#FF8A8A',
 
   // Yellows
   yellow: '#FFD700',

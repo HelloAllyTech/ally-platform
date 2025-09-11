@@ -156,7 +156,7 @@ const styles = ScaledSheet.create({
   },
   bullet: {
     marginRight: '6@s',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   listText: {
     flex: 1,

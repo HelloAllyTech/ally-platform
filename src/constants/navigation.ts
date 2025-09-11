@@ -17,6 +17,7 @@ export const SCREEN_NAMES = {
   COMMUNITY: 'Community',
   USER_ANALYTICS: 'UserAnalytics',
   SEARCH: 'Search',
+  LEARN: 'Learn',
 
   // Drawer Screens
   BOTTOM_TABS: 'BottomTabs',

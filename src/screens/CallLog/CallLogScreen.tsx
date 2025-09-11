@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -6,20 +6,23 @@ import {
   BackHandler,
   FlatList,
   Linking,
+  Platform,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {env} from '@/config/env';
-import {CHAT_TYPES, SCREEN_NAMES} from '@/constants';
+import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
   useHardwareBackPressHandler,
+  usePermission,
   useTranslate,
   useUser,
 } from '@/hooks';
@@ -28,15 +31,22 @@ import {
   useGetSummaryFieldsQuery,
   useGetVisibleChatTypesQuery,
 } from '@/services/settingsApi';
+import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
+import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat, UserRole} from '@/types';
 import {logger} from '@/utils/logger';
 
-import {CallLogHeader, CallLogItem, StartSessionModal} from './components';
+import {
+  CallLogHeader,
+  CallLogItem,
+  StartSessionModal,
+  TabView,
+} from './components';
 import {FeatureNotAvailable} from './components/FeatureNotAvailable';
-import {CallLog} from './types';
+import {LogItem} from './types';
 
 // Number of items to fetch per page for pagination
 const ITEMS_PER_PAGE = 10;
@@ -48,11 +58,22 @@ const ITEMS_PER_PAGE = 10;
  * and expandable items. It handles loading states, infinite scroll, and pull-to-refresh.
  */
 export const CallLogScreen: React.FC = () => {
+  const {permissions} = useAppSelector((state: AppRootState) => state.user);
+
   const [search, setSearch] = useState('');
   const [expandedIdx, setExpandedIdx] = useState(-1);
-  const [offset, setOffset] = useState(0);
-  const [allLogs, setAllLogs] = useState<CallLog[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [activeTab, setActiveTab] = useState<LogType>(LogType.REAL);
+
+  // Real call logs state
+  const [realLogsOffset, setRealLogsOffset] = useState(0);
+  const [allRealLogs, setAllRealLogs] = useState<LogItem[]>([]);
+  const [hasMoreRealLogs, setHasMoreRealLogs] = useState(true);
+
+  // Simulation logs state
+  const [simulationLogsOffset, setSimulationLogsOffset] = useState(0);
+  const [allSimulationLogs, setAllSimulationLogs] = useState<LogItem[]>([]);
+  const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
+
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const [showStartSession, setShowStartSession] = useState(false);
   const {userData} = useUser();
@@ -61,12 +82,17 @@ export const CallLogScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const dispatch = useAppDispatch();
-  const [getCallLogs, {isFetching}] = useLazyGetCallLogsQuery();
+  const [getCallLogs, {isFetching: isFetchingRealLogs}] =
+    useLazyGetCallLogsQuery();
+  const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
+    useLazyGetSimulationLogsQuery();
   const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
 
   const isCounselor = userData?.role === UserRole.COUNSELOR;
+  const isLearnUser = userData?.role === UserRole.LEARN;
+  const isCallLogFeatureEnabled = isCounselor || isLearnUser;
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -80,75 +106,194 @@ export const CallLogScreen: React.FC = () => {
     [enabledChatTypes],
   );
 
+  const availableLogTypes = useMemo(() => {
+    const logTypes: LogType[] = [];
+
+    if (permissions?.includes(USER_PERMISSIONS.CALL_LOG)) {
+      logTypes.push(LogType.REAL);
+    }
+
+    if (permissions?.includes(USER_PERMISSIONS.LEARN)) {
+      logTypes.push(LogType.SIMULATION);
+    }
+
+    return logTypes;
+  }, [permissions]);
+
   useHardwareBackPressHandler(() => {
     BackHandler.exitApp();
     return true;
   });
 
+  const microphonePermission = Platform.select({
+    ios: PERMISSIONS.IOS.MICROPHONE,
+    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+  });
+
+  const {
+    status: micPermissionStatus,
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicPermissionGranted,
+  } = usePermission(microphonePermission!);
+
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!isMicPermissionGranted) {
+        const permissionResult = await requestMicPermission();
+
+        if (permissionResult === 'blocked') {
+          Alert.alert(
+            t('Common.permissions.microphoneRequired'),
+            t('Common.permissions.microphoneMessage'),
+            [
+              {
+                text: t('Common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('Common.ok'),
+                onPress: openAppSettings,
+              },
+            ],
+          );
+        }
+      }
+    };
+
+    checkPermission();
+  }, [
+    micPermissionStatus,
+    isMicPermissionGranted,
+    requestMicPermission,
+    openAppSettings,
+    t,
+  ]);
+
   /**
-   * Fetches the initial set of call logs
+   * Fetches the initial set of real call logs
    * Sets up the initial state for pagination
    */
-  const fetchInitialData = useCallback(async () => {
+  const fetchInitialRealLogs = useCallback(async () => {
     const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
       const filteredCallLogs = result.data.data.filter(
-        (log: CallLog) => log.details?.chatId !== currentChat?.chatId,
+        (log: LogItem) => log.details?.chatId !== currentChat?.chatId,
       );
-      setAllLogs(filteredCallLogs);
-      setHasMore(result.data.data.length === ITEMS_PER_PAGE);
+      setAllRealLogs(filteredCallLogs);
+      setHasMoreRealLogs(result.data.data.length === ITEMS_PER_PAGE);
     } else {
-      setAllLogs([]);
+      setAllRealLogs([]);
     }
   }, [currentChat?.chatId, getCallLogs]);
+
+  /**
+   * Fetches the initial set of simulation logs
+   * Sets up the initial state for pagination
+   */
+  const fetchInitialSimulationLogs = useCallback(async () => {
+    const result = await getSimulationLogs({limit: ITEMS_PER_PAGE, offset: 0});
+    if (result.data) {
+      setAllSimulationLogs(result.data);
+      setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+    } else {
+      setAllSimulationLogs([]);
+    }
+  }, [getSimulationLogs]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      setOffset(0);
-      setHasMore(true);
-      fetchInitialData();
+      setRealLogsOffset(0);
+      setSimulationLogsOffset(0);
+      setHasMoreRealLogs(true);
+      setHasMoreSimulationLogs(true);
+
+      // Only fetch data for available log types
+      if (availableLogTypes.includes(LogType.REAL)) {
+        fetchInitialRealLogs();
+      }
+      if (availableLogTypes.includes(LogType.SIMULATION)) {
+        fetchInitialSimulationLogs();
+      }
+
       if (visibleFields) {
         dispatch(setSummaryVisibleFields(visibleFields));
       }
-    }, [fetchInitialData, visibleFields, dispatch]),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+      fetchInitialRealLogs,
+      fetchInitialSimulationLogs,
+      visibleFields,
+      dispatch,
+    ]),
   );
 
   /**
-   * Handles loading more call logs when user scrolls to the bottom
-   * Implements infinite scroll functionality
+   * Handles loading more logs when user scrolls to the bottom
+   * Implements infinite scroll functionality for both real and simulation logs
    */
   const handleLoadMore = async () => {
-    if (!hasMore || isFetching) return;
+    if (activeTab === LogType.REAL) {
+      if (!hasMoreRealLogs || isFetchingRealLogs) return;
 
-    const newOffset = offset + ITEMS_PER_PAGE;
-    const result = await getCallLogs({
-      limit: ITEMS_PER_PAGE,
-      offset: newOffset,
-    });
+      const newOffset = realLogsOffset + ITEMS_PER_PAGE;
+      const result = await getCallLogs({
+        limit: ITEMS_PER_PAGE,
+        offset: newOffset,
+      });
 
-    if (result?.data?.data) {
-      setAllLogs(prev => [...prev, ...(result?.data?.data || [])]);
-      setOffset(newOffset);
-      setHasMore(result.data.data.length === ITEMS_PER_PAGE);
+      if (result?.data?.data) {
+        setAllRealLogs(prev => [...prev, ...(result?.data?.data || [])]);
+        setRealLogsOffset(newOffset);
+        setHasMoreRealLogs(result.data.data.length === ITEMS_PER_PAGE);
+      }
+    } else {
+      if (!hasMoreSimulationLogs || isFetchingSimulationLogs) return;
+
+      const newOffset = simulationLogsOffset + ITEMS_PER_PAGE;
+      const result = await getSimulationLogs({
+        limit: ITEMS_PER_PAGE,
+        offset: newOffset,
+      });
+
+      if (result?.data) {
+        setAllSimulationLogs(prev => [...prev, ...(result?.data || [])]);
+        setSimulationLogsOffset(newOffset);
+        setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+      }
     }
   };
 
   /**
    * Handles pull-to-refresh functionality
-   * Resets the list and fetches fresh data
+   * Resets the list and fetches fresh data for the active tab
    */
   const handleRefresh = async () => {
-    setOffset(0);
-    setHasMore(true);
-    await fetchInitialData();
+    if (activeTab === LogType.REAL) {
+      setRealLogsOffset(0);
+      setHasMoreRealLogs(true);
+      await fetchInitialRealLogs();
+    } else {
+      setSimulationLogsOffset(0);
+      setHasMoreSimulationLogs(true);
+      await fetchInitialSimulationLogs();
+    }
   };
 
-  const handleItemPress = (item: CallLog) => {
-    navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
-      callId: item?.details?.chatId,
-    });
+  const handleItemPress = (item: LogItem) => {
+    if (activeTab === LogType.REAL) {
+      navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
+        callId: item?.details?.chatId,
+      });
+    } else {
+      // For simulation logs, navigate to simulation summary or details
+      navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+        simulationId: item?.id?.toString(),
+        fromLogs: true,
+      });
+    }
   };
 
   /**
@@ -160,15 +305,16 @@ export const CallLogScreen: React.FC = () => {
   };
 
   /**
-   * Renders individual call log items
-   * @param item - Call log data
+   * Renders individual log items (both real and simulation logs)
+   * @param item - Log data
    * @param index - Index of the item in the list
    */
-  const renderItem = ({item, index}: {item: CallLog; index: number}) => {
+  const renderItem = ({item, index}: {item: LogItem; index: number}) => {
     return (
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
+        disableExpand={activeTab === LogType.SIMULATION}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
       />
@@ -180,7 +326,14 @@ export const CallLogScreen: React.FC = () => {
    * when fetching more data
    */
   const renderFooter = () => {
-    if (!isFetching || allLogs?.length === 0) return null;
+    const isFetching =
+      activeTab === LogType.REAL
+        ? isFetchingRealLogs
+        : isFetchingSimulationLogs;
+    const currentLogs =
+      activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
+
+    if (!isFetching || currentLogs?.length < 10) return null;
     return (
       <ActivityIndicator
         size="small"
@@ -234,37 +387,56 @@ export const CallLogScreen: React.FC = () => {
     );
   };
 
+  if (!isCallLogFeatureEnabled) {
+    return (
+      <FeatureNotAvailable
+        description={t('CallLogs.appCurrentlyForCounsellors')}
+        ctaText={t('CallLogs.learnMore')}
+        onCtaPress={handleLearnMorePress}
+        containerStyle={styles.featureNotAvailable}
+      />
+    );
+  }
+  // Get current logs and loading state based on active tab
+  const currentLogs =
+    activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
+  const isFetching =
+    activeTab === LogType.REAL ? isFetchingRealLogs : isFetchingSimulationLogs;
+  const currentOffset =
+    activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
-        isCounselor={isCounselor}
       />
-      {!isCounselor ? (
-        <FeatureNotAvailable
-          description={t('CallLogs.appCurrentlyForCounsellors')}
-          ctaText={t('CallLogs.learnMore')}
-          onCtaPress={handleLearnMorePress}
-          containerStyle={styles.featureNotAvailable}
-        />
-      ) : allLogs.length === 0 && !isFetching ? (
+      {availableLogTypes.length > 1 && (
+        <TabView activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
+      {currentLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
           <NoCallLogsIcon
             style={styles.noCallLogsIcon}
             width={160}
             height={130}
           />
-          <Text style={styles.emptyText}>{t('CallLogs.noCallLogs')}</Text>
+          <Text style={styles.emptyText}>
+            {activeTab === LogType.REAL
+              ? t('CallLogs.noCallLogs')
+              : t('CallLogs.noSimulationLogs')}
+          </Text>
           <Text style={styles.emptyDescription}>
-            {t('CallLogs.noCallLogsDescription')}
+            {activeTab === LogType.REAL
+              ? t('CallLogs.noCallLogsDescription')
+              : t('CallLogs.noSimulationLogsDescription')}
           </Text>
         </View>
       ) : (
         <View style={styles.listContainer}>
           <FlatList
-            data={allLogs}
+            data={currentLogs}
             keyExtractor={(item, index) => `${item.id}-${index}`}
             contentContainerStyle={styles.listContent}
             renderItem={renderItem}
@@ -280,7 +452,7 @@ export const CallLogScreen: React.FC = () => {
             updateCellsBatchingPeriod={50}
             windowSize={5}
           />
-          {isFetching && offset === 0 && renderLoader()}
+          {isFetching && currentOffset === 0 && renderLoader()}
         </View>
       )}
       {isCounselor && !currentChat?.chatId && (
@@ -292,9 +464,7 @@ export const CallLogScreen: React.FC = () => {
           ]}
           disabled={!hasAnyCallType}
           activeOpacity={0.9}
-          onPress={() => {
-            setShowStartSession(true);
-          }}>
+          onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
         </TouchableOpacity>
       )}
