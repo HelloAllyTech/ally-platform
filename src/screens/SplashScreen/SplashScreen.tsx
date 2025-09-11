@@ -61,14 +61,6 @@ export const SplashScreen: React.FC<
       });
     },
     onNoActiveChatFound: () => {
-      //TODO: Remove this later (End all active simulations on splash screen)
-      getSimulationLogs({limit: 100, offset: 0}).then(result => {
-        result.data?.map(log => {
-          if (log.status === 'ACTIVE') {
-            endScenarioSession({scenarioSessionId: log.id.toString()});
-          }
-        });
-      });
       navigation.replace(SCREEN_NAMES.CALL_LOG);
     },
   });
@@ -92,6 +84,15 @@ export const SplashScreen: React.FC<
     // Play lottie animation from frame 0 to 200 and freeze at the end frame
     lottieRef.current?.play(0, 200);
     checkAuth();
+
+    //TODO: Remove this later (End all active simulations on splash screen)
+    getSimulationLogs({limit: 100, offset: 0}).then(result => {
+      result.data?.map(log => {
+        if (log.status === 'ACTIVE') {
+          endScenarioSession({scenarioSessionId: log.id.toString()});
+        }
+      });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

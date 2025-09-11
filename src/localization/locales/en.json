@@ -252,7 +252,8 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "endSession": "End session",
-    "practiceSessionScore": "Practice Session Score"
+    "practiceSessionScore": "Practice Session Score",
+    "linkCopiedToClipboard": "Link copied to clipboard"
   },
   "NetworkLogs": {
     "logs": "Logs"
