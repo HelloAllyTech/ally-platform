@@ -11,7 +11,8 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ScenarioStatus, SCREEN_NAMES} from '@/constants';
+import {SimulationsSkeleton} from '@/components';
+import {isIOS, ScenarioStatus, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
@@ -153,7 +154,9 @@ export const SimulationsScreen: React.FC = () => {
         data={sortedScenarios}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListEmptyComponent={!isFetching ? ListEmptyElement : null}
+        ListEmptyComponent={
+          !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
+        }
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={refetch} />
@@ -250,6 +253,7 @@ const styles = ScaledSheet.create({
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   introWrapper: {
     marginTop: '22@ms',
@@ -282,6 +286,7 @@ const styles = ScaledSheet.create({
   },
   brandTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   listHeaderRow: {
     flexDirection: 'row',

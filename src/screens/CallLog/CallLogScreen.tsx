@@ -16,6 +16,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
+import {CallLogSkeleton, LinearLoader} from '@/components';
 import {env} from '@/config/env';
 import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
@@ -382,7 +383,12 @@ export const CallLogScreen: React.FC = () => {
   const renderLoader = () => {
     return (
       <View style={styles.centerContent}>
-        <ActivityIndicator size="large" color={colors.darkSlate} />
+        <LinearLoader
+          height={3}
+          width="87%"
+          useColorGradient
+          color={colors.darkGray2}
+        />
       </View>
     );
   };
@@ -415,7 +421,9 @@ export const CallLogScreen: React.FC = () => {
       {availableLogTypes.length > 1 && (
         <TabView activeTab={activeTab} onTabChange={setActiveTab} />
       )}
-      {currentLogs.length === 0 && !isFetching ? (
+      {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
+        <CallLogSkeleton count={10} />
+      ) : currentLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
           <NoCallLogsIcon
             style={styles.noCallLogsIcon}
@@ -452,7 +460,10 @@ export const CallLogScreen: React.FC = () => {
             updateCellsBatchingPeriod={50}
             windowSize={5}
           />
-          {isFetching && currentOffset === 0 && renderLoader()}
+          {isFetching &&
+            currentOffset === 0 &&
+            currentLogs.length > 0 &&
+            renderLoader()}
         </View>
       )}
       {isCounselor && !currentChat?.chatId && (
@@ -498,14 +509,19 @@ const styles = ScaledSheet.create({
   },
   centerContent: {
     position: 'absolute',
-    top: 0,
+    top: -8,
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: '14@ms',
+    alignItems: 'center',
+  },
+  linearLoader: {
+    marginTop: '20@ms',
   },
   footerLoader: {
     paddingVertical: '16@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

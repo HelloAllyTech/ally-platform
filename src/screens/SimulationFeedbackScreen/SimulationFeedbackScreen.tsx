@@ -13,7 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
-import {FEEDBACK_OPTIONS} from '@/constants';
+import {FEEDBACK_OPTIONS, isIOS} from '@/constants';
 import {
   useAppNavigation,
   useDebounce,
@@ -142,33 +142,22 @@ export const SimulationFeedbackScreen: React.FC<
     return (
       <>
         {renderSectionHeader(t('SimulationFeedback.headerText'))}
-        {fromLogs ? (
-          <View>
-            <View style={styles.disabledStarsContainer}>
-              {renderStars(true)}
-            </View>
-            <Text style={styles.feedbackTextDisabled}>
-              {feedbackText || '-'}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.feedbackCard}>
-            <Text style={styles.questionText}>
-              {t('SimulationFeedback.questionText')}
-            </Text>
-            <View style={styles.starsContainer}>{renderStars()}</View>
-            <Text style={styles.feedbackText}>{feedbackText}</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder={t('SimulationFeedback.placeholderText')}
-              placeholderTextColor={colors.lightGray3}
-              value={additionalFeedback}
-              onChangeText={handleTextChange}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-        )}
+        <View style={styles.feedbackCard}>
+          <Text style={styles.questionText}>
+            {t('SimulationFeedback.questionText')}
+          </Text>
+          <View style={styles.starsContainer}>{renderStars()}</View>
+          <Text style={styles.feedbackText}>{feedbackText}</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder={t('SimulationFeedback.placeholderText')}
+            placeholderTextColor={colors.lightGray3}
+            value={additionalFeedback}
+            onChangeText={handleTextChange}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
       </>
     );
   };
@@ -274,12 +263,13 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...typography.headline.large,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray2,
     fontSize: '18@ms',
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   headerSection: {
     flexDirection: 'row',
@@ -331,14 +321,6 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
     marginBottom: '12@vs',
   },
-  feedbackTextDisabled: {
-    ...typography.body.large,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '15@ms',
-    marginBottom: '12@vs',
-    paddingLeft: '5@ms',
-  },
   textInput: {
     backgroundColor: colors.lightGray1,
     borderRadius: '8@ms',
@@ -371,12 +353,6 @@ const styles = ScaledSheet.create({
     width: '30@ms',
     height: '30@ms',
     paddingTop: '3@ms',
-  },
-  disabledStarsContainer: {
-    flexDirection: 'row',
-    marginTop: '10@vs',
-    marginLeft: -4,
-    marginBottom: '8@vs',
   },
   titleExtraPadding: {
     paddingLeft: '10@vs',
