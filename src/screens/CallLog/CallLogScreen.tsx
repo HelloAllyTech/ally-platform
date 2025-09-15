@@ -16,7 +16,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton, LinearLoader} from '@/components';
+import {CallLogSkeleton} from '@/components';
 import {env} from '@/config/env';
 import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
@@ -380,19 +380,6 @@ export const CallLogScreen: React.FC = () => {
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
-  const renderLoader = () => {
-    return (
-      <View style={styles.centerContent}>
-        <LinearLoader
-          height={3}
-          width="87%"
-          useColorGradient
-          color={colors.darkGray2}
-        />
-      </View>
-    );
-  };
-
   if (!isCallLogFeatureEnabled) {
     return (
       <FeatureNotAvailable
@@ -417,6 +404,7 @@ export const CallLogScreen: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
+        isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
         <TabView activeTab={activeTab} onTabChange={setActiveTab} />
@@ -460,10 +448,6 @@ export const CallLogScreen: React.FC = () => {
             updateCellsBatchingPeriod={50}
             windowSize={5}
           />
-          {isFetching &&
-            currentOffset === 0 &&
-            currentLogs.length > 0 &&
-            renderLoader()}
         </View>
       )}
       {isCounselor && !currentChat?.chatId && (
