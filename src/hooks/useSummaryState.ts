@@ -25,6 +25,8 @@ export const useSummaryState = (
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isSummaryAvailable, setIsSummaryAvailable] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [shouldShowFeedbackPopup, setShouldShowFeedbackPopup] = useState(false);
+  const [isEndReached, setIsEndReached] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -92,6 +94,10 @@ export const useSummaryState = (
     refreshing,
     handleRefresh,
     handleNoteChange,
+    shouldShowFeedbackPopup,
+    setShouldShowFeedbackPopup,
+    isEndReached,
+    setIsEndReached,
     summaryStatus: summaryData?.summaryStatus,
   };
 };

@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {PERMISSIONS} from 'react-native-permissions';
+import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
@@ -143,7 +143,7 @@ export const CallLogScreen: React.FC = () => {
       if (!isMicPermissionGranted) {
         const permissionResult = await requestMicPermission();
 
-        if (permissionResult === 'blocked') {
+        if (permissionResult === RESULTS.BLOCKED) {
           Alert.alert(
             t('Common.permissions.microphoneRequired'),
             t('Common.permissions.microphoneMessage'),
@@ -158,6 +158,8 @@ export const CallLogScreen: React.FC = () => {
               },
             ],
           );
+        } else if (permissionResult !== RESULTS.GRANTED) {
+          await requestMicPermission();
         }
       }
     };

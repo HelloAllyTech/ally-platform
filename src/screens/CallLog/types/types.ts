@@ -15,6 +15,7 @@ export interface CallLog {
     createdAt?: string;
     callInfo?: {
       summaryName?: string;
+      isSummaryFeedbackAdded?: boolean;
     };
   };
   client: {
