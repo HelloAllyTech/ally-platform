@@ -19,6 +19,7 @@ import {
   MINUTES_IN_MS,
   SCREEN_NAMES,
   SECONDS_IN_MS,
+  SESSION_AUTO_END_MINUTES,
   SESSION_END_MODAL_MINUTES,
   SESSION_END_MODAL_SECONDS,
 } from '@/constants';
@@ -83,15 +84,32 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   useEffect(() => {
     // Show the ending-soon modal at 29 minutes 30 seconds from the start time
     if (!startTime) return;
-    const targetMs =
+
+    const modalTargetMs =
       SESSION_END_MODAL_MINUTES * MINUTES_IN_MS +
       SESSION_END_MODAL_SECONDS * SECONDS_IN_MS;
+    const autoEndTargetMs = SESSION_AUTO_END_MINUTES * MINUTES_IN_MS;
+
     const now = Date.now();
     const elapsed = now - startTime.getTime();
-    const remaining = targetMs - elapsed;
-    const timer = setTimeout(() => setShowEndingSoon(true), remaining);
-    return () => clearTimeout(timer);
-  }, [startTime]);
+
+    const remainingModal = Math.max(0, modalTargetMs - elapsed);
+    const remainingAutoEnd = Math.max(0, autoEndTargetMs - elapsed);
+
+    const modalTimer = setTimeout(
+      () => setShowEndingSoon(true),
+      remainingModal,
+    );
+    const autoEndTimer = setTimeout(() => {
+      if (!isDisconnecting) handleDisconnect();
+    }, remainingAutoEnd);
+
+    return () => {
+      clearTimeout(modalTimer);
+      clearTimeout(autoEndTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startTime, isDisconnecting]);
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = () => {
