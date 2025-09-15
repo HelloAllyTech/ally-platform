@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   StatusBar,
@@ -9,7 +9,7 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {PrimaryButton} from '@/components';
+import {PrimaryButton, useToast} from '@/components';
 import {ChatSummaryStatus} from '@/constants';
 import {
   useAppNavigation,
@@ -81,18 +81,42 @@ export const CallSummaryScreen: React.FC<
     onHeaderPress,
     isSummaryDropdownVisible,
     hideHeaderDropdown,
+    onAddSummaryFeedback,
   } = useCallSummaryActions({
     chatId: chatId || 0,
     name: callInfo.summaryName || '',
     isCallLogSummaryFlow: Boolean(callId),
   });
 
+  const {showToast} = useToast();
+
   const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
 
+  const [mountTime] = useState<number>(Date.now());
+  const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
+    useState<boolean>(false);
+
   useHardwareBackPressHandler(() => {
-    handleGoBack();
+    onBackNavigation();
     return true;
   });
+
+  const onBackNavigation = () => {
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - mountTime;
+    const thresholdMs = 30 * 1000; // 30 seconds
+
+    const hasFeedbackAlready = Boolean(
+      summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
+    );
+
+    if (timeElapsed >= thresholdMs && !hasFeedbackAlready) {
+      setIsFeedbackPopupVisible(true);
+      return;
+    }
+
+    handleGoBack();
+  };
 
   const handleBlur = () => {
     if (handleSummaryNameChange) {
@@ -103,6 +127,19 @@ export const CallSummaryScreen: React.FC<
   const onViewCallLogs = () => {
     dispatch(clearCurrentChat());
     navigateToCallLogTab(navigation);
+  };
+
+  const onSubmitSummaryFeedback = async (
+    rating: number,
+    feedback: {issues: string[]; comment: string},
+  ) => {
+    const response = await onAddSummaryFeedback(rating, feedback);
+    if (response.data) {
+      setIsFeedbackPopupVisible(false);
+      handleGoBack();
+    } else {
+      showToast(t('CallSummary.info.summaryFeedbackSubmittedFailed'), 'error');
+    }
   };
 
   const showSummaryButtonLoader =
@@ -212,10 +249,13 @@ export const CallSummaryScreen: React.FC<
         showSummary={showSummary}
         setShowSummary={setShowSummary}
         isSummaryAvailable={isSummaryAvailable}
+        isSummaryFeedbackPopup={isFeedbackPopupVisible}
+        hideSummaryFeedbackPopup={() => setIsFeedbackPopupVisible(false)}
+        onSubmitSummaryFeedback={onSubmitSummaryFeedback}
       />
 
       <Header
-        onBackPress={handleGoBack}
+        onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
         showSummary={showSummary}

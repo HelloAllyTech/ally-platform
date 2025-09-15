@@ -32,6 +32,9 @@ export type {
 } from './Carousel';
 export {PrivacyTooltip} from './PrivacyTooltip';
 export {ShinyText} from './ShinyText';
+export {StarRating, type StarRatingProps} from './StarRating';
+export {ChipGroup, type ChipGroupProps, type ChipOption} from './ChipGroup';
 export {EmptyTranscript} from './EmptyTranscript';
 export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';
+export {FeedbackPopup} from './FeedbackPopup';

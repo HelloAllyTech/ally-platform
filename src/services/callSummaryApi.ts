@@ -6,6 +6,7 @@ import {api} from './api';
 
 interface CallInfo {
   summaryName: string;
+  isSummaryFeedbackAdded: boolean;
   clientTalkingTime: number;
   wordCountByLanguage: Record<string, number>;
   counselorTalkingTime: number;
@@ -200,6 +201,23 @@ export const callSummaryApi = api.injectEndpoints({
         body,
       }),
     }),
+    addSummaryFeedback: builder.mutation<
+      {success: boolean},
+      {
+        chatId: number;
+        rating: number;
+        feedback: {issues: string[]; comment: string};
+      }
+    >({
+      query: ({chatId, rating, feedback}) => ({
+        url: `/chats/${chatId}/summary-feedback`,
+        method: 'POST',
+        body: {
+          rating,
+          feedback,
+        },
+      }),
+    }),
   }),
 });
 
@@ -210,4 +228,5 @@ export const {
   useUpdateCallInfoMutation,
   useEnhanceCallSummaryMutation,
   useGetTagsMutation,
+  useAddSummaryFeedbackMutation,
 } = callSummaryApi;

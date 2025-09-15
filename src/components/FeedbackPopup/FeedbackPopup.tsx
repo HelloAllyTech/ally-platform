@@ -1,0 +1,253 @@
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {ChipGroup, StarRating} from '@/components';
+import {FEEDBACK_ISSUE_OPTIONS, isIOS, RATING_TEXT_MAP} from '@/constants';
+import {colors, fontFamily, typography} from '@/theme';
+
+import type {FeedbackPopupProps} from './types';
+
+const DEFAULT_RATING = 0;
+
+export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+  customContainerStyle,
+  customTitleStyle,
+  customTextAreaStyle,
+  customButtonStyle,
+  customTitle,
+  note = null,
+  showChips = true,
+  placeholder,
+  testID,
+}) => {
+  const {t} = useTranslation();
+  const [rating, setRating] = useState(DEFAULT_RATING);
+  const [suggestion, setSuggestion] = useState('');
+  const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (visible) {
+      setRating(DEFAULT_RATING);
+      setSuggestion('');
+      setSelectedIssues([]);
+    }
+  }, [visible]);
+
+  const handleIssueSelectionChange = useCallback(
+    (newSelectedIssues: string[]) => {
+      setSelectedIssues(newSelectedIssues);
+    },
+    [],
+  );
+
+  const handleSubmit = useCallback(() => {
+    onSubmit(rating, {issues: selectedIssues, comment: suggestion});
+    onClose();
+  }, [onSubmit, rating, suggestion, selectedIssues, onClose]);
+
+  const issueOptions = useMemo(
+    () =>
+      FEEDBACK_ISSUE_OPTIONS.map(option => ({
+        ...option,
+        label: t(option.label),
+      })),
+    [t],
+  );
+
+  const getRatingText = useMemo(() => {
+    const ratingKey =
+      RATING_TEXT_MAP[rating] || RATING_TEXT_MAP[DEFAULT_RATING];
+    return t(ratingKey);
+  }, [t, rating]);
+
+  const setStarRating = (rating: number) => {
+    setRating(rating);
+    setSelectedIssues([]);
+  };
+
+  const renderSuggestionInput = (showTitle?: boolean) => {
+    return (
+      <>
+        {showTitle && (
+          <Text style={styles.suggestionPrompt}>
+            {t('FeedbackPopup.suggestionPrompt')}
+          </Text>
+        )}
+        <TextInput
+          style={[styles.textArea, customTextAreaStyle]}
+          value={suggestion}
+          onChangeText={setSuggestion}
+          placeholder={placeholder || t('FeedbackPopup.suggestionPlaceholder')}
+          placeholderTextColor={colors.lightGray3}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          testID={`${testID}-suggestion-input`}
+        />
+      </>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      testID={testID}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={isIOS ? 'padding' : 'height'}
+        keyboardVerticalOffset={isIOS ? 0 : 20}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.container, customContainerStyle]}>
+                <Text style={[styles.title, customTitleStyle]}>
+                  {customTitle || t('FeedbackPopup.title')}
+                </Text>
+                <StarRating
+                  rating={rating}
+                  onRatingChange={starRating => setStarRating(starRating)}
+                  testID={`${testID}-stars`}
+                />
+                <Text style={styles.ratingText}>{getRatingText}</Text>
+                {rating !== 5 && showChips && (
+                  <ChipGroup
+                    options={issueOptions}
+                    selectedValues={selectedIssues}
+                    onSelectionChange={handleIssueSelectionChange}
+                    title={t('FeedbackPopup.issueSelectionTitle')}
+                    testID={`${testID}-issue-chips`}
+                  />
+                )}
+                {(rating === 5 ||
+                  !showChips ||
+                  selectedIssues.includes(
+                    FEEDBACK_ISSUE_OPTIONS[FEEDBACK_ISSUE_OPTIONS.length - 1]
+                      .value,
+                  )) &&
+                  renderSuggestionInput(
+                    !placeholder && selectedIssues.length < 1,
+                  )}
+                {note && note?.length > 0 && (
+                  <>
+                    <View style={styles.separator} />
+                    <Text style={styles.instructionText}>{note}</Text>
+                  </>
+                )}
+                <TouchableOpacity
+                  style={[styles.submitButton, customButtonStyle]}
+                  onPress={handleSubmit}
+                  testID={`${testID}-submit-button`}>
+                  <Text style={styles.submitButtonText}>
+                    {t('FeedbackPopup.submitButton')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const styles = ScaledSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  container: {
+    backgroundColor: colors.white,
+    borderRadius: '12@ms',
+    borderBottomEndRadius: '0@ms',
+    borderBottomLeftRadius: '0@ms',
+    padding: '24@ms',
+    width: '100%',
+    alignItems: 'center',
+  },
+  title: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '16@ms',
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: '4@vs',
+  },
+  ratingText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '14@ms',
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: '14@vs',
+    marginTop: '4@vs',
+  },
+  suggestionPrompt: {
+    fontSize: '12@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.darkGray12,
+    textAlign: 'center',
+    marginTop: '4@vs',
+    marginBottom: '12@vs',
+  },
+  textArea: {
+    width: '100%',
+    minHeight: '80@vs',
+    borderWidth: 0.5,
+    borderColor: colors.lightGray4,
+    borderRadius: '8@ms',
+    padding: '12@ms',
+    backgroundColor: colors.white,
+    ...typography.body.medium,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.black,
+    marginBottom: '16@vs',
+  },
+  separator: {
+    width: '100%',
+    height: 1,
+    backgroundColor: colors.lightGray4,
+    marginBottom: '16@vs',
+  },
+  instructionText: {
+    fontSize: '14@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.darkGray16,
+    textAlign: 'center',
+    marginBottom: '24@vs',
+    lineHeight: '18@vs',
+  },
+  submitButton: {
+    backgroundColor: colors.azureBlue,
+    paddingVertical: '12@vs',
+    paddingHorizontal: '32@ms',
+    borderRadius: '24@ms',
+    minWidth: '120@ms',
+    width: '95%',
+  },
+  submitButtonText: {
+    fontSize: '14@ms',
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.white,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+});

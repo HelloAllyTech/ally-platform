@@ -3,7 +3,6 @@ import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   type NativeScrollEvent,
@@ -12,14 +11,9 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {ArrowDown, ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
-import {PrimaryButton, useErrorToast} from '@/components';
-import {FEEDBACK_OPTIONS} from '@/constants';
-import {
-  useAppNavigation,
-  useDebounce,
-  useHardwareBackPressHandler,
-} from '@/hooks';
+import {ArrowDown, ChevronDown, LeftArrowIcon} from '@/assets';
+import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
@@ -36,6 +30,10 @@ import {
 } from './components';
 import {styles} from './styles';
 
+const RETRY_COUNT_LIMIT = 4;
+const RETRY_DELAY = 5000;
+const FEEDBACK_THRESHOLD = 30 * 1000;
+
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
@@ -45,12 +43,13 @@ export const SimulationFeedbackScreen: React.FC<
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const [rating, setRating] = useState<number>(0);
-  const [feedbackText, setFeedbackText] = useState<string>('');
-  const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
+  const [mountTime] = useState<number>(Date.now());
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   const [showSummary, setShowSummary] = useState<boolean>(true);
   const [isDropdownVisible, setIsDropdownVisible] = useState<boolean>(false);
+  const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
+  const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
+    useState<boolean>(false);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -58,53 +57,101 @@ export const SimulationFeedbackScreen: React.FC<
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
   ] = useLazyGetSimulationDetailsQuery();
-  const {showErrorToast} = useErrorToast();
+  const {showToast} = useToast();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchSimulationDetailsWithRetry = async (
+    currentRetryCount: number = 0,
+  ) => {
+    if (!simulationId) return;
+
+    try {
+      const response = await getSimulationDetails({
+        id: simulationId.toString(),
+      });
+      if (!response.data?.details && currentRetryCount < RETRY_COUNT_LIMIT) {
+        const nextRetryCount = currentRetryCount + 1;
+
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchSimulationDetailsWithRetry(nextRetryCount);
+        }, RETRY_DELAY);
+      } else if (currentRetryCount >= RETRY_COUNT_LIMIT) {
+        setRetryLimitReached(true);
+        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
+      }
+    } catch (error) {
+      if (currentRetryCount < RETRY_COUNT_LIMIT) {
+        const nextRetryCount = currentRetryCount + 1;
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchSimulationDetailsWithRetry(nextRetryCount);
+        }, RETRY_DELAY);
+      } else {
+        setRetryLimitReached(true);
+        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
+      }
+    }
+  };
 
   useHardwareBackPressHandler(() => {
     if (fromLogs) {
-      navigation.goBack();
+      onBackPress();
       return true;
     }
     navigateToLearnTab(navigation);
     return true;
   });
 
-  const debouncedSubmitFeedback = useDebounce(
-    async (comment: string, currentRating: number) => {
-      if (rating === 0) return;
-      try {
-        await addSimulationFeedback({
-          scenarioSessionId: simulationId?.toString() || '',
-          rating: currentRating,
-          comment,
-        });
-      } catch (error) {
-        showErrorToast(error, 'Errors.submitFeedback');
+  const onBackPress = () => {
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - mountTime;
+
+    if (timeElapsed >= FEEDBACK_THRESHOLD && !simulationDetails?.hasFeedback) {
+      setIsFeedbackPopupVisible(true);
+      return true;
+    }
+    navigation.goBack();
+  };
+
+  const submitFeedback = async (
+    rating: number,
+    {comment}: {issues: string[]; comment: string},
+  ) => {
+    if (rating === 0) return;
+    try {
+      const response = await addSimulationFeedback({
+        scenarioSessionId: simulationId?.toString() || '',
+        rating,
+        comment,
+      });
+      if (response.data) {
+        showToast(t('Success.submitFeedback'), 'success');
+      } else {
+        showToast(t('Errors.submitFeedback'), 'error');
       }
-    },
-    {delay: 500},
-  );
+      navigation.goBack();
+    } catch (error) {
+      showToast(t('Errors.submitFeedback'), 'error');
+    }
+  };
 
   useEffect(() => {
     if (simulationId) {
-      getSimulationDetails({id: simulationId?.toString()});
+      setRetryLimitReached(false);
+      fetchSimulationDetailsWithRetry(0);
     }
+
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulationId]);
 
-  const handleTextChange = (text: string) => {
-    debouncedSubmitFeedback(text, rating);
-    setAdditionalFeedback(text);
-  };
-
-  const handleStarPress = (starIndex: number) => {
-    const feedback = starIndex + 1;
-    setRating(feedback);
-
-    setFeedbackText(
-      FEEDBACK_OPTIONS[feedback as keyof typeof FEEDBACK_OPTIONS],
-    );
+  const hideFeedbackPopup = () => {
+    setIsFeedbackPopupVisible(false);
   };
 
   const handleSubmit = () => {
@@ -128,52 +175,12 @@ export const SimulationFeedbackScreen: React.FC<
   const onHeaderPress = () => setIsDropdownVisible(true);
   const hideHeaderDropdown = () => setIsDropdownVisible(false);
 
-  const renderStars = (disabled?: boolean) => {
-    return Array.from({length: 5}, (_, index) => (
-      <TouchableOpacity
-        key={index}
-        onPress={() => handleStarPress(index)}
-        disabled={disabled}
-        style={styles.starContainer}>
-        <StarIcon
-          width={24}
-          height={24}
-          color={index < rating ? colors.starYellow : colors.lightGray4}
-        />
-      </TouchableOpacity>
-    ));
-  };
-
   const renderSectionHeader = (headerText: string) => {
     return (
       <View style={styles.headerSection}>
         <Text style={styles.headerText}>{headerText}</Text>
         <View style={styles.headerLine} />
       </View>
-    );
-  };
-
-  const renderFeedback = () => {
-    return (
-      <>
-        {renderSectionHeader(t('SimulationFeedback.headerText'))}
-        <View style={styles.feedbackCard}>
-          <Text style={styles.questionText}>
-            {t('SimulationFeedback.questionText')}
-          </Text>
-          <View style={styles.starsContainer}>{renderStars()}</View>
-          <Text style={styles.feedbackText}>{feedbackText}</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder={t('SimulationFeedback.placeholderText')}
-            placeholderTextColor={colors.lightGray3}
-            value={additionalFeedback}
-            onChangeText={handleTextChange}
-            multiline
-            textAlignVertical="top"
-          />
-        </View>
-      </>
     );
   };
 
@@ -205,8 +212,8 @@ export const SimulationFeedbackScreen: React.FC<
         <Text style={styles.titleItalic}>
           {showSummary
             ? !fromLogs
-              ? t('CallSummary.header.subtitle')
-              : t('SimulationFeedback.titleEnded')
+              ? t('SimulationFeedback.titleEnded')
+              : t('CallSummary.header.subtitle')
             : t('SimulationFeedback.transcript')}
         </Text>
       </Text>
@@ -221,9 +228,7 @@ export const SimulationFeedbackScreen: React.FC<
       ]}>
       <View style={styles.titleSection}>
         {fromLogs && (
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}>
+          <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
             <LeftArrowIcon />
           </TouchableOpacity>
         )}
@@ -253,12 +258,11 @@ export const SimulationFeedbackScreen: React.FC<
           automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}>
-          {isSimulationDetailsLoading ? (
+          {!simulationDetails?.details && !retryLimitReached ? (
             <SimulationSummarySkeleton />
           ) : (
             <>
               {renderSummary()}
-              {!fromLogs && renderFeedback()}
               {!fromLogs && renderButtonContainer()}
             </>
           )}
@@ -275,6 +279,14 @@ export const SimulationFeedbackScreen: React.FC<
         onClose={hideHeaderDropdown}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
+      />
+      <FeedbackPopup
+        visible={isFeedbackPopupVisible}
+        onClose={hideFeedbackPopup}
+        onSubmit={submitFeedback}
+        showChips={false}
+        placeholder={t('SimulationFeedback.placeholderText')}
+        customTitle={t('SimulationFeedback.questionText')}
       />
       {showScrollButton && !isSimulationDetailsLoading && (
         <TouchableOpacity

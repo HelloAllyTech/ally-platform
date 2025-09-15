@@ -1,5 +1,6 @@
 import React from 'react';
-import {useTranslation} from 'react-i18next';
+
+import {FeedbackPopup} from '@/components';
 
 import {CustomMenuModal, DeleteRenameModal, SummaryDropdown} from '../index';
 
@@ -20,6 +21,12 @@ interface SummaryModalsProps {
   showSummary: boolean;
   setShowSummary: (show: boolean) => void;
   isSummaryAvailable?: boolean;
+  isSummaryFeedbackPopup?: boolean;
+  hideSummaryFeedbackPopup: () => void;
+  onSubmitSummaryFeedback: (
+    rating: number,
+    feedback: {issues: string[]; comment: string},
+  ) => void;
 }
 
 export const SummaryModals: React.FC<SummaryModalsProps> = ({
@@ -37,8 +44,10 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   showSummary,
   setShowSummary,
   isSummaryAvailable = false,
+  isSummaryFeedbackPopup = false,
+  hideSummaryFeedbackPopup,
+  onSubmitSummaryFeedback,
 }) => {
-  const {t} = useTranslation();
   return (
     <>
       <DeleteRenameModal
@@ -61,6 +70,11 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         onExport={handleExport}
         setModalType={setActiveModal}
         showExportOption={isSummaryAvailable}
+      />
+      <FeedbackPopup
+        visible={isSummaryFeedbackPopup}
+        onClose={hideSummaryFeedbackPopup}
+        onSubmit={onSubmitSummaryFeedback}
       />
     </>
   );
