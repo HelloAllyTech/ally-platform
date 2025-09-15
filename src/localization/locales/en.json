@@ -301,7 +301,8 @@
     "submitButton": "Submit Feedback",
     "submittingButton": "Submitting...",
     "sessionSummary": "SESSION SUMMARY",
-    "tryAnother": "Try Another Simulation"
+    "tryAnother": "Try Another Simulation",
+    "transcript": "Transcript"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",

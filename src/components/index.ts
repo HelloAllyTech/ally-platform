@@ -32,3 +32,6 @@ export type {
 } from './Carousel';
 export {PrivacyTooltip} from './PrivacyTooltip';
 export {ShinyText} from './ShinyText';
+export {EmptyTranscript} from './EmptyTranscript';
+export {TranscriptItem} from './TranscriptItem';
+export {DropdownMenu} from './DropdownMenu';

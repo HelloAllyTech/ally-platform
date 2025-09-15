@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {FlatList} from 'react-native';
 
 import {formatTimeToMMSS} from '@/components/DateSelector/dateUtils';
+import {SortOrder} from '@/constants';
 import {
   ChatMessage,
   useLazyGetChatMessagesQuery,
@@ -30,7 +31,7 @@ export const useCallTranscriptDetails = (chatId: number) => {
     () => ({
       id: chatId,
       limit: LIMIT,
-      sortOrder: 'ASC',
+      sortOrder: SortOrder.ASC,
       sortBy:
         summaryData?.details?.callInfo?.provider === ChatProvider.WEBRTC
           ? 'createdAt'

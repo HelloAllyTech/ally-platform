@@ -70,12 +70,15 @@ export const API_ROUTES = {
   END_SCENARIO_SESSION: '/learn/scenario-session',
   SCENARIO_SESSION_START: '/learn/scenario-session-start',
   SIMULATION_DETAILS: '/learn/scenario-session',
+  SIMULATION_MESSAGES: '/learn/scenario-session/:scenarioSessionId/messages',
 } as const;
 
 export const API_METHODS = {
   GET: 'GET',
   POST: 'POST',
   DELETE: 'DELETE',
+  PATCH: 'PATCH',
+  PUT: 'PUT',
 } as const;
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
@@ -140,3 +143,8 @@ export const USER_PERMISSIONS = {
   EDIT_SUMMARY: 'edit:summary',
   START_CALL: 'view:button:start-call',
 };
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}

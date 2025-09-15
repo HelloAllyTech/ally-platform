@@ -1,3 +1,5 @@
+import {API_METHODS} from '@/constants';
+
 import {api} from './api';
 
 export interface ChatMessage {
@@ -30,7 +32,7 @@ export const callTranscriptApi = api.injectEndpoints({
     getChatMessages: builder.query<ChatMessagesResponse, ChatMessagesParams>({
       query: ({id, limit, offset, sortBy, sortOrder, type}) => ({
         url: `/chats/${id}/messages`,
-        method: 'GET',
+        method: API_METHODS.GET,
         params: {
           limit,
           offset,

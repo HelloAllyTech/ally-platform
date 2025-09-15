@@ -74,6 +74,7 @@ import SessionSummaryIcon from './sessionSummary.svg';
 import ShareIcon from './share.svg';
 import ShieldIcon from './shield.svg';
 import ShieldWithTickIcon from './shieldWithTick.svg';
+import SimulationIcon from './simulation.svg';
 import SmileIcon from './smile.svg';
 import StarIcon from './star.svg';
 import TableEyeIcon from './tableEye.svg';
@@ -180,4 +181,5 @@ export {
   ThumbUpIcon,
   BulbIcon,
   ShareIcon,
+  SimulationIcon,
 };
