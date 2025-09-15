@@ -6,14 +6,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
+import {ArrowDown, ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
 import {PrimaryButton, useErrorToast} from '@/components';
-import {FEEDBACK_OPTIONS, isIOS} from '@/constants';
+import {FEEDBACK_OPTIONS} from '@/constants';
 import {
   useAppNavigation,
   useDebounce,
@@ -24,10 +25,16 @@ import {
   useAddSimulationFeedbackMutation,
   useLazyGetSimulationDetailsQuery,
 } from '@/services';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, globalStyles} from '@/theme';
 import {navigateToLearnTab} from '@/utils';
 
-import {SimulationSummary, SimulationSummarySkeleton} from './components';
+import {
+  FeedbackDropdown,
+  SimulationSummary,
+  SimulationSummarySkeleton,
+  SimulationTranscript,
+} from './components';
+import {styles} from './styles';
 
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
@@ -42,6 +49,8 @@ export const SimulationFeedbackScreen: React.FC<
   const [feedbackText, setFeedbackText] = useState<string>('');
   const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
+  const [showSummary, setShowSummary] = useState<boolean>(true);
+  const [isDropdownVisible, setIsDropdownVisible] = useState<boolean>(false);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -106,12 +115,18 @@ export const SimulationFeedbackScreen: React.FC<
     scrollViewRef.current?.scrollToEnd();
   }, []);
 
-  const handleScroll = useCallback((event: any) => {
-    const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
-    const isNearBottom =
-      contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-    setShowScrollButton(!isNearBottom);
-  }, []);
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
+      const isNearBottom =
+        contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
+      setShowScrollButton(!isNearBottom);
+    },
+    [],
+  );
+
+  const onHeaderPress = () => setIsDropdownVisible(true);
+  const hideHeaderDropdown = () => setIsDropdownVisible(false);
 
   const renderStars = (disabled?: boolean) => {
     return Array.from({length: 5}, (_, index) => (
@@ -183,6 +198,21 @@ export const SimulationFeedbackScreen: React.FC<
     );
   };
 
+  const renderTitle = () => {
+    return (
+      <Text style={styles.title}>
+        {t('SimulationFeedback.title')}{' '}
+        <Text style={styles.titleItalic}>
+          {showSummary
+            ? !fromLogs
+              ? t('CallSummary.header.subtitle')
+              : t('SimulationFeedback.titleEnded')
+            : t('SimulationFeedback.transcript')}
+        </Text>
+      </Text>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -197,35 +227,55 @@ export const SimulationFeedbackScreen: React.FC<
             <LeftArrowIcon />
           </TouchableOpacity>
         )}
-        <Text style={[styles.title, !fromLogs && styles.titleExtraPadding]}>
-          {t('SimulationFeedback.title')}{' '}
-          <Text style={styles.titleItalic}>
-            {fromLogs
-              ? t('SimulationFeedback.titleDetails')
-              : t('SimulationFeedback.titleEnded')}
-          </Text>
-        </Text>
+        <TouchableOpacity
+          style={[
+            globalStyles.rowCenter,
+            !fromLogs && styles.titleExtraPadding,
+          ]}
+          onPress={onHeaderPress}
+          disabled={!fromLogs}
+          activeOpacity={0.8}>
+          {renderTitle()}
+          {fromLogs && (
+            <View style={styles.arrowDownContainer}>
+              <ArrowDown width={9} height={5} />
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
-      <KeyboardAwareScrollView
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        extraScrollHeight={100}
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}>
-        {isSimulationDetailsLoading ? (
-          <SimulationSummarySkeleton />
-        ) : (
-          <>
-            {renderSummary()}
-            {/* TODO: Remove this later. Future enhancement to show added feedback for logs */}
-            {!fromLogs && renderFeedback()}
-            {!fromLogs && renderButtonContainer()}
-          </>
-        )}
-      </KeyboardAwareScrollView>
+      {showSummary && (
+        <KeyboardAwareScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          extraScrollHeight={100}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}>
+          {isSimulationDetailsLoading ? (
+            <SimulationSummarySkeleton />
+          ) : (
+            <>
+              {renderSummary()}
+              {!fromLogs && renderFeedback()}
+              {!fromLogs && renderButtonContainer()}
+            </>
+          )}
+        </KeyboardAwareScrollView>
+      )}
+      {!isSimulationDetailsLoading && !showSummary && (
+        <SimulationTranscript
+          sessionId={simulationId ?? ''}
+          startedAt={simulationDetails?.startedAt}
+        />
+      )}
+      <FeedbackDropdown
+        visible={isDropdownVisible}
+        onClose={hideHeaderDropdown}
+        showSummary={showSummary}
+        setShowSummary={setShowSummary}
+      />
       {showScrollButton && !isSimulationDetailsLoading && (
         <TouchableOpacity
           onPress={handleScrollToBottom}
@@ -236,125 +286,3 @@ export const SimulationFeedbackScreen: React.FC<
     </SafeAreaView>
   );
 };
-
-const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: '20@ms',
-    paddingBottom: '40@vs',
-  },
-  titleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: '10@vs',
-    paddingRight: '20@ms',
-    paddingLeft: '10@ms',
-    paddingBottom: '8@vs',
-    marginTop: '8@vs',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
-  },
-  backButton: {
-    paddingRight: '1@ms',
-  },
-  title: {
-    ...typography.headline.large,
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.darkGray2,
-    fontSize: '18@ms',
-  },
-  titleItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: isIOS ? 'italic' : 'normal',
-  },
-  headerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: '5@vs',
-  },
-  headerText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '12@ms',
-    color: colors.lightGray12,
-    letterSpacing: '4@ms',
-    fontWeight: '700',
-  },
-  headerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.lightGray4,
-    marginLeft: '10@ms',
-  },
-  feedbackCard: {
-    borderRadius: '12@ms',
-    padding: '16@ms',
-    marginBottom: '20@vs',
-    borderWidth: 0.5,
-    borderColor: colors.lightGray4,
-    marginTop: '16@vs',
-  },
-  questionText: {
-    ...typography.headline.small,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray12,
-    fontSize: '18@ms',
-    textAlign: 'center',
-    marginBottom: '12@vs',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: '8@vs',
-  },
-  starContainer: {
-    marginHorizontal: '4@ms',
-  },
-  feedbackText: {
-    ...typography.body.large,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '15@ms',
-    textAlign: 'center',
-    marginBottom: '12@vs',
-  },
-  textInput: {
-    backgroundColor: colors.lightGray1,
-    borderRadius: '8@ms',
-    padding: '12@ms',
-    minHeight: '90@vs',
-    maxHeight: '120@vs',
-    ...typography.body.medium,
-    color: colors.darkGray2,
-    borderWidth: 0.5,
-    borderColor: colors.lightGray4,
-  },
-  buttonContainer: {
-    marginTop: 'auto',
-  },
-  submitButton: {
-    marginTop: '10@vs',
-    paddingVertical: '8@vs',
-  },
-  scrollToBottomButton: {
-    position: 'absolute',
-    bottom: '60@vs',
-    right: '16@ms',
-    zIndex: 1000,
-    borderRadius: '50%',
-    backgroundColor: colors.whiteTransparent10,
-    borderWidth: 1,
-    borderColor: colors.lightGray4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '30@ms',
-    height: '30@ms',
-    paddingTop: '3@ms',
-  },
-  titleExtraPadding: {
-    paddingLeft: '10@vs',
-  },
-});
