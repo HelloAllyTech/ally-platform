@@ -15,7 +15,6 @@ export {
   LoadingSkeleton,
   SimulationsSkeleton,
   CallLogSkeleton,
-  LinearLoader,
 } from './LoadingSkeleton';
 export {NetworkLogs} from './NetworkLogs';
 export {ResourceArticleCard} from './ResourceArticleCard';

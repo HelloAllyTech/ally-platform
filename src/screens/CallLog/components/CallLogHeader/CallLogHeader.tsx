@@ -1,5 +1,5 @@
-import React, {useCallback} from 'react';
-import {Text, TouchableOpacity, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo} from 'react';
+import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DrawerMenuIcon, ReplayIcon} from '@/assets/icons';
@@ -11,15 +11,37 @@ interface CallLogHeaderProps {
   search: string;
   onSearchChange: (text: string) => void;
   onRefresh: () => void;
+  isFetching?: boolean;
 }
 
 export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   search: _search,
   onSearchChange: _onSearchChange,
   onRefresh,
+  isFetching = false,
 }) => {
   const {t} = useTranslate();
   const drawerNavigation = useDrawerNavigation();
+  const rotationAnimation = useMemo(() => new Animated.Value(0), []);
+
+  useEffect(() => {
+    if (isFetching) {
+      Animated.timing(rotationAnimation, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      setTimeout(() => {
+        rotationAnimation.setValue(0);
+      }, 600);
+    }
+  }, [isFetching, rotationAnimation]);
+
+  const rotation = rotationAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   const handleOpenDrawer = useCallback(() => {
     drawerNavigation.openDrawer();
@@ -42,7 +64,10 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
       </View>
       <View style={styles.actionsContainer}>
         <TouchableOpacity onPress={onRefresh} accessibilityLabel="Refresh">
-          <ReplayIcon width={16} height={16} />
+          <Animated.View
+            style={[styles.iconContainer, {transform: [{rotate: rotation}]}]}>
+            <ReplayIcon width={16} height={16} />
+          </Animated.View>
         </TouchableOpacity>
         {/* TODO: Can uncomment later when we have the search and filter functionality */}
         {/* <View style={styles.searchBar}>
@@ -132,5 +157,11 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkSlate,
     fontSize: '16@ms',
+  },
+  iconContainer: {
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
