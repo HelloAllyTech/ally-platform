@@ -252,6 +252,9 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "endSession": "End session",
+    "session": "Session",
+    "endingSoon": "Ending Soon",
+    "sessionWillEnd": "Your session will end in 30 seconds.",
     "practiceSessionScore": "Practice Session Score",
     "linkCopiedToClipboard": "Link copied to clipboard"
   },

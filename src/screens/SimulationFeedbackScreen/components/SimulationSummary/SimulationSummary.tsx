@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, KeyEventsIcon, ThumbUpIcon} from '@/assets';
+import {ArrowDown, KeyEventsIcon, LightBulbIcon, ThumbUpIcon} from '@/assets';
 import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
@@ -148,7 +148,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
       )}
       {renderExpandableSection(
         'Areas for improvement',
-        <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
+        <LightBulbIcon width={20} height={20} style={styles.sectionIcon} />,
         improvements,
         'areasForImprovement',
         renderFeedbackItem,

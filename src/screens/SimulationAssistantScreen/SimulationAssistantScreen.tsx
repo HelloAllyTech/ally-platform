@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -15,7 +15,13 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {
+  MINUTES_IN_MS,
+  SCREEN_NAMES,
+  SECONDS_IN_MS,
+  SESSION_END_MODAL_MINUTES,
+  SESSION_END_MODAL_SECONDS,
+} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
@@ -26,6 +32,7 @@ import {decodeFeedbackPayloadToJson} from '@/utils';
 import {
   AudioWave,
   ControlButtons,
+  EndingSoonModal,
   LiveFeedback,
   SessionScoreMeter,
   SimulationTimer,
@@ -37,9 +44,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {roomData, scenario} = route.params;
   const {liveKitServerUrl, accessToken, id: roomId} = roomData;
-  const startTime = roomData?.createdAt
-    ? new Date(roomData?.createdAt)
-    : new Date();
+  const startTime = useMemo(
+    () => (roomData?.createdAt ? new Date(roomData?.createdAt) : new Date()),
+    [roomData?.createdAt],
+  );
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const [endScenarioSession] = useEndScenarioSessionMutation();
@@ -52,6 +60,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
+  const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -70,6 +79,19 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       deactivateKeepAwake();
     };
   }, []);
+
+  useEffect(() => {
+    // Show the ending-soon modal at 29 minutes 30 seconds from the start time
+    if (!startTime) return;
+    const targetMs =
+      SESSION_END_MODAL_MINUTES * MINUTES_IN_MS +
+      SESSION_END_MODAL_SECONDS * SECONDS_IN_MS;
+    const now = Date.now();
+    const elapsed = now - startTime.getTime();
+    const remaining = targetMs - elapsed;
+    const timer = setTimeout(() => setShowEndingSoon(true), remaining);
+    return () => clearTimeout(timer);
+  }, [startTime]);
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = () => {
@@ -243,6 +265,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             isDisableMic={showSimulationLoading}
             isDisableStop={isDisconnecting}
             isMuted={!isMicEnabled}
+          />
+          <EndingSoonModal
+            visible={showEndingSoon && !showSimulationLoading}
+            titleMain={t('SimulationAssistant.session')}
+            titleItalic={t('SimulationAssistant.endingSoon')}
+            description={t('SimulationAssistant.sessionWillEnd')}
+            onContinue={() => setShowEndingSoon(false)}
+            onEndSession={handleDisconnect}
           />
         </View>
       </RoomContext.Provider>
