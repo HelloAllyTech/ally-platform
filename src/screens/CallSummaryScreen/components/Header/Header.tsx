@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
             <TouchableOpacity
               style={styles.backButtonExpanded}
               onPress={onBackPress}>
-              <LeftArrowIcon />
+              <LeftArrowIcon color={colors.black} />
             </TouchableOpacity>
             <View>
               <TouchableOpacity

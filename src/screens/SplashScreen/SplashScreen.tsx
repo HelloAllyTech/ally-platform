@@ -249,7 +249,7 @@ export const SplashScreen: React.FC<
       <View style={styles.flex1}>
         {currentStep === 'OTP' && (
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <LeftArrowIcon width={44} height={44} color="black" />
+            <LeftArrowIcon width={44} height={44} color={colors.black} />
           </TouchableOpacity>
         )}
         {renderLottieAnimation}

@@ -132,6 +132,8 @@ export const SimulationFeedbackScreen: React.FC<
       navigation.goBack();
     } catch (error) {
       showToast(t('Errors.submitFeedback'), 'error');
+      hideFeedbackPopup();
+      navigation.goBack();
     }
   };
 
@@ -175,24 +177,6 @@ export const SimulationFeedbackScreen: React.FC<
   const onHeaderPress = () => setIsDropdownVisible(true);
   const hideHeaderDropdown = () => setIsDropdownVisible(false);
 
-  const renderSectionHeader = (headerText: string) => {
-    return (
-      <View style={styles.headerSection}>
-        <Text style={styles.headerText}>{headerText}</Text>
-        <View style={styles.headerLine} />
-      </View>
-    );
-  };
-
-  const renderSummary = () => {
-    return (
-      <View>
-        {renderSectionHeader(t('SimulationFeedback.sessionSummary'))}
-        <SimulationSummary data={simulationDetails} />
-      </View>
-    );
-  };
-
   const renderButtonContainer = () => {
     return (
       <View style={styles.buttonContainer}>
@@ -227,26 +211,35 @@ export const SimulationFeedbackScreen: React.FC<
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <View style={styles.titleSection}>
-        {fromLogs && (
-          <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
-            <LeftArrowIcon />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[
-            globalStyles.rowCenter,
-            !fromLogs && styles.titleExtraPadding,
-          ]}
-          onPress={onHeaderPress}
-          disabled={!fromLogs}
-          activeOpacity={0.8}>
-          {renderTitle()}
+        <View style={styles.titleRow}>
           {fromLogs && (
-            <View style={styles.arrowDownContainer}>
-              <ArrowDown width={9} height={5} />
-            </View>
+            <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
+              <LeftArrowIcon color={colors.black} />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          <View style={globalStyles.column}>
+            <TouchableOpacity
+              style={[
+                globalStyles.rowCenter,
+                !fromLogs && styles.titleExtraPadding,
+              ]}
+              onPress={onHeaderPress}
+              disabled={!fromLogs}
+              activeOpacity={0.8}>
+              {renderTitle()}
+              {fromLogs && (
+                <View style={styles.arrowDownContainer}>
+                  <ArrowDown width={9} height={5} />
+                </View>
+              )}
+            </TouchableOpacity>
+            {simulationDetails?.metadata?.sessionName && (
+              <Text style={styles.subTitle}>
+                {simulationDetails.metadata.sessionName}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
       {showSummary && (
         <KeyboardAwareScrollView
@@ -262,7 +255,9 @@ export const SimulationFeedbackScreen: React.FC<
             <SimulationSummarySkeleton />
           ) : (
             <>
-              {renderSummary()}
+              {simulationDetails && (
+                <SimulationSummary data={simulationDetails} />
+              )}
               {!fromLogs && renderButtonContainer()}
             </>
           )}

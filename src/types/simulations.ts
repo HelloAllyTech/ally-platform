@@ -111,6 +111,10 @@ export interface SimulationEvent {
   description?: string;
 }
 
+interface SummaryMetadata {
+  sessionName?: string;
+}
+
 export interface SimulationSummaryData {
   events?: SimulationEvent[];
   whatWentWell?: string[];
@@ -126,7 +130,11 @@ export interface SimulationSummaryData {
   startedAt: string;
   endedAt: string;
   totalScore: number | null;
-  metadata: null;
+  metadata: SummaryMetadata | null;
+  hasFeedback: boolean;
+  scenario?: {
+    title?: string;
+  };
   details?: {
     createdAt?: string;
     updatedAt?: string;
