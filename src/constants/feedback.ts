@@ -1,36 +1,39 @@
 import type {ChipOption} from '@/components/ChipGroup';
 
+export enum IssueOptions {
+  MISSING_KEY_INFORMATION = 'MISSING_KEY_INFORMATION',
+  INACCURATE = 'INACCURATE',
+  TOO_VAGUE = 'TOO_VAGUE',
+  DIFFICULT_TO_UNDERSTAND = 'DIFFICULT_TO_UNDERSTAND',
+  TOO_SHORT = 'TOO_SHORT',
+  OTHER = 'OTHER',
+}
+
 export const FEEDBACK_ISSUE_OPTIONS: ChipOption[] = [
   {
-    id: 'missingKeyInfo',
     label: 'FeedbackPopup.issues.missingKeyInfo',
-    value: 'missingKeyInfo',
+    value: IssueOptions.MISSING_KEY_INFORMATION,
   },
   {
-    id: 'inaccurate',
     label: 'FeedbackPopup.issues.inaccurate',
-    value: 'inaccurate',
+    value: IssueOptions.INACCURATE,
   },
   {
-    id: 'tooVague',
     label: 'FeedbackPopup.issues.tooVague',
-    value: 'tooVague',
+    value: IssueOptions.TOO_VAGUE,
   },
   {
-    id: 'difficultToUnderstand',
     label: 'FeedbackPopup.issues.difficultToUnderstand',
-    value: 'difficultToUnderstand',
+    value: IssueOptions.DIFFICULT_TO_UNDERSTAND,
   },
   {
-    id: 'tooShort',
     label: 'FeedbackPopup.issues.tooShort',
-    value: 'tooShort',
+    value: IssueOptions.TOO_SHORT,
   },
   {
     // Make sure that last option is always 'other'
-    id: 'other',
     label: 'FeedbackPopup.issues.other',
-    value: 'other',
+    value: IssueOptions.OTHER,
   },
 ];
 

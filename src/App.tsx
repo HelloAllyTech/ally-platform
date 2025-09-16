@@ -22,7 +22,7 @@ export const App = () => {
           <ToastProvider>
             <RootNavigator />
           </ToastProvider>
-          {__DEV__ && env.ENVIRONMENT === 'development' && <NetworkLogs />}
+          {env.ENVIRONMENT === 'development' && <NetworkLogs />}
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>

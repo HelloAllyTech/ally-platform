@@ -15,13 +15,11 @@ import {colors, fontFamily} from '@/theme';
 export interface LiveFeedbackProps {
   message: string;
   emoji?: string;
-  testID?: string;
 }
 
 export const LiveFeedback: React.FC<LiveFeedbackProps> = ({
   message,
   emoji = '🙂',
-  testID = 'live-feedback',
 }) => {
   const translateY = useSharedValue(96);
   const opacity = useSharedValue(0);
@@ -54,13 +52,11 @@ export const LiveFeedback: React.FC<LiveFeedbackProps> = ({
   }));
 
   return (
-    <Animated.View
-      testID={testID}
-      style={[styles.container, containerAnimStyle]}>
+    <Animated.View style={[styles.container, containerAnimStyle]}>
       <View style={styles.emojiWrapper}>
         <Text style={styles.emoji}>{emoji}</Text>
       </View>
-      <Text style={styles.message} numberOfLines={2}>
+      <Text style={styles.message} numberOfLines={4}>
         {message}
       </Text>
     </Animated.View>

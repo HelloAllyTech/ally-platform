@@ -125,7 +125,7 @@ export interface SimulationSummaryData {
   status: string;
   startedAt: string;
   endedAt: string;
-  score: number | null;
+  totalScore: number | null;
   metadata: null;
   details?: {
     createdAt?: string;

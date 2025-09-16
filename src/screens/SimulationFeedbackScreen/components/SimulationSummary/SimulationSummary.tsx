@@ -130,7 +130,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
           'Session Duration',
           getDuration(data.startedAt, data.endedAt),
         )}
-        {renderMetricCard('Total Score', data.score || '-')}
+        {renderMetricCard('Total Score', data.totalScore || '-')}
       </View>
       {renderExpandableSection(
         'Key events',
