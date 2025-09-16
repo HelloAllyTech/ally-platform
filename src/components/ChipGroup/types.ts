@@ -1,9 +1,11 @@
 import {StyleProp, TextStyle, ViewStyle} from 'react-native';
 
+import {IssueOptions} from '@/constants';
+import {TranslationType} from '@/localization/locales/type';
+
 export interface ChipOption {
-  id: string;
-  label: string;
-  value: string;
+  label: TranslationType;
+  value: IssueOptions;
 }
 
 export interface ChipGroupProps {

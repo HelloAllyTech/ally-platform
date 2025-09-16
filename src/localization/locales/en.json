@@ -29,6 +29,7 @@
     "simulations": "Simulations",
     "start": "Start",
     "session": "Session",
+    "sessionScore": "Session score",
     "chooseListening": "Choose your listening mode",
     "joinCall": "Join Call",
     "listenLive": "Listen Live",
@@ -323,11 +324,11 @@
   "FeedbackPopup": {
     "title": "Rate the AI-generated summary?",
     "ratingTexts": {
-      "poor": "Poor quality - Needs significant improvement",
-      "fair": "Below expectations - Could be much better",
-      "good": "Average quality - Meets basic expectations",
-      "veryGood": "Good quality - Above expectations",
-      "excellent": "Excellent quality - Highly recommended"
+      "poor": "Needs major improvements.",
+      "fair": "Could be better.",
+      "good": "Decent, but room to grow.",
+      "veryGood": "Nice Experience!",
+      "excellent": "Excellent and highly effective!"
     },
     "issueSelectionTitle": "Please select one or more issues",
     "issues": {

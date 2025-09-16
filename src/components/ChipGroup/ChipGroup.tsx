@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -12,21 +13,20 @@ const Chip: React.FC<ChipProps> = ({
   onPress,
   customStyle,
   customTextStyle,
-  testID,
 }) => {
+  const {t} = useTranslation();
   return (
     <TouchableOpacity
       style={[styles.chip, isSelected && styles.chipSelected, customStyle]}
       onPress={onPress}
-      activeOpacity={0.7}
-      testID={`${testID}-chip-${option.id}`}>
+      activeOpacity={0.7}>
       <Text
         style={[
           styles.chipText,
           isSelected && styles.chipTextSelected,
           customTextStyle,
         ]}>
-        {option.label}
+        {t(option.label)}
       </Text>
     </TouchableOpacity>
   );
@@ -41,7 +41,6 @@ export const ChipGroup: React.FC<ChipGroupProps> = ({
   customChipStyle,
   customChipTextStyle,
   customTitleStyle,
-  testID,
 }) => {
   const handleChipPress = (value: string) => {
     const newSelectedValues = selectedValues.includes(value)
@@ -52,18 +51,17 @@ export const ChipGroup: React.FC<ChipGroupProps> = ({
   };
 
   return (
-    <View style={[styles.container, customContainerStyle]} testID={testID}>
+    <View style={[styles.container, customContainerStyle]}>
       {title && <Text style={[styles.title, customTitleStyle]}>{title}</Text>}
       <View style={styles.chipContainer}>
         {options.map(option => (
           <Chip
-            key={option.id}
+            key={option.value}
             option={option}
             isSelected={selectedValues.includes(option.value)}
             onPress={() => handleChipPress(option.value)}
             customStyle={customChipStyle}
             customTextStyle={customChipTextStyle}
-            testID={testID}
           />
         ))}
       </View>

@@ -222,7 +222,10 @@ const styles = ScaledSheet.create({
     gap: '8@ms',
     marginBottom: '18@ms',
     marginHorizontal: '10@ms',
-    paddingTop: isIOS ? '0@vs' : '8@vs',
+    paddingTop: '16@ms',
+    paddingBottom: '8@ms',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.lightGray5,
   },
   headerLeft: {
     justifyContent: 'center',
@@ -235,6 +238,7 @@ const styles = ScaledSheet.create({
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   row: {
     flexDirection: 'row',

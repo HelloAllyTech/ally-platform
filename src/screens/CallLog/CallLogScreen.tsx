@@ -317,9 +317,9 @@ export const CallLogScreen: React.FC = () => {
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
-        disableExpand={activeTab === LogType.SIMULATION}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
+        logType={activeTab}
       />
     );
   };

@@ -136,6 +136,7 @@ export const CallSummaryScreen: React.FC<
     const response = await onAddSummaryFeedback(rating, feedback);
     if (response.data) {
       setIsFeedbackPopupVisible(false);
+      showToast(t('Success.submitFeedback'), 'success');
       handleGoBack();
     } else {
       showToast(t('CallSummary.info.summaryFeedbackSubmittedFailed'), 'error');

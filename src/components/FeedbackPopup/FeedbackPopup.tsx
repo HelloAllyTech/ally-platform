@@ -62,19 +62,20 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
     () =>
       FEEDBACK_ISSUE_OPTIONS.map(option => ({
         ...option,
-        label: t(option.label),
+        label: option.label,
       })),
-    [t],
+    [],
   );
 
   const getRatingText = useMemo(() => {
+    if (rating < 1) return '';
     const ratingKey =
       RATING_TEXT_MAP[rating] || RATING_TEXT_MAP[DEFAULT_RATING];
     return t(ratingKey);
   }, [t, rating]);
 
-  const setStarRating = (rating: number) => {
-    setRating(rating);
+  const setStarRating = (newRating: number) => {
+    setRating(newRating);
     setSelectedIssues([]);
   };
 
@@ -124,7 +125,9 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                   onRatingChange={starRating => setStarRating(starRating)}
                   testID={`${testID}-stars`}
                 />
-                <Text style={styles.ratingText}>{getRatingText}</Text>
+                {getRatingText?.length > 0 && (
+                  <Text style={styles.ratingText}>{getRatingText}</Text>
+                )}
                 {rating !== 5 && showChips && (
                   <ChipGroup
                     options={issueOptions}
