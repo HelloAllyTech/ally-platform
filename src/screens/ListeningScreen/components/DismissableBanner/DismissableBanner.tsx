@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -15,13 +15,6 @@ export const DismissableBanner: React.FC<ExotelFocusBannerProps> = ({
   onClose,
 }) => {
   const {t} = useTranslate();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose();
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
 
   return (
     <View style={styles.container} accessibilityRole="summary">

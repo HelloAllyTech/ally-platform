@@ -144,19 +144,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         setFeedbackKey(id);
       }
     };
-    const onTrackPublished = () => {
-      // console.log('TrackPublished');
-    };
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
-      .on(RoomEvent.TrackPublished, onTrackPublished)
       .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
-        .off(RoomEvent.TrackPublished, onTrackPublished)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
   }, [room, showErrorToast, clamp]);

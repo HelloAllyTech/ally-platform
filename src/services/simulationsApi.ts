@@ -8,6 +8,7 @@ import {
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
+  SimulationSummaryData,
 } from '@/types';
 
 import {api} from './api';
@@ -53,7 +54,10 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getSimulationDetails: builder.query<any, {id: string | number}>({
+    getSimulationDetails: builder.query<
+      SimulationSummaryData,
+      {id: string | number}
+    >({
       query: ({id}) => ({url: `${API_ROUTES.SIMULATION_DETAILS}/${id}`}),
     }),
 

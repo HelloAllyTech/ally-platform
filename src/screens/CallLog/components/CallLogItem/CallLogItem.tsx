@@ -90,15 +90,6 @@ export const CallLogItem = ({
                   ellipsizeMode="tail">
                   {logTitle}
                 </Text>
-                {logType === LogType.SIMULATION && (
-                  <Text
-                    style={styles.scenarioName}
-                    numberOfLines={1}
-                    ellipsizeMode="tail">
-                    {item?.scenario?.title || ''}
-                    {` • ${formatDate(item.startedAt)}`}
-                  </Text>
-                )}
               </View>
 
               <View style={styles.statusAndEyeContainer}>
@@ -111,10 +102,20 @@ export const CallLogItem = ({
               </View>
             </View>
           </View>
-          {logType === LogType.REAL && (
+          {logType === LogType.REAL ? (
             <Text style={styles.logDate}>
               {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
             </Text>
+          ) : (
+            logType === LogType.SIMULATION && (
+              <Text
+                style={styles.scenarioName}
+                numberOfLines={1}
+                ellipsizeMode="tail">
+                {item?.scenario?.title || ''}
+                {` • ${formatDate(item.startedAt)}`}
+              </Text>
+            )
           )}
         </View>
       </View>
@@ -215,12 +216,13 @@ const styles = ScaledSheet.create({
     color: colors.darkCharcoal,
     flexShrink: 1,
     marginRight: '3@ms',
+    marginLeft: '30@ms',
   },
   logDate: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '12@ms',
     color: colors.darkCharcoal,
     marginLeft: '30@ms',
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
   },
   logDetails: {
     marginTop: '6@ms',
@@ -245,7 +247,8 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flex: 1,
+    width: '95%',
+    marginRight: '20@ms',
   },
   statusAndEyeContainer: {
     flexDirection: 'row',

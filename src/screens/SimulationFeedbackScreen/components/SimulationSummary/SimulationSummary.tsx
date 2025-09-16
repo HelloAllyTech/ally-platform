@@ -125,6 +125,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
 
   return (
     <View style={styles.container}>
+      {data?.scenario?.title && (
+        <Text style={styles.scenarioName}>{data.scenario.title}</Text>
+      )}
       <View style={styles.metricsContainer}>
         {renderMetricCard(
           'Session Duration',
@@ -160,7 +163,6 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingTop: '16@vs',
   },
   metricsContainer: {
     flexDirection: 'row',
@@ -193,6 +195,13 @@ const styles = ScaledSheet.create({
   },
   sectionHeader: {
     marginBottom: '12@vs',
+  },
+  scenarioName: {
+    ...fontFamily.REPLAY_PRO.BOLD,
+    fontSize: '16@ms',
+    color: colors.black,
+    marginTop: '16@vs',
+    marginBottom: '24@vs',
   },
   sectionTitleContainer: {
     flexDirection: 'row',

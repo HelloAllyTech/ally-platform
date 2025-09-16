@@ -14,8 +14,6 @@ export const styles = ScaledSheet.create({
     paddingBottom: '40@vs',
   },
   titleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: '10@vs',
     paddingRight: '20@ms',
     paddingLeft: '10@ms',
@@ -23,6 +21,10 @@ export const styles = ScaledSheet.create({
     marginTop: '8@vs',
     borderBottomWidth: 1,
     borderBottomColor: colors.ashGray,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
     paddingRight: '1@ms',
@@ -32,6 +34,12 @@ export const styles = ScaledSheet.create({
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray2,
     fontSize: '18@ms',
+  },
+  subTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.charcoal2,
+    fontSize: '14@ms',
+    marginTop: '-4@ms',
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -43,24 +51,6 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: '6@ms',
-  },
-  headerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: '5@vs',
-  },
-  headerText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '12@ms',
-    color: colors.lightGray12,
-    letterSpacing: '4@ms',
-    fontWeight: '700',
-  },
-  headerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.lightGray4,
-    marginLeft: '10@ms',
   },
   buttonContainer: {
     marginTop: 'auto',
