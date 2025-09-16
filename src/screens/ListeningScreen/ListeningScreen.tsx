@@ -16,7 +16,12 @@ import {
 import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
-import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
+import {
+  AllyPlatforms,
+  AUDIO_INACTIVE_TIMEOUT,
+  SCREEN_NAMES,
+  USER_PERMISSIONS,
+} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -84,6 +89,7 @@ export const ListeningScreen = ({
     useEndCallMutation();
   const {userData} = useUser();
   const chatData = useAppSelector(state => state.chat.currentChat);
+  const permissions = useAppSelector(state => state.user.permissions);
 
   const callProvider = chatData?.provider;
 
@@ -641,6 +647,9 @@ export const ListeningScreen = ({
         showPauseResumeButton={isWebrtcOrMicrophoneMode}
         showEndSessionButton={isWebrtcOrMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
+        showFocusModeButton={permissions?.includes(
+          USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,
+        )}
       />
     </View>
   );

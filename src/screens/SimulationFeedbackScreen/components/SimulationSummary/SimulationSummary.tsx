@@ -16,6 +16,7 @@ interface SimulationSummaryProps {
 }
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
+  const MAX_SUMMARY_SCORE = 10;
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,
@@ -133,7 +134,10 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
           'Session Duration',
           getDuration(data.startedAt, data.endedAt),
         )}
-        {renderMetricCard('Total Score', data.totalScore || '-')}
+        {renderMetricCard(
+          'Total Score',
+          `${data.totalScore || '0'}/${MAX_SUMMARY_SCORE}`,
+        )}
       </View>
       {renderExpandableSection(
         'Key events',

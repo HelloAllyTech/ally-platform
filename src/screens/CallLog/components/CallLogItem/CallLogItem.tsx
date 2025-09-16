@@ -52,7 +52,7 @@ export const CallLogItem = ({
     () =>
       item?.details?.callInfo?.summaryName ||
       item?.details?.chatId ||
-      `${logType === LogType.REAL ? 'Item' : 'SS-'} ${item.id?.toString()?.toUpperCase()}`,
+      `${logType === LogType.REAL ? 'Item' : 'SS-'}${item.id?.toString()?.toUpperCase()}`,
     [
       item?.details?.callInfo?.summaryName,
       item?.details?.chatId,

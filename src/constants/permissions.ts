@@ -1,4 +1,4 @@
-export enum Permissions {
+export enum USER_PERMISSIONS {
   VIEW_NAVBAR_CALLS = 'view:navbar:calls',
   VIEW_NAVBAR_CALENDAR = 'view:navbar:calendar',
   VIEW_NAVBAR_LEARN = 'view:navbar:learn',
@@ -8,4 +8,7 @@ export enum Permissions {
   EDIT_SUMMARY = 'edit:summary',
   VIEW_START_CALL_PAGE = 'view:button:start-call',
   VIEW_NAVBAR_SEARCH = 'view:navbar:search',
+  VIEW_NAVBAR_COMMUNITY = 'view:navbar:community',
+  VIEW_SCENARIO_SESSION = 'view:scenario-session',
+  VIEW_ADMIN_SCENARIO_SESSION = 'view:admin:scenario-session',
 }

@@ -25,6 +25,7 @@ interface ControlButtonsSectionProps {
   onPauseResumePress: () => void;
   showPauseResumeButton?: boolean;
   showEndSessionButton?: boolean;
+  showFocusModeButton?: boolean;
 }
 
 export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
@@ -39,6 +40,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
   onPauseResumePress,
   showPauseResumeButton = true,
   showEndSessionButton = true,
+  showFocusModeButton = false,
 }) => {
   const {t} = useTranslate();
   const translateY = React.useRef(new Animated.Value(0)).current;
@@ -99,23 +101,25 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
             )}
 
             {/* Focus Mode Button */}
-            <TouchableOpacity
-              style={[
-                styles.buttonContainer,
-                isFocusMode && {backgroundColor: colors.white},
-              ]}
-              onPress={onFocusModeButtonPress}
-              activeOpacity={0.85}
-              hitSlop={DEFAULT_HIT_SLOP}>
-              <MicIcon color={isFocusMode ? colors.black : colors.white} />
-              <Text
+            {showFocusModeButton && (
+              <TouchableOpacity
                 style={[
-                  styles.buttonText,
-                  isFocusMode && {color: colors.darkGray5},
-                ]}>
-                {t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`)}
-              </Text>
-            </TouchableOpacity>
+                  styles.buttonContainer,
+                  isFocusMode && {backgroundColor: colors.white},
+                ]}
+                onPress={onFocusModeButtonPress}
+                activeOpacity={0.85}
+                hitSlop={DEFAULT_HIT_SLOP}>
+                <MicIcon color={isFocusMode ? colors.black : colors.white} />
+                <Text
+                  style={[
+                    styles.buttonText,
+                    isFocusMode && {color: colors.darkGray5},
+                  ]}>
+                  {t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`)}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* End Session Button */}
             {showEndSessionButton && (

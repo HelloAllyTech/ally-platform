@@ -135,17 +135,6 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   },
 };
 
-export const USER_PERMISSIONS = {
-  CALL_LOG: 'view:navbar:calls',
-  CALENDAR: 'view:navbar:calendar',
-  ANALYTICS: 'view:navbar:analytics',
-  LEARN: 'view:navbar:learn',
-  STRESS_BUSTER: 'view:navbar:stress-buster',
-  SETTINGS: 'view:navbar:settings',
-  EDIT_SUMMARY: 'edit:summary',
-  START_CALL: 'view:button:start-call',
-};
-
 export enum SortOrder {
   ASC = 'ASC',
   DESC = 'DESC',
