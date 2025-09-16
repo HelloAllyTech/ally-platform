@@ -19,7 +19,7 @@ import {
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {Permissions, SCREEN_NAMES} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
@@ -36,30 +36,30 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_CALLS
-    requiredPermission: '',
+    requiredPermissions: [
+      USER_PERMISSIONS.VIEW_NAVBAR_CALLS,
+      USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
+    ],
   },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_ANALYTICS
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_ANALYTICS],
   },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_SEARCH
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_SEARCH],
   },
   {
     name: SCREEN_NAMES.LEARN,
     component: SimulationsScreen,
-    requiredPermission: Permissions.VIEW_NAVBAR_LEARN,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_LEARN],
   },
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_COMMUNITY],
   },
 ];
 
@@ -67,12 +67,8 @@ interface BottomTabsProps {
   hideTabBar?: boolean;
 }
 
-const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
+const CustomTabBar = (props: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
-
-  if (props.hideTabBar) {
-    return null;
-  }
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
@@ -122,9 +118,9 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
   );
 };
 
-export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
+export const BottomTabs: React.FC<BottomTabsProps> = () => {
   const renderCustomTabBar = (props: BottomTabBarProps) => {
-    return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
+    return <CustomTabBar {...props} />;
   };
 
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
@@ -136,7 +132,10 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
 
   const visibleTabs = ALL_TABS.filter(
     tab =>
-      !tab.requiredPermission || permissions.includes(tab.requiredPermission),
+      tab?.requiredPermissions?.length === 0 ||
+      tab?.requiredPermissions?.some(permission =>
+        permissions.includes(permission),
+      ),
   );
   const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
 

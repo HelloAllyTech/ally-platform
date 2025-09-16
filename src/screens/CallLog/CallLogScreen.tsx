@@ -25,7 +25,6 @@ import {
   useHardwareBackPressHandler,
   usePermission,
   useTranslate,
-  useUser,
 } from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
@@ -37,7 +36,7 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
-import {Chat, UserRole} from '@/types';
+import {Chat} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {
@@ -46,7 +45,6 @@ import {
   StartSessionModal,
   TabView,
 } from './components';
-import {FeatureNotAvailable} from './components/FeatureNotAvailable';
 import {LogItem} from './types';
 
 // Number of items to fetch per page for pagination
@@ -77,7 +75,6 @@ export const CallLogScreen: React.FC = () => {
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const [showStartSession, setShowStartSession] = useState(false);
-  const {userData} = useUser();
 
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -91,9 +88,9 @@ export const CallLogScreen: React.FC = () => {
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
 
-  const isCounselor = userData?.role === UserRole.COUNSELOR;
-  const isLearnUser = userData?.role === UserRole.LEARN;
-  const isCallLogFeatureEnabled = isCounselor || isLearnUser;
+  const canStartCall = permissions?.includes(
+    USER_PERMISSIONS.VIEW_START_CALL_PAGE,
+  );
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -110,16 +107,26 @@ export const CallLogScreen: React.FC = () => {
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
 
-    if (permissions?.includes(USER_PERMISSIONS.CALL_LOG)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_NAVBAR_CALLS)) {
       logTypes.push(LogType.REAL);
     }
 
-    if (permissions?.includes(USER_PERMISSIONS.LEARN)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_SCENARIO_SESSION)) {
       logTypes.push(LogType.SIMULATION);
     }
 
     return logTypes;
   }, [permissions]);
+
+  // Set initial active tab based on available permissions
+  useEffect(() => {
+    if (
+      availableLogTypes.length > 0 &&
+      !availableLogTypes.includes(activeTab)
+    ) {
+      setActiveTab(availableLogTypes[0]);
+    }
+  }, [availableLogTypes, activeTab]);
 
   useHardwareBackPressHandler(() => {
     BackHandler.exitApp();
@@ -382,16 +389,6 @@ export const CallLogScreen: React.FC = () => {
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
-  if (!isCallLogFeatureEnabled) {
-    return (
-      <FeatureNotAvailable
-        description={t('CallLogs.appCurrentlyForCounsellors')}
-        ctaText={t('CallLogs.learnMore')}
-        onCtaPress={handleLearnMorePress}
-        containerStyle={styles.featureNotAvailable}
-      />
-    );
-  }
   // Get current logs and loading state based on active tab
   const currentLogs =
     activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
@@ -452,7 +449,7 @@ export const CallLogScreen: React.FC = () => {
           />
         </View>
       )}
-      {isCounselor && !currentChat?.chatId && (
+      {canStartCall && !currentChat?.chatId && (
         <TouchableOpacity
           style={[
             styles.fab,
