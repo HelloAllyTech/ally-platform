@@ -135,6 +135,11 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   },
 };
 
+export const APP_STORE_URLS = {
+  ios: 'https://apps.apple.com/app/helloally/id6745545012',
+  android: 'https://play.google.com/store/apps/details?id=com.helloally.app',
+};
+
 export enum SortOrder {
   ASC = 'ASC',
   DESC = 'DESC',

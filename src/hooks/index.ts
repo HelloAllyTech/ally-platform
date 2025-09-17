@@ -26,5 +26,6 @@ export {useUser} from './useUser';
 
 // Utility hooks
 export {useDebounce} from './useDebounce';
+export {useForceUpdate} from './useForceUpdate';
 export {usePermission} from './usePermission';
 export {useStoragePermissions} from './useStoragePermissions';

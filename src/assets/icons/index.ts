@@ -35,6 +35,7 @@ import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
+import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
 import GoldenShieldIcon from './goldenShield.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
@@ -169,6 +170,7 @@ export {
   SearchInactiveIcon,
   SessionSummaryIcon,
   ShareIcon,
+  ForceUpdateAlertIcon,
   ShieldIcon,
   ShieldWithTickIcon,
   SimulationIcon,
