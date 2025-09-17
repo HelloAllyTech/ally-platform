@@ -2,6 +2,7 @@ export {PrimaryButton} from './Button';
 export type {PrimaryButtonProps} from './Button';
 export {CustomModal} from './CustomModal';
 export {IllustratedModal} from './IllustratedModal';
+export {IllustratedActionModal} from './IllustratedActionModal';
 export {CustomDropdown} from './Dropdown';
 export {Toast} from './Toast';
 export {

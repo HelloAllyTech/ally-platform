@@ -70,6 +70,7 @@ import ProfileIcon from './profileIcon.svg';
 import ReplayIcon from './replay.svg';
 import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
+import RunningSimulationIcon from './runningSimulation.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
@@ -165,6 +166,7 @@ export {
   ReplayIcon,
   ResumeIcon,
   RightArrow,
+  RunningSimulationIcon,
   SearchActiveIcon,
   SearchIcon,
   SearchInactiveIcon,
