@@ -1,4 +1,4 @@
-import {API_METHODS, API_ROUTES} from '@/constants';
+import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
   EndScenarioSessionResponse,
@@ -62,12 +62,12 @@ export const simulationsApi = api.injectEndpoints({
     }),
 
     getSimulationLogs: builder.query<
-      LogItem[],
+      {data: LogItem[]},
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
         url: API_ROUTES.SIMULATION_LOGS,
-        params: {limit, offset, sortBy: 'createdAt', order: 'DESC'},
+        params: {limit, offset, sortBy: 'createdAt', order: SortOrder.DESC},
       }),
     }),
 

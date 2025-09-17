@@ -204,9 +204,10 @@ export const CallLogScreen: React.FC = () => {
    */
   const fetchInitialSimulationLogs = useCallback(async () => {
     const result = await getSimulationLogs({limit: ITEMS_PER_PAGE, offset: 0});
-    if (result.data) {
-      setAllSimulationLogs(result.data);
-      setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+    const logsResponse = result.data?.data;
+    if (logsResponse) {
+      setAllSimulationLogs(logsResponse);
+      setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
     } else {
       setAllSimulationLogs([]);
     }
@@ -267,11 +268,11 @@ export const CallLogScreen: React.FC = () => {
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
       });
-
-      if (result?.data) {
-        setAllSimulationLogs(prev => [...prev, ...(result?.data || [])]);
+      const logsResponse = result.data?.data;
+      if (logsResponse) {
+        setAllSimulationLogs(prev => [...prev, ...(logsResponse || [])]);
         setSimulationLogsOffset(newOffset);
-        setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+        setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
       }
     }
   };
