@@ -302,7 +302,12 @@
     "emailPlaceholder": "Enter your email",
     "continue": "Continue",
     "pleaseEnterEmail": "Please enter your email address",
-    "pleaseEnterValidEmail": "Please enter a valid email address"
+    "pleaseEnterValidEmail": "Please enter a valid email address",
+    "activeSimulation": "Active simulation",
+    "detected": "detected",
+    "activeSimulationDescription": "You have a running simulation. End the existing session to start a new one.",
+    "noActiveSimulation": "No active simulation found",
+    "sessionEndedSuccessfully": "Session ended successfully"
   },
   "SimulationFeedback": {
     "title": "Simulation",
