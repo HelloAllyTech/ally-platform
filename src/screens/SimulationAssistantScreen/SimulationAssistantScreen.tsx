@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -16,6 +16,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
 import {
+  FEEDBACK_MIN_DISPLAY_MS,
   MINUTES_IN_MS,
   SCREEN_NAMES,
   SECONDS_IN_MS,
@@ -62,6 +63,46 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
+
+  // Queue incoming feedback and ensure each item shows for at least 10 seconds
+  const [, setFeedbackQueue] = useState<NonNullable<Feedback>[]>([]);
+  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showNextFeedback = useCallback(() => {
+    setFeedbackQueue(prevQueue => {
+      if (prevQueue.length === 0) {
+        // Keep showing the last feedback when the queue is empty
+        return prevQueue;
+      }
+      const [next, ...rest] = prevQueue;
+      setFeedback(next);
+      setFeedbackKey(next.id);
+
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      feedbackTimerRef.current = setTimeout(() => {
+        feedbackTimerRef.current = null;
+        showNextFeedback();
+      }, FEEDBACK_MIN_DISPLAY_MS);
+      return rest;
+    });
+  }, []);
+
+  const enqueueFeedback = useCallback(
+    (item: NonNullable<Feedback>) => {
+      setFeedbackQueue(prev => {
+        const nextQueue = [...prev, item];
+        if (!feedbackTimerRef.current) {
+          // If no timer is running, either nothing is shown or
+          // the current item has already satisfied its minimum display time.
+          showNextFeedback();
+        }
+        return nextQueue;
+      });
+    },
+    [showNextFeedback],
+  );
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -140,8 +181,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
       if (message && typeof message === 'string') {
         const id = Date.now();
-        setFeedback({id, text: message, emoji: emoji ?? undefined});
-        setFeedbackKey(id);
+        enqueueFeedback({id, text: message, emoji: emoji ?? undefined});
       }
     };
     room
@@ -154,9 +194,19 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp]);
+  }, [room, showErrorToast, clamp, enqueueFeedback]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
+
+  // Cleanup the feedback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const configureAudioSession = async () => {
     try {

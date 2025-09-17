@@ -1,8 +1,11 @@
 import type {CircleConfig} from '@/types';
 
+import {SECONDS_IN_MS} from './general';
+
 export const SESSION_END_MODAL_MINUTES = 29;
 export const SESSION_END_MODAL_SECONDS = 30;
 export const SESSION_AUTO_END_MINUTES = 30;
+export const FEEDBACK_MIN_DISPLAY_MS = 10 * SECONDS_IN_MS;
 
 export const AUDIO = {
   FFT_SIZE: 256,
