@@ -5,13 +5,12 @@ import {
   Modal,
   Text,
   TextInput,
-  TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChipGroup, StarRating} from '@/components';
+import {ChipGroup, PrimaryButton, StarRating} from '@/components';
 import {FEEDBACK_ISSUE_OPTIONS, isIOS, RATING_TEXT_MAP} from '@/constants';
 import {colors, fontFamily, typography} from '@/theme';
 
@@ -152,14 +151,13 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                     <Text style={styles.instructionText}>{note}</Text>
                   </>
                 )}
-                <TouchableOpacity
-                  style={[styles.submitButton, customButtonStyle]}
+                <PrimaryButton
+                  label={t('FeedbackPopup.submitButton')}
                   onPress={handleSubmit}
-                  testID={`${testID}-submit-button`}>
-                  <Text style={styles.submitButtonText}>
-                    {t('FeedbackPopup.submitButton')}
-                  </Text>
-                </TouchableOpacity>
+                  customContainerStyle={customButtonStyle}
+                  isDisabled={rating < 1}
+                  testID={`${testID}-submit-button`}
+                />
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -237,20 +235,5 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
     marginBottom: '24@vs',
     lineHeight: '18@vs',
-  },
-  submitButton: {
-    backgroundColor: colors.azureBlue,
-    paddingVertical: '12@vs',
-    paddingHorizontal: '32@ms',
-    borderRadius: '24@ms',
-    minWidth: '120@ms',
-    width: '95%',
-  },
-  submitButtonText: {
-    fontSize: '14@ms',
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.white,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });
