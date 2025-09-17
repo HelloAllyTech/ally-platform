@@ -16,7 +16,7 @@ interface SimulationSummaryProps {
 }
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
-  const MAX_SUMMARY_SCORE = 10;
+  const MAX_SUMMARY_SCORE = 50;
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,

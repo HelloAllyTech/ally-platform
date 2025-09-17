@@ -3,8 +3,9 @@ import {
   BottomTabBarProps,
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
-import {StyleSheet, TouchableOpacity, View} from 'react-native';
+import {TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
 import {
@@ -101,7 +102,12 @@ const CustomTabBar = (props: BottomTabBarProps) => {
   };
 
   return (
-    <View style={[styles.tabBar, {paddingBottom: insets.bottom}]}>
+    <View
+      style={[
+        styles.tabBar,
+        {paddingBottom: insets.bottom},
+        props.state.routes?.length < 3 && styles.smallTabBar, // For less number items in tabbar
+      ]}>
       {props.state.routes.map((route, index) => {
         const isFocused = props.state.index === index;
 
@@ -161,7 +167,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
   container: {
     flex: 1,
   },
@@ -171,10 +177,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    height: 60,
-    borderRadius: 40,
-    marginHorizontal: 40,
-    marginBottom: 30,
+    height: '60@ms',
+    borderRadius: '40@ms',
+    marginHorizontal: '40@ms',
+    minWidth: '200@ms',
+    marginBottom: '30@ms',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -186,10 +193,13 @@ const styles = StyleSheet.create({
     borderColor: colors.lightGray2,
     elevation: 3,
   },
+  smallTabBar: {
+    marginHorizontal: '100@ms',
+  },
   tabItem: {
     flex: 1,
     height: '100%',
-    minHeight: 60,
+    minHeight: '60@ms',
     justifyContent: 'center',
     alignItems: 'center',
   },
