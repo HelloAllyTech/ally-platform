@@ -32,6 +32,7 @@ export type {
 } from './Carousel';
 export {PrivacyTooltip} from './PrivacyTooltip';
 export {ShinyText} from './ShinyText';
+export {ForceUpdateModal} from './ForceUpdateModal';
 export {StarRating, type StarRatingProps} from './StarRating';
 export {ChipGroup, type ChipGroupProps, type ChipOption} from './ChipGroup';
 export {EmptyTranscript} from './EmptyTranscript';

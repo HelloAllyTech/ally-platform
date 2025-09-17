@@ -20,6 +20,14 @@
       "tryAgain": "Try again"
     }
   },
+  "ForceUpdate": {
+    "title": "Update ",
+    "titleBold": "Alert!",
+    "description": "A new version of Ally is available. Please update to continue using the app.",
+    "currentVersion": "Current Version:",
+    "latestVersion": "Latest Version:",
+    "updateButton": "Update Now"
+  },
   "CallLogs": {
     "header": {
       "title": "Session",

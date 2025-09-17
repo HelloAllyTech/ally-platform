@@ -1,7 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import LottieView from 'lottie-react-native';
 import {
-  Dimensions,
   Keyboard,
   StatusBar,
   Text,
@@ -19,10 +18,11 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
-import {PrimaryButton, SecurityCarousel} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {ForceUpdateModal, PrimaryButton, SecurityCarousel} from '@/components';
+import {SCREEN_NAMES, WINDOW_HEIGHT} from '@/constants';
 import {
   useCounselorChat,
+  useForceUpdate,
   useHardwareBackPressHandler,
   useTranslate,
   useUser,
@@ -35,30 +35,37 @@ import {EmailLogin, OtpVerification} from './components';
 import {styles} from './styles';
 import {AuthStep} from './types';
 
-const {height} = Dimensions.get('screen');
-
 export const SplashScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.SPLASH>
 > = ({navigation}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
   const [isLoginButtonVisible, setIsLoginButtonVisible] = useState(false);
+
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
+  const {t} = useTranslate();
+  const {versionInfo} = useForceUpdate();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       // Go directly to Listening
-      navigation.reset({
-        index: 1,
-        routes: [{name: SCREEN_NAMES.CALL_LOG}, {name: SCREEN_NAMES.LISTENING}],
-      });
+      if (!versionInfo?.isUpdateRequired) {
+        navigation.reset({
+          index: 1,
+          routes: [
+            {name: SCREEN_NAMES.CALL_LOG},
+            {name: SCREEN_NAMES.LISTENING},
+          ],
+        });
+      }
     },
     onNoActiveChatFound: () => {
-      navigation.replace(SCREEN_NAMES.CALL_LOG);
+      if (!versionInfo?.isUpdateRequired) {
+        navigation.replace(SCREEN_NAMES.CALL_LOG);
+      }
     },
   });
-  const {t} = useTranslate();
 
   const animationTranslateY = useSharedValue(0);
 
@@ -85,13 +92,13 @@ export const SplashScreen: React.FC<
   const onLoginPress = () => {
     setIsLoginButtonVisible(false);
     setIsBottomSheetVisible(true);
-    animationTranslateY.value = withTiming(-height * 0.6, {
+    animationTranslateY.value = withTiming(-WINDOW_HEIGHT * 0.6, {
       duration: 1000,
     });
   };
 
   useEffect(() => {
-    if (!isAnimationEnded) {
+    if (!isAnimationEnded || versionInfo?.isUpdateRequired) {
       return;
     }
 
@@ -154,8 +161,8 @@ export const SplashScreen: React.FC<
   const authContentStyle = useAnimatedStyle(() => {
     const translateY = interpolate(
       animationTranslateY.value,
-      [0, -height * 0.65], // From 0 to -65% of screen height
-      [height, height * 0.35], // Start at 100% of screen height, end at 35%
+      [0, -WINDOW_HEIGHT * 0.65], // From 0 to -65% of screen height
+      [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.35], // Start at 100% of screen height, end at 35%
       {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
@@ -166,7 +173,7 @@ export const SplashScreen: React.FC<
       transform: [{translateY}],
       opacity: interpolate(
         animationTranslateY.value,
-        [0, -height * 0.3],
+        [0, -WINDOW_HEIGHT * 0.3],
         [0, 1],
         {
           extrapolateLeft: 'clamp',
@@ -179,7 +186,7 @@ export const SplashScreen: React.FC<
   const textStyle = useAnimatedStyle(() => {
     const progress = interpolate(
       animationTranslateY.value,
-      [0, -height * 0.65],
+      [0, -WINDOW_HEIGHT * 0.65],
       [0, 1],
       {
         extrapolateLeft: 'clamp',
@@ -187,10 +194,15 @@ export const SplashScreen: React.FC<
       },
     );
 
-    const translateY = interpolate(progress, [0, 1], [height, height * 0.2], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
+    const translateY = interpolate(
+      progress,
+      [0, 1],
+      [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.2],
+      {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      },
+    );
 
     return {
       transform: [{translateY}],
@@ -275,6 +287,7 @@ export const SplashScreen: React.FC<
             {renderAuthContent()}
           </Animated.View>
         )}
+        <ForceUpdateModal visible={versionInfo?.isUpdateRequired} />
       </View>
     </TouchableWithoutFeedback>
   );

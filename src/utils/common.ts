@@ -1,4 +1,7 @@
 import Clipboard from '@react-native-clipboard/clipboard';
+import {Linking, Platform} from 'react-native';
+
+import {APP_STORE_URLS} from '@/constants';
 
 export type Maybe<T> = T | null;
 
@@ -23,4 +26,12 @@ export const uint8ToString = (bytes: Uint8Array): string => {
 
 export const copyToClipboard = (text: string) => {
   Clipboard.setString(text);
+};
+
+export const openAppStore = async (): Promise<void> => {
+  const storeUrl = Platform.select(APP_STORE_URLS);
+
+  if (storeUrl) {
+    await Linking.openURL(storeUrl);
+  }
 };

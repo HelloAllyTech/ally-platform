@@ -194,7 +194,7 @@ const styles = ScaledSheet.create({
     elevation: 3,
   },
   smallTabBar: {
-    marginHorizontal: '100@ms',
+    marginHorizontal: '80@ms',
   },
   tabItem: {
     flex: 1,
