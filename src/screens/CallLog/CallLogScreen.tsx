@@ -25,6 +25,7 @@ import {
   useHardwareBackPressHandler,
   usePermission,
   useTranslate,
+  useUser,
 } from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
@@ -37,11 +38,13 @@ import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat} from '@/types';
+import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
 import {
   CallLogHeader,
   CallLogItem,
+  FeatureNotAvailable,
   StartSessionModal,
   TabView,
 } from './components';
@@ -74,6 +77,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
+  const {userData} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
@@ -297,6 +301,7 @@ export const CallLogScreen: React.FC = () => {
     if (activeTab === LogType.REAL) {
       navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
         callId: item?.details?.chatId,
+        fromLogs: true,
       });
     } else {
       // For simulation logs, navigate to simulation summary or details
@@ -397,6 +402,25 @@ export const CallLogScreen: React.FC = () => {
     activeTab === LogType.REAL ? isFetchingRealLogs : isFetchingSimulationLogs;
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
+
+  if (userData && !isAppFeatureEnabled(userData)) {
+    return (
+      <View style={[styles.container, {paddingTop: insets.top}]}>
+        <CallLogHeader
+          search={search}
+          onSearchChange={setSearch}
+          showTitle={false}
+          isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
+        />
+        <FeatureNotAvailable
+          description={t('CallLogs.appCurrentlyForCounsellors')}
+          ctaText={t('CallLogs.learnMore')}
+          onCtaPress={handleLearnMorePress}
+          containerStyle={styles.featureNotAvailable}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>

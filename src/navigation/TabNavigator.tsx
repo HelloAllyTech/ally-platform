@@ -21,6 +21,7 @@ import {
   SearchInactiveIcon,
 } from '@/assets';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {useUser} from '@/hooks/useUser';
 import {
   CallLogScreen,
   CommunityScreen,
@@ -30,6 +31,7 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
+import {isAppFeatureEnabled} from '@/utils/common';
 
 const Tab = createBottomTabNavigator();
 
@@ -125,7 +127,9 @@ const CustomTabBar = (props: BottomTabBarProps) => {
 };
 
 export const BottomTabs: React.FC<BottomTabsProps> = () => {
+  const {userData} = useUser();
   const renderCustomTabBar = (props: BottomTabBarProps) => {
+    if (userData && !isAppFeatureEnabled(userData)) return null;
     return <CustomTabBar {...props} />;
   };
 

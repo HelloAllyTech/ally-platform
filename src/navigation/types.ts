@@ -6,7 +6,7 @@ import {RoomData, Scenario} from '@/types/simulations';
 export type RootStackParamList = {
   Splash: undefined;
   Listening: {isMicrophoneMode?: boolean} | undefined;
-  CallSummary: {callId?: number} | undefined;
+  CallSummary: {callId?: number; fromLogs?: boolean} | undefined;
   CallLog: undefined;
   Breathing: undefined;
   LiveKitTest: undefined;

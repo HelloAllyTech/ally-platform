@@ -70,11 +70,7 @@ export const SimulationFeedbackScreen: React.FC<
       const response = await getSimulationDetails({
         id: simulationId.toString(),
       });
-      if (
-        !response.data?.details &&
-        response.data?.events?.length === 0 &&
-        currentRetryCount < RETRY_COUNT_LIMIT
-      ) {
+      if (!response.data?.details && currentRetryCount < RETRY_COUNT_LIMIT) {
         const nextRetryCount = currentRetryCount + 1;
 
         retryTimeoutRef.current = setTimeout(() => {
@@ -264,7 +260,7 @@ export const SimulationFeedbackScreen: React.FC<
               {simulationDetails && (
                 <SimulationSummary data={simulationDetails} />
               )}
-              {!fromLogs && renderButtonContainer()}
+              {!fromLogs && simulationDetails && renderButtonContainer()}
             </>
           )}
         </KeyboardAwareScrollView>
