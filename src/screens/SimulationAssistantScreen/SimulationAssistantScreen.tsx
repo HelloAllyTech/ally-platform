@@ -214,7 +214,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         // This configures the audio session to route to speaker first instead of phone speaker
         android: {
           preferredOutputList: ['speaker'],
-          audioTypeOptions: AndroidAudioTypePresets.media,
+          audioTypeOptions: {
+            ...AndroidAudioTypePresets.media,
+            // Enforce routing even on devices that misbehave
+            forceHandleAudioRouting: true,
+          },
         },
       });
     } catch (error) {

@@ -126,7 +126,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
 
   return (
     <View style={styles.container}>
-      {data?.scenario?.title && (
+      {data.scenario?.title && (
         <Text style={styles.scenarioName}>{data.scenario.title}</Text>
       )}
       <View style={styles.metricsContainer}>
@@ -136,7 +136,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
         )}
         {renderMetricCard(
           'Total Score',
-          `${data.totalScore || '0'}/${MAX_SUMMARY_SCORE}`,
+          `${data.score || '0'}/${MAX_SUMMARY_SCORE}`,
         )}
       </View>
       {renderExpandableSection(

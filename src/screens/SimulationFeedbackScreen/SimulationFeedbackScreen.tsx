@@ -237,7 +237,7 @@ export const SimulationFeedbackScreen: React.FC<
                 </View>
               )}
             </TouchableOpacity>
-            {simulationDetails?.metadata?.sessionName && (
+            {fromLogs && simulationDetails?.metadata?.sessionName && (
               <Text style={styles.subTitle}>
                 {simulationDetails.metadata.sessionName}
               </Text>
