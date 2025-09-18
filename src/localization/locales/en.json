@@ -17,7 +17,9 @@
       "networkTitle": "No internet connection",
       "networkDescription": "Call ended due to network interruption, please check your connection and try again.",
       "goBack": "Go back",
-      "tryAgain": "Try again"
+      "tryAgain": "Try again",
+      "microphoneFailureTitle": "Microphone failure",
+      "microphoneFailureDescription": "The call ended due to a microphone failure. Please try again or relaunch app"
     }
   },
   "ForceUpdate": {
