@@ -1,6 +1,7 @@
 import {forwardRef, useImperativeHandle, useRef, useState} from 'react';
 import {TextInput, View} from 'react-native';
 
+import {KeyCode} from '@/constants';
 import {isNumeric} from '@/utils/validation';
 
 import {styles} from './styles';
@@ -11,7 +12,10 @@ export interface OtpInputRef {
 }
 
 export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
-  ({value, onChange, inputCount = 4, hasError = false}, ref) => {
+  (
+    {value, onChange, inputCount = 4, hasError = false, onSubmitEditing},
+    ref,
+  ) => {
     const inputRefs = useRef<TextInput[]>([]);
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
@@ -60,13 +64,17 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
       {nativeEvent: {key}}: {nativeEvent: {key: string}},
       index: number,
     ) => {
-      if (key === 'Backspace') {
+      if (key === KeyCode.Backspace) {
         if (value[index]) {
           const newValue = [...value];
           newValue[index] = '';
           onChange(newValue);
         } else {
           clearAndFocusPrevious(index);
+        }
+      } else if (key === KeyCode.Enter || key === KeyCode.Return) {
+        if (value.every(v => v !== '')) {
+          onSubmitEditing();
         }
       }
     };
@@ -95,6 +103,12 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
               onKeyPress={e => handleKeyPress(e, index)}
               onFocus={() => setFocusedIndex(index)}
               onBlur={() => setFocusedIndex(null)}
+              returnKeyType={value.every(v => v !== '') ? 'go' : 'default'}
+              onSubmitEditing={() => {
+                if (index === inputCount - 1) {
+                  onSubmitEditing();
+                }
+              }}
             />
           </View>
         ))}
