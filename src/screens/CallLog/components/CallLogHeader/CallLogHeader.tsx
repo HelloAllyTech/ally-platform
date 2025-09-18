@@ -10,8 +10,9 @@ import {colors, fontFamily} from '@/theme';
 interface CallLogHeaderProps {
   search: string;
   onSearchChange: (text: string) => void;
-  onRefresh: () => void;
+  onRefresh?: () => void;
   isFetching?: boolean;
+  showTitle?: boolean;
 }
 
 export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
@@ -19,6 +20,7 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   onSearchChange: _onSearchChange,
   onRefresh,
   isFetching = false,
+  showTitle = true,
 }) => {
   const {t} = useTranslate();
   const drawerNavigation = useDrawerNavigation();
@@ -55,35 +57,25 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
           onPress={handleOpenDrawer}>
           <DrawerMenuIcon />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {t('CallLogs.header.title')}{' '}
-          <Text style={styles.headerItalic}>
-            {t('CallLogs.header.subtitle')}
+        {showTitle && (
+          <Text style={styles.headerTitle}>
+            {t('CallLogs.header.title')}{' '}
+            <Text style={styles.headerItalic}>
+              {t('CallLogs.header.subtitle')}
+            </Text>
           </Text>
-        </Text>
+        )}
       </View>
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity onPress={onRefresh} accessibilityLabel="Refresh">
-          <Animated.View
-            style={[styles.iconContainer, {transform: [{rotate: rotation}]}]}>
-            <ReplayIcon width={16} height={16} />
-          </Animated.View>
-        </TouchableOpacity>
-        {/* TODO: Can uncomment later when we have the search and filter functionality */}
-        {/* <View style={styles.searchBar}>
-          <SearchIcon width={16} height={16} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('CallLogs.search.placeholder')}
-            placeholderTextColor={colors.gray99}
-            value={search}
-            onChangeText={onSearchChange}
-          />
+      {onRefresh && (
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity onPress={onRefresh} accessibilityLabel="Refresh">
+            <Animated.View
+              style={[styles.iconContainer, {transform: [{rotate: rotation}]}]}>
+              <ReplayIcon width={16} height={16} />
+            </Animated.View>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.filterCircle}>
-          <FilterIcon width={16} height={16} />
-        </TouchableOpacity> */}
-      </View>
+      )}
     </View>
   );
 };

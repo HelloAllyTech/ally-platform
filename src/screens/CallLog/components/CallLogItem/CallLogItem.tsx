@@ -51,13 +51,14 @@ export const CallLogItem = ({
   const logTitle = useMemo(
     () =>
       item?.details?.callInfo?.summaryName ||
+      item?.metadata?.sessionName ||
       item?.details?.chatId ||
-      `${logType === LogType.REAL ? 'Item' : 'SS-'}${item.id?.toString()?.toUpperCase()}`,
+      `ID-${item.id}`,
     [
       item?.details?.callInfo?.summaryName,
       item?.details?.chatId,
       item.id,
-      logType,
+      item?.metadata?.sessionName,
     ],
   );
   const tags = item.details?.summary?.tags || [];

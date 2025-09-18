@@ -45,6 +45,7 @@ export const CallSummaryScreen: React.FC<
   const {hasChanges} = useCallSummaryForm();
 
   const callId = route.params?.callId;
+  const fromLogs = route.params?.fromLogs;
   const chatId = callId || currentChat?.chatId;
   const showTranscript = Boolean(callId);
 
@@ -69,7 +70,6 @@ export const CallSummaryScreen: React.FC<
 
   const {
     handleSummaryNameChange,
-    onUpdateSummary,
     isMenuVisible,
     hideMenu,
     showMenu,
@@ -110,12 +110,16 @@ export const CallSummaryScreen: React.FC<
       summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
     );
 
-    if (timeElapsed >= thresholdMs && !hasFeedbackAlready) {
+    if ((timeElapsed >= thresholdMs || !fromLogs) && !hasFeedbackAlready) {
       setIsFeedbackPopupVisible(true);
       return;
     }
 
     handleGoBack();
+  };
+
+  const onSaveButtonPress = () => {
+    setIsFeedbackPopupVisible(true);
   };
 
   const handleBlur = () => {
@@ -194,7 +198,7 @@ export const CallSummaryScreen: React.FC<
       return (
         <CallSummaryDetails
           isLoading={isLoading}
-          onSubmit={onUpdateSummary}
+          onSubmit={onSaveButtonPress}
           showSaveButton={shouldShowSaveButton}
         />
       );
