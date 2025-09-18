@@ -95,6 +95,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               autoCorrect={false}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
+              returnKeyType="go"
               onSubmitEditing={handleSubmit}
               editable={!isLoading}
               placeholderTextColor={colors.mediumGray}

@@ -144,3 +144,9 @@ export enum SortOrder {
   ASC = 'ASC',
   DESC = 'DESC',
 }
+
+export enum KeyCode {
+  Backspace = 'Backspace',
+  Enter = 'Enter',
+  Return = 'Return',
+}

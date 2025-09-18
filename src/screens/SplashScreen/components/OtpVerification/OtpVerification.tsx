@@ -115,6 +115,11 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
               onChange={handleOtpChange}
               inputCount={4}
               hasError={!!error}
+              onSubmitEditing={() => {
+                if (isOtpComplete && !isVerifying) {
+                  handleSubmit();
+                }
+              }}
             />
           </View>
           {error ? (
