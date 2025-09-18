@@ -129,7 +129,7 @@ export interface SimulationSummaryData {
   status: string;
   startedAt: string;
   endedAt: string;
-  totalScore: number | null;
+  score: number | null;
   metadata: SummaryMetadata | null;
   hasFeedback: boolean;
   scenario?: {
