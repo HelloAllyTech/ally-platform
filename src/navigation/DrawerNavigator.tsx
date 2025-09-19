@@ -11,7 +11,7 @@ import {BottomTabs} from './TabNavigator';
 
 const Drawer = createDrawerNavigator();
 
-export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
+export const DrawerNavigator = () => {
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
 
   const openLogoutModal = () => setIsLogoutModalVisible(true);
@@ -31,7 +31,7 @@ export const DrawerNavigator = ({hideTabBar}: {hideTabBar: boolean}) => {
         }}>
         <Drawer.Screen
           name={SCREEN_NAMES.BOTTOM_TABS}
-          children={() => <BottomTabs hideTabBar={hideTabBar} />}
+          children={() => <BottomTabs />}
         />
       </Drawer.Navigator>
       {isLogoutModalVisible && (

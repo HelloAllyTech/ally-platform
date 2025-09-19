@@ -2,6 +2,7 @@ import {useCallback, useEffect, useState} from 'react';
 
 import {useErrorToast, useToast} from '@/components';
 import {
+  useAddSummaryFeedbackMutation,
   useLazyExportCallSummaryQuery,
   useUpdateCallInfoMutation,
   useUpdateCallSummaryMutation,
@@ -27,6 +28,7 @@ export const useCallSummaryActions = ({
   const [updateCallInfo] = useUpdateCallInfoMutation();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
+  const [addSummaryFeedback] = useAddSummaryFeedbackMutation();
 
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
@@ -153,6 +155,19 @@ export const useCallSummaryActions = ({
     [showToast, t, handleGoBack],
   );
 
+  const onAddSummaryFeedback = useCallback(
+    async (rating: number, feedback: {issues: string[]; comment: string}) => {
+      const response = await addSummaryFeedback({
+        chatId,
+        rating,
+        feedback: feedback || {issues: [], comment: ''},
+      });
+
+      return response;
+    },
+    [addSummaryFeedback, chatId],
+  );
+
   // Show summary, transcript dropdown
   const onHeaderPress = () => {
     setIsSummaryDropdownVisible(true);
@@ -177,5 +192,6 @@ export const useCallSummaryActions = ({
     onHeaderPress,
     isSummaryDropdownVisible,
     hideHeaderDropdown,
+    onAddSummaryFeedback,
   };
 };

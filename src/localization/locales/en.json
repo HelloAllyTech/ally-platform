@@ -5,6 +5,8 @@
     "yes": "Yes",
     "cancel": "Cancel",
     "version": "Version",
+    "viewMore": "View more",
+    "viewLess": "View less",
     "somethingWentWrong": "Something went wrong. Please try again.",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
@@ -17,8 +19,18 @@
       "networkTitle": "No internet connection",
       "networkDescription": "Call ended due to network interruption, please check your connection and try again.",
       "goBack": "Go back",
-      "tryAgain": "Try again"
+      "tryAgain": "Try again",
+      "microphoneFailureTitle": "Microphone failure",
+      "microphoneFailureDescription": "The call ended due to a microphone failure. Please try again or relaunch app"
     }
+  },
+  "ForceUpdate": {
+    "title": "Update ",
+    "titleBold": "Alert!",
+    "description": "A new version of Ally is available. Please update to continue using the app.",
+    "currentVersion": "Current Version:",
+    "latestVersion": "Latest Version:",
+    "updateButton": "Update Now"
   },
   "CallLogs": {
     "header": {
@@ -29,6 +41,7 @@
     "simulations": "Simulations",
     "start": "Start",
     "session": "Session",
+    "sessionScore": "Session score",
     "chooseListening": "Choose your listening mode",
     "joinCall": "Join Call",
     "listenLive": "Listen Live",
@@ -173,7 +186,8 @@
       "confirm": "Confirm",
       "rename": "Rename",
       "endSession": "End Session",
-      "notesAutoSaveInfo": "Your notes are auto-saved and will appear under 'Additional Notes' after the summary and highlights are generated"
+      "notesAutoSaveInfo": "Your notes are auto-saved and will appear under 'Additional Notes' after the summary and highlights are generated",
+      "summaryFeedbackSubmittedFailed": "Failed to submit summary feedback"
     }
   },
   "CallTranscript": {
@@ -252,6 +266,9 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "endSession": "End session",
+    "session": "Session",
+    "endingSoon": "Ending Soon",
+    "sessionWillEnd": "Your session will end in 30 seconds.",
     "practiceSessionScore": "Practice Session Score",
     "linkCopiedToClipboard": "Link copied to clipboard"
   },
@@ -289,7 +306,12 @@
     "emailPlaceholder": "Enter your email",
     "continue": "Continue",
     "pleaseEnterEmail": "Please enter your email address",
-    "pleaseEnterValidEmail": "Please enter a valid email address"
+    "pleaseEnterValidEmail": "Please enter a valid email address",
+    "activeSimulation": "Active simulation",
+    "detected": "detected",
+    "activeSimulationDescription": "You have a running simulation. End the existing session to start a new one.",
+    "noActiveSimulation": "No active simulation found",
+    "sessionEndedSuccessfully": "Session ended successfully"
   },
   "SimulationFeedback": {
     "title": "Simulation",
@@ -301,7 +323,9 @@
     "submitButton": "Submit Feedback",
     "submittingButton": "Submitting...",
     "sessionSummary": "SESSION SUMMARY",
-    "tryAnother": "Try Another Simulation"
+    "tryAnother": "Try Another Simulation",
+    "transcript": "Transcript",
+    "failedToFetchDetails": "Failed to fetch simulation details"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
@@ -310,5 +334,31 @@
     "connect": "Failed to connect to the room",
     "toggleMic": "Failed to toggle microphone",
     "submitFeedback": "Failed to submit feedback"
+  },
+  "Success": {
+    "submitFeedback": "Feedback submitted successfully"
+  },
+  "FeedbackPopup": {
+    "title": "Rate the AI-generated summary?",
+    "ratingTexts": {
+      "poor": "Needs major improvements.",
+      "fair": "Could be better.",
+      "good": "Decent, but room to grow.",
+      "veryGood": "Nice Experience!",
+      "excellent": "Excellent and highly effective!"
+    },
+    "issueSelectionTitle": "Please select one or more issues",
+    "issues": {
+      "missingKeyInfo": "Missing key information",
+      "inaccurate": "Inaccurate",
+      "tooVague": "Too vague",
+      "difficultToUnderstand": "Difficult to understand",
+      "tooShort": "Too short",
+      "other": "Other"
+    },
+    "suggestionPrompt": "Any more suggestion?",
+    "suggestionPlaceholder": "Anything else that you'd like to share about the summary?",
+    "instructionText": "Please rate the quality, let us know what worked well, and share areas for improvement.",
+    "submitButton": "Submit"
   }
 }

@@ -1,3 +1,4 @@
+import {useMemo} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -6,7 +7,7 @@ import {
   DoubleRightArrowIcon,
   EyeIcon,
 } from '@/assets/icons';
-import {DEFAULT_HIT_SLOP, TAG_COLORS} from '@/constants';
+import {DEFAULT_HIT_SLOP, LogType, TAG_COLORS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
@@ -26,7 +27,7 @@ interface CallLogItemProps {
   item: LogItem;
   expanded: boolean;
   disabled?: boolean;
-  disableExpand?: boolean;
+  logType: LogType;
   onToggle: () => void;
   onItemPress: () => void;
 }
@@ -41,14 +42,26 @@ interface CallLogItemProps {
 export const CallLogItem = ({
   item,
   expanded,
+  logType,
   disabled = false,
-  disableExpand = false,
   onToggle,
   onItemPress,
 }: CallLogItemProps) => {
   const {t} = useTranslate();
+  const logTitle = useMemo(
+    () =>
+      item?.details?.callInfo?.summaryName ||
+      item?.metadata?.sessionName ||
+      item?.details?.chatId ||
+      `ID-${item.id}`,
+    [
+      item?.details?.callInfo?.summaryName,
+      item?.details?.chatId,
+      item.id,
+      item?.metadata?.sessionName,
+    ],
+  );
   const tags = item.details?.summary?.tags || [];
-  const isExpanded = expanded && !disableExpand;
   return (
     <TouchableOpacity
       disabled={disabled}
@@ -56,28 +69,30 @@ export const CallLogItem = ({
       onPress={onItemPress}
       style={[styles.logItemContainer, disabled && styles.disabled]}>
       {/* Header section with client info and call quality score */}
-      <View style={[styles.logHeader, isExpanded && styles.expandedLogHeader]}>
+      <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
         <View style={styles.leftContainer}>
           <View style={styles.logHeaderContent}>
             <TouchableOpacity
               onPress={onToggle}
               activeOpacity={0.7}
-              disabled={disableExpand}
               hitSlop={DEFAULT_HIT_SLOP}
               style={styles.arrowContainer}>
-              {isExpanded ? (
+              {expanded ? (
                 <DoubleBottomArrowIcon width={16} height={16} />
               ) : (
                 <DoubleRightArrowIcon width={16} height={16} />
               )}
             </TouchableOpacity>
             <View style={styles.titleRow}>
-              <Text style={styles.logId} numberOfLines={1} ellipsizeMode="tail">
-                {item?.details?.callInfo?.summaryName ||
-                  item?.details?.chatId ||
-                  item.scenario?.title ||
-                  `Item ${item.id}`}
-              </Text>
+              <View style={styles.colShrink}>
+                <Text
+                  style={styles.logId}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {logTitle}
+                </Text>
+              </View>
+
               <View style={styles.statusAndEyeContainer}>
                 <StatusBadge
                   status={item.summaryStatus || (item.status as any)}
@@ -88,17 +103,32 @@ export const CallLogItem = ({
               </View>
             </View>
           </View>
-          <Text style={styles.logDate}>
-            {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
-          </Text>
+          {logType === LogType.REAL ? (
+            <Text style={styles.logDate}>
+              {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
+            </Text>
+          ) : (
+            logType === LogType.SIMULATION && (
+              <Text
+                style={styles.scenarioName}
+                numberOfLines={1}
+                ellipsizeMode="tail">
+                {item?.scenario?.title || ''}
+                {` • ${formatDate(item.startedAt)}`}
+              </Text>
+            )
+          )}
         </View>
       </View>
 
       {/* Expanded details section */}
-      {isExpanded && (
+      {expanded && (
         <View style={styles.logDetails}>
           <Text style={styles.duration}>
             {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
+            {item?.score
+              ? ` • ${t('CallLogs.sessionScore')} : ${item?.score}`
+              : ''}
           </Text>
           {/* Render tags if they exist */}
           {(tags?.length ?? 0) > 0 && (
@@ -158,7 +188,10 @@ const styles = ScaledSheet.create({
   },
   logHeaderContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexShrink: 1,
+  },
+  colShrink: {
+    flexDirection: 'column',
     flexShrink: 1,
   },
   arrowContainer: {
@@ -178,11 +211,19 @@ const styles = ScaledSheet.create({
     flexShrink: 1,
     marginRight: '3@ms',
   },
+  scenarioName: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    color: colors.darkCharcoal,
+    flexShrink: 1,
+    marginRight: '3@ms',
+    marginLeft: '30@ms',
+  },
   logDate: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '12@ms',
     color: colors.darkCharcoal,
     marginLeft: '30@ms',
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
   },
   logDetails: {
     marginTop: '6@ms',
@@ -207,7 +248,8 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flex: 1,
+    width: '95%',
+    marginRight: '20@ms',
   },
   statusAndEyeContainer: {
     flexDirection: 'row',

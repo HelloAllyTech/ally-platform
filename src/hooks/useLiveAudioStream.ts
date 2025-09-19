@@ -139,14 +139,12 @@ export const useLiveAudioStream = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableLiveAudio, permissionStatus]);
 
-  const startStreaming = useCallback(() => {
-    if (permissionStatus !== RESULTS.GRANTED) {
-      logger.warn('Cannot start streaming: permission not granted');
-      return;
-    }
-    LiveAudioStream?.start?.();
-    setIsStreaming(true);
-  }, [permissionStatus]);
+  const startStreaming = () => {
+    setTimeout(() => {
+      LiveAudioStream?.start?.();
+      setIsStreaming(true);
+    }, 1000);
+  };
 
   const stopStreaming = useCallback(() => {
     LiveAudioStream?.stop?.();

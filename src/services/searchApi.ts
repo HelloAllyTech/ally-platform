@@ -1,3 +1,4 @@
+import {API_METHODS} from '@/constants';
 import {SearchRequest, SearchResult} from '@/screens/SearchScreen/types';
 
 import {api} from './api';
@@ -7,14 +8,14 @@ export const searchApi = api.injectEndpoints({
     getSearchResults: builder.query<SearchResult, SearchRequest>({
       query: (params: SearchRequest) => ({
         url: 'reference-document/search',
-        method: 'POST',
+        method: API_METHODS.POST,
         body: params,
       }),
     }),
     getCategories: builder.query<string[], void>({
       query: () => ({
         url: 'reference-document/categories',
-        method: 'GET',
+        method: API_METHODS.GET,
       }),
     }),
   }),

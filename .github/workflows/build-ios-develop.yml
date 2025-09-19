@@ -85,6 +85,13 @@ jobs:
           agvtool what-version
           echo "build_number=$build_number" >> $GITHUB_OUTPUT
 
+      - name: Update app display name for dev version
+        run: |
+          cd ios
+          # Update Info.plist to show "Ally(Develop)" in TestFlight
+          plutil -replace CFBundleDisplayName -string "Ally(Develop)" ally/Info.plist
+          echo "✅ Updated app display name to 'Ally(Develop)'"
+
       - name: Build archive
         run: |
           cd ios

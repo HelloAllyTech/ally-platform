@@ -1,4 +1,4 @@
-import {API_METHODS, API_ROUTES} from '@/constants';
+import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
   EndScenarioSessionResponse,
@@ -8,6 +8,7 @@ import {
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
+  SimulationSummaryData,
 } from '@/types';
 
 import {api} from './api';
@@ -53,17 +54,20 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getSimulationDetails: builder.query<any, {id: string | number}>({
+    getSimulationDetails: builder.query<
+      SimulationSummaryData,
+      {id: string | number}
+    >({
       query: ({id}) => ({url: `${API_ROUTES.SIMULATION_DETAILS}/${id}`}),
     }),
 
     getSimulationLogs: builder.query<
-      LogItem[],
+      {data: LogItem[]},
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
         url: API_ROUTES.SIMULATION_LOGS,
-        params: {limit, offset, sortBy: 'createdAt', order: 'DESC'},
+        params: {limit, offset, sortBy: 'createdAt', order: SortOrder.DESC},
       }),
     }),
 

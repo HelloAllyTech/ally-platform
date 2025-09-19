@@ -1,3 +1,4 @@
+import {API_METHODS} from '@/constants';
 import {Chat, ChatStatus, FeedbackResponse} from '@/types';
 
 import {api} from './api';
@@ -31,7 +32,7 @@ export const chatApi = api.injectEndpoints({
     endCall: builder.mutation<EndCallResponse, {chatId: number}>({
       query: ({chatId}) => ({
         url: `/chats/${chatId}/end`,
-        method: 'POST',
+        method: API_METHODS.POST,
       }),
     }),
     addFeedback: builder.mutation<
@@ -40,7 +41,7 @@ export const chatApi = api.injectEndpoints({
     >({
       query: ({id, feedback}) => ({
         url: `chats/messages/${id}/feedback`,
-        method: 'POST',
+        method: API_METHODS.POST,
         body: feedback,
       }),
     }),
@@ -50,7 +51,7 @@ export const chatApi = api.injectEndpoints({
     >({
       query: ({feedbackId, feedback}) => ({
         url: `chats/messages/feedback/${feedbackId}`,
-        method: 'PATCH',
+        method: API_METHODS.PATCH,
         body: feedback,
       }),
     }),
@@ -60,7 +61,7 @@ export const chatApi = api.injectEndpoints({
     >({
       query: ({chatId, notes}) => ({
         url: `/chats/${chatId}/notes`,
-        method: 'POST',
+        method: API_METHODS.POST,
         body: notes,
       }),
     }),

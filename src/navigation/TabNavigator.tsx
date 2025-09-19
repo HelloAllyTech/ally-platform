@@ -3,8 +3,9 @@ import {
   BottomTabBarProps,
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
-import {StyleSheet, TouchableOpacity, View} from 'react-native';
+import {TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
 import {
@@ -19,7 +20,8 @@ import {
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {Permissions, SCREEN_NAMES} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {useUser} from '@/hooks/useUser';
 import {
   CallLogScreen,
   CommunityScreen,
@@ -29,6 +31,7 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
+import {isAppFeatureEnabled} from '@/utils/common';
 
 const Tab = createBottomTabNavigator();
 
@@ -36,30 +39,30 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_CALLS
-    requiredPermission: '',
+    requiredPermissions: [
+      USER_PERMISSIONS.VIEW_NAVBAR_CALLS,
+      USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
+    ],
   },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_ANALYTICS
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_ANALYTICS],
   },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
-    // TODO: Replace with Permissions.VIEW_NAVBAR_SEARCH
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_SEARCH],
   },
   {
     name: SCREEN_NAMES.LEARN,
     component: SimulationsScreen,
-    requiredPermission: Permissions.VIEW_NAVBAR_LEARN,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_LEARN],
   },
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
-    requiredPermission: '',
+    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_COMMUNITY],
   },
 ];
 
@@ -67,12 +70,8 @@ interface BottomTabsProps {
   hideTabBar?: boolean;
 }
 
-const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
+const CustomTabBar = (props: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
-
-  if (props.hideTabBar) {
-    return null;
-  }
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
@@ -105,7 +104,12 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
   };
 
   return (
-    <View style={[styles.tabBar, {paddingBottom: insets.bottom}]}>
+    <View
+      style={[
+        styles.tabBar,
+        {paddingBottom: insets.bottom},
+        props.state.routes?.length < 3 && styles.smallTabBar, // For less number items in tabbar
+      ]}>
       {props.state.routes.map((route, index) => {
         const isFocused = props.state.index === index;
 
@@ -122,9 +126,11 @@ const CustomTabBar = (props: BottomTabBarProps & BottomTabsProps) => {
   );
 };
 
-export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
+export const BottomTabs: React.FC<BottomTabsProps> = () => {
+  const {userData} = useUser();
   const renderCustomTabBar = (props: BottomTabBarProps) => {
-    return <CustomTabBar {...props} hideTabBar={hideTabBar} />;
+    if (userData && !isAppFeatureEnabled(userData)) return null;
+    return <CustomTabBar {...props} />;
   };
 
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
@@ -136,7 +142,10 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
 
   const visibleTabs = ALL_TABS.filter(
     tab =>
-      !tab.requiredPermission || permissions.includes(tab.requiredPermission),
+      tab?.requiredPermissions?.length === 0 ||
+      tab?.requiredPermissions?.some(permission =>
+        permissions.includes(permission),
+      ),
   );
   const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
 
@@ -162,7 +171,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({hideTabBar = false}) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
   container: {
     flex: 1,
   },
@@ -172,10 +181,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    height: 60,
-    borderRadius: 40,
-    marginHorizontal: 40,
-    marginBottom: 30,
+    height: '60@ms',
+    borderRadius: '40@ms',
+    marginHorizontal: '40@ms',
+    minWidth: '200@ms',
+    marginBottom: '30@ms',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -187,10 +197,13 @@ const styles = StyleSheet.create({
     borderColor: colors.lightGray2,
     elevation: 3,
   },
+  smallTabBar: {
+    marginHorizontal: '80@ms',
+  },
   tabItem: {
     flex: 1,
     height: '100%',
-    minHeight: 60,
+    minHeight: '60@ms',
     justifyContent: 'center',
     alignItems: 'center',
   },

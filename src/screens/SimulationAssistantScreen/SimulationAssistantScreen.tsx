@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -15,17 +15,26 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {
+  FEEDBACK_MIN_DISPLAY_MS,
+  MINUTES_IN_MS,
+  SCREEN_NAMES,
+  SECONDS_IN_MS,
+  SESSION_AUTO_END_MINUTES,
+  SESSION_END_MODAL_MINUTES,
+  SESSION_END_MODAL_SECONDS,
+} from '@/constants';
 import {useAppNavigation} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import {Feedback, LiveEventPayload} from '@/types';
-import {decodeFeedbackPayloadToJson} from '@/utils';
+import {decodeFeedbackPayloadToJson, logger} from '@/utils';
 
 import {
   AudioWave,
   ControlButtons,
+  EndingSoonModal,
   LiveFeedback,
   SessionScoreMeter,
   SimulationTimer,
@@ -37,9 +46,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {roomData, scenario} = route.params;
   const {liveKitServerUrl, accessToken, id: roomId} = roomData;
-  const startTime = roomData?.createdAt
-    ? new Date(roomData?.createdAt)
-    : new Date();
+  const startTime = useMemo(
+    () => (roomData?.createdAt ? new Date(roomData?.createdAt) : new Date()),
+    [roomData?.createdAt],
+  );
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const [endScenarioSession] = useEndScenarioSessionMutation();
@@ -52,6 +62,47 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
+  const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
+
+  // Queue incoming feedback and ensure each item shows for at least 10 seconds
+  const [, setFeedbackQueue] = useState<NonNullable<Feedback>[]>([]);
+  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showNextFeedback = useCallback(() => {
+    setFeedbackQueue(prevQueue => {
+      if (prevQueue.length === 0) {
+        // Keep showing the last feedback when the queue is empty
+        return prevQueue;
+      }
+      const [next, ...rest] = prevQueue;
+      setFeedback(next);
+      setFeedbackKey(next.id);
+
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      feedbackTimerRef.current = setTimeout(() => {
+        feedbackTimerRef.current = null;
+        showNextFeedback();
+      }, FEEDBACK_MIN_DISPLAY_MS);
+      return rest;
+    });
+  }, []);
+
+  const enqueueFeedback = useCallback(
+    (item: NonNullable<Feedback>) => {
+      setFeedbackQueue(prev => {
+        const nextQueue = [...prev, item];
+        if (!feedbackTimerRef.current) {
+          // If no timer is running, either nothing is shown or
+          // the current item has already satisfied its minimum display time.
+          showNextFeedback();
+        }
+        return nextQueue;
+      });
+    },
+    [showNextFeedback],
+  );
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -71,12 +122,58 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
   }, []);
 
+  useEffect(() => {
+    // Show the ending-soon modal at 29 minutes 30 seconds from the start time
+    if (!startTime) return;
+
+    const modalTargetMs =
+      SESSION_END_MODAL_MINUTES * MINUTES_IN_MS +
+      SESSION_END_MODAL_SECONDS * SECONDS_IN_MS;
+    const autoEndTargetMs = SESSION_AUTO_END_MINUTES * MINUTES_IN_MS;
+
+    const now = Date.now();
+    const elapsed = now - startTime.getTime();
+
+    const remainingModal = Math.max(0, modalTargetMs - elapsed);
+    const remainingAutoEnd = Math.max(0, autoEndTargetMs - elapsed);
+
+    const modalTimer = setTimeout(
+      () => setShowEndingSoon(true),
+      remainingModal,
+    );
+    const autoEndTimer = setTimeout(() => {
+      if (!isDisconnecting) handleDisconnect();
+    }, remainingAutoEnd);
+
+    return () => {
+      clearTimeout(modalTimer);
+      clearTimeout(autoEndTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startTime, isDisconnecting]);
+
+  const ensureSpeakerOutput = useCallback(async () => {
+    // Try a few times with small delays; OEM skins sometimes override routing during focus changes
+    const attempts = 3;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await AudioSession.startAudioSession();
+        await AudioSession.selectAudioOutput('speaker');
+        break;
+      } catch (error) {
+        logger.error(`Failed to ensure speaker output: ${error}`);
+      }
+      await new Promise(res => setTimeout(res, 200));
+    }
+  }, []);
+
   const attachRoomListeners = useCallback(() => {
-    const onConnected = () => {
+    const onConnected = async () => {
       setIsConnecting(false);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
+        await ensureSpeakerOutput();
       } catch (error) {
         showErrorToast(error, 'Errors.attachListeners');
       }
@@ -100,36 +197,45 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
       if (message && typeof message === 'string') {
         const id = Date.now();
-        setFeedback({id, text: message, emoji: emoji ?? undefined});
-        setFeedbackKey(id);
+        enqueueFeedback({id, text: message, emoji: emoji ?? undefined});
       }
-    };
-    const onTrackPublished = () => {
-      // console.log('TrackPublished');
     };
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
-      .on(RoomEvent.TrackPublished, onTrackPublished)
       .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
-        .off(RoomEvent.TrackPublished, onTrackPublished)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp]);
+  }, [room, showErrorToast, clamp, enqueueFeedback, ensureSpeakerOutput]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
+
+  // Cleanup the feedback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const configureAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
-        // This configures the audio session to route to speaker first instead of phone speaker
+        // Keep speaker output but engage inCommunication mode to help AEC
         android: {
           preferredOutputList: ['speaker'],
-          audioTypeOptions: AndroidAudioTypePresets.media,
+          audioTypeOptions: {
+            ...AndroidAudioTypePresets.media,
+            audioMode: 'inCommunication',
+            forceHandleAudioRouting: true,
+            audioAttributesUsageType: 'voiceCommunication',
+          },
         },
       });
     } catch (error) {
@@ -243,6 +349,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             isDisableMic={showSimulationLoading}
             isDisableStop={isDisconnecting}
             isMuted={!isMicEnabled}
+          />
+          <EndingSoonModal
+            visible={showEndingSoon && !showSimulationLoading}
+            titleMain={t('SimulationAssistant.session')}
+            titleItalic={t('SimulationAssistant.endingSoon')}
+            description={t('SimulationAssistant.sessionWillEnd')}
+            onContinue={() => setShowEndingSoon(false)}
+            onEndSession={handleDisconnect}
           />
         </View>
       </RoomContext.Provider>

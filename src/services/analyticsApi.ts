@@ -1,3 +1,5 @@
+import {API_METHODS} from '@/constants';
+
 import {api} from './api';
 
 export interface CounselorStats {
@@ -17,7 +19,7 @@ export const analyticsApi = api.injectEndpoints({
     getCounselorStats: builder.query<CounselorStats, AnalyticsRequestParams>({
       query: params => ({
         url: 'analytics/counselor-stats',
-        method: 'GET',
+        method: API_METHODS.GET,
         params,
       }),
     }),
