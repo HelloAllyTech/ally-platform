@@ -118,7 +118,7 @@ const NavigationContent = ({
         <>
           <Stack.Screen
             name={SCREEN_NAMES.CALL_LOG}
-            children={() => <DrawerNavigator hideTabBar={!isCounselor} />}
+            children={() => <DrawerNavigator />}
           />
           <Stack.Screen
             name={SCREEN_NAMES.LISTENING}

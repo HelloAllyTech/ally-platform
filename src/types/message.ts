@@ -154,4 +154,5 @@ export interface Nudge {
 export enum DisconnectedType {
   SOCKET = 'socket',
   NETWORK = 'network',
+  MICROPHONE_FAILURE = 'microphone_failure',
 }

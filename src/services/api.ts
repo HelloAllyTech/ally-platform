@@ -7,7 +7,7 @@ import {
 } from '@reduxjs/toolkit/query/react';
 
 import {env} from '@/config/env';
-import {AsyncStorageKeys} from '@/constants';
+import {API_METHODS, AsyncStorageKeys} from '@/constants';
 import {handleLogout, storeTokens} from '@/store/slices/userSlice';
 import {store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
@@ -54,7 +54,7 @@ const baseQueryWithReauth: BaseQueryFn<
         const refreshResult = await baseQuery(
           {
             url: '/auth/refresh',
-            method: 'POST',
+            method: API_METHODS.POST,
             body: {refreshToken},
           },
           _store,

@@ -1,5 +1,10 @@
 import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants';
 
+/**
+ * Formats a date string into a short month and day representation.
+ * @param dateString - ISO date string
+ * @returns Formatted date in "MMM DD" (e.g., "May 09")
+ */
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   const month = MONTH_NAMES_SHORT[date.getMonth()];
@@ -7,6 +12,11 @@ export const formatDate = (dateString: string) => {
   return `${month} ${day}`;
 };
 
+/**
+ * Formats a date string into 12-hour time with AM/PM.
+ * @param dateString - ISO date string
+ * @returns Formatted time in "h:mm AM/PM" (e.g., "1:05 PM")
+ */
 export const formatTime = (dateString: string) => {
   const date = new Date(dateString);
   let hours = date.getHours();
@@ -17,6 +27,12 @@ export const formatTime = (dateString: string) => {
   return `${hours}:${minutes} ${ampm}`;
 };
 
+/**
+ * Calculates duration between two date strings.
+ * @param start - Start time (ISO date string)
+ * @param end - End time (ISO date string)
+ * @returns Duration in "X mins Y secs" (e.g., "3 mins 07 secs")
+ */
 export const calculateDuration = (start: string, end: string) => {
   const startTime = new Date(start);
   const endTime = new Date(end);

@@ -7,6 +7,8 @@ import {CarouselConfig} from '@/components/Carousel/types';
 import {colors, fontFamily} from '@/theme';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
+export const MINUTES_IN_MS = 60 * 1000;
+export const SECONDS_IN_MS = 1000;
 
 export const DEFAULT_HIT_SLOP = {
   top: 10,
@@ -70,12 +72,15 @@ export const API_ROUTES = {
   END_SCENARIO_SESSION: '/learn/scenario-session',
   SCENARIO_SESSION_START: '/learn/scenario-session-start',
   SIMULATION_DETAILS: '/learn/scenario-session',
+  SIMULATION_MESSAGES: '/learn/scenario-session/:scenarioSessionId/messages',
 } as const;
 
 export const API_METHODS = {
   GET: 'GET',
   POST: 'POST',
   DELETE: 'DELETE',
+  PATCH: 'PATCH',
+  PUT: 'PUT',
 } as const;
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
@@ -130,13 +135,18 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   },
 };
 
-export const USER_PERMISSIONS = {
-  CALL_LOG: 'view:navbar:calls',
-  CALENDAR: 'view:navbar:calendar',
-  ANALYTICS: 'view:navbar:analytics',
-  LEARN: 'view:navbar:learn',
-  STRESS_BUSTER: 'view:navbar:stress-buster',
-  SETTINGS: 'view:navbar:settings',
-  EDIT_SUMMARY: 'edit:summary',
-  START_CALL: 'view:button:start-call',
+export const APP_STORE_URLS = {
+  ios: 'https://apps.apple.com/app/helloally/id6745545012',
+  android: 'https://play.google.com/store/apps/details?id=com.helloally.app',
 };
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+export enum KeyCode {
+  Backspace = 'Backspace',
+  Enter = 'Enter',
+  Return = 'Return',
+}

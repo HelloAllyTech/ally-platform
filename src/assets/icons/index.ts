@@ -35,11 +35,13 @@ import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
+import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
 import GoldenShieldIcon from './goldenShield.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
+import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
@@ -47,6 +49,7 @@ import LearnInactiveIcon from './learn.svg';
 import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
 import LeftArrowIcon from './leftArrowIcon.svg';
+import LightBulbIcon from './lightBulb.svg';
 import LockIcon from './lock.svg';
 import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
@@ -67,6 +70,7 @@ import ProfileIcon from './profileIcon.svg';
 import ReplayIcon from './replay.svg';
 import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
+import RunningSimulationIcon from './runningSimulation.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
@@ -74,6 +78,7 @@ import SessionSummaryIcon from './sessionSummary.svg';
 import ShareIcon from './share.svg';
 import ShieldIcon from './shield.svg';
 import ShieldWithTickIcon from './shieldWithTick.svg';
+import SimulationIcon from './simulation.svg';
 import SmileIcon from './smile.svg';
 import StarIcon from './star.svg';
 import TableEyeIcon from './tableEye.svg';
@@ -90,94 +95,99 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  AnalyticsActiveIcon,
+  AnalyticsInactiveIcon,
+  ArrowDown,
+  ArrowRight,
+  AssessmentIcon,
   BarsIcon,
-  TickIcon,
-  ProfileIcon,
-  DrawerMenuIcon,
-  LogoutIcon,
-  SearchActiveIcon,
-  SearchInactiveIcon,
-  CommunityActiveIcon,
-  CommunityInactiveIcon,
-  LeftArrowIcon,
-  CallEndIcon,
-  NoCallLogsIcon,
-  MicIcon,
-  ThumbIcon,
-  HeadphoneIcon,
-  InfoIcon,
-  PauseIcon,
-  PlayIcon,
-  TickRoundIcon,
+  BlueWarningIcon,
+  BrightnessAlertIcon,
+  BulbIcon,
   CallDetailsIcon,
-  KeyConcernIcon,
+  CallEndIcon,
   CallHighlightsIcon,
-  DemogsIcon,
-  FlowIcon,
-  SearchIcon,
-  FilterIcon,
-  EyeIcon,
+  CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
-  DoubleRightArrowIcon,
-  DoubleBottomArrowIcon,
-  PauseWhiteIcon,
-  PlayWhiteIcon,
-  VolumeIcon,
-  VolumeOffIcon,
-  ThreeDotsIcon,
   CheckIcon,
-  CloseCircle,
-  EditSquareIcon,
-  WandStarsIcon,
-  TableEyeIcon,
-  AssessmentIcon,
-  BrightnessAlertIcon,
-  DatabaseIcon,
-  HandShareIcon,
-  HeadsetMicIcon,
-  MagnifyEyeIcon,
-  NewsStandIcon,
-  TagIcon,
-  SmileIcon,
-  PrescriptionsIcon,
-  DeleteIcon,
-  ExportIcon,
-  AnalyticsInactiveIcon,
-  AnalyticsActiveIcon,
-  EditIcon,
-  ArrowRight,
-  ArrowDown,
-  SessionSummaryIcon,
-  RightArrow,
-  LeftArrow,
   ChevronDown,
-  CallIcon,
-  TranscriptIcon,
-  EmptyTranscriptIcon,
-  PageIcon,
-  NotesIcon,
-  TranscribeIcon,
-  ReplayIcon,
+  CloseCircle,
   CloseIcon,
-  StarIcon,
-  ShieldIcon,
-  LockIcon,
-  GoldenShieldIcon,
+  CommunityActiveIcon,
+  CommunityInactiveIcon,
   ContractIcon,
-  ResumeIcon,
-  BlueWarningIcon,
-  ShieldWithTickIcon,
+  DatabaseIcon,
+  DeleteIcon,
+  DemogsIcon,
+  DoubleBottomArrowIcon,
+  DoubleRightArrowIcon,
   DownArrowIcon,
-  NetworkDisconnectedIcon,
-  HexagonCloseIcon,
+  DrawerMenuIcon,
+  EditIcon,
+  EditSquareIcon,
+  EmptyTranscriptIcon,
   EndSessionIcon,
+  ExportIcon,
+  EyeIcon,
+  FilterIcon,
+  FlowIcon,
+  GoldenShieldIcon,
+  HandShareIcon,
+  HeadphoneIcon,
+  HeadsetMicIcon,
+  HexagonCloseIcon,
+  HourGlassIcon,
+  InfoIcon,
+  KeyConcernIcon,
+  KeyEventsIcon,
   LearnActiveIcon,
   LearnInactiveIcon,
-  MicOnIcon,
+  LeftArrow,
+  LeftArrowIcon,
+  LightBulbIcon,
+  LockIcon,
+  LogoutIcon,
+  MagnifyEyeIcon,
+  MicIcon,
   MicOffIcon,
-  KeyEventsIcon,
-  ThumbUpIcon,
-  BulbIcon,
+  MicOnIcon,
+  NetworkDisconnectedIcon,
+  NewsStandIcon,
+  NoCallLogsIcon,
+  NotesIcon,
+  PageIcon,
+  PauseIcon,
+  PauseWhiteIcon,
+  PlayIcon,
+  PlayWhiteIcon,
+  PrescriptionsIcon,
+  ProfileIcon,
+  ReplayIcon,
+  ResumeIcon,
+  RightArrow,
+  RunningSimulationIcon,
+  SearchActiveIcon,
+  SearchIcon,
+  SearchInactiveIcon,
+  SessionSummaryIcon,
   ShareIcon,
+  ForceUpdateAlertIcon,
+  ShieldIcon,
+  ShieldWithTickIcon,
+  SimulationIcon,
+  SmileIcon,
+  StarIcon,
+  TableEyeIcon,
+  TagIcon,
+  ThreeDotsIcon,
+  ThumbIcon,
+  ThumbUpIcon,
+  TickIcon,
+  TickRoundIcon,
+  TranscriptIcon,
+  TranscribeIcon,
+  VolumeIcon,
+  VolumeOffIcon,
+  WandStarsIcon,
 };
