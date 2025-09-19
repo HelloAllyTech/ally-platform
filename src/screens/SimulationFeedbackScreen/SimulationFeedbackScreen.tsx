@@ -129,11 +129,14 @@ export const SimulationFeedbackScreen: React.FC<
       } else {
         showToast(t('Errors.submitFeedback'), 'error');
       }
-      navigation.goBack();
     } catch (error) {
       showToast(t('Errors.submitFeedback'), 'error');
       hideFeedbackPopup();
+    }
+    if (fromLogs) {
       navigation.goBack();
+    } else {
+      navigateToLearnTab(navigation);
     }
   };
 
@@ -157,7 +160,7 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const handleSubmit = () => {
-    navigateToLearnTab(navigation);
+    setIsFeedbackPopupVisible(true);
   };
 
   const handleScrollToBottom = useCallback(() => {
@@ -251,9 +254,7 @@ export const SimulationFeedbackScreen: React.FC<
           automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}>
-          {!simulationDetails?.details &&
-          simulationDetails?.events?.length === 0 &&
-          !retryLimitReached ? (
+          {!simulationDetails?.details && !retryLimitReached ? (
             <SimulationSummarySkeleton />
           ) : (
             <>
