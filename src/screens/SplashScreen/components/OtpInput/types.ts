@@ -3,5 +3,4 @@ export interface OtpInputProps {
   onChange: (newValue: string[]) => void;
   inputCount?: number;
   hasError?: boolean;
-  onSubmitEditing: () => void;
 }
