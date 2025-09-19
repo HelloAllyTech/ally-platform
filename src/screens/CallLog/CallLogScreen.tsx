@@ -11,11 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {PERMISSIONS} from 'react-native-permissions';
+import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
+import {CallLogSkeleton} from '@/components';
 import {env} from '@/config/env';
 import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
@@ -36,16 +37,17 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
-import {Chat, UserRole} from '@/types';
+import {Chat} from '@/types';
+import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
 import {
   CallLogHeader,
   CallLogItem,
+  FeatureNotAvailable,
   StartSessionModal,
   TabView,
 } from './components';
-import {FeatureNotAvailable} from './components/FeatureNotAvailable';
 import {LogItem} from './types';
 
 // Number of items to fetch per page for pagination
@@ -75,8 +77,8 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const [showStartSession, setShowStartSession] = useState(false);
   const {userData} = useUser();
+  const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -90,9 +92,9 @@ export const CallLogScreen: React.FC = () => {
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
 
-  const isCounselor = userData?.role === UserRole.COUNSELOR;
-  const isLearnUser = userData?.role === UserRole.LEARN;
-  const isCallLogFeatureEnabled = isCounselor || isLearnUser;
+  const canStartCall = permissions?.includes(
+    USER_PERMISSIONS.VIEW_START_CALL_PAGE,
+  );
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -109,16 +111,26 @@ export const CallLogScreen: React.FC = () => {
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
 
-    if (permissions?.includes(USER_PERMISSIONS.CALL_LOG)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_NAVBAR_CALLS)) {
       logTypes.push(LogType.REAL);
     }
 
-    if (permissions?.includes(USER_PERMISSIONS.LEARN)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_SCENARIO_SESSION)) {
       logTypes.push(LogType.SIMULATION);
     }
 
     return logTypes;
   }, [permissions]);
+
+  // Set initial active tab based on available permissions
+  useEffect(() => {
+    if (
+      availableLogTypes.length > 0 &&
+      !availableLogTypes.includes(activeTab)
+    ) {
+      setActiveTab(availableLogTypes[0]);
+    }
+  }, [availableLogTypes, activeTab]);
 
   useHardwareBackPressHandler(() => {
     BackHandler.exitApp();
@@ -142,7 +154,7 @@ export const CallLogScreen: React.FC = () => {
       if (!isMicPermissionGranted) {
         const permissionResult = await requestMicPermission();
 
-        if (permissionResult === 'blocked') {
+        if (permissionResult === RESULTS.BLOCKED) {
           Alert.alert(
             t('Common.permissions.microphoneRequired'),
             t('Common.permissions.microphoneMessage'),
@@ -157,6 +169,8 @@ export const CallLogScreen: React.FC = () => {
               },
             ],
           );
+        } else if (permissionResult !== RESULTS.GRANTED) {
+          await requestMicPermission();
         }
       }
     };
@@ -194,9 +208,10 @@ export const CallLogScreen: React.FC = () => {
    */
   const fetchInitialSimulationLogs = useCallback(async () => {
     const result = await getSimulationLogs({limit: ITEMS_PER_PAGE, offset: 0});
-    if (result.data) {
-      setAllSimulationLogs(result.data);
-      setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+    const logsResponse = result.data?.data;
+    if (logsResponse) {
+      setAllSimulationLogs(logsResponse);
+      setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
     } else {
       setAllSimulationLogs([]);
     }
@@ -257,11 +272,11 @@ export const CallLogScreen: React.FC = () => {
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
       });
-
-      if (result?.data) {
-        setAllSimulationLogs(prev => [...prev, ...(result?.data || [])]);
+      const logsResponse = result.data?.data;
+      if (logsResponse) {
+        setAllSimulationLogs(prev => [...prev, ...(logsResponse || [])]);
         setSimulationLogsOffset(newOffset);
-        setHasMoreSimulationLogs(result.data.length === ITEMS_PER_PAGE);
+        setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
       }
     }
   };
@@ -286,6 +301,7 @@ export const CallLogScreen: React.FC = () => {
     if (activeTab === LogType.REAL) {
       navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
         callId: item?.details?.chatId,
+        fromLogs: true,
       });
     } else {
       // For simulation logs, navigate to simulation summary or details
@@ -314,9 +330,9 @@ export const CallLogScreen: React.FC = () => {
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
-        disableExpand={activeTab === LogType.SIMULATION}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
+        logType={activeTab}
       />
     );
   };
@@ -379,24 +395,6 @@ export const CallLogScreen: React.FC = () => {
     navigation.navigate('Listening', {isMicrophoneMode: true});
   };
 
-  const renderLoader = () => {
-    return (
-      <View style={styles.centerContent}>
-        <ActivityIndicator size="large" color={colors.darkSlate} />
-      </View>
-    );
-  };
-
-  if (!isCallLogFeatureEnabled) {
-    return (
-      <FeatureNotAvailable
-        description={t('CallLogs.appCurrentlyForCounsellors')}
-        ctaText={t('CallLogs.learnMore')}
-        onCtaPress={handleLearnMorePress}
-        containerStyle={styles.featureNotAvailable}
-      />
-    );
-  }
   // Get current logs and loading state based on active tab
   const currentLogs =
     activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
@@ -405,17 +403,39 @@ export const CallLogScreen: React.FC = () => {
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
+  if (userData && !isAppFeatureEnabled(userData)) {
+    return (
+      <View style={[styles.container, {paddingTop: insets.top}]}>
+        <CallLogHeader
+          search={search}
+          onSearchChange={setSearch}
+          showTitle={false}
+          isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
+        />
+        <FeatureNotAvailable
+          description={t('CallLogs.appCurrentlyForCounsellors')}
+          ctaText={t('CallLogs.learnMore')}
+          onCtaPress={handleLearnMorePress}
+          containerStyle={styles.featureNotAvailable}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
+        isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
         <TabView activeTab={activeTab} onTabChange={setActiveTab} />
       )}
-      {currentLogs.length === 0 && !isFetching ? (
+      {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
+        <CallLogSkeleton count={10} />
+      ) : currentLogs.length === 0 && !isFetching ? (
         <View style={styles.emptyContainer}>
           <NoCallLogsIcon
             style={styles.noCallLogsIcon}
@@ -452,10 +472,9 @@ export const CallLogScreen: React.FC = () => {
             updateCellsBatchingPeriod={50}
             windowSize={5}
           />
-          {isFetching && currentOffset === 0 && renderLoader()}
         </View>
       )}
-      {isCounselor && !currentChat?.chatId && (
+      {canStartCall && !currentChat?.chatId && (
         <TouchableOpacity
           style={[
             styles.fab,
@@ -498,14 +517,19 @@ const styles = ScaledSheet.create({
   },
   centerContent: {
     position: 'absolute',
-    top: 0,
+    top: -8,
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: '14@ms',
+    alignItems: 'center',
+  },
+  linearLoader: {
+    marginTop: '20@ms',
   },
   footerLoader: {
     paddingVertical: '16@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

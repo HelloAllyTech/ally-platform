@@ -1,9 +1,8 @@
-import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {EmptyTranscriptIcon} from '@/assets/icons';
+import {EmptyTranscript, TranscriptItem} from '@/components';
 import {useCallTranscriptDetails, useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
 
 type Message = {
   id: number;
@@ -22,28 +21,17 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
   const renderItem = ({item}: {item: Message}) => {
     const {time, counselor, message} = item;
     return (
-      <View style={styles.messageContainer}>
-        <View style={styles.timeContainer}>
-          <Text style={styles.timeText}>{time}</Text>
-        </View>
-        <View style={styles.messageContent}>
-          <Text style={styles.messageText}>
-            {`${counselor ? t('CallTranscript.you') : t('CallTranscript.client')}: `}
-            <Text style={styles.message}>{message}</Text>
-          </Text>
-        </View>
-      </View>
+      <TranscriptItem
+        time={time}
+        message={message}
+        speakerLabel={
+          counselor ? t('CallTranscript.you') : t('CallTranscript.client')
+        }
+      />
     );
   };
 
-  const renderEmptyComponent = () => {
-    return (
-      <View style={styles.emptyContainer}>
-        <EmptyTranscriptIcon />
-        <Text style={styles.emptyText}>{t('CallTranscript.empty')}</Text>
-      </View>
-    );
-  };
+  const renderEmptyComponent = () => <EmptyTranscript />;
   return (
     <FlatList
       style={styles.container}
@@ -61,50 +49,9 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
 };
 
 const styles = ScaledSheet.create({
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: '40%',
-  },
-  emptyText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '16@ms',
-    lineHeight: '24@mvs',
-    marginTop: '30@mvs',
-    marginHorizontal: '30%',
-    textAlign: 'center',
-  },
   container: {
     flex: 1,
     paddingHorizontal: '32@ms',
-  },
-  messageContainer: {
-    marginVertical: '7@mvs',
-    flexDirection: 'row',
-  },
-  timeContainer: {
-    width: '60@ms',
-  },
-  timeText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.mediumGray2,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
-  },
-  messageText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
-    color: colors.black,
-  },
-  message: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.charcoal2,
-  },
-  messageContent: {
-    flex: 1,
   },
   contentContainer: {
     paddingBottom: '48@mvs',

@@ -80,19 +80,12 @@ jobs:
           cd ios
           which agvtool
           agvtool what-version
-          # Add "0" prefix for production builds to distinguish from develop builds
-          build_number="0$(date +%Y%m%d%H%M)"
+          # Add "1" prefix for production builds to distinguish from develop builds
+          build_number="1$(date +%Y%m%d%H%M)"
           echo "Production build number: $build_number"
           agvtool new-version -all $build_number
           agvtool what-version
           echo "build_number=$build_number" >> $GITHUB_OUTPUT
-
-      - name: Update app display name for production
-        run: |
-          cd ios
-          # Update Info.plist to show "Ally (Production)" in TestFlight
-          plutil -replace CFBundleDisplayName -string "Ally (Production)" ally/Info.plist
-          echo "✅ Updated app display name to 'Ally (Production)'"
 
       - name: Add production build metadata
         run: |

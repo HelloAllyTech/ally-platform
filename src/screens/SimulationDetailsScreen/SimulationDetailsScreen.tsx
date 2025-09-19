@@ -24,6 +24,8 @@ import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import {copyToClipboard} from '@/utils';
 
+import {ActiveSimulationModal} from './components';
+
 type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
@@ -36,6 +38,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [startScenarioSession] = useStartScenarioSessionMutation();
+  const [showActiveSimulationModal, setShowActiveSimulationModal] =
+    useState(false);
+  const [activeSimulationId, setActiveSimulationId] = useState<string | null>(
+    null,
+  );
 
   useHardwareBackPressHandler(() => {
     navigation.goBack();
@@ -65,7 +72,13 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         });
       }
     } catch (error) {
-      showErrorToast(error, 'Errors.startSimulation');
+      const err = error as {data?: {entityId?: string}};
+      if (err.data?.entityId) {
+        setActiveSimulationId(err.data?.entityId || null);
+        setShowActiveSimulationModal(true);
+      } else {
+        showErrorToast(error, 'Errors.startSimulation');
+      }
     } finally {
       setIsCreatingRoom(false);
     }
@@ -144,6 +157,13 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       {renderHeader()}
       {renderDetailsSection()}
       {renderCtaSection()}
+      {showActiveSimulationModal && activeSimulationId && (
+        <ActiveSimulationModal
+          visible={showActiveSimulationModal}
+          onClose={() => setShowActiveSimulationModal(false)}
+          scenarioSessionId={activeSimulationId}
+        />
+      )}
     </View>
   );
 };
@@ -222,7 +242,10 @@ const styles = ScaledSheet.create({
     gap: '8@ms',
     marginBottom: '18@ms',
     marginHorizontal: '10@ms',
-    paddingTop: isIOS ? '0@vs' : '8@vs',
+    paddingTop: '16@ms',
+    paddingBottom: '8@ms',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.lightGray5,
   },
   headerLeft: {
     justifyContent: 'center',
@@ -235,6 +258,7 @@ const styles = ScaledSheet.create({
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   row: {
     flexDirection: 'row',
