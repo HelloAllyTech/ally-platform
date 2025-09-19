@@ -3,6 +3,7 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, KeyEventsIcon, LightBulbIcon, ThumbUpIcon} from '@/assets';
+import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
@@ -17,6 +18,8 @@ interface SimulationSummaryProps {
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   const MAX_SUMMARY_SCORE = 50;
+  const {t} = useTranslate();
+
   const [expandedSections, setExpandedSections] = useState({
     keyEvents: false,
     whatWentWell: false,
@@ -99,7 +102,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
             <TouchableOpacity
               style={styles.viewMoreButton}
               onPress={() => toggleSection(sectionKey)}>
-              <Text style={styles.viewMoreText}>View more</Text>
+              <Text style={styles.viewMoreText}>
+                {isExpanded ? t('Common.viewLess') : t('Common.viewMore')}
+              </Text>
               <ArrowDown
                 width={10}
                 height={10}

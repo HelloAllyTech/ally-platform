@@ -5,6 +5,8 @@
     "yes": "Yes",
     "cancel": "Cancel",
     "version": "Version",
+    "viewMore": "View more",
+    "viewLess": "View less",
     "somethingWentWrong": "Something went wrong. Please try again.",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
