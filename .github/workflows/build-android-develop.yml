@@ -56,10 +56,6 @@ jobs:
         run: |
           echo "${{ secrets.ENV_VALUES_DEVELOP }}" > .env
 
-      - name: Update app name in strings.xml
-        run: |
-          sed -i '' 's/<string name="app_name">Ally<\/string>/<string name="app_name">Ally(Dev)<\/string>/' android/app/src/main/res/values/strings.xml
-
       - name: Build with Gradle
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
