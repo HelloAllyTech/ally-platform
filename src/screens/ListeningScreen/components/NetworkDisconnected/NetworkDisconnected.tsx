@@ -22,20 +22,38 @@ export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
   const {t} = useTranslate();
   const {isOffline} = useNetworkConnectivity();
 
+  const getTitle = () => {
+    switch (disconnectedType) {
+      case DisconnectedType.SOCKET:
+        return t('Common.offline.socketTitle');
+      case DisconnectedType.NETWORK:
+        return t('Common.offline.networkTitle');
+      case DisconnectedType.MICROPHONE_FAILURE:
+        return t('Common.offline.microphoneFailureTitle');
+      default:
+        return t('Common.offline.socketTitle');
+    }
+  };
+
+  const getDescription = () => {
+    switch (disconnectedType) {
+      case DisconnectedType.SOCKET:
+        return t('Common.offline.socketDescription');
+      case DisconnectedType.NETWORK:
+        return t('Common.offline.networkDescription');
+      case DisconnectedType.MICROPHONE_FAILURE:
+        return t('Common.offline.microphoneFailureDescription');
+      default:
+        return t('Common.offline.socketDescription');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.card}>
         <NetworkDisconnectedIcon />
-        <Text style={styles.title}>
-          {disconnectedType === DisconnectedType.SOCKET
-            ? t('Common.offline.socketTitle')
-            : t('Common.offline.networkTitle')}
-        </Text>
-        <Text style={styles.description}>
-          {disconnectedType === DisconnectedType.SOCKET
-            ? t('Common.offline.socketDescription')
-            : t('Common.offline.networkDescription')}
-        </Text>
+        <Text style={styles.title}>{getTitle()}</Text>
+        <Text style={styles.description}>{getDescription()}</Text>
         {!isOffline && (
           <PrimaryButton
             label={t('Common.offline.tryAgain')}

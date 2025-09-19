@@ -16,7 +16,12 @@ import {
 import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
-import {AllyPlatforms, AUDIO_INACTIVE_TIMEOUT, SCREEN_NAMES} from '@/constants';
+import {
+  AllyPlatforms,
+  AUDIO_INACTIVE_TIMEOUT,
+  SCREEN_NAMES,
+  USER_PERMISSIONS,
+} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
@@ -84,6 +89,7 @@ export const ListeningScreen = ({
     useEndCallMutation();
   const {userData} = useUser();
   const chatData = useAppSelector(state => state.chat.currentChat);
+  const permissions = useAppSelector(state => state.user.permissions);
 
   const callProvider = chatData?.provider;
 
@@ -105,6 +111,7 @@ export const ListeningScreen = ({
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
+  const [isMicrophoneAudioActive, setIsMicrophoneAudioActive] = useState(false);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
@@ -113,6 +120,7 @@ export const ListeningScreen = ({
     useState<DisconnectedType | null>(null);
 
   const streamingInitialized = useRef(false);
+  const chatIdTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Use ref to always access the latest isCallPaused value inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
@@ -174,11 +182,35 @@ export const ListeningScreen = ({
     });
   }, [isMicrophoneMode, navigation]);
 
+  useEffect(() => {
+    const clearChatIdTimeout = () => {
+      if (chatIdTimeoutRef.current) {
+        clearTimeout(chatIdTimeoutRef.current);
+        chatIdTimeoutRef.current = null;
+      }
+    };
+
+    if (!chatData?.chatId) {
+      chatIdTimeoutRef.current = setTimeout(() => {
+        setDisconnectedType(DisconnectedType.MICROPHONE_FAILURE);
+      }, 5000); // 5 seconds
+    } else {
+      clearChatIdTimeout();
+    }
+
+    return () => {
+      clearChatIdTimeout();
+    };
+  }, [chatData?.chatId]);
+
   // Clear timeout on unmount
   useEffect(() => {
     return () => {
       if (audioTimeoutRef.current) {
         clearTimeout(audioTimeoutRef.current);
+      }
+      if (chatIdTimeoutRef.current) {
+        clearTimeout(chatIdTimeoutRef.current);
       }
     };
   }, []);
@@ -301,6 +333,7 @@ export const ListeningScreen = ({
 
   const handleAudioData = useCallback(
     (base64Wav: string) => {
+      setIsMicrophoneAudioActive(true);
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (
         !isCallPausedRef.current &&
@@ -337,19 +370,15 @@ export const ListeningScreen = ({
   ]);
 
   useEffect(() => {
-    if (
-      isAudioSessionReady &&
-      chatData?.chatId &&
-      !streamingInitialized.current
-    ) {
+    if (isMicrophoneMode && !streamingInitialized.current) {
       streamingInitialized.current = true;
       startStreaming();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAudioSessionReady, chatData?.chatId]);
+  }, [isMicrophoneMode]);
 
   useEffect(() => {
-    if (isAudioSessionReady && !isAudioChatEmitted) {
+    if (isAudioSessionReady && isMicrophoneAudioActive && !isAudioChatEmitted) {
       // This is to prevent socket event from being emitted before the
       // socket connection is established (Flow: permission denied and then granted from settings)
       setTimeout(() => {
@@ -361,6 +390,7 @@ export const ListeningScreen = ({
       });
     }
   }, [
+    isMicrophoneAudioActive,
     isAudioSessionReady,
     emitSocketEvent,
     isAudioChatEmitted,
@@ -641,6 +671,9 @@ export const ListeningScreen = ({
         showPauseResumeButton={isWebrtcOrMicrophoneMode}
         showEndSessionButton={isWebrtcOrMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
+        showFocusModeButton={permissions?.includes(
+          USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,
+        )}
       />
     </View>
   );

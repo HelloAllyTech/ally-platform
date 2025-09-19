@@ -1,6 +1,7 @@
 import {forwardRef, useImperativeHandle, useRef, useState} from 'react';
 import {TextInput, View} from 'react-native';
 
+import {KeyCode} from '@/constants';
 import {isNumeric} from '@/utils/validation';
 
 import {styles} from './styles';
@@ -60,7 +61,7 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
       {nativeEvent: {key}}: {nativeEvent: {key: string}},
       index: number,
     ) => {
-      if (key === 'Backspace') {
+      if (key === KeyCode.Backspace) {
         if (value[index]) {
           const newValue = [...value];
           newValue[index] = '';
@@ -95,6 +96,7 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
               onKeyPress={e => handleKeyPress(e, index)}
               onFocus={() => setFocusedIndex(index)}
               onBlur={() => setFocusedIndex(null)}
+              returnKeyType={value.every(v => v !== '') ? 'go' : 'default'}
             />
           </View>
         ))}

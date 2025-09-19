@@ -3,32 +3,36 @@ import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChevronDown, LeftArrowIcon, StarIcon} from '@/assets';
-import {PrimaryButton, useErrorToast} from '@/components';
-import {FEEDBACK_OPTIONS} from '@/constants';
-import {
-  useAppNavigation,
-  useDebounce,
-  useHardwareBackPressHandler,
-} from '@/hooks';
+import {ArrowDown, ChevronDown, LeftArrowIcon} from '@/assets';
+import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
-  useEndScenarioSessionMutation,
   useLazyGetSimulationDetailsQuery,
 } from '@/services';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, globalStyles} from '@/theme';
 import {navigateToLearnTab} from '@/utils';
 
-import {SimulationSummary, SimulationSummarySkeleton} from './components';
+import {
+  FeedbackDropdown,
+  SimulationSummary,
+  SimulationSummarySkeleton,
+  SimulationTranscript,
+} from './components';
+import {styles} from './styles';
+
+const RETRY_COUNT_LIMIT = 4;
+const RETRY_DELAY = 5000;
+const FEEDBACK_THRESHOLD = 30 * 1000;
 
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
@@ -39,10 +43,13 @@ export const SimulationFeedbackScreen: React.FC<
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const [rating, setRating] = useState<number>(0);
-  const [feedbackText, setFeedbackText] = useState<string>('');
-  const [additionalFeedback, setAdditionalFeedback] = useState<string>('');
+  const [mountTime] = useState<number>(Date.now());
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
+  const [showSummary, setShowSummary] = useState<boolean>(true);
+  const [isDropdownVisible, setIsDropdownVisible] = useState<boolean>(false);
+  const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
+  const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
+    useState<boolean>(false);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -50,140 +57,128 @@ export const SimulationFeedbackScreen: React.FC<
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
   ] = useLazyGetSimulationDetailsQuery();
-  const {showErrorToast} = useErrorToast();
+  const {showToast} = useToast();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
-  const [endScenarioSession] = useEndScenarioSessionMutation();
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchSimulationDetailsWithRetry = async (
+    currentRetryCount: number = 0,
+  ) => {
+    if (!simulationId) return;
+
+    try {
+      const response = await getSimulationDetails({
+        id: simulationId.toString(),
+      });
+      if (!response.data?.details && currentRetryCount < RETRY_COUNT_LIMIT) {
+        const nextRetryCount = currentRetryCount + 1;
+
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchSimulationDetailsWithRetry(nextRetryCount);
+        }, RETRY_DELAY);
+      } else if (currentRetryCount >= RETRY_COUNT_LIMIT) {
+        setRetryLimitReached(true);
+        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
+      }
+    } catch (error) {
+      if (currentRetryCount < RETRY_COUNT_LIMIT) {
+        const nextRetryCount = currentRetryCount + 1;
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchSimulationDetailsWithRetry(nextRetryCount);
+        }, RETRY_DELAY);
+      } else {
+        setRetryLimitReached(true);
+        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
+      }
+    }
+  };
 
   useHardwareBackPressHandler(() => {
     if (fromLogs) {
-      navigation.goBack();
+      onBackPress();
       return true;
     }
     navigateToLearnTab(navigation);
     return true;
   });
 
-  const debouncedSubmitFeedback = useDebounce(
-    async (comment: string, currentRating: number) => {
-      if (rating === 0) return;
-      try {
-        await addSimulationFeedback({
-          scenarioSessionId: simulationId?.toString() || '',
-          rating: currentRating,
-          comment,
-        });
-      } catch (error) {
-        showErrorToast(error, 'Errors.submitFeedback');
+  const onBackPress = () => {
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - mountTime;
+
+    if (timeElapsed >= FEEDBACK_THRESHOLD && !simulationDetails?.hasFeedback) {
+      setIsFeedbackPopupVisible(true);
+      return true;
+    }
+    navigation.goBack();
+  };
+
+  const submitFeedback = async (
+    rating: number,
+    {comment}: {issues: string[]; comment: string},
+  ) => {
+    if (rating === 0) return;
+    try {
+      const response = await addSimulationFeedback({
+        scenarioSessionId: simulationId?.toString() || '',
+        rating,
+        comment,
+      });
+      if (response.data) {
+        showToast(t('Success.submitFeedback'), 'success');
+      } else {
+        showToast(t('Errors.submitFeedback'), 'error');
       }
-    },
-    {delay: 500},
-  );
+    } catch (error) {
+      showToast(t('Errors.submitFeedback'), 'error');
+      hideFeedbackPopup();
+    }
+    if (fromLogs) {
+      navigation.goBack();
+    } else {
+      navigateToLearnTab(navigation);
+    }
+  };
 
   useEffect(() => {
     if (simulationId) {
-      // TODO: Remove this later
-      endScenarioSession({scenarioSessionId: simulationId?.toString()});
-      getSimulationDetails({id: simulationId?.toString()});
+      setRetryLimitReached(false);
+      fetchSimulationDetailsWithRetry(0);
     }
-  }, [getSimulationDetails, simulationId, endScenarioSession]);
 
-  const handleTextChange = (text: string) => {
-    debouncedSubmitFeedback(text, rating);
-    setAdditionalFeedback(text);
-  };
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simulationId]);
 
-  const handleStarPress = (starIndex: number) => {
-    const feedback = starIndex + 1;
-    setRating(feedback);
-
-    setFeedbackText(
-      FEEDBACK_OPTIONS[feedback as keyof typeof FEEDBACK_OPTIONS],
-    );
+  const hideFeedbackPopup = () => {
+    setIsFeedbackPopupVisible(false);
   };
 
   const handleSubmit = () => {
-    navigateToLearnTab(navigation);
+    setIsFeedbackPopupVisible(true);
   };
 
   const handleScrollToBottom = useCallback(() => {
     scrollViewRef.current?.scrollToEnd();
   }, []);
 
-  const handleScroll = useCallback((event: any) => {
-    const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
-    const isNearBottom =
-      contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-    setShowScrollButton(!isNearBottom);
-  }, []);
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
+      const isNearBottom =
+        contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
+      setShowScrollButton(!isNearBottom);
+    },
+    [],
+  );
 
-  const renderStars = (disabled?: boolean) => {
-    return Array.from({length: 5}, (_, index) => (
-      <TouchableOpacity
-        key={index}
-        onPress={() => handleStarPress(index)}
-        disabled={disabled}
-        style={styles.starContainer}>
-        <StarIcon
-          width={24}
-          height={24}
-          color={index < rating ? colors.starYellow : colors.lightGray4}
-        />
-      </TouchableOpacity>
-    ));
-  };
-
-  const renderSectionHeader = (headerText: string) => {
-    return (
-      <View style={styles.headerSection}>
-        <Text style={styles.headerText}>{headerText}</Text>
-        <View style={styles.headerLine} />
-      </View>
-    );
-  };
-
-  const renderFeedback = () => {
-    return (
-      <>
-        {renderSectionHeader(t('SimulationFeedback.headerText'))}
-        {fromLogs ? (
-          <View>
-            <View style={styles.disabledStarsContainer}>
-              {renderStars(true)}
-            </View>
-            <Text style={styles.feedbackTextDisabled}>
-              {feedbackText || '-'}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.feedbackCard}>
-            <Text style={styles.questionText}>
-              {t('SimulationFeedback.questionText')}
-            </Text>
-            <View style={styles.starsContainer}>{renderStars()}</View>
-            <Text style={styles.feedbackText}>{feedbackText}</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder={t('SimulationFeedback.placeholderText')}
-              placeholderTextColor={colors.lightGray3}
-              value={additionalFeedback}
-              onChangeText={handleTextChange}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-        )}
-      </>
-    );
-  };
-
-  const renderSummary = () => {
-    return (
-      <View>
-        {renderSectionHeader(t('SimulationFeedback.sessionSummary'))}
-        <SimulationSummary data={simulationDetails} />
-      </View>
-    );
-  };
+  const onHeaderPress = () => setIsDropdownVisible(true);
+  const hideHeaderDropdown = () => setIsDropdownVisible(false);
 
   const renderButtonContainer = () => {
     return (
@@ -197,6 +192,21 @@ export const SimulationFeedbackScreen: React.FC<
     );
   };
 
+  const renderTitle = () => {
+    return (
+      <Text style={styles.title}>
+        {t('SimulationFeedback.title')}{' '}
+        <Text style={styles.titleItalic}>
+          {showSummary
+            ? !fromLogs
+              ? t('SimulationFeedback.titleEnded')
+              : t('CallSummary.header.subtitle')
+            : t('SimulationFeedback.transcript')}
+        </Text>
+      </Text>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -204,41 +214,78 @@ export const SimulationFeedbackScreen: React.FC<
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <View style={styles.titleSection}>
-        {fromLogs && (
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}>
-            <LeftArrowIcon />
-          </TouchableOpacity>
-        )}
-        <Text style={[styles.title, !fromLogs && styles.titleExtraPadding]}>
-          {t('SimulationFeedback.title')}{' '}
-          <Text style={styles.titleItalic}>
-            {fromLogs
-              ? t('SimulationFeedback.titleDetails')
-              : t('SimulationFeedback.titleEnded')}
-          </Text>
-        </Text>
+        <View style={styles.titleRow}>
+          {fromLogs && (
+            <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
+              <LeftArrowIcon color={colors.black} />
+            </TouchableOpacity>
+          )}
+          <View style={globalStyles.column}>
+            <TouchableOpacity
+              style={[
+                globalStyles.rowCenter,
+                !fromLogs && styles.titleExtraPadding,
+              ]}
+              onPress={onHeaderPress}
+              disabled={!fromLogs}
+              activeOpacity={0.8}>
+              {renderTitle()}
+              {fromLogs && (
+                <View style={styles.arrowDownContainer}>
+                  <ArrowDown width={9} height={5} />
+                </View>
+              )}
+            </TouchableOpacity>
+            {fromLogs && simulationDetails?.metadata?.sessionName && (
+              <Text style={styles.subTitle}>
+                {simulationDetails.metadata.sessionName}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
-      <KeyboardAwareScrollView
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        extraScrollHeight={100}
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}>
-        {isSimulationDetailsLoading ? (
-          <SimulationSummarySkeleton />
-        ) : (
-          <>
-            {renderSummary()}
-            {renderFeedback()}
-            {!fromLogs && renderButtonContainer()}
-          </>
-        )}
-      </KeyboardAwareScrollView>
+      {showSummary && (
+        <KeyboardAwareScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          extraScrollHeight={100}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}>
+          {!simulationDetails?.details && !retryLimitReached ? (
+            <SimulationSummarySkeleton />
+          ) : (
+            <>
+              {simulationDetails && (
+                <SimulationSummary data={simulationDetails} />
+              )}
+              {!fromLogs && simulationDetails && renderButtonContainer()}
+            </>
+          )}
+        </KeyboardAwareScrollView>
+      )}
+      {!isSimulationDetailsLoading && !showSummary && (
+        <SimulationTranscript
+          sessionId={simulationId ?? ''}
+          startedAt={simulationDetails?.startedAt}
+        />
+      )}
+      <FeedbackDropdown
+        visible={isDropdownVisible}
+        onClose={hideHeaderDropdown}
+        showSummary={showSummary}
+        setShowSummary={setShowSummary}
+      />
+      <FeedbackPopup
+        visible={isFeedbackPopupVisible}
+        onClose={hideFeedbackPopup}
+        onSubmit={submitFeedback}
+        showChips={false}
+        placeholder={t('SimulationFeedback.placeholderText')}
+        customTitle={t('SimulationFeedback.questionText')}
+      />
       {showScrollButton && !isSimulationDetailsLoading && (
         <TouchableOpacity
           onPress={handleScrollToBottom}
@@ -249,134 +296,3 @@ export const SimulationFeedbackScreen: React.FC<
     </SafeAreaView>
   );
 };
-
-const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: '20@ms',
-    paddingBottom: '40@vs',
-  },
-  titleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: '10@vs',
-    paddingRight: '20@ms',
-    paddingLeft: '10@ms',
-    paddingBottom: '10@vs',
-    borderBottomWidth: 0.3,
-    borderBottomColor: colors.lightGray4,
-  },
-  backButton: {
-    paddingRight: '1@ms',
-  },
-  title: {
-    ...typography.headline.large,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray2,
-    fontSize: '18@ms',
-  },
-  titleItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-  },
-  headerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerText: {
-    ...typography.label.medium,
-    color: colors.lightGray3,
-    letterSpacing: 1,
-  },
-  headerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.lightGray4,
-    marginLeft: '10@ms',
-  },
-  feedbackCard: {
-    borderRadius: '12@ms',
-    padding: '16@ms',
-    marginBottom: '20@vs',
-    borderWidth: 0.5,
-    borderColor: colors.lightGray4,
-    marginTop: '16@vs',
-  },
-  questionText: {
-    ...typography.headline.small,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray12,
-    fontSize: '18@ms',
-    textAlign: 'center',
-    marginBottom: '12@vs',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: '8@vs',
-  },
-  starContainer: {
-    marginHorizontal: '4@ms',
-  },
-  feedbackText: {
-    ...typography.body.large,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '15@ms',
-    textAlign: 'center',
-    marginBottom: '12@vs',
-  },
-  feedbackTextDisabled: {
-    ...typography.body.large,
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '15@ms',
-    marginBottom: '12@vs',
-    paddingLeft: '5@ms',
-  },
-  textInput: {
-    backgroundColor: colors.lightGray1,
-    borderRadius: '8@ms',
-    padding: '12@ms',
-    minHeight: '90@vs',
-    maxHeight: '120@vs',
-    ...typography.body.medium,
-    color: colors.darkGray2,
-    borderWidth: 0.5,
-    borderColor: colors.lightGray4,
-  },
-  buttonContainer: {
-    marginTop: 'auto',
-  },
-  submitButton: {
-    marginTop: '10@vs',
-    paddingVertical: '8@vs',
-  },
-  scrollToBottomButton: {
-    position: 'absolute',
-    bottom: '60@vs',
-    right: '16@ms',
-    zIndex: 1000,
-    borderRadius: '50%',
-    backgroundColor: colors.whiteTransparent10,
-    borderWidth: 1,
-    borderColor: colors.lightGray4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '30@ms',
-    height: '30@ms',
-    paddingTop: '3@ms',
-  },
-  disabledStarsContainer: {
-    flexDirection: 'row',
-    marginTop: '10@vs',
-    marginLeft: -4,
-    marginBottom: '8@vs',
-  },
-  titleExtraPadding: {
-    paddingLeft: '10@vs',
-  },
-});

@@ -1,0 +1,52 @@
+import {API_METHODS, API_ROUTES} from '@/constants';
+
+import {api} from './api';
+
+export interface SimulationMessage {
+  id: number;
+  scenarioSessionId: number;
+  content: string;
+  context?: string | null;
+  createdAt: string;
+  feedback?: string | null;
+  senderId: number;
+  startSeconds?: number | null;
+}
+
+type SimulationMessagesResponse = {
+  messages: SimulationMessage[];
+  count: number;
+};
+
+interface SimulationMessagesParams {
+  scenarioSessionId: string | number;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+export const simulationTranscriptApi = api.injectEndpoints({
+  endpoints: builder => ({
+    getSimulationMessages: builder.query<
+      SimulationMessagesResponse,
+      SimulationMessagesParams
+    >({
+      query: ({scenarioSessionId, limit, offset, sortBy, sortOrder}) => ({
+        url: API_ROUTES.SIMULATION_MESSAGES.replace(
+          ':scenarioSessionId',
+          String(scenarioSessionId),
+        ),
+        method: API_METHODS.GET,
+        params: {
+          limit,
+          offset,
+          sortBy,
+          sortOrder,
+        },
+      }),
+    }),
+  }),
+});
+
+export const {useLazyGetSimulationMessagesQuery} = simulationTranscriptApi;

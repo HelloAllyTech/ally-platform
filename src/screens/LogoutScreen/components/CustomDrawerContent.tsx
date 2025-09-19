@@ -7,7 +7,7 @@ import {env} from '@/config/env';
 import {CarouselVariant} from '@/constants';
 import {useTranslate, useUser} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
-import {getAppVersion} from '@/utils';
+import {getAppVersion, isAppFeatureEnabled} from '@/utils';
 
 interface DrawerContentProps {
   openLogoutModal: () => void;
@@ -46,15 +46,19 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         </View>
         <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
       </TouchableOpacity>
-      <View style={styles.carouselWrapper}>
-        <SecurityCarousel variant={CarouselVariant.DRAWER} />
-      </View>
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>
-          {t('Common.version')}: {getAppVersion()}{' '}
-          {env.ENVIRONMENT === 'development' && '(Dev)'}
-        </Text>
-      </View>
+      {userData && isAppFeatureEnabled(userData) && (
+        <>
+          <View style={styles.carouselWrapper}>
+            <SecurityCarousel variant={CarouselVariant.DRAWER} />
+          </View>
+          <View style={styles.versionContainer}>
+            <Text style={styles.versionText}>
+              {t('Common.version')}: {getAppVersion()}{' '}
+              {env.ENVIRONMENT === 'development' && '(Dev)'}
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 };
