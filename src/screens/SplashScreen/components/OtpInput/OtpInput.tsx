@@ -12,10 +12,7 @@ export interface OtpInputRef {
 }
 
 export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
-  (
-    {value, onChange, inputCount = 4, hasError = false, onSubmitEditing},
-    ref,
-  ) => {
+  ({value, onChange, inputCount = 4, hasError = false}, ref) => {
     const inputRefs = useRef<TextInput[]>([]);
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
@@ -72,10 +69,6 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
         } else {
           clearAndFocusPrevious(index);
         }
-      } else if (key === KeyCode.Enter || key === KeyCode.Return) {
-        if (value.every(v => v !== '')) {
-          onSubmitEditing();
-        }
       }
     };
 
@@ -104,11 +97,6 @@ export const OtpInput = forwardRef<OtpInputRef, OtpInputProps>(
               onFocus={() => setFocusedIndex(index)}
               onBlur={() => setFocusedIndex(null)}
               returnKeyType={value.every(v => v !== '') ? 'go' : 'default'}
-              onSubmitEditing={() => {
-                if (index === inputCount - 1) {
-                  onSubmitEditing();
-                }
-              }}
             />
           </View>
         ))}
