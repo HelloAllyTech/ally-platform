@@ -29,7 +29,7 @@ import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import {Feedback, LiveEventPayload} from '@/types';
-import {decodeFeedbackPayloadToJson} from '@/utils';
+import {decodeFeedbackPayloadToJson, logger} from '@/utils';
 
 import {
   AudioWave,
@@ -152,12 +152,28 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startTime, isDisconnecting]);
 
+  const ensureSpeakerOutput = useCallback(async () => {
+    // Try a few times with small delays; OEM skins sometimes override routing during focus changes
+    const attempts = 3;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await AudioSession.startAudioSession();
+        await AudioSession.selectAudioOutput('speaker');
+        break;
+      } catch (error) {
+        logger.error(`Failed to ensure speaker output: ${error}`);
+      }
+      await new Promise(res => setTimeout(res, 200));
+    }
+  }, []);
+
   const attachRoomListeners = useCallback(() => {
-    const onConnected = () => {
+    const onConnected = async () => {
       setIsConnecting(false);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
+        await ensureSpeakerOutput();
       } catch (error) {
         showErrorToast(error, 'Errors.attachListeners');
       }
@@ -194,7 +210,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp, enqueueFeedback]);
+  }, [room, showErrorToast, clamp, enqueueFeedback, ensureSpeakerOutput]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
@@ -211,12 +227,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const configureAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
+        // Keep speaker output but engage inCommunication mode to help AEC
         android: {
           preferredOutputList: ['speaker'],
           audioTypeOptions: {
             ...AndroidAudioTypePresets.media,
             audioMode: 'inCommunication',
             forceHandleAudioRouting: true,
+            audioAttributesUsageType: 'voiceCommunication',
           },
         },
       });
