@@ -6,12 +6,10 @@ import {
   BackHandler,
   FlatList,
   Linking,
-  Platform,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
@@ -23,7 +21,6 @@ import {
   useAppNavigation,
   useCounselorChat,
   useHardwareBackPressHandler,
-  usePermission,
   useTranslate,
   useUser,
 } from '@/hooks';
@@ -136,53 +133,6 @@ export const CallLogScreen: React.FC = () => {
     BackHandler.exitApp();
     return true;
   });
-
-  const microphonePermission = Platform.select({
-    ios: PERMISSIONS.IOS.MICROPHONE,
-    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
-  });
-
-  const {
-    status: micPermissionStatus,
-    requestPermission: requestMicPermission,
-    openAppSettings,
-    isGranted: isMicPermissionGranted,
-  } = usePermission(microphonePermission!);
-
-  useEffect(() => {
-    const checkPermission = async () => {
-      if (!isMicPermissionGranted) {
-        const permissionResult = await requestMicPermission();
-
-        if (permissionResult === RESULTS.BLOCKED) {
-          Alert.alert(
-            t('Common.permissions.microphoneRequired'),
-            t('Common.permissions.microphoneMessage'),
-            [
-              {
-                text: t('Common.cancel'),
-                style: 'cancel',
-              },
-              {
-                text: t('Common.ok'),
-                onPress: openAppSettings,
-              },
-            ],
-          );
-        } else if (permissionResult !== RESULTS.GRANTED) {
-          await requestMicPermission();
-        }
-      }
-    };
-
-    checkPermission();
-  }, [
-    micPermissionStatus,
-    isMicPermissionGranted,
-    requestMicPermission,
-    openAppSettings,
-    t,
-  ]);
 
   /**
    * Fetches the initial set of real call logs
