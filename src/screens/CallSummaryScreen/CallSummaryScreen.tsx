@@ -207,7 +207,7 @@ export const CallSummaryScreen: React.FC<
     if (isLoading) {
       return (
         <View style={styles.spinnerContainer}>
-          <ActivityIndicator color={colors.white} />
+          <ActivityIndicator color={colors.darkSlate} />
         </View>
       );
     }

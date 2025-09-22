@@ -39,7 +39,6 @@ const NavigationContent = ({
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
   const {userData, isAuthenticated} = useUser();
-  const isCounselor = userData?.role === UserRole.COUNSELOR;
 
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
@@ -127,6 +126,7 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.CALL_SUMMARY}
             component={CallSummaryScreen}
+            options={{gestureEnabled: false}}
           />
           <Stack.Screen
             name={SCREEN_NAMES.BREATHING}
@@ -149,6 +149,7 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_FEEDBACK}
             component={SimulationFeedbackScreen}
+            options={{gestureEnabled: false}}
           />
         </>
       ) : (

@@ -101,6 +101,7 @@ export const BoxBreathingAnimation = ({
   useEffect(() => {
     const setup = async () => {
       SoundPlayer.playAsset(require('../../../../assets/sounds/breath.mp3'));
+      SoundPlayer.setSpeaker(false);
       setIsPlayerReady(true);
     };
     setup();
