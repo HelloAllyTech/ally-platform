@@ -69,7 +69,6 @@ import {
   getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
-  webRTCAudioDataToAmplitudes,
 } from './utils';
 
 export const ListeningScreen = ({
@@ -155,9 +154,8 @@ export const ListeningScreen = ({
 
   const getSocketPath = useCallback(() => {
     if (isConferenceCall) return env.CLOUD_TELEPHONY_PATH;
-    if (isMicrophoneMode) return env.MICROPHONE_SOCKET_PATH;
-    return env.WEBRTC_SOCKET_PATH;
-  }, [isConferenceCall, isMicrophoneMode]);
+    return env.MICROPHONE_SOCKET_PATH;
+  }, [isConferenceCall]);
 
   useEffect(() => {
     if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
@@ -277,10 +275,6 @@ export const ListeningScreen = ({
         if (data.payload?.audioData) {
           if (isConferenceCall) {
             latestAmplitudesRef.current = exotelAudioDataToAmplitudes(
-              data.payload.audioData as string,
-            );
-          } else {
-            latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
               data.payload.audioData as string,
             );
           }
@@ -509,12 +503,6 @@ export const ListeningScreen = ({
       isMicrophoneMode={isMicrophoneMode}
     />
   );
-  const isWebrtcOrMicrophoneMode = useMemo(
-    () =>
-      callProvider &&
-      [ChatProvider.WEBRTC, ChatProvider.MICROPHONE].includes(callProvider),
-    [callProvider],
-  );
 
   const handleTryAgain = useCallback(() => {
     dispatch(clearCurrentChat());
@@ -668,8 +656,8 @@ export const ListeningScreen = ({
         onCallEndPress={() => setShowCallEndConfirmation(true)}
         isCallPaused={isCallPaused}
         onPauseResumePress={handlePlayPauseCallPress}
-        showPauseResumeButton={isWebrtcOrMicrophoneMode}
-        showEndSessionButton={isWebrtcOrMicrophoneMode}
+        showPauseResumeButton={isMicrophoneMode}
+        showEndSessionButton={isMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
         showFocusModeButton={permissions?.includes(
           USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,
