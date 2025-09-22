@@ -1,12 +1,15 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {PERMISSIONS, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -17,6 +20,7 @@ import {isIOS, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
+  usePermission,
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -44,6 +48,26 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     null,
   );
 
+  const microphonePermission = useMemo(
+    () => ({
+      ios: PERMISSIONS.IOS.MICROPHONE,
+      android: PERMISSIONS.ANDROID.RECORD_AUDIO,
+    }),
+    [],
+  );
+  const {
+    requestPermission: requestMicPermission,
+    openAppSettings,
+    isGranted: isMicPermissionGranted,
+  } = usePermission(
+    Platform.select({
+      ios: microphonePermission.ios,
+      android: microphonePermission.android,
+    }) as unknown as
+      | typeof PERMISSIONS.IOS.MICROPHONE
+      | typeof PERMISSIONS.ANDROID.RECORD_AUDIO,
+  );
+
   useHardwareBackPressHandler(() => {
     navigation.goBack();
     return true;
@@ -56,6 +80,35 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const startSimulationPress = async () => {
     try {
+      // Ensure mic permission before creating/joining room
+      if (!isMicPermissionGranted) {
+        const result = await requestMicPermission();
+        if (result === RESULTS.BLOCKED) {
+          Alert.alert(
+            t('Common.permissions.microphoneRequired'),
+            t('Common.permissions.microphoneMessage'),
+            [
+              {
+                text: t('Common.cancel'),
+                style: 'cancel',
+              },
+              {
+                text: t('Common.ok'),
+                onPress: openAppSettings,
+              },
+            ],
+          );
+          return;
+        }
+        if (result !== RESULTS.GRANTED) {
+          showErrorToast(
+            new Error(t('Common.permissions.microphoneMessage')),
+            'Errors.permission',
+          );
+          return;
+        }
+      }
+
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
         scenarioId: Number(scenario.id),

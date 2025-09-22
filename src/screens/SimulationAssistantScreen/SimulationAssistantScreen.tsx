@@ -64,45 +64,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
 
-  // Queue incoming feedback and ensure each item shows for at least 10 seconds
-  const [, setFeedbackQueue] = useState<NonNullable<Feedback>[]>([]);
-  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const showNextFeedback = useCallback(() => {
-    setFeedbackQueue(prevQueue => {
-      if (prevQueue.length === 0) {
-        // Keep showing the last feedback when the queue is empty
-        return prevQueue;
-      }
-      const [next, ...rest] = prevQueue;
-      setFeedback(next);
-      setFeedbackKey(next.id);
-
-      if (feedbackTimerRef.current) {
-        clearTimeout(feedbackTimerRef.current);
-      }
-      feedbackTimerRef.current = setTimeout(() => {
-        feedbackTimerRef.current = null;
-        showNextFeedback();
-      }, FEEDBACK_MIN_DISPLAY_MS);
-      return rest;
-    });
-  }, []);
-
-  const enqueueFeedback = useCallback(
-    (item: NonNullable<Feedback>) => {
-      setFeedbackQueue(prev => {
-        const nextQueue = [...prev, item];
-        if (!feedbackTimerRef.current) {
-          // If no timer is running, either nothing is shown or
-          // the current item has already satisfied its minimum display time.
-          showNextFeedback();
-        }
-        return nextQueue;
-      });
-    },
-    [showNextFeedback],
-  );
+  // Track last accepted event timestamp to gate incoming feedback
+  const lastEventTimestampRef = useRef<number | null>(null);
+  const feedbackHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -181,23 +145,49 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
     };
-    const onDataReceived = (
-      payload: unknown,
-      _participant: unknown,
-      _kind: unknown,
-      _topic: unknown,
-    ) => {
-      const parsed = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
-      if (!parsed || !parsed.data) return;
-      const {score, emoji, message} = parsed.data;
+    const onDataReceived = (payload: unknown) => {
+      const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
+      if (!eventObj?.data) return;
 
-      if (typeof score === 'number' && !Number.isNaN(score)) {
-        setAccumulatedScore(prev => clamp(prev + score, -100, 100));
-      }
+      // Accept events only if at least 10s since last accepted event (web parity)
+      const incomingMs = Date.parse(eventObj?.timestamp ?? '');
+      const lastMs = lastEventTimestampRef.current;
 
-      if (message && typeof message === 'string') {
-        const id = Date.now();
-        enqueueFeedback({id, text: message, emoji: emoji ?? undefined});
+      const incomingValid = !Number.isNaN(incomingMs);
+      const lastValid = typeof lastMs === 'number' && !Number.isNaN(lastMs);
+      const shouldAccept =
+        lastValid && incomingValid
+          ? incomingMs - lastMs >= FEEDBACK_MIN_DISPLAY_MS
+          : true;
+
+      if (shouldAccept) {
+        const {score, emoji, message} = eventObj.data;
+
+        if (typeof score === 'number' && !Number.isNaN(score)) {
+          setAccumulatedScore(prev => clamp(prev + score, -100, 100));
+        }
+
+        if (message && typeof message === 'string') {
+          const id = Date.now();
+          const next = {id, text: message, emoji: emoji ?? undefined};
+          setFeedback(next);
+          setFeedbackKey(next.id);
+
+          // Auto-hide latest feedback after the minimum display time
+          if (feedbackHideTimerRef.current) {
+            clearTimeout(feedbackHideTimerRef.current);
+          }
+          feedbackHideTimerRef.current = setTimeout(() => {
+            feedbackHideTimerRef.current = null;
+            setFeedback(null);
+          }, FEEDBACK_MIN_DISPLAY_MS);
+        }
+
+        if (incomingValid) {
+          lastEventTimestampRef.current = incomingMs;
+        }
+      } else {
+        logger.info('Skipping event append due to 10s gating');
       }
     };
     room
@@ -210,16 +200,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp, enqueueFeedback, ensureSpeakerOutput]);
+  }, [room, showErrorToast, clamp, ensureSpeakerOutput]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
-  // Cleanup the feedback timer on unmount
+  // Cleanup hide timer on unmount
   useEffect(() => {
     return () => {
-      if (feedbackTimerRef.current) {
-        clearTimeout(feedbackTimerRef.current);
-        feedbackTimerRef.current = null;
+      if (feedbackHideTimerRef.current) {
+        clearTimeout(feedbackHideTimerRef.current);
+        feedbackHideTimerRef.current = null;
       }
     };
   }, []);
