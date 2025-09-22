@@ -364,7 +364,11 @@ export const ListeningScreen = ({
   ]);
 
   useEffect(() => {
-    if (isMicrophoneMode && !streamingInitialized.current) {
+    if (
+      isMicrophoneMode &&
+      !isWebMicrophoneMode &&
+      !streamingInitialized.current
+    ) {
       streamingInitialized.current = true;
       startStreaming();
     }
