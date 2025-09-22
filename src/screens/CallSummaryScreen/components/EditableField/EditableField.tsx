@@ -103,11 +103,13 @@ const styles = ScaledSheet.create({
     lineHeight: '20@mvs',
     color: colors.black,
     marginRight: '20@ms',
+    maxHeight: '200@ms',
   },
   displayText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     lineHeight: '20@mvs',
     color: colors.lightGray3,
+    maxHeight: '200@ms',
   },
 });

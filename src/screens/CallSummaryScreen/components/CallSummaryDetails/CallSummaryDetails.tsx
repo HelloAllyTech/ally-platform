@@ -134,7 +134,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 
   if (isLoadingSummary) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.darkSlate} />
       </View>
     );
@@ -179,6 +179,12 @@ export const CallSummaryDetails = memo(CallSummaryDetailsComponent);
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.white,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.white,
   },
   contentContainer: {
