@@ -23,7 +23,6 @@ export type {
   ChatMessage,
   Chat,
   FeedbackResponse,
-  WebRTCAudioData,
   SocketMessage,
   WaitingClientChat,
   WaitingClient,

@@ -90,12 +90,6 @@ const NavigationContent = ({
   );
 
   useSocketConnection({
-    path: env.WEBRTC_SOCKET_PATH,
-    userId: userData?.id,
-    eventCallbacks: socketEventCallbacks,
-  });
-
-  useSocketConnection({
     path: env.CLOUD_TELEPHONY_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,

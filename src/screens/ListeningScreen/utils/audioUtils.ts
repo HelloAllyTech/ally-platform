@@ -1,5 +1,3 @@
-import {toByteArray} from 'base64-js';
-
 import {
   AllyPlatforms,
   isIOS,
@@ -43,23 +41,6 @@ export const exotelAudioDataToAmplitudes = (audioData: string): number[] => {
     const avg = count > 0 ? sum / count : 0;
     amplitudes.push(avg / 255);
   }
-  return amplitudes;
-};
-
-export const webRTCAudioDataToAmplitudes = (base64Audio: string): number[] => {
-  const bytesArray = toByteArray(base64Audio);
-  const targetLength = NUM_BARS;
-  const amplitudes = [];
-  const usedIndices = new Set();
-
-  while (amplitudes.length < targetLength) {
-    const idx = Math.floor(Math.random() * bytesArray.length);
-    if (!usedIndices.has(idx)) {
-      amplitudes.push(bytesArray[idx] / 255); // normalize here
-      usedIndices.add(idx);
-    }
-  }
-
   return amplitudes;
 };
 
