@@ -1,19 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, AppState, AppStateStatus, Platform} from 'react-native';
+import {AppState, AppStateStatus} from 'react-native';
 import LiveAudioStream from 'react-native-live-audio-stream';
-import {
-  check,
-  openSettings,
-  PERMISSIONS,
-  request,
-  RESULTS,
-} from 'react-native-permissions';
+import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 
+import {MICROPHONE_PERMISSION} from '@/constants';
 import {isIOS, MICROPHONE_AUDIO_SAMPLE_RATE} from '@/constants/general';
-import {useTranslate} from '@/hooks';
+import {useAppNavigation, usePermissionAlert} from '@/hooks';
 import {logger} from '@/utils/logger';
-
-import {useAppNavigation} from './useAppNavigation';
 
 interface UseLiveAudioStreamOptions {
   onAudioData: (base64Wav: string) => void;
@@ -24,18 +17,15 @@ export const useLiveAudioStream = ({
   onAudioData,
   enableLiveAudio,
 }: UseLiveAudioStreamOptions) => {
-  const {t} = useTranslate();
   const [isStreaming, setIsStreaming] = useState(false);
   const navigation = useAppNavigation();
-  const [permissionStatus, setPermissionStatus] =
-    useState<(typeof RESULTS)[keyof typeof RESULTS]>('unavailable');
+  const [permissionStatus, setPermissionStatus] = useState<
+    (typeof RESULTS)[keyof typeof RESULTS]
+  >(RESULTS.UNAVAILABLE);
   const [hasRequestedPermission, setHasRequestedPermission] = useState(false);
-  const appState = useRef(AppState.currentState);
 
-  const micPermission = Platform.select({
-    ios: PERMISSIONS.IOS.MICROPHONE,
-    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
-  });
+  const appState = useRef(AppState.currentState);
+  const {showSettingsAlert} = usePermissionAlert();
 
   const initAudioStream = useCallback(() => {
     LiveAudioStream?.init?.({
@@ -51,12 +41,12 @@ export const useLiveAudioStream = ({
 
   const checkPermission = useCallback(
     async (shouldRequestIfNeeded = false) => {
-      if (!enableLiveAudio || !micPermission) return;
+      if (!enableLiveAudio || !MICROPHONE_PERMISSION) return;
 
       try {
-        const status = await check(micPermission);
-        if (status === 'granted') {
-          setPermissionStatus('granted');
+        const status = await check(MICROPHONE_PERMISSION);
+        if (status === RESULTS.GRANTED) {
+          setPermissionStatus(RESULTS.GRANTED);
           setHasRequestedPermission(false); // Reset for next time
           initAudioStream();
         } else {
@@ -65,42 +55,36 @@ export const useLiveAudioStream = ({
           // Only request permission if explicitly needed AND we haven't already requested
           if (shouldRequestIfNeeded && !hasRequestedPermission) {
             setHasRequestedPermission(true);
-            const result = await request(micPermission);
+            const result = await request(MICROPHONE_PERMISSION);
             setPermissionStatus(result);
 
-            if (result === 'granted') {
+            if (result === RESULTS.GRANTED) {
               initAudioStream();
             } else {
-              Alert.alert(
-                t('Common.permissions.microphoneRequired'),
-                t('Common.permissions.microphoneMessage'),
-                [
-                  {
-                    text: t('Common.cancel'),
-                    style: 'cancel',
-                    onPress: () => navigation.goBack(),
-                  },
-                  {
-                    text: t('Common.permissions.openSettings'),
-                    onPress: () => openSettings(),
-                  },
-                ],
+              showSettingsAlert(
+                'Common.permissions.microphoneRequired',
+                'Common.permissions.microphoneMessage',
+                {
+                  cancelKey: 'Common.cancel',
+                  settingsKey: 'Common.ok',
+                  onCancel: () => navigation.goBack(),
+                  onOpenSettings: () => openSettings(),
+                },
               );
             }
           }
         }
       } catch (error) {
         logger.error(`Permission check failed: ${error}`);
-        setPermissionStatus('denied');
+        setPermissionStatus(RESULTS.DENIED);
       }
     },
     [
       enableLiveAudio,
-      micPermission,
       hasRequestedPermission,
       initAudioStream,
-      t,
       navigation,
+      showSettingsAlert,
     ],
   );
 
@@ -118,7 +102,7 @@ export const useLiveAudioStream = ({
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active' &&
-        permissionStatus !== 'granted'
+        permissionStatus !== RESULTS.GRANTED
       ) {
         // App has come to foreground and permission was not granted
         // Re-check permission in case user granted it from settings
@@ -156,6 +140,6 @@ export const useLiveAudioStream = ({
     startStreaming,
     stopStreaming,
     permissionStatus,
-    isPermissionGranted: permissionStatus === 'granted',
+    isPermissionGranted: permissionStatus === RESULTS.GRANTED,
   };
 };
