@@ -121,10 +121,11 @@ export const ListeningScreen = ({
   const streamingInitialized = useRef(false);
   const chatIdTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Use ref to always access the latest isCallPaused value inside audio event callback,
+  // Use ref to always access the latest isCallPaused and isWebMicrophoneMode values inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
   const isCallPausedRef = useRef(isCallPaused);
+  const isWebMicrophoneModeRef = useRef(isWebMicrophoneMode);
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
@@ -173,6 +174,10 @@ export const ListeningScreen = ({
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
   }, [isCallPaused]);
+
+  useEffect(() => {
+    isWebMicrophoneModeRef.current = isWebMicrophoneMode;
+  }, [isWebMicrophoneMode]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -332,6 +337,7 @@ export const ListeningScreen = ({
       if (
         !isCallPausedRef.current &&
         !isWebMicrophoneMode &&
+        !isWebMicrophoneModeRef.current &&
         chatIdRef.current
       ) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
