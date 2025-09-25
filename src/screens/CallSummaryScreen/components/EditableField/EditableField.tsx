@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {TextInput, View} from 'react-native';
+import {ScrollView, Text, TextInput, View} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -24,8 +24,7 @@ interface EditableFieldProps {
 }
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
-
-// TO DO: Replace with original text component or else delete this file
+const AnimatedText = Animated.createAnimatedComponent(Text);
 export const EditableField: React.FC<EditableFieldProps> = ({
   fieldKey,
   label,
@@ -65,30 +64,36 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     }
   }, [isEnhancing, opacity]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({opacity: opacity.value}));
 
   return (
     <View style={styles.container}>
-      <AnimatedTextInput
-        ref={inputRef}
-        style={[
-          canEdit && isEditing ? styles.editableText : styles.displayText,
-          animatedStyle,
-        ]}
-        key={fieldKey}
-        value={value || ''}
-        onChangeText={onChangeText}
-        placeholder={
-          !isEditing ? placeholder || `Add ${label?.toLowerCase()}` : ''
-        }
-        placeholderTextColor={colors.lightGray3}
-        multiline
-        editable={canEdit && isEditing && !isEnhancing}
-      />
+      {canEdit && isEditing ? (
+        <AnimatedTextInput
+          ref={inputRef}
+          style={[styles.editableText, animatedStyle]}
+          key={fieldKey}
+          value={value || ''}
+          onChangeText={onChangeText}
+          placeholderTextColor={colors.lightGray3}
+          multiline
+          scrollEnabled
+        />
+      ) : (
+        <Animated.View style={animatedStyle}>
+          <ScrollView
+            style={styles.displayWrapper}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled">
+            <AnimatedText style={styles.displayText}>
+              {value && value.length
+                ? value
+                : placeholder || `Add ${label?.toLowerCase()}`}
+            </AnimatedText>
+          </ScrollView>
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -105,11 +110,13 @@ const styles = ScaledSheet.create({
     marginRight: '20@ms',
     maxHeight: '200@ms',
   },
+  displayWrapper: {
+    maxHeight: '200@ms',
+  },
   displayText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     lineHeight: '20@mvs',
     color: colors.lightGray3,
-    maxHeight: '200@ms',
   },
 });
