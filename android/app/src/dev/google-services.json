@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "942067141754",
+    "project_id": "ally-dev-34948",
+    "storage_bucket": "ally-dev-34948.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942067141754:android:6a213e077a4a41bbf57fc3",
+        "android_client_info": {
+          "package_name": "com.helloally.app.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuA_DKrWBeuyqZ-7Rs5VF7lOndWRjR_gw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

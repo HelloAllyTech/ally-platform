@@ -78,6 +78,8 @@ yarn-error.log
 
 # Environment files
 .env
+.env.dev
+.env.prod
 
 # Cursor
 .cursor/

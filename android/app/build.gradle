@@ -4,6 +4,13 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
+// Map build variants to env files
+project.ext.envConfigFiles = [
+    devDebug: ".env.dev",
+    devRelease: ".env.dev",
+    prodDebug: ".env.prod",
+    prodRelease: ".env.prod",
+]
 
 react {
     autolinkLibrariesWithApp()
@@ -27,6 +34,22 @@ android {
         versionCode 15
         versionName "1.1.1"
     }
+
+    flavorDimensions "version"
+    productFlavors {
+        dev {
+            dimension "version"
+            applicationId "com.helloally.app.dev"
+            resValue "string", "app_name", "Ally - Dev"
+            resValue "string", "build_config_package", "com.helloally.app"
+        }
+        prod {
+            dimension "version"
+            applicationId "com.helloally.app"
+            resValue "string", "app_name", "Ally"
+            resValue "string", "build_config_package", "com.helloally.app"
+        }
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -46,8 +69,6 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
