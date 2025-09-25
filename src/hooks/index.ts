@@ -23,9 +23,9 @@ export {useSearch} from './useSearch';
 export {useSummaryState} from './useSummaryState';
 export {useTranslate} from './useTranslate';
 export {useUser} from './useUser';
+export {usePermissionAlert} from './usePermissionAlert';
 
 // Utility hooks
 export {useDebounce} from './useDebounce';
 export {useForceUpdate} from './useForceUpdate';
-export {usePermission} from './usePermission';
 export {useStoragePermissions} from './useStoragePermissions';

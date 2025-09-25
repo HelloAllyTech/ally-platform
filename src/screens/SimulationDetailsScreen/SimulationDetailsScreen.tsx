@@ -1,26 +1,24 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
-  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {PERMISSIONS, RESULTS} from 'react-native-permissions';
+import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon, ShareIcon} from '@/assets';
 import {PrimaryButton, useErrorToast, useToast} from '@/components';
 import {env} from '@/config/env';
-import {isIOS, SCREEN_NAMES} from '@/constants';
+import {isIOS, MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
-  usePermission,
+  usePermissionAlert,
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -48,25 +46,14 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     null,
   );
 
-  const microphonePermission = useMemo(
-    () => ({
-      ios: PERMISSIONS.IOS.MICROPHONE,
-      android: PERMISSIONS.ANDROID.RECORD_AUDIO,
-    }),
-    [],
-  );
-  const {
-    requestPermission: requestMicPermission,
-    openAppSettings,
-    isGranted: isMicPermissionGranted,
-  } = usePermission(
-    Platform.select({
-      ios: microphonePermission.ios,
-      android: microphonePermission.android,
-    }) as unknown as
-      | typeof PERMISSIONS.IOS.MICROPHONE
-      | typeof PERMISSIONS.ANDROID.RECORD_AUDIO,
-  );
+  const [isMicPermissionGranted, setIsMicPermissionGranted] = useState(false);
+  const {showSettingsAlert} = usePermissionAlert();
+
+  useEffect(() => {
+    check(MICROPHONE_PERMISSION).then(status => {
+      setIsMicPermissionGranted(status === RESULTS.GRANTED);
+    });
+  }, []);
 
   useHardwareBackPressHandler(() => {
     navigation.goBack();
@@ -82,21 +69,17 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     try {
       // Ensure mic permission before creating/joining room
       if (!isMicPermissionGranted) {
-        const result = await requestMicPermission();
+        const result = await request(MICROPHONE_PERMISSION);
         if (result === RESULTS.BLOCKED) {
-          Alert.alert(
-            t('Common.permissions.microphoneRequired'),
-            t('Common.permissions.microphoneMessage'),
-            [
-              {
-                text: t('Common.cancel'),
-                style: 'cancel',
-              },
-              {
-                text: t('Common.ok'),
-                onPress: openAppSettings,
-              },
-            ],
+          showSettingsAlert(
+            'Common.permissions.microphoneRequired',
+            'Common.permissions.microphoneMessage',
+            {
+              cancelKey: 'Common.cancel',
+              settingsKey: 'Common.ok',
+              onCancel: undefined,
+              onOpenSettings: () => openSettings(),
+            },
           );
           return;
         }

@@ -10,17 +10,25 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {check, request, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {CallLogSkeleton} from '@/components';
 import {env} from '@/config/env';
-import {CHAT_TYPES, LogType, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {
+  CHAT_TYPES,
+  LogType,
+  MICROPHONE_PERMISSION,
+  SCREEN_NAMES,
+  USER_PERMISSIONS,
+} from '@/constants';
 import {
   useAppNavigation,
   useCounselorChat,
   useHardwareBackPressHandler,
+  usePermissionAlert,
   useTranslate,
   useUser,
 } from '@/hooks';
@@ -88,6 +96,7 @@ export const CallLogScreen: React.FC = () => {
   const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
+  const {showMicrophoneSettingsAlert} = usePermissionAlert();
 
   const canStartCall = permissions?.includes(
     USER_PERMISSIONS.VIEW_START_CALL_PAGE,
@@ -341,8 +350,34 @@ export const CallLogScreen: React.FC = () => {
   };
 
   const handleVoiceRecording = async () => {
-    checkCounselorChat();
-    navigation.navigate('Listening', {isMicrophoneMode: true});
+    try {
+      const micPermission = MICROPHONE_PERMISSION;
+
+      // Check existing status
+      const status = await check(micPermission);
+      let finalStatus = status;
+
+      // Request if not granted yet
+      if (status !== RESULTS.GRANTED) {
+        finalStatus = await request(micPermission);
+      }
+
+      if (finalStatus === RESULTS.GRANTED) {
+        checkCounselorChat();
+        navigation.navigate('Listening', {isMicrophoneMode: true});
+        return;
+      }
+
+      if (finalStatus === RESULTS.BLOCKED) {
+        showMicrophoneSettingsAlert();
+        return;
+      }
+
+      // Denied or any other non-granted state
+      showMicrophoneSettingsAlert();
+    } catch (error) {
+      logger.error(`Mic permission flow failed: ${error}`);
+    }
   };
 
   // Get current logs and loading state based on active tab
