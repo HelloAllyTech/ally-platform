@@ -54,7 +54,7 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env.prod
+          echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env
 
       - name: Build with Gradle (Production)
         env:
