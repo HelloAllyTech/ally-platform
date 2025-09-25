@@ -6,10 +6,10 @@ apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
 // Map build variants to env files
 project.ext.envConfigFiles = [
-    devDebug: ".env.dev",
-    devRelease: ".env.dev",
-    prodDebug: ".env.prod",
-    prodRelease: ".env.prod",
+    devDebug: ".env",
+    devRelease: ".env",
+    prodDebug: ".env",
+    prodRelease: ".env",
 ]
 
 react {

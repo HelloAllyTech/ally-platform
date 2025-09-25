@@ -6,6 +6,8 @@
   "scripts": {
     "android:dev": "react-native run-android --appId com.helloally.app.dev --tasks installDevDebug",
     "android:prod": "react-native run-android --appId com.helloally.app --tasks installProdDebug",
+    "build:dev": "cd android && ./gradlew assembleDevRelease --stacktrace",
+    "build:prod": "cd android && ./gradlew assembleProdRelease --stacktrace",
     "android:clean": "cd android && ./gradlew clean",
     "ios": "react-native run-ios",
     "lint": "eslint .",
