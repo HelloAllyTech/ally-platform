@@ -221,11 +221,11 @@ export const ListeningScreen = ({
   useHardwareBackPressHandler(() => {
     if (isMicrophoneMode) {
       if (isWebMicrophoneMode) {
-        dispatch(clearCurrentChat());
         navigation.goBack();
       } else if (chatData?.chatId) {
         setShowCallEndConfirmation(true);
       }
+      dispatch(clearCurrentChat());
       return true;
     }
     navigation.goBack();
@@ -403,12 +403,10 @@ export const ListeningScreen = ({
 
   // Keep screen awake during microphone mode calls
   useEffect(() => {
-    if (isMicrophoneMode) {
-      try {
-        activateKeepAwake();
-      } catch (error) {
-        console.warn('Failed to activate keep awake:', error);
-      }
+    try {
+      activateKeepAwake();
+    } catch (error) {
+      console.warn('Failed to activate keep awake:', error);
     }
 
     // Cleanup function to deactivate keep awake when component unmounts or mode changes
@@ -480,12 +478,7 @@ export const ListeningScreen = ({
               !res.data ||
               (Array.isArray(res.data) && res.data.length === 0)
             ) {
-              // Clear chat state before navigation
-              dispatch(clearCurrentChat());
-              navigation.reset({
-                index: 0,
-                routes: [{name: SCREEN_NAMES.CALL_LOG}],
-              });
+              handleCallEndRedirection();
             }
           });
         }, 500);
@@ -501,7 +494,7 @@ export const ListeningScreen = ({
     isMicrophoneMode,
     isPermissionGranted,
     isWebMicrophoneMode,
-    navigation,
+    handleCallEndRedirection,
     dispatch,
   ]);
 
