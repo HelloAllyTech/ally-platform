@@ -57,11 +57,8 @@ const NavigationContent = ({
     },
     onNoActiveChatFound: () => {
       const currentRoute = navigationRef?.getCurrentRoute()?.name as RouteNames;
-      const shouldPreserveScreen =
-        currentRoute === SCREEN_NAMES.CALL_SUMMARY ||
-        currentRoute === SCREEN_NAMES.BREATHING;
 
-      if (!shouldPreserveScreen) {
+      if (currentRoute === SCREEN_NAMES.SPLASH) {
         navigationRef.reset({
           index: 0,
           routes: [{name: SCREEN_NAMES.CALL_LOG}],

@@ -40,13 +40,12 @@ export const useCounselorChat = ({
         dispatch(setCurrentChat(data));
         onActiveChatFound?.(data);
       } else {
-        // Check if we should preserve chat based on current route
         const currentRoute = getCurrentRoute?.() as RouteNames;
         const shouldPreserveChat =
           currentRoute === SCREEN_NAMES.BREATHING ||
-          currentRoute === SCREEN_NAMES.CALL_SUMMARY;
+          currentRoute === SCREEN_NAMES.CALL_SUMMARY ||
+          currentRoute === SCREEN_NAMES.LISTENING;
 
-        // Only clear current chat if preservation is not enabled
         if (!shouldPreserveChat) {
           dispatch(clearCurrentChat());
         }
