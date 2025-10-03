@@ -201,7 +201,7 @@ const styles = ScaledSheet.create({
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: '3@ms',
     left: 0,
     right: 0,
     zIndex: 1000,
