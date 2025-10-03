@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "start": "npx react-native start --reset-cache",
     "test": "jest --passWithNoTests",
+    "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=html --passWithNoTests",
     "lint-staged": "lint-staged",
     "prepare": "husky install",
     "postinstall": "patch-package",

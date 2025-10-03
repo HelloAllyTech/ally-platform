@@ -1,6 +1,13 @@
 module.exports = {
   preset: 'react-native',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  collectCoverageFrom: [
+    '<rootDir>/src/**/*.{ts,tsx}',
+    '!<rootDir>/src/**/__tests__/**',
+    '!<rootDir>/src/**/*.d.ts',
+    '!<rootDir>/src/**/index.ts',
+    '!<rootDir>/src/**/index.tsx',
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(svg)$': '<rootDir>/__mocks__/svgMock.js',
