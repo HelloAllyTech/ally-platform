@@ -17,7 +17,8 @@ import {
   TagIcon,
 } from '@/assets/icons';
 import {colors} from '@/theme';
-import {FieldType, SectionItem, SummaryField} from '@/types';
+import type {SectionItem, SummaryField} from '@/types/callSummary';
+import {FieldType} from '@/types/fields';
 
 export enum ChatSummaryStatus {
   PENDING = 'PENDING',

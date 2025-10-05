@@ -2,15 +2,14 @@
 export type {CircleConfig, AudioTrackRef, CircleProps} from './audio';
 
 // Call Summary types
-export {
-  FieldType,
-  type SummaryField,
-  type FieldConfig,
-  type VisibleFields,
-  type SummaryFieldValueTypes,
-  type EditableFieldKey,
-  type SectionItem,
-  type SummaryFormData,
+export type {
+  SummaryField,
+  FieldConfig,
+  VisibleFields,
+  SummaryFieldValueTypes,
+  EditableFieldKey,
+  SectionItem,
+  SummaryFormData,
 } from './callSummary';
 
 // General types
@@ -39,3 +38,4 @@ export * from './components';
 export * from './general';
 export * from './message';
 export * from './forceUpdate';
+export * from './fields';
