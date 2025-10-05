@@ -11,8 +11,13 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(svg)$': '<rootDir>/__mocks__/svgMock.js',
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|ttf|woff|woff2|mp3|mp4|wav)$':
+      '<rootDir>/__mocks__/fileMock.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@react-native|react-native|react-native-.*|@react-navigation|@react-native-.*|@react-native-community|react-native-size-matters|@react-native/assets|@react-native/polyfills|react-native-svg)/)',
+    'node_modules/(?!(@react-native|react-native|react-native-.*|@react-navigation|@react-native-.*|@react-native-community|react-native-size-matters|@react-native/assets|@react-native/polyfills|react-native-svg|react-redux)/)',
   ],
+  collectCoverage: true,
+  coverageReporters: ['html'],
+  coverageDirectory: '<rootDir>/coverage',
 };

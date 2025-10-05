@@ -33,6 +33,7 @@ interface BoxBreathingAnimationProps {
   isPlaying: boolean;
   animationDuration?: number;
   onPhaseChange?: (phase: Phase) => void;
+  testID?: string;
 }
 
 const phases: Phase[] = [
@@ -231,10 +232,11 @@ export const BoxBreathingAnimation = ({
   // No setState listener — we pass animated value directly to petals
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="box-breathing-container">
       <View style={[styles.square, {width: squareSize, height: squareSize}]}>
         {/* Animated dot */}
         <RNAnimated.View
+          testID="animated-dot"
           style={[
             styles.dot,
             {
