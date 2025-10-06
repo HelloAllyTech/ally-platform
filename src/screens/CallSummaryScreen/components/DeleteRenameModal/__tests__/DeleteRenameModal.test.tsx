@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {render, fireEvent} from '@testing-library/react-native';
 
 import {DeleteRenameModal} from '../DeleteRenameModal';
 
@@ -7,7 +7,11 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {Text} = require('react-native');
   return {
-    CustomModal: (props: any) => <Text>{props.title}</Text>,
+    CustomModal: (props: any) => (
+      <Text onPress={props.onPrimaryPress} testID="modal">
+        {props.title}
+      </Text>
+    ),
   };
 });
 
@@ -28,6 +32,39 @@ describe('CallSummaryScreen/DeleteRenameModal', () => {
       />,
     );
     expect(getByText('CallSummary.customMenu.delete')).toBeTruthy();
+  });
+
+  it('invokes delete on primary press in delete modal', () => {
+    const handleDelete = jest.fn();
+    const {getByTestId} = render(
+      <DeleteRenameModal
+        activeModal="delete"
+        setActiveModal={() => {}}
+        handleDelete={handleDelete}
+        handleBlur={() => {}}
+        editedName=""
+        setEditedName={() => {}}
+      />,
+    );
+    fireEvent.press(getByTestId('modal'));
+    expect(handleDelete).toHaveBeenCalled();
+  });
+
+  it('shows rename modal and calls blur confirm', () => {
+    const handleBlur = jest.fn();
+    const {getByText, getByTestId} = render(
+      <DeleteRenameModal
+        activeModal="rename"
+        setActiveModal={() => {}}
+        handleDelete={() => {}}
+        handleBlur={handleBlur}
+        editedName="Name"
+        setEditedName={() => {}}
+      />,
+    );
+    expect(getByText('CallSummary.info.rename')).toBeTruthy();
+    fireEvent.press(getByTestId('modal'));
+    expect(handleBlur).toHaveBeenCalled();
   });
 });
 

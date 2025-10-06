@@ -1,6 +1,6 @@
 import React from 'react';
 import {FlatList, Keyboard, Text} from 'react-native';
-import {act, render, waitFor} from '@testing-library/react-native';
+import {act, render, waitFor, renderHook} from '@testing-library/react-native';
 
 import {useSearch} from '../useSearch';
 
@@ -30,6 +30,11 @@ jest.mock('@/services/searchApi', () => ({
 
 jest.mock('@/utils/logger', () => ({
   logger: {error: jest.fn(), info: jest.fn()},
+}));
+
+jest.mock('@/hooks', () => ({
+  __esModule: true,
+  useTranslate: () => ({ t: (k: string) => k }),
 }));
 
 const TestComponent = ({withRef = false}: {withRef?: boolean}) => {
@@ -115,6 +120,26 @@ describe('useSearch', () => {
     });
     expect(getByTestId('showSearchResults').props.children).toBe('false');
     jest.useRealTimers();
+  });
+});
+
+describe('useSearch extended', () => {
+  it('handles tabs change and end reached', () => {
+    const flatListRef: any = { current: { scrollToOffset: jest.fn() } };
+    const { result, rerender } = renderHook(() => useSearch(flatListRef));
+    if (result.current.tabsMeta.length === 0) {
+      // no tabs to change; just exercise handlers that are safe
+      require('@testing-library/react-native').act(() => {
+        result.current.handleEndReached();
+        result.current.resetSearch();
+      });
+      return;
+    }
+    require('@testing-library/react-native').act(() => {
+      result.current.handleTabChange(0);
+      result.current.handleEndReached();
+      result.current.resetSearch();
+    });
   });
 });
 

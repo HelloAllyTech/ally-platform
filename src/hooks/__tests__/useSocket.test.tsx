@@ -21,6 +21,8 @@ jest.mock('@/utils', () => ({
   logger: {error: jest.fn()},
 }));
 
+jest.mock('@/utils/logger', () => ({ logger: { error: jest.fn(), info: jest.fn() } }));
+
 const Test = () => {
   const hook = useSocket({userId: 1, path: '/sock'});
   return (
