@@ -10,6 +10,7 @@ import {
 import {DEFAULT_HIT_SLOP, LogType, TAG_COLORS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
+import {getLogSourceLabelConfig} from '@/utils/callLog';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
 import {LogItem} from '../../types';
@@ -62,6 +63,8 @@ export const CallLogItem = ({
     ],
   );
   const tags = item.details?.summary?.tags || [];
+  const provider = item.details?.callInfo?.provider;
+
   return (
     <TouchableOpacity
       disabled={disabled}
@@ -124,12 +127,26 @@ export const CallLogItem = ({
       {/* Expanded details section */}
       {expanded && (
         <View style={styles.logDetails}>
-          <Text style={styles.duration}>
-            {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
-            {item?.score
-              ? ` • ${t('CallLogs.sessionScore')}: ${item?.score}`
-              : ''}
-          </Text>
+          <View style={styles.durationRow}>
+            {provider && (
+              <>
+                <Text
+                  style={[
+                    styles.sourceText,
+                    {color: getLogSourceLabelConfig(provider).color},
+                  ]}>
+                  {t(getLogSourceLabelConfig(provider).label)}
+                </Text>
+                <Text style={styles.separator}>|</Text>
+              </>
+            )}
+            <Text style={styles.duration}>
+              {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
+              {item?.score
+                ? ` • ${t('CallLogs.sessionScore')}: ${item?.score}`
+                : ''}
+            </Text>
+          </View>
           {/* Render tags if they exist */}
           {(tags?.length ?? 0) > 0 && (
             <View style={styles.tagsRow}>
@@ -229,11 +246,23 @@ const styles = ScaledSheet.create({
     marginTop: '6@ms',
     marginLeft: '4@ms',
   },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: '8@ms',
+  },
+  separator: {
+    color: colors.lightGray2,
+    marginHorizontal: '4@ms',
+  },
   duration: {
     color: colors.darkCharcoal,
     fontSize: '12@ms',
-    marginBottom: '8@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+  },
+  sourceText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
   },
   tagsRow: {
     flexDirection: 'row',

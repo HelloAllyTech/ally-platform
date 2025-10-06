@@ -125,6 +125,9 @@ export const colors = {
   // Browns
   russetBrown: '#873200',
 
+  // Purples
+  deepPurple: '#673AB7',
+
   // Warning/Alert colors
   warning: '#FFF3CD',
 };

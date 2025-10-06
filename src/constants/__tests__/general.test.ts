@@ -41,7 +41,7 @@ describe('constants/general', () => {
     expect(API_ROUTES.ROOMS).toContain('/rooms');
     expect(API_METHODS.POST).toBe('POST');
     expect(TERMS_AND_CONDITIONS_URL).toContain('terms');
-    expect(PRIVACY_POLICY_URL).toContain('privacy');
+    expect(PRIVACY_POLICY_URL).toContain('policy');
   });
   it('carousel configs', () => {
     expect(drawerSecurityCarouselConfig.width).toBeGreaterThan(0);
