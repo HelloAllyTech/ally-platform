@@ -41,7 +41,9 @@ export const CallEndOverlay = () => {
       colors={[colors.black, colors.darkBlue3]}
       style={styles.container}>
       <View style={styles.content}>
-        <Animated.View style={[styles.block, animatedStyle]}>
+        <Animated.View
+          style={[styles.block, animatedStyle]}
+          testID="animated-message">
           {messageIndex === 0 ? (
             <View style={styles.lineWrap}>
               {/* Line 1: text + pill */}

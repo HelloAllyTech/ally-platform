@@ -16,6 +16,7 @@ type Props = {
   isPlaying: boolean;
   onToggleMute: () => void;
   onTogglePlayPause: () => void;
+  testID?: string;
 };
 
 export const BreathingControls: React.FC<Props> = ({
@@ -23,19 +24,22 @@ export const BreathingControls: React.FC<Props> = ({
   isPlaying,
   onToggleMute,
   onTogglePlayPause,
+  testID,
 }) => {
   return (
-    <View style={styles.controls}>
+    <View style={styles.controls} testID={testID}>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onToggleMute}
-        style={styles.button}>
+        style={styles.button}
+        testID="volume-button">
         {isMuted ? <VolumeOffIcon /> : <VolumeIcon />}
       </TouchableOpacity>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onTogglePlayPause}
-        style={styles.button}>
+        style={styles.button}
+        testID="play-pause-button">
         {isPlaying ? <PauseWhiteIcon /> : <PlayWhiteIcon />}
       </TouchableOpacity>
     </View>

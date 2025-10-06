@@ -102,6 +102,12 @@ export const CallSummaryScreen: React.FC<
   });
 
   const onBackNavigation = () => {
+    // If the summary is not yet generated/ready, allow immediate back navigation
+    const summaryGenerated = isSummaryAvailable && canShowSummary;
+    if (!summaryGenerated) {
+      handleGoBack();
+      return;
+    }
     const currentTime = Date.now();
     const timeElapsed = currentTime - mountTime;
     const thresholdMs = 30 * 1000; // 30 seconds
@@ -207,7 +213,7 @@ export const CallSummaryScreen: React.FC<
     if (isLoading) {
       return (
         <View style={styles.spinnerContainer}>
-          <ActivityIndicator color={colors.white} />
+          <ActivityIndicator color={colors.darkSlate} />
         </View>
       );
     }

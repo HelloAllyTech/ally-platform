@@ -96,7 +96,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
           {displayItems?.length > 0 ? (
             displayItems?.map(renderItem)
           ) : (
-            <Text style={styles.noItemsText}>No Data Available</Text>
+            <Text style={styles.noItemsText}>
+              {t('SimulationFeedback.noDataAvailable')}
+            </Text>
           )}
           {items.length > 3 && (
             <TouchableOpacity
@@ -136,30 +138,30 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
       )}
       <View style={styles.metricsContainer}>
         {renderMetricCard(
-          'Session Duration',
+          t('SimulationFeedback.sessionDuration'),
           getDuration(data.startedAt, data.endedAt),
         )}
         {renderMetricCard(
-          'Total Score',
-          `${data.score || '0'}/${MAX_SUMMARY_SCORE}`,
+          t('SimulationFeedback.totalScore'),
+          `${data.score ?? '0'} ${t('SimulationFeedback.benchmark', {benchmark: MAX_SUMMARY_SCORE})}`,
         )}
       </View>
       {renderExpandableSection(
-        'Key events',
+        t('SimulationFeedback.keyEvents'),
         <KeyEventsIcon width={20} height={20} style={styles.sectionIcon} />,
         events,
         'keyEvents',
         renderEventItem,
       )}
       {renderExpandableSection(
-        'What went well',
+        t('SimulationFeedback.whatWentWell'),
         <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
         positives,
         'whatWentWell',
         renderFeedbackItem,
       )}
       {renderExpandableSection(
-        'Areas for improvement',
+        t('SimulationFeedback.areasForImprovement'),
         <LightBulbIcon width={20} height={20} style={styles.sectionIcon} />,
         improvements,
         'areasForImprovement',

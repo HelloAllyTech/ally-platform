@@ -9,13 +9,7 @@ import {
 } from '@/constants/summary';
 import {AgeRange, Language} from '@/services/callSummaryApi';
 
-export enum FieldType {
-  Text = 'Text',
-  InlineTextInput = 'InlineTextInput',
-  MultilineTextInput = 'MultilineTextInput',
-  Dropdown = 'Dropdown',
-  SearchableDropdown = 'SearchableDropdown',
-}
+import {FieldType} from './fields';
 
 export interface SummaryField {
   isEditable: boolean;

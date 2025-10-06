@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 
 import {FeedbackPopup} from '@/components';
 
@@ -48,6 +49,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   hideSummaryFeedbackPopup,
   onSubmitSummaryFeedback,
 }) => {
+  const {t} = useTranslation();
   return (
     <>
       <DeleteRenameModal
@@ -72,6 +74,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         showExportOption={isSummaryAvailable}
       />
       <FeedbackPopup
+        note={t('FeedbackPopup.instructionText')}
         visible={isSummaryFeedbackPopup}
         onClose={hideSummaryFeedbackPopup}
         onSubmit={onSubmitSummaryFeedback}

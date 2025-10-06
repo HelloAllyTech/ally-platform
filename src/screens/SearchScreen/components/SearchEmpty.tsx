@@ -1,9 +1,11 @@
-import {Text, TouchableOpacity, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SearchActiveIcon, SearchIcon} from '@/assets/icons';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
+
+import {SearchSuggestion} from './SearchSuggestions';
 
 interface SearchEmptyProps {
   searchText: string;
@@ -30,18 +32,27 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
       )}
       <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
       {trySuggestions.map(suggestion => (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          key={suggestion.id}
-          style={themedStyles.trySuggestion}
-          onPress={() => onPressSuggestion(suggestion.text)}>
-          {colorTheme === 'dark' ? (
-            <SearchActiveIcon width={14} height={14} color={colors.darkGray8} />
-          ) : (
-            <SearchIcon width={14} height={14} />
-          )}
-          <Text style={themedStyles.suggestionText}>{suggestion.text}</Text>
-        </TouchableOpacity>
+        <>
+          <View style={themedStyles.marginL16}>
+            <SearchSuggestion
+              colorTheme={colorTheme}
+              icon={
+                colorTheme === 'dark' ? (
+                  <SearchActiveIcon
+                    width={14}
+                    height={14}
+                    color={colors.darkGray8}
+                  />
+                ) : (
+                  <SearchIcon width={14} height={14} />
+                )
+              }
+              text={suggestion.text}
+              onPressSuggestion={() => onPressSuggestion(suggestion.text)}
+              suggestionId={suggestion.id}
+            />
+          </View>
+        </>
       ))}
     </View>
   );
@@ -70,18 +81,8 @@ const getThemedStyles = (colorTheme: 'light' | 'dark') => {
       marginTop: '18@ms',
       marginBottom: '10@ms',
     },
-    trySuggestion: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: '18@ms',
+    marginL16: {
       marginLeft: '16@ms',
-    },
-    suggestionText: {
-      ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      color: isDark ? colors.gray99 : colors.darkGray6,
-      fontSize: '14@ms',
-      lineHeight: '20@ms',
-      marginLeft: '10@ms',
     },
   });
 };

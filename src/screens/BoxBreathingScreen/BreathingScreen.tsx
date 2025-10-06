@@ -135,6 +135,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           </Text>
           <View style={styles.content}>
             <BoxBreathingAnimation
+              testID="box-breathing-animation"
               isPlaying={isPlaying}
               isMuted={isMuted}
               animationDuration={4000}
@@ -143,6 +144,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
             <Text style={styles.timer}>{seconds}</Text>
 
             <BreathingControls
+              testID="breathing-controls"
               isMuted={isMuted}
               isPlaying={isPlaying}
               onToggleMute={toggleMute}
