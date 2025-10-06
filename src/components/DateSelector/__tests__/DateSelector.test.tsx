@@ -1,15 +1,23 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {render, fireEvent} from '@testing-library/react-native';
+import {Text} from 'react-native';
 
 import {DateSelector} from '@/components/DateSelector';
 
 jest.mock('react-native-calendars', () => {
   const React = require('react');
-  const Calendar = ({onDayPress}: any) => {
+  const {Text} = require('react-native');
+  const Calendar = ({onDayPress, markedDates, current, markingType}: any) => {
     React.useEffect(() => {
       onDayPress?.({dateString: '2024-01-02'});
     }, [onDayPress]);
-    return null;
+    return (
+      <>
+        <Text testID="marked-keys">{Object.keys(markedDates || {}).join(',')}</Text>
+        <Text testID="current-date">{current}</Text>
+        <Text testID="marking-type">{markingType}</Text>
+      </>
+    );
   };
   return { Calendar, LocaleConfig: { locales: { shortDays: {} }, defaultLocale: 'shortDays' } };
 });
@@ -60,6 +68,12 @@ jest.mock('@/components/DateSelector/useDateSelection', () => ({
 }));
 
 describe('DateSelector', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseDateSelection.selectedDate = { startDate: '2024-01-01', endDate: '2024-01-01' } as any;
+    mockUseDateSelection.tempSelectedDate = { startDate: '2024-01-01', endDate: '2024-01-01' } as any;
+  });
+
   it('renders All mode summary', () => {
     const {toJSON} = render(
       <DateSelector
@@ -71,15 +85,16 @@ describe('DateSelector', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  it('renders Daily mode without errors', () => {
-    const {toJSON} = render(
+  it('renders Daily mode and shows today label', () => {
+    const {getByText} = render(
       <DateSelector
         pickerMode={'D' as any}
         dateRange={{ startDate: '2024-01-01', endDate: '2024-01-01' }}
         setDateRange={jest.fn()}
       />,
     );
-    expect(toJSON()).toBeTruthy();
+    // isToday mocked to true, so today label should show
+    expect(getByText('analytics.dateSelector.today')).toBeTruthy();
   });
 
   it('renders Weekly mode header and actions', () => {
@@ -113,5 +128,79 @@ describe('DateSelector', () => {
       />,
     );
     expect(toJSON()).toBeTruthy();
+  });
+
+  it('opens modal when month selector pressed and closes on cancel', () => {
+    const {getByText} = render(
+      <DateSelector
+        pickerMode={'D' as any}
+        dateRange={{ startDate: '2024-01-01', endDate: '2024-01-01' }}
+        setDateRange={jest.fn()}
+      />,
+    );
+    // Month selector shows MOCK_DISPLAY
+    fireEvent.press(getByText('MOCK_DISPLAY'));
+    // Cancel button exists via translation key
+    fireEvent.press(getByText('analytics.modal.cancel'));
+    expect(mockUseDateSelection.handleCancel).toHaveBeenCalled();
+  });
+
+  it('handles month grid interactions', () => {
+    const {getByText} = render(
+      <DateSelector
+        pickerMode={'M' as any}
+        dateRange={{ startDate: '2023-01-01', endDate: '2023-01-31' }}
+        setDateRange={jest.fn()}
+      />,
+    );
+    // Open modal via month selector press
+    fireEvent.press(getByText('MOCK_DISPLAY'));
+    // Click on a month cell, e.g., Feb
+    fireEvent.press(getByText('Feb'));
+    expect(mockUseDateSelection.setMonthRange).toHaveBeenCalled();
+  });
+
+  it('handles year grid interactions', () => {
+    const {getByText} = render(
+      <DateSelector
+        pickerMode={'Y' as any}
+        dateRange={{ startDate: '2024-01-01', endDate: '2024-12-31' }}
+        setDateRange={jest.fn()}
+      />,
+    );
+    // Open modal via month selector press
+    fireEvent.press(getByText('MOCK_DISPLAY'));
+    // Click current year cell (from getYearRange mock)
+    fireEvent.press(getByText(new Date('2024-01-01').getFullYear().toString()));
+    expect(mockUseDateSelection.setYearRange).toHaveBeenCalled();
+  });
+
+  it('weekly markedDates shows full range when start and end provided', () => {
+    mockUseDateSelection.tempSelectedDate = { startDate: '2024-01-01', endDate: '2024-01-03' } as any;
+    const {getByTestId, getByText} = render(
+      <DateSelector
+        pickerMode={'W' as any}
+        dateRange={{ startDate: '2024-01-01', endDate: '2024-01-03' }}
+        setDateRange={jest.fn()}
+      />,
+    );
+    // open modal to render Calendar
+    fireEvent.press(getByText('MOCK_DISPLAY'));
+    const keys = getByTestId('marked-keys').props.children.split(',');
+    expect(keys).toEqual(expect.arrayContaining(['2024-01-01','2024-01-02','2024-01-03']));
+    expect(getByTestId('marking-type').props.children).toBe('period');
+  });
+
+  it('weekly markedDates shows start-only when only start provided', () => {
+    mockUseDateSelection.tempSelectedDate = { startDate: '2024-02-01', endDate: null } as any;
+    const {getByTestId, getByText} = render(
+      <DateSelector
+        pickerMode={'W' as any}
+        dateRange={{ startDate: '2024-02-01', endDate: '2024-02-01' }}
+        setDateRange={jest.fn()}
+      />,
+    );
+    fireEvent.press(getByText('MOCK_DISPLAY'));
+    expect(getByTestId('marked-keys').props.children).toBe('2024-02-01');
   });
 });

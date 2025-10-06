@@ -198,6 +198,67 @@ describe('SimulationAssistantScreen', () => {
     fireEvent.press(getByLabelText('mic'));
     expect(mockSetMic).toHaveBeenCalledWith(false);
   });
+
+  it('handles stop press and navigates to feedback after endScenarioSession', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getByLabelText} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    fireEvent.press(getByLabelText('stop'));
+
+    const {mockReplace} = require('@/hooks');
+    await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+  });
+
+  it('processes feedback events with 10s gating and auto-hide', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    const dataHandlers: Array<(p: any) => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      if (event === 'data') dataHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getByTestId, queryByText} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    const now = Date.now();
+    const makeEvt = (msOffset: number) => ({
+      timestamp: new Date(now + msOffset).toISOString(),
+      data: {score: 10, message: 'hello'},
+    });
+
+    // First event accepted
+    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(0))));
+    expect(getByTestId('score').props.children).toBe('10');
+
+    // Second event within 10s should be skipped
+    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(1000))));
+    expect(getByTestId('score').props.children).toBe('10');
+
+    // After 10s, event accepted and score increases
+    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(11_000))));
+    expect(getByTestId('score').props.children).toBe('20');
+
+    // Auto-hide feedback after minimum display time
+    await act(async () => {
+      jest.advanceTimersByTime(FEEDBACK_MIN_DISPLAY_MS);
+    });
+    expect(queryByText('hello')).toBeNull();
+  });
 });
 
 
