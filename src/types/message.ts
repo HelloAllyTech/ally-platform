@@ -25,6 +25,7 @@ export enum ChatProvider {
   MICROPHONE = 'MICROPHONE',
   WEBRTC = 'WEBRTC',
   OZONETEL = 'OZONETEL',
+  AUDIO_UPLOAD = 'AUDIO_UPLOAD',
 }
 
 export const ConferenceCallProviders = [
