@@ -44,7 +44,7 @@ TTS_PROVIDERS = {
     ),
     TTSProvider.SARVAM: sarvam.TTS(
       target_language_code="en-IN",
-      speaker=settings.VOICE_ID,
+      speaker="anushka",
       api_key=settings.SARVAM_API_KEY,
    )
 }
