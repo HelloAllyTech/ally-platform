@@ -17,7 +17,8 @@ import {
   TagIcon,
 } from '@/assets/icons';
 import {colors} from '@/theme';
-import {FieldType, SectionItem, SummaryField} from '@/types';
+import type {SectionItem, SummaryField} from '@/types/callSummary';
+import {FieldType} from '@/types/fields';
 
 export enum ChatSummaryStatus {
   PENDING = 'PENDING',
@@ -539,6 +540,6 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> =
 export const ALWAYS_VISIBLE_SECTIONS = [SectionKey.AdditionalNotes];
 
 export const CallSummaryGenerationData = {
-  durationInSeconds: 30 * 60, // 30 mins
-  summaryGenerationDurationInSeconds: 5 * 60, // 5 mins
+  durationInSeconds: 2503, // 41 mins 43 secs
+  summaryGenerationDurationInSeconds: 178, // 2 mins 58 secs
 };

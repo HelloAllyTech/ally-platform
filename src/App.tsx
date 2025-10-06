@@ -4,11 +4,10 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {Provider} from 'react-redux';
 
+import {NetworkLogs, ToastProvider} from '@/components';
 import {env} from '@/config/env';
+import {RootNavigator} from '@/navigation/RootNavigator';
 
-import {NetworkLogs} from './components/NetworkLogs/NetworkLogs';
-import {ToastProvider} from './components/Toast/ToastProvider';
-import {RootNavigator} from './navigation/RootNavigator';
 import {store} from './store/store';
 
 import './localization/i18n';

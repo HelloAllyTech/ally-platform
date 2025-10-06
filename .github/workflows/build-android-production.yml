@@ -64,18 +64,18 @@ jobs:
         run: |
           cd android
           ./gradlew clean
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleProdRelease --stacktrace
 
       - name: Rename APK with build number, date, and env
         run: |
           DATETIME=$(date +'%Y%m%d-%H%M')
-          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk
+          mv android/app/build/outputs/apk/prod/release/app-prod-release.apk android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-production-release-${{ github.run_number }}
-          path: android/app/build/outputs/apk/release/app-production-release-${{ github.run_number }}-*.apk
+          path: android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-*.apk
           retention-days: 30
 
       - name: Send Slack notification (Production)

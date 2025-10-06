@@ -167,5 +167,5 @@ export type LiveEventPayload = {
     emoji?: string | null;
     message?: string | null;
   } | null;
-  time?: string;
+  timestamp?: string;
 } | null;
