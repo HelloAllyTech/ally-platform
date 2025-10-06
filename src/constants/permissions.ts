@@ -1,3 +1,6 @@
+import {Platform} from 'react-native';
+import {PERMISSIONS} from 'react-native-permissions';
+
 export enum USER_PERMISSIONS {
   VIEW_NAVBAR_CALLS = 'view:navbar:calls',
   VIEW_NAVBAR_CALENDAR = 'view:navbar:calendar',
@@ -12,3 +15,8 @@ export enum USER_PERMISSIONS {
   VIEW_SCENARIO_SESSION = 'view:scenario-session',
   VIEW_ADMIN_SCENARIO_SESSION = 'view:admin:scenario-session',
 }
+
+export const MICROPHONE_PERMISSION =
+  Platform.OS === 'ios'
+    ? PERMISSIONS.IOS.MICROPHONE
+    : PERMISSIONS.ANDROID.RECORD_AUDIO;

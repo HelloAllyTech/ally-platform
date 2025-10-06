@@ -39,7 +39,6 @@ const NavigationContent = ({
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
   const {userData, isAuthenticated} = useUser();
-  const isCounselor = userData?.role === UserRole.COUNSELOR;
 
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
@@ -58,11 +57,8 @@ const NavigationContent = ({
     },
     onNoActiveChatFound: () => {
       const currentRoute = navigationRef?.getCurrentRoute()?.name as RouteNames;
-      const shouldPreserveScreen =
-        currentRoute === SCREEN_NAMES.CALL_SUMMARY ||
-        currentRoute === SCREEN_NAMES.BREATHING;
 
-      if (!shouldPreserveScreen) {
+      if (currentRoute === SCREEN_NAMES.SPLASH) {
         navigationRef.reset({
           index: 0,
           routes: [{name: SCREEN_NAMES.CALL_LOG}],
@@ -89,12 +85,6 @@ const NavigationContent = ({
     }),
     [checkCounselorChat, userData?.role],
   );
-
-  useSocketConnection({
-    path: env.WEBRTC_SOCKET_PATH,
-    userId: userData?.id,
-    eventCallbacks: socketEventCallbacks,
-  });
 
   useSocketConnection({
     path: env.CLOUD_TELEPHONY_PATH,
@@ -127,6 +117,7 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.CALL_SUMMARY}
             component={CallSummaryScreen}
+            options={{gestureEnabled: false}}
           />
           <Stack.Screen
             name={SCREEN_NAMES.BREATHING}
@@ -149,6 +140,7 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_FEEDBACK}
             component={SimulationFeedbackScreen}
+            options={{gestureEnabled: false}}
           />
         </>
       ) : (

@@ -127,7 +127,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                 {getRatingText?.length > 0 && (
                   <Text style={styles.ratingText}>{getRatingText}</Text>
                 )}
-                {rating !== 5 && showChips && (
+                {rating !== 5 && rating !== 0 && showChips && (
                   <ChipGroup
                     options={issueOptions}
                     selectedValues={selectedIssues}

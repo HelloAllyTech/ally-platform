@@ -61,8 +61,6 @@ export interface FeedbackResponse {
   feedbackId: number;
 }
 
-export type WebRTCAudioData = {type: 'Buffer'; data: number[]};
-
 export type SocketMessage = {
   type: SocketEvent | string;
   payload?: {
@@ -77,7 +75,7 @@ export type SocketMessage = {
     createdAt: string;
     updatedAt: string;
     feedback?: FeedbackResponse;
-    audioData: string | WebRTCAudioData;
+    audioData: string;
   };
   content?: string;
   context?: {
@@ -104,16 +102,6 @@ export enum SocketEvent {
   AUDIO_CHAT_RESUMED = 'AUDIO_CHAT_RESUMED',
   SESSION_CREATED = 'SESSION_CREATED',
   AUDIO_CHAT_ENDED = 'AUDIO_CHAT_ENDED',
-
-  // Unused socket events
-  // STAGE = 'STAGE',
-  // CHAT_ACCEPTED = 'CHAT_ACCEPTED',
-  // MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',
-  // AUDIO_CHAT_MUTED = 'AUDIO_CHAT_MUTED',
-  // ICE_CANDIDATE = 'webrtc-ice-candidate',
-  // WEBRTC_OFFER = 'webrtc-offer',
-  // WEBRTC_ANSWER = 'webrtc-answer',
-  // UTTERANCE_ENDED = 'UTTERANCE_ENDED',
 }
 
 export interface WaitingClientChat {
