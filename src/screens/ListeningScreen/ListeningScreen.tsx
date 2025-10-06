@@ -69,7 +69,6 @@ import {
   getStartAudioChatPayload,
   NUM_BARS,
   recorderAudioToAmplitudes,
-  webRTCAudioDataToAmplitudes,
 } from './utils';
 
 export const ListeningScreen = ({
@@ -122,10 +121,11 @@ export const ListeningScreen = ({
   const streamingInitialized = useRef(false);
   const chatIdTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Use ref to always access the latest isCallPaused value inside audio event callback,
+  // Use ref to always access the latest isCallPaused and isWebMicrophoneMode values inside audio event callback,
   // since react-native-live-audio-stream registers the handler once and won't re-subscribe
   // on state changes, avoiding unnecessary re-inits of the stream.
   const isCallPausedRef = useRef(isCallPaused);
+  const isWebMicrophoneModeRef = useRef(isWebMicrophoneMode);
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const latestAmplitudesRef = useRef<number[] | null>(
     new Array(NUM_BARS).fill(0),
@@ -155,9 +155,8 @@ export const ListeningScreen = ({
 
   const getSocketPath = useCallback(() => {
     if (isConferenceCall) return env.CLOUD_TELEPHONY_PATH;
-    if (isMicrophoneMode) return env.MICROPHONE_SOCKET_PATH;
-    return env.WEBRTC_SOCKET_PATH;
-  }, [isConferenceCall, isMicrophoneMode]);
+    return env.MICROPHONE_SOCKET_PATH;
+  }, [isConferenceCall]);
 
   useEffect(() => {
     if (isOffline && isMicrophoneMode && !isWebMicrophoneMode) {
@@ -175,6 +174,10 @@ export const ListeningScreen = ({
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
   }, [isCallPaused]);
+
+  useEffect(() => {
+    isWebMicrophoneModeRef.current = isWebMicrophoneMode;
+  }, [isWebMicrophoneMode]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -218,11 +221,11 @@ export const ListeningScreen = ({
   useHardwareBackPressHandler(() => {
     if (isMicrophoneMode) {
       if (isWebMicrophoneMode) {
-        dispatch(clearCurrentChat());
         navigation.goBack();
       } else if (chatData?.chatId) {
         setShowCallEndConfirmation(true);
       }
+      dispatch(clearCurrentChat());
       return true;
     }
     navigation.goBack();
@@ -277,10 +280,6 @@ export const ListeningScreen = ({
         if (data.payload?.audioData) {
           if (isConferenceCall) {
             latestAmplitudesRef.current = exotelAudioDataToAmplitudes(
-              data.payload.audioData as string,
-            );
-          } else {
-            latestAmplitudesRef.current = webRTCAudioDataToAmplitudes(
               data.payload.audioData as string,
             );
           }
@@ -338,6 +337,7 @@ export const ListeningScreen = ({
       if (
         !isCallPausedRef.current &&
         !isWebMicrophoneMode &&
+        !isWebMicrophoneModeRef.current &&
         chatIdRef.current
       ) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
@@ -370,7 +370,11 @@ export const ListeningScreen = ({
   ]);
 
   useEffect(() => {
-    if (isMicrophoneMode && !streamingInitialized.current) {
+    if (
+      isMicrophoneMode &&
+      !isWebMicrophoneMode &&
+      !streamingInitialized.current
+    ) {
       streamingInitialized.current = true;
       startStreaming();
     }
@@ -399,12 +403,10 @@ export const ListeningScreen = ({
 
   // Keep screen awake during microphone mode calls
   useEffect(() => {
-    if (isMicrophoneMode) {
-      try {
-        activateKeepAwake();
-      } catch (error) {
-        console.warn('Failed to activate keep awake:', error);
-      }
+    try {
+      activateKeepAwake();
+    } catch (error) {
+      console.warn('Failed to activate keep awake:', error);
     }
 
     // Cleanup function to deactivate keep awake when component unmounts or mode changes
@@ -476,12 +478,7 @@ export const ListeningScreen = ({
               !res.data ||
               (Array.isArray(res.data) && res.data.length === 0)
             ) {
-              // Clear chat state before navigation
-              dispatch(clearCurrentChat());
-              navigation.reset({
-                index: 0,
-                routes: [{name: SCREEN_NAMES.CALL_LOG}],
-              });
+              handleCallEndRedirection();
             }
           });
         }, 500);
@@ -497,7 +494,7 @@ export const ListeningScreen = ({
     isMicrophoneMode,
     isPermissionGranted,
     isWebMicrophoneMode,
-    navigation,
+    handleCallEndRedirection,
     dispatch,
   ]);
 
@@ -508,12 +505,6 @@ export const ListeningScreen = ({
       onConfirm={handleEndCall}
       isMicrophoneMode={isMicrophoneMode}
     />
-  );
-  const isWebrtcOrMicrophoneMode = useMemo(
-    () =>
-      callProvider &&
-      [ChatProvider.WEBRTC, ChatProvider.MICROPHONE].includes(callProvider),
-    [callProvider],
   );
 
   const handleTryAgain = useCallback(() => {
@@ -668,8 +659,8 @@ export const ListeningScreen = ({
         onCallEndPress={() => setShowCallEndConfirmation(true)}
         isCallPaused={isCallPaused}
         onPauseResumePress={handlePlayPauseCallPress}
-        showPauseResumeButton={isWebrtcOrMicrophoneMode}
-        showEndSessionButton={isWebrtcOrMicrophoneMode}
+        showPauseResumeButton={isMicrophoneMode}
+        showEndSessionButton={isMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
         showFocusModeButton={permissions?.includes(
           USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,

@@ -134,7 +134,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 
   if (isLoadingSummary) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.darkSlate} />
       </View>
     );
@@ -181,6 +181,12 @@ const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+  },
   contentContainer: {
     paddingBottom: '70@ms',
   },
@@ -195,7 +201,7 @@ const styles = ScaledSheet.create({
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: '3@ms',
     left: 0,
     right: 0,
     zIndex: 1000,

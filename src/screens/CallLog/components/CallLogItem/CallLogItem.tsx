@@ -127,7 +127,7 @@ export const CallLogItem = ({
           <Text style={styles.duration}>
             {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
             {item?.score
-              ? ` • ${t('CallLogs.sessionScore')} : ${item?.score}`
+              ? ` • ${t('CallLogs.sessionScore')}: ${item?.score}`
               : ''}
           </Text>
           {/* Render tags if they exist */}

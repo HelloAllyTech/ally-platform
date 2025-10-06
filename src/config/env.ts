@@ -6,7 +6,6 @@ export interface Env {
   API_VERSION: string;
   ALLY_WEB_URL: string;
   THIRD_PARTY_CALL_NUMBER: string;
-  WEBRTC_SOCKET_PATH: string;
   MICROPHONE_SOCKET_PATH: string;
   CLOUD_TELEPHONY_PATH: string;
 }
@@ -29,10 +28,6 @@ export const env: Env = {
   THIRD_PARTY_CALL_NUMBER: assertEnvVar(
     Config.THIRD_PARTY_CALL_NUMBER,
     'THIRD_PARTY_CALL_NUMBER',
-  ),
-  WEBRTC_SOCKET_PATH: assertEnvVar(
-    Config.WEBRTC_SOCKET_PATH,
-    'WEBRTC_SOCKET_PATH',
   ),
   MICROPHONE_SOCKET_PATH: assertEnvVar(
     Config.MICROPHONE_SOCKET_PATH,

@@ -4,11 +4,16 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "android": "react-native run-android",
+    "android:dev": "react-native run-android --appId com.helloally.app.dev --tasks installDevDebug",
+    "android:prod": "react-native run-android --appId com.helloally.app --tasks installProdDebug",
+    "build:dev": "cd android && ./gradlew assembleDevRelease --stacktrace",
+    "build:prod": "cd android && ./gradlew assembleProdRelease --stacktrace",
+    "android:clean": "cd android && ./gradlew clean",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "npx react-native start --reset-cache",
     "test": "jest --passWithNoTests",
+    "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=html --passWithNoTests",
     "lint-staged": "lint-staged",
     "prepare": "husky install",
     "postinstall": "patch-package",
@@ -82,6 +87,7 @@
     "@types/lodash": "^4.17.16",
     "@types/react": "^19.0.0",
     "@types/react-native-version-check": "^3.4.8",
+    "@types/redux-mock-store": "^1.5.0",
     "babel-plugin-module-resolver": "^5.0.2",
     "eslint": "^8.19.0",
     "eslint-config-prettier": "^10.1.2",
@@ -96,6 +102,7 @@
     "prettier-plugin-unused-imports-configurable": "^1.14.3",
     "react-native-svg-transformer": "^1.5.1",
     "react-test-renderer": "^19.0.0",
+    "redux-mock-store": "^1.5.5",
     "typescript": "^5.0.4"
   },
   "engines": {
