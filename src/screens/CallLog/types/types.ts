@@ -1,4 +1,5 @@
 import {ChatSummaryStatus} from '@/constants';
+import {ChatProvider} from '@/types';
 
 export interface CallLog {
   id: number;
@@ -113,6 +114,7 @@ export type LogItem = {
     createdAt?: string;
     callInfo?: {
       summaryName?: string;
+      provider?: ChatProvider;
     };
   };
   client: {

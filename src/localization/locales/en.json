@@ -65,7 +65,9 @@
     "appCurrentlyForCounsellors": "This app is currently for counsellors only.",
     "learnMore": "Learn more",
     "duration": "Duration",
-    "noAudioDetected": "No audio detected"
+    "noAudioDetected": "No audio detected",
+    "uploaded": "Uploaded",
+    "liveSession": "Live session"
   },
   "Logout": {
     "logout": "Logout",
