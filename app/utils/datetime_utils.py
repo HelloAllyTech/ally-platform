@@ -21,3 +21,17 @@ def timestamp_to_iso_utc(timestamp: Union[int, float]) -> str:
         '2022-01-01T12:00:00Z'
     """
     return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+def get_current_iso_timestamp() -> str:
+    """
+    Get current timestamp in ISO 8601 UTC format with 'Z' suffix.
+    
+    Returns:
+        ISO 8601 formatted UTC datetime string with 'Z' suffix
+        
+    Example:
+        >>> get_current_iso_timestamp()
+        '2022-01-01T12:00:00.123456Z'
+    """
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

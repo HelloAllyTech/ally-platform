@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized successfully")
         yield
     except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+        logger.error(f"Failed to initialize database: {type(e).__name__}")
         raise
     finally:
         # Shutdown
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
             await close_database()
             logger.info("Database connections closed successfully")
         except Exception as e:
-            logger.error(f"Error closing database connections: {e}")
+            logger.error(f"Error closing database connections: {type(e).__name__}")
 
 
 app = FastAPI(

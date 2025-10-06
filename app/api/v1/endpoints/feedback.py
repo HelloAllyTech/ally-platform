@@ -69,19 +69,19 @@ async def create_feedback(
         return response
         
     except ValueError as e:
-        logger.error(f"Validation error during feedback creation: {e}")
+        logger.error(f"Validation error during feedback creation: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except NotFoundException as e:
-        logger.error(f"User not found during feedback creation: {e}")
+        logger.error(f"User not found during feedback creation: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
-        logger.error(f"Error creating feedback: {e}")
+        logger.error(f"Error creating feedback: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create feedback"
@@ -131,7 +131,7 @@ async def list_all_feedback(
         return response
         
     except Exception as e:
-        logger.error(f"Error listing feedback: {e}")
+        logger.error(f"Error listing feedback: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list feedback"

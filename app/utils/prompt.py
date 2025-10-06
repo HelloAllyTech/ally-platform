@@ -1,6 +1,8 @@
 """
 Prompt templates for AI agents.
 """
+from langchain_core.messages import SystemMessage
+
 from app.core.scenario.scenario_types import ScenarioType
 
 # Dictionary of prompts that can be selected dynamically
@@ -134,3 +136,12 @@ Respond to the therapist’s questions thoughtfully, occasionally showing hesita
 
 # Default prompt if none is specified
 AI_AGENT_PROMPT = PROMPT_TEMPLATES[ScenarioType.HOPELESS_MALE]
+
+def get_conversation_start_prompt(life_history: str, scenario_name: str) -> SystemMessage:
+    from langchain_core.messages import SystemMessage
+
+    content = (f"As a therapy client, reflect on your background: {life_history or 'No background'}. "
+               f"Align with the scenario '{scenario_name}'. "
+               f"Express your current thoughts or struggles authentically in under 50 words.")
+
+    return SystemMessage(content=content)

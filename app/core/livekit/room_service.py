@@ -50,7 +50,7 @@ class RoomService:
             
             return await livekit_client.room.create_room(request)
         except Exception as e:
-            logger.exception(f"Failed to create LiveKit room: {str(e)}")
+            logger.exception(f"Failed to create LiveKit room: {type(e).__name__}")
             raise
     
     async def list_rooms(self) -> List[Room]:
@@ -61,11 +61,13 @@ class RoomService:
             List[Room]: List of rooms.
         """
         try:
+            if not livekit_client.client:
+                await livekit_client.init()
             request = ListRoomsRequest()
             rooms_response = await livekit_client.room.list_rooms(request)
             return rooms_response.rooms
         except Exception as e:
-            logger.exception(f"Failed to list LiveKit rooms: {str(e)}")
+            logger.exception(f"Failed to list LiveKit rooms: {type(e).__name__}")
             raise
     
     async def delete_room(self, room_name: str) -> None:
@@ -79,7 +81,7 @@ class RoomService:
             request = DeleteRoomRequest(room=room_name)
             await livekit_client.room.delete_room(request)
         except Exception as e:
-            logger.exception(f"Failed to delete LiveKit room: {str(e)}")
+            logger.exception(f"Failed to delete LiveKit room: {type(e).__name__}")
             raise
     
     async def update_room_metadata(self, room_name: str, metadata: str) -> Room:
@@ -97,7 +99,7 @@ class RoomService:
             request = UpdateRoomMetadataRequest(room=room_name, metadata=metadata)
             return await livekit_client.room.update_room_metadata(request)
         except Exception as e:
-            logger.exception(f"Failed to update LiveKit room metadata: {str(e)}")
+            logger.exception(f"Failed to update LiveKit room metadata: {type(e).__name__}")
             raise
 
 

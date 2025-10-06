@@ -30,8 +30,8 @@ async def get_scenarios() -> ScenarioList:
         scenarios = await scenario_service.get_all_scenarios()
         return ScenarioList(scenarios=scenarios)
     except Exception as e:
-        logger.exception(f"Failed to get scenarios: {str(e)}")
+        logger.exception(f"Failed to get scenarios: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get scenarios: {str(e)}"
+            detail=f"Failed to get scenarios: {type(e).__name__}"
         )

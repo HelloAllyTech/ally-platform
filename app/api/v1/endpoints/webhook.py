@@ -111,15 +111,15 @@ async def livekit_webhook(request: Request) -> Response:
             return JSONResponse(content={"status": "success", "event": event_type})
             
         except Exception as e:
-            logger.exception(f"Failed to verify webhook: {str(e)}")
+            logger.exception(f"Failed to verify webhook: {type(e).__name__}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid webhook payload: {str(e)}"
+                detail=f"Invalid webhook payload: {type(e).__name__}"
             )
             
     except Exception as e:
-        logger.exception(f"Error processing webhook: {str(e)}")
+        logger.exception(f"Error processing webhook: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing webhook: {str(e)}"
+            detail=f"Error processing webhook: {type(e).__name__}"
         )

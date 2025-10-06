@@ -33,16 +33,16 @@ async def create_user(
     except UserAlreadyExistsException as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
         # Log the unexpected error for debugging
-        logger.exception(f"Unexpected error creating user {user_data.email}: {str(e)}")
+        logger.exception(f"Unexpected error creating user {user_data.email}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while creating the user"
@@ -99,16 +99,16 @@ async def update_user(
     except NotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except UserAlreadyExistsException as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
         # Log the unexpected error for debugging
-        logger.exception(f"Unexpected error updating user {user_data.email}: {str(e)}")
+        logger.exception(f"Unexpected error updating user {user_data.email}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the user"
@@ -128,11 +128,11 @@ async def delete_user(
     except NotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
         # Log the unexpected error for debugging
-        logger.exception(f"Unexpected error deleting user {user_id}: {str(e)}")
+        logger.exception(f"Unexpected error deleting user {user_id}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while deleting the user"
@@ -169,11 +169,11 @@ async def restore_user(
     except NotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
         # Log the unexpected error for debugging
-        logger.exception(f"Unexpected error restoring user {user_id}: {str(e)}")
+        logger.exception(f"Unexpected error restoring user {user_id}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while restoring the user"
@@ -193,11 +193,11 @@ async def hard_delete_user(
     except NotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
     except Exception as e:
         # Log the unexpected error for debugging
-        logger.exception(f"Unexpected error hard deleting user {user_id}: {str(e)}")
+        logger.exception(f"Unexpected error hard deleting user {user_id}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while hard deleting the user"

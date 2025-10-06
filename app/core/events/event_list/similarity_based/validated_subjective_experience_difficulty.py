@@ -1,0 +1,45 @@
+from typing import Sequence
+
+from app.core.events.event_list.similarity_based.base import SimilarityBaseEvent
+from app.core.events.registry import register_event
+from app.core.events.event_list.similarity_based.event_ids import VALIDATE_DIFFICULTY
+
+_VALIDATED_DIFFICULTY_SENTENCES: Sequence[str] = [
+    "That sounds really hard.",
+    "It makes sense you'd feel that way.",
+    "Given what you've been through, it's understandable this is difficult.",
+    "I can see why this feels overwhelming for you.",
+    "Anyone in your position might feel the same way.",
+    "You're carrying a lot right now.",
+    "It's valid that this feels like too much.",
+    "Of course you're struggling — this is a big deal.",
+    "What you're feeling is completely understandable.",
+    "This sounds like it's taking a real toll on you.",
+    "It makes sense this feels so heavy.",
+    "You have good reasons for feeling the way you do.",
+    "This isn't easy, and it shows your strength that you're talking about it.",
+    "It's okay that this feels complicated.",
+    "I hear how difficult this is for you.",
+    "You're not overreacting — this is a lot to handle.",
+    "It's understandable you'd find this painful.",
+    "This sounds exhausting.",
+    "Of course you're having a hard time with this.",
+    "Your struggle here makes perfect sense.",
+    "You're going through something very challenging.",
+    "It's valid to feel upset about this.",
+    "No wonder you feel stuck — this is really tough.",
+    "I get why this feels overwhelming.",
+    "This is a very real challenge you're facing.",
+    "It's completely fair that this feels like too much right now.",
+    "I can understand why this is weighing on you.",
+    "This is not an easy thing to deal with.",
+    "You're experiencing something really difficult, and that matters.",
+    "It makes sense you'd find this hard to carry."
+]
+
+
+@register_event
+class CareAgentValidatedSubjectiveExperienceDifficultyEvent(SimilarityBaseEvent):
+    """Event for validating subjective experience difficulty"""
+    event_id = VALIDATE_DIFFICULTY
+    similar_sentences = _VALIDATED_DIFFICULTY_SENTENCES

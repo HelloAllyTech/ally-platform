@@ -1,0 +1,46 @@
+from typing import Sequence
+
+from app.core.events.event_list.similarity_based.base import SimilarityBaseEvent
+from app.core.events.registry import register_event
+from app.core.events.event_list.similarity_based.event_ids import ENCOURAGE_SOCIAL_SUPPORT
+
+_ENCOURAGED_BUILDING_SOCIAL_SUPPORT_SENTENCES: Sequence[str] = [
+    "Have you thought about reaching out to a friend about this?",
+    "Talking with someone you trust could help you feel less alone.",
+    "Who in your life might be able to support you right now?",
+    "Sometimes sharing what you're going through makes it more manageable.",
+    "Could you lean on a family member for help or perspective?",
+    "Connecting with supportive people can make a big difference.",
+    "Is there a friend or colleague you feel safe confiding in?",
+    "Have you considered joining a group or community that understands what you're facing?",
+    "Reaching out to others can give you additional resources for coping.",
+    "Who in your support network can you turn to this week?",
+    "Sharing your feelings with someone trustworthy often helps lighten the load.",
+    "Have you thought about talking with someone who's been through something similar?",
+    "Sometimes just having someone listen is a form of support.",
+    "Could a mentor, friend, or family member help you process this?",
+    "Building a support system can strengthen your resilience.",
+    "Who makes you feel understood and safe to talk to?",
+    "Even small connections with others can help you feel less isolated.",
+    "Are there people you can rely on for encouragement or guidance?",
+    "Reaching out doesn't mean you're weak — it means you're taking care of yourself.",
+    "Have you considered attending a support group for people in similar situations?",
+    "Maintaining social connections can help buffer stress.",
+    "Who do you feel comfortable sharing this with?",
+    "Talking to someone who cares about you can give perspective.",
+    "Could a trusted friend or family member help you brainstorm solutions?",
+    "Building relationships that support your well-being is important.",
+    "Who in your circle could provide emotional support?",
+    "Even brief check-ins with supportive people can help you cope.",
+    "Are there safe people you can reach out to when you feel overwhelmed?",
+    "Connecting with others can remind you that you're not alone in this.",
+    "Could you ask someone you trust for practical or emotional support?",
+    "Sometimes seeking support strengthens your ability to manage challenges."
+]
+
+
+@register_event
+class CareAgentEncouragedBuildingSocialSupportEvent(SimilarityBaseEvent):
+    """Event for encouraging building social support"""
+    event_id = ENCOURAGE_SOCIAL_SUPPORT
+    similar_sentences = _ENCOURAGED_BUILDING_SOCIAL_SUPPORT_SENTENCES

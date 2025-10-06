@@ -2,11 +2,13 @@
 Configuration settings for the application.
 """
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal
 from urllib.parse import quote_plus
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.constants import TTSProvider
 
 
 class Settings(BaseSettings):
@@ -33,8 +35,10 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = Field(...)
     LIVEKIT_API_SECRET: str = Field(...)
     LIVEKIT_URL: str = Field(...)
+    AGENT_NAME: str = Field(default="Agent", description="Agent name for LiveKit")
 
     OPENAI_API_KEY: str = Field(...)
+    OPENAI_MODEL: str = Field(default="gpt-4o-mini", description="OpenAI model to use for LLM responses")
 
     DEEPGRAM_API_KEY: str = Field(...)
 
@@ -45,6 +49,7 @@ class Settings(BaseSettings):
     AWS_ENDPOINT_URL: Optional[str] = Field(default=None, description="AWS endpoint URL (for LocalStack)")
     SES_FROM_EMAIL: str = Field(..., description="Verified sender email address")
     SES_FROM_NAME: str = Field(default="Ally Learn", description="Sender name")
+    SQS_MESSAGE_EVENT_QUEUE_NAME: str = Field(..., description="SQS queue name for message and events")
 
     # Database component settings
     DATABASE_HOST: str = Field(..., description="Database host")
@@ -62,6 +67,16 @@ class Settings(BaseSettings):
     # Token settings
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
+    ELEVEN_API_KEY: str = Field(...)
+    SARVAM_API_KEY: str = Field(...)
+    VOICE_ID: str = Field(...)
+
+    TTS_PROVIDER: TTSProvider= Field(
+        default=TTSProvider.DEEPGRAM,
+        description="The TTS provider to use ('elevenlabs' or 'deepgram')"
+    )
+
+    LLM_TEMPERATURE : str = Field(...)
 
     @computed_field
     @property

@@ -14,6 +14,11 @@ class LiveKitClient:
         self.api_key = settings.LIVEKIT_API_KEY
         self.api_secret = settings.LIVEKIT_API_SECRET
         self.url = settings.LIVEKIT_URL
+        self.client=None
+
+    async def init(self):
+        """Initialize the LiveKitAPI inside a running event loop."""
+
         self.client = api.LiveKitAPI(
             url=self.url,
             api_key=self.api_key,

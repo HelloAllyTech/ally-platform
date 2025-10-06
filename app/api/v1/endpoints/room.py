@@ -76,10 +76,10 @@ async def create_room(
             created_at=created_at
         )
     except Exception as e:
-        logger.exception(f"Failed to create room: {str(e)}")
+        logger.exception(f"Failed to create room: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create room: {str(e)}"
+            detail=f"Failed to create room: {type(e).__name__}"
         )
 
 
@@ -106,15 +106,16 @@ async def list_rooms(
             result.append(RoomListResponse(
                 sid=room.sid,
                 name=room.name,
-                created_at=created_at
+                created_at=created_at,
+                metadata=room.metadata
             ))
         
         return result
     except Exception as e:
-        logger.exception(f"Failed to list rooms: {str(e)}")
+        logger.exception(f"Failed to list rooms: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list rooms: {str(e)}"
+            detail=f"Failed to list rooms: {type(e).__name__}"
         )
 
 
@@ -133,10 +134,10 @@ async def delete_room(
     try:
         await room_service.delete_room(room_name)
     except Exception as e:
-        logger.exception(f"Failed to delete room: {str(e)}")
+        logger.exception(f"Failed to delete room: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete room: {str(e)}"
+            detail=f"Failed to delete room: {type(e).__name__}"
         )
 
 
@@ -176,8 +177,8 @@ async def update_room_metadata(
         
         return RoomResponse(**room_dict)
     except Exception as e:
-        logger.exception(f"Failed to update room metadata: {str(e)}")
+        logger.exception(f"Failed to update room metadata: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update room metadata: {str(e)}"
+            detail=f"Failed to update room metadata: {type(e).__name__}"
         )

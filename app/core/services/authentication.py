@@ -17,7 +17,9 @@ from app.core.config import settings
 from app.core.exceptions import NotFoundException
 from app.core.services.email_service import EmailService
 from app.schemas.auth import TokenPair
+from app.utils import get_logger
 
+logger = get_logger(__name__)
 
 class AuthenticationService:
     """Service class for handling authentication operations."""
@@ -71,7 +73,7 @@ class AuthenticationService:
             
         except Exception as e:
             await self.session.rollback()
-            print(f"Failed to generate OTP: {e}")
+            logger.exception(f"Failed to generate OTP: {type(e).__name__}")
             return False
     
     async def verify_otp_and_login(self, email: str, code: str) -> Tuple[Optional[User], Optional[TokenPair]]:
@@ -116,7 +118,7 @@ class AuthenticationService:
             
         except Exception as e:
             await self.session.rollback()
-            print(f"Failed to complete login: {e}")
+            logger.exception(f"Failed to complete login: {type(e).__name__}")
             return None, None
     
     async def refresh_access_token(self, refresh_token: str) -> Optional[TokenPair]:
@@ -235,7 +237,7 @@ class AuthenticationService:
             return result.rowcount > 0
             
         except Exception as e:
-            print(f"Failed to logout user: {e}")
+            logger.exception(f"Failed to logout user: {type(e).__name__}")
             return False
     
     # Private helper methods
@@ -298,7 +300,7 @@ class AuthenticationService:
             )
             
         except Exception as e:
-            print(f"Failed to generate tokens: {e}")
+            logger.exception(f"Failed to generate tokens: {type(e).__name__}")
             return None
     
     def _create_access_token(self, user_id: int, email: str) -> str:

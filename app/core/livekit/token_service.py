@@ -74,7 +74,7 @@ class TokenService:
             # Generate the token string
             return token.to_jwt()
         except Exception as e:
-            logger.exception(f"Failed to create participant token: {str(e)}")
+            logger.exception(f"Failed to create participant token: {type(e).__name__}")
             raise
 
 

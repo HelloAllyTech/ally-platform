@@ -65,7 +65,7 @@ async def send_otp(
             expires_in_minutes=10
         )
     except Exception as e:
-        logger.exception(f"Unexpected error sending OTP to {request.email}: {str(e)}")
+        logger.exception(f"Unexpected error sending OTP to {request.email}: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while sending OTP"
@@ -114,7 +114,7 @@ async def verify_otp(
         # User doesn't exist
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=type(e).__name__
         )
 
 
@@ -183,7 +183,8 @@ async def logout(
         )
         
     except Exception as e:
+        logger.exception(f"Unexpected error during logout: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Logout failed: {str(e)}"
+            detail=f"Logout failed: {type(e).__name__}"
         )

@@ -17,7 +17,7 @@ async def initialize_database() -> None:
         await db_manager.initialize()
         
     except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+        logger.error(f"Failed to initialize database: {type(e).__name__}")
         raise
 
 
@@ -27,5 +27,5 @@ async def close_database() -> None:
         await db_manager.close()
         logger.info("Database connections closed")
     except Exception as e:
-        logger.error(f"Error closing database connections: {e}")
+        logger.error(f"Error closing database connections: {type(e).__name__}")
         raise

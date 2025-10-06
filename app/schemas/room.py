@@ -30,6 +30,7 @@ class RoomListResponse(BaseModel):
     sid: str = Field(..., description="Room SID")
     name: str = Field(..., description="Room name")
     created_at: str = Field(..., description="Room creation time in ISO format")
+    metadata: Optional[str] = Field(None, description="Room metadata")
 
 
 class RoomCreationResponse(BaseModel):

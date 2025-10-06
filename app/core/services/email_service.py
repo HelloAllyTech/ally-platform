@@ -61,7 +61,7 @@ class EmailService:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send OTP email to {email}: {str(e)}")
+            logger.error(f"Failed to send OTP email to {email}: {type(e).__name__}")
             return False
     
     def _send_otp_email_sync(self, email: str, otp_code: str) -> None:
