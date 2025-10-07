@@ -30,26 +30,33 @@ from app.utils.opening_line import get_opening_line
 
 logger = get_logger(__name__)
 
-TTS_PROVIDERS = {
-    TTSProvider.ELEVENLABS: elevenlabs.TTS(
+TTS_FACTORY = {
+    TTSProvider.ELEVENLABS: lambda: elevenlabs.TTS(
         voice_id=settings.VOICE_ID,
         model="eleven_multilingual_v2",
         api_key=settings.ELEVEN_API_KEY,
     ),
-    TTSProvider.DEEPGRAM: deepgram.TTS(
+    TTSProvider.DEEPGRAM: lambda: deepgram.TTS(
         model=settings.VOICE_ID,
         encoding="linear16",
         sample_rate=24000,
         api_key=settings.DEEPGRAM_API_KEY,
     ),
-    TTSProvider.SARVAM: sarvam.TTS(
-      target_language_code="en-IN",
-      speaker="anushka",
-      api_key=settings.SARVAM_API_KEY,
-   )
+    TTSProvider.SARVAM: lambda: sarvam.TTS(
+        target_language_code="en-IN",
+        speaker=settings.VOICE_ID,
+        api_key=settings.SARVAM_API_KEY,
+    ),
 }
 
-tts_config = TTS_PROVIDERS.get(settings.TTS_PROVIDER)
+def get_tts_config() -> object:
+    """Lazily instantiate only the configured TTS provider."""
+    factory = TTS_FACTORY.get(settings.TTS_PROVIDER)
+    if not factory:
+        raise ValueError(f"Unsupported TTS provider: {settings.TTS_PROVIDER}")
+    return factory()
+
+tts_config = get_tts_config()
 
 
 class Assistant(Agent):
