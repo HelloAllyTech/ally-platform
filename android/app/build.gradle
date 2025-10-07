@@ -32,7 +32,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 16
-        versionName "1.1.1"
+        versionName "1.2.0"
     }
 
     flavorDimensions "version"
