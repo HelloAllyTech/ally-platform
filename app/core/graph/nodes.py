@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Optional, cast, List
 
@@ -11,6 +12,7 @@ from app.core.config import settings
 from app.core.events.base import ChatMessage, BaseEvent
 from app.core.events.core_event_sender import CoreEventMessageType
 from app.core.events.ui_event_sender import send_event, CustomUIEventMessageType
+from app.core.events.event_processor import EventProcessor
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import SimulationState
 from app.core.graph.utils import convert_messages_to_chat_messages
@@ -42,13 +44,17 @@ async def process_events(state: SimulationState, config: Optional[RunnableConfig
     logger.debug(f"Detected Event number: {len(detected_events)}")
 
     new_events = [event for _, event in detected_events]
+    
+    # Calculate the score change from new events
+    score_change = sum(event.score for event in new_events)
+    new_current_score = state.current_score + score_change
 
     return SimulationState(
         messages=state.messages,
         permitted_events=state.permitted_events,
         events_accumulator=state.events_accumulator + detected_events,
         new_events=new_events,
-        current_score=state.current_score,
+        current_score=new_current_score,
     )
 
 
@@ -58,20 +64,17 @@ async def send_events_to_ui(state: SimulationState, config: Optional[RunnableCon
     logger.debug(f"New events: {state.new_events}")
 
     if state.new_events:
-        # Calculate sum of all scores
-        total_score = sum(event.score for event in state.new_events)
-
-        # Find event with highest absolute score
-        highest_abs_event = max(state.new_events, key=lambda e: abs(e.score))
-
-        # Create single UI message with combined data
-        ui_message_type = CustomUIEventMessageType.create(
-            score=total_score,
-            emoji=highest_abs_event.emoji,
-            message=highest_abs_event.emoji_message,
-            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        )
-        await send_event(ui_message_type, room)
+        # Log event summary for debugging only if debug level is enabled
+        if logger.isEnabledFor(logging.DEBUG):
+            event_summary = EventProcessor.get_events_summary(state.new_events)
+            logger.debug(f"Event summary: {event_summary}")
+        
+        # Process events using the new two-part logic
+        ui_message_type = EventProcessor.process_events_for_ui(state.new_events)
+        
+        # Only send event if it is identified
+        if ui_message_type is not None:
+            await send_event(ui_message_type, room)
 
     return state
 
