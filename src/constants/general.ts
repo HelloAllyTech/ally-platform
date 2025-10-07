@@ -84,7 +84,7 @@ export const API_METHODS = {
 } as const;
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
-export const PRIVACY_POLICY_URL = 'https://helloally.ai/privacy';
+export const PRIVACY_POLICY_URL = 'https://helloally.ai/policy';
 
 export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
   {image: carousel1, textKey: 'Carousel.slide1'},
