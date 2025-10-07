@@ -6,6 +6,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {AllyLogoIcon} from '@/assets/icons';
 import {isIOS} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -26,18 +27,9 @@ export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
     };
   });
 
-  const titleAnimStyle = useAnimatedStyle(() => {
-    const animatedFontSize = withTiming(isFocused ? 36 : 48, {duration: 300});
-    return {
-      fontSize: animatedFontSize,
-    };
-  });
-
   return (
     <View style={styles.headerContainer}>
-      <Animated.Text style={[styles.header, titleAnimStyle]}>
-        {t('SearchScreen.header.title')}
-      </Animated.Text>
+      <AllyLogoIcon />
       <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
         {t('SearchScreen.header.subTitle')}
       </Animated.Text>
@@ -63,6 +55,7 @@ const styles = ScaledSheet.create({
     lineHeight: '20@ms',
     color: colors.black,
     marginBottom: '24@vs',
+    marginTop: '10@ms',
     textAlign: 'center',
   },
 });

@@ -1,3 +1,4 @@
+import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
 import ArrowDown from './arrowDown.svg';
@@ -95,6 +96,7 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  AllyLogoIcon,
   AnalyticsActiveIcon,
   AnalyticsInactiveIcon,
   ArrowDown,
