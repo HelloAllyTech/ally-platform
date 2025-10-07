@@ -116,9 +116,7 @@ export const SimulationsScreen: React.FC = () => {
               <Trans
                 i18nKey="Simulations.learnIntro"
                 components={{
-                  ai: <Text style={styles.blueBold} />,
-                  counsellors: <Text style={styles.blueBold} />,
-                  expertise: <Text style={styles.blueBold} />,
+                  blue: <Text style={styles.blueBold} />,
                 }}
               />
             </Text>
