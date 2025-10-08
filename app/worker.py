@@ -65,44 +65,17 @@ class Assistant(Agent):
 
 
 async def entrypoint(ctx: agents.JobContext):
-    # Parse the metadata string to dict format expected by create method
+    # Parse the metadata from job context
     try:
-        if not livekit_client.client:
-            await livekit_client.init()
-
-        rooms_response = await livekit_client.room.list_rooms(ListRoomsRequest())
-        rooms = getattr(rooms_response, "rooms", [])
-
-        # Log rooms in a prettier format
-        room_names = [f"{r.name} (sid: {r.sid}, participants: {r.num_participants})" for r in rooms]
-        logger.debug("Rooms retrieved: %s", room_names)
-
-        room_name = ctx.room.name
-        logger.debug("Looking for room with name: %s", room_name)
-
-        room = next((r for r in rooms if r.name == room_name), None)
-        if not room:
-            raise ValueError(f"No room found with name {room_name}")
-
-        if not room.metadata:
-            logger.warning("Room has no metadata: %s", room_name)
-            raise ValueError(f"Room {room_name} has no metadata")
-
-        logger.debug("Room metadata raw: %s", room.metadata)
-        metadata_dict = json.loads(room.metadata)
+        logger.debug("Job metadata raw: %s", ctx.job.metadata)
+        metadata_dict = json.loads(ctx.job.metadata) if ctx.job.metadata else {}
         rm_md_envelope = RoomMetadataEnvelope.create(metadata_dict)
 
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse room metadata JSON: {e}")
-        rm_md_envelope = RoomMetadataEnvelope.create({})
-    except ValueError as e:
-        logger.error(f"Room validation error: {e}")
-        rm_md_envelope = RoomMetadataEnvelope.create({})
-    except AttributeError as e:
-        logger.error(f"Missing expected attribute in room data: {e}")
+        logger.error("Failed to parse job metadata JSON: %s", e)
         rm_md_envelope = RoomMetadataEnvelope.create({})
     except Exception as e:
-        logger.exception("Unexpected error while fetching/parsing room metadata")
+        logger.exception("Unexpected error while parsing job metadata")
         rm_md_envelope = RoomMetadataEnvelope.create({})
 
     scenario = rm_md_envelope.scenario
