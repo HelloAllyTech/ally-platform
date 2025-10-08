@@ -64,9 +64,9 @@ class Scenario(BaseModel):
         Normalize BE keys to what Scenario expects (compatible with aliases).
         """
         return {
-            "scenarioName": raw.get("title"),
-            "learningObjective": raw.get("description"),
-            "prompt": raw["prompt"] or "",
+            "scenarioName": raw.get("title") or "",
+            "learningObjective": raw.get("description") or "",
+            "prompt": raw.get("prompt") or "",
             "lifeHistory": raw.get("lifeHistory") or raw.get("life_history"),
             "metadata": raw.get("metadata", {}),
         }

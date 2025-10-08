@@ -72,19 +72,23 @@ async def entrypoint(ctx: agents.JobContext):
 
         rooms_response = await livekit_client.room.list_rooms(ListRoomsRequest())
         rooms = getattr(rooms_response, "rooms", [])
-        logger.debug("Rooms retrieved:", rooms_response)
 
-        room_name = str(ctx.room.name)
+        # Log rooms in a prettier format
+        room_names = [f"{r.name} (sid: {r.sid}, participants: {r.num_participants})" for r in rooms]
+        logger.debug("Rooms retrieved: %s", room_names)
+
+        room_name = ctx.room.name
+        logger.debug("Looking for room with name: %s", room_name)
 
         room = next((r for r in rooms if r.name == room_name), None)
         if not room:
             raise ValueError(f"No room found with name {room_name}")
 
         if not room.metadata:
-            logger.warning("Room has no metadata:", room_name)
+            logger.warning("Room has no metadata: %s", room_name)
             raise ValueError(f"Room {room_name} has no metadata")
 
-        logger.debug("Room metadata raw:", room.metadata)
+        logger.debug("Room metadata raw: %s", room.metadata)
         metadata_dict = json.loads(room.metadata)
         rm_md_envelope = RoomMetadataEnvelope.create(metadata_dict)
 
