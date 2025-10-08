@@ -70,33 +70,36 @@ async def entrypoint(ctx: agents.JobContext):
         if not livekit_client.client:
             await livekit_client.init()
 
-        request = ListRoomsRequest()
-        rooms_response = await livekit_client.room.list_rooms(request)
-
+        rooms_response = await livekit_client.room.list_rooms(ListRoomsRequest())
         rooms = getattr(rooms_response, "rooms", [])
-        logger.debug("Rooms API Response:", rooms)
+        logger.debug("Rooms retrieved:", rooms_response)
 
         room_name = str(ctx.room.name)
-        logger.debug("Name of Room:", room_name)
 
         room = next((r for r in rooms if r.name == room_name), None)
         if not room:
             raise ValueError(f"No room found with name {room_name}")
-        if not room.metadata:
-            logger.warning(f"Room {room_name} has no metadata — using SCENARIO_SAMPLE fallback.")
-            metadata_dict = json.loads(SCENARIO_SAMPLE)
-        else:
-            try:
-                metadata_dict = json.loads(room.metadata)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid JSON in room metadata: {e} — using SCENARIO_SAMPLE fallback.")
-                metadata_dict = json.loads(SCENARIO_SAMPLE)
 
+        if not room.metadata:
+            logger.warning("Room has no metadata:", room_name)
+            raise ValueError(f"Room {room_name} has no metadata")
+
+        logger.debug("Room metadata raw:", room.metadata)
+        metadata_dict = json.loads(room.metadata)
         rm_md_envelope = RoomMetadataEnvelope.create(metadata_dict)
 
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse room metadata JSON: {e}")
+        rm_md_envelope = RoomMetadataEnvelope.create({})
+    except ValueError as e:
+        logger.error(f"Room validation error: {e}")
+        rm_md_envelope = RoomMetadataEnvelope.create({})
+    except AttributeError as e:
+        logger.error(f"Missing expected attribute in room data: {e}")
+        rm_md_envelope = RoomMetadataEnvelope.create({})
     except Exception as e:
-        logger.exception(f"Failed to fetch/parse room metadata: {type(e).__name__}")
-        rm_md_envelope = RoomMetadataEnvelope.create(SCENARIO_SAMPLE)
+        logger.exception("Unexpected error while fetching/parsing room metadata")
+        rm_md_envelope = RoomMetadataEnvelope.create({})
 
     scenario = rm_md_envelope.scenario
     logger.debug(f"Events in scenario: {str(scenario.events)}")
