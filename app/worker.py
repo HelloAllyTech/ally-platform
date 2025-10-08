@@ -206,7 +206,7 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, num_idle_processes=1,
+    agents.cli.run_app(agents.WorkerOptions(agent_name=settings.AGENT_NAME, entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, num_idle_processes=1,
                                             api_key=settings.LIVEKIT_API_KEY,
                                             api_secret=settings.LIVEKIT_API_SECRET, ws_url=settings.LIVEKIT_URL,
                                             drain_timeout=10))
