@@ -219,7 +219,7 @@ describe('SimulationAssistantScreen', () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalled());
   });
 
-  it('processes feedback events with 10s gating and auto-hide', async () => {
+  it('accumulates feedback events', async () => {
     const connectedHandlers: Array<() => void> = [];
     const dataHandlers: Array<(p: any) => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
@@ -228,7 +228,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByTestId, queryByText} = renderWithProviders(
+    const {getByTestId} = renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -245,19 +245,15 @@ describe('SimulationAssistantScreen', () => {
     await act(async () => dataHandlers.forEach(fn => fn(makeEvt(0))));
     expect(getByTestId('score').props.children).toBe('10');
 
-    // Second event within 10s should be skipped
+    // Second event increments score immediately
     await act(async () => dataHandlers.forEach(fn => fn(makeEvt(1000))));
-    expect(getByTestId('score').props.children).toBe('10');
-
-    // After 10s, event accepted and score increases
-    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(11_000))));
     expect(getByTestId('score').props.children).toBe('20');
 
-    // Auto-hide feedback after minimum display time
-    await act(async () => {
-      jest.advanceTimersByTime(FEEDBACK_MIN_DISPLAY_MS);
-    });
-    expect(queryByText('hello')).toBeNull();
+    // Another event increases the score further
+    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(11_000))));
+    expect(getByTestId('score').props.children).toBe('30');
+
+    // No auto-hide assertion; screen keeps latest feedback visible
   });
 });
 
