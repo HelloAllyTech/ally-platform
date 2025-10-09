@@ -18,7 +18,8 @@
 		D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		D7E80D5568D445CBB488E6B2 /* Roboto-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */; };
 		F46AFA792DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */; };
-		F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */; };
+		0A3DFD7B659143C89BE627C3 /* IBMPlexSerif-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */; };
+		577F05B2C9E04E3084C60078 /* YesevaOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,7 +39,8 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F3492155ED4A59D6BD37D0E4 /* Pods-ally.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ally.release.xcconfig"; path = "Target Support Files/Pods-ally/Pods-ally.release.xcconfig"; sourceTree = "<group>"; };
 		F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Regular.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Regular.ttf"; sourceTree = "<group>"; };
-		F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Medium.ttf"; sourceTree = "<group>"; };
+		4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */ = {isa = PBXFileReference; name = "IBMPlexSerif-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Medium.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */ = {isa = PBXFileReference; name = "YesevaOne-Regular.ttf"; path = "../src/assets/fonts/YesevaOne-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,12 +110,13 @@
 		A6B1B120E4F843D2BE11BAD4 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */,
 				F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */,
 				664E565B023A4633A1ECA2B7 /* ReplayPro-BoldItalic.otf */,
 				6EDB66A9BCCA4802A590CB62 /* ReplayPro-Headline.otf */,
 				81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */,
 				906261E9D5EA43119D9980AD /* ReplayPro-Bold.otf */,
+				4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */,
+				8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -191,7 +194,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
-				F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				0575529D285843CD8E52C59D /* ReplayPro-BoldItalic.otf in Resources */,
 				25B7937C2C90405B9DF04E66 /* ReplayPro-Headline.otf in Resources */,
@@ -200,6 +202,8 @@
 				BDAEC9842E1D21ED008EFC84 /* GoogleService-Info.plist in Resources */,
 				315EA2BB9865486E85DC00EC /* ReplayPro-Bold.otf in Resources */,
 				D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */,
+				0A3DFD7B659143C89BE627C3 /* IBMPlexSerif-Medium.ttf in Resources */,
+				577F05B2C9E04E3084C60078 /* YesevaOne-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
