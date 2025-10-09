@@ -109,4 +109,12 @@ export const styles = ScaledSheet.create({
     width: '100%',
     zIndex: 200,
   },
+  welcomeGradientContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '58%',
+    height: '25%',
+    zIndex: 40,
+  },
 });
