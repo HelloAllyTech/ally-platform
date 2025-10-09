@@ -26,4 +26,9 @@ export const fontFamily = {
       fontFamily: 'IBMPlexSerif-Medium',
     },
   },
+  YESEVA_ONE: {
+    REGULAR: {
+      fontFamily: 'YesevaOne-Regular',
+    },
+  },
 };
