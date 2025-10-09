@@ -11,6 +11,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -40,6 +41,7 @@ export const SplashScreen: React.FC<
 > = ({navigation}) => {
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
+  const [isSheetFullyOpen, setIsSheetFullyOpen] = useState(false);
   const [isLoginButtonVisible, setIsLoginButtonVisible] = useState(false);
 
   const lottieRef = useRef<LottieView>(null);
@@ -92,9 +94,13 @@ export const SplashScreen: React.FC<
   const onLoginPress = () => {
     setIsLoginButtonVisible(false);
     setIsBottomSheetVisible(true);
-    animationTranslateY.value = withTiming(-WINDOW_HEIGHT * 0.6, {
-      duration: 1000,
-    });
+    animationTranslateY.value = withTiming(
+      -WINDOW_HEIGHT * 0.6,
+      {duration: 1000},
+      () => {
+        runOnJS(setIsSheetFullyOpen)(true);
+      },
+    );
   };
 
   useEffect(() => {
@@ -266,6 +272,16 @@ export const SplashScreen: React.FC<
             </Text>
           )}
         </Animated.View>
+
+        {isSheetFullyOpen && (
+          <LinearGradient
+            colors={[colors.lightGray18, 'transparent']}
+            locations={[0.0, 1.0]}
+            start={{x: 0, y: 1}}
+            end={{x: 0, y: 0}}
+            style={styles.welcomeGradientContainer}
+          />
+        )}
 
         {isLoginButtonVisible && (
           <LinearGradient
