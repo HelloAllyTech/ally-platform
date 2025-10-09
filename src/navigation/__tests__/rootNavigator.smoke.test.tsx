@@ -3,6 +3,24 @@ import {render} from '@testing-library/react-native';
 
 import {RootNavigator} from '../RootNavigator';
 
+// Mock RTK Query api to avoid importing real store/api wiring
+jest.mock('@/services/api', () => {
+  const api = {
+    reducerPath: 'api',
+    reducer: jest.fn(),
+    middleware: jest.fn(),
+    injectEndpoints: jest.fn().mockReturnValue({
+      useGetSummaryFieldsQuery: () => ({data: ['field1'], isLoading: false}),
+    }),
+  } as any;
+  return {api};
+});
+
+// Mock store to prevent configureStore side effects in tests importing navigators
+jest.mock('@/store/store', () => ({
+  store: {dispatch: jest.fn(), getState: jest.fn()},
+}));
+
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
@@ -26,6 +44,11 @@ jest.mock('@react-navigation/native-stack', () => ({
 }));
 
 jest.mock('@/config/env', () => ({env: {CLOUD_TELEPHONY_PATH: '/a', MICROPHONE_SOCKET_PATH: '/b'}}));
+
+// Mock redux hooks used by RootNavigator so we don't need a Provider
+jest.mock('@/store/hooks', () => ({
+  useAppDispatch: () => jest.fn(),
+}));
 
 let mockUseUser: any;
 let mockUseCounselorChat: any;
