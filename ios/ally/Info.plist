@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone for audio streaming</string>
 	<key>NSCameraUsageDescription</key>
@@ -45,8 +45,9 @@
 		<string>ReplayPro-Headline.otf</string>
 		<string>Roboto-Regular.ttf</string>
 		<string>IBMPlexSerif-Regular.ttf</string>
-		<string>IBMPlexSerif-Medium.ttf</string>
 		<string>ReplayPro-Bold.otf</string>
+		<string>IBMPlexSerif-Medium.ttf</string>
+		<string>YesevaOne-Regular.ttf</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
