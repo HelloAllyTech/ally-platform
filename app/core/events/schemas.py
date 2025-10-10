@@ -2,6 +2,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.core.constants import VisibilityType
+
 
 class ScenarioEvent(BaseModel):
     id: str
@@ -10,6 +12,7 @@ class ScenarioEvent(BaseModel):
     emoji: str
     message: str
     conversationInstruction: str
+    visibilityType: Optional[VisibilityType] = Field(default=None, description="Optional visibility type for backward compatibility")
 
 
 class Scenario(BaseModel):

@@ -3,6 +3,7 @@ from typing import ClassVar, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.core.constants import VisibilityType
 from app.core.events.schemas import ChatMessage
 
 
@@ -20,6 +21,7 @@ class BaseEvent(BaseModel, ABC):
     emoji: str
     emoji_message: str
     branching_instruction: str
+    visibility_type: VisibilityType = Field(default=VisibilityType.ACTIVE, description="Controls whether event is sent to UI and Core (ACTIVE) or only Core (PASSIVE)")
 
     model_config = {"arbitrary_types_allowed": True}
 

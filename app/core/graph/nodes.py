@@ -9,6 +9,7 @@ from langchain_openai import ChatOpenAI
 from livekit import rtc
 
 from app.core.config import settings
+from app.core.constants import VisibilityType
 from app.core.events.base import ChatMessage, BaseEvent
 from app.core.events.core_event_sender import CoreEventMessageType
 from app.core.events.ui_event_sender import send_event, CustomUIEventMessageType
@@ -64,17 +65,24 @@ async def send_events_to_ui(state: SimulationState, config: Optional[RunnableCon
     logger.debug(f"New events: {state.new_events}")
 
     if state.new_events:
-        # Log event summary for debugging only if debug level is enabled
-        if logger.isEnabledFor(logging.DEBUG):
-            event_summary = EventProcessor.get_events_summary(state.new_events)
-            logger.debug(f"Event summary: {event_summary}")
+        # Filter events to only include ACTIVE events for UI
+        active_events = [event for event in state.new_events if event.visibility_type == VisibilityType.ACTIVE]
+        logger.debug(f"Active events for UI: {len(active_events)} out of {len(state.new_events)} total events")
         
-        # Process events using the new two-part logic
-        ui_message_type = EventProcessor.process_events_for_ui(state.new_events)
-        
-        # Only send event if it is identified
-        if ui_message_type is not None:
-            await send_event(ui_message_type, room)
+        if active_events:
+            # Log event summary for debugging only if debug level is enabled
+            if logger.isEnabledFor(logging.DEBUG):
+                event_summary = EventProcessor.get_events_summary(active_events)
+                logger.debug(f"Active events summary: {event_summary}")
+            
+            # Process only ACTIVE events using the two-part logic
+            ui_message_type = EventProcessor.process_events_for_ui(active_events)
+            
+            # Only send event if it is identified
+            if ui_message_type is not None:
+                await send_event(ui_message_type, room)
+        else:
+            logger.debug("No ACTIVE events to send to UI")
 
     return state
 
@@ -125,7 +133,10 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
 async def send_events_to_core(state: SimulationState, config: Optional[RunnableConfig] = None) -> SimulationState:
     logger.debug("Sending events to core")
     room = cast(rtc.Room, config["configurable"].get("room"))
+    logger.debug(f"Sending all events to core: {len(state.new_events)} events (both ACTIVE and PASSIVE)")
+    
     for event in state.new_events:
+        logger.debug(f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})")
         core_event_message = CoreEventMessageType.create(event_id=event.event_id, room_id=room.name)
         await msg_event_queue.send_message(message_body=core_event_message.model_dump_json())
     return state
