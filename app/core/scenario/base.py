@@ -2,6 +2,7 @@ from typing import Optional, List, Any, Dict, Mapping
 
 from pydantic import BaseModel, Field
 
+from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
 from app.core.events.registry import get_event_class
 
@@ -90,6 +91,7 @@ class Scenario(BaseModel):
                 "emoji": e.get("emoji", ""),
                 "emoji_message": e.get("message", ""),  # map BE `message` -> BaseEvent.emoji_message
                 "branching_instruction": e.get("branchingInstruction", ""),
+                "visibility_type": e.get("visibilityType", VisibilityType.ACTIVE)
             }
             instances.append(ev_cls(**kwargs))
 
