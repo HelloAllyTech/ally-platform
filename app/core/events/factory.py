@@ -1,5 +1,6 @@
 from typing import List, Literal
 
+from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
 from app.core.events.registry import get_event_class
 from app.core.events.schemas import LivekitMetadata
@@ -47,11 +48,15 @@ def build_events_from_metadata(
             continue
 
         # Map metadata fields to BaseEvent instance
+        # Use visibilityType from metadata if provided, otherwise default to ACTIVE
+        visibility_type = ev.visibilityType if ev.visibilityType is not None else VisibilityType.ACTIVE
+        
         instance = cls(
             score=ev.score,
             emoji=ev.emoji,
             emoji_message=ev.message,
-            branching_instruction=ev.branchingInstruction,
+            branching_instruction=ev.conversationInstruction,
+            visibility_type=visibility_type,
         )
         events.append(instance)
 
