@@ -23,90 +23,19 @@ jest.mock('@/components', () => {
   };
 });
 
-// Mock analytics API hook
+// Mock analytics API used in the screen
 jest.mock('@/services/analyticsApi', () => ({
-  useGetCounselorStatsQuery: jest.fn(),
+  useGetDashboardsQuery: () => ({data: [], isLoading: false, error: undefined}),
+  useLazyGetDashboardUrlQuery: () => [jest.fn()],
 }));
 
+// Mock WebView since native module is not present in Jest
+jest.mock('react-native-webview', () => 'WebView');
+
 describe('UserAnalyticsScreen', () => {
-  const useGetCounselorStatsQueryMock = require('@/services/analyticsApi')
-    .useGetCounselorStatsQuery as jest.Mock;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('shows loading skeleton while data is loading', () => {
-    useGetCounselorStatsQueryMock.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isFetching: true,
-      error: undefined,
-    });
-
-    const {getByTestId} = render(<UserAnalyticsScreen />);
-    expect(getByTestId('loading-skeleton')).toBeTruthy();
-  });
-
-  it('renders listening/talking distribution with computed stats when loaded', async () => {
-    useGetCounselorStatsQueryMock.mockReturnValue({
-      data: {
-        counselorListeningDuration: 30,
-        counselorSharingDuration: 70,
-        counselorSharingPercentage: 70,
-        counselorName: 'Test',
-      },
-      isLoading: false,
-      isFetching: false,
-      error: undefined,
-    });
-
-    const {getByText} = render(<UserAnalyticsScreen />);
-
-    // talkingPercent is counselorSharingPercentage (=70)
-    await waitFor(() => expect(getByText('70.00%')).toBeTruthy());
-    // listeningPercent is 30 (100 - sharing)
-    expect(getByText('30.00%')).toBeTruthy();
-  });
-
-  it('renders zero state when both durations are 0', () => {
-    useGetCounselorStatsQueryMock.mockReturnValue({
-      data: {
-        counselorListeningDuration: 0,
-        counselorSharingDuration: 0,
-        counselorSharingPercentage: 0,
-        counselorName: 'Test',
-      },
-      isLoading: false,
-      isFetching: false,
-      error: undefined,
-    });
-
-    const {getByText} = render(<UserAnalyticsScreen />);
-    expect(getByText('analytics.listeningTalking.noData')).toBeTruthy();
-  });
-
-  it('changes date range when switching tabs via TabBar', () => {
-    // Keep the data static; we verify TabBar interaction triggers rerender with new pickerMode
-    useGetCounselorStatsQueryMock.mockReturnValue({
-      data: {
-        counselorListeningDuration: 1,
-        counselorSharingDuration: 1,
-        counselorSharingPercentage: 50,
-        counselorName: 'Test',
-      },
-      isLoading: false,
-      isFetching: false,
-      error: undefined,
-    });
-
-    const {getByText} = render(<UserAnalyticsScreen />);
-
-    // Switch to Week tab
-    fireEvent.press(getByText('W'));
-    // Switch to Month tab
-    fireEvent.press(getByText('M'));
-    // If no crash and component re-renders, interaction works.
+  it('renders without crashing with no dashboards', () => {
+    const {toJSON} = render(<UserAnalyticsScreen />);
+    expect(toJSON()).toBeTruthy();
   });
 });
 
