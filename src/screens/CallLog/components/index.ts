@@ -5,4 +5,3 @@ export {Tag} from './Tag';
 export {StartSessionModal} from './StartSessionModal/StartSessionModal';
 export {FeatureNotAvailable} from './FeatureNotAvailable';
 export {StatusBadge} from './StatusBadge';
-export {TabView} from './TabView';
