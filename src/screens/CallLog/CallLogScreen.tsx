@@ -33,13 +33,9 @@ import {
   useUser,
 } from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
-import {
-  useGetSummaryFieldsQuery,
-  useLazyGetVisibleChatTypesQuery,
-} from '@/services/settingsApi';
+import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat} from '@/types';
@@ -95,7 +91,6 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetSimulationLogsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
-  const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
 
@@ -200,16 +195,8 @@ export const CallLogScreen: React.FC = () => {
         fetchInitialSimulationLogs();
       }
 
-      if (visibleFields) {
-        dispatch(setSummaryVisibleFields(visibleFields));
-      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      fetchInitialRealLogs,
-      fetchInitialSimulationLogs,
-      visibleFields,
-      dispatch,
-    ]),
+    }, [fetchInitialRealLogs, fetchInitialSimulationLogs, dispatch]),
   );
 
   /**
