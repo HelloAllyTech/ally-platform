@@ -40,3 +40,4 @@ export {EmptyTranscript} from './EmptyTranscript';
 export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';
 export {FeedbackPopup} from './FeedbackPopup';
+export {TabView} from './TabView';

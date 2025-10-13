@@ -15,7 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton} from '@/components';
+import {CallLogSkeleton, TabView} from '@/components';
 import {env} from '@/config/env';
 import {
   CHAT_TYPES,
@@ -54,7 +54,6 @@ import {
   CallLogItem,
   FeatureNotAvailable,
   StartSessionModal,
-  TabView,
 } from './components';
 import {LogItem} from './types';
 
@@ -433,7 +432,14 @@ export const CallLogScreen: React.FC = () => {
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
-        <TabView activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabView
+          tabs={[
+            {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
+            {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       )}
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />
