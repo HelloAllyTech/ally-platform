@@ -1,5 +1,5 @@
-import {formatDiffAsMMSS} from '@/components/DateSelector/dateUtils';
 import {SimulationEvent, SimulationSummaryData} from '@/types';
+import {formatDiffAsMMSS} from '@/utils';
 
 export type FormattedEvent = {
   time: string;
