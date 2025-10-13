@@ -10,14 +10,15 @@ export const isSupportedDeepLink = (url: URL): boolean => {
   return (
     url.protocol === 'https:' &&
     ALLOWED_DEEPLINK_URLS.map(_url => new URL(_url).host).includes(url.host) &&
-    url.pathname === '/open'
+    url.pathname.startsWith('/summary')
   );
 };
 
 export const getCallIdFromUrl = (url: URL): number | undefined => {
-  const itemId = url.searchParams.get('itemId') ?? undefined;
-  if (!itemId) return undefined;
-  const callId = Number(itemId);
+  const parts = url.pathname.split('/').filter(Boolean); // ["summary", ":id"]
+  const id = parts[1];
+  if (!id) return undefined;
+  const callId = Number(id);
   return Number.isNaN(callId) ? undefined : callId;
 };
 

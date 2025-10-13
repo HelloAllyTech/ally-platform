@@ -48,7 +48,12 @@ jest.mock('@/hooks', () => ({
 
 // Store
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (sel: any) => sel({ user: { permissions: ['CALLS', 'START'] }, chat: { currentChat: null } }),
+  useAppSelector: (sel: any) =>
+    sel({
+      user: { permissions: ['CALLS', 'START'] },
+      chat: { currentChat: null },
+      summary: { visibleFields: [] },
+    }),
   useAppDispatch: () => jest.fn(),
 }));
 
@@ -61,7 +66,7 @@ jest.mock('@/services/simulationsApi', () => ({
 }));
 jest.mock('@/services/settingsApi', () => ({
   useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],
-  useGetSummaryFieldsQuery: () => ({ data: ['field1'] }),
+  useLazyGetSummaryFieldsQuery: () => [jest.fn(), { data: ['field1'] }],
 }));
 
 // Utils
@@ -92,7 +97,12 @@ describe('CallLogScreen', () => {
 
   it('shows TabView when multiple log types available', () => {
     jest.doMock('@/store/hooks', () => ({
-      useAppSelector: (sel: any) => sel({ user: { permissions: ['CALLS', 'SIM', 'START'] }, chat: { currentChat: null } }),
+      useAppSelector: (sel: any) =>
+        sel({
+          user: { permissions: ['CALLS', 'SIM', 'START'] },
+          chat: { currentChat: null },
+          summary: { visibleFields: [] },
+        }),
       useAppDispatch: () => jest.fn(),
     }));
     const {unmount} = render(<CallLogScreen />);

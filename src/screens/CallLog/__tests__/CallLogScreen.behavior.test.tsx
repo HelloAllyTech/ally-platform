@@ -43,7 +43,12 @@ jest.mock('@/hooks', () => ({
 // Store
 let mockPermissions: string[] = ['CALLS', 'START'];
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (sel: any) => sel({user: {permissions: mockPermissions}, chat: {currentChat: null}}),
+  useAppSelector: (sel: any) =>
+    sel({
+      user: {permissions: mockPermissions},
+      chat: {currentChat: null},
+      summary: {visibleFields: []},
+    }),
   useAppDispatch: () => jest.fn(),
 }));
 
@@ -74,7 +79,7 @@ jest.mock('@/services/simulationsApi', () => ({
 let mockVisibleChatTypes: string[] = ['MIC', 'EXOTEL'];
 jest.mock('@/services/settingsApi', () => ({
   useLazyGetVisibleChatTypesQuery: () => [jest.fn(), {data: mockVisibleChatTypes}],
-  useGetSummaryFieldsQuery: () => ({data: ['field1']}),
+  useLazyGetSummaryFieldsQuery: () => [jest.fn(), {data: ['field1']}],
 }));
 
 // Utils
