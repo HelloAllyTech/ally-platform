@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {FlatList} from 'react-native';
 
-import {formatTimeToMMSS} from '@/components/DateSelector/dateUtils';
 import {SortOrder} from '@/constants';
 import {
   ChatMessage,
@@ -10,6 +9,7 @@ import {
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryData} from '@/store/slices/summarySlice';
 import {ChatProvider} from '@/types';
+import {formatTimeToMMSS} from '@/utils/date';
 
 const LIMIT = 20;
 

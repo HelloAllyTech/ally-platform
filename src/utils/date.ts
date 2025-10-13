@@ -101,3 +101,26 @@ const getOrdinalSuffix = (day: number): string => {
       return 'th';
   }
 };
+
+export const formatDiffAsMMSS = (from?: string, to?: string) => {
+  if (!from || !to) return '00:00';
+  const start = new Date(from).getTime();
+  const end = new Date(to).getTime();
+  const diffMs = Math.max(0, end - start);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = seconds.toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+};
+
+export const formatTimeToMMSS = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes.toString().padStart(2, '0')}.${seconds
+    .toString()
+    .padStart(2, '0')}`;
+};

@@ -14,7 +14,19 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // Assets & components barrel
 jest.mock('@/assets/icons', () => ({NoCallLogsIcon: () => null, TranscribeIcon: () => null}));
-jest.mock('@/components', () => ({CallLogSkeleton: () => null}));
+jest.mock('@/components', () => {
+  const React = require('react');
+  const RN = require('react-native');
+  return {
+    CallLogSkeleton: () => null,
+    TabView: ({onTabChange}: any) =>
+      React.createElement(
+        RN.TouchableOpacity,
+        {testID: 'to-simulation', onPress: () => onTabChange('SIMULATION')},
+        React.createElement(RN.Text, null, 'to-sim'),
+      ),
+  };
+});
 
 // Config and constants
 jest.mock('@/config/env', () => ({env: {ALLY_WEB_URL: 'https://example.com', THIRD_PARTY_CALL_NUMBER: '123'}}));
@@ -96,7 +108,7 @@ jest.mock('react-native-permissions', () => ({
   RESULTS: {GRANTED: 'granted', BLOCKED: 'blocked'},
 }));
 
-// Child components with an actionable StartSessionModal
+// Child components with an actionable StartSessionModal (local components)
 jest.mock('../components', () => {
   const React = require('react');
   const RN = require('react-native');
@@ -137,12 +149,7 @@ jest.mock('../components', () => {
           React.createElement(RN.Text, null, 'join'),
         ),
       ),
-    TabView: ({onTabChange}: any) =>
-      React.createElement(
-        RN.TouchableOpacity,
-        {testID: 'to-simulation', onPress: () => onTabChange('SIMULATION')},
-        React.createElement(RN.Text, null, 'to-sim'),
-      ),
+    // Note: TabView is imported from '@/components' in screen; mocked above
   };
 });
 

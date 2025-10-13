@@ -21,7 +21,6 @@ export {NetworkLogs} from './NetworkLogs';
 export {ResourceArticleCard} from './ResourceArticleCard';
 export {SearchableLocationDropdown} from './SearchableLocationDropdown';
 export {CustomTabs} from './CustomTabs';
-export {DateSelector, useDateSelection} from './DateSelector';
 
 export {Carousel, Pagination, SecurityCarousel} from './Carousel';
 export type {
