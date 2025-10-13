@@ -5,6 +5,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:app.dev.helloally.ai</string>
+		<string>applinks:app.helloally.ai</string>
 	</array>
 </dict>
 </plist>
