@@ -35,7 +35,7 @@ import {
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
   useGetSummaryFieldsQuery,
-  useGetVisibleChatTypesQuery,
+  useLazyGetVisibleChatTypesQuery,
 } from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
@@ -93,7 +93,8 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
+  const [getVisibleChatTypes, {data: enabledChatTypes}] =
+    useLazyGetVisibleChatTypesQuery();
   const {data: visibleFields} = useGetSummaryFieldsQuery();
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
@@ -101,6 +102,13 @@ export const CallLogScreen: React.FC = () => {
   const canStartCall = permissions?.includes(
     USER_PERMISSIONS.VIEW_START_CALL_PAGE,
   );
+
+  useEffect(() => {
+    if (canStartCall) {
+      getVisibleChatTypes();
+    }
+  }, [canStartCall, getVisibleChatTypes]);
+
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
