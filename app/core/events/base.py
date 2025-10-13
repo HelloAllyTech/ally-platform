@@ -15,13 +15,15 @@ class BaseEvent(BaseModel, ABC):
 
     # Class-level identifier used for registry mapping (e.g., "counselor-rephrased")
     event_id: ClassVar[str]
+    
+    # Class-level visibility type (can be overridden by subclasses)
+    visibility_type: ClassVar[VisibilityType] = VisibilityType.ACTIVE
 
     # Per-scenario values (come from metadata)
     score: int
     emoji: str
     emoji_message: str
     branching_instruction: str
-    visibility_type: VisibilityType = Field(default=VisibilityType.ACTIVE, description="Controls whether event is sent to UI and Core (ACTIVE) or only Core (PASSIVE)")
 
     model_config = {"arbitrary_types_allowed": True}
 

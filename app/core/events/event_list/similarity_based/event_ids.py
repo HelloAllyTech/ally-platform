@@ -1,6 +1,6 @@
 # Event ID constants for similarity-based events
-# Shorter, more meaningful identifiers - Updated for all 49 events
 
+# ACTIVE Events
 # Positive Events (Score: 1) - 25 events
 ENCOURAGER = "encourager"
 OPEN_ENDED_QUESTION = "open-ended-question"
@@ -53,3 +53,15 @@ FORCE_CONFRONTATION = "force-confrontation"
 TAKE_SIDES = "take-sides"
 END_ABRUPTLY = "end-abruptly"
 OVERBURDEN_CLIENT = "overburden-client"
+
+# Passive Events - 10 events
+EMPATHISING = "empathising"
+QUESTIONING = "questioning"
+VALIDATING = "validating"
+ACCEPTING = "accepting"
+CALMING = "calming"
+ENCOURAGING_TO_SHARE = "encouraging-to-share"
+CLARIFYING = "clarifying"
+NOTING_AND_REFLECTING = "noting-and-reflecting"
+CONFRONTING = "confronting"
+FOCUSING = "focusing"
