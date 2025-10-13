@@ -73,7 +73,7 @@ jest.mock('@/services/simulationsApi', () => ({
 }));
 let mockVisibleChatTypes: string[] = ['MIC', 'EXOTEL'];
 jest.mock('@/services/settingsApi', () => ({
-  useGetVisibleChatTypesQuery: () => ({data: mockVisibleChatTypes}),
+  useLazyGetVisibleChatTypesQuery: () => [jest.fn(), {data: mockVisibleChatTypes}],
   useGetSummaryFieldsQuery: () => ({data: ['field1']}),
 }));
 
