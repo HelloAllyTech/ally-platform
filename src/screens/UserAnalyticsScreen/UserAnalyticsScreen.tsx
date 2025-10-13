@@ -1,160 +1,156 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {ScrollView, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {t} from 'i18next';
+import {ActivityIndicator, ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
+import WebView from 'react-native-webview';
 
-import {DateSelector, LoadingSkeleton} from '@/components';
-import {CALENDAR_MODES} from '@/constants/analytics';
-import {isIOS} from '@/constants/general';
-import {useTabBackToHomeHandler, useTranslate} from '@/hooks';
-import {useGetCounselorStatsQuery} from '@/services/analyticsApi';
-import {colors, fontFamily} from '@/theme';
-
-import {ListeningTalkingDistribution, TabBar} from './components';
-
-interface DateRange {
-  startDate: string;
-  endDate: string;
-}
-
-const useAnalyticsDateRange = (selectedTab: string) => {
-  const today = new Date();
-  const formattedDate = today.toISOString().split('T')[0];
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: formattedDate,
-    endDate: formattedDate,
-  });
-
-  useEffect(() => {
-    const updateDateRange = () => {
-      const today = new Date();
-      let startDate: Date;
-      let endDate: Date;
-
-      switch (selectedTab) {
-        case 'W': {
-          // Last 7 days: from 6 days ago to today
-          // Week: 7 days ending on current startDate
-          endDate = new Date(today); // endDate is the current startDate
-          startDate = new Date(today);
-          startDate.setDate(startDate.getDate() - 6); // startDate is 6 days before
-          break;
-        }
-        case 'M': {
-          // First day of current month
-          startDate = new Date(today.getFullYear(), today.getMonth(), 2);
-          // Last day of current month (or today if before last day)
-          endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-          break;
-        }
-        case 'Y': {
-          // First day of current year
-          startDate = new Date(today.getFullYear(), 0, 2);
-          // Last day of current year (or today if before last day)
-          endDate = new Date(today.getFullYear(), 11, 31);
-          break;
-        }
-        case 'A': {
-          startDate = new Date(today.getFullYear(), 0, 2);
-          endDate = new Date(today);
-          break;
-        }
-        default: {
-          startDate = new Date(today);
-          endDate = new Date(today);
-          endDate.setDate(endDate.getDate() + 1);
-        }
-      }
-
-      setDateRange({
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-      });
-    };
-
-    updateDateRange();
-  }, [selectedTab]);
-
-  return {dateRange, setDateRange};
-};
+import {TabView} from '@/components';
+import {AnalyticsType} from '@/constants/analytics';
+import {SCREEN_WIDTH} from '@/constants/general';
+import {
+  useGetDashboardsQuery,
+  useLazyGetDashboardUrlQuery,
+} from '@/services/analyticsApi';
+import {colors} from '@/theme/colors';
+import {fontFamily} from '@/theme/fonts';
+import {typography} from '@/theme/typography';
 
 export const UserAnalyticsScreen: React.FC = () => {
-  useTabBackToHomeHandler();
-  const {t} = useTranslate();
-  const [selectedTab, setSelectedTab] = useState('D');
-  const {dateRange, setDateRange} = useAnalyticsDateRange(selectedTab);
+  const [activeTab, setActiveTab] = useState<AnalyticsType>(
+    AnalyticsType.CALL_LOG_ANALYTICS,
+  );
 
+  const [getDashboardUrl] = useLazyGetDashboardUrlQuery();
   const {
-    data: stats,
-    isLoading,
-    isFetching,
+    data: dashboards,
+    isLoading: isLoadingDashboards,
     error,
-  } = useGetCounselorStatsQuery(dateRange);
+  } = useGetDashboardsQuery();
 
-  const {
-    counselorSharingPercentage,
-    counselorListeningDuration,
-    counselorSharingDuration,
-  } = stats || {};
+  const [dashboardUrls, setDashboardUrls] = useState<{[id: string]: string}>(
+    {},
+  );
 
-  const durationZero =
-    counselorListeningDuration === 0 && counselorSharingDuration === 0;
+  const triggerDashboardUrl = useCallback(
+    async (dashboardId: string) => {
+      const result = await getDashboardUrl({dashboardId});
+      const url = result.data?.url;
+      if (url) {
+        setDashboardUrls(prev => ({
+          ...prev,
+          [dashboardId]: url,
+        }));
+      }
+    },
+    [getDashboardUrl],
+  );
 
-  const pickerMode = useMemo(() => {
-    switch (selectedTab) {
-      case 'D':
-        return CALENDAR_MODES.D;
-      case 'W':
-        return CALENDAR_MODES.W;
-      case 'M':
-        return CALENDAR_MODES.M;
-      case 'Y':
-        return CALENDAR_MODES.Y;
-      case 'A':
-        return CALENDAR_MODES.A;
-      default:
-        return CALENDAR_MODES.D;
+  useEffect(() => {
+    if (dashboards) {
+      dashboards.forEach(({externalId}) => {
+        triggerDashboardUrl(externalId);
+      });
     }
-  }, [selectedTab]);
+  }, [dashboards, triggerDashboardUrl]);
 
-  const ListeningTalkingStats = error
-    ? {listeningPercent: 0, talkingPercent: 0}
-    : {
-        listeningPercent: durationZero
-          ? 0
-          : Math.max(0, 100 - (counselorSharingPercentage || 0)),
-        talkingPercent: durationZero ? 0 : counselorSharingPercentage || 0,
-      };
+  const presentTypes = useMemo(() => {
+    const types = new Set<AnalyticsType>();
+    dashboards?.forEach(d => {
+      if (d.analyticsType === AnalyticsType.CALL_LOG_ANALYTICS) {
+        types.add(AnalyticsType.CALL_LOG_ANALYTICS);
+      } else if (d.analyticsType === AnalyticsType.SIMULATION_ANALYTICS) {
+        types.add(AnalyticsType.SIMULATION_ANALYTICS);
+      }
+    });
+    return types;
+  }, [dashboards]);
+
+  // If only one type exists, lock the active tab to that type
+  useEffect(() => {
+    if (presentTypes.size === 1) {
+      const onlyType = presentTypes.values().next().value as AnalyticsType;
+      if (onlyType && onlyType !== activeTab) {
+        setActiveTab(onlyType);
+      }
+    }
+  }, [presentTypes, activeTab]);
+
+  // Filter dashboards by current tab's analytics type
+  const filteredDashboards = useMemo(() => {
+    return dashboards?.filter(d => d.analyticsType === activeTab) ?? [];
+  }, [dashboards, activeTab]);
+
+  const renderLoading = () => {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.azureBlue} />
+      </View>
+    );
+  };
+
+  if (isLoadingDashboards) {
+    return renderLoading();
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {t('analytics.failedToLoadAnalytics')}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>
-          {t('analytics.header.title')}
-          <Text style={styles.headerSubtitle}>
-            {` ${t('analytics.header.subtitle')}`}
-          </Text>
-        </Text>
-      </View>
+      {/* Show tabs only if both analytics types are present */}
+      {presentTypes.has(AnalyticsType.CALL_LOG_ANALYTICS) &&
+        presentTypes.has(AnalyticsType.SIMULATION_ANALYTICS) && (
+          <TabView<AnalyticsType>
+            tabs={[
+              {key: AnalyticsType.CALL_LOG_ANALYTICS, label: 'Calls'},
+              {key: AnalyticsType.SIMULATION_ANALYTICS, label: 'Simulations'},
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        )}
+
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+        contentContainerStyle={
+          Object.keys(dashboardUrls).length === 0 &&
+          dashboards &&
+          dashboards.length > 0
+            ? styles.loadingContent
+            : styles.content
+        }
         showsVerticalScrollIndicator={false}>
-        <TabBar selectedTab={selectedTab} onTabChange={setSelectedTab} />
-        <DateSelector
-          pickerMode={pickerMode}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-        />
-        {isLoading ? (
-          <LoadingSkeleton />
+        {Object.keys(dashboardUrls).length === 0 &&
+        dashboards &&
+        dashboards.length > 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.azureBlue} />
+          </View>
         ) : (
-          <>
-            <ListeningTalkingDistribution
-              isLoading={isFetching}
-              stats={ListeningTalkingStats}
-            />
-            {/* <QuestionsUsed /> */}
-          </>
+          filteredDashboards.map(dashboard => {
+            const url = dashboardUrls[dashboard.externalId];
+            if (!url) return null;
+
+            return (
+              <View key={dashboard.externalId} style={styles.webViewContainer}>
+                <WebView
+                  source={{uri: url}}
+                  style={styles.webView}
+                  startInLoadingState
+                />
+              </View>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -164,32 +160,56 @@ export const UserAnalyticsScreen: React.FC = () => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: '40@s',
     backgroundColor: colors.white,
   },
-  scrollContent: {
-    alignItems: 'center',
-    paddingBottom: '30@s',
-    padding: '20@s',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: '16@ms',
-    paddingHorizontal: '20@ms',
-    paddingBottom: '16@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
-  },
-  headerTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
+  title: {
+    ...fontFamily.REPLAY_PRO.BOLD,
+    fontSize: '18@s',
     color: colors.darkSlate,
-    textAlign: 'left',
-    fontWeight: '400',
   },
-  headerSubtitle: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontStyle: isIOS ? 'italic' : 'normal',
+  content: {
+    flex: 1,
+    padding: '16@s',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '16@s',
+  },
+  errorText: {
+    ...fontFamily.REPLAY_PRO.BOLD,
+    fontSize: '16@s',
+    color: colors.darkGray,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  webViewContainer: {
+    marginBottom: ms(16),
+  },
+  webView: {
+    width: SCREEN_WIDTH - ms(50),
+    height: SCREEN_WIDTH - ms(50),
+    borderRadius: ms(8),
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.darkSlate,
+    marginTop: ms(16),
   },
 });
