@@ -1,10 +1,11 @@
-import {useMemo} from 'react';
+import {useEffect, useMemo, useRef} from 'react';
 import {
   NavigationContainer,
   NavigationContainerRef,
   useNavigationContainerRef,
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {Linking} from 'react-native';
 
 import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
@@ -24,8 +25,16 @@ import {
   SimulationsScreen,
   SplashScreen,
 } from '@/screens';
+import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {useAppDispatch} from '@/store/hooks';
+import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {SocketEvent, UserRole} from '@/types';
 import {logger} from '@/utils';
+import {
+  getCallIdFromUrl,
+  isSupportedDeepLink,
+  navigateToCallSummaryOrLog,
+} from '@/utils/deeplink';
 
 import {DrawerNavigator} from './DrawerNavigator';
 import type {RootStackParamList, RouteNames} from './types';
@@ -39,9 +48,30 @@ const NavigationContent = ({
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
   const {userData, isAuthenticated} = useUser();
+  const pendingItemIdRef = useRef<number | undefined>(undefined);
+  const deepLinkInProgressRef = useRef<boolean>(false);
+  const {data: summaryFields, isLoading: summaryFieldsLoading} =
+    useGetSummaryFieldsQuery();
+  const dispatch = useAppDispatch();
+
+  const isDeepLinkInProgress = useMemo(
+    () =>
+      pendingItemIdRef.current !== undefined || deepLinkInProgressRef.current,
+    [],
+  );
+
+  // Ensure visible fields are available even on cold-start deep link
+  useEffect(() => {
+    if (summaryFields && Array.isArray(summaryFields)) {
+      dispatch(setSummaryVisibleFields(summaryFields));
+    }
+  }, [summaryFields, dispatch]);
 
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
+      if (isDeepLinkInProgress) {
+        return;
+      }
       if (
         (navigationRef?.getCurrentRoute()?.name as RouteNames) !==
         SCREEN_NAMES.LISTENING
@@ -57,7 +87,12 @@ const NavigationContent = ({
     },
     onNoActiveChatFound: () => {
       const currentRoute = navigationRef?.getCurrentRoute()?.name as RouteNames;
-
+      if (isDeepLinkInProgress) {
+        return;
+      }
+      if (currentRoute === SCREEN_NAMES.CALL_SUMMARY) {
+        return;
+      }
       if (currentRoute === SCREEN_NAMES.SPLASH) {
         navigationRef.reset({
           index: 0,
@@ -97,6 +132,56 @@ const NavigationContent = ({
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
   });
+
+  useEffect(() => {
+    const navigateToCallSummary = (callId: number) => {
+      deepLinkInProgressRef.current = true;
+      if (!isAuthenticated || summaryFieldsLoading || !summaryFields) {
+        pendingItemIdRef.current = callId;
+        return;
+      }
+      navigateToCallSummaryOrLog(navigationRef, callId, true);
+      deepLinkInProgressRef.current = false;
+      pendingItemIdRef.current = undefined;
+    };
+
+    const handleURL = (url?: string | null) => {
+      if (!url) return;
+      try {
+        const parsed = new URL(url);
+        if (isSupportedDeepLink(parsed)) {
+          const callId = getCallIdFromUrl(parsed);
+          if (callId) {
+            navigateToCallSummary(callId);
+          }
+        }
+      } catch {
+        logger.error(`Error handling deep link: ${url}`);
+      }
+    };
+
+    Linking.getInitialURL().then(handleURL);
+    const sub = Linking.addEventListener('url', e => handleURL(e.url));
+    return () => sub.remove();
+  }, [isAuthenticated, navigationRef, summaryFieldsLoading, summaryFields]);
+
+  // If dependencies flip true while a deep link is pending, handle it now
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      !summaryFieldsLoading &&
+      summaryFields &&
+      pendingItemIdRef.current !== undefined
+    ) {
+      const itemId = pendingItemIdRef.current;
+      pendingItemIdRef.current = undefined;
+      const callId = itemId ? Number(itemId) : undefined;
+      if (callId) {
+        navigateToCallSummaryOrLog(navigationRef, callId, true);
+      }
+      deepLinkInProgressRef.current = false;
+    }
+  }, [isAuthenticated, summaryFieldsLoading, summaryFields, navigationRef]);
 
   return (
     <Stack.Navigator
