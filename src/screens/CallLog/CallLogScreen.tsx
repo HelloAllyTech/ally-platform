@@ -34,12 +34,15 @@ import {
 } from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
-  useGetSummaryFieldsQuery,
-  useGetVisibleChatTypesQuery,
+  useLazyGetSummaryFieldsQuery,
+  useLazyGetVisibleChatTypesQuery,
 } from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
+import {
+  selectSummaryVisibleFields,
+  setSummaryVisibleFields,
+} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat} from '@/types';
@@ -93,14 +96,36 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
-  const {data: visibleFields} = useGetSummaryFieldsQuery();
+  const [getSummaryFields, {data: visibleFields}] =
+    useLazyGetSummaryFieldsQuery();
+  const [getVisibleChatTypes, {data: enabledChatTypes}] =
+    useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
+  const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+
+  useEffect(() => {
+    if (visibleFields) {
+      dispatch(setSummaryVisibleFields(visibleFields));
+    }
+  }, [visibleFields, dispatch]);
+
+  useEffect(() => {
+    if (!visibleFieldsState?.length) {
+      getSummaryFields();
+    }
+  }, [getSummaryFields, visibleFieldsState?.length]);
 
   const canStartCall = permissions?.includes(
     USER_PERMISSIONS.VIEW_START_CALL_PAGE,
   );
+
+  useEffect(() => {
+    if (canStartCall) {
+      getVisibleChatTypes();
+    }
+  }, [canStartCall, getVisibleChatTypes]);
+
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -192,16 +217,8 @@ export const CallLogScreen: React.FC = () => {
         fetchInitialSimulationLogs();
       }
 
-      if (visibleFields) {
-        dispatch(setSummaryVisibleFields(visibleFields));
-      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      fetchInitialRealLogs,
-      fetchInitialSimulationLogs,
-      visibleFields,
-      dispatch,
-    ]),
+    }, [fetchInitialRealLogs, fetchInitialSimulationLogs, dispatch]),
   );
 
   /**
