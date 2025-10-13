@@ -64,7 +64,7 @@
     "react-native-version-check": "^3.5.0",
     "react-native-video": "^6.16.1",
     "react-native-walkthrough-tooltip": "^1.6.0",
-    "react-native-webview": "^13.16.0",
+    "react-native-webview": "^13.15.0",
     "react-redux": "^9.2.0",
     "socket.io-client": "^4.8.1"
   },

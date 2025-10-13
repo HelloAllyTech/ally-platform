@@ -30,3 +30,8 @@ export const CALENDAR_MODES = {
   Y: 'year',
   A: 'all',
 };
+
+export enum AnalyticsType {
+  CALL_LOG_ANALYTICS = 'CALL_LOG_ANALYTICS',
+  SIMULATION_ANALYTICS = 'SIMULATION_ANALYTICS',
+}

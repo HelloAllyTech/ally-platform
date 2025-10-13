@@ -1,4 +1,5 @@
 import {API_METHODS} from '@/constants';
+import {AnalyticsType} from '@/constants/analytics';
 
 import {api} from './api';
 
@@ -14,10 +15,11 @@ export interface AnalyticsRequestParams {
   endDate?: string;
 }
 
-interface Dashboard {
+export interface Dashboard {
   externalId: string;
   name: string;
   description?: string;
+  analyticsType?: AnalyticsType;
 }
 
 interface DashboardUrlResponse {

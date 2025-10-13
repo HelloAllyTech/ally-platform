@@ -249,7 +249,8 @@
     "modal": {
       "cancel": "Cancel",
       "ok": "OK"
-    }
+    },
+    "failedToLoadAnalytics": "Failed to load analytics"
   },
   "SearchScreen": {
     "header": {
