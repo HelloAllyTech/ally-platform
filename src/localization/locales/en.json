@@ -230,8 +230,8 @@
       "title": "Session",
       "subtitle": "Statistics"
     },
-    "sessionAnalytics": "Session Analytics",
-    "simulationAnalytics": "Simulation Analytics",
+    "sessionAnalytics": "Session analytics",
+    "simulationAnalytics": "Simulation analytics",
     "failedToLoadAnalytics": "Failed to load analytics"
   },
   "SearchScreen": {
