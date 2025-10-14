@@ -7,7 +7,7 @@ import WebView from 'react-native-webview';
 
 import {TabView} from '@/components';
 import {AnalyticsType} from '@/constants/analytics';
-import {SCREEN_WIDTH} from '@/constants/general';
+import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 import {
   useGetDashboardsQuery,
   useLazyGetDashboardUrlQuery,
@@ -108,12 +108,26 @@ export const UserAnalyticsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Show tabs only if both analytics types are present */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>
+          {t('analytics.header.title')}{' '}
+          <Text style={styles.boldItalic}>
+            {t('analytics.header.subtitle')}
+          </Text>
+        </Text>
+      </View>
       {presentTypes.has(AnalyticsType.CALL_LOG_ANALYTICS) &&
         presentTypes.has(AnalyticsType.SIMULATION_ANALYTICS) && (
           <TabView<AnalyticsType>
             tabs={[
-              {key: AnalyticsType.CALL_LOG_ANALYTICS, label: 'Calls'},
-              {key: AnalyticsType.SIMULATION_ANALYTICS, label: 'Simulations'},
+              {
+                key: AnalyticsType.CALL_LOG_ANALYTICS,
+                label: t('analytics.sessionAnalytics'),
+              },
+              {
+                key: AnalyticsType.SIMULATION_ANALYTICS,
+                label: t('analytics.simulationAnalytics'),
+              },
             ]}
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -165,10 +179,23 @@ const styles = ScaledSheet.create({
     paddingBottom: '40@s',
     backgroundColor: colors.white,
   },
+  titleContainer: {
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray7,
+    marginTop: '16@s',
+    paddingBottom: '16@s',
+  },
   title: {
-    ...fontFamily.REPLAY_PRO.BOLD,
+    ...fontFamily.REPLAY_PRO.HEADLINE,
     fontSize: '18@s',
     color: colors.darkSlate,
+    marginLeft: '16@s',
+    textAlign: 'left',
+  },
+  boldItalic: {
+    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontStyle: isIOS ? 'italic' : 'normal',
   },
   content: {
     flex: 1,
