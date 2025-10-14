@@ -66,6 +66,10 @@ export const CallSummaryScreen: React.FC<
     summaryStatus,
   } = useSummaryState(chatId, callId);
 
+  const hasFeedbackAlready = Boolean(
+    summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
+  );
+
   const dispatch = useAppDispatch();
 
   const {
@@ -112,10 +116,6 @@ export const CallSummaryScreen: React.FC<
     const timeElapsed = currentTime - mountTime;
     const thresholdMs = 30 * 1000; // 30 seconds
 
-    const hasFeedbackAlready = Boolean(
-      summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
-    );
-
     if ((timeElapsed >= thresholdMs || !fromLogs) && !hasFeedbackAlready) {
       setIsFeedbackPopupVisible(true);
       return;
@@ -125,7 +125,7 @@ export const CallSummaryScreen: React.FC<
   };
 
   const onSaveButtonPress = () => {
-    setIsFeedbackPopupVisible(true);
+    if (!hasFeedbackAlready) setIsFeedbackPopupVisible(true);
   };
 
   const handleBlur = () => {
