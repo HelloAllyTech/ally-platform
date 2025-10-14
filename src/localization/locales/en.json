@@ -227,29 +227,11 @@
   },
   "analytics": {
     "header": {
-      "title": "Call",
-      "subtitle": "Analytics"
+      "title": "Session",
+      "subtitle": "Statistics"
     },
-    "dateSelector": {
-      "selectDate": "Select Date",
-      "selectMonth": "Select Month",
-      "selectYear": "Select Year",
-      "today": "Today"
-    },
-    "listeningTalking": {
-      "title": "Listening : Talking Distribution",
-      "listening": "Listening",
-      "talking": "Talking",
-      "noData": "No data available for this date"
-    },
-    "questions": {
-      "title": "Questions used",
-      "description": "This is the total number of questions per 60 conversation minutes used by you to facilitate reflections across your sessions. Number on the right is average of all counsellors."
-    },
-    "modal": {
-      "cancel": "Cancel",
-      "ok": "OK"
-    },
+    "sessionAnalytics": "Session Analytics",
+    "simulationAnalytics": "Simulation Analytics",
     "failedToLoadAnalytics": "Failed to load analytics"
   },
   "SearchScreen": {
