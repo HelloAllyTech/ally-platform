@@ -84,7 +84,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const {userData} = useUser();
+  const {userData, isUserLoading, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
@@ -102,6 +102,15 @@ export const CallLogScreen: React.FC = () => {
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userData) {
+        checkAuth();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userData]),
+  );
 
   useEffect(() => {
     if (visibleFields) {

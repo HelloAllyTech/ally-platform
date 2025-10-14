@@ -7,13 +7,13 @@ export enum USER_PERMISSIONS {
   VIEW_NAVBAR_LEARN = 'view:navbar:learn',
   VIEW_NAVBAR_STRESS_BUSTER = 'view:navbar:stress-buster',
   VIEW_NAVBAR_SETTINGS = 'view:navbar:settings',
-  VIEW_NAVBAR_ANALYTICS = 'view:navbar:analytics',
   EDIT_SUMMARY = 'edit:summary',
   VIEW_START_CALL_PAGE = 'view:button:start-call',
   VIEW_NAVBAR_SEARCH = 'view:navbar:search',
   VIEW_NAVBAR_COMMUNITY = 'view:navbar:community',
   VIEW_SCENARIO_SESSION = 'view:scenario-session',
   VIEW_ADMIN_SCENARIO_SESSION = 'view:admin:scenario-session',
+  VIEW_ANALYTICS_DASHBOARD = 'view:analytics:dashboard',
 }
 
 export const MICROPHONE_PERMISSION =
