@@ -20,10 +20,10 @@ class BaseEvent(BaseModel, ABC):
     visibility_type: ClassVar[VisibilityType] = VisibilityType.ACTIVE
 
     # Per-scenario values (come from metadata)
-    score: int
-    emoji: str
-    emoji_message: str
-    branching_instruction: str
+    score: Optional[int] = None
+    emoji: Optional[str] = None
+    emoji_message: Optional[str] = None
+    branching_instruction: Optional[str] = None
 
     model_config = {"arbitrary_types_allowed": True}
 

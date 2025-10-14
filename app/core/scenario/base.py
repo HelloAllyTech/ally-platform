@@ -87,10 +87,10 @@ class Scenario(BaseModel):
                 continue
 
             kwargs = {
-                "score": e.get("score"),
-                "emoji": e.get("emoji", ""),
-                "emoji_message": e.get("message", ""),  # map BE `message` -> BaseEvent.emoji_message
-                "branching_instruction": e.get("branchingInstruction", ""),
+                "score": e.get("score", None),
+                "emoji": e.get("emoji", None),
+                "emoji_message": e.get("message", None),  # map BE `message` -> BaseEvent.emoji_message
+                "branching_instruction": e.get("branchingInstruction", None),
                 "visibility_type": e.get("visibilityType", VisibilityType.ACTIVE)
             }
             instances.append(ev_cls(**kwargs))

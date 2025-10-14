@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from datetime import datetime, timezone
 from typing import Optional, cast, List
 
@@ -47,7 +48,7 @@ async def process_events(state: SimulationState, config: Optional[RunnableConfig
     new_events = [event for _, event in detected_events]
     
     # Calculate the score change from new events
-    score_change = sum(event.score for event in new_events)
+    score_change = sum(event.score for event in new_events if event.score)
     new_current_score = state.current_score + score_change
 
     return SimulationState(
@@ -91,9 +92,11 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
     logger.info("Generating response")
 
     # Determine next conversation-specific instruction (if any)
+    # Filter events that have branching_instruction, then randomly select one
+    events_with_branching = [e for e in state.new_events if e.branching_instruction]
     next_instruction = (
-        max(state.new_events, key=lambda e: abs(e.score)).branching_instruction
-        if state.new_events else None
+        random.choice(events_with_branching).branching_instruction
+        if events_with_branching else None
     )
 
     # Build system message from scenario and prepend only for the LLM call
