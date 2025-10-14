@@ -98,7 +98,7 @@ export const UserAnalyticsScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
-            {t('analytics.failedToLoadAnalytics')}
+            {t('Analytics.failedToLoadAnalytics')}
           </Text>
         </View>
       </SafeAreaView>
@@ -110,9 +110,9 @@ export const UserAnalyticsScreen: React.FC = () => {
       {/* Show tabs only if both analytics types are present */}
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          {t('analytics.header.title')}{' '}
+          {t('Analytics.header.title')}{' '}
           <Text style={styles.boldItalic}>
-            {t('analytics.header.subtitle')}
+            {t('Analytics.header.subtitle')}
           </Text>
         </Text>
       </View>
@@ -122,11 +122,11 @@ export const UserAnalyticsScreen: React.FC = () => {
             tabs={[
               {
                 key: AnalyticsType.CALL_LOG_ANALYTICS,
-                label: t('analytics.sessionAnalytics'),
+                label: t('Analytics.sessionAnalytics'),
               },
               {
                 key: AnalyticsType.SIMULATION_ANALYTICS,
-                label: t('analytics.simulationAnalytics'),
+                label: t('Analytics.simulationAnalytics'),
               },
             ]}
             activeTab={activeTab}
