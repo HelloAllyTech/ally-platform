@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {FlatList} from 'react-native';
 
-import {formatTimeToMMSS} from '@/components/DateSelector/dateUtils';
 import {SortOrder} from '@/constants';
 import {
   SimulationMessage,
   useLazyGetSimulationMessagesQuery,
 } from '@/services/simulationTranscriptApi';
+import {formatTimeToMMSS} from '@/utils';
 
 const LIMIT = 10;
 

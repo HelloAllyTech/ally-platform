@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -16,7 +16,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
 import {
-  FEEDBACK_MIN_DISPLAY_MS,
   MINUTES_IN_MS,
   SCREEN_NAMES,
   SECONDS_IN_MS,
@@ -63,10 +62,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
-
-  // Track last accepted event timestamp to gate incoming feedback
-  const lastEventTimestampRef = useRef<number | null>(null);
-  const feedbackHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -149,45 +144,17 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
       if (!eventObj?.data) return;
 
-      // Accept events only if at least 10s since last accepted event (web parity)
-      const incomingMs = Date.parse(eventObj?.timestamp ?? '');
-      const lastMs = lastEventTimestampRef.current;
+      const {score, emoji, message} = eventObj.data;
 
-      const incomingValid = !Number.isNaN(incomingMs);
-      const lastValid = typeof lastMs === 'number' && !Number.isNaN(lastMs);
-      const shouldAccept =
-        lastValid && incomingValid
-          ? incomingMs - lastMs >= FEEDBACK_MIN_DISPLAY_MS
-          : true;
+      if (typeof score === 'number' && !Number.isNaN(score)) {
+        setAccumulatedScore(prev => clamp(prev + score, -100, 100));
+      }
 
-      if (shouldAccept) {
-        const {score, emoji, message} = eventObj.data;
-
-        if (typeof score === 'number' && !Number.isNaN(score)) {
-          setAccumulatedScore(prev => clamp(prev + score, -100, 100));
-        }
-
-        if (message && typeof message === 'string') {
-          const id = Date.now();
-          const next = {id, text: message, emoji: emoji ?? undefined};
-          setFeedback(next);
-          setFeedbackKey(next.id);
-
-          // Auto-hide latest feedback after the minimum display time
-          if (feedbackHideTimerRef.current) {
-            clearTimeout(feedbackHideTimerRef.current);
-          }
-          feedbackHideTimerRef.current = setTimeout(() => {
-            feedbackHideTimerRef.current = null;
-            setFeedback(null);
-          }, FEEDBACK_MIN_DISPLAY_MS);
-        }
-
-        if (incomingValid) {
-          lastEventTimestampRef.current = incomingMs;
-        }
-      } else {
-        logger.info('Skipping event append due to 10s gating');
+      if (message && typeof message === 'string') {
+        const id = Date.now();
+        const next = {id, text: message, emoji: emoji ?? undefined};
+        setFeedback(next);
+        setFeedbackKey(next.id);
       }
     };
     room
@@ -203,16 +170,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   }, [room, showErrorToast, clamp, ensureSpeakerOutput]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
-
-  // Cleanup hide timer on unmount
-  useEffect(() => {
-    return () => {
-      if (feedbackHideTimerRef.current) {
-        clearTimeout(feedbackHideTimerRef.current);
-        feedbackHideTimerRef.current = null;
-      }
-    };
-  }, []);
 
   const configureAudioSession = async () => {
     try {

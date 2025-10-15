@@ -1,30 +1,29 @@
-import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LogType} from '@/constants';
-import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 
-interface TabViewProps {
-  activeTab: LogType;
-  onTabChange: (tab: LogType) => void;
+export interface GenericTabMeta<T extends string = string> {
+  key: T;
+  label: string;
+}
+
+export interface TabViewProps<T extends string = string> {
+  tabs: GenericTabMeta<T>[];
+  activeTab: T;
+  onTabChange: (tabKey: T) => void;
 }
 
 /**
- * TabView Component
+ * Generic TabView Component (pill-style header)
  *
- * A tab component that allows switching between real call logs and simulation logs.
- * Displays two tabs with active/inactive states and smooth transitions.
+ * Usage sites fully control tab keys and labels.
  */
-export const TabView: React.FC<TabViewProps> = ({activeTab, onTabChange}) => {
-  const {t} = useTranslate();
-
-  const tabs = [
-    {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
-    {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
-  ];
-
+export const TabView = <T extends string = string>({
+  tabs,
+  activeTab,
+  onTabChange,
+}: TabViewProps<T>) => {
   return (
     <View style={styles.container}>
       {tabs.map(tab => (
@@ -59,7 +58,8 @@ const styles = ScaledSheet.create({
   tab: {
     flex: 1,
     paddingVertical: '12@ms',
-    paddingHorizontal: '16@ms',
+    paddingLeft: '4@ms',
+    paddingRight: '2@ms',
     borderRadius: '7@ms',
     alignItems: 'center',
     justifyContent: 'center',
