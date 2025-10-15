@@ -8,12 +8,31 @@ interface ApiError {
   };
 }
 
-export const getErrorMessage = (error: unknown): string => {
-  if (typeof error === 'string') return error;
+export const getErrorDetails = (
+  error: unknown,
+): {message: string; status?: number} => {
+  if (typeof error === 'string')
+    return {
+      message: error,
+    };
 
   const apiError = error as ApiError;
-  if (apiError.data?.message) return apiError.data.message;
-  if (apiError.data?.error) return apiError.data.error;
+  if (apiError.data?.message)
+    return {
+      message: apiError.data.message,
+      status: apiError.status,
+    };
+  if (apiError.data?.error)
+    return {
+      message: apiError.data.error,
+      status: apiError.status,
+    };
 
-  return t('Common.somethingWentWrong');
+  return {
+    message: t('Common.somethingWentWrong'),
+  };
+};
+
+export const getErrorMessage = (error: unknown): string => {
+  return getErrorDetails(error).message;
 };
