@@ -32,7 +32,3 @@ export const getErrorDetails = (
     message: t('Common.somethingWentWrong'),
   };
 };
-
-export const getErrorMessage = (error: unknown): string => {
-  return getErrorDetails(error).message;
-};
