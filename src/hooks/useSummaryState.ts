@@ -15,8 +15,10 @@ export const useSummaryState = (
   callId: number | undefined,
 ) => {
   const dispatch = useAppDispatch();
-  const [fetchCallSummary, {isLoading, data: summaryData}] =
-    useLazyGetCallSummaryQuery();
+  const [
+    fetchCallSummary,
+    {isLoading, data: summaryData, error: summaryError},
+  ] = useLazyGetCallSummaryQuery();
   const [updateNotes] = useUpdateNotesMutation();
 
   const [showSummary, setShowSummary] = useState(true);
@@ -82,6 +84,7 @@ export const useSummaryState = (
   return {
     isLoading,
     summaryData,
+    summaryError,
     showSummary,
     setShowSummary,
     canShowSummary,
