@@ -145,6 +145,10 @@
     "summaryGenerationFailed": "Failed to generate session summary",
     "retry": "Retry"
   },
+  "CallSummaryUnauthorized": {
+    "title": "Summary Not Found",
+    "description": "The summary you are looking for does not exist."
+  },
   "CallSummary": {
     "enterDetail": "Enter detail",
     "header": {
