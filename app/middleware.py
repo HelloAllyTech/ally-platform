@@ -1,24 +1,50 @@
 """
 Middleware for the FastAPI application.
 """
-from fastapi import FastAPI
+import uuid
+from typing import List
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from app.utils.logger import logger,trace_id_var
 
-from app.core.config import settings
 
 
-def setup_middleware(app: FastAPI) -> None:
+class LogRequestMiddleware(BaseHTTPMiddleware):
+    """Custom middleware for logging requests and adding a Trace ID."""
+
+    async def dispatch(self, request: Request, call_next):
+        trace_id = str(uuid.uuid4())
+        trace_id_var.set(trace_id)
+
+
+        if request.url.path != "/api/v1/health":
+            logger.info(f"Incoming request {request.method} {request.url} (TraceID: {trace_id})")
+
+        response = await call_next(request)
+        response.headers["X-Trace-ID"] = trace_id  # Include Trace ID in the response
+
+        if request.url.path != "/api/v1/health":
+            logger.info(
+                f"Completed request {request.method} {request.url} with status {response.status_code} (TraceID: {trace_id})"
+            )
+
+        return response
+
+
+def get_middlewares() -> List[Middleware]:
     """
-    Set up middleware for the FastAPI application.
-    
-    Args:
-        app: The FastAPI application.
+    Create and configure middleware for the application.
     """
-    # Set up CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    middlewares = [
+        Middleware(LogRequestMiddleware),
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ]
+    return middlewares

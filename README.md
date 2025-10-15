@@ -30,6 +30,13 @@ Edit the `.env` file with your configuration.
 
 ### Running the Service
 
+First start the ai-agent worker by running worker.py file
+
+```bash
+PYTHONPATH=$(pwd) poetry run python app/worker.py dev
+```
+
+Then start the application
 ```bash
 poetry run uvicorn app.main:app --reload
 ```

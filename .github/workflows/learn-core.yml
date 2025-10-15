@@ -1,3 +1,5 @@
+# templates/pipeline.yml.tpl
+
 name: Build and Deploy
 
 on:
@@ -13,21 +15,23 @@ on:
   push:
     branches:
       - dev
-      - main
+      - develop
+      - stg
+      - staging
 
 env:
-  ENABLE_DB_MIGRATION: false
-  S3_ENV_FILES: ""
+  ENABLE_DB_MIGRATION: "false"
+  S3_ENV_FILES: 'learn-core/.env'
   BUILD_PLATFORM: linux/amd64
   BUILD_PATH: dockerfile
-  SUBNETS: ["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]
-  SECURITY_GROUPS: ["sg-05f0c1b5ae75e1320"]
+  SUBNETS: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
+  SECURITY_GROUPS: '["sg-05f0c1b5ae75e1320"]'
   SERVICE_NAME: learn-core
 
 jobs:
   prepare-env:
     name: Prepare Env
-    runs-on: "ubuntu-22.04"
+    runs-on: ubuntu-22.04
     outputs:
       AWS_ROLE: ${{ steps.vars.outputs.AWS_ROLE }}
       AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
@@ -36,7 +40,7 @@ jobs:
       PROJECT_REGION: ${{ steps.vars.outputs.PROJECT_REGION }}
       ECS_CLUSTER: ${{ steps.set_env.outputs.ECS_CLUSTER }}
       ECS_SERVICE: ${{ steps.set_env.outputs.ECS_SERVICE }}
-      ECR_REPOSITORY: ${{ steps.vars.outputs.ECR_REPOSITORY }}
+      ECR_REPOSITORY: ${{ steps.set_env.outputs.ECR_REPOSITORY }}
       TASK_DEFINITION: ${{ steps.set_env.outputs.TASK_DEFINITION }}
       CONTAINER_NAME: ${{ steps.set_env.outputs.CONTAINER_NAME }}
       ENVIRONMENT_BUCKET: ${{ steps.set_env.outputs.ENVIRONMENT_BUCKET }}
@@ -45,133 +49,124 @@ jobs:
 
     steps:
       - id: vars
+        name: Determine vars
         shell: bash
         run: |
-          BRANCH="${{GITHUB_REF#refs/heads/}}"
-          ENV=${{ github.event.inputs.environment }}
-          echo $BRANCH
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          ENV=${{ github.event.inputs.Environment }}
 
-          if [ -z "$ENV" ]
-          then
-            case $BRANCH in
-              "dev")
-                ENV="dev"
+          if [ -z "$ENV" ]; then
+            case "$BRANCH" in
+              "dev"|"develop")  ENV="dev" ;;
+              "main"|"master") 
+                echo "Production deployment must be manual via workflow_dispatch" 
+                exit 1 
                 ;;
-              "main")
-                ENV="prd"
-                ;;
-              *)
-                echo "ENV not configured" && exit 1
-                ;;
+              *) echo "ENV not configured" && exit 1 ;;
             esac
           fi
-          if [[ $ENV == 'prd' && $BRANCH == 'main' ]]
-          then
-            echo "AWS_ROLE=${{ vars.PRD_AWS_ROLE }}" >> $GITHUB_OUTPUT
-            echo "AWS_REGION=${{ vars.PRD_AWS_REGION }}" >> $GITHUB_OUTPUT
+
+          if [[ "$ENV" == "prd" ]]; then
+            echo "AWS_ROLE=${{ vars.PRD_AWS_ROLE }}"      >> $GITHUB_OUTPUT
+            echo "AWS_REGION=${{ vars.PRD_AWS_REGION }}"  >> $GITHUB_OUTPUT
             echo "ECR_REPOSITORY=${{ vars.PRD_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
-            echo "PROJECT_PREFIX=ally-prd" >> $GITHUB_OUTPUT
-            echo "PROJECT_REGION=mb" >> $GITHUB_OUTPUT
-          elif [ $ENV == 'dev' ]
-          then
-            echo "AWS_ROLE=${{ vars.DEV_AWS_ROLE }}" >> $GITHUB_OUTPUT
-            echo "AWS_REGION=${{ vars.DEV_AWS_REGION }}" >> $GITHUB_OUTPUT
+            echo "PROJECT_PREFIX=ally-prd"                >> $GITHUB_OUTPUT
+            echo "PROJECT_REGION=mb"                      >> $GITHUB_OUTPUT
+          elif [[ "$ENV" == "dev" ]]; then
+            echo "AWS_ROLE=${{ vars.DEV_AWS_ROLE }}"      >> $GITHUB_OUTPUT
+            echo "AWS_REGION=${{ vars.DEV_AWS_REGION }}"  >> $GITHUB_OUTPUT
             echo "ECR_REPOSITORY=${{ vars.DEV_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
-            echo "PROJECT_PREFIX=ally-dev" >> $GITHUB_OUTPUT
-            echo "PROJECT_REGION=sg" >> $GITHUB_OUTPUT
+            echo "PROJECT_PREFIX=ally-dev"                >> $GITHUB_OUTPUT
+            echo "PROJECT_REGION=sg"                      >> $GITHUB_OUTPUT
           else
-            echo "Branch not configured!"
-            exit 1
+            echo "Branch not configured!" && exit 1
           fi
-          echo "ENV=$ENV"  >> $GITHUB_OUTPUT
-          echo ":rocket: Environment - $ENV " >> $GITHUB_STEP_SUMMARY
-      - name: set variables
+
+          echo "ENV=$ENV"            >> $GITHUB_OUTPUT
+          echo ":rocket: Env is $ENV" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set derived variables
         id: set_env
         run: |
-          PROJECT_PREFIX=${{ steps.vars.outputs.PROJECT_PREFIX }}
-          PROJECT_REGION=${{  steps.vars.outputs.PROJECT_REGION  }}
-          echo "ECS_CLUSTER=$PROJECT_PREFIX-$PROJECT_REGION-ecs-cluster"  >> $GITHUB_OUTPUT
-          echo "ECS_SERVICE=$PROJECT_PREFIX-svc-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-          echo "ECR_IMAGE=$PROJECT_PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-          echo "TASK_DEFINITION=$PROJECT_PREFIX-td-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-          echo "CONTAINER_NAME=$PROJECT_PREFIX-cntr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-          echo "ENVIRONMENT_BUCKET=$PROJECT_PREFIX-s3-environment"  >> $GITHUB_OUTPUT
-          echo ":seedling: Branch:${{GITHUB_REF#refs/heads/}}" >> $GITHUB_STEP_SUMMARY
+          PREFIX=${{ steps.vars.outputs.PROJECT_PREFIX }}
+          REGION=${{ steps.vars.outputs.PROJECT_REGION }}
+          ECR=${{ steps.vars.outputs.ECR_REPOSITORY }}
+          echo "ECS_CLUSTER=$PREFIX-$REGION-ecs-cluster"                  >> $GITHUB_OUTPUT
+          echo "ECS_SERVICE=$PREFIX-svc-${{ env.SERVICE_NAME }}"         >> $GITHUB_OUTPUT
+          echo "TASK_DEFINITION=$PREFIX-td-${{ env.SERVICE_NAME }}"      >> $GITHUB_OUTPUT
+          echo "CONTAINER_NAME=$PREFIX-cntr-${{ env.SERVICE_NAME }}"     >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY=$PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT_BUCKET=$PREFIX-s3-environment"                >> $GITHUB_OUTPUT
+          echo ":seedling: Branch is ${GITHUB_REF#refs/heads/}"          >> $GITHUB_STEP_SUMMARY
 
   build-push-image:
     name: Build and Push Image
-    runs-on: "ubuntu-22.04"
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write
       pull-requests: write
       contents: read
-    needs:
-      - prepare-env
+    needs: [prepare-env]
     outputs:
       APP_IMAGE: ${{ steps.build_and_push.outputs.APP_IMAGE }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
-      - name: build and push
+      - uses: actions/checkout@v4
+      - name: Build & Push
         id: build_and_push
-        uses: KeyvalueSoftwareSystems/lifeline-infra/actions/build-push@main
+        uses: KeyvalueSoftwareSystems/lifeline-infra/.github/actions/build-push@main
         with:
-          aws-region: ${{needs.prepare-env.outputs.AWS_REGION}}
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
           aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-          ecr-repository: ${{needs.prepare-env.outputs.ECR_REPOSITORY}}
+          ecr-repository: ${{ needs.prepare-env.outputs.ECR_REPOSITORY }}
           release-tag: ${{ github.sha }}
-          environment-bucket: ${{needs.prepare-env.outputs.ENVIRONMENT_BUCKET}}
+          environment-bucket: ${{ needs.prepare-env.outputs.ENVIRONMENT_BUCKET }}
           s3-env-files: ${{ env.S3_ENV_FILES }}
           build-platform: ${{ env.BUILD_PLATFORM }}
           build-path: ${{ env.BUILD_PATH }}
 
   run-db-migration:
-    if: env.ENABLE_DB_MIGRATION == 'true'
     name: Run the DB migration
-    runs-on: "ubuntu-22.04"
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write
       pull-requests: write
       contents: read
-    needs:
-      - prepare-env
-      - build-push-image
+    needs: [prepare-env, build-push-image]
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
-      - name: run db migration
+      - uses: actions/checkout@v4
+      - name: Notify migration skipped
+        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
+        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
+      - name: Run migration
+        if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
         id: run_db_migration
-        uses: KeyvalueSoftwareSystems/lifeline-infra/actions/run-migration@main
+        uses: KeyvalueSoftwareSystems/lifeline-infra/.github/actions/run-migration@main
         with:
-          aws-region: ${{needs.prepare-env.outputs.AWS_REGION}}
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
           aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
           task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
           container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
           ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
           image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
-          subnets: ${{ needs.prepare-env.outputs.SUBNETS }}
-          security-groups: ${{ needs.prepare-env.outputs.SECURITY_GROUPS }}
+          subnets: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
+          security-groups: '["sg-05f0c1b5ae75e1320"]'
 
   deploy-to-ecs-service:
     name: Deploy to ECS service
-    runs-on: "ubuntu-22.04"
+    runs-on: ubuntu-22.04
     timeout-minutes: 8
     permissions:
       id-token: write
       pull-requests: write
       contents: read
-    needs:
-      - prepare-env
-      - build-push-image
-      - run-db-migration
+    needs: [prepare-env, build-push-image, run-db-migration]
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
-      - name: deploy backend
+      - uses: actions/checkout@v4
+      - name: Deploy backend
         id: deploy_backend
-        uses: KeyvalueSoftwareSystems/lifeline-infra/actions/deploy-ecs@main
+        uses: KeyvalueSoftwareSystems/lifeline-infra/.github/actions/deploy-ecs@main
         with:
-          aws-region: ${{needs.prepare-env.outputs.AWS_REGION}}
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
           aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
           task-definition: ${{ needs.prepare-env.outputs.TASK_DEFINITION }}
           container-name: ${{ needs.prepare-env.outputs.CONTAINER_NAME }}
