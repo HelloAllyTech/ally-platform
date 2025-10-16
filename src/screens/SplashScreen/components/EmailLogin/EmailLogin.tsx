@@ -14,7 +14,7 @@ import {
 import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme';
-import {getErrorMessage} from '@/utils/error';
+import {getErrorDetails} from '@/utils';
 
 import {styles} from './styles';
 import type {EmailLoginProps} from './types';
@@ -30,7 +30,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
 
   const handleOtpError = useCallback(
     (err: FetchBaseQueryError | SerializedError) => {
-      const message = getErrorMessage(err);
+      const message = getErrorDetails(err).message;
       Alert.alert(
         'Failed to Send OTP',
         message === 'Network Error'

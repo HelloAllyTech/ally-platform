@@ -1,7 +1,7 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
-import {CallLogScreen} from '@/screens/CallLog/CallLogScreen';
+import {CallLogScreen} from '../CallLogScreen';
 
 // Navigation focus effect - no-op to avoid async updates during render
 jest.mock('@react-navigation/native', () => ({
@@ -48,7 +48,12 @@ jest.mock('@/hooks', () => ({
 
 // Store
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (sel: any) => sel({ user: { permissions: ['CALLS', 'START'] }, chat: { currentChat: null } }),
+  useAppSelector: (sel: any) =>
+    sel({
+      user: { permissions: ['CALLS', 'START'] },
+      chat: { currentChat: null },
+      summary: { visibleFields: [] },
+    }),
   useAppDispatch: () => jest.fn(),
 }));
 
@@ -60,8 +65,8 @@ jest.mock('@/services/simulationsApi', () => ({
   useLazyGetSimulationLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
 }));
 jest.mock('@/services/settingsApi', () => ({
-  useGetVisibleChatTypesQuery: () => ({ data: ['MIC'] }),
-  useGetSummaryFieldsQuery: () => ({ data: ['field1'] }),
+  useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],
+  useLazyGetSummaryFieldsQuery: () => [jest.fn(), { data: ['field1'] }],
 }));
 
 // Utils
@@ -92,7 +97,12 @@ describe('CallLogScreen', () => {
 
   it('shows TabView when multiple log types available', () => {
     jest.doMock('@/store/hooks', () => ({
-      useAppSelector: (sel: any) => sel({ user: { permissions: ['CALLS', 'SIM', 'START'] }, chat: { currentChat: null } }),
+      useAppSelector: (sel: any) =>
+        sel({
+          user: { permissions: ['CALLS', 'SIM', 'START'] },
+          chat: { currentChat: null },
+          summary: { visibleFields: [] },
+        }),
       useAppDispatch: () => jest.fn(),
     }));
     const {unmount} = render(<CallLogScreen />);
@@ -101,7 +111,7 @@ describe('CallLogScreen', () => {
 
   it('renders feature-not-available when microphone disabled', () => {
     jest.doMock('@/services/settingsApi', () => ({
-      useGetVisibleChatTypesQuery: () => ({ data: [] }),
+      useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: [] }],
       useGetSummaryFieldsQuery: () => ({ data: ['field1'] }),
     }));
     const {toJSON} = render(<CallLogScreen />);

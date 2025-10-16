@@ -47,7 +47,7 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_ANALYTICS],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_ANALYTICS_DASHBOARD],
   },
   {
     name: SCREEN_NAMES.SEARCH,

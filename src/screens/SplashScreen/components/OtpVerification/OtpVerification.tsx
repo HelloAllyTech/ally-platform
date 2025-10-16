@@ -8,7 +8,7 @@ import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
-import {getErrorMessage} from '@/utils';
+import {getErrorDetails} from '@/utils';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
 import {styles} from './styles';
@@ -62,7 +62,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   useEffect(() => {
     if (isError && apiError) {
-      setError(getErrorMessage(apiError));
+      setError(getErrorDetails(apiError).message);
     }
   }, [isError, apiError]);
 
@@ -88,7 +88,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
       resetOtpState();
       otpInputRef.current?.focusFirst();
     } catch (err) {
-      Alert.alert('Error', getErrorMessage(err));
+      Alert.alert('Error', getErrorDetails(err).message);
     }
   }, [email, generateOtp, resetOtpState]);
 

@@ -15,7 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton} from '@/components';
+import {CallLogSkeleton, TabView} from '@/components';
 import {env} from '@/config/env';
 import {
   CHAT_TYPES,
@@ -34,12 +34,15 @@ import {
 } from '@/hooks';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
-  useGetSummaryFieldsQuery,
-  useGetVisibleChatTypesQuery,
+  useLazyGetSummaryFieldsQuery,
+  useLazyGetVisibleChatTypesQuery,
 } from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
+import {
+  selectSummaryVisibleFields,
+  setSummaryVisibleFields,
+} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily} from '@/theme';
 import {Chat} from '@/types';
@@ -51,7 +54,6 @@ import {
   CallLogItem,
   FeatureNotAvailable,
   StartSessionModal,
-  TabView,
 } from './components';
 import {LogItem} from './types';
 
@@ -82,7 +84,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const {userData} = useUser();
+  const {userData, isUserLoading, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
@@ -93,14 +95,45 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const {data: enabledChatTypes} = useGetVisibleChatTypesQuery();
-  const {data: visibleFields} = useGetSummaryFieldsQuery();
+  const [getSummaryFields, {data: visibleFields}] =
+    useLazyGetSummaryFieldsQuery();
+  const [getVisibleChatTypes, {data: enabledChatTypes}] =
+    useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
+  const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userData) {
+        checkAuth();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userData]),
+  );
+
+  useEffect(() => {
+    if (visibleFields) {
+      dispatch(setSummaryVisibleFields(visibleFields));
+    }
+  }, [visibleFields, dispatch]);
+
+  useEffect(() => {
+    if (!visibleFieldsState?.length) {
+      getSummaryFields();
+    }
+  }, [getSummaryFields, visibleFieldsState?.length]);
 
   const canStartCall = permissions?.includes(
     USER_PERMISSIONS.VIEW_START_CALL_PAGE,
   );
+
+  useEffect(() => {
+    if (canStartCall) {
+      getVisibleChatTypes();
+    }
+  }, [canStartCall, getVisibleChatTypes]);
+
   const hasAnyCallType = useMemo(
     () =>
       Boolean(
@@ -192,16 +225,8 @@ export const CallLogScreen: React.FC = () => {
         fetchInitialSimulationLogs();
       }
 
-      if (visibleFields) {
-        dispatch(setSummaryVisibleFields(visibleFields));
-      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      fetchInitialRealLogs,
-      fetchInitialSimulationLogs,
-      visibleFields,
-      dispatch,
-    ]),
+    }, [fetchInitialRealLogs, fetchInitialSimulationLogs, dispatch]),
   );
 
   /**
@@ -416,7 +441,14 @@ export const CallLogScreen: React.FC = () => {
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
-        <TabView activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabView
+          tabs={[
+            {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
+            {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       )}
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />

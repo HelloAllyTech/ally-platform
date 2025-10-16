@@ -145,6 +145,10 @@
     "summaryGenerationFailed": "Failed to generate session summary",
     "retry": "Retry"
   },
+  "CallSummaryUnauthorized": {
+    "title": "Summary Not Found",
+    "description": "The summary you are looking for does not exist."
+  },
   "CallSummary": {
     "enterDetail": "Enter detail",
     "header": {
@@ -225,31 +229,14 @@
     "noLocationsFound": "No locations found",
     "startTypingToSearch": "Start typing to search for locations"
   },
-  "analytics": {
+  "Analytics": {
     "header": {
-      "title": "Call",
-      "subtitle": "Analytics"
+      "title": "Session",
+      "subtitle": "Statistics"
     },
-    "dateSelector": {
-      "selectDate": "Select Date",
-      "selectMonth": "Select Month",
-      "selectYear": "Select Year",
-      "today": "Today"
-    },
-    "listeningTalking": {
-      "title": "Listening : Talking Distribution",
-      "listening": "Listening",
-      "talking": "Talking",
-      "noData": "No data available for this date"
-    },
-    "questions": {
-      "title": "Questions used",
-      "description": "This is the total number of questions per 60 conversation minutes used by you to facilitate reflections across your sessions. Number on the right is average of all counsellors."
-    },
-    "modal": {
-      "cancel": "Cancel",
-      "ok": "OK"
-    }
+    "sessionAnalytics": "Session analytics",
+    "simulationAnalytics": "Simulation analytics",
+    "failedToLoadAnalytics": "Failed to load analytics"
   },
   "SearchScreen": {
     "header": {

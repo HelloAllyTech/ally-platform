@@ -2,11 +2,11 @@
   "migIndex": 1,
   "data": [
     {
-      "path": "src/assets/fonts/IBMPlexSerif-Regular.ttf",
-      "sha1": "6d704ba16b088c4c15b4647992dc73f448fb29de"
+      "path": "src/assets/fonts/IBMPlexSerif-Medium.ttf",
+      "sha1": "1cf27f2db907b431625232d1ff29d1c542c7d841"
     },
     {
-      "path": "src/assets/fonts/IBMPlexSerif-Medium.ttf",
+      "path": "src/assets/fonts/IBMPlexSerif-Regular.ttf",
       "sha1": "6d704ba16b088c4c15b4647992dc73f448fb29de"
     },
     {
@@ -24,6 +24,10 @@
     {
       "path": "src/assets/fonts/Roboto-Regular.ttf",
       "sha1": "3bff51436aa7eb995d84cfc592cc63e1316bb400"
+    },
+    {
+      "path": "src/assets/fonts/YesevaOne-Regular.ttf",
+      "sha1": "8dc9c17c5c4e6224755e0863eee59a088eb78228"
     }
   ]
 }
