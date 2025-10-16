@@ -24,7 +24,7 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme';
-import {navigateToCallLogTab} from '@/utils';
+import {getErrorDetails, navigateToCallLogTab} from '@/utils';
 
 import {
   AddNotesSection,
@@ -33,6 +33,7 @@ import {
   Header,
   SummaryGenerationProgress,
   SummaryModals,
+  SummaryUnauthorized,
 } from './components';
 import {styles} from './styles';
 
@@ -47,7 +48,6 @@ export const CallSummaryScreen: React.FC<
   const callId = route.params?.callId;
   const fromLogs = route.params?.fromLogs;
   const chatId = callId || currentChat?.chatId;
-  const showTranscript = Boolean(callId);
 
   const navigation = useAppNavigation();
 
@@ -55,6 +55,7 @@ export const CallSummaryScreen: React.FC<
     isLoading,
     refreshing,
     summaryData,
+    summaryError,
     showSummary,
     setShowSummary,
     canShowSummary,
@@ -65,6 +66,13 @@ export const CallSummaryScreen: React.FC<
     handleNoteChange,
     summaryStatus,
   } = useSummaryState(chatId, callId);
+
+  const hasFeedbackAlready = Boolean(
+    summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
+  );
+  const isUnauthorized =
+    summaryError && getErrorDetails(summaryError).status === 403;
+  const showTranscript = Boolean(callId) && !isUnauthorized;
 
   const dispatch = useAppDispatch();
 
@@ -112,10 +120,6 @@ export const CallSummaryScreen: React.FC<
     const timeElapsed = currentTime - mountTime;
     const thresholdMs = 30 * 1000; // 30 seconds
 
-    const hasFeedbackAlready = Boolean(
-      summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
-    );
-
     if ((timeElapsed >= thresholdMs || !fromLogs) && !hasFeedbackAlready) {
       setIsFeedbackPopupVisible(true);
       return;
@@ -125,7 +129,7 @@ export const CallSummaryScreen: React.FC<
   };
 
   const onSaveButtonPress = () => {
-    setIsFeedbackPopupVisible(true);
+    if (!hasFeedbackAlready) setIsFeedbackPopupVisible(true);
   };
 
   const handleBlur = () => {
@@ -199,6 +203,10 @@ export const CallSummaryScreen: React.FC<
   };
 
   const renderContent = () => {
+    if (isUnauthorized) {
+      return <SummaryUnauthorized onGoBack={handleGoBack} />;
+    }
+
     if (showSummary && isSummaryAvailable && canShowSummary) {
       const shouldShowSaveButton = !callId || hasChanges;
       return (

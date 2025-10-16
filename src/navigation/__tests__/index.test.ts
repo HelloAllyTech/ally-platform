@@ -32,6 +32,22 @@ jest.mock('../DrawerNavigator', () => ({
 
 import * as nav from '../index';
 
+// Mock RTK Query api and store to avoid reducerPath undefined due to slice wiring
+jest.mock('@/services/api', () => {
+  const api = {
+    reducerPath: 'api',
+    reducer: jest.fn(),
+    middleware: jest.fn(),
+    injectEndpoints: jest.fn().mockReturnValue({
+      useGetSummaryFieldsQuery: () => ({data: ['field1'], isLoading: false}),
+    }),
+  } as any;
+  return {api};
+});
+jest.mock('@/store/store', () => ({
+  store: {dispatch: jest.fn(), getState: jest.fn()},
+}));
+
 describe('navigation index exports', () => {
   it('exports navigators and types re-exports', () => {
     expect(typeof nav).toBe('object');

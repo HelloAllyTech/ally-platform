@@ -8,9 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		0575529D285843CD8E52C59D /* ReplayPro-BoldItalic.otf in Resources */ = {isa = PBXBuildFile; fileRef = 664E565B023A4633A1ECA2B7 /* ReplayPro-BoldItalic.otf */; };
+		0A3DFD7B659143C89BE627C3 /* IBMPlexSerif-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		25B7937C2C90405B9DF04E66 /* ReplayPro-Headline.otf in Resources */ = {isa = PBXBuildFile; fileRef = 6EDB66A9BCCA4802A590CB62 /* ReplayPro-Headline.otf */; };
 		315EA2BB9865486E85DC00EC /* ReplayPro-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 906261E9D5EA43119D9980AD /* ReplayPro-Bold.otf */; };
+		577F05B2C9E04E3084C60078 /* YesevaOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		BDAEC9842E1D21ED008EFC84 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BDAEC9832E1D21ED008EFC84 /* GoogleService-Info.plist */; };
@@ -18,7 +20,6 @@
 		D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		D7E80D5568D445CBB488E6B2 /* Roboto-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */; };
 		F46AFA792DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */; };
-		F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,19 +27,21 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = ally/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ally/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = ally/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSerif-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Medium.ttf"; sourceTree = "<group>"; };
 		664E565B023A4633A1ECA2B7 /* ReplayPro-BoldItalic.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ReplayPro-BoldItalic.otf"; path = "../src/assets/fonts/ReplayPro-BoldItalic.otf"; sourceTree = "<group>"; };
 		6EDB66A9BCCA4802A590CB62 /* ReplayPro-Headline.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ReplayPro-Headline.otf"; path = "../src/assets/fonts/ReplayPro-Headline.otf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ally/AppDelegate.swift; sourceTree = "<group>"; };
 		81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Roboto-Regular.ttf"; path = "../src/assets/fonts/Roboto-Regular.ttf"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ally/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "YesevaOne-Regular.ttf"; path = "../src/assets/fonts/YesevaOne-Regular.ttf"; sourceTree = "<group>"; };
 		906261E9D5EA43119D9980AD /* ReplayPro-Bold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ReplayPro-Bold.otf"; path = "../src/assets/fonts/ReplayPro-Bold.otf"; sourceTree = "<group>"; };
 		95EA08D892194FB99F3EF69E /* libPods-ally.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ally.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A128D6D52E99274E00EC08D9 /* ally.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ally.entitlements; path = ally/ally.entitlements; sourceTree = "<group>"; };
 		BDAEC9832E1D21ED008EFC84 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		DDB73E65160904A674F33875 /* Pods-ally.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ally.debug.xcconfig"; path = "Target Support Files/Pods-ally/Pods-ally.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F3492155ED4A59D6BD37D0E4 /* Pods-ally.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ally.release.xcconfig"; path = "Target Support Files/Pods-ally/Pods-ally.release.xcconfig"; sourceTree = "<group>"; };
 		F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Regular.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Regular.ttf"; sourceTree = "<group>"; };
-		F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "IBMPlexSerif-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSerif-Medium.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +59,7 @@
 		13B07FAE1A68108700A75B9A /* ally */ = {
 			isa = PBXGroup;
 			children = (
+				A128D6D52E99274E00EC08D9 /* ally.entitlements */,
 				BDAEC9832E1D21ED008EFC84 /* GoogleService-Info.plist */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
@@ -108,12 +112,13 @@
 		A6B1B120E4F843D2BE11BAD4 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				F46AFA7A2DF0422300F0326D /* IBMPlexSerif-Medium.ttf */,
 				F46AFA782DF03E9B00F0326D /* IBMPlexSerif-Regular.ttf */,
 				664E565B023A4633A1ECA2B7 /* ReplayPro-BoldItalic.otf */,
 				6EDB66A9BCCA4802A590CB62 /* ReplayPro-Headline.otf */,
 				81A73BA0BC954866AA01E26D /* Roboto-Regular.ttf */,
 				906261E9D5EA43119D9980AD /* ReplayPro-Bold.otf */,
+				4B3AB11DF03E44B3AABE2A29 /* IBMPlexSerif-Medium.ttf */,
+				8ACB8FBC76F64F9AAE524297 /* YesevaOne-Regular.ttf */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -191,7 +196,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
-				F46AFA7B2DF0422300F0326D /* IBMPlexSerif-Medium.ttf in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				0575529D285843CD8E52C59D /* ReplayPro-BoldItalic.otf in Resources */,
 				25B7937C2C90405B9DF04E66 /* ReplayPro-Headline.otf in Resources */,
@@ -200,6 +204,8 @@
 				BDAEC9842E1D21ED008EFC84 /* GoogleService-Info.plist in Resources */,
 				315EA2BB9865486E85DC00EC /* ReplayPro-Bold.otf in Resources */,
 				D614B44373067A0356CD4985 /* PrivacyInfo.xcprivacy in Resources */,
+				0A3DFD7B659143C89BE627C3 /* IBMPlexSerif-Medium.ttf in Resources */,
+				577F05B2C9E04E3084C60078 /* YesevaOne-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -343,8 +349,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
+				CODE_SIGN_ENTITLEMENTS = ally/ally.entitlements;
 				DEVELOPMENT_TEAM = GS528Q8583;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = GS528Q8583;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = ally/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ally;
@@ -354,7 +362,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -374,9 +382,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = ally/ally.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = GS528Q8583;
 				INFOPLIST_FILE = ally/Info.plist;
@@ -387,7 +396,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -471,10 +480,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -543,10 +549,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
