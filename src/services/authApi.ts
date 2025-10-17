@@ -1,4 +1,4 @@
-import {API_METHODS} from '@/constants';
+import {API_METHODS, API_ROUTES} from '@/constants';
 import {User} from '@/types';
 
 import {api} from './api';
@@ -21,23 +21,23 @@ export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<{success: boolean}, GenerateOtpRequest>({
       query: ({email}) => ({
-        url: '/auth/generate-otp',
+        url: API_ROUTES.AUTH.GENERATE_OTP,
         method: API_METHODS.POST,
         body: {email},
       }),
     }),
     verifyOtp: builder.mutation<AuthResponse, VerifyOtpRequest>({
       query: ({email, otp}) => ({
-        url: '/auth/verify-otp',
+        url: API_ROUTES.AUTH.VERIFY_OTP,
         method: API_METHODS.POST,
         body: {email, otp},
       }),
     }),
     getUser: builder.query<User, void>({
-      query: () => '/users/me',
+      query: () => API_ROUTES.USERS.ME,
     }),
     getPermissions: builder.query<string[], void>({
-      query: () => '/auth/permissions',
+      query: () => API_ROUTES.AUTH.PERMISSIONS,
     }),
   }),
 });

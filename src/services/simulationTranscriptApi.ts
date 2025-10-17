@@ -33,7 +33,7 @@ export const simulationTranscriptApi = api.injectEndpoints({
       SimulationMessagesParams
     >({
       query: ({scenarioSessionId, limit, offset, sortBy, sortOrder}) => ({
-        url: API_ROUTES.SIMULATION_MESSAGES.replace(
+        url: API_ROUTES.LEARN.SIMULATION_MESSAGES.replace(
           ':scenarioSessionId',
           String(scenarioSessionId),
         ),
