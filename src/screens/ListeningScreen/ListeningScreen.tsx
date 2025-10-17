@@ -663,7 +663,7 @@ export const ListeningScreen = ({
         showEndSessionButton={isMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
         showFocusModeButton={permissions?.includes(
-          USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,
+          USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT,
         )}
       />
     </View>

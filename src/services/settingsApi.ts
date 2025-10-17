@@ -1,17 +1,17 @@
-import {CHAT_TYPES, SummaryFieldKey} from '@/constants';
+import {API_ROUTES, CHAT_TYPES, SummaryFieldKey} from '@/constants';
 
 import {api} from './api';
 
 export const settingsApi = api.injectEndpoints({
   endpoints: builder => ({
     getSummaryFields: builder.query<SummaryFieldKey[], void>({
-      query: () => '/settings/summary-fields',
+      query: () => API_ROUTES.SETTINGS.SUMMARY_FIELDS,
     }),
     getNudgeStatus: builder.query<boolean, void>({
-      query: () => '/settings/nudge-status',
+      query: () => API_ROUTES.SETTINGS.NUDGE_STATUS,
     }),
     getVisibleChatTypes: builder.query<CHAT_TYPES[], void>({
-      query: () => '/settings/chat-types',
+      query: () => API_ROUTES.SETTINGS.CHAT_TYPES,
     }),
   }),
 });

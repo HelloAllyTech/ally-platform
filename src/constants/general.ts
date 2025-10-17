@@ -64,15 +64,62 @@ export enum LanguageMap {
 
 // API route constants
 export const API_ROUTES = {
-  ROOMS: '/rooms',
-  SCENARIOS: '/learn/scenarios',
-  FEEDBACK: '/feedback/', // slash appended at the end to fix Fastapi bug
-  ADMIN_SIMULATION_LOGS: '/learn/admin-scenario-sessions',
-  SIMULATION_LOGS: '/learn/scenario-sessions',
-  END_SCENARIO_SESSION: '/learn/scenario-session',
-  SCENARIO_SESSION_START: '/learn/scenario-session-start',
-  SIMULATION_DETAILS: '/learn/scenario-session',
-  SIMULATION_MESSAGES: '/learn/scenario-session/:scenarioSessionId/messages',
+  AUTH: {
+    REFRESH: '/auth/refresh',
+    GENERATE_OTP: '/auth/generate-otp',
+    VERIFY_OTP: '/auth/verify-otp',
+    PERMISSIONS: '/auth/permissions',
+  },
+  USERS: {
+    ME: '/users/me',
+  },
+  CHATS: {
+    ROOT: '/chats',
+    COUNSELLOR_CHAT: '/chats/counsellor-chat',
+    BY_ID: '/chats/:chatId',
+    END: '/chats/:chatId/end',
+    NOTES: '/chats/:chatId/notes',
+    MESSAGES: '/chats/:chatId/messages',
+    CALL_DETAILS: '/chats/:chatId/call-details',
+    EXPORT_SUMMARY: '/chats/:chatId/export-summary',
+    CALL_INFO: '/chats/:chatId/call-info',
+    SUMMARY_FEEDBACK: '/chats/:chatId/summary-feedback',
+    ENHANCE: '/chats/enhance',
+    CALL_LOGS: '/chats/call-logs',
+    SUMMARY_TAG_RATINGS: '/chats/summary/tag-positivity-ratings',
+    MESSAGES_FEEDBACK: '/chats/messages/:id/feedback',
+    MESSAGES_FEEDBACK_BY_ID: '/chats/messages/feedback/:feedbackId',
+  },
+  ANALYTICS: {
+    DASHBOARD: '/analytics/dashboard',
+    DASHBOARD_BY_ID: '/analytics/dashboard/:dashboardId',
+  },
+  REFERENCE_DOCUMENT: {
+    SEARCH: '/reference-document/search',
+    CATEGORIES: '/reference-document/categories',
+  },
+  PLACES: {
+    ROOT: '/places',
+    SEARCH: '/places/search',
+  },
+  SETTINGS: {
+    SUMMARY_FIELDS: '/settings/summary-fields',
+    NUDGE_STATUS: '/settings/nudge-status',
+    CHAT_TYPES: '/settings/chat-types',
+  },
+  LEARN: {
+    ROOMS: '/rooms',
+    ROOM_BY_ID: '/rooms/:roomId',
+    SCENARIO_SESSION_FEEDBACK:
+      '/learn/scenario-session/:scenarioSessionId/feedback',
+    SCENARIOS: '/learn/scenarios',
+    SCENARIO_BY_ID: '/learn/scenarios/:id',
+    SIMULATION_DETAILS: '/learn/scenario-session/:id',
+    SCENARIO_SESSION_START: '/learn/scenario-session-start',
+    END_SCENARIO_SESSION: '/learn/scenario-session/:scenarioSessionId/end',
+    SIMULATION_LOGS: '/learn/scenario-sessions',
+    SIMULATION_MESSAGES: '/learn/scenario-session/:scenarioSessionId/messages',
+  },
 } as const;
 
 export const API_METHODS = {

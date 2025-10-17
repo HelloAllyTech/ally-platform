@@ -40,7 +40,7 @@ const ALL_TABS = [
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
     requiredPermissions: [
-      USER_PERMISSIONS.VIEW_NAVBAR_CALLS,
+      USER_PERMISSIONS.VIEW_CALL_LOGS,
       USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
     ],
   },
@@ -52,7 +52,7 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_SEARCH],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT],
   },
   {
     name: SCREEN_NAMES.LEARN,

@@ -150,7 +150,7 @@ export const CallLogScreen: React.FC = () => {
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
 
-    if (permissions?.includes(USER_PERMISSIONS.VIEW_NAVBAR_CALLS)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_CALL_LOGS)) {
       logTypes.push(LogType.REAL);
     }
 
