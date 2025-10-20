@@ -89,6 +89,7 @@ jobs:
           AAB_SRC="android/app/build/outputs/bundle/devRelease/app-dev-release.aab"
           AAB_DST="android/app/build/outputs/bundle/dev/release/app-develop-release-${{ github.run_number }}-${DATETIME}.aab"
           if [ -f "$AAB_SRC" ]; then
+            mkdir -p "$(dirname "$AAB_DST")"
             mv "$AAB_SRC" "$AAB_DST"
           else
             echo "AAB not found at $AAB_SRC"
