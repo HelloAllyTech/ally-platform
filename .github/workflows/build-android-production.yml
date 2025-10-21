@@ -56,50 +56,83 @@ jobs:
         run: |
           echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env
 
-      - name: Build with Gradle (Production)
+      - name: Build with Gradle (clean, assemble APK and bundle AAB)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
-          ./gradlew clean
+          ./gradlew clean --stacktrace
+          # Build APK
           ./gradlew assembleProdRelease --stacktrace
+          # Build AAB (App Bundle)
+          ./gradlew bundleProdRelease --stacktrace
 
       - name: Rename APK with build number, date, and env
         run: |
           DATETIME=$(date +'%Y%m%d-%H%M')
-          mv android/app/build/outputs/apk/prod/release/app-prod-release.apk android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk
+          APK_SRC="android/app/build/outputs/apk/prod/release/app-prod-release.apk"
+          APK_DST="android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk"
+          if [ -f "$APK_SRC" ]; then
+            mv "$APK_SRC" "$APK_DST"
+          else
+            echo "APK not found at $APK_SRC"
+            ls -R android/app/build/outputs/apk || true
+            exit 1
+          fi
 
-      - name: Upload APK
+      - name: Rename AAB with build number, date, and env
+        run: |
+          DATETIME=$(date +'%Y%m%d-%H%M')
+          # Expected AAB path for flavor 'prod' and buildType 'release'
+          AAB_SRC="android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
+          AAB_DST="android/app/build/outputs/bundle/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.aab"
+          if [ -f "$AAB_SRC" ]; then
+            mkdir -p "$(dirname "$AAB_DST")"
+            mv "$AAB_SRC" "$AAB_DST"
+          else
+            echo "AAB not found at $AAB_SRC"
+            ls -R android/app/build/outputs/bundle || true
+            exit 1
+          fi
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-production-release-${{ github.run_number }}
+          name: app-production-release-apk-${{ github.run_number }}
           path: android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-*.apk
           retention-days: 30
 
-      - name: Send Slack notification (Production)
-        if: success()
-        uses: tokorom/action-slack-incoming-webhook@main
-        env:
-          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
         with:
-          text: 'Android Production Build #${{ github.run_number }} Successful!'
-          attachments: |
-            [
-              {
-                "color": "good",
-                "author_name": "${{ github.actor }}",
-                "author_icon": "${{ github.event.sender.avatar_url }}",
-                "fields": [
-                  {
-                    "title": "What's New",
-                    "value": "${{ github.event.head_commit.message }}"
-                  },
-                  {
-                    "title": "Download Production APK",
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
-                  }
-                ]
-              }
-            ]
+          name: app-production-release-aab-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/prod/release/app-production-release-${{ github.run_number }}-*.aab
+          retention-days: 30
+
+      # - name: Send Slack notification (Production)
+      #   if: success()
+      #   uses: tokorom/action-slack-incoming-webhook@main
+      #   env:
+      #     INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   with:
+      #     text: 'Android Production Build #${{ github.run_number }} Successful!'
+      #     attachments: |
+      #       [
+      #         {
+      #           "color": "good",
+      #           "author_name": "${{ github.actor }}",
+      #           "author_icon": "${{ github.event.sender.avatar_url }}",
+      #           "fields": [
+      #             {
+      #               "title": "What's New",
+      #               "value": "${{ github.event.head_commit.message }}"
+      #             },
+      #             {
+      #               "title": "Download Production APK",
+      #               "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+      #             }
+      #           ]
+      #         }
+      #       ]
