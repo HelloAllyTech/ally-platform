@@ -56,7 +56,7 @@ jobs:
         run: |
           echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env
 
-      - name: Build with Gradle (clean, assemble APK and bundle AAB)
+      - name: Build with Gradle (Production)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

@@ -97,7 +97,7 @@ jobs:
                     "value": "${{ github.event.head_commit.message }}"
                   },
                   {
-                    "title": "Download Build (Artifacts)",
+                    "title": "Download Develop APK",
                     "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
                   }
                 ]
