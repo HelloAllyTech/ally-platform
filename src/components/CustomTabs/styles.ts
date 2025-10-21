@@ -3,24 +3,41 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily, typography} from '@/theme';
 import type {ThemeMode} from '@/types';
 
+const lightTheme = {
+  background: colors.white,
+  borderColor: colors.lightGray14,
+  activeBorderColor: colors.black,
+  textColor: colors.lightGray3,
+  activeTextColor: colors.darkSlate,
+};
+
+const darkTheme = {
+  background: colors.darkGray7,
+  borderColor: colors.darkGray9,
+  activeBorderColor: colors.white,
+  textColor: colors.lightGray15,
+  activeTextColor: colors.lightGray15,
+};
+
 export const getThemedStyles = (colorScheme: ThemeMode | null) => {
-  const isDark = colorScheme === 'dark';
+  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+
   return ScaledSheet.create({
     container: {
-      backgroundColor: isDark ? colors.darkGray7 : colors.white,
+      backgroundColor: theme.background,
     },
     tabHeader: {
       height: '38@ms',
-      backgroundColor: isDark ? colors.darkGray7 : colors.white,
+      backgroundColor: theme.background,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? colors.darkGray9 : colors.lightGray14,
+      borderBottomColor: theme.borderColor,
     },
     tabHeaderContent: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 0,
       minHeight: '36@ms',
-      backgroundColor: isDark ? colors.darkGray7 : colors.white,
+      backgroundColor: theme.background,
     },
     tabButton: {
       paddingHorizontal: '10@ms',
@@ -28,26 +45,26 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       height: '36@ms',
       justifyContent: 'flex-end',
       alignItems: 'center',
-      backgroundColor: isDark ? colors.darkGray7 : colors.white,
+      backgroundColor: theme.background,
     },
     activeTabButton: {
       borderBottomWidth: 2,
       marginBottom: '-2@ms',
-      borderBottomColor: isDark ? colors.white : colors.black,
+      borderBottomColor: theme.activeBorderColor,
     },
     tabText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
       ...typography.body.small,
-      color: isDark ? colors.lightGray15 : colors.lightGray3,
+      color: theme.textColor,
       textAlign: 'center',
       fontWeight: '400',
     },
     activeTabText: {
-      color: isDark ? colors.lightGray15 : colors.darkSlate,
+      color: theme.activeTextColor,
       fontWeight: '500',
     },
     tabBody: {
-      backgroundColor: isDark ? colors.darkGray7 : colors.white,
+      backgroundColor: theme.background,
       marginTop: '6@ms',
     },
     tabBodyContent: {
