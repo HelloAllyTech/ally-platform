@@ -56,83 +56,50 @@ jobs:
         run: |
           echo "${{ secrets.ENV_VALUES_DEVELOP }}" > .env
 
-      - name: Build with Gradle (clean, assemble APK and bundle AAB)
+      - name: Build with Gradle (Development)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
-          ./gradlew clean --stacktrace
-          # Build APK
+          ./gradlew clean
           ./gradlew assembleDevRelease --stacktrace
-          # Build AAB (App Bundle)
-          ./gradlew bundleDevRelease --stacktrace
 
       - name: Rename APK with build number, date, and env
         run: |
           DATETIME=$(date +'%Y%m%d-%H%M')
-          APK_SRC="android/app/build/outputs/apk/dev/release/app-dev-release.apk"
-          APK_DST="android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-${DATETIME}.apk"
-          if [ -f "$APK_SRC" ]; then
-            mv "$APK_SRC" "$APK_DST"
-          else
-            echo "APK not found at $APK_SRC"
-            ls -R android/app/build/outputs/apk || true
-            exit 1
-          fi
+          mv android/app/build/outputs/apk/dev/release/app-dev-release.apk android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-${DATETIME}.apk
 
-      - name: Rename AAB with build number, date, and env
-        run: |
-          DATETIME=$(date +'%Y%m%d-%H%M')
-          # Expected AAB path for flavor 'dev' and buildType 'release'
-          AAB_SRC="android/app/build/outputs/bundle/devRelease/app-dev-release.aab"
-          AAB_DST="android/app/build/outputs/bundle/dev/release/app-develop-release-${{ github.run_number }}-${DATETIME}.aab"
-          if [ -f "$AAB_SRC" ]; then
-            mkdir -p "$(dirname "$AAB_DST")"
-            mv "$AAB_SRC" "$AAB_DST"
-          else
-            echo "AAB not found at $AAB_SRC"
-            ls -R android/app/build/outputs/bundle || true
-            exit 1
-          fi
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-develop-release-apk-${{ github.run_number }}
+          name: app-develop-release-${{ github.run_number }}
           path: android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
+      - name: Send Slack notification
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          name: app-develop-release-aab-${{ github.run_number }}
-          path: android/app/build/outputs/bundle/dev/release/app-develop-release-${{ github.run_number }}-*.aab
-          retention-days: 7
-
-      # - name: Send Slack notification
-      #   if: success()
-      #   uses: tokorom/action-slack-incoming-webhook@main
-      #   env:
-      #     INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #   with:
-      #     text: 'Android Development Build #${{ github.run_number }} Successful!'
-      #     attachments: |
-      #       [
-      #         {
-      #           "color": "good",
-      #           "author_name": "${{ github.actor }}",
-      #           "author_icon": "${{ github.event.sender.avatar_url }}",
-      #           "fields": [
-      #             {
-      #               "title": "What's New",
-      #               "value": "${{ github.event.head_commit.message }}"
-      #             },
-      #             {
-      #               "title": "Download Build (Artifacts)",
-      #               "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
-      #             }
-      #           ]
-      #         }
-      #       ]
+          text: 'Android Development Build #${{ github.run_number }} Successful!'
+          attachments: |
+            [
+              {
+                "color": "good",
+                "author_name": "${{ github.actor }}",
+                "author_icon": "${{ github.event.sender.avatar_url }}",
+                "fields": [
+                  {
+                    "title": "What's New",
+                    "value": "${{ github.event.head_commit.message }}"
+                  },
+                  {
+                    "title": "Download Build (Artifacts)",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+                  }
+                ]
+              }
+            ]
