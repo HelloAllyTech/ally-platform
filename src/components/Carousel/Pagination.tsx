@@ -10,7 +10,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   totalItems,
   currentIndex,
   style,
-  dotStyle,
+  inactiveDotStyle,
   activeDotStyle,
 }) => {
   if (totalItems <= 1) return null;
@@ -23,9 +23,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           testID={`pagination-dot-${index}`}
           style={[
             styles.dot,
-            dotStyle,
-            index === currentIndex && styles.activeDot,
-            index === currentIndex && activeDotStyle,
+            inactiveDotStyle,
+            index === currentIndex ? [styles.activeDot, activeDotStyle] : [],
           ]}
           activeOpacity={0.7}
         />
