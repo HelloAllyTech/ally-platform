@@ -21,13 +21,15 @@ Steps to reproduce the behavior:
 
 ### Expected behavior
 
-What you expected to happen.
+Describe what you expected to happen.
 
 ### Screenshots
 
 If applicable, add screenshots or recordings.
 
 ### Environment
+
+Provide the exact environment and build details to help reproduce the issue reliably.
 
 - App version/commit:
 - iOS/Android version:

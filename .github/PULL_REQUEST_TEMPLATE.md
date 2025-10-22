@@ -1,4 +1,4 @@
-This template outlines the recommended format for creating pull requests within this project. Please fill out all sections before submitting your PR
+This template outlines the recommended format for creating pull requests within this project. Please follow the given guidelines.
 
 ## Branch Naming:
 
@@ -8,9 +8,16 @@ This template outlines the recommended format for creating pull requests within 
 
 ## Commit Guidelines:
 
-- Adhere to the "scope:subject" commit message structure
-- Scope can be feat, fix, docs, test, refactor, build, format, etc.
-- Use imperative tense (e.g., "fix: User unable to login")
+- Use Conventional Commits format: `type[optional scope]: subject`
+- Allowed `type` values: `feat`, `fix`, `docs`, `chore`, `style`, `refactor`, `ci`, `test`, `revert`, `perf`, `build`
+- Subject must be in sentence case and must not end with a period
+- Write the subject in imperative mood (e.g., "Fix login redirect")
+- Examples:
+  - `feat: Add biometric login`
+  - `fix: Prevent crash when token is missing`
+  - `docs: Update setup steps`
+
+Note: Commit messages are enforced by a commit hook (`husky` → `commit-msg`) using `commitlint`.
 
 ## Pull Request Checklist:
 
@@ -21,9 +28,6 @@ This template outlines the recommended format for creating pull requests within 
 
 ## Description:
 
-- Start your pull request summary with a clear and informative heading. Use the Markdown syntax `##` for the heading, like `## Your Heading Here`.
-- For the section detailing the changes introduced by this pull request, use the Markdown heading `## Changes`.
-- Briefly describe the changes introduced in this pull request.Ensure that the changelog has been updated accordingly
 - Explain the motivation and the problem it solves
 - Mention any breaking changes
 - Link to related issues or internal tickets

@@ -194,10 +194,6 @@ Commit messages should be in sentence-case and should not end with a period.
 - `npm test`: Run tests
 - `npm run lint-staged`: Run linters on staged files
 
-## Node Version
-
-This project requires Node.js version 18 or higher.
-
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
@@ -279,27 +275,12 @@ To learn more about React Native, take a look at the following resources:
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
 
-## Environment Setup
+## Pull Request Guidelines
 
-### Environment Variables
+Before opening a PR, please review our guidelines to avoid duplication:
 
-The app uses environment variables for configuration. Create a `.env` file in the root directory based on `env/.env.example`. Required variables:
-
-```
-ENVIRONMENT=development|staging|production
-API_BASE_URL=<https-url>
-API_VERSION=v1
-ALLY_WEB_URL=<https-url>
-THIRD_PARTY_CALL_NUMBER=<string>
-MICROPHONE_SOCKET_PATH=<path>
-CLOUD_TELEPHONY_PATH=<path>
-```
-
-See `src/config/env.ts` for the authoritative list and validation.
-
-## Contributing
-
-Please read `CONTRIBUTING.md` for guidelines on how to propose changes, set up your environment, and follow our coding standards.
+- Contributing Guide: see [CONTRIBUTING.md](CONTRIBUTING.md)
+- Pull Request Template: use [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)
 
 ## Code of Conduct
 
@@ -308,7 +289,3 @@ This project adheres to a Code of Conduct. By participating, you are expected to
 ## Security
 
 If you discover a security vulnerability, please follow the steps in `SECURITY.md` and do not open a public issue with sensitive details.
-
-## License
-
-MIT © Ally Contributors. See `LICENSE` for details.
