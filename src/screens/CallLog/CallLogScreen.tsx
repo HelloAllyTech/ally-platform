@@ -84,7 +84,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const {userData, isUserLoading, checkAuth} = useUser();
+  const {userData, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();

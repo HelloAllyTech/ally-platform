@@ -1,4 +1,4 @@
-import {ms, ScaledSheet} from 'react-native-size-matters';
+import {ms} from 'react-native-size-matters';
 
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal} from '@/components';
@@ -55,10 +55,3 @@ export const CallEndConfirmationModal = ({
     />
   );
 };
-
-const styles = ScaledSheet.create({
-  illustration: {
-    width: '171.05@ms',
-    height: '154.99@ms',
-  },
-});
