@@ -1,4 +1,4 @@
-import {getErrorMessage} from '../error';
+import {getErrorDetails} from '../error';
 
 const t = jest.fn().mockImplementation(key => key);
 
@@ -6,23 +6,23 @@ jest.mock('i18next', () => ({
   t: jest.fn().mockImplementation(key => key),
 }));
 
-describe('getErrorMessage', () => {
-  it('should return the error message from a string', () => {
-    expect(getErrorMessage('Error occurred')).toBe('Error occurred');
+describe('getErrorDetails', () => {
+  it('returns message for string input', () => {
+    expect(getErrorDetails('Error occurred').message).toBe('Error occurred');
   });
 
-  it('should return the message from an ApiError object', () => {
+  it('returns message from ApiError.message', () => {
     const error = {data: {message: 'API error message'}};
-    expect(getErrorMessage(error)).toBe('API error message');
+    expect(getErrorDetails(error).message).toBe('API error message');
   });
 
-  it('should return the error from an ApiError object', () => {
+  it('returns message from ApiError.error', () => {
     const error = {data: {error: 'API error'}};
-    expect(getErrorMessage(error)).toBe('API error');
+    expect(getErrorDetails(error).message).toBe('API error');
   });
 
-  it('should return a default message if no message or error is present', () => {
+  it('returns default message if none present', () => {
     const error = {};
-    expect(getErrorMessage(error)).toBe('Common.somethingWentWrong');
+    expect(getErrorDetails(error).message).toBe('Common.somethingWentWrong');
   });
 });
