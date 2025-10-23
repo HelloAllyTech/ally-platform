@@ -6,6 +6,20 @@ from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
 from app.core.events.registry import get_event_class
 
+class VoiceConfig(BaseModel):
+    model: Optional[str] = Field(default=None)
+    voice_id: Optional[str] = Field(default=None)
+
+    speaker: Optional[str] = Field(default=None)
+
+
+
+class ScenarioVoice(BaseModel):
+    name: str = Field(alias="name")
+    provider : str = Field(alias="provider")
+    config : VoiceConfig = Field(alias="config")
+
+
 
 class Scenario(BaseModel):
     """
@@ -19,6 +33,7 @@ class Scenario(BaseModel):
     life_history: Optional[str] = Field(default=None, alias="lifeHistory")
     events: List[BaseEvent] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    voice: ScenarioVoice = Field(default_factory=ScenarioVoice)
 
     model_config = {
         "populate_by_name": True,     # allow both alias and field name on input
@@ -41,6 +56,8 @@ class Scenario(BaseModel):
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
         built_events = cls._build_events(raw)
+        # Build voice from metadata (if present)
+        voice_obj = cls._build_voice(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
@@ -49,6 +66,7 @@ class Scenario(BaseModel):
             lifeHistory=normalized.get("lifeHistory"),
             metadata=normalized.get("metadata", {}),
             events=built_events,
+            voice=voice_obj
         )
 
     # ---------------------------
@@ -69,7 +87,7 @@ class Scenario(BaseModel):
             "learningObjective": raw.get("description") or "",
             "prompt": raw.get("prompt") or "",
             "lifeHistory": raw.get("lifeHistory") or raw.get("life_history"),
-            "metadata": raw.get("metadata", {}),
+            "metadata": raw.get("metadata", {})
         }
 
     @staticmethod
@@ -96,3 +114,25 @@ class Scenario(BaseModel):
             instances.append(ev_cls(**kwargs))
 
         return instances
+
+    @staticmethod
+    def _build_voice(raw: Mapping[str, Any]) -> Optional[ScenarioVoice]:
+        """Extract voice config from scenario-level `voice` key."""
+        voice_meta = raw.get("voice")
+        if not voice_meta:
+            return None
+
+        config_meta = voice_meta.get("config", {}) or {}
+
+        voice_config = VoiceConfig(
+            model=config_meta.get("model"),
+            voice_id=config_meta.get("voice_id"),
+            speaker=config_meta.get("speaker"),
+        )
+
+        return ScenarioVoice(
+            name=voice_meta.get("name", ""),
+            provider=voice_meta.get("provider", ""),
+            config=voice_config,
+        )
+
