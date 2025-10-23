@@ -57,7 +57,7 @@ jest.mock('@/hooks', () => ({
 jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) =>
     sel({
-      user: { permissions: ['CALLS', 'START'] },
+      user: { permissions: ['view:call:logs', 'view:scenario-session', 'start:microphone-chat', 'start:cloud-telephony-chat'] },
       chat: { currentChat: null },
       summary: { visibleFields: [] },
     }),
@@ -90,10 +90,35 @@ jest.mock('@/screens/CallLog/components', () => ({
 }));
 
 // Permissions
-jest.mock('react-native-permissions', () => ({ check: jest.fn().mockResolvedValue('granted'), request: jest.fn().mockResolvedValue('granted'), RESULTS: { GRANTED: 'granted', BLOCKED: 'blocked' } }));
+jest.mock('react-native-permissions', () => ({ 
+  check: jest.fn().mockResolvedValue('granted'), 
+  request: jest.fn().mockResolvedValue('granted'), 
+  RESULTS: { GRANTED: 'granted', BLOCKED: 'blocked' },
+  PERMISSIONS: {
+    IOS: { MICROPHONE: 'ios.permission.MICROPHONE' },
+    ANDROID: { RECORD_AUDIO: 'android.permission.RECORD_AUDIO' }
+  }
+}));
 
 // Linking
 jest.mock('react-native/Libraries/Linking/Linking', () => ({ openURL: jest.fn() }));
+
+// Constants
+jest.mock('@/constants', () => ({
+  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
+  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
+  SCREEN_NAMES: { LISTENING: 'Listening' },
+  CHAT_TYPES: { 
+    EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
+    MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
+  },
+  USER_PERMISSIONS: {
+    VIEW_CALL_LOGS: 'view:call:logs',
+    VIEW_SCENARIO_SESSION: 'view:scenario-session',
+    START_MICROPHONE_CHAT: 'start:microphone-chat',
+    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
+  },
+}));
 
 describe('CallLogScreen', () => {
   it('renders empty state when no logs', () => {

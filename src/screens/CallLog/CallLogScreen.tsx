@@ -21,6 +21,7 @@ import {
   LogType,
   MICROPHONE_PERMISSION,
   SCREEN_NAMES,
+  START_CALL_PERMISSIONS,
   USER_PERMISSIONS,
 } from '@/constants';
 import {
@@ -123,8 +124,8 @@ export const CallLogScreen: React.FC = () => {
     }
   }, [getSummaryFields, visibleFieldsState?.length]);
 
-  const canStartCall = permissions?.includes(
-    USER_PERMISSIONS.VIEW_START_CALL_PAGE,
+  const canStartCall = START_CALL_PERMISSIONS.some(permission =>
+    permissions?.includes(permission),
   );
 
   useEffect(() => {

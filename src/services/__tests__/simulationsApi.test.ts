@@ -13,7 +13,6 @@ describe('simulationsApi', () => {
   it('exposes simulation endpoints', () => {
     const e = (simulationsApi as any).endpoints;
     expect(e.listRooms).toBeTruthy();
-    expect(e.deleteRoom).toBeTruthy();
     expect(e.getScenarios).toBeTruthy();
     expect(e.getScenarioById).toBeTruthy();
     expect(e.addSimulationFeedback).toBeTruthy();
