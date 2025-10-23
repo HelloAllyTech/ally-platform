@@ -3337,6 +3337,24 @@ testingfree = ["huggingface-hub (>=0.12.1)", "hypothesis (>=6.70.2)", "pytest (>
 torch = ["safetensors[numpy]", "torch (>=1.10)"]
 
 [[package]]
+name = "sarvamai"
+version = "0.1.21"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "sarvamai-0.1.21-py3-none-any.whl", hash = "sha256:daa4e5d16635fe434f5f270cee416849249285369141d77132a17f0bf670f120"},
+    {file = "sarvamai-0.1.21.tar.gz", hash = "sha256:865065635b2b99d40f5519308832954015627938e06a6333b5f62ae9c36278bb"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.2"
+pydantic = ">=1.9.2"
+pydantic-core = ">=2.18.2"
+typing_extensions = ">=4.0.0"
+websockets = ">=12.0"
+
+[[package]]
 name = "six"
 version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -4361,4 +4379,4 @@ cffi = ["cffi (>=1.17,<2.0)", "cffi (>=2.0.0b)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "99e2402c427923f7fd0d3900eb19dcb2dfc754c217e87d3d8a5b66eeae83f446"
+content-hash = "26efcc2ffe590058e9cdb1c1922af38cbde6e481edf0b596bf8b8505b2a71a4e"

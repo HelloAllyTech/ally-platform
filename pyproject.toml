@@ -33,6 +33,7 @@ livekit-plugins-openai = "~1.2"
 livekit-plugins-deepgram = "~1.2"
 livekit-plugins-silero = "~1.2"
 livekit-plugins-elevenlabs = "^1.2.9"
+sarvamai = "^0.1.21"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
