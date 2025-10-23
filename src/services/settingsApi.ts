@@ -17,7 +17,6 @@ export const settingsApi = api.injectEndpoints({
 });
 
 export const {
-  useGetSummaryFieldsQuery,
   useLazyGetSummaryFieldsQuery,
   useGetNudgeStatusQuery,
   useLazyGetVisibleChatTypesQuery,
