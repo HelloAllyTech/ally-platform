@@ -13,3 +13,11 @@ async def health():
     Health check endpoint.
     """
     return {"status": "ok"}
+
+@app.get("/api/v1/health")
+async def health():
+    """
+    Health check endpoint.
+    DEPRECATED - Will remove in future
+    """
+    return {"status": "ok"}

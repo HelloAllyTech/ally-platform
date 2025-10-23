@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e  # Exit on any error
 
-echo "Running database migrations..."
-poetry run alembic upgrade head
-
 echo "Starting application services..."
 
 # Start uvicorn in background
