@@ -610,6 +610,24 @@ humanfriendly = ">=9.1"
 cron = ["capturer (>=2.4)"]
 
 [[package]]
+name = "deepgram-sdk"
+version = "5.2.0"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "deepgram_sdk-5.2.0-py3-none-any.whl", hash = "sha256:077e81fafff1b9e954f792ee71c46381504f9c7805fb54d4a4e2ccbc752dfc93"},
+    {file = "deepgram_sdk-5.2.0.tar.gz", hash = "sha256:14941667d68454fc66c3a0c109ca58d2f0eb626697e509946f84851966b61a77"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.2"
+pydantic = ">=1.9.2"
+pydantic-core = ">=2.18.2"
+typing_extensions = ">=4.0.0"
+websockets = ">=12.0"
+
+[[package]]
 name = "distro"
 version = "1.9.0"
 description = "Distro - an OS platform information API"
@@ -673,6 +691,28 @@ six = ">=1.9.0"
 [package.extras]
 gmpy = ["gmpy"]
 gmpy2 = ["gmpy2"]
+
+[[package]]
+name = "elevenlabs"
+version = "2.20.0"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "elevenlabs-2.20.0-py3-none-any.whl", hash = "sha256:a14ee682e71ddf1d0d99796e031fff9d6f148fd1d450062adaea7d9d96a36857"},
+    {file = "elevenlabs-2.20.0.tar.gz", hash = "sha256:0369d26b9ac6ae15efd1c08423edc516aaddda1f5620b4c64ed7692e9c85f809"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.2"
+pydantic = ">=1.9.2"
+pydantic-core = ">=2.18.2"
+requests = ">=2.20"
+typing_extensions = ">=4.0.0"
+websockets = ">=11.0"
+
+[package.extras]
+pyaudio = ["pyaudio (>=0.2.14)"]
 
 [[package]]
 name = "email-validator"
@@ -4379,4 +4419,4 @@ cffi = ["cffi (>=1.17,<2.0)", "cffi (>=2.0.0b)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "26efcc2ffe590058e9cdb1c1922af38cbde6e481edf0b596bf8b8505b2a71a4e"
+content-hash = "3fd743bfc098952088c1cedb661bf2baf290f23464ccb111d257f5b0cf258c0d"

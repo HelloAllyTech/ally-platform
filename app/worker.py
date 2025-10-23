@@ -81,7 +81,7 @@ def get_provider_tts(provider: str, config):
             model=config.model,
             api_key=settings.ELEVEN_API_KEY,
         )
-        if not validate_elevenlabs_voice(config.model, settings.ELEVEN_API_KEY, config.model):
+        if not validate_elevenlabs_voice(config.voice_id):
             raise ValueError("Invalid ElevenLabs voice configuration")
         return tts
 
@@ -92,7 +92,7 @@ def get_provider_tts(provider: str, config):
             sample_rate=24000,
             api_key=settings.DEEPGRAM_API_KEY,
         )
-        if not validate_deepgram_voice(config.model, settings.DEEPGRAM_API_KEY):
+        if not validate_deepgram_voice(config.model):
             raise ValueError("Invalid Deepgram voice configuration")
         return tts
 
@@ -102,7 +102,7 @@ def get_provider_tts(provider: str, config):
             speaker=config.speaker,
             api_key=settings.SARVAM_API_KEY,
         )
-        if not validate_sarvam_voice(config.speaker, settings.SARVAM_API_KEY):
+        if not validate_sarvam_voice(config.speaker):
             raise ValueError("Invalid Sarvam voice configuration")
         return tts
 

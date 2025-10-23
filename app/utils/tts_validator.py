@@ -1,11 +1,17 @@
-import requests
-import logging
 import base64
+import logging
+from typing import Optional
+
+from deepgram import DeepgramClient
+from deepgram.core import ApiError as DeepgramApiError
+from elevenlabs import ElevenLabs
+from elevenlabs.core import ApiError as ElevenLabsApiError
+from sarvamai import SarvamAI
+from sarvamai.core import ApiError as SarvamaiApiError
+
 from app.core.constants import TTSProvider
 from app.core.config import settings
-from sarvamai import SarvamAI
 
-# Configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -18,37 +24,45 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 
-def validate_deepgram_voice(model: str, api_key: str) -> bool:
-    """Validate Deepgram TTS by generating a short audio sample."""
-    url = "https://api.deepgram.com/v1/speak"
-    params = {"model": model}
-    headers = {
-        "Authorization": f"Token {api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {"text": "Hello from Deepgram!"}
-
+def validate_deepgram_voice(model: str) -> bool:
+    """Validate Deepgram TTS model using SDK by generating a short audio sample."""
     logger.info(f"Validating Deepgram voice model='{model}'")
 
     try:
-        response = requests.post(url, json=payload, headers=headers, params=params, timeout=10)
-        logger.info(f"Deepgram response status: {response.status_code}")
+        client = DeepgramClient(api_key=settings.DEEPGRAM_API_KEY)
+        test_text = "Test"
 
-        if response.status_code == 200:
+        # Deepgram returns a generator yielding audio chunks
+        audio_stream = client.speak.v1.audio.generate(
+            text=test_text,
+            model=model,
+            encoding="linear16",
+            sample_rate=16000,
+        )
+
+        audio_bytes = b"".join(chunk for chunk in audio_stream)
+
+        if audio_bytes:
+            logger.info(f"Deepgram voice validation succeeded. Generated {len(audio_bytes)} bytes.")
             return True
-        else:
-            logger.warning(f"Deepgram validation failed | Status: {response.status_code} | Response: {response.text}")
-            return False
 
+        logger.warning("Deepgram voice validation failed: No audio data generated.")
+        return False
+
+    except DeepgramApiError as api_err:
+        logger.warning(f"Deepgram validation failed | API error: {api_err}")
+        return False
     except Exception as e:
         logger.exception(f"Deepgram validation error: {e}")
         return False
 
 
-def validate_sarvam_voice(speaker: str, api_key: str) -> bool:
-    """Validate a Sarvam TTS voice using the official SDK."""
+def validate_sarvam_voice(speaker: str) -> bool:
+    """Validate Sarvam TTS speaker by generating a short audio sample."""
+    logger.info(f"Validating Sarvam voice speaker='{speaker}'")
+
     try:
-        client = SarvamAI(api_subscription_key=api_key)
+        client = SarvamAI(api_subscription_key=settings.SARVAM_API_KEY)
         response = client.text_to_speech.convert(
             target_language_code="en-IN",
             text="Hello from Sarvam AI!",
@@ -56,64 +70,67 @@ def validate_sarvam_voice(speaker: str, api_key: str) -> bool:
             speaker=speaker,
         )
 
-        if hasattr(response, "audios") and response.audios:
-            audio_b64 = response.audios[0]
-            try:
-                base64.b64decode(audio_b64)
-                logger.info("Sarvam TTS validation passed")
-                return True
-            except Exception:
-                logger.warning("Invalid audio data in Sarvam response")
-                return False
+        if not getattr(response, "audios", None):
+            logger.warning("Sarvam validation failed | No audio found in response")
+            return False
 
-        logger.warning("Sarvam validation failed | No audio found in response")
+        try:
+            base64.b64decode(response.audios[0])
+            logger.info("Sarvam TTS validation passed")
+            return True
+        except Exception:
+            logger.warning("Sarvam validation failed | Invalid audio data")
+            return False
+
+    except SarvamaiApiError as api_err:
+        logger.warning(f"Sarvam validation failed | API error: {api_err}")
         return False
-
     except Exception as e:
-        logger.warning(f"Sarvam TTS check failed: {e}")
+        logger.exception(f"Sarvam TTS validation error: {e}")
         return False
 
 
-def validate_elevenlabs_voice(voice_id: str, api_key: str, model: str) -> bool:
-    """Validate ElevenLabs voice by checking voice existence."""
-    url = f"https://api.elevenlabs.io/v1/voices/{voice_id}"
-    headers = {"xi-api-key": api_key}
+def validate_elevenlabs_voice(voice_id: str) -> bool:
+    """
+    Validate an ElevenLabs voice by fetching metadata using the SDK.
+    model parameter included for interface consistency.
+    """
     logger.info(f"Validating ElevenLabs voice voice_id='{voice_id}'")
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        logger.info(f"ElevenLabs response status: {response.status_code}")
+        client = ElevenLabs(api_key=settings.ELEVEN_API_KEY)
+        voice = client.voices.get(voice_id=voice_id)
 
-        if response.status_code == 200:
+        if voice and getattr(voice, "voice_id", None) == voice_id:
             logger.info("ElevenLabs voice validation successful")
             return True
-        else:
-            logger.warning(f"ElevenLabs validation failed | Status: {response.status_code} | Response: {response.text}")
-            return False
 
+        logger.warning(f"ElevenLabs validation failed | Unexpected response: {voice!r}")
+        return False
+
+    except ElevenLabsApiError as api_err:
+        logger.warning(f"ElevenLabs validation failed | API error: {api_err}")
+        return False
     except Exception as e:
         logger.exception(f"ElevenLabs validation error: {e}")
         return False
 
 
 def validate_current_voice() -> bool:
-    """Main entry to validate the active TTS provider voice."""
+    """Validate the currently configured TTS provider and voice."""
     provider = settings.TTS_PROVIDER
     logger.info(f"Starting voice validation for provider='{provider}'")
 
     try:
         if provider == TTSProvider.DEEPGRAM:
-            result = validate_deepgram_voice(settings.VOICE_ID, settings.DEEPGRAM_API_KEY)
+            return validate_deepgram_voice(settings.VOICE_ID)
         elif provider == TTSProvider.SARVAM:
-            result = validate_sarvam_voice(settings.VOICE_ID, settings.SARVAM_API_KEY)
+            return validate_sarvam_voice(settings.VOICE_ID)
         elif provider == TTSProvider.ELEVENLABS:
-            result = validate_elevenlabs_voice(settings.VOICE_ID, settings.ELEVEN_API_KEY)
+            return validate_elevenlabs_voice(settings.VOICE_ID)
         else:
             logger.error(f"Unsupported TTS provider: {provider}")
             return False
-
-        logger.info(f"Validation result for {provider}: {result}")
-        return result
 
     except Exception as e:
         logger.exception(f"Unexpected error during voice validation: {e}")
