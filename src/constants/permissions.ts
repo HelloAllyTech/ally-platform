@@ -2,7 +2,7 @@ import {Platform} from 'react-native';
 import {PERMISSIONS} from 'react-native-permissions';
 
 export enum USER_PERMISSIONS {
-  VIEW_CALL_LOGS = 'view:calls:logs',
+  VIEW_CALL_LOGS = 'view:call:logs',
   VIEW_NAVBAR_CALENDAR = 'view:navbar:calendar',
   VIEW_NAVBAR_LEARN = 'view:navbar:learn',
   VIEW_NAVBAR_STRESS_BUSTER = 'view:navbar:stress-buster',
