@@ -4,7 +4,6 @@ import {
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
-  RoomDeletionResponse,
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
@@ -19,13 +18,6 @@ export const simulationsApi = api.injectEndpoints({
       query: () => ({
         url: API_ROUTES.LEARN.ROOMS,
         method: API_METHODS.GET,
-      }),
-    }),
-
-    deleteRoom: builder.mutation<RoomDeletionResponse, string>({
-      query: roomId => ({
-        url: API_ROUTES.LEARN.ROOM_BY_ID.replace(':roomId', String(roomId)),
-        method: API_METHODS.DELETE,
       }),
     }),
 
