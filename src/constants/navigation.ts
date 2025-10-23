@@ -1,6 +1,7 @@
 export const SCREEN_NAMES = {
   // Root Stack Screens
   SPLASH: 'Splash',
+  SUSPENDED_ACCOUNT: 'SuspendedAccount',
   HOME: 'Home',
   LISTENING: 'Listening',
   CALL_SUMMARY: 'CallSummary',

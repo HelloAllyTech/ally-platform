@@ -251,9 +251,8 @@ const styles = ScaledSheet.create({
     marginTop: ms(16),
   },
   emptyStateContainer: {
-    height: '90%',
-    flexGrow: 1,
+    flex: 1,
+    justifyContent: 'center',
     marginHorizontal: '24@s',
-    marginTop: '24@s',
   },
 });

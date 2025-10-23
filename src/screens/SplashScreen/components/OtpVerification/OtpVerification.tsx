@@ -3,8 +3,8 @@ import {Alert, Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
-import {ALLOWED_ROLES, isIOS} from '@/constants';
-import {useTranslate} from '@/hooks';
+import {ALLOWED_ROLES, isIOS, SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useTranslate} from '@/hooks';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
@@ -26,6 +26,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   const [isResendDisabled, setIsResendDisabled] = useState(true);
   const otpInputRef = useRef<OtpInputRef>(null);
   const dispatch = useAppDispatch();
+  const navigation = useAppNavigation();
 
   const [
     verifyOtp,
@@ -62,9 +63,20 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   useEffect(() => {
     if (isError && apiError) {
-      setError(getErrorDetails(apiError).message);
+      const errorDetails = getErrorDetails(apiError);
+
+      // Check if user is suspended
+      if (
+        errorDetails.status === 403 &&
+        errorDetails.message === 'User suspended'
+      ) {
+        navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
+        return;
+      }
+
+      setError(errorDetails.message);
     }
-  }, [isError, apiError]);
+  }, [isError, apiError, navigation]);
 
   const handleOtpChange = useCallback((newValue: string[]) => {
     setOtpValue(newValue);

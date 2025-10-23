@@ -464,6 +464,7 @@ export const CallLogScreen: React.FC = () => {
               ? t('CallLogs.noCallLogsDescription')
               : t('CallLogs.noSimulationLogsDescription')
           }
+          containerStyle={styles.emptyStateContainer}
         />
       ) : (
         <View style={styles.listContainer}>
@@ -559,5 +560,10 @@ const styles = ScaledSheet.create({
   },
   bgAshGray: {
     backgroundColor: colors.ashGray,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
