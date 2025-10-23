@@ -41,7 +41,10 @@ jest.mock('@/services', () => ({
 
 jest.mock('@/store/hooks', () => ({useAppDispatch: () => jest.fn()}));
 jest.mock('@/store/slices/userSlice', () => ({storeTokens: (p: any) => ({type: 'store', payload: p})}));
-jest.mock('@/hooks', () => ({useTranslate: () => ({t: (k: string) => k})}));
+jest.mock('@/hooks', () => ({
+  useTranslate: () => ({t: (k: string) => k}),
+  useAppNavigation: () => ({replace: jest.fn()})
+}));
 
 describe('OtpVerification behavior', () => {
   beforeEach(() => {

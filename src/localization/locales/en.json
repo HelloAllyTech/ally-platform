@@ -107,6 +107,11 @@
     "focused": "Focused",
     "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call."
   },
+  "SuspendedAccount": {
+    "title": "Account Suspended",
+    "description": "Your account has been suspended. Contact your administrator for assistance",
+    "goToLogin": "Go to login"
+  },
   "SplashScreen": {
     "hey": "Hey,",
     "welcome": "Welcome to",

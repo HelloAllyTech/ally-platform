@@ -24,6 +24,7 @@ import {
   SimulationFeedbackScreen,
   SimulationsScreen,
   SplashScreen,
+  SuspendedAccountScreen,
 } from '@/screens';
 import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
@@ -238,7 +239,13 @@ const NavigationContent = ({
           />
         </>
       ) : (
-        <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
+        <>
+          <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
+          <Stack.Screen
+            name={SCREEN_NAMES.SUSPENDED_ACCOUNT}
+            component={SuspendedAccountScreen}
+          />
+        </>
       )}
     </Stack.Navigator>
   );

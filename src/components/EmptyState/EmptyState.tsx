@@ -31,10 +31,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: '100@ms',
   },
   icon: {
     marginBottom: '28@ms',
@@ -52,6 +49,5 @@ const styles = ScaledSheet.create({
     color: colors.darkGray2,
     textAlign: 'center',
     marginTop: '16@vs',
-    marginBottom: '30@vs',
   },
 });
