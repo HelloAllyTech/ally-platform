@@ -236,7 +236,9 @@
     },
     "sessionAnalytics": "Session analytics",
     "simulationAnalytics": "Simulation analytics",
-    "failedToLoadAnalytics": "Failed to load analytics"
+    "failedToLoadAnalytics": "Failed to load analytics",
+    "noAnalyticsData": "Analytics not available",
+    "noAnalyticsDescription": "Looks like we don’t have analytics to show right now. Once data becomes available, it’ll appear here automatically."
   },
   "SearchScreen": {
     "header": {

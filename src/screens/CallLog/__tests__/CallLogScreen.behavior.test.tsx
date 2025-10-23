@@ -19,6 +19,7 @@ jest.mock('@/components', () => {
   const RN = require('react-native');
   return {
     CallLogSkeleton: () => null,
+    EmptyState: ({title}: {title: string}) => React.createElement(RN.Text, {}, title),
     TabView: ({onTabChange}: any) =>
       React.createElement(
         RN.TouchableOpacity,

@@ -20,9 +20,16 @@ jest.mock('@/assets/icons', () => ({
 }));
 
 // Mock components barrel to avoid importing NetworkLogs
-jest.mock('@/components', () => ({
-  CallLogSkeleton: () => null,
-}));
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {Text} = require('react-native');
+  
+  return {
+    CallLogSkeleton: () => null,
+    EmptyState: ({title}: {title: string}) => React.createElement(Text, {}, title),
+    TabView: () => null,
+  };
+});
 
 // Config
 jest.mock('@/config/env', () => ({ env: { ALLY_WEB_URL: 'https://example.com', THIRD_PARTY_CALL_NUMBER: '123' } }));

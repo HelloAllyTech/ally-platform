@@ -41,9 +41,15 @@ jest.mock('@/assets/icons', () => ({
 }));
 
 // Mock components barrel
-jest.mock('@/components', () => ({
-  CallLogSkeleton: () => null,
-}));
+jest.mock('@/components', () => {
+  const React = require('react');
+  const RN = require('react-native');
+  return {
+    CallLogSkeleton: () => null,
+    EmptyState: ({title}: {title: string}) => React.createElement(RN.Text, {}, title),
+    TabView: () => null,
+  };
+});
 
 // Config
 jest.mock('@/config/env', () => ({

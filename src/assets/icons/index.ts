@@ -22,6 +22,7 @@ import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
 import ContractIcon from './contract.svg';
 import DatabaseIcon from './database.svg';
+import DataUnavailableIcon from './dataUnavailable.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
@@ -192,4 +193,5 @@ export {
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
+  DataUnavailableIcon,
 };
