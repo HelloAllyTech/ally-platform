@@ -1,26 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:17.4
-    container_name: ally_learn_postgres
-    environment:
-      POSTGRES_DB: ally_learn_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_HOST_AUTH_METHOD: trust
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d ally_learn_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   localstack:
     image: localstack/localstack:3.0
     container_name: ally_learn_localstack
@@ -55,7 +35,5 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
-    driver: local
   localstack_data:
     driver: local
