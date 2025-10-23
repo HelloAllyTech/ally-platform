@@ -69,9 +69,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
-    MODEL : Optional[str] = Field(...)
-    VOICE_ID: Optional[str] = Field(...)
-    SPEAKER: Optional[str] = Field(...)
+    MODEL : Optional[str] = Field(None)
+    VOICE_ID: Optional[str] = Field(None)
+    SPEAKER: Optional[str] = Field(None)
 
     TTS_PROVIDER: TTSProvider= Field(
         default=TTSProvider.DEEPGRAM,
