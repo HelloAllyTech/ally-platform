@@ -10,27 +10,17 @@ interface ApiError {
 
 export const getErrorDetails = (
   error: unknown,
-): {message: string; status?: number} => {
-  if (typeof error === 'string')
-    return {
-      message: error,
-    };
+): {message: string; status?: number; error?: string} => {
+  if (typeof error === 'string') {
+    return {message: error};
+  }
 
-  const apiError = error as ApiError;
-  if (apiError.data?.message)
-    return {
-      message: apiError.data.message,
-      status: apiError.status,
-    };
-  if (apiError.data?.error)
-    return {
-      message: apiError.data.error,
-      status: apiError.status,
-    };
+  const apiError = (error ?? {}) as Partial<ApiError>;
+  const {data, status} = apiError;
+  const message =
+    data?.message || data?.error || t('Common.somethingWentWrong');
 
-  return {
-    message: t('Common.somethingWentWrong'),
-  };
+  return {message, status, error: data?.error};
 };
 
 export const getErrorMessage = (error: unknown): string => {

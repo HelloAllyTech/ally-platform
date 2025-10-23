@@ -3,7 +3,7 @@ import {Alert, Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
-import {ALLOWED_ROLES, isIOS, SCREEN_NAMES} from '@/constants';
+import {ALLOWED_ROLES, ErrorCode, isIOS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
@@ -68,7 +68,8 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
       // Check if user is suspended
       if (
         errorDetails.status === 403 &&
-        errorDetails.message === 'User suspended'
+        (errorDetails.error === ErrorCode.USER_SUSPENDED ||
+          errorDetails.message === 'User suspended')
       ) {
         navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
         return;
