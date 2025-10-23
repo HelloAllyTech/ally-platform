@@ -6,7 +6,6 @@ import {
   BackHandler,
   FlatList,
   Linking,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,7 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton, TabView} from '@/components';
+import {CallLogSkeleton, EmptyState, TabView} from '@/components';
 import {env} from '@/config/env';
 import {
   CHAT_TYPES,
@@ -44,7 +43,7 @@ import {
   setSummaryVisibleFields,
 } from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
-import {colors, fontFamily} from '@/theme';
+import {colors} from '@/theme';
 import {Chat} from '@/types';
 import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
@@ -453,23 +452,19 @@ export const CallLogScreen: React.FC = () => {
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />
       ) : currentLogs.length === 0 && !isFetching ? (
-        <View style={styles.emptyContainer}>
-          <NoCallLogsIcon
-            style={styles.noCallLogsIcon}
-            width={160}
-            height={130}
-          />
-          <Text style={styles.emptyText}>
-            {activeTab === LogType.REAL
+        <EmptyState
+          icon={NoCallLogsIcon}
+          title={
+            activeTab === LogType.REAL
               ? t('CallLogs.noCallLogs')
-              : t('CallLogs.noSimulationLogs')}
-          </Text>
-          <Text style={styles.emptyDescription}>
-            {activeTab === LogType.REAL
+              : t('CallLogs.noSimulationLogs')
+          }
+          description={
+            activeTab === LogType.REAL
               ? t('CallLogs.noCallLogsDescription')
-              : t('CallLogs.noSimulationLogsDescription')}
-          </Text>
-        </View>
+              : t('CallLogs.noSimulationLogsDescription')
+          }
+        />
       ) : (
         <View style={styles.listContainer}>
           <FlatList
@@ -547,30 +542,6 @@ const styles = ScaledSheet.create({
     paddingVertical: '16@ms',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  emptyText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '20@ms',
-    lineHeight: '24@ms',
-    color: colors.darkGray2,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: '100@ms',
-  },
-  noCallLogsIcon: {
-    marginBottom: '28@ms',
-  },
-  emptyDescription: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '24@ms',
-    color: colors.darkGray2,
-    textAlign: 'center',
-    marginTop: '16@vs',
-    marginBottom: '30@vs',
   },
   fab: {
     position: 'absolute',
