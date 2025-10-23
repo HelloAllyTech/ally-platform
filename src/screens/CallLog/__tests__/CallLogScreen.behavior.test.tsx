@@ -54,7 +54,7 @@ jest.mock('@/hooks', () => ({
 }));
 
 // Store
-let mockPermissions: string[] = ['CALLS', 'START'];
+let mockPermissions: string[] = ['view:call:logs', 'view:scenario-session', 'start:microphone-chat', 'start:cloud-telephony-chat'];
 jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) =>
     sel({
@@ -102,11 +102,32 @@ jest.mock('@/utils/common', () => ({isAppFeatureEnabled: () => mockIsAppFeatureE
 jest.mock('react-native/Libraries/Linking/Linking', () => ({openURL: jest.fn()}));
 jest.mock('@/utils/logger', () => ({logger: {error: jest.fn()}}));
 
+// Constants
+jest.mock('@/constants', () => ({
+  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
+  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
+  SCREEN_NAMES: { LISTENING: 'Listening' },
+  CHAT_TYPES: { 
+    EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
+    MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
+  },
+  USER_PERMISSIONS: {
+    VIEW_CALL_LOGS: 'view:call:logs',
+    VIEW_SCENARIO_SESSION: 'view:scenario-session',
+    START_MICROPHONE_CHAT: 'start:microphone-chat',
+    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
+  },
+}));
+
 // Permissions (overridden per test)
 jest.mock('react-native-permissions', () => ({
   check: jest.fn().mockResolvedValue('granted'),
   request: jest.fn().mockResolvedValue('granted'),
   RESULTS: {GRANTED: 'granted', BLOCKED: 'blocked'},
+  PERMISSIONS: {
+    IOS: { MICROPHONE: 'ios.permission.MICROPHONE' },
+    ANDROID: { RECORD_AUDIO: 'android.permission.RECORD_AUDIO' }
+  }
 }));
 
 // Child components with an actionable StartSessionModal (local components)
@@ -226,8 +247,8 @@ describe('CallLogScreen behaviors', () => {
   });
 
   it('shows simulation empty state after switching to simulation tab', async () => {
-    mockPermissions = ['CALLS', 'START', 'SIM'];
-    mockVisibleChatTypes = ['MIC', 'EXOTEL'];
+    mockPermissions = ['view:call:logs', 'view:scenario-session', 'start:microphone-chat', 'start:cloud-telephony-chat'];
+    mockVisibleChatTypes = ['MICROPHONE_CHAT', 'EXOTEL_CONFERENCE_CHAT'];
     const {getByTestId, getByText} = render(<CallLogScreen />);
     await act(async () => {
       fireEvent.press(getByTestId('to-simulation'));

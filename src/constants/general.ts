@@ -7,6 +7,8 @@ import {CarouselConfig} from '@/components/Carousel/types';
 import {colors, fontFamily} from '@/theme';
 import {UserRole} from '@/types';
 
+import {USER_PERMISSIONS} from './permissions';
+
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 export const MINUTES_IN_MS = 60 * 1000;
 export const SECONDS_IN_MS = 1000;
@@ -205,3 +207,8 @@ export enum KeyCode {
   Enter = 'Enter',
   Return = 'Return',
 }
+
+export const START_CALL_PERMISSIONS = [
+  USER_PERMISSIONS.START_MICROPHONE_CHAT,
+  USER_PERMISSIONS.START_CLOUD_TELEPHONY_CHAT,
+];
