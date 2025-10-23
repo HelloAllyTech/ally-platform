@@ -1,5 +1,5 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
-import {User} from '@/types';
+import {User, UserRole} from '@/types';
 
 import {api} from './api';
 
@@ -10,27 +10,29 @@ export interface AuthResponse {
 
 export interface GenerateOtpRequest {
   email: string;
+  allowedRoles: UserRole[];
 }
 
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
+  allowedRoles: UserRole[];
 }
 
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<{success: boolean}, GenerateOtpRequest>({
-      query: ({email}) => ({
+      query: ({email, allowedRoles}) => ({
         url: API_ROUTES.AUTH.GENERATE_OTP,
         method: API_METHODS.POST,
-        body: {email},
+        body: {email, allowedRoles},
       }),
     }),
     verifyOtp: builder.mutation<AuthResponse, VerifyOtpRequest>({
-      query: ({email, otp}) => ({
+      query: ({email, otp, allowedRoles}) => ({
         url: API_ROUTES.AUTH.VERIFY_OTP,
         method: API_METHODS.POST,
-        body: {email, otp},
+        body: {email, otp, allowedRoles},
       }),
     }),
     getUser: builder.query<User, void>({

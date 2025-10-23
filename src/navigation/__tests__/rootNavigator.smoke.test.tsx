@@ -16,6 +16,11 @@ jest.mock('@/services/api', () => {
   return {api};
 });
 
+// Mock settingsApi specifically for useLazyGetSummaryFieldsQuery
+jest.mock('@/services/settingsApi', () => ({
+  useLazyGetSummaryFieldsQuery: () => [jest.fn(), {data: ['field1'], isLoading: false}],
+}));
+
 // Mock store to prevent configureStore side effects in tests importing navigators
 jest.mock('@/store/store', () => ({
   store: {dispatch: jest.fn(), getState: jest.fn()},

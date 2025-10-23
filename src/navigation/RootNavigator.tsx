@@ -25,7 +25,7 @@ import {
   SimulationsScreen,
   SplashScreen,
 } from '@/screens';
-import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {SocketEvent, UserRole} from '@/types';
@@ -50,8 +50,17 @@ const NavigationContent = ({
   const {userData, isAuthenticated} = useUser();
   const pendingItemIdRef = useRef<number | undefined>(undefined);
   const deepLinkInProgressRef = useRef<boolean>(false);
-  const {data: summaryFields, isLoading: summaryFieldsLoading} =
-    useGetSummaryFieldsQuery();
+  const [
+    getSummaryFields,
+    {data: summaryFields, isLoading: summaryFieldsLoading},
+  ] = useLazyGetSummaryFieldsQuery();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      getSummaryFields();
+    }
+  }, [isAuthenticated, getSummaryFields]);
+
   const dispatch = useAppDispatch();
 
   const isDeepLinkInProgress = useMemo(

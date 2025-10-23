@@ -5,6 +5,7 @@ import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
 import {CarouselItem} from '@/components';
 import {CarouselConfig} from '@/components/Carousel/types';
 import {colors, fontFamily} from '@/theme';
+import {UserRole} from '@/types';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 export const MINUTES_IN_MS = 60 * 1000;
@@ -22,6 +23,11 @@ export const WINDOW_HEIGHT = Dimensions.get('window').height;
 
 export const isIOS = Platform.OS === 'ios';
 
+export enum APIVersion {
+  V1 = 'v1',
+  V2 = 'v2',
+}
+
 export enum LanguageCode {
   EN = 'en',
 }
@@ -33,6 +39,8 @@ export const TAG_COLORS = {
   4: {bg: '#D7F4DC80', text: '#388E3C'},
   5: {bg: '#B9EFC880', text: '#1B5E20'},
 };
+
+export const ALLOWED_ROLES = [UserRole.COUNSELOR, UserRole.LEARNER];
 
 export const isValidEmail = (emailAddress: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
