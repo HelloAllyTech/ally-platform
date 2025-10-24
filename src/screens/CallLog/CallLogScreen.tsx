@@ -84,7 +84,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const {userData, isUserLoading, checkAuth} = useUser();
+  const {userData, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
@@ -288,7 +288,6 @@ export const CallLogScreen: React.FC = () => {
         fromLogs: true,
       });
     } else {
-      // For simulation logs, navigate to simulation summary or details
       navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         simulationId: item?.id?.toString(),
         fromLogs: true,
@@ -310,10 +309,18 @@ export const CallLogScreen: React.FC = () => {
    * @param index - Index of the item in the list
    */
   const renderItem = ({item, index}: {item: LogItem; index: number}) => {
+    const isDisabled =
+      activeTab === LogType.REAL
+        ? !permissions?.includes(USER_PERMISSIONS.VIEW_SUMMARY)
+        : !permissions?.includes(
+            USER_PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
+          );
+
     return (
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
+        disabled={isDisabled}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
         logType={activeTab}

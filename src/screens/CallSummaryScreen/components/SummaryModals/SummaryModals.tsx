@@ -21,7 +21,7 @@ interface SummaryModalsProps {
   hideHeaderDropdown: () => void;
   showSummary: boolean;
   setShowSummary: (show: boolean) => void;
-  isSummaryAvailable?: boolean;
+  showExportOption?: boolean;
   isSummaryFeedbackPopup?: boolean;
   hideSummaryFeedbackPopup: () => void;
   onSubmitSummaryFeedback: (
@@ -44,7 +44,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   hideHeaderDropdown,
   showSummary,
   setShowSummary,
-  isSummaryAvailable = false,
+  showExportOption = false,
   isSummaryFeedbackPopup = false,
   hideSummaryFeedbackPopup,
   onSubmitSummaryFeedback,
@@ -71,7 +71,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         onClose={hideMenu}
         onExport={handleExport}
         setModalType={setActiveModal}
-        showExportOption={isSummaryAvailable}
+        showExportOption={showExportOption}
       />
       <FeedbackPopup
         note={t('FeedbackPopup.instructionText')}

@@ -3,10 +3,6 @@ import {PERMISSIONS} from 'react-native-permissions';
 
 export enum USER_PERMISSIONS {
   VIEW_CALL_LOGS = 'view:call:logs',
-  VIEW_NAVBAR_CALENDAR = 'view:navbar:calendar',
-  VIEW_NAVBAR_LEARN = 'view:navbar:learn',
-  VIEW_NAVBAR_STRESS_BUSTER = 'view:navbar:stress-buster',
-  VIEW_NAVBAR_SETTINGS = 'view:navbar:settings',
   EDIT_SUMMARY = 'edit:summary',
   VIEW_REFERENCE_DOCUMENT = 'view:reference-document',
   VIEW_NAVBAR_COMMUNITY = 'view:navbar:community',
@@ -15,6 +11,12 @@ export enum USER_PERMISSIONS {
   VIEW_ANALYTICS_DASHBOARD = 'view:analytics:dashboard',
   START_MICROPHONE_CHAT = 'start:microphone-chat',
   START_CLOUD_TELEPHONY_CHAT = 'start:cloud-telephony-chat',
+  VIEW_SUMMARY = 'view:summary',
+  EXPORT_CHAT_SUMMARY = 'export:chat:summary',
+  EDIT_SUMMARY_FEEDBACK = 'edit:summary:feedback',
+  VIEW_SCENARIO_SESSION_DETAILS = 'view:scenario-session:details',
+  EDIT_SCENARIO_SESSION = 'edit:scenario-session',
+  VIEW_SESSION_SCENARIO_MESSAGES = 'view:session-scenario:messages',
 }
 
 export const MICROPHONE_PERMISSION =
