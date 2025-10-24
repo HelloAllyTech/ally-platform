@@ -70,8 +70,7 @@ export const CallLogItem = ({
       disabled={disabled}
       activeOpacity={0.7}
       onPress={onItemPress}
-      style={[styles.logItemContainer, disabled && styles.disabled]}>
-      {/* Header section with client info and call quality score */}
+      style={styles.logItemContainer}>
       <View style={[styles.logHeader, expanded && styles.expandedLogHeader]}>
         <View style={styles.leftContainer}>
           <View style={styles.logHeaderContent}>
@@ -179,9 +178,6 @@ const styles = ScaledSheet.create({
     paddingVertical: '10@ms',
     borderBottomWidth: 1,
     borderColor: colors.lightGray2,
-  },
-  disabled: {
-    opacity: 0.6,
   },
   leftContainer: {
     flex: 1,

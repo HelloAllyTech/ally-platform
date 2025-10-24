@@ -13,12 +13,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ArrowDown, ChevronDown, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {USER_PERMISSIONS} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
   useLazyGetSimulationDetailsQuery,
 } from '@/services';
+import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
 import {navigateToLearnTab} from '@/utils';
 
@@ -39,7 +41,7 @@ export const SimulationFeedbackScreen: React.FC<
 > = ({route}) => {
   const simulationId = route.params?.simulationId;
   const fromLogs = route.params?.fromLogs;
-
+  const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
@@ -206,6 +208,10 @@ export const SimulationFeedbackScreen: React.FC<
       </Text>
     );
   };
+  const showTranscript = !isSimulationDetailsLoading && !showSummary;
+  const disableDropdown =
+    !fromLogs ||
+    !permissions?.includes(USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES);
 
   return (
     <SafeAreaView
@@ -227,7 +233,7 @@ export const SimulationFeedbackScreen: React.FC<
                 !fromLogs && styles.titleExtraPadding,
               ]}
               onPress={onHeaderPress}
-              disabled={!fromLogs}
+              disabled={disableDropdown}
               activeOpacity={0.8}>
               {renderTitle()}
               {fromLogs && (
@@ -266,7 +272,7 @@ export const SimulationFeedbackScreen: React.FC<
           )}
         </KeyboardAwareScrollView>
       )}
-      {!isSimulationDetailsLoading && !showSummary && (
+      {showTranscript && (
         <SimulationTranscript
           sessionId={simulationId ?? ''}
           startedAt={simulationDetails?.startedAt}

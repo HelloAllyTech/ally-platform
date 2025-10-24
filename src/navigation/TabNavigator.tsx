@@ -57,7 +57,7 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.LEARN,
     component: SimulationsScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_LEARN],
+    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
   },
   {
     name: SCREEN_NAMES.COMMUNITY,
