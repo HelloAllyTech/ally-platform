@@ -1,12 +1,13 @@
 """Room metadata parsing utilities."""
 import json
+from typing import Mapping,Any
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def parse_room_metadata(metadata: str) -> RoomMetadataEnvelope:
+def parse_room_metadata(metadata) -> RoomMetadataEnvelope:
     """
     Parse room metadata JSON into RoomMetadataEnvelope.
     Returns empty envelope on error.

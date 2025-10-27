@@ -2,10 +2,30 @@ from typing import Optional, List, Any, Dict, Mapping
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import VisibilityType
+from app.core.constants import VisibilityType, TTSProvider
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
 from app.core.events.registry import get_event_class
+
+class VoicePromptData(BaseModel):
+    name : str = Field(...)
+    age : str = Field(...)
+    gender : str = Field(...)
+    gender_identity : Optional[str] = Field(default=None)
+    sexual_orientation : Optional[str] = Field(default=None)
+    current_location : str = Field(...)
+    profession : Optional[str] = Field(default=None)
+    context : str = Field(...)
+    session_behavior_guidelines : Optional[str] = Field(default=None)
+    life_history_summary : str = Field(...)
+    core_memories : Optional[str] = Field(default=None)
+    personality : Optional[str] = Field(default=None)
+    starting_state : Optional[str] = Field(default=None)
+    emotional_needs : Optional[str] = Field(default=None)
+    tone : Optional[str] = Field(default=None)
+    opening_statements : str = Field(...)
+    agent_goal : Optional[str] = Field(default=None)
+
 
 class VoiceConfig(BaseModel):
     model: Optional[str] = Field(default=None)
@@ -31,10 +51,10 @@ class Scenario(BaseModel):
     name: str = Field(alias="scenarioName")
     learning_objective: str = Field(alias="learningObjective")
     prompt: str
-    life_history: Optional[str] = Field(default=None, alias="lifeHistory")
     events: List[BaseEvent] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     voice: ScenarioVoice = Field(default_factory=ScenarioVoice)
+    prompt_data : VoicePromptData = Field(default_factory=VoicePromptData)
 
     model_config = {
         "populate_by_name": True,     # allow both alias and field name on input
@@ -60,15 +80,16 @@ class Scenario(BaseModel):
         built_events = build_events_from_metadata(raw)
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
+        prompt_data = cls._build_prompt_data(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
             learningObjective=normalized["learningObjective"],
             prompt=normalized["prompt"],
-            lifeHistory=normalized.get("lifeHistory"),
             metadata=normalized.get("metadata", {}),
             events=built_events,
-            voice=voice_obj
+            voice=voice_obj,
+            prompt_data=prompt_data
         )
 
     # ---------------------------
@@ -88,7 +109,6 @@ class Scenario(BaseModel):
             "scenarioName": raw.get("title") or "",
             "learningObjective": raw.get("description") or "",
             "prompt": raw.get("prompt") or "",
-            "lifeHistory": raw.get("lifeHistory") or raw.get("life_history"),
             "metadata": raw.get("metadata", {})
         }
 
@@ -134,7 +154,47 @@ class Scenario(BaseModel):
 
         return ScenarioVoice(
             name=voice_meta.get("name", ""),
-            provider=voice_meta.get("provider", ""),
+            provider=voice_meta.get("provider", "").lower(),
             config=voice_config,
         )
+
+    @staticmethod
+    def _build_prompt_data(raw: Mapping[str, Any]) -> VoicePromptData:
+        """
+        Parses the raw input dictionary, maps keys, and creates a VoicePromptData object.
+        """
+        prompt_data_dict = raw.get("promptData")
+
+        if not prompt_data_dict:
+            print("Error: 'promptData' key not found in raw data.")
+            return None
+
+        try:
+            mapped_data = {
+                "name": prompt_data_dict.get("name"),
+                "age": prompt_data_dict.get("age"),
+                "gender": prompt_data_dict.get("gender"),
+                "gender_identity": prompt_data_dict.get("genderIdentity",None),
+                "sexual_orientation": prompt_data_dict.get("sexualOrientation",None),
+                "current_location": prompt_data_dict.get("currentLocation"),
+                "profession": prompt_data_dict.get("profession",None),
+                "context": prompt_data_dict.get("context"),
+                "session_behavior_guidelines": prompt_data_dict.get("sessionBehaviorGuidelines",None),
+                "life_history_summary": prompt_data_dict.get("lifeHistory"),
+                "core_memories": prompt_data_dict.get("coreMemories",None),
+                "personality": prompt_data_dict.get("personality",None),
+                "starting_state": prompt_data_dict.get("startingState",None),
+                "emotional_needs": prompt_data_dict.get("emotionalNeeds",None),
+                "tone": prompt_data_dict.get("tone",None),
+                "opening_statements": prompt_data_dict.get("openingStatements"),
+                "agent_goal": prompt_data_dict.get("agentGoal"),
+            }
+
+            prompt_data_obj = VoicePromptData(**mapped_data)
+            return prompt_data_obj
+        except Exception as e:
+            print(f"Error instantiating VoicePromptData from mapped data: {e}")
+            return None
+
+
 
