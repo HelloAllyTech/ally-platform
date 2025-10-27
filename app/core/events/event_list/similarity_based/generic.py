@@ -9,8 +9,7 @@ from typing import List, Optional, Tuple, Dict, override
 from pydantic import PrivateAttr
 
 from app.core.constants import SimilarityEventConfig
-from app.core.events.base import BaseEvent
-from app.core.events.schemas import ChatMessage
+from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_list.similarity_based.constants import DEFAULT_STOPWORDS
 
 

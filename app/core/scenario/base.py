@@ -6,6 +6,9 @@ from app.core.constants import VisibilityType, TTSProvider
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
 from app.core.events.registry import get_event_class
+from app.utils import get_logger
+
+logger = get_logger(__name__)
 
 class VoicePromptData(BaseModel):
     name : str = Field(...)
@@ -166,13 +169,13 @@ class Scenario(BaseModel):
         prompt_data_dict = raw.get("promptData")
 
         if not prompt_data_dict:
-            print("Error: 'promptData' key not found in raw data.")
+            logger.error("Error: 'promptData' key not found in raw data.")
             return None
 
         try:
             mapped_data = {
                 "name": prompt_data_dict.get("name"),
-                "age": prompt_data_dict.get("age"),
+                "age": str(prompt_data_dict.get("age")),
                 "gender": prompt_data_dict.get("gender"),
                 "gender_identity": prompt_data_dict.get("genderIdentity",None),
                 "sexual_orientation": prompt_data_dict.get("sexualOrientation",None),
@@ -193,7 +196,7 @@ class Scenario(BaseModel):
             prompt_data_obj = VoicePromptData(**mapped_data)
             return prompt_data_obj
         except Exception as e:
-            print(f"Error instantiating VoicePromptData from mapped data: {e}")
+            logger.error(f"Error instantiating VoicePromptData from mapped data: {e}")
             return None
 
 
