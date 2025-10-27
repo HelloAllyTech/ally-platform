@@ -62,6 +62,7 @@ import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
+import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
@@ -162,6 +163,7 @@ export {
   NetworkDisconnectedIcon,
   NewsStandIcon,
   NoCallLogsIcon,
+  NoCreditsIcon,
   NotesIcon,
   PageIcon,
   PauseIcon,
