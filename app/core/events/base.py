@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.constants import VisibilityType
 from app.core.events.schemas import ChatMessage
@@ -10,14 +10,14 @@ from app.core.events.schemas import ChatMessage
 class BaseEvent(BaseModel, ABC):
     """
     Runtime event instance populated from scenario metadata.
-    Concrete subclasses must set `event_id` (ClassVar) and implement `detect_event`.
+    Concrete subclasses must implement `detect_event`.
     """
 
-    # Class-level identifier used for registry mapping (e.g., "counselor-rephrased")
-    event_id: ClassVar[str]
+    # Instance-level event identifier
+    event_id: str
     
-    # Class-level visibility type (can be overridden by subclasses)
-    visibility_type: ClassVar[VisibilityType] = VisibilityType.ACTIVE
+    # Instance-level visibility type
+    visibility_type: VisibilityType = VisibilityType.ACTIVE
 
     # Per-scenario values (come from metadata)
     score: Optional[int] = None

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
+from app.core.events.factory import build_events_from_metadata
 from app.core.events.registry import get_event_class
 
 class VoiceConfig(BaseModel):
@@ -55,7 +56,8 @@ class Scenario(BaseModel):
         """
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
-        built_events = cls._build_events(raw)
+        # built_events = cls._build_events(raw)
+        built_events = build_events_from_metadata(raw)
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
 

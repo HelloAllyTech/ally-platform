@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess, ConversationItemAddedEvent
@@ -7,12 +6,7 @@ from livekit.plugins.langchain import LLMAdapter
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from app.core.config import settings
-from app.core.events.core_event_sender import CoreEventMessageType
-from app.core.events.base import ChatMessage
-from app.core.events.event_list.similarity_based import *
 from app.core.graph import agent_graph
-from app.core.queue import msg_event_queue
-from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.utils.logger import get_logger
 from app.utils.opening_line import get_opening_line
 from app.utils.tts_manager import get_tts_for_scenario, get_default_tts_config
