@@ -6,6 +6,7 @@ import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
+import BoltIcon from './bolt.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import BulbIcon from './bulb.svg';
 import CallIcon from './call.svg';
@@ -106,6 +107,7 @@ export {
   AssessmentIcon,
   BarsIcon,
   BlueWarningIcon,
+  BoltIcon,
   BrightnessAlertIcon,
   BulbIcon,
   CallDetailsIcon,
