@@ -2,7 +2,8 @@ import random
 
 from datetime import datetime, timezone
 from livekit import agents
-from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess, ConversationItemAddedEvent
+from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
+from livekit.agents.cli.log import setup_logging
 from livekit.plugins import deepgram, noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -15,6 +16,7 @@ from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
 
 logger = get_logger(__name__)
+setup_logging(settings.LIVEKIT_LOG_LEVEL, devmode=settings.LIVEKIT_LOG_DEV_MODE, console=settings.LIVEKIT_LOG_CONSOLE)
 
 
 class Assistant(Agent):

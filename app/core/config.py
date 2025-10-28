@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     SLACK_ALERTS_API_TOKEN: str = Field(...)
     SLACK_ALERTS_CHANNEL_ID: str = Field(...)
     SLACK_ALERTS_LOG_LEVEL: str = "WARNING"
+    LIVEKIT_LOG_LEVEL: str = Field(...)
+    LIVEKIT_LOG_DEV_MODE: bool = Field(default=False)
+    LIVEKIT_LOG_CONSOLE: bool = Field(default=False)
 
     LIVEKIT_API_KEY: str = Field(...)
     LIVEKIT_API_SECRET: str = Field(...)
