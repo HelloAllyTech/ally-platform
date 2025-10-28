@@ -37,7 +37,9 @@ SCENARIO_SAMPLE = {
             "emotionalNeeds": "Emotional needs of the AI client persona",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": "Hi, I need some help.",
+            "openingStatements": [
+              "Hi, I need some help."
+            ],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Session behavior guidelines of theAI client persona"
         },

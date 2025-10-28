@@ -24,7 +24,7 @@ class VoicePromptData(BaseModel):
     starting_state : Optional[str] = Field(default=None)
     emotional_needs : Optional[str] = Field(default=None)
     tone : Optional[str] = Field(default=None)
-    opening_statements : str = Field(...)
+    opening_statements : List[str] = Field(...)
     agent_goal : Optional[str] = Field(default=None)
 
 

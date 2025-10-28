@@ -122,8 +122,6 @@ def generate_system_message(
     {emotional_needs_block}
     {tone_block}
     
-    **Begin the conversation by saying:**
-    {prompt_data.opening_statements}
     
     {next_instruction_block}
     """

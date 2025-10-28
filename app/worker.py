@@ -1,3 +1,5 @@
+import random
+
 from datetime import datetime, timezone
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess, ConversationItemAddedEvent
@@ -8,7 +10,6 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from app.core.config import settings
 from app.core.graph import agent_graph
 from app.utils.logger import get_logger
-from app.utils.opening_line import get_opening_line
 from app.utils.tts_manager import get_tts_for_scenario, get_default_tts_config
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
@@ -102,7 +103,7 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
 
-    await session.say(get_opening_line())
+    await session.say(random.choice(scenario.prompt_data.opening_statements))
     await ctx.connect()
 
 
