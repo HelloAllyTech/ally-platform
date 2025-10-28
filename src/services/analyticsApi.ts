@@ -22,10 +22,7 @@ export const analyticsApi = api.injectEndpoints({
     getDashboardUrl: builder.query<DashboardUrlResponse, {dashboardId: string}>(
       {
         query: ({dashboardId}) =>
-          API_ROUTES.ANALYTICS.DASHBOARD_BY_ID.replace(
-            ':dashboardId',
-            String(dashboardId),
-          ),
+          API_ROUTES.ANALYTICS.DASHBOARD_BY_ID(dashboardId),
       },
     ),
   }),

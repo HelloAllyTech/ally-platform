@@ -31,7 +31,7 @@ export const chatApi = api.injectEndpoints({
     }),
     endCall: builder.mutation<EndCallResponse, {chatId: number}>({
       query: ({chatId}) => ({
-        url: API_ROUTES.CHATS.END.replace(':chatId', String(chatId)),
+        url: API_ROUTES.CHATS.END(chatId),
         method: API_METHODS.POST,
       }),
     }),
@@ -40,7 +40,7 @@ export const chatApi = api.injectEndpoints({
       {id: number; feedback: FeedbackInput}
     >({
       query: ({id, feedback}) => ({
-        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK.replace(':id', String(id)),
+        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK(id),
         method: API_METHODS.POST,
         body: feedback,
       }),
@@ -50,10 +50,7 @@ export const chatApi = api.injectEndpoints({
       {feedbackId: number; feedback: FeedbackInput}
     >({
       query: ({feedbackId, feedback}) => ({
-        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK_BY_ID.replace(
-          ':feedbackId',
-          String(feedbackId),
-        ),
+        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK_BY_ID(feedbackId),
         method: API_METHODS.PATCH,
         body: feedback,
       }),
@@ -63,7 +60,7 @@ export const chatApi = api.injectEndpoints({
       {chatId: number; notes: UpdateNotesInput}
     >({
       query: ({chatId, notes}) => ({
-        url: API_ROUTES.CHATS.NOTES.replace(':chatId', String(chatId)),
+        url: API_ROUTES.CHATS.NOTES(chatId),
         method: API_METHODS.POST,
         body: notes,
       }),

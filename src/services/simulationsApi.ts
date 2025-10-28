@@ -29,19 +29,16 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getScenarioById: builder.query<Scenario, {id: string | number}>({
+    getScenarioById: builder.query<Scenario, {id: string}>({
       query: ({id}) => ({
-        url: `${API_ROUTES.LEARN.SCENARIO_BY_ID.replace(':id', String(id))}`,
+        url: API_ROUTES.LEARN.SCENARIO_BY_ID(id),
         method: API_METHODS.GET,
       }),
     }),
 
     addSimulationFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
       query: ({scenarioSessionId, rating, comment}) => ({
-        url: API_ROUTES.LEARN.SCENARIO_SESSION_FEEDBACK.replace(
-          ':scenarioSessionId',
-          String(scenarioSessionId),
-        ),
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_FEEDBACK(scenarioSessionId),
         method: API_METHODS.POST,
         body: {
           rating: Number(rating),
@@ -50,12 +47,9 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getSimulationDetails: builder.query<
-      SimulationSummaryData,
-      {id: string | number}
-    >({
+    getSimulationDetails: builder.query<SimulationSummaryData, {id: string}>({
       query: ({id}) => ({
-        url: `${API_ROUTES.LEARN.SIMULATION_DETAILS.replace(':id', String(id))}`,
+        url: API_ROUTES.LEARN.SIMULATION_DETAILS(id),
       }),
     }),
 
@@ -85,10 +79,7 @@ export const simulationsApi = api.injectEndpoints({
       {scenarioSessionId: string}
     >({
       query: ({scenarioSessionId}) => ({
-        url: API_ROUTES.LEARN.END_SCENARIO_SESSION.replace(
-          ':scenarioSessionId',
-          String(scenarioSessionId),
-        ),
+        url: API_ROUTES.LEARN.END_SCENARIO_SESSION(scenarioSessionId),
         method: API_METHODS.POST,
       }),
     }),
