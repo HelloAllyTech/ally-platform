@@ -82,6 +82,7 @@ export const simulationsApi = api.injectEndpoints({
         url: API_ROUTES.LEARN.END_SCENARIO_SESSION(scenarioSessionId),
         method: API_METHODS.POST,
       }),
+      invalidatesTags: ['SimulationCredits'],
     }),
 
     getSimulationCredits: builder.query<SimulationCredits, void>({
@@ -89,6 +90,7 @@ export const simulationsApi = api.injectEndpoints({
         url: API_ROUTES.LEARN.SIMULATION_CREDITS,
         method: API_METHODS.GET,
       }),
+      providesTags: ['SimulationCredits'],
     }),
   }),
 });

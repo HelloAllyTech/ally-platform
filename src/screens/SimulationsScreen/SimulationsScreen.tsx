@@ -13,7 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {BoltIcon} from '@/assets';
 import {SimulationsSkeleton} from '@/components';
-import {isIOS, ScenarioStatus, SCREEN_NAMES} from '@/constants';
+import {isIOS, SCREEN_NAMES} from '@/constants';
 import {
   useAppNavigation,
   useSimulationCredits,
@@ -30,18 +30,6 @@ export const SimulationsScreen: React.FC = () => {
   const {data, isFetching, refetch} = useGetScenariosQuery();
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  // Show available simulations first, followed by coming soon
-  const sortedScenarios = useMemo(() => {
-    const scenarios = data ?? [];
-    const available = scenarios.filter(
-      scenario => scenario.status !== ScenarioStatus.COMING_SOON,
-    );
-    const comingSoon = scenarios.filter(
-      scenario => scenario.status === ScenarioStatus.COMING_SOON,
-    );
-    return [...available, ...comingSoon];
-  }, [data]);
-
   const keyExtractor = (item: Scenario) => item.id;
 
   useTabBackToHomeHandler();
@@ -52,34 +40,21 @@ export const SimulationsScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: Scenario}) => {
     // TODO: Move this after the API is updated and add enum
-    const isComingSoon = item.status === ScenarioStatus.COMING_SOON;
 
     return (
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.card}
-        onPress={() => handleStart(item)}
-        disabled={isComingSoon}>
+        onPress={() => handleStart(item)}>
         {!!item.coverImageUrl && (
-          <>
-            <View style={isComingSoon && styles.grayscaleWrapper}>
-              <Image
-                source={{uri: item.coverImageUrl}}
-                style={styles.cover}
-                resizeMode="cover"
-                onError={() => {}}
-                blurRadius={isComingSoon ? 25 : 0}
-              />
-            </View>
-
-            {isComingSoon && (
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonText}>
-                  {t('Common.comingSoon')}
-                </Text>
-              </View>
-            )}
-          </>
+          <View>
+            <Image
+              source={{uri: item.coverImageUrl}}
+              style={styles.cover}
+              resizeMode="cover"
+              onError={() => {}}
+            />
+          </View>
         )}
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -170,7 +145,7 @@ export const SimulationsScreen: React.FC = () => {
       {renderHeader()}
       <FlatList
         contentContainerStyle={[styles.list, styles.marginH22]}
-        data={sortedScenarios}
+        data={data ?? []}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListEmptyComponent={
@@ -238,7 +213,6 @@ const styles = ScaledSheet.create({
     margin: '12@ms',
     width: '55%',
     flexDirection: 'column',
-    justifyContent: 'center',
   },
   cardTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
