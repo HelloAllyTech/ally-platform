@@ -19,6 +19,7 @@ jest.mock('@/hooks', () => {
     useToast: () => ({showToast: mockShowToast}),
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     useTranslate: () => ({t: (k: string) => k}),
+    useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
     // expose for assertions
     mockNavigate,
     mockGoBack,
@@ -40,6 +41,7 @@ jest.mock('@/components', () => {
         <Text>{label}</Text>
       </TouchableOpacity>
     ),
+    IllustratedModal: () => null,
     useToast: () => ({showToast: mockShowToast}),
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     __mocks: {mockShowToast, mockShowErrorToast},

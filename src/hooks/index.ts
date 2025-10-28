@@ -20,6 +20,7 @@ export {useNetworkConnectivity} from './useNetworkConnectivity';
 // UI & State hooks
 export {useKeyboardState} from './useKeyboardState';
 export {useSearch} from './useSearch';
+export {useSimulationCredits} from './useSimulationCredits';
 export {useSummaryState} from './useSummaryState';
 export {useTranslate} from './useTranslate';
 export {useUser} from './useUser';
