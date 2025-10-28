@@ -107,6 +107,11 @@
     "focused": "Focused",
     "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call."
   },
+  "SuspendedAccount": {
+    "title": "Account Suspended",
+    "description": "Your account has been suspended. Contact your administrator for assistance",
+    "goToLogin": "Go to login"
+  },
   "SplashScreen": {
     "hey": "Hey,",
     "welcome": "Welcome to",
@@ -236,7 +241,9 @@
     },
     "sessionAnalytics": "Session analytics",
     "simulationAnalytics": "Simulation analytics",
-    "failedToLoadAnalytics": "Failed to load analytics"
+    "failedToLoadAnalytics": "Failed to load analytics",
+    "noAnalyticsData": "Analytics not available",
+    "noAnalyticsDescription": "Looks like we don’t have analytics to show right now. Once data becomes available, it’ll appear here automatically."
   },
   "SearchScreen": {
     "header": {
@@ -268,6 +275,11 @@
   "save": "Save",
   "ResourceArticleCard": {
     "viewMore": "View more"
+  },
+  "Credits": {
+    "usage": "Credit usage",
+    "lowCreditsTitle": "No Credits Left",
+    "lowCreditsDescription": "Looks like you have run out of simulation credits"
   },
   "Simulations": {
     "header": {

@@ -1,3 +1,4 @@
+import {API_ROUTES} from '@/constants';
 import {CallLog} from '@/screens/CallLog/types';
 
 import {api} from './api';
@@ -14,7 +15,7 @@ export const callsAPI = api.injectEndpoints({
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
-        url: '/chats/call-logs',
+        url: API_ROUTES.CHATS.CALL_LOGS,
         params: {limit, offset},
       }),
     }),

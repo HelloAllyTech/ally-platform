@@ -38,5 +38,6 @@ export {ChipGroup, type ChipGroupProps, type ChipOption} from './ChipGroup';
 export {EmptyTranscript} from './EmptyTranscript';
 export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';
+export {EmptyState} from './EmptyState';
 export {FeedbackPopup} from './FeedbackPopup';
 export {TabView} from './TabView';

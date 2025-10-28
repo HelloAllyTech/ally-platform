@@ -29,6 +29,10 @@ export type {User} from './user';
 
 // Simulations types
 export * from './simulations';
+
+// Credits types
+export * from './credits';
+
 export * from './general';
 export * from './message';
 export * from './forceUpdate';

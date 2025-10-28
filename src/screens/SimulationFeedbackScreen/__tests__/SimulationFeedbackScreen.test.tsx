@@ -12,6 +12,19 @@ jest.mock('@/hooks', () => ({
   useHardwareBackPressHandler: () => {},
 }));
 
+// Mock Redux hooks
+jest.mock('@/store/hooks', () => ({
+  useAppSelector: (selector: any) => {
+    // Mock user permissions state
+    const mockState = {
+      user: {
+        permissions: ['edit:scenario-session', 'view:session-scenario:messages'],
+      },
+    };
+    return selector(mockState);
+  },
+}));
+
 jest.mock('@/assets', () => {
   const React = require('react');
   const {Text} = require('react-native');
@@ -66,16 +79,21 @@ jest.mock('@/services', () => {
 
 jest.mock('../components', () => {
   const React = require('react');
-  const {useEffect} = React;
+  const {TouchableOpacity, Text} = require('react-native');
   return {
     SimulationSummarySkeleton: () => <summary-skeleton testID="summary-skeleton" />,
     SimulationSummary: () => <summary-comp testID="summary-comp" />,
     SimulationTranscript: () => <transcript-comp testID="transcript-comp" />,
     FeedbackDropdown: ({visible, setShowSummary}: any) => {
-      useEffect(() => {
-        if (visible) setShowSummary(false);
-      }, [visible, setShowSummary]);
-      return null;
+      if (!visible) return null;
+      return (
+        <TouchableOpacity 
+          testID="transcript-option" 
+          onPress={() => setShowSummary(false)}
+        >
+          <Text>Transcript Option</Text>
+        </TouchableOpacity>
+      );
     },
   };
 });
@@ -135,7 +153,12 @@ describe('SimulationFeedbackScreen', () => {
     );
     // Press arrow icon within header to open dropdown (bubbles to Touchable)
     fireEvent.press(getByTestId('arrow-down'));
-    // Transcript should render due to FeedbackDropdown mock toggling
+    // Wait for dropdown to appear and click transcript option
+    await waitFor(() => {
+      expect(getByTestId('transcript-option')).toBeTruthy();
+    });
+    fireEvent.press(getByTestId('transcript-option'));
+    // Transcript should render after clicking the transcript option
     await waitFor(() => {
       expect(getByTestId('transcript-comp')).toBeTruthy();
     });

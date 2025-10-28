@@ -20,6 +20,8 @@ jest.mock('@/components', () => {
       <View testID="date-selector" accessibilityLabel={JSON.stringify(dateRange)} />
     ),
     LoadingSkeleton: () => <View testID="loading-skeleton" />,
+    EmptyState: () => <View testID="empty-state" />,
+    TabView: () => <View testID="tab-view" />,
   };
 });
 
@@ -31,6 +33,11 @@ jest.mock('@/services/analyticsApi', () => ({
 
 // Mock WebView since native module is not present in Jest
 jest.mock('react-native-webview', () => 'WebView');
+
+// Mock assets
+jest.mock('@/assets/icons', () => ({
+  DataUnavailableIcon: () => null,
+}));
 
 describe('UserAnalyticsScreen', () => {
   it('renders without crashing with no dashboards', () => {
