@@ -7,6 +7,7 @@ import {
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
+  SimulationCredits,
   SimulationSummaryData,
 } from '@/types';
 
@@ -91,6 +92,13 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.POST,
       }),
     }),
+
+    getSimulationCredits: builder.query<SimulationCredits, void>({
+      query: () => ({
+        url: API_ROUTES.LEARN.SIMULATION_CREDITS,
+        method: API_METHODS.GET,
+      }),
+    }),
   }),
 });
 
@@ -103,4 +111,5 @@ export const {
   useStartScenarioSessionMutation,
   useEndScenarioSessionMutation,
   useLazyGetSimulationDetailsQuery,
+  useLazyGetSimulationCreditsQuery,
 } = simulationsApi;

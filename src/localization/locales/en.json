@@ -276,6 +276,11 @@
   "ResourceArticleCard": {
     "viewMore": "View more"
   },
+  "Credits": {
+    "usage": "Credit usage",
+    "lowCreditsTitle": "No Credits Left",
+    "lowCreditsDescription": "Looks like you have run out of simulation credits"
+  },
   "Simulations": {
     "header": {
       "title": "Ally",
