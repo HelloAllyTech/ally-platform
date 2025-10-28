@@ -6,6 +6,7 @@ import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
+import BoltIcon from './bolt.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import BulbIcon from './bulb.svg';
 import CallIcon from './call.svg';
@@ -61,6 +62,7 @@ import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
+import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
@@ -106,6 +108,7 @@ export {
   AssessmentIcon,
   BarsIcon,
   BlueWarningIcon,
+  BoltIcon,
   BrightnessAlertIcon,
   BulbIcon,
   CallDetailsIcon,
@@ -160,6 +163,7 @@ export {
   NetworkDisconnectedIcon,
   NewsStandIcon,
   NoCallLogsIcon,
+  NoCreditsIcon,
   NotesIcon,
   PageIcon,
   PauseIcon,

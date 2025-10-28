@@ -23,7 +23,7 @@ import {
   SESSION_END_MODAL_MINUTES,
   SESSION_END_MODAL_SECONDS,
 } from '@/constants';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useSimulationCredits} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
@@ -62,6 +62,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
+  const {refreshCredits} = useSimulationCredits();
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -212,6 +213,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           simulationId: roomId,
         });
+        refreshCredits();
       }
     } finally {
       setIsMicEnabled(false);

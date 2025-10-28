@@ -14,6 +14,7 @@ jest.mock('@/hooks', () => {
       navigate: mockNavigate,
     }),
     useTabBackToHomeHandler: () => {},
+    useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
     mockNavigate,
   };
 });

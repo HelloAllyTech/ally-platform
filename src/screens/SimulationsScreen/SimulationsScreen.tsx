@@ -11,9 +11,14 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {BoltIcon} from '@/assets';
 import {SimulationsSkeleton} from '@/components';
 import {isIOS, ScenarioStatus, SCREEN_NAMES} from '@/constants';
-import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
+import {
+  useAppNavigation,
+  useSimulationCredits,
+  useTabBackToHomeHandler,
+} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import type {Scenario} from '@/types';
@@ -23,6 +28,7 @@ export const SimulationsScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
   const {data, isFetching, refetch} = useGetScenariosQuery();
+  const {credits, getCreditsInfo} = useSimulationCredits();
 
   // Show available simulations first, followed by coming soon
   const sortedScenarios = useMemo(() => {
@@ -109,6 +115,21 @@ export const SimulationsScreen: React.FC = () => {
               {t('Simulations.header.subtitle')}
             </Text>
           </Text>
+          {credits && getCreditsInfo && (
+            <View style={styles.creditDisplay}>
+              <BoltIcon width={14} height={14} />
+              <Text
+                style={[
+                  styles.creditText,
+                  getCreditsInfo.isLow && styles.creditTextLow,
+                ]}>
+                {credits.consumedCredits}
+                <Text style={styles.creditLimitText}>
+                  /{credits.creditLimit}
+                </Text>
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.marginH22}>
           <View style={styles.introWrapper}>
@@ -270,13 +291,17 @@ const styles = ScaledSheet.create({
     marginBottom: '16@ms',
   },
   brandHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingTop: '18@ms',
     paddingBottom: '8@ms',
+    paddingHorizontal: '24@ms',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray5,
   },
   brandTitle: {
-    marginHorizontal: '24@ms',
+    flex: 1,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray2,
     fontSize: '18@ms',
@@ -285,6 +310,22 @@ const styles = ScaledSheet.create({
   brandTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: isIOS ? 'italic' : 'normal',
+  },
+  creditDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+  },
+  creditText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '16@ms',
+  },
+  creditTextLow: {
+    color: colors.softCoralRed,
+  },
+  creditLimitText: {
+    color: colors.darkGray,
+    fontSize: '10@ms',
   },
   listHeaderRow: {
     flexDirection: 'row',
