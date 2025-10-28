@@ -76,10 +76,17 @@ jest.mock('livekit-client', () => {
 // Hooks and toasts
 jest.mock('@/hooks', () => {
   const mockReplace = jest.fn();
+  const mockRefreshCredits = jest.fn();
   return {
     __esModule: true,
     useAppNavigation: () => ({replace: mockReplace}),
+    useSimulationCredits: () => ({
+      credits: null,
+      getCreditsInfo: null,
+      refreshCredits: mockRefreshCredits,
+    }),
     mockReplace,
+    mockRefreshCredits,
   } as any;
 });
 

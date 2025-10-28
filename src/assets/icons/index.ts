@@ -6,6 +6,7 @@ import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
+import BoltIcon from './bolt.svg';
 import BrightnessAlertIcon from './brightnessAlert.svg';
 import BulbIcon from './bulb.svg';
 import CallIcon from './call.svg';
@@ -22,6 +23,7 @@ import CommunityActiveIcon from './communityActive.svg';
 import CommunityInactiveIcon from './communityInactive.svg';
 import ContractIcon from './contract.svg';
 import DatabaseIcon from './database.svg';
+import DataUnavailableIcon from './dataUnavailable.svg';
 import DeleteIcon from './delete.svg';
 import DemogsIcon from './demogs.svg';
 import DoubleBottomArrowIcon from './doubleBottomArrow.svg';
@@ -60,6 +62,7 @@ import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
+import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
@@ -82,6 +85,7 @@ import ShieldWithTickIcon from './shieldWithTick.svg';
 import SimulationIcon from './simulation.svg';
 import SmileIcon from './smile.svg';
 import StarIcon from './star.svg';
+import SuspendedAccountIcon from './suspendedAccount.svg';
 import TableEyeIcon from './tableEye.svg';
 import TagIcon from './tag.svg';
 import ThreeDotsIcon from './threeDots.svg';
@@ -104,6 +108,7 @@ export {
   AssessmentIcon,
   BarsIcon,
   BlueWarningIcon,
+  BoltIcon,
   BrightnessAlertIcon,
   BulbIcon,
   CallDetailsIcon,
@@ -120,6 +125,7 @@ export {
   CommunityInactiveIcon,
   ContractIcon,
   DatabaseIcon,
+  DataUnavailableIcon,
   DeleteIcon,
   DemogsIcon,
   DoubleBottomArrowIcon,
@@ -157,6 +163,7 @@ export {
   NetworkDisconnectedIcon,
   NewsStandIcon,
   NoCallLogsIcon,
+  NoCreditsIcon,
   NotesIcon,
   PageIcon,
   PauseIcon,
@@ -180,6 +187,7 @@ export {
   SimulationIcon,
   SmileIcon,
   StarIcon,
+  SuspendedAccountIcon,
   TableEyeIcon,
   TagIcon,
   ThreeDotsIcon,

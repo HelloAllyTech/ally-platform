@@ -2,6 +2,7 @@ export * from './logger';
 export * from './asyncStorage';
 export * from './callSummary';
 export * from './common';
+export * from './credits';
 export * from './date';
 export * from './error';
 export * from './fileOperations';

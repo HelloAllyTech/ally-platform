@@ -1,5 +1,12 @@
 import React from 'react';
-import {StyleProp, Text, TouchableOpacity, View, ViewStyle} from 'react-native';
+import {
+  StyleProp,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
@@ -11,15 +18,15 @@ interface IllustratedModalProps {
   onClose: () => void;
   title?: string;
   description: string;
-  actionButtonText: string;
-  onActionPress: () => void;
+  actionButtonText?: string;
+  onActionPress?: () => void;
   actionButtonColor?: string;
   actionTextColor?: string;
   illustration?: React.ReactNode;
-  titleVariant?: 'default' | 'mixed';
   titleMain: string;
   titleItalic?: string;
   actionButtonStyle?: StyleProp<ViewStyle>;
+  descriptionStyle?: StyleProp<TextStyle>;
 }
 
 export const IllustratedModal: React.FC<IllustratedModalProps> = ({
@@ -34,11 +41,12 @@ export const IllustratedModal: React.FC<IllustratedModalProps> = ({
   titleMain,
   titleItalic,
   actionButtonStyle = {},
+  descriptionStyle = {},
 }) => {
   if (!visible) return null;
 
   const handleActionPress = () => {
-    onActionPress();
+    onActionPress?.();
     onClose();
   };
 
@@ -64,18 +72,25 @@ export const IllustratedModal: React.FC<IllustratedModalProps> = ({
           <View style={styles.illustrationContainer}>{illustration}</View>
         )}
 
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.description, descriptionStyle]}>
+          {description}
+        </Text>
 
-        <PrimaryButton
-          label={actionButtonText}
-          onPress={handleActionPress}
-          customContainerStyle={[
-            styles.actionButton,
-            actionButtonStyle,
-            {backgroundColor: actionButtonColor},
-          ]}
-          customTextStyle={[styles.actionButtonText, {color: actionTextColor}]}
-        />
+        {!!actionButtonText && !!onActionPress && (
+          <PrimaryButton
+            label={actionButtonText}
+            onPress={handleActionPress}
+            customContainerStyle={[
+              styles.actionButton,
+              actionButtonStyle,
+              {backgroundColor: actionButtonColor},
+            ]}
+            customTextStyle={[
+              styles.actionButtonText,
+              {color: actionTextColor},
+            ]}
+          />
+        )}
       </View>
     </View>
   );

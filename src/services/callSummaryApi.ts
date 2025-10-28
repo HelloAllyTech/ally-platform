@@ -1,4 +1,4 @@
-import {API_METHODS, ChatSummaryStatus} from '@/constants';
+import {API_METHODS, API_ROUTES, ChatSummaryStatus} from '@/constants';
 import {setSummaryData} from '@/store/slices/summarySlice';
 import {ChatProvider} from '@/types';
 
@@ -148,7 +148,7 @@ export const callSummaryApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
-      query: chatId => `/chats/${chatId}`,
+      query: chatId => API_ROUTES.CHATS.BY_ID(chatId),
       async onQueryStarted(_, {dispatch, queryFulfilled}) {
         const {data} = await queryFulfilled;
         dispatch(setSummaryData(data));
@@ -159,7 +159,7 @@ export const callSummaryApi = api.injectEndpoints({
       {chatId: number; data: any} // eslint-disable-line @typescript-eslint/no-explicit-any
     >({
       query: ({chatId, data}) => ({
-        url: `/chats/${chatId}/call-details`,
+        url: API_ROUTES.CHATS.CALL_DETAILS(chatId),
         method: API_METHODS.PUT,
         body: data,
       }),
@@ -170,7 +170,7 @@ export const callSummaryApi = api.injectEndpoints({
     }),
     exportCallSummary: builder.query<string, number>({
       query: chatId => ({
-        url: `/chats/${chatId}/export-summary`,
+        url: API_ROUTES.CHATS.EXPORT_SUMMARY(chatId),
         responseHandler: async response => response.text(),
       }),
     }),
@@ -179,7 +179,7 @@ export const callSummaryApi = api.injectEndpoints({
       {chatId: number; summaryName: string}
     >({
       query: ({chatId, summaryName}) => ({
-        url: `/chats/${chatId}/call-info`,
+        url: API_ROUTES.CHATS.CALL_INFO(chatId),
         method: API_METHODS.PATCH,
         body: {summaryName},
       }),
@@ -189,14 +189,14 @@ export const callSummaryApi = api.injectEndpoints({
       {content: string}
     >({
       query: ({content}) => ({
-        url: `/chats/enhance`,
+        url: API_ROUTES.CHATS.ENHANCE,
         method: API_METHODS.POST,
         body: {content},
       }),
     }),
     getTags: builder.mutation<Tag[], {tags: string[]}>({
       query: body => ({
-        url: '/chats/summary/tag-positivity-ratings',
+        url: API_ROUTES.CHATS.SUMMARY_TAG_RATINGS,
         method: API_METHODS.POST,
         body,
       }),
@@ -210,7 +210,7 @@ export const callSummaryApi = api.injectEndpoints({
       }
     >({
       query: ({chatId, rating, feedback}) => ({
-        url: `/chats/${chatId}/summary-feedback`,
+        url: API_ROUTES.CHATS.SUMMARY_FEEDBACK(chatId),
         method: 'POST',
         body: {
           rating,

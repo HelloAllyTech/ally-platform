@@ -19,7 +19,7 @@ type SimulationMessagesResponse = {
 };
 
 interface SimulationMessagesParams {
-  scenarioSessionId: string | number;
+  scenarioSessionId: string;
   limit?: number;
   offset?: number;
   sortBy?: string;
@@ -33,10 +33,7 @@ export const simulationTranscriptApi = api.injectEndpoints({
       SimulationMessagesParams
     >({
       query: ({scenarioSessionId, limit, offset, sortBy, sortOrder}) => ({
-        url: API_ROUTES.SIMULATION_MESSAGES.replace(
-          ':scenarioSessionId',
-          String(scenarioSessionId),
-        ),
+        url: API_ROUTES.LEARN.SIMULATION_MESSAGES(scenarioSessionId),
         method: API_METHODS.GET,
         params: {
           limit,

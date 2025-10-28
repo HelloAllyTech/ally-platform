@@ -24,11 +24,6 @@ export interface RoomListResponse {
   }>;
 }
 
-export interface RoomDeletionResponse {
-  success: boolean;
-  message?: string;
-}
-
 export interface FeedbackRequest {
   scenarioSessionId: string;
   rating?: number;

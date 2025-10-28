@@ -11,9 +11,14 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {BoltIcon} from '@/assets';
 import {SimulationsSkeleton} from '@/components';
-import {isIOS, ScenarioStatus, SCREEN_NAMES} from '@/constants';
-import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
+import {isIOS, SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useSimulationCredits,
+  useTabBackToHomeHandler,
+} from '@/hooks';
 import {useGetScenariosQuery} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import type {Scenario} from '@/types';
@@ -23,18 +28,7 @@ export const SimulationsScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
   const {data, isFetching, refetch} = useGetScenariosQuery();
-
-  // Show available simulations first, followed by coming soon
-  const sortedScenarios = useMemo(() => {
-    const scenarios = data ?? [];
-    const available = scenarios.filter(
-      scenario => scenario.status !== ScenarioStatus.COMING_SOON,
-    );
-    const comingSoon = scenarios.filter(
-      scenario => scenario.status === ScenarioStatus.COMING_SOON,
-    );
-    return [...available, ...comingSoon];
-  }, [data]);
+  const {credits, getCreditsInfo} = useSimulationCredits();
 
   const keyExtractor = (item: Scenario) => item.id;
 
@@ -46,34 +40,21 @@ export const SimulationsScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: Scenario}) => {
     // TODO: Move this after the API is updated and add enum
-    const isComingSoon = item.status === ScenarioStatus.COMING_SOON;
 
     return (
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.card}
-        onPress={() => handleStart(item)}
-        disabled={isComingSoon}>
+        onPress={() => handleStart(item)}>
         {!!item.coverImageUrl && (
-          <>
-            <View style={isComingSoon && styles.grayscaleWrapper}>
-              <Image
-                source={{uri: item.coverImageUrl}}
-                style={styles.cover}
-                resizeMode="cover"
-                onError={() => {}}
-                blurRadius={isComingSoon ? 25 : 0}
-              />
-            </View>
-
-            {isComingSoon && (
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonText}>
-                  {t('Common.comingSoon')}
-                </Text>
-              </View>
-            )}
-          </>
+          <View>
+            <Image
+              source={{uri: item.coverImageUrl}}
+              style={styles.cover}
+              resizeMode="cover"
+              onError={() => {}}
+            />
+          </View>
         )}
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -109,6 +90,21 @@ export const SimulationsScreen: React.FC = () => {
               {t('Simulations.header.subtitle')}
             </Text>
           </Text>
+          {credits && getCreditsInfo && (
+            <View style={styles.creditDisplay}>
+              <BoltIcon width={14} height={14} />
+              <Text
+                style={[
+                  styles.creditText,
+                  getCreditsInfo.isLow && styles.creditTextLow,
+                ]}>
+                {credits.consumedCredits}
+                <Text style={styles.creditLimitText}>
+                  /{credits.creditLimit}
+                </Text>
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.marginH22}>
           <View style={styles.introWrapper}>
@@ -149,7 +145,7 @@ export const SimulationsScreen: React.FC = () => {
       {renderHeader()}
       <FlatList
         contentContainerStyle={[styles.list, styles.marginH22]}
-        data={sortedScenarios}
+        data={data ?? []}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListEmptyComponent={
@@ -217,7 +213,6 @@ const styles = ScaledSheet.create({
     margin: '12@ms',
     width: '55%',
     flexDirection: 'column',
-    justifyContent: 'center',
   },
   cardTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -270,13 +265,17 @@ const styles = ScaledSheet.create({
     marginBottom: '16@ms',
   },
   brandHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingTop: '18@ms',
     paddingBottom: '8@ms',
+    paddingHorizontal: '24@ms',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray5,
   },
   brandTitle: {
-    marginHorizontal: '24@ms',
+    flex: 1,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.darkGray2,
     fontSize: '18@ms',
@@ -285,6 +284,22 @@ const styles = ScaledSheet.create({
   brandTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: isIOS ? 'italic' : 'normal',
+  },
+  creditDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+  },
+  creditText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '16@ms',
+  },
+  creditTextLow: {
+    color: colors.softCoralRed,
+  },
+  creditLimitText: {
+    color: colors.darkGray,
+    fontSize: '10@ms',
   },
   listHeaderRow: {
     flexDirection: 'row',

@@ -38,7 +38,7 @@ describe('constants/general', () => {
   });
   it('enums and routes', () => {
     expect(LanguageCode.EN).toBe('en');
-    expect(API_ROUTES.ROOMS).toContain('/rooms');
+    expect(API_ROUTES.LEARN.ROOMS).toContain('/rooms');
     expect(API_METHODS.POST).toBe('POST');
     expect(TERMS_AND_CONDITIONS_URL).toContain('terms');
     expect(PRIVACY_POLICY_URL).toContain('policy');

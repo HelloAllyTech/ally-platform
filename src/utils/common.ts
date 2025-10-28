@@ -1,8 +1,8 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking, Platform} from 'react-native';
 
-import {APP_STORE_URLS} from '@/constants';
-import {User, UserRole} from '@/types';
+import {ALLOWED_ROLES, APP_STORE_URLS} from '@/constants';
+import {User} from '@/types';
 
 export type Maybe<T> = T | null;
 
@@ -38,7 +38,5 @@ export const openAppStore = async (): Promise<void> => {
 };
 
 export const isAppFeatureEnabled = (user: User) => {
-  return (
-    user.role && [UserRole.COUNSELOR, UserRole.LEARNER].includes(user.role)
-  );
+  return user.role && ALLOWED_ROLES.includes(user.role);
 };

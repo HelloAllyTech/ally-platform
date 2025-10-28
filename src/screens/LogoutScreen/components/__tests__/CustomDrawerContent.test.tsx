@@ -8,6 +8,7 @@ jest.mock('@/hooks', () => ({
   __esModule: true,
   useTranslate: () => ({ t: (k: string) => k }),
   useUser: () => ({ userData: { name: 'John Doe', email: 'john.very.long.email.address@example.com' } }),
+  useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
 }));
 
 jest.mock('@/utils', () => ({
