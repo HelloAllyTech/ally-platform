@@ -111,6 +111,7 @@ export const colors = {
   brickRed: '#E5675A',
   tomatoRed: '#FF5454',
   salmonRed: '#FF8A8A',
+  softCoralRed: '#FE6F64',
 
   // Yellows
   yellow: '#FFD700',

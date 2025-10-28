@@ -11,6 +11,7 @@ import {USER_PERMISSIONS} from './permissions';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
 export const MINUTES_IN_MS = 60 * 1000;
+export const MINUTES_IN_SECONDS = 60;
 export const SECONDS_IN_MS = 1000;
 
 export const DEFAULT_HIT_SLOP = {
@@ -129,6 +130,7 @@ export const API_ROUTES = {
     END_SCENARIO_SESSION: '/learn/scenario-session/:scenarioSessionId/end',
     SIMULATION_LOGS: '/learn/scenario-sessions',
     SIMULATION_MESSAGES: '/learn/scenario-session/:scenarioSessionId/messages',
+    SIMULATION_CREDITS: '/simulation-credits',
   },
 } as const;
 
