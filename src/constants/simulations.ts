@@ -43,5 +43,5 @@ export const FEEDBACK_OPTIONS = {
 };
 
 export enum ScenarioStatus {
-  COMING_SOON = 'COMING_SOON',
+  ACTIVE = 'ACTIVE',
 }

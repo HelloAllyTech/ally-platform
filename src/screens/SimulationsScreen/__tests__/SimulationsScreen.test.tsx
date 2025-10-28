@@ -83,7 +83,6 @@ describe('SimulationsScreen', () => {
         title: 'B Coming Soon',
         description: 'desc',
         coverImageUrl: 'http://image',
-        status: ScenarioStatus.COMING_SOON,
       },
       {
         id: '2',
@@ -112,8 +111,8 @@ describe('SimulationsScreen', () => {
       }),
     );
 
-    // Coming soon should be visible and disabled badge shown
-    expect(getByText('Common.comingSoon')).toBeTruthy();
+    // Both scenarios should be rendered
+    expect(getByText('B Coming Soon')).toBeTruthy();
   });
 });
 

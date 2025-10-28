@@ -23,6 +23,6 @@ describe('constants/simulations', () => {
   });
   it('feedback options and scenario status exist', () => {
     expect(FEEDBACK_OPTIONS[5]).toContain('Excellent');
-    expect(ScenarioStatus.COMING_SOON).toBe('COMING_SOON');
+    expect(ScenarioStatus.ACTIVE).toBe('ACTIVE');
   });
 });
