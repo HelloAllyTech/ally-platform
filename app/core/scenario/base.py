@@ -2,10 +2,8 @@ from typing import Optional, List, Any, Dict, Mapping
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import VisibilityType, TTSProvider
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
-from app.core.events.registry import get_event_class
 from app.utils import get_logger
 
 logger = get_logger(__name__)
@@ -114,31 +112,6 @@ class Scenario(BaseModel):
             "prompt": raw.get("prompt") or "",
             "metadata": raw.get("metadata", {})
         }
-
-    @staticmethod
-    def _build_events(raw: Mapping[str, Any]) -> List[BaseEvent]:
-        """
-        Convert BE event dicts to instantiated BaseEvent objects using the registry.
-        - Adds score, emoji, message -> emoji_message, conversationInstruction -> conversation_instruction
-        - Skips events that have no registered class.
-        """
-        instances: List[BaseEvent] = []
-        for e in (raw.get("events") or []):
-            ev_cls = get_event_class(e.get("id", ""))
-            if ev_cls is None:
-                # No registered class for this id; skip silently (or log if desired)
-                continue
-
-            kwargs = {
-                "score": e.get("score", None),
-                "emoji": e.get("emoji", None),
-                "emoji_message": e.get("message", None),  # map BE `message` -> BaseEvent.emoji_message
-                "branching_instruction": e.get("branchingInstruction", None),
-                "visibility_type": e.get("visibilityType", VisibilityType.ACTIVE)
-            }
-            instances.append(ev_cls(**kwargs))
-
-        return instances
 
     @staticmethod
     def _build_voice(raw: Mapping[str, Any]) -> Optional[ScenarioVoice]:
