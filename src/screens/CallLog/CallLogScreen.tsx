@@ -311,7 +311,7 @@ export const CallLogScreen: React.FC = () => {
   const renderItem = ({item, index}: {item: LogItem; index: number}) => {
     const isDisabled =
       activeTab === LogType.REAL
-        ? !permissions?.includes(USER_PERMISSIONS.VIEW_SUMMARY)
+        ? !permissions?.includes(USER_PERMISSIONS.VIEW_CHAT_DETAILS)
         : !permissions?.includes(
             USER_PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
           );
