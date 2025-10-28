@@ -11,7 +11,7 @@ import {formatTimeToMMSS} from '@/utils';
 const LIMIT = 10;
 
 export const useSimulationTranscriptDetails = (
-  scenarioSessionId: number | string,
+  scenarioSessionId: string,
   sessionStartedAt?: string,
 ) => {
   const [messages, setMessages] = useState<SimulationMessage[]>([]);

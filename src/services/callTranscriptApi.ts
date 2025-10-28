@@ -31,7 +31,7 @@ export const callTranscriptApi = api.injectEndpoints({
   endpoints: builder => ({
     getChatMessages: builder.query<ChatMessagesResponse, ChatMessagesParams>({
       query: ({id, limit, offset, sortBy, sortOrder, type}) => ({
-        url: API_ROUTES.CHATS.MESSAGES.replace(':chatId', String(id)),
+        url: API_ROUTES.CHATS.MESSAGES(id),
         method: API_METHODS.GET,
         params: {
           limit,
