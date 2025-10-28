@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
 
-import {SCREEN_NAMES} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {RouteNames} from '@/navigation';
 import {useLazyGetCounsellorChatQuery} from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat, setCurrentChat} from '@/store/slices/chatSlice';
-import {Chat, UserRole} from '@/types';
+import {Chat} from '@/types';
 
 interface UseCounselorChatProps {
   onActiveChatFound?: (data: Chat) => void;
@@ -22,6 +22,7 @@ export const useCounselorChat = ({
   getCurrentRoute,
 }: UseCounselorChatProps = {}) => {
   const userData = useAppSelector(state => state.user);
+  const permissions = useAppSelector(state => state.user.permissions);
   const dispatch = useAppDispatch();
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const appState = useRef(AppState.currentState);
@@ -74,13 +75,13 @@ export const useCounselorChat = ({
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active' &&
         userData?.isAuthenticated &&
-        userData?.user?.role === UserRole.COUNSELOR
+        permissions.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)
       ) {
         await checkCounselorChat();
       }
       appState.current = nextAppState;
     },
-    [checkCounselorChat, userData],
+    [checkCounselorChat, userData, permissions],
   );
 
   useEffect(() => {

@@ -11,12 +11,15 @@ export enum USER_PERMISSIONS {
   VIEW_ANALYTICS_DASHBOARD = 'view:analytics:dashboard',
   START_MICROPHONE_CHAT = 'start:microphone-chat',
   START_CLOUD_TELEPHONY_CHAT = 'start:cloud-telephony-chat',
-  VIEW_SUMMARY = 'view:summary',
+  VIEW_CHAT_DETAILS = 'view:chat:details',
   EXPORT_CHAT_SUMMARY = 'export:chat:summary',
   EDIT_SUMMARY_FEEDBACK = 'edit:summary:feedback',
   VIEW_SCENARIO_SESSION_DETAILS = 'view:scenario-session:details',
   EDIT_SCENARIO_SESSION = 'edit:scenario-session',
   VIEW_SESSION_SCENARIO_MESSAGES = 'view:session-scenario:messages',
+  VIEW_COUNSELOR_CHAT = 'view:chat:counselor',
+  VIEW_MESSAGES = 'view:messages',
+  EDIT_MESSAGE_FEEDBACK = 'edit:message:feedback',
 }
 
 export const MICROPHONE_PERMISSION =

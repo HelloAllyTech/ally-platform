@@ -73,7 +73,10 @@ export const CallSummaryScreen: React.FC<
   );
   const isUnauthorized =
     summaryError && getErrorDetails(summaryError).status === 403;
-  const showTranscript = Boolean(callId) && !isUnauthorized;
+  const showTranscriptOption =
+    Boolean(callId) &&
+    !isUnauthorized &&
+    permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
   const dispatch = useAppDispatch();
 
@@ -289,7 +292,7 @@ export const CallSummaryScreen: React.FC<
         summaryName={summaryName}
         showSummary={showSummary}
         onHeaderPress={onHeaderPress}
-        showTranscript={showTranscript}
+        showTranscript={showTranscriptOption}
       />
 
       {renderContent()}
