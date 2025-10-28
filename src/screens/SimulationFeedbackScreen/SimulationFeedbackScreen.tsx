@@ -272,9 +272,9 @@ export const SimulationFeedbackScreen: React.FC<
           )}
         </KeyboardAwareScrollView>
       )}
-      {showTranscript && (
+      {showTranscript && simulationId && (
         <SimulationTranscript
-          sessionId={simulationId ?? ''}
+          sessionId={simulationId}
           startedAt={simulationDetails?.startedAt}
         />
       )}

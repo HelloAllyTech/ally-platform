@@ -148,8 +148,7 @@ export const callSummaryApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: builder => ({
     getCallSummary: builder.query<CallSummaryResponse, number>({
-      query: chatId =>
-        API_ROUTES.CHATS.BY_ID.replace(':chatId', String(chatId)),
+      query: chatId => API_ROUTES.CHATS.BY_ID(chatId),
       async onQueryStarted(_, {dispatch, queryFulfilled}) {
         const {data} = await queryFulfilled;
         dispatch(setSummaryData(data));
@@ -160,7 +159,7 @@ export const callSummaryApi = api.injectEndpoints({
       {chatId: number; data: any} // eslint-disable-line @typescript-eslint/no-explicit-any
     >({
       query: ({chatId, data}) => ({
-        url: API_ROUTES.CHATS.CALL_DETAILS.replace(':chatId', String(chatId)),
+        url: API_ROUTES.CHATS.CALL_DETAILS(chatId),
         method: API_METHODS.PUT,
         body: data,
       }),
@@ -171,7 +170,7 @@ export const callSummaryApi = api.injectEndpoints({
     }),
     exportCallSummary: builder.query<string, number>({
       query: chatId => ({
-        url: API_ROUTES.CHATS.EXPORT_SUMMARY.replace(':chatId', String(chatId)),
+        url: API_ROUTES.CHATS.EXPORT_SUMMARY(chatId),
         responseHandler: async response => response.text(),
       }),
     }),
@@ -180,7 +179,7 @@ export const callSummaryApi = api.injectEndpoints({
       {chatId: number; summaryName: string}
     >({
       query: ({chatId, summaryName}) => ({
-        url: API_ROUTES.CHATS.CALL_INFO.replace(':chatId', String(chatId)),
+        url: API_ROUTES.CHATS.CALL_INFO(chatId),
         method: API_METHODS.PATCH,
         body: {summaryName},
       }),
@@ -211,10 +210,7 @@ export const callSummaryApi = api.injectEndpoints({
       }
     >({
       query: ({chatId, rating, feedback}) => ({
-        url: API_ROUTES.CHATS.SUMMARY_FEEDBACK.replace(
-          ':chatId',
-          String(chatId),
-        ),
+        url: API_ROUTES.CHATS.SUMMARY_FEEDBACK(chatId),
         method: 'POST',
         body: {
           rating,
