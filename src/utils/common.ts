@@ -1,8 +1,7 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking, Platform} from 'react-native';
 
-import {ALLOWED_ROLES, APP_STORE_URLS} from '@/constants';
-import {User} from '@/types';
+import {APP_STORE_URLS} from '@/constants';
 
 export type Maybe<T> = T | null;
 
@@ -40,8 +39,4 @@ export const openAppStore = async (): Promise<void> => {
   if (storeUrl) {
     await Linking.openURL(storeUrl);
   }
-};
-
-export const isAppFeatureEnabled = (user: User): boolean => {
-  return ALLOWED_ROLES.includes(user.role);
 };

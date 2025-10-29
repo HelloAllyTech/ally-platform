@@ -91,9 +91,9 @@ jest.mock('../../hooks/useUser', () => ({
   useUser: jest.fn(() => ({userData: null})),
 }));
 
+// Mock utils/common (no longer needed for isAppFeatureEnabled)
 jest.mock('../../utils/common', () => ({
   ...jest.requireActual('../../utils/common'),
-  isAppFeatureEnabled: jest.fn(() => true),
 }));
 
 // Mock API to prevent store issues
@@ -153,21 +153,8 @@ describe('BottomTabs (TabNavigator)', () => {
     expect(queryByTestId(`tab-screen-${SCREEN_NAMES.LEARN}`)).toBeNull();
   });
 
-  it('hides custom tab bar when feature flag disabled for user', () => {
-    const {useUser} = require('../../hooks/useUser');
-    const {isAppFeatureEnabled} = require('../../utils/common');
-    useUser.mockReturnValue({userData: {id: 1}});
-    isAppFeatureEnabled.mockReturnValue(false);
-
-    const selectorResults = [false, [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT]];
-    mockUseSelector.mockImplementation(() => selectorResults.shift());
-
-    const {getByTestId} = render(<BottomTabs />);
-    const tabBarWrapper = getByTestId('mock-tab-bar');
-    // When feature flag is disabled, the tab bar should still render (this test was checking wrong behavior)
-    // The current implementation doesn't conditionally hide the tab bar based on feature flags
-    expect(tabBarWrapper.props.children).toBeTruthy();
-  });
+  // Test removed as isAppFeatureEnabled function no longer exists
+  // The tab bar is now always rendered regardless of feature flags
 });
 
 
