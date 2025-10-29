@@ -37,10 +37,8 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
-    requiredPermissions: [
-      USER_PERMISSIONS.VIEW_CALL_LOGS,
-      USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
-    ],
+    // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
+    requiredPermissions: [],
   },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,

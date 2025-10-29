@@ -51,6 +51,7 @@ import {logger} from '@/utils/logger';
 import {
   CallLogHeader,
   CallLogItem,
+  FeatureNotAvailable,
   // FeatureNotAvailable,
   StartSessionModal,
 } from './components';
@@ -101,6 +102,14 @@ export const CallLogScreen: React.FC = () => {
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+  const showFeatureUnavailable = useMemo(() => {
+    return !permissions?.some(permission =>
+      [
+        USER_PERMISSIONS.VIEW_CALL_LOGS,
+        USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
+      ].includes(permission as USER_PERMISSIONS),
+    );
+  }, [permissions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -420,24 +429,24 @@ export const CallLogScreen: React.FC = () => {
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
   // TODO: Handle this later
-  // if (userData && !isAppFeatureEnabled(userData)) {
-  //   return (
-  //     <View style={[styles.container, {paddingTop: insets.top}]}>
-  //       <CallLogHeader
-  //         search={search}
-  //         onSearchChange={setSearch}
-  //         showTitle={false}
-  //         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
-  //       />
-  //       <FeatureNotAvailable
-  //         description={t('CallLogs.appCurrentlyForCounsellors')}
-  //         ctaText={t('CallLogs.learnMore')}
-  //         onCtaPress={handleLearnMorePress}
-  //         containerStyle={styles.featureNotAvailable}
-  //       />
-  //     </View>
-  //   );
-  // }
+  if (showFeatureUnavailable) {
+    return (
+      <View style={[styles.container, {paddingTop: insets.top}]}>
+        <CallLogHeader
+          search={search}
+          onSearchChange={setSearch}
+          showTitle={false}
+          isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
+        />
+        <FeatureNotAvailable
+          description={t('CallLogs.appCurrentlyForCounsellors')}
+          ctaText={t('CallLogs.learnMore')}
+          onCtaPress={handleLearnMorePress}
+          containerStyle={styles.featureNotAvailable}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>

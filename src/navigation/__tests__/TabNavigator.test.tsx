@@ -144,11 +144,11 @@ describe('BottomTabs (TabNavigator)', () => {
     const {getByTestId, queryByTestId} = render(<BottomTabs />);
 
     expect(getByTestId('tab-navigator')).toBeTruthy();
-    // Included tabs
+    // Included tabs (CALL_LOG is always visible now for drawer access)
+    expect(getByTestId(`tab-screen-${SCREEN_NAMES.CALL_LOG}`)).toBeTruthy();
     expect(getByTestId(`tab-screen-${SCREEN_NAMES.SEARCH}`)).toBeTruthy();
     expect(getByTestId(`tab-screen-${SCREEN_NAMES.COMMUNITY}`)).toBeTruthy();
     // Excluded tabs
-    expect(queryByTestId(`tab-screen-${SCREEN_NAMES.CALL_LOG}`)).toBeNull();
     expect(queryByTestId(`tab-screen-${SCREEN_NAMES.USER_ANALYTICS}`)).toBeNull();
     expect(queryByTestId(`tab-screen-${SCREEN_NAMES.LEARN}`)).toBeNull();
   });
