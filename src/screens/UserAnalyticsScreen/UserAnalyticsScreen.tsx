@@ -145,39 +145,43 @@ export const UserAnalyticsScreen: React.FC = () => {
           />
         )}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={
-          Object.keys(dashboardUrls).length === 0 &&
+      {!!dashboards?.length && (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={
+            Object.keys(dashboardUrls).length === 0 &&
+            dashboards &&
+            dashboards.length > 0
+              ? styles.loadingContent
+              : styles.content
+          }
+          showsVerticalScrollIndicator={false}>
+          {Object.keys(dashboardUrls).length === 0 &&
           dashboards &&
-          dashboards.length > 0
-            ? styles.loadingContent
-            : styles.content
-        }
-        showsVerticalScrollIndicator={false}>
-        {Object.keys(dashboardUrls).length === 0 &&
-        dashboards &&
-        dashboards.length > 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.azureBlue} />
-          </View>
-        ) : (
-          filteredDashboards.map(dashboard => {
-            const url = dashboardUrls[dashboard.externalId];
-            if (!url) return null;
+          dashboards.length > 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.azureBlue} />
+            </View>
+          ) : (
+            filteredDashboards.map(dashboard => {
+              const url = dashboardUrls[dashboard.externalId];
+              if (!url) return null;
 
-            return (
-              <View key={dashboard.externalId} style={styles.webViewContainer}>
-                <WebView
-                  source={{uri: url}}
-                  style={styles.webView}
-                  startInLoadingState
-                />
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
+              return (
+                <View
+                  key={dashboard.externalId}
+                  style={styles.webViewContainer}>
+                  <WebView
+                    source={{uri: url}}
+                    style={styles.webView}
+                    startInLoadingState
+                  />
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
