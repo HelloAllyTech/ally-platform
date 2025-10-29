@@ -37,6 +37,6 @@ export const openAppStore = async (): Promise<void> => {
   }
 };
 
-export const isAppFeatureEnabled = (user: User) => {
-  return user.role && ALLOWED_ROLES.includes(user.role);
+export const isAppFeatureEnabled = (user: User): boolean => {
+  return ALLOWED_ROLES.includes(user.role);
 };

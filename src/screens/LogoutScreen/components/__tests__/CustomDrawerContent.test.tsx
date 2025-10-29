@@ -11,6 +11,11 @@ jest.mock('@/hooks', () => ({
   useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
 }));
 
+jest.mock('@/store/hooks', () => ({
+  __esModule: true,
+  useAppSelector: () => ['start:microphone-chat'], // Mock permissions
+}));
+
 jest.mock('@/utils', () => ({
   __esModule: true,
   getAppVersion: () => '1.2.3',
@@ -78,9 +83,11 @@ describe('CustomDrawerContent', () => {
   it('hides carousel and version when feature disabled or user missing', () => {
     const utilsMod: any = require('@/utils');
     const hooksMod: any = require('@/hooks');
+    const storeHooksMod: any = require('@/store/hooks');
 
     jest.spyOn(utilsMod, 'isAppFeatureEnabled').mockReturnValue(false);
     jest.spyOn(hooksMod, 'useUser').mockReturnValue({ userData: null });
+    jest.spyOn(storeHooksMod, 'useAppSelector').mockReturnValue([]); // No permissions
 
     const {queryByTestId, queryByText} = render(
       <DrawerContent openLogoutModal={jest.fn()} />,

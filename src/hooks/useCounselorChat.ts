@@ -30,7 +30,12 @@ export const useCounselorChat = ({
 
   const checkCounselorChat = useCallback(async () => {
     // Prevent multiple simultaneous checks
-    if (!userData?.isAuthenticated || isCheckingRef.current) return;
+    if (
+      !userData?.isAuthenticated ||
+      isCheckingRef.current ||
+      !permissions.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)
+    )
+      return;
 
     try {
       isCheckingRef.current = true;
@@ -66,6 +71,7 @@ export const useCounselorChat = ({
     onActiveChatFound,
     onNoActiveChatFound,
     getCurrentRoute,
+    permissions,
   ]);
 
   const handleAppStateChange = useCallback(

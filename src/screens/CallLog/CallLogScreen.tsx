@@ -46,13 +46,12 @@ import {
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {Chat} from '@/types';
-import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
 import {
   CallLogHeader,
   CallLogItem,
-  FeatureNotAvailable,
+  // FeatureNotAvailable,
   StartSessionModal,
 } from './components';
 import {LogItem} from './types';
@@ -420,24 +419,25 @@ export const CallLogScreen: React.FC = () => {
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
-  if (userData && !isAppFeatureEnabled(userData)) {
-    return (
-      <View style={[styles.container, {paddingTop: insets.top}]}>
-        <CallLogHeader
-          search={search}
-          onSearchChange={setSearch}
-          showTitle={false}
-          isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
-        />
-        <FeatureNotAvailable
-          description={t('CallLogs.appCurrentlyForCounsellors')}
-          ctaText={t('CallLogs.learnMore')}
-          onCtaPress={handleLearnMorePress}
-          containerStyle={styles.featureNotAvailable}
-        />
-      </View>
-    );
-  }
+  // TODO: Handle this later
+  // if (userData && !isAppFeatureEnabled(userData)) {
+  //   return (
+  //     <View style={[styles.container, {paddingTop: insets.top}]}>
+  //       <CallLogHeader
+  //         search={search}
+  //         onSearchChange={setSearch}
+  //         showTitle={false}
+  //         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
+  //       />
+  //       <FeatureNotAvailable
+  //         description={t('CallLogs.appCurrentlyForCounsellors')}
+  //         ctaText={t('CallLogs.learnMore')}
+  //         onCtaPress={handleLearnMorePress}
+  //         containerStyle={styles.featureNotAvailable}
+  //       />
+  //     </View>
+  //   );
+  // }
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
