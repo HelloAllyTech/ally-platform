@@ -52,7 +52,6 @@ import {
   CallLogHeader,
   CallLogItem,
   FeatureNotAvailable,
-  // FeatureNotAvailable,
   StartSessionModal,
 } from './components';
 import {LogItem} from './types';
