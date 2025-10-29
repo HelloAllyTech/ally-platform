@@ -58,7 +58,7 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_COMMUNITY],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY],
   },
 ];
 
