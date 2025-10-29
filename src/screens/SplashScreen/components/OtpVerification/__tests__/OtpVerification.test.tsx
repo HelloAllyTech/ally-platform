@@ -63,8 +63,7 @@ describe('OtpVerification', () => {
     fireEvent.press(button);
     expect(mockVerify).toHaveBeenCalledWith({ 
       email: 'user@example.com', 
-      otp: '1234', 
-      allowedRoles: ['COUNSELOR', 'LEARNER', 'ADMIN'] 
+      otp: '1234'
     });
   });
 

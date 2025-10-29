@@ -75,8 +75,7 @@ describe('OtpVerification behavior', () => {
       fireEvent.press(resendTouchable);
     });
     expect(mockGen).toHaveBeenCalledWith({
-      email: 'user@example.com',
-      allowedRoles: ['COUNSELOR', 'LEARNER', 'ADMIN']
+      email: 'user@example.com'
     });
     expect(mockFocusFirst).toHaveBeenCalled();
   });

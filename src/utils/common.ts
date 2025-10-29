@@ -6,6 +6,11 @@ import {User} from '@/types';
 
 export type Maybe<T> = T | null;
 
+export const isValidEmail = (emailAddress: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(emailAddress);
+};
+
 // Decode helpers and a unified payload-to-JSON converter used across the app
 export const tryParseJson = (str: string): unknown => {
   try {

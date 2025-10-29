@@ -6,16 +6,14 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
 import {
-  ALLOWED_ROLES,
   isIOS,
-  isValidEmail,
   PRIVACY_POLICY_URL,
   TERMS_AND_CONDITIONS_URL,
 } from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, isValidEmail} from '@/utils';
 
 import {styles} from './styles';
 import type {EmailLoginProps} from './types';
@@ -63,7 +61,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
 
   const handleSubmit = useCallback(async () => {
     if (isValidEmail(email)) {
-      await generateOtp({email, allowedRoles: ALLOWED_ROLES});
+      await generateOtp({email});
     }
   }, [email, generateOtp]);
 
