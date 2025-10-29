@@ -76,8 +76,7 @@ jest.mock('@/services/settingsApi', () => ({
   useLazyGetSummaryFieldsQuery: () => [jest.fn(), { data: ['field1'] }],
 }));
 
-// Utils
-jest.mock('@/utils/common', () => ({ isAppFeatureEnabled: () => true }));
+// Utils (isAppFeatureEnabled removed)
 jest.mock('@/utils/logger', () => ({ logger: { error: jest.fn() } }));
 
 // Child components

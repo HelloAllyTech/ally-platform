@@ -19,7 +19,6 @@ jest.mock('@/store/hooks', () => ({
 jest.mock('@/utils', () => ({
   __esModule: true,
   getAppVersion: () => '1.2.3',
-  isAppFeatureEnabled: () => true,
 }));
 
 jest.mock('@/config/env', () => ({
@@ -80,23 +79,8 @@ describe('CustomDrawerContent', () => {
     expect(openLogoutModal).toHaveBeenCalled();
   });
 
-  it('hides carousel and version when feature disabled or user missing', () => {
-    const utilsMod: any = require('@/utils');
-    const hooksMod: any = require('@/hooks');
-    const storeHooksMod: any = require('@/store/hooks');
-
-    jest.spyOn(utilsMod, 'isAppFeatureEnabled').mockReturnValue(false);
-    jest.spyOn(hooksMod, 'useUser').mockReturnValue({ userData: null });
-    jest.spyOn(storeHooksMod, 'useAppSelector').mockReturnValue([]); // No permissions
-
-    const {queryByTestId, queryByText} = render(
-      <DrawerContent openLogoutModal={jest.fn()} />,
-    );
-
-    expect(queryByTestId('security-carousel')).toBeNull();
-    expect(queryByText(/Common.version/)).toBeNull();
-    expect(queryByText(/\(Dev\)/)).toBeNull();
-  });
+  // Test removed as isAppFeatureEnabled function no longer exists
+  // The carousel and version are now shown based on permissions only
 });
 
 

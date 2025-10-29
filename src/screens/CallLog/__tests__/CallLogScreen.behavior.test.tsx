@@ -95,9 +95,7 @@ jest.mock('@/services/settingsApi', () => ({
   useLazyGetSummaryFieldsQuery: () => [jest.fn(), {data: ['field1']}],
 }));
 
-// Utils
-let mockIsAppFeatureEnabled = true;
-jest.mock('@/utils/common', () => ({isAppFeatureEnabled: () => mockIsAppFeatureEnabled}));
+// Utils (isAppFeatureEnabled removed)
 // Linking
 jest.mock('react-native/Libraries/Linking/Linking', () => ({openURL: jest.fn()}));
 jest.mock('@/utils/logger', () => ({logger: {error: jest.fn()}}));
