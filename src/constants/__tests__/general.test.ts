@@ -15,7 +15,6 @@ import {
   isIOS,
   LanguageCode,
   TAG_COLORS,
-  isValidEmail,
   API_ROUTES,
   API_METHODS,
   TERMS_AND_CONDITIONS_URL,
@@ -27,6 +26,7 @@ import {
   SortOrder,
   KeyCode,
 } from '../general';
+import {isValidEmail} from '../../utils/common';
 
 describe('constants/general', () => {
   it('basic constants', () => {

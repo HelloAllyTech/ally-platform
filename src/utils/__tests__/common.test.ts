@@ -1,11 +1,8 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking} from 'react-native';
 
-import {UserRole} from '../../types';
-
 import {
   copyToClipboard,
-  isAppFeatureEnabled,
   openAppStore,
   tryParseJson,
   uint8ToString,
@@ -76,13 +73,4 @@ describe('Common Utilities', () => {
     expect(Linking.openURL).toHaveBeenCalledWith('mock-url');
   });
 
-  it('should check if app feature is enabled for a user', () => {
-    const user = {role: UserRole.COUNSELOR};
-    expect(isAppFeatureEnabled(user)).toBe(true);
-  });
-
-  it('should return false if user role is not enabled', () => {
-    const user = {role: 'UNKNOWN_ROLE'};
-    expect(isAppFeatureEnabled(user)).toBe(false);
-  });
 });

@@ -46,7 +46,6 @@ import {
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {Chat} from '@/types';
-import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
 import {
@@ -102,6 +101,14 @@ export const CallLogScreen: React.FC = () => {
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+  const showFeatureUnavailable = useMemo(() => {
+    return !permissions?.some(permission =>
+      [
+        USER_PERMISSIONS.VIEW_CALL_LOGS,
+        USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
+      ].includes(permission as USER_PERMISSIONS),
+    );
+  }, [permissions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -311,7 +318,7 @@ export const CallLogScreen: React.FC = () => {
   const renderItem = ({item, index}: {item: LogItem; index: number}) => {
     const isDisabled =
       activeTab === LogType.REAL
-        ? !permissions?.includes(USER_PERMISSIONS.VIEW_SUMMARY)
+        ? !permissions?.includes(USER_PERMISSIONS.VIEW_CHAT_DETAILS)
         : !permissions?.includes(
             USER_PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
           );
@@ -420,7 +427,7 @@ export const CallLogScreen: React.FC = () => {
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
-  if (userData && !isAppFeatureEnabled(userData)) {
+  if (showFeatureUnavailable) {
     return (
       <View style={[styles.container, {paddingTop: insets.top}]}>
         <CallLogHeader

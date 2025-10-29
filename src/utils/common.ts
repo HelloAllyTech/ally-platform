@@ -1,10 +1,14 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking, Platform} from 'react-native';
 
-import {ALLOWED_ROLES, APP_STORE_URLS} from '@/constants';
-import {User} from '@/types';
+import {APP_STORE_URLS} from '@/constants';
 
 export type Maybe<T> = T | null;
+
+export const isValidEmail = (emailAddress: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(emailAddress);
+};
 
 // Decode helpers and a unified payload-to-JSON converter used across the app
 export const tryParseJson = (str: string): unknown => {
@@ -35,8 +39,4 @@ export const openAppStore = async (): Promise<void> => {
   if (storeUrl) {
     await Linking.openURL(storeUrl);
   }
-};
-
-export const isAppFeatureEnabled = (user: User) => {
-  return user.role && ALLOWED_ROLES.includes(user.role);
 };
