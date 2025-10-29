@@ -29,7 +29,7 @@ import {
 import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch} from '@/store/hooks';
 import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
-import {SocketEvent, UserRole} from '@/types';
+import {SocketEvent} from '@/types';
 import {logger} from '@/utils';
 import {
   getCallIdFromUrl,
@@ -120,15 +120,13 @@ const NavigationContent = ({
     () => ({
       [SocketEvent.USER_JOINED]: async () => {
         try {
-          if (userData?.role === UserRole.COUNSELOR) {
-            checkCounselorChat();
-          }
+          checkCounselorChat();
         } catch (error) {
           logger.error(`Error in USER_JOINED handler: ${error}`);
         }
       },
     }),
-    [checkCounselorChat, userData?.role],
+    [checkCounselorChat],
   );
 
   useSocketConnection({

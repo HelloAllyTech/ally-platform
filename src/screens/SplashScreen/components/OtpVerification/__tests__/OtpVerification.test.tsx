@@ -64,7 +64,7 @@ describe('OtpVerification', () => {
     expect(mockVerify).toHaveBeenCalledWith({ 
       email: 'user@example.com', 
       otp: '1234', 
-      allowedRoles: ['COUNSELOR', 'LEARNER'] 
+      allowedRoles: ['COUNSELOR', 'LEARNER', 'ADMIN'] 
     });
   });
 

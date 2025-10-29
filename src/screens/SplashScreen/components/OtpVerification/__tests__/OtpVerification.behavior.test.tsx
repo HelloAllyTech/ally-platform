@@ -76,7 +76,7 @@ describe('OtpVerification behavior', () => {
     });
     expect(mockGen).toHaveBeenCalledWith({
       email: 'user@example.com',
-      allowedRoles: ['COUNSELOR', 'LEARNER']
+      allowedRoles: ['COUNSELOR', 'LEARNER', 'ADMIN']
     });
     expect(mockFocusFirst).toHaveBeenCalled();
   });
