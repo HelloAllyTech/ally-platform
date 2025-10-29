@@ -427,7 +427,6 @@ export const CallLogScreen: React.FC = () => {
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
-  // TODO: Handle this later
   if (showFeatureUnavailable) {
     return (
       <View style={[styles.container, {paddingTop: insets.top}]}>
