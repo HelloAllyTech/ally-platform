@@ -164,9 +164,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
-        {!!scenario.scenario && (
-          <Text style={styles.fieldValue}>{scenario.description}</Text>
-        )}
+        <Text style={styles.fieldValue}>{scenario.description}</Text>
       </ScrollView>
     );
   };

@@ -4,10 +4,11 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {BoltIcon, LogoutIcon, ProfileIcon} from '@/assets';
 import {SecurityCarousel} from '@/components';
 import {env} from '@/config/env';
-import {CarouselVariant} from '@/constants';
+import {CarouselVariant, USER_PERMISSIONS} from '@/constants';
 import {useSimulationCredits, useTranslate, useUser} from '@/hooks';
+import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
-import {getAppVersion, isAppFeatureEnabled} from '@/utils';
+import {getAppVersion} from '@/utils';
 
 interface DrawerContentProps {
   openLogoutModal: () => void;
@@ -15,9 +16,16 @@ interface DrawerContentProps {
 
 export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
   const {userData} = useUser();
+  const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslate();
   const {credits, getCreditsInfo} = useSimulationCredits();
   const {name, email} = userData ?? {};
+  const showSecurityCarousel = permissions?.some(permission =>
+    [
+      USER_PERMISSIONS.START_MICROPHONE_CHAT,
+      USER_PERMISSIONS.START_CLOUD_TELEPHONY_CHAT,
+    ].includes(permission.toString() as USER_PERMISSIONS),
+  );
 
   return (
     <View style={styles.container}>
@@ -86,7 +94,7 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         </View>
         <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
       </TouchableOpacity>
-      {userData && isAppFeatureEnabled(userData) && (
+      {showSecurityCarousel && (
         <>
           <View style={styles.carouselWrapper}>
             <SecurityCarousel variant={CarouselVariant.DRAWER} />

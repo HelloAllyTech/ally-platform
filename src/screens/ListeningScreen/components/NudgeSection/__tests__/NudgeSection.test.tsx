@@ -10,6 +10,11 @@ jest.mock('@/hooks', () => ({
   useDebounce: (fn: any) => fn,
 }));
 
+jest.mock('@/store/hooks', () => ({
+  __esModule: true,
+  useAppSelector: () => ['edit:message:feedback'], // Mock permissions for feedback
+}));
+
 jest.mock('@/services/chatApi', () => ({
   __esModule: true,
   useAddFeedbackMutation: () => [jest.fn(() => ({ unwrap: () => Promise.resolve({feedbackId: '1', rating: 1}) }))],

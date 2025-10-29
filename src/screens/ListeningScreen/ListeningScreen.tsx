@@ -468,7 +468,8 @@ export const ListeningScreen = ({
           if (
             isMicrophoneMode &&
             !isWebMicrophoneMode &&
-            !isPermissionGranted
+            !isPermissionGranted &&
+            !permissions.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)
           ) {
             return;
           }
@@ -496,6 +497,7 @@ export const ListeningScreen = ({
     isWebMicrophoneMode,
     handleCallEndRedirection,
     dispatch,
+    permissions,
   ]);
 
   const callEndModalElement = (

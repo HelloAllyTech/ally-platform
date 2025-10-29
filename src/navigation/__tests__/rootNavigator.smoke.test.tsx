@@ -67,6 +67,11 @@ jest.mock('@/hooks', () => ({
   useSocketConnection: (...args: any[]) => mockUseSocketConnection?.(...args),
 }));
 
+jest.mock('@/store/hooks', () => ({
+  useAppSelector: () => [],
+  useAppDispatch: () => jest.fn(),
+}));
+
 jest.mock('@/screens', () => {
   const React = require('react');
   const {Text} = require('react-native');

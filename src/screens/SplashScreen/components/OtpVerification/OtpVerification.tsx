@@ -3,7 +3,7 @@ import {Alert, Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
-import {ALLOWED_ROLES, ErrorCode, isIOS, SCREEN_NAMES} from '@/constants';
+import {ErrorCode, isIOS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
@@ -85,7 +85,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   }, []);
 
   const handleSubmit = useCallback(() => {
-    verifyOtp({email, otp, allowedRoles: ALLOWED_ROLES});
+    verifyOtp({email, otp});
   }, [email, otp, verifyOtp]);
 
   const resetOtpState = useCallback(() => {
@@ -97,7 +97,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   const handleResendOtp = useCallback(async () => {
     try {
-      await generateOtp({email, allowedRoles: ALLOWED_ROLES});
+      await generateOtp({email});
       resetOtpState();
       otpInputRef.current?.focusFirst();
     } catch (err) {

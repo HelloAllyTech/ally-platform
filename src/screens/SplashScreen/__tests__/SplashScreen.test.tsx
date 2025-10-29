@@ -55,6 +55,12 @@ jest.mock('@/hooks', () => ({
   useHardwareBackPressHandler: () => {},
 }));
 
+const mockUseAppSelector = jest.fn(() => []);
+jest.mock('@/store/hooks', () => ({
+  useAppSelector: (selector: any) => mockUseAppSelector(selector),
+  useAppDispatch: () => jest.fn(),
+}));
+
 jest.mock('@/screens/SplashScreen/components', () => {
   const React = require('react');
   const {View} = require('react-native');
@@ -93,6 +99,7 @@ describe('SplashScreen', () => {
     mockUseUser.isAuthenticated = false;
     mockUseUser.isUserLoading = false;
     mockUseUser.userData = undefined as any;
+    mockUseAppSelector.mockReturnValue([]); // Reset permissions
     const hooks = jest.requireMock('@/hooks');
     (hooks.useForceUpdate as jest.Mock).mockReturnValue({
       versionInfo: {isUpdateRequired: false},
@@ -143,6 +150,7 @@ describe('SplashScreen', () => {
   it('calls checkCounselorChat for authenticated counselor', async () => {
     mockUseUser.isAuthenticated = true;
     mockUseUser.userData = {role: UserRole.COUNSELOR} as any;
+    mockUseAppSelector.mockReturnValue(['view:chat:counselor']); // Mock the required permission
 
     render(
       <SafeAreaProvider
