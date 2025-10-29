@@ -43,11 +43,7 @@ export const TAG_COLORS = {
   5: {bg: '#B9EFC880', text: '#1B5E20'},
 };
 
-export const ALLOWED_ROLES = [
-  UserRole.COUNSELOR,
-  UserRole.LEARNER,
-  UserRole.ADMIN,
-];
+export const ALLOWED_ROLES = [UserRole.COUNSELOR, UserRole.LEARNER];
 
 export enum AllyPlatforms {
   WEB = 'WEB',
