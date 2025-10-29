@@ -45,15 +45,12 @@ class Settings(BaseSettings):
 
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
-    MODEL : Optional[str] = Field(None)
-    VOICE_ID: Optional[str] = Field(None)
-    SPEAKER: Optional[str] = Field(None)
 
-    TTS_PROVIDER: TTSProvider= Field(
-        default=TTSProvider.DEEPGRAM,
-        description="The TTS provider to use ('elevenlabs' or 'deepgram')"
-    )
 
     LLM_TEMPERATURE : str = Field(...)
+
+    DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(None)
+    DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(None)
+    DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(None)
 
 settings = Settings()

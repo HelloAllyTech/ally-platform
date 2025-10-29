@@ -1,4 +1,5 @@
 """TTS provider management and configuration."""
+from enum import Enum
 from typing import Optional, Callable, Dict
 from livekit.plugins import deepgram, elevenlabs, sarvam
 from app.core.constants import TTSProvider
@@ -13,24 +14,11 @@ from app.utils.tts_validator import (
 
 logger = get_logger(__name__)
 
-TTS_FACTORY: Dict[str, Callable] = {
-    TTSProvider.ELEVENLABS: lambda: elevenlabs.TTS(
-        voice_id=settings.VOICE_ID,
-        model="eleven_multilingual_v2",
-        api_key=settings.ELEVEN_API_KEY,
-    ),
-    TTSProvider.DEEPGRAM: lambda: deepgram.TTS(
-        model=settings.MODEL,
-        encoding="linear16",
-        sample_rate=24000,
-        api_key=settings.DEEPGRAM_API_KEY,
-    ),
-    TTSProvider.SARVAM: lambda: sarvam.TTS(
-        target_language_code="en-IN",
-        speaker=settings.SPEAKER,
-        api_key=settings.SARVAM_API_KEY,
-    ),
-}
+class Gender(str, Enum):
+    """Enumeration for gender types."""
+    MALE = "male"
+    FEMALE = "female"
+    NON_BINARY = "non-binary"
 
 TTS_VALIDATORS = {
     TTSProvider.ELEVENLABS: validate_elevenlabs_voice,
@@ -39,12 +27,30 @@ TTS_VALIDATORS = {
 }
 
 
-def get_default_tts_config() -> object:
-    """Get default TTS provider from environment settings."""
-    factory = TTS_FACTORY.get(settings.TTS_PROVIDER)
-    if not factory:
-        raise ValueError(f"Unsupported TTS provider: {settings.TTS_PROVIDER}")
-    return factory()
+def get_default_tts_config(gender: Gender) -> object:
+    """Get default Deepgram TTS provider based on gender."""
+    try:
+
+        if gender == Gender.MALE:
+            model = settings.DEFAULT_MALE_MODEL
+        elif gender == Gender.FEMALE:
+            model = settings.DEFAULT_FEMALE_MODEL
+        else:
+            model = settings.DEFAULT_NON_BINARY_MODEL
+
+        return deepgram.TTS(
+            model=model,
+            encoding="linear16",
+            sample_rate=24000,
+            api_key=settings.DEEPGRAM_API_KEY,
+        )
+    except AttributeError as e:
+        logger.error(f"Missing gender-specific default Deepgram setting: {e}")
+        raise ValueError(f"Missing default Deepgram TTS settings for gender '{gender.value}'. "
+                         f"Check your config for DEFAULT_MALE_MODEL, DEFAULT_FEMALE_MODEL, and DEFAULT_NONBINARY_MODEL.")
+    except Exception as e:
+        logger.error(f"Failed to create default Deepgram TTS: {e}")
+        raise
 
 
 def validate_tts_config(provider: str, config) -> bool:

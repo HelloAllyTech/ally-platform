@@ -67,7 +67,7 @@ async def entrypoint(ctx: agents.JobContext):
         tts_config = get_tts_for_scenario(scenario.voice)
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
-        tts_config = get_default_tts_config()
+        tts_config = get_default_tts_config(scenario.prompt_data.gender)
 
     # Initialize state
     initialize_agent_state(ctx.room.name, scenario)
