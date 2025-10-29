@@ -138,7 +138,7 @@ describe('BottomTabs (TabNavigator)', () => {
   });
 
   it('renders only tabs allowed by permissions', () => {
-    const selectorResults = [false, [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT, USER_PERMISSIONS.VIEW_NAVBAR_COMMUNITY]];
+    const selectorResults = [false, [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT, USER_PERMISSIONS.VIEW_COMMUNITY]];
     mockUseSelector.mockImplementation(() => selectorResults.shift());
 
     const {getByTestId, queryByTestId} = render(<BottomTabs />);
