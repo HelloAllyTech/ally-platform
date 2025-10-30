@@ -9,6 +9,7 @@ jest.mock('@/hooks', () => ({
     tVariable: (key: string) => key,
   }),
   useTabBackToHomeHandler: () => {},
+  useUser: () => ({ userData: { id: 1 }, isAuthenticated: true }),
 }));
 
 // Mock components used inside the screen to isolate behavior

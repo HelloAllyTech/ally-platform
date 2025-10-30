@@ -7,6 +7,7 @@ import {UserAnalyticsScreen} from '../UserAnalyticsScreen';
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (k: string) => k}),
   useTabBackToHomeHandler: () => {},
+  useUser: () => ({ userData: { id: 1 }, isAuthenticated: true }),
 }));
 
 // Stable component mocks
