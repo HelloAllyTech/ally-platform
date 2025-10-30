@@ -1,23 +1,39 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
 from app.core.constants import VisibilityType
-from app.core.events.schemas import ChatMessage
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., description="The role of the sender (e.g., user, assistant, counselor)")
+    content: str = Field(..., description="The content of the message")
+    start_time: Optional[float] = Field(None, description="Start time of the message in seconds (relative position)")
+    end_time: Optional[float] = Field(None, description="End time of the message in seconds (relative position)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "role": "counselor",
+                "content": "Hello, how are you?",
+                "start_time": 0.5,
+                "end_time": 5.7,
+            }
+        }
 
 
 class BaseEvent(BaseModel, ABC):
     """
     Runtime event instance populated from scenario metadata.
-    Concrete subclasses must set `event_id` (ClassVar) and implement `detect_event`.
+    Concrete subclasses must implement `detect_event`.
     """
 
-    # Class-level identifier used for registry mapping (e.g., "counselor-rephrased")
-    event_id: ClassVar[str]
+    # Instance-level event identifier
+    event_id: str
     
-    # Class-level visibility type (can be overridden by subclasses)
-    visibility_type: ClassVar[VisibilityType] = VisibilityType.ACTIVE
+    # Instance-level visibility type
+    visibility_type: VisibilityType = VisibilityType.ACTIVE
 
     # Per-scenario values (come from metadata)
     score: Optional[int] = None

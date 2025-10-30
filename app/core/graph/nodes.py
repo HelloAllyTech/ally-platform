@@ -104,10 +104,7 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
     system_message = None
     if scenario is not None:
         system_message = generate_system_message(
-            about=scenario.name,
-            goal=scenario.learning_objective,
-            role=scenario.prompt,
-            life_history=scenario.life_history,
+            prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
         )
 

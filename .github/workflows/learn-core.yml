@@ -124,33 +124,6 @@ jobs:
           build-platform: ${{ env.BUILD_PLATFORM }}
           build-path: ${{ env.BUILD_PATH }}
 
-  run-db-migration:
-    name: Run the DB migration
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      pull-requests: write
-      contents: read
-    needs: [prepare-env, build-push-image]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Notify migration skipped
-        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
-        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
-      - name: Run migration
-        if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
-        id: run_db_migration
-        uses: KeyvalueSoftwareSystems/lifeline-infra/.github/actions/run-migration@main
-        with:
-          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
-          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-          task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
-          container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
-          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
-          subnets: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
-          security-groups: '["sg-05f0c1b5ae75e1320"]'
-
   deploy-to-ecs-service:
     name: Deploy to ECS service
     runs-on: ubuntu-22.04
@@ -159,7 +132,7 @@ jobs:
       id-token: write
       pull-requests: write
       contents: read
-    needs: [prepare-env, build-push-image, run-db-migration]
+    needs: [prepare-env, build-push-image]
     steps:
       - uses: actions/checkout@v4
       - name: Deploy backend
