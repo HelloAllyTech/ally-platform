@@ -49,8 +49,8 @@ class Settings(BaseSettings):
 
     LLM_TEMPERATURE : str = Field(...)
 
-    DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(None)
-    DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(None)
-    DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(None)
+    DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(...)
+    DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)
+    DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(...)
 
 settings = Settings()

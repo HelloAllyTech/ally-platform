@@ -108,22 +108,22 @@ def create_provider_tts(provider: str, config):
     return tts
 
 
-def get_tts_for_scenario(voice: Optional[ScenarioVoice]):
+def get_tts_for_scenario(voice: Optional[ScenarioVoice], gender: Gender):
     """
     Get TTS instance for scenario voice.
     Falls back to default on error or invalid config.
     """
     if not voice:
-        return get_default_tts_config()
+        return get_default_tts_config(gender)
 
     provider = voice.provider.lower()
 
     if not validate_tts_config(provider, voice.config):
         logger.warning(f"Invalid {provider} config, using default")
-        return get_default_tts_config()
+        return get_default_tts_config(gender)
 
     try:
         return create_provider_tts(provider, voice.config)
     except Exception as e:
         logger.warning(f"Failed to create {provider} TTS: {e}")
-        return get_default_tts_config()
+        return get_default_tts_config(gender)
