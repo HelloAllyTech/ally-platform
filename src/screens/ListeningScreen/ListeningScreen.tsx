@@ -110,7 +110,6 @@ export const ListeningScreen = ({
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
-  const [isMicrophoneAudioActive, setIsMicrophoneAudioActive] = useState(false);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
@@ -332,7 +331,6 @@ export const ListeningScreen = ({
 
   const handleAudioData = useCallback(
     (base64Wav: string) => {
-      setIsMicrophoneAudioActive(true);
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
       if (
         !isCallPausedRef.current &&
@@ -382,7 +380,7 @@ export const ListeningScreen = ({
   }, [isMicrophoneMode]);
 
   useEffect(() => {
-    if (isAudioSessionReady && isMicrophoneAudioActive && !isAudioChatEmitted) {
+    if (isAudioSessionReady && !isAudioChatEmitted) {
       // This is to prevent socket event from being emitted before the
       // socket connection is established (Flow: permission denied and then granted from settings)
       setTimeout(() => {
@@ -394,7 +392,6 @@ export const ListeningScreen = ({
       });
     }
   }, [
-    isMicrophoneAudioActive,
     isAudioSessionReady,
     emitSocketEvent,
     isAudioChatEmitted,
@@ -468,7 +465,8 @@ export const ListeningScreen = ({
           if (
             isMicrophoneMode &&
             !isWebMicrophoneMode &&
-            !isPermissionGranted
+            !isPermissionGranted &&
+            !permissions.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)
           ) {
             return;
           }
@@ -496,6 +494,7 @@ export const ListeningScreen = ({
     isWebMicrophoneMode,
     handleCallEndRedirection,
     dispatch,
+    permissions,
   ]);
 
   const callEndModalElement = (
@@ -663,7 +662,7 @@ export const ListeningScreen = ({
         showEndSessionButton={isMicrophoneMode}
         isPauseResumeDisabled={isMicrophoneMode && isWebMicrophoneMode}
         showFocusModeButton={permissions?.includes(
-          USER_PERMISSIONS.VIEW_NAVBAR_SEARCH,
+          USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT,
         )}
       />
     </View>

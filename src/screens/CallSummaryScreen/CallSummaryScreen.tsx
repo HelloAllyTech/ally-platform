@@ -10,7 +10,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PrimaryButton, useToast} from '@/components';
-import {ChatSummaryStatus} from '@/constants';
+import {ChatSummaryStatus, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -43,6 +43,7 @@ export const CallSummaryScreen: React.FC<
   const {t} = useTranslate();
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const callInfo = useAppSelector(selectCallInfo);
+  const {permissions} = useAppSelector(state => state.user);
   const {hasChanges} = useCallSummaryForm();
 
   const callId = route.params?.callId;
@@ -72,7 +73,10 @@ export const CallSummaryScreen: React.FC<
   );
   const isUnauthorized =
     summaryError && getErrorDetails(summaryError).status === 403;
-  const showTranscript = Boolean(callId) && !isUnauthorized;
+  const showTranscriptOption =
+    Boolean(callId) &&
+    !isUnauthorized &&
+    permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
   const dispatch = useAppDispatch();
 
@@ -99,6 +103,9 @@ export const CallSummaryScreen: React.FC<
   const {showToast} = useToast();
 
   const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
+  const hasEditFeedbackPermission = permissions?.includes(
+    USER_PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
+  );
 
   const [mountTime] = useState<number>(Date.now());
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
@@ -120,7 +127,11 @@ export const CallSummaryScreen: React.FC<
     const timeElapsed = currentTime - mountTime;
     const thresholdMs = 30 * 1000; // 30 seconds
 
-    if ((timeElapsed >= thresholdMs || !fromLogs) && !hasFeedbackAlready) {
+    if (
+      (timeElapsed >= thresholdMs || !fromLogs) &&
+      !hasFeedbackAlready &&
+      hasEditFeedbackPermission
+    ) {
       setIsFeedbackPopupVisible(true);
       return;
     }
@@ -129,7 +140,9 @@ export const CallSummaryScreen: React.FC<
   };
 
   const onSaveButtonPress = () => {
-    if (!hasFeedbackAlready) setIsFeedbackPopupVisible(true);
+    if (!hasFeedbackAlready && hasEditFeedbackPermission) {
+      setIsFeedbackPopupVisible(true);
+    }
   };
 
   const handleBlur = () => {
@@ -267,7 +280,7 @@ export const CallSummaryScreen: React.FC<
         hideHeaderDropdown={hideHeaderDropdown}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
-        isSummaryAvailable={isSummaryAvailable}
+        showExportOption={isSummaryAvailable}
         isSummaryFeedbackPopup={isFeedbackPopupVisible}
         hideSummaryFeedbackPopup={() => setIsFeedbackPopupVisible(false)}
         onSubmitSummaryFeedback={onSubmitSummaryFeedback}
@@ -279,7 +292,7 @@ export const CallSummaryScreen: React.FC<
         summaryName={summaryName}
         showSummary={showSummary}
         onHeaderPress={onHeaderPress}
-        showTranscript={showTranscript}
+        showTranscript={showTranscriptOption}
       />
 
       {renderContent()}

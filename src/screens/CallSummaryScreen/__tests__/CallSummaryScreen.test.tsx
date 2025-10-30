@@ -27,7 +27,10 @@ jest.mock('@/screens/CallSummaryScreen/components', () => {
 
 // Store hooks/selectors
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (sel: any) => sel({ chat: { currentChat: null } }),
+  useAppSelector: (sel: any) => sel({ 
+    chat: { currentChat: null }, 
+    user: { permissions: [] } 
+  }),
   useAppDispatch: () => jest.fn(),
 }));
 
@@ -39,7 +42,10 @@ jest.mock('@/store/slices/summarySlice', () => ({
 jest.mock('@/utils', () => ({ navigateToCallLogTab: jest.fn() }));
 
 // Constants
-jest.mock('@/constants', () => ({ ChatSummaryStatus: { FAILED: 'FAILED', NO_AUDIO: 'NO_AUDIO' } }));
+jest.mock('@/constants', () => ({ 
+  ChatSummaryStatus: { FAILED: 'FAILED', NO_AUDIO: 'NO_AUDIO' },
+  USER_PERMISSIONS: { EDIT_SUMMARY_FEEDBACK: 'edit:summary:feedback' }
+}));
 
 // Hooks with configurable state for tests
 let mockSummaryState: any = {

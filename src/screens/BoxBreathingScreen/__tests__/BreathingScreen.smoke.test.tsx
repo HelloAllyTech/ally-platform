@@ -35,7 +35,6 @@ describe('BreathingScreen smoke', () => {
   it('renders without crashing', () => {
     const navigation: any = {navigate: jest.fn(), reset: jest.fn()};
     render(
-      // @ts-expect-error partial props
       <BreathingScreen navigation={navigation} route={{} as any} />,
     );
   });

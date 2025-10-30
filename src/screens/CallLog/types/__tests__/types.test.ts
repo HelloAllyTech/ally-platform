@@ -32,7 +32,7 @@ describe('CallLog types', () => {
       endedAt: 'b',
       status: 'ok',
       client: {name: 'Bob'},
-      summaryStatus: ChatSummaryStatus.COMPLETED as any,
+      summaryStatus: ChatSummaryStatus.SUCCESS as any,
       details: {summary: {callQuality: 5, tags: [{tag: 't', positivity_rating: 1}]}, chatId: 10, createdAt: 'c', callInfo: {summaryName: 'name'}},
     };
     expect(li.details?.chatId).toBe(10);

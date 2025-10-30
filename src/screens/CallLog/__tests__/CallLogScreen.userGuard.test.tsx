@@ -41,9 +41,15 @@ jest.mock('@/assets/icons', () => ({
 }));
 
 // Mock components barrel
-jest.mock('@/components', () => ({
-  CallLogSkeleton: () => null,
-}));
+jest.mock('@/components', () => {
+  const React = require('react');
+  const RN = require('react-native');
+  return {
+    CallLogSkeleton: () => null,
+    EmptyState: ({title}: {title: string}) => React.createElement(RN.Text, {}, title),
+    TabView: () => null,
+  };
+});
 
 // Config
 jest.mock('@/config/env', () => ({
@@ -56,7 +62,14 @@ jest.mock('@/constants', () => ({
   LogType: {REAL: 'REAL', SIMULATION: 'SIMULATION'},
   MICROPHONE_PERMISSION: 'mic',
   SCREEN_NAMES: {CALL_SUMMARY: 'CallSummary', SIMULATION_FEEDBACK: 'SimulationFeedback'},
-  USER_PERMISSIONS: {VIEW_NAVBAR_CALLS: 'CALLS', VIEW_SCENARIO_SESSION: 'SIM', VIEW_START_CALL_PAGE: 'START'},
+  USER_PERMISSIONS: {
+    VIEW_CALL_LOGS: 'CALLS', 
+    VIEW_SCENARIO_SESSION: 'SIM', 
+    VIEW_START_CALL_PAGE: 'START',
+    START_MICROPHONE_CHAT: 'start:microphone-chat',
+    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
+  },
+  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
 }));
 
 // Hooks mock provided above
@@ -65,7 +78,7 @@ jest.mock('@/constants', () => ({
 jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) =>
     sel({
-      user: {permissions: ['CALLS', 'START']},
+      user: {permissions: ['start:microphone-chat', 'start:cloud-telephony-chat']},
       chat: {currentChat: null},
       summary: {visibleFields: []},
     }),
@@ -84,8 +97,7 @@ jest.mock('@/services/settingsApi', () => ({
   useLazyGetSummaryFieldsQuery: () => [jest.fn(), {data: ['field1']}],
 }));
 
-// Utils
-jest.mock('@/utils/common', () => ({isAppFeatureEnabled: () => true}));
+// Utils (isAppFeatureEnabled removed)
 jest.mock('@/utils/logger', () => ({logger: {error: jest.fn()}}));
 
 // Permissions
@@ -93,6 +105,10 @@ jest.mock('react-native-permissions', () => ({
   check: jest.fn().mockResolvedValue('granted'),
   request: jest.fn().mockResolvedValue('granted'),
   RESULTS: {GRANTED: 'granted', BLOCKED: 'blocked'},
+  PERMISSIONS: {
+    IOS: { MICROPHONE: 'ios.permission.MICROPHONE' },
+    ANDROID: { RECORD_AUDIO: 'android.permission.RECORD_AUDIO' }
+  }
 }));
 
 // Linking

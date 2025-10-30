@@ -73,7 +73,7 @@ describe('useLiveAudioStream', () => {
     await act(async () => {
       // simulate app coming active
       (AppState as any)._currentState = 'background';
-      AppState.emit?.('change', 'active');
+      (AppState as any).emit?.('change', 'active');
     });
   });
 
