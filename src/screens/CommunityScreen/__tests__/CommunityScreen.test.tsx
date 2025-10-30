@@ -19,7 +19,7 @@ jest.mock('@/hooks', () => ({
 
 describe('CommunityScreen', () => {
   it('opens community URL on focus', () => {
-    const spy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce();
+    const spy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true as any);
     render(<CommunityScreen />);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
