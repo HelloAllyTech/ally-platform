@@ -52,7 +52,7 @@ describe('formDataTransformer', () => {
       location: 'L',
       codeOfConcern: 'C',
     };
-    const form = transformSummaryToFormData(summary, {notes: 'N'} as any);
+    const form = transformSummaryToFormData(summary, {notes: 'N'} as any) as any;
     expect(form.sessionSummary).toBe('s');
     expect(form.dominantFeelings).toBe('calm, happy');
     expect(form.tags).toBe('x');
@@ -63,7 +63,7 @@ describe('formDataTransformer', () => {
     const formData: any = {age: 25, gender: 'M', tags: 'ignored', notes: 'n'};
     const summaryData: any = {details: {summary: {existing: true}}};
     const tags = [{id: 1, tag: 'a'}] as any;
-    const out = transformFormDataForSubmission(formData, summaryData, tags);
+    const out = transformFormDataForSubmission(formData, summaryData, tags) as any;
     expect(out.age).toBe(25);
     expect(out.tags).toEqual(tags);
     expect(out.notes).toBe('n');

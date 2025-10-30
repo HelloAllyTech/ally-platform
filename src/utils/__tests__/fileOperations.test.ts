@@ -82,7 +82,7 @@ describe('saveFile', () => {
     Object.defineProperty(generalModule, 'isIOS', {get: () => true});
 
     // Mock exists to return false to trigger directory creation
-    RNFS.exists.mockResolvedValueOnce(false);
+    (RNFS.exists as unknown as jest.Mock).mockResolvedValueOnce(false);
 
     await saveFile({
       content: 'Test content',

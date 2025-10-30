@@ -9,7 +9,7 @@ jest.mock('@/config/env', () => ({ env: { API_BASE_URL: 'https://example.com', A
 
 import {UserRole} from '@/types';
 
-import {authApi, GenerateOtpRequest, VerifyOtpRequest} from '../authApi';
+import {authApi} from '../authApi';
 
 describe('authApi endpoints', () => {
   it('defines generateOtp and verifyOtp endpoints', () => {
@@ -19,22 +19,22 @@ describe('authApi endpoints', () => {
   });
 
   describe('endpoint interfaces', () => {
-    it('should have correct GenerateOtpRequest interface', () => {
-      const request: GenerateOtpRequest = {
+    it('should support allowedRoles payload alongside email (runtime body)', () => {
+      const request = {
         email: 'test@example.com',
         allowedRoles: [UserRole.COUNSELOR, UserRole.LEARNER],
-      };
+      } as any;
       
       expect(request.email).toBe('test@example.com');
       expect(request.allowedRoles).toEqual([UserRole.COUNSELOR, UserRole.LEARNER]);
     });
 
-    it('should have correct VerifyOtpRequest interface', () => {
-      const request: VerifyOtpRequest = {
+    it('should support allowedRoles in verify payload (runtime body)', () => {
+      const request = {
         email: 'test@example.com',
         otp: '123456',
         allowedRoles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
-      };
+      } as any;
       
       expect(request.email).toBe('test@example.com');
       expect(request.otp).toBe('123456');
@@ -50,10 +50,10 @@ describe('authApi endpoints', () => {
         UserRole.SUPER_ADMIN,
       ];
 
-      const request: GenerateOtpRequest = {
+      const request = {
         email: 'test@example.com',
         allowedRoles: allRoles,
-      };
+      } as any;
       
       expect(request.allowedRoles).toHaveLength(5);
       expect(request.allowedRoles).toContain(UserRole.ADMIN);

@@ -55,9 +55,9 @@ jest.mock('@/hooks', () => ({
   useHardwareBackPressHandler: () => {},
 }));
 
-const mockUseAppSelector = jest.fn(() => []);
+const mockUseAppSelector: jest.Mock<any, [any?]> = jest.fn((_?: any) => []);
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (selector: any) => mockUseAppSelector(selector),
+  useAppSelector: (selector: any) => (mockUseAppSelector as any)(selector),
   useAppDispatch: () => jest.fn(),
 }));
 
@@ -150,7 +150,7 @@ describe('SplashScreen', () => {
   it('calls checkCounselorChat for authenticated counselor', async () => {
     mockUseUser.isAuthenticated = true;
     mockUseUser.userData = {role: UserRole.COUNSELOR} as any;
-    mockUseAppSelector.mockReturnValue(['view:chat:counselor']); // Mock the required permission
+    mockUseAppSelector.mockReturnValue(['view:chat:counselor'] as any); // Mock the required permission
 
     render(
       <SafeAreaProvider

@@ -19,7 +19,7 @@ describe('usePermissionAlert', () => {
       const {showSettingsAlert, showMicrophoneSettingsAlert} = usePermissionAlert();
       return (
         <>
-          <Text testID="generic" onPress={() => showSettingsAlert('Title', 'Message')} />
+          <Text testID="generic" onPress={() => showSettingsAlert('Common.ok' as any, 'Common.ok' as any)} />
           <Text testID="micro" onPress={() => showMicrophoneSettingsAlert()} />
         </>
       );
@@ -28,7 +28,7 @@ describe('usePermissionAlert', () => {
     const {getByTestId} = render(<Test />);
 
     fireEvent.press(getByTestId('generic'));
-    expect(alertSpy).toHaveBeenCalledWith('Title', 'Message', expect.any(Array));
+    expect(alertSpy).toHaveBeenCalledWith('Common.ok', 'Common.ok', expect.any(Array));
 
     fireEvent.press(getByTestId('micro'));
     expect(alertSpy).toHaveBeenCalledWith(
