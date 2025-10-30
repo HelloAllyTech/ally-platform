@@ -9,7 +9,6 @@
     "noImplicitAny": false
   },
   "exclude": [
-    "**/__tests__/**",
     "**/__mocks__/**",
     "node_modules",
     "babel.config.js",

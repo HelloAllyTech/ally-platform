@@ -10,7 +10,15 @@ jest.mock('@/services/chatApi', () => ({
 
 jest.mock('@/store/hooks', () => ({
   useAppDispatch: () => jest.fn(),
-  useAppSelector: () => ({isAuthenticated: true, user: {role: 1}}),
+  useAppSelector: (selector: any) => {
+    const mockState = {
+      user: {
+        userData: {isAuthenticated: true, user: {role: 1}},
+        permissions: ['VIEW_COUNSELOR_CHAT'], // Provide permissions as array
+      },
+    };
+    return selector(mockState);
+  },
 }));
 
 jest.mock('@/store/slices/chatSlice', () => ({

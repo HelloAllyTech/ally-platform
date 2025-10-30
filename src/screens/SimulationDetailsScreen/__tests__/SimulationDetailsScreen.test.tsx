@@ -19,6 +19,7 @@ jest.mock('@/hooks', () => {
     useToast: () => ({showToast: mockShowToast}),
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     useTranslate: () => ({t: (k: string) => k}),
+    useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
     // expose for assertions
     mockNavigate,
     mockGoBack,
@@ -40,6 +41,7 @@ jest.mock('@/components', () => {
         <Text>{label}</Text>
       </TouchableOpacity>
     ),
+    IllustratedModal: () => null,
     useToast: () => ({showToast: mockShowToast}),
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     __mocks: {mockShowToast, mockShowErrorToast},
@@ -120,7 +122,7 @@ describe('SimulationDetailsScreen', () => {
     __setStartUnwrap(() => deferred as Promise<any>);
 
     const {getByTestId, findByText, queryByText} = renderWithSafeArea(
-      <SimulationDetailsScreen route={{params: {scenario}} as any} />,
+      <SimulationDetailsScreen navigation={{} as any} route={{params: {scenario}} as any} />,
     );
 
     fireEvent.press(getByTestId('primary-button'));
@@ -162,7 +164,7 @@ describe('SimulationDetailsScreen', () => {
     __setStartUnwrap(() => Promise.resolve(null));
 
     const {getByTestId} = renderWithSafeArea(
-      <SimulationDetailsScreen route={{params: {scenario}} as any} />,
+      <SimulationDetailsScreen navigation={{} as any} route={{params: {scenario}} as any} />,
     );
 
     fireEvent.press(getByTestId('primary-button'));
@@ -178,7 +180,7 @@ describe('SimulationDetailsScreen', () => {
     perms.request.mockResolvedValueOnce(perms.RESULTS.DENIED);
 
     const {getByTestId} = renderWithSafeArea(
-      <SimulationDetailsScreen route={{params: {scenario}} as any} />,
+      <SimulationDetailsScreen navigation={{} as any} route={{params: {scenario}} as any} />,
     );
 
     fireEvent.press(getByTestId('primary-button'));
@@ -194,7 +196,7 @@ describe('SimulationDetailsScreen', () => {
     __setStartUnwrap(() => Promise.reject({data: {entityId: 'active-1'}}));
 
     const {getByTestId, findByTestId} = renderWithSafeArea(
-      <SimulationDetailsScreen route={{params: {scenario}} as any} />,
+      <SimulationDetailsScreen navigation={{} as any} route={{params: {scenario}} as any} />,
     );
 
     fireEvent.press(getByTestId('primary-button'));

@@ -1,13 +1,14 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {t} from 'i18next';
 import {ActivityIndicator, ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 import WebView from 'react-native-webview';
 
-import {TabView} from '@/components';
+import {DataUnavailableIcon} from '@/assets/icons';
+import {EmptyState, TabView} from '@/components';
 import {AnalyticsType} from '@/constants/analytics';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
+import {useTranslate, useUser} from '@/hooks';
 import {
   useGetDashboardsQuery,
   useLazyGetDashboardUrlQuery,
@@ -17,6 +18,8 @@ import {fontFamily} from '@/theme/fonts';
 import {typography} from '@/theme/typography';
 
 export const UserAnalyticsScreen: React.FC = () => {
+  const {t} = useTranslate();
+  const {userData} = useUser();
   const [activeTab, setActiveTab] = useState<AnalyticsType>(
     AnalyticsType.CALL_LOG_ANALYTICS,
   );
@@ -26,7 +29,10 @@ export const UserAnalyticsScreen: React.FC = () => {
     data: dashboards,
     isLoading: isLoadingDashboards,
     error,
-  } = useGetDashboardsQuery();
+  } = useGetDashboardsQuery(undefined, {
+    skip: !userData?.id,
+    refetchOnMountOrArgChange: true,
+  });
 
   const [dashboardUrls, setDashboardUrls] = useState<{[id: string]: string}>(
     {},
@@ -53,6 +59,10 @@ export const UserAnalyticsScreen: React.FC = () => {
       });
     }
   }, [dashboards, triggerDashboardUrl]);
+
+  useEffect(() => {
+    setDashboardUrls({});
+  }, [userData?.id]);
 
   const presentTypes = useMemo(() => {
     const types = new Set<AnalyticsType>();
@@ -116,6 +126,15 @@ export const UserAnalyticsScreen: React.FC = () => {
           </Text>
         </Text>
       </View>
+      {!isLoadingDashboards && !dashboards?.length && (
+        <View style={styles.emptyStateContainer}>
+          <EmptyState
+            icon={DataUnavailableIcon}
+            title={t('Analytics.noAnalyticsData')}
+            description={t('Analytics.noAnalyticsDescription')}
+          />
+        </View>
+      )}
       {presentTypes.has(AnalyticsType.CALL_LOG_ANALYTICS) &&
         presentTypes.has(AnalyticsType.SIMULATION_ANALYTICS) && (
           <TabView<AnalyticsType>
@@ -134,39 +153,43 @@ export const UserAnalyticsScreen: React.FC = () => {
           />
         )}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={
-          Object.keys(dashboardUrls).length === 0 &&
+      {!!dashboards?.length && (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={
+            Object.keys(dashboardUrls).length === 0 &&
+            dashboards &&
+            dashboards.length > 0
+              ? styles.loadingContent
+              : styles.content
+          }
+          showsVerticalScrollIndicator={false}>
+          {Object.keys(dashboardUrls).length === 0 &&
           dashboards &&
-          dashboards.length > 0
-            ? styles.loadingContent
-            : styles.content
-        }
-        showsVerticalScrollIndicator={false}>
-        {Object.keys(dashboardUrls).length === 0 &&
-        dashboards &&
-        dashboards.length > 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.azureBlue} />
-          </View>
-        ) : (
-          filteredDashboards.map(dashboard => {
-            const url = dashboardUrls[dashboard.externalId];
-            if (!url) return null;
+          dashboards.length > 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.azureBlue} />
+            </View>
+          ) : (
+            filteredDashboards.map(dashboard => {
+              const url = dashboardUrls[dashboard.externalId];
+              if (!url) return null;
 
-            return (
-              <View key={dashboard.externalId} style={styles.webViewContainer}>
-                <WebView
-                  source={{uri: url}}
-                  style={styles.webView}
-                  startInLoadingState
-                />
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
+              return (
+                <View
+                  key={dashboard.externalId}
+                  style={styles.webViewContainer}>
+                  <WebView
+                    source={{uri: url}}
+                    style={styles.webView}
+                    startInLoadingState
+                  />
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -238,5 +261,10 @@ const styles = ScaledSheet.create({
     ...typography.body,
     color: colors.darkSlate,
     marginTop: ms(16),
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    marginHorizontal: '24@s',
   },
 });

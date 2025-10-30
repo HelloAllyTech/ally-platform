@@ -24,7 +24,7 @@ export const formatSimulationKeyEvents = (
         summary?.createdAt || summary?.startedAt,
         e?.createdAt || e?.occurredAt,
       ),
-      event: e?.events?.message || e?.description || '',
-      score: e?.events?.score ?? e?.score ?? null,
+      event: e?.message || e?.events?.message || '',
+      score: e?.score || e?.events?.score || null,
     }));
 };

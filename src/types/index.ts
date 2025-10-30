@@ -5,8 +5,6 @@ export type {CircleConfig, AudioTrackRef, CircleProps} from './audio';
 export type {
   SummaryField,
   FieldConfig,
-  VisibleFields,
-  SummaryFieldValueTypes,
   EditableFieldKey,
   SectionItem,
   SummaryFormData,
@@ -23,17 +21,18 @@ export type {
   Chat,
   FeedbackResponse,
   SocketMessage,
-  WaitingClientChat,
-  WaitingClient,
-  GetWaitingClientsResponse,
 } from './message';
 
 // User types
-export {UserRole, UserStatus} from './user';
+export {UserRole} from './user';
 export type {User} from './user';
 
 // Simulations types
 export * from './simulations';
+
+// Credits types
+export * from './credits';
+
 export * from './general';
 export * from './message';
 export * from './forceUpdate';

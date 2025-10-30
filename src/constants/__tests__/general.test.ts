@@ -15,7 +15,6 @@ import {
   isIOS,
   LanguageCode,
   TAG_COLORS,
-  isValidEmail,
   API_ROUTES,
   API_METHODS,
   TERMS_AND_CONDITIONS_URL,
@@ -27,6 +26,7 @@ import {
   SortOrder,
   KeyCode,
 } from '../general';
+import {isValidEmail} from '../../utils/common';
 
 describe('constants/general', () => {
   it('basic constants', () => {
@@ -38,7 +38,7 @@ describe('constants/general', () => {
   });
   it('enums and routes', () => {
     expect(LanguageCode.EN).toBe('en');
-    expect(API_ROUTES.ROOMS).toContain('/rooms');
+    expect(API_ROUTES.LEARN.ROOMS).toContain('/rooms');
     expect(API_METHODS.POST).toBe('POST');
     expect(TERMS_AND_CONDITIONS_URL).toContain('terms');
     expect(PRIVACY_POLICY_URL).toContain('policy');

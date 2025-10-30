@@ -6,7 +6,6 @@ import {
   BackHandler,
   FlatList,
   Linking,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,13 +14,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton, TabView} from '@/components';
+import {CallLogSkeleton, EmptyState, TabView} from '@/components';
 import {env} from '@/config/env';
 import {
   CHAT_TYPES,
   LogType,
   MICROPHONE_PERMISSION,
   SCREEN_NAMES,
+  START_CALL_PERMISSIONS,
   USER_PERMISSIONS,
 } from '@/constants';
 import {
@@ -44,9 +44,8 @@ import {
   setSummaryVisibleFields,
 } from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
-import {colors, fontFamily} from '@/theme';
+import {colors} from '@/theme';
 import {Chat} from '@/types';
-import {isAppFeatureEnabled} from '@/utils/common';
 import {logger} from '@/utils/logger';
 
 import {
@@ -84,7 +83,7 @@ export const CallLogScreen: React.FC = () => {
   const [hasMoreSimulationLogs, setHasMoreSimulationLogs] = useState(true);
 
   const currentChat = useAppSelector(state => state.chat.currentChat);
-  const {userData, isUserLoading, checkAuth} = useUser();
+  const {userData, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
   const navigation = useAppNavigation();
@@ -102,6 +101,14 @@ export const CallLogScreen: React.FC = () => {
   const {checkCounselorChat} = useCounselorChat();
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
+  const showFeatureUnavailable = useMemo(() => {
+    return !permissions?.some(permission =>
+      [
+        USER_PERMISSIONS.VIEW_CALL_LOGS,
+        USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
+      ].includes(permission as USER_PERMISSIONS),
+    );
+  }, [permissions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,8 +131,8 @@ export const CallLogScreen: React.FC = () => {
     }
   }, [getSummaryFields, visibleFieldsState?.length]);
 
-  const canStartCall = permissions?.includes(
-    USER_PERMISSIONS.VIEW_START_CALL_PAGE,
+  const canStartCall = START_CALL_PERMISSIONS.some(permission =>
+    permissions?.includes(permission),
   );
 
   useEffect(() => {
@@ -150,7 +157,7 @@ export const CallLogScreen: React.FC = () => {
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
 
-    if (permissions?.includes(USER_PERMISSIONS.VIEW_NAVBAR_CALLS)) {
+    if (permissions?.includes(USER_PERMISSIONS.VIEW_CALL_LOGS)) {
       logTypes.push(LogType.REAL);
     }
 
@@ -288,7 +295,6 @@ export const CallLogScreen: React.FC = () => {
         fromLogs: true,
       });
     } else {
-      // For simulation logs, navigate to simulation summary or details
       navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         simulationId: item?.id?.toString(),
         fromLogs: true,
@@ -310,10 +316,18 @@ export const CallLogScreen: React.FC = () => {
    * @param index - Index of the item in the list
    */
   const renderItem = ({item, index}: {item: LogItem; index: number}) => {
+    const isDisabled =
+      activeTab === LogType.REAL
+        ? !permissions?.includes(USER_PERMISSIONS.VIEW_CHAT_DETAILS)
+        : !permissions?.includes(
+            USER_PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
+          );
+
     return (
       <CallLogItem
         item={item}
         expanded={expandedIdx === index}
+        disabled={isDisabled}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
         logType={activeTab}
@@ -413,7 +427,7 @@ export const CallLogScreen: React.FC = () => {
   const currentOffset =
     activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
 
-  if (userData && !isAppFeatureEnabled(userData)) {
+  if (showFeatureUnavailable) {
     return (
       <View style={[styles.container, {paddingTop: insets.top}]}>
         <CallLogHeader
@@ -453,23 +467,20 @@ export const CallLogScreen: React.FC = () => {
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />
       ) : currentLogs.length === 0 && !isFetching ? (
-        <View style={styles.emptyContainer}>
-          <NoCallLogsIcon
-            style={styles.noCallLogsIcon}
-            width={160}
-            height={130}
-          />
-          <Text style={styles.emptyText}>
-            {activeTab === LogType.REAL
+        <EmptyState
+          icon={NoCallLogsIcon}
+          title={
+            activeTab === LogType.REAL
               ? t('CallLogs.noCallLogs')
-              : t('CallLogs.noSimulationLogs')}
-          </Text>
-          <Text style={styles.emptyDescription}>
-            {activeTab === LogType.REAL
+              : t('CallLogs.noSimulationLogs')
+          }
+          description={
+            activeTab === LogType.REAL
               ? t('CallLogs.noCallLogsDescription')
-              : t('CallLogs.noSimulationLogsDescription')}
-          </Text>
-        </View>
+              : t('CallLogs.noSimulationLogsDescription')
+          }
+          containerStyle={styles.emptyStateContainer}
+        />
       ) : (
         <View style={styles.listContainer}>
           <FlatList
@@ -548,30 +559,6 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '20@ms',
-    lineHeight: '24@ms',
-    color: colors.darkGray2,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: '100@ms',
-  },
-  noCallLogsIcon: {
-    marginBottom: '28@ms',
-  },
-  emptyDescription: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '24@ms',
-    color: colors.darkGray2,
-    textAlign: 'center',
-    marginTop: '16@vs',
-    marginBottom: '30@vs',
-  },
   fab: {
     position: 'absolute',
     right: '20@ms',
@@ -588,5 +575,10 @@ const styles = ScaledSheet.create({
   },
   bgAshGray: {
     backgroundColor: colors.ashGray,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

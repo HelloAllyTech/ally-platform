@@ -16,7 +16,7 @@ type TranscriptItem = {
 };
 
 export const SimulationTranscript: React.FC<{
-  sessionId: number | string;
+  sessionId: string;
   startedAt?: string;
 }> = ({sessionId, startedAt}) => {
   const {t} = useTranslate();

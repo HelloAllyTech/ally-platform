@@ -14,8 +14,8 @@ jest.mock('../useAppNavigation', () => ({
 
 const mockUseCounselorChat = jest.fn(() => ({checkCounselorChat: jest.fn()}));
 jest.mock('../useCounselorChat', () => ({
-  useCounselorChat: (...args: any[]) => mockUseCounselorChat(...args),
-}));
+  useCounselorChat: (...args: any[]) => (mockUseCounselorChat as any)(...args),
+}) as any);
 
 describe('useNavigationAwareCounselorChat', () => {
   beforeEach(() => {
@@ -25,7 +25,7 @@ describe('useNavigationAwareCounselorChat', () => {
   it('subscribes to nav state and composes useCounselorChat', () => {
     const ref: any = {
       addListener: jest.fn(() => jest.fn()),
-      getCurrentRoute: jest.fn(() => ({name: SCREEN_NAMES.CALL_LOG})),
+      getCurrentRoute: jest.fn(() => ({key: 'k', name: SCREEN_NAMES.CALL_LOG})),
     } satisfies Partial<NavigationContainerRef<any>>;
 
     const Test = () => {
@@ -42,7 +42,7 @@ describe('useNavigationAwareCounselorChat', () => {
     const listeners: Record<string, Function> = {};
     const ref: any = {
       addListener: jest.fn((event: string, cb: any) => { listeners[event]=cb; return jest.fn(); }),
-      getCurrentRoute: jest.fn(() => ({name: SCREEN_NAMES.SPLASH})),
+      getCurrentRoute: jest.fn(() => ({key: 'k', name: SCREEN_NAMES.SPLASH})),
     };
 
     const Test = () => {
@@ -52,7 +52,8 @@ describe('useNavigationAwareCounselorChat', () => {
 
     render(<Test />);
     act(() => { listeners['state'] && listeners['state'](); });
-    const opts = mockUseCounselorChat.mock.calls[0][0];
+    const calls: any[] = (mockUseCounselorChat as any).mock.calls as any[];
+    const opts: any = calls[0]?.[0];
     opts.onActiveChatFound && opts.onActiveChatFound();
     expect(mockReset).toHaveBeenCalled();
   });
@@ -61,7 +62,7 @@ describe('useNavigationAwareCounselorChat', () => {
     const listeners: Record<string, Function> = {};
     const ref: any = {
       addListener: jest.fn((event: string, cb: any) => { listeners[event]=cb; return jest.fn(); }),
-      getCurrentRoute: jest.fn(() => ({name: SCREEN_NAMES.CALL_LOG})),
+      getCurrentRoute: jest.fn(() => ({key: 'k', name: SCREEN_NAMES.CALL_LOG})),
     };
 
     const Test = () => {
@@ -71,7 +72,8 @@ describe('useNavigationAwareCounselorChat', () => {
 
     render(<Test />);
     act(() => { listeners['state'] && listeners['state'](); });
-    const opts = mockUseCounselorChat.mock.calls[0][0];
+    const calls: any[] = (mockUseCounselorChat as any).mock.calls as any[];
+    const opts: any = calls[0]?.[0];
     opts.onActiveChatFound && opts.onActiveChatFound();
     expect(mockNavigate).toHaveBeenCalled();
   });

@@ -55,7 +55,7 @@ export interface PaginationProps {
   totalItems: number;
   currentIndex: number;
   style?: StyleProp<ViewStyle>;
-  dotStyle?: StyleProp<ViewStyle>;
+  inactiveDotStyle?: StyleProp<ViewStyle>;
   activeDotStyle?: StyleProp<ViewStyle>;
 }
 

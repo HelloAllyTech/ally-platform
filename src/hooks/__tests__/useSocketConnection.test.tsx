@@ -16,7 +16,7 @@ jest.spyOn(AppState, 'addEventListener').mockImplementation(((_e: any, _cb: any)
 
 const Test = () => {
   const {emitSocketEvent} = useSocketConnection({userId: 1});
-  return <Text testID="root" onPress={() => emitSocketEvent(0 as any)} />;
+  return <Text testID="root" onPress={() => emitSocketEvent(0 as any, {} as any)} />;
 };
 
 describe('useSocketConnection', () => {

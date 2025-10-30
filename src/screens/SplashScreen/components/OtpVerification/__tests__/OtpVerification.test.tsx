@@ -28,7 +28,10 @@ jest.mock('@/services', () => ({
 
 jest.mock('@/store/hooks', () => ({ useAppDispatch: () => jest.fn() }));
 jest.mock('@/store/slices/userSlice', () => ({ storeTokens: (p: any) => ({ type: 'store', payload: p }) }));
-jest.mock('@/hooks', () => ({ useTranslate: () => ({ t: (k: string) => k }) }));
+jest.mock('@/hooks', () => ({ 
+  useTranslate: () => ({ t: (k: string) => k }),
+  useAppNavigation: () => ({ replace: jest.fn() })
+}));
 
 describe('OtpVerification', () => {
   beforeEach(() => {
@@ -58,7 +61,10 @@ describe('OtpVerification', () => {
     fireEvent.changeText(inputs[3], '4');
 
     fireEvent.press(button);
-    expect(mockVerify).toHaveBeenCalledWith({ email: 'user@example.com', otp: '1234' });
+    expect(mockVerify).toHaveBeenCalledWith({ 
+      email: 'user@example.com', 
+      otp: '1234'
+    });
   });
 
 });
