@@ -3,10 +3,6 @@ from typing import List, Literal, Mapping, Any
 from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
 from app.core.events.event_list.similarity_based.generic import GenericSimilarityEvent
-from app.core.events.sentences.loader import (
-    has_similarity_sentences,
-    load_similarity_sentences,
-)
 
 
 class UnknownEventIdError(RuntimeError):
@@ -27,7 +23,7 @@ def build_events_from_metadata(
     Args:
         metadata: Bare scenario dict as returned by `Scenario._extract_scenario_section`,
                   e.g. {"id": str, "events": [ ... ], ...}
-        on_unknown: What to do if an event id has no registered handler:
+        on_unknown: What to do if an event doesn't have sentences field:
                     - "ignore": skip silently
                     - "warn": skip and log a warning
                     - "error": raise UnknownEventIdError
@@ -37,7 +33,7 @@ def build_events_from_metadata(
         List[BaseEvent]: Instantiated event handlers populated with scenario fields.
 
     Raises:
-        UnknownEventIdError: If on_unknown="error" and unknown ids exist.
+        UnknownEventIdError: If on_unknown="error" and events without sentences exist.
     """
     events: List[BaseEvent] = []
     unknown_ids: list[str] = []
@@ -48,40 +44,7 @@ def build_events_from_metadata(
     for ev in event_dicts:
         event_id = ev.get("id", "")
         
-        # Check if YAML-driven similarity event exists
-        if has_similarity_sentences(event_id):
-            try:
-                definition = load_similarity_sentences(event_id)
-                if definition is None:
-                    unknown_ids.append(event_id)
-                    continue
-
-                # Prefer metadata visibility if present, else YAML default, else ACTIVE
-                visibility_type = ev.get("visibilityType") or definition.visibility or VisibilityType.ACTIVE
-
-                instance = GenericSimilarityEvent.create(
-                    event_id=definition.id,
-                    visibility_type=visibility_type,
-                    custom_sentences=definition.sentences,
-                    match_threshold=definition.match_threshold,
-                    min_match_tokens=definition.min_match_tokens,
-                    # Per-scenario BaseEvent fields
-                    score=ev.get("score"),
-                    emoji=ev.get("emoji"),
-                    emoji_message=ev.get("message"),
-                    branching_instruction=ev.get("conversationInstruction"),
-                )
-                events.append(instance)
-                continue
-            except Exception as e:
-                if logger:
-                    logger.error("Failed to load similarity sentences for '%s': %s", event_id, e)
-                if on_unknown == "error":
-                    raise
-                unknown_ids.append(event_id)
-                continue
-
-        # Not in YAML - check if metadata contains sentences field
+        # Only process events that have sentences field in metadata
         if "sentences" in ev:
             try:
                 metadata_sentences = ev.get("sentences", [])
@@ -105,7 +68,7 @@ def build_events_from_metadata(
                     score=ev.get("score"),
                     emoji=ev.get("emoji"),
                     emoji_message=ev.get("message"),
-                    branching_instruction=ev.get("conversationInstruction"),
+                    branching_instruction=ev.get("branchInstruction"),
                 )
                 events.append(instance)
                 continue
@@ -117,12 +80,14 @@ def build_events_from_metadata(
                 unknown_ids.append(event_id)
                 continue
 
-        # Unknown id - no YAML definition and no sentences in metadata
+        # Event without sentences field - not supported anymore
+        if logger:
+            logger.warning("Event '%s' has no sentences field, skipping (predefined events no longer supported)", event_id)
         unknown_ids.append(event_id)
 
     if unknown_ids:
         if on_unknown == "warn" and logger is not None:
-            logger.warning("Unknown event ids in metadata: %s", unknown_ids)
+            logger.warning("Events without sentences field: %s", unknown_ids)
         elif on_unknown == "error":
             raise UnknownEventIdError(unknown_ids)
 
