@@ -89,7 +89,6 @@ describe('BreathingScreen behavior', () => {
   it('hides overlay after timeout and shows animation', async () => {
     const navigation: any = {navigate: jest.fn(), reset: jest.fn()};
     const {getByText, queryByText} = render(
-      // @ts-expect-error partial props
       <BreathingScreen navigation={navigation} route={{} as any} />,
     );
     expect(getByText('overlay')).toBeTruthy();
@@ -103,7 +102,6 @@ describe('BreathingScreen behavior', () => {
   it('navigates to summary on button press', async () => {
     const navigation: any = {navigate: jest.fn(), reset: jest.fn()};
     const {getByText, getByTestId} = render(
-      // @ts-expect-error partial props
       <BreathingScreen navigation={navigation} route={{} as any} />,
     );
     await act(async () => {
@@ -116,7 +114,6 @@ describe('BreathingScreen behavior', () => {
   it('increments timer on phase change when playing', async () => {
     const navigation: any = {navigate: jest.fn(), reset: jest.fn()};
     const {getByText, getByTestId} = render(
-      // @ts-expect-error partial props
       <BreathingScreen navigation={navigation} route={{} as any} />,
     );
     await act(async () => {
@@ -135,7 +132,6 @@ describe('BreathingScreen behavior', () => {
     const navigation: any = {navigate: jest.fn(), reset: jest.fn()};
     const hooks = require('@/hooks');
     render(
-      // @ts-expect-error partial props
       <BreathingScreen navigation={navigation} route={{} as any} />,
     );
     // invoke stored back handler

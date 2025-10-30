@@ -19,7 +19,7 @@ jest.mock('@/utils/asyncStorage', () => ({
   getItem: jest.fn(async (k: string) => (k.includes('ACCESS_TOKEN') ? mockAccessToken : mockRefreshToken)),
 }));
 
-const mockGetUser = jest.fn(async () => ({ data: { id: 1, name: 'User' } }));
+const mockGetUser = jest.fn(async () => ({ data: { id: 1 } }));
 const mockGetPerms = jest.fn(async () => ({ data: ['A'] }));
 jest.mock('@/services/authApi', () => ({
   useLazyGetUserQuery: () => [mockGetUser],

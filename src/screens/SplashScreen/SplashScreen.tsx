@@ -20,7 +20,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
 import {ForceUpdateModal, PrimaryButton, SecurityCarousel} from '@/components';
-import {SCREEN_NAMES, WINDOW_HEIGHT} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS, WINDOW_HEIGHT} from '@/constants';
 import {
   useCounselorChat,
   useForceUpdate,
@@ -29,8 +29,8 @@ import {
   useUser,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {useAppSelector} from '@/store/hooks';
 import {colors} from '@/theme';
-import {UserRole} from '@/types';
 
 import {EmailLogin, OtpVerification} from './components';
 import {styles} from './styles';
@@ -49,6 +49,7 @@ export const SplashScreen: React.FC<
   const {t} = useTranslate();
   const {versionInfo} = useForceUpdate();
   const {checkAuth, isAuthenticated, isUserLoading, userData} = useUser();
+  const permissions = useAppSelector(state => state.user.permissions);
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
       // Go directly to Listening
@@ -114,7 +115,7 @@ export const SplashScreen: React.FC<
         setIsLoginButtonVisible(true);
       }
     } else if (isAuthenticated) {
-      if (userData?.role === UserRole.COUNSELOR) {
+      if (permissions?.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)) {
         checkCounselorChat();
       } else {
         navigation.replace(SCREEN_NAMES.CALL_LOG);
@@ -127,6 +128,7 @@ export const SplashScreen: React.FC<
     isUserLoading,
     isBottomSheetVisible,
     userData?.role,
+    permissions,
   ]);
 
   const handleOtpGenerationSuccess = async (emailAddress: string) => {

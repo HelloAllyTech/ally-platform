@@ -7,7 +7,12 @@ import {
 } from '@reduxjs/toolkit/query/react';
 
 import {env} from '@/config/env';
-import {API_METHODS, AsyncStorageKeys} from '@/constants';
+import {
+  API_METHODS,
+  API_ROUTES,
+  APIVersion,
+  AsyncStorageKeys,
+} from '@/constants';
 import {handleLogout, storeTokens} from '@/store/slices/userSlice';
 import {store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
@@ -15,16 +20,44 @@ import {logger} from '@/utils/logger';
 
 import {AuthResponse} from './authApi';
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: env.API_BASE_URL + '/api/' + env.API_VERSION,
-  prepareHeaders: async headers => {
-    const token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
+const V2_ENDPOINTS = [API_ROUTES.AUTH.GENERATE_OTP, API_ROUTES.AUTH.VERIFY_OTP];
+
+const baseQuery: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  let url: string;
+  let version = APIVersion.V1;
+
+  if (typeof args === 'string') {
+    url = args;
+  } else {
+    url = args.url;
+    // Check if this endpoint should use v2
+    if (V2_ENDPOINTS.some(v2Endpoint => url.includes(v2Endpoint))) {
+      version = APIVersion.V2;
     }
-    return headers;
-  },
-});
+  }
+
+  const versionedArgs =
+    typeof args === 'string'
+      ? `${version}${args}`
+      : {...args, url: `${version}${url}`};
+
+  const originalBaseQuery = fetchBaseQuery({
+    baseUrl: env.API_BASE_URL + '/api/',
+    prepareHeaders: async (headers, {endpoint: _endpoint}) => {
+      const token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
+  });
+
+  return originalBaseQuery(versionedArgs, api, extraOptions);
+};
 
 const handleUserLogout = () => {
   store.dispatch(handleLogout());
@@ -37,6 +70,7 @@ const baseQueryWithReauth: BaseQueryFn<
 > = async (args, _store, extraOptions) => {
   try {
     let result = await baseQuery(args, _store, extraOptions);
+    console.log('🚀 ~ baseQueryWithReauth ~ result:', result);
     if (result.error && result.error.status === 401) {
       // Try to get a new token
       const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
@@ -53,7 +87,7 @@ const baseQueryWithReauth: BaseQueryFn<
       try {
         const refreshResult = await baseQuery(
           {
-            url: '/auth/refresh',
+            url: API_ROUTES.AUTH.REFRESH,
             method: API_METHODS.POST,
             body: {refreshToken},
           },
@@ -98,5 +132,6 @@ const baseQueryWithReauth: BaseQueryFn<
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  tagTypes: ['SimulationCredits'],
   endpoints: () => ({}),
 });

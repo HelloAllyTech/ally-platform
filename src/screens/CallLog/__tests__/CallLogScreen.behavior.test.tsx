@@ -19,6 +19,7 @@ jest.mock('@/components', () => {
   const RN = require('react-native');
   return {
     CallLogSkeleton: () => null,
+    EmptyState: ({title}: {title: string}) => React.createElement(RN.Text, {}, title),
     TabView: ({onTabChange}: any) =>
       React.createElement(
         RN.TouchableOpacity,
@@ -35,7 +36,7 @@ jest.mock('@/constants', () => ({
   LogType: {REAL: 'REAL', SIMULATION: 'SIMULATION'},
   MICROPHONE_PERMISSION: 'mic',
   SCREEN_NAMES: {CALL_SUMMARY: 'CallSummary', SIMULATION_FEEDBACK: 'SimulationFeedback'},
-  USER_PERMISSIONS: {VIEW_NAVBAR_CALLS: 'CALLS', VIEW_SCENARIO_SESSION: 'SIM', VIEW_START_CALL_PAGE: 'START'},
+  USER_PERMISSIONS: {VIEW_CALL_LOGS: 'CALLS', VIEW_SCENARIO_SESSION: 'SIM', VIEW_START_CALL_PAGE: 'START'},
 }));
 
 // Hooks (dynamic via mock-prefixed variables)
@@ -53,7 +54,7 @@ jest.mock('@/hooks', () => ({
 }));
 
 // Store
-let mockPermissions: string[] = ['CALLS', 'START'];
+let mockPermissions: string[] = ['view:call:logs', 'view:scenario-session', 'start:microphone-chat', 'start:cloud-telephony-chat'];
 jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) =>
     sel({
@@ -94,18 +95,37 @@ jest.mock('@/services/settingsApi', () => ({
   useLazyGetSummaryFieldsQuery: () => [jest.fn(), {data: ['field1']}],
 }));
 
-// Utils
-let mockIsAppFeatureEnabled = true;
-jest.mock('@/utils/common', () => ({isAppFeatureEnabled: () => mockIsAppFeatureEnabled}));
+// Utils (isAppFeatureEnabled removed)
 // Linking
 jest.mock('react-native/Libraries/Linking/Linking', () => ({openURL: jest.fn()}));
 jest.mock('@/utils/logger', () => ({logger: {error: jest.fn()}}));
+
+// Constants
+jest.mock('@/constants', () => ({
+  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
+  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
+  SCREEN_NAMES: { LISTENING: 'Listening' },
+  CHAT_TYPES: { 
+    EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
+    MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
+  },
+  USER_PERMISSIONS: {
+    VIEW_CALL_LOGS: 'view:call:logs',
+    VIEW_SCENARIO_SESSION: 'view:scenario-session',
+    START_MICROPHONE_CHAT: 'start:microphone-chat',
+    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
+  },
+}));
 
 // Permissions (overridden per test)
 jest.mock('react-native-permissions', () => ({
   check: jest.fn().mockResolvedValue('granted'),
   request: jest.fn().mockResolvedValue('granted'),
   RESULTS: {GRANTED: 'granted', BLOCKED: 'blocked'},
+  PERMISSIONS: {
+    IOS: { MICROPHONE: 'ios.permission.MICROPHONE' },
+    ANDROID: { RECORD_AUDIO: 'android.permission.RECORD_AUDIO' }
+  }
 }));
 
 // Child components with an actionable StartSessionModal (local components)
@@ -215,18 +235,20 @@ describe('CallLogScreen behaviors', () => {
 
   it('renders FeatureNotAvailable state', async () => {
     mockUserData = {}; // means userData exists
-    mockIsAppFeatureEnabled = false; // force feature not available branch
+    // make user lack required permissions
+    const original = mockPermissions;
+    mockPermissions = [];
     const {toJSON, unmount} = render(<CallLogScreen />);
     expect(toJSON()).toBeTruthy();
     unmount();
     // reset
     mockUserData = undefined;
-    mockIsAppFeatureEnabled = true;
+    mockPermissions = original;
   });
 
   it('shows simulation empty state after switching to simulation tab', async () => {
-    mockPermissions = ['CALLS', 'START', 'SIM'];
-    mockVisibleChatTypes = ['MIC', 'EXOTEL'];
+    mockPermissions = ['view:call:logs', 'view:scenario-session', 'start:microphone-chat', 'start:cloud-telephony-chat'];
+    mockVisibleChatTypes = ['MICROPHONE_CHAT', 'EXOTEL_CONFERENCE_CHAT'];
     const {getByTestId, getByText} = render(<CallLogScreen />);
     await act(async () => {
       fireEvent.press(getByTestId('to-simulation'));

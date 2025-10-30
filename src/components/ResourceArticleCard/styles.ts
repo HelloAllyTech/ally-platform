@@ -2,14 +2,43 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
 
+const lightTheme = {
+  cardBackground: colors.white,
+  cardBorderColor: colors.lightGray14,
+  categoryChipBackground: colors.white4,
+  categoryTextColor: colors.darkGray14,
+  tagChipBackground: colors.white,
+  tagChipBorderColor: colors.lightGray14,
+  tagTextColor: colors.darkGray15,
+  titleColor: colors.black,
+  contentColor: colors.darkGray6,
+  moreButtonBackground: colors.white,
+  moreTextColor: colors.darkGray6,
+};
+
+const darkTheme = {
+  cardBackground: colors.darkGray5,
+  cardBorderColor: colors.darkGray5,
+  categoryChipBackground: colors.white3,
+  categoryTextColor: colors.darkGray5,
+  tagChipBackground: colors.darkGray10,
+  tagChipBorderColor: colors.darkGray10,
+  tagTextColor: colors.white2,
+  titleColor: colors.white,
+  contentColor: colors.white2,
+  moreButtonBackground: colors.darkGray5,
+  moreTextColor: colors.white2,
+};
+
 export const getThemedStyles = (colorScheme: string | null) => {
-  const isDark = colorScheme === 'dark';
+  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+
   return ScaledSheet.create({
     card: {
-      backgroundColor: isDark ? colors.darkGray5 : colors.white,
+      backgroundColor: theme.cardBackground,
       borderRadius: '8@ms',
       borderWidth: 0.5,
-      borderColor: isDark ? colors.darkGray5 : colors.lightGray14,
+      borderColor: theme.cardBorderColor,
       paddingVertical: '10@vs',
       marginVertical: '6@vs',
     },
@@ -24,7 +53,7 @@ export const getThemedStyles = (colorScheme: string | null) => {
       overflow: 'hidden',
     },
     categoryChip: {
-      backgroundColor: isDark ? colors.white3 : colors.white4,
+      backgroundColor: theme.categoryChipBackground,
       borderRadius: '16@ms',
       paddingHorizontal: '12@s',
       paddingVertical: '3@vs',
@@ -36,13 +65,13 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     categoryText: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-      color: isDark ? colors.darkGray5 : colors.darkGray14,
+      color: theme.categoryTextColor,
       fontSize: '12@ms',
       lineHeight: '16@ms',
     },
     tagChip: {
-      backgroundColor: isDark ? colors.darkGray10 : colors.white,
-      borderColor: isDark ? colors.darkGray10 : colors.lightGray14,
+      backgroundColor: theme.tagChipBackground,
+      borderColor: theme.tagChipBorderColor,
       borderWidth: 0.5,
       justifyContent: 'center',
       alignItems: 'center',
@@ -53,14 +82,14 @@ export const getThemedStyles = (colorScheme: string | null) => {
     },
     tagText: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      color: isDark ? colors.white2 : colors.darkGray15,
+      color: theme.tagTextColor,
       fontSize: '12@ms',
       lineHeight: '20@mvs',
     },
     title: {
       ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
       fontSize: '16@ms',
-      color: isDark ? colors.white : colors.black,
+      color: theme.titleColor,
       lineHeight: '18@ms',
       marginBottom: '8@vs',
     },
@@ -71,18 +100,18 @@ export const getThemedStyles = (colorScheme: string | null) => {
     content: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
       fontSize: '14@ms',
-      color: isDark ? colors.white2 : colors.darkGray6,
+      color: theme.contentColor,
       lineHeight: '18@ms',
     },
     moreButton: {
-      backgroundColor: isDark ? colors.darkGray5 : colors.white,
+      backgroundColor: theme.moreButtonBackground,
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: '4@ms',
     },
     moreText: {
       ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      color: isDark ? colors.white2 : colors.darkGray6,
+      color: theme.moreTextColor,
       fontSize: '13@ms',
       lineHeight: '18@ms',
     },

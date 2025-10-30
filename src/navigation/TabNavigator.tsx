@@ -21,7 +21,6 @@ import {
   SearchInactiveIcon,
 } from '@/assets';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
-import {useUser} from '@/hooks/useUser';
 import {
   CallLogScreen,
   CommunityScreen,
@@ -31,7 +30,6 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
-import {isAppFeatureEnabled} from '@/utils/common';
 
 const Tab = createBottomTabNavigator();
 
@@ -39,10 +37,8 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
-    requiredPermissions: [
-      USER_PERMISSIONS.VIEW_NAVBAR_CALLS,
-      USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
-    ],
+    // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
+    requiredPermissions: [],
   },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
@@ -52,17 +48,17 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_SEARCH],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT],
   },
   {
     name: SCREEN_NAMES.LEARN,
     component: SimulationsScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_LEARN],
+    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
   },
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_NAVBAR_COMMUNITY],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY],
   },
 ];
 
@@ -127,9 +123,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
 };
 
 export const BottomTabs: React.FC<BottomTabsProps> = () => {
-  const {userData} = useUser();
   const renderCustomTabBar = (props: BottomTabBarProps) => {
-    if (userData && !isAppFeatureEnabled(userData)) return null;
     return <CustomTabBar {...props} />;
   };
 

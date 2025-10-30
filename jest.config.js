@@ -7,6 +7,8 @@ module.exports = {
     '!<rootDir>/src/**/*.d.ts',
     '!<rootDir>/src/**/index.ts',
     '!<rootDir>/src/**/index.tsx',
+    // Exclude pure type definitions
+    '!<rootDir>/src/types/**',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

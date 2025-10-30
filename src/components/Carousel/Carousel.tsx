@@ -84,7 +84,7 @@ export const Carousel = forwardRef<CarouselRef, CarouselProps>(
             totalItems={data.length}
             currentIndex={currentIndex}
             style={paginationStyle}
-            dotStyle={paginationDotStyle}
+            inactiveDotStyle={paginationDotStyle}
             activeDotStyle={paginationActiveDotStyle}
           />
         )}

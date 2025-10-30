@@ -17,7 +17,6 @@ import {
   BoxBreathingAnimation,
   BreathingControls,
   CallEndOverlay,
-  Phase,
 } from './components';
 
 export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
@@ -92,7 +91,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
     navigation.navigate(SCREEN_NAMES.CALL_SUMMARY);
   };
 
-  const onPhaseChange = (phase: Phase) => {
+  const onPhaseChange = () => {
     // Only start timer if isPlaying is true
     if (!isPlaying) {
       return;

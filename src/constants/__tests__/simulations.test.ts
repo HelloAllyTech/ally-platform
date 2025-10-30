@@ -13,7 +13,7 @@ import {
 describe('constants/simulations', () => {
   it('timing constants are defined', () => {
     expect(SESSION_END_MODAL_MINUTES).toBeGreaterThan(0);
-    expect(SESSION_AUTO_END_MINUTES).toBe(30);
+    expect(SESSION_AUTO_END_MINUTES).toBe(20);
     expect(FEEDBACK_MIN_DISPLAY_MS).toBeGreaterThan(0);
   });
   it('audio and circle configs exist', () => {
@@ -23,6 +23,6 @@ describe('constants/simulations', () => {
   });
   it('feedback options and scenario status exist', () => {
     expect(FEEDBACK_OPTIONS[5]).toContain('Excellent');
-    expect(ScenarioStatus.COMING_SOON).toBe('COMING_SOON');
+    expect(ScenarioStatus.ACTIVE).toBe('ACTIVE');
   });
 });

@@ -1,13 +1,14 @@
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LogoutIcon, ProfileIcon} from '@/assets';
+import {BoltIcon, LogoutIcon, ProfileIcon} from '@/assets';
 import {SecurityCarousel} from '@/components';
 import {env} from '@/config/env';
-import {CarouselVariant} from '@/constants';
-import {useTranslate, useUser} from '@/hooks';
+import {CarouselVariant, USER_PERMISSIONS} from '@/constants';
+import {useSimulationCredits, useTranslate, useUser} from '@/hooks';
+import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
-import {getAppVersion, isAppFeatureEnabled} from '@/utils';
+import {getAppVersion} from '@/utils';
 
 interface DrawerContentProps {
   openLogoutModal: () => void;
@@ -15,8 +16,16 @@ interface DrawerContentProps {
 
 export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
   const {userData} = useUser();
+  const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslate();
+  const {credits, getCreditsInfo} = useSimulationCredits();
   const {name, email} = userData ?? {};
+  const showSecurityCarousel = permissions?.some(permission =>
+    [
+      USER_PERMISSIONS.START_MICROPHONE_CHAT,
+      USER_PERMISSIONS.START_CLOUD_TELEPHONY_CHAT,
+    ].includes(permission.toString() as USER_PERMISSIONS),
+  );
 
   return (
     <View style={styles.container}>
@@ -38,6 +47,45 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
           )}
         </View>
       </View>
+
+      {credits && getCreditsInfo && (
+        <>
+          <View style={styles.creditContainer}>
+            <View style={styles.creditHeader}>
+              <BoltIcon width={16} height={16} />
+              <Text style={styles.creditTitle}>{t('Credits.usage')}</Text>
+            </View>
+            <View style={styles.creditInfo}>
+              <Text>
+                <Text style={styles.creditConsumedText}>
+                  {credits.consumedCredits}
+                </Text>
+                <Text style={styles.creditLimitText}>
+                  /{credits.creditLimit}
+                </Text>
+              </Text>
+              <Text style={styles.creditPercentage}>
+                {getCreditsInfo.usagePercentage}%
+              </Text>
+            </View>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  {
+                    width: `${getCreditsInfo.usagePercentage}%`,
+                    backgroundColor: getCreditsInfo.isLow
+                      ? colors.softCoralRed
+                      : colors.azureBlue,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+          <View style={styles.separator} />
+        </>
+      )}
+
       <TouchableOpacity
         style={styles.logoutContainer}
         onPress={openLogoutModal}>
@@ -46,7 +94,7 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         </View>
         <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
       </TouchableOpacity>
-      {userData && isAppFeatureEnabled(userData) && (
+      {showSecurityCarousel && (
         <>
           <View style={styles.carouselWrapper}>
             <SecurityCarousel variant={CarouselVariant.DRAWER} />
@@ -100,6 +148,54 @@ const styles = ScaledSheet.create({
   },
   emailSmall: {
     fontSize: '9@ms',
+  },
+  creditContainer: {
+    marginTop: '20@mvs',
+  },
+  creditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '18@ms',
+    marginBottom: '8@mvs',
+  },
+  creditTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+  },
+  creditInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8@mvs',
+  },
+  creditConsumedText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '18@ms',
+  },
+  creditLimitText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    color: colors.darkCharcoal,
+  },
+  creditPercentage: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '12@ms',
+    color: colors.darkCharcoal,
+  },
+  progressBarContainer: {
+    height: '6@mvs',
+    backgroundColor: colors.lightGray2,
+    borderRadius: '4@ms',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: '4@ms',
+  },
+  separator: {
+    height: 0.5,
+    backgroundColor: colors.lightGray5,
+    marginTop: '20@mvs',
   },
   logoutContainer: {
     flexDirection: 'row',

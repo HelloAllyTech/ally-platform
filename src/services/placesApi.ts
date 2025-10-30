@@ -1,3 +1,5 @@
+import {API_ROUTES} from '@/constants';
+
 import {api} from './api';
 
 export interface Place {
@@ -22,7 +24,7 @@ export const placesApi = api.injectEndpoints({
     getPlaces: builder.query<PlacesResponse, {page?: number; limit?: number}>({
       query: ({page = 1, limit = 50} = {}) => {
         return {
-          url: '/places',
+          url: API_ROUTES.PLACES.ROOT,
           params: {page, limit},
         };
       },
@@ -30,7 +32,7 @@ export const placesApi = api.injectEndpoints({
     searchPlaces: builder.query<Place[], PlacesSearchParams>({
       query: ({query}) => {
         return {
-          url: '/places/search',
+          url: API_ROUTES.PLACES.SEARCH,
           params: {query},
         };
       },
