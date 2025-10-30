@@ -25,14 +25,14 @@ describe('Carousel', () => {
     const onSnap = jest.fn();
     const {getByText} = render(
       <Carousel
-        data={[{id: 1, label: 'A'}]}
-        renderItem={(item: any) => <Text>{item.label}</Text>}
+        data={[{image: 0 as any, textKey: 'Common.ok' as any}]}
+        renderItem={(item: any) => <Text>{item.textKey}</Text>}
         onSnapToItem={onSnap}
         testID="carousel"
       />,
     );
 
-    expect(getByText('A')).toBeTruthy();
+    expect(getByText('Common.ok')).toBeTruthy();
     expect(onSnap).toHaveBeenCalledWith(1);
   });
 });

@@ -235,13 +235,15 @@ describe('CallLogScreen behaviors', () => {
 
   it('renders FeatureNotAvailable state', async () => {
     mockUserData = {}; // means userData exists
-    mockIsAppFeatureEnabled = false; // force feature not available branch
+    // make user lack required permissions
+    const original = mockPermissions;
+    mockPermissions = [];
     const {toJSON, unmount} = render(<CallLogScreen />);
     expect(toJSON()).toBeTruthy();
     unmount();
     // reset
     mockUserData = undefined;
-    mockIsAppFeatureEnabled = true;
+    mockPermissions = original;
   });
 
   it('shows simulation empty state after switching to simulation tab', async () => {

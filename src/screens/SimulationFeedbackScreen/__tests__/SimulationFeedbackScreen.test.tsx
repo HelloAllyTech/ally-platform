@@ -79,11 +79,11 @@ jest.mock('@/services', () => {
 
 jest.mock('../components', () => {
   const React = require('react');
-  const {TouchableOpacity, Text} = require('react-native');
+  const {TouchableOpacity, Text, View} = require('react-native');
   return {
-    SimulationSummarySkeleton: () => <summary-skeleton testID="summary-skeleton" />,
-    SimulationSummary: () => <summary-comp testID="summary-comp" />,
-    SimulationTranscript: () => <transcript-comp testID="transcript-comp" />,
+    SimulationSummarySkeleton: () => <View testID="summary-skeleton" />,
+    SimulationSummary: () => <View testID="summary-comp" />,
+    SimulationTranscript: () => <View testID="transcript-comp" />,
     FeedbackDropdown: ({visible, setShowSummary}: any) => {
       if (!visible) return null;
       return (
@@ -113,8 +113,8 @@ describe('SimulationFeedbackScreen', () => {
   it('renders summary when data exists', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
-        // @ts-expect-error partial route
-        route={{params: {simulationId: '1'}}}
+        navigation={{} as any}
+        route={{params: {simulationId: '1'}} as any}
       />,
     );
     expect(getByTestId('summary-comp')).toBeTruthy();
@@ -122,7 +122,7 @@ describe('SimulationFeedbackScreen', () => {
 
   it('opens feedback popup on button press', () => {
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
     );
     fireEvent.press(getByTestId('primary-button'));
     // Popup rendered by mocked component within screen
@@ -137,7 +137,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
     );
     expect(getByTestId('summary-skeleton')).toBeTruthy();
   });
@@ -149,7 +149,7 @@ describe('SimulationFeedbackScreen', () => {
       {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
     ]);
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
     );
     // Press arrow icon within header to open dropdown (bubbles to Touchable)
     fireEvent.press(getByTestId('arrow-down'));
@@ -171,7 +171,7 @@ describe('SimulationFeedbackScreen', () => {
       {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
     ]);
     const {UNSAFE_getByType, getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
     );
     const {KeyboardAwareScrollView} = require('react-native-keyboard-aware-scroll-view');
     const scrollView = UNSAFE_getByType(KeyboardAwareScrollView);
@@ -202,7 +202,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
     );
 
     // advance beyond FEEDBACK_THRESHOLD (30s)
@@ -228,7 +228,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
     );
 
     // immediately press back (below threshold)
@@ -249,7 +249,7 @@ describe('SimulationFeedbackScreen', () => {
     showToastMock.mockClear();
 
     renderWithProviders(
-      <SimulationFeedbackScreen route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
     );
 
     // RETRY_COUNT_LIMIT is 4, each after 5000ms; advance enough time
