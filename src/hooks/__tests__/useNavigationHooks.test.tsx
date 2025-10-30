@@ -37,12 +37,12 @@ jest.mock('@/constants', () => ({
 
 const AppNavTest = () => {
   const navigation = useAppNavigation();
-  return <Text testID="go" onPress={() => navigation.navigate('CallLog')} />;
+  return <Text testID="go" onPress={() => (navigation as any).navigate('CallLog')} />;
 };
 
 const DrawerNavTest = () => {
   const navigation = useDrawerNavigation();
-  return <Text testID="drawer" onPress={() => navigation.navigate('CallLog')} />;
+  return <Text testID="drawer" onPress={() => (navigation as any).navigate('CallLog')} />;
 };
 
 const TabBackHandlerTest = () => {

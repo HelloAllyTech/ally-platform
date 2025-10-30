@@ -5,7 +5,7 @@ import {
 
 describe('CallSummary Utilities', () => {
   it('should map tags to a string', () => {
-    const tags = [{tag: 'tag1'}, {tag: 'tag2'}];
+    const tags = [{tag: 'tag1', priority_rating: 1}, {tag: 'tag2', priority_rating: 1}];
     expect(mapTagsToString(tags)).toBe('tag1, tag2');
   });
 
