@@ -12,11 +12,7 @@ export {
   hideToast as hideGlobalToast,
   useErrorToast,
 } from './Toast/ToastProvider';
-export {
-  LoadingSkeleton,
-  SimulationsSkeleton,
-  CallLogSkeleton,
-} from './LoadingSkeleton';
+export {SimulationsSkeleton, CallLogSkeleton} from './LoadingSkeleton';
 export {NetworkLogs} from './NetworkLogs';
 export {ResourceArticleCard} from './ResourceArticleCard';
 export {SearchableLocationDropdown} from './SearchableLocationDropdown';
