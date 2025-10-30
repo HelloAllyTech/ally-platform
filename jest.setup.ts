@@ -114,10 +114,11 @@ jest.mock('react-native-size-matters', () => ({
   vs: jest.fn().mockImplementation(size => size),
   s: jest.fn().mockImplementation(size => size),
   mvs: jest.fn().mockImplementation(size => size),
+  moderateScale: jest.fn().mockImplementation(size => size),
   ScaledSheet: {
     create: jest.fn(styles => {
       // Process the styles to handle the @ms and @vs annotations
-      const processedStyles = {};
+      const processedStyles: Record<string, Record<string, any>> = {};
       Object.entries(styles).forEach(([key, value]) => {
         processedStyles[key] = {};
         Object.entries(value as object).forEach(([propKey, propValue]) => {

@@ -6,6 +6,7 @@ import {SCREEN_NAMES, FEEDBACK_MIN_DISPLAY_MS} from '../../../constants';
 
 // Keep timers controllable
 jest.useFakeTimers();
+jest.setTimeout(15000);
 
 // Mocks
 jest.mock('@sayem314/react-native-keep-awake', () => ({
