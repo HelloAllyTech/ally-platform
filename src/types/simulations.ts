@@ -103,7 +103,7 @@ export interface SimulationEvent {
   events?: SimulationEventDetailsMeta | null;
   timestamp?: string;
   score?: number | null;
-  description?: string;
+  message?: string;
 }
 
 interface SummaryMetadata {
