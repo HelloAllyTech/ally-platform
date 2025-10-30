@@ -8,7 +8,7 @@ import {DataUnavailableIcon} from '@/assets/icons';
 import {EmptyState, TabView} from '@/components';
 import {AnalyticsType} from '@/constants/analytics';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
-import {useTranslate} from '@/hooks';
+import {useTranslate, useUser} from '@/hooks';
 import {
   useGetDashboardsQuery,
   useLazyGetDashboardUrlQuery,
@@ -19,6 +19,7 @@ import {typography} from '@/theme/typography';
 
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
+  const {userData} = useUser();
   const [activeTab, setActiveTab] = useState<AnalyticsType>(
     AnalyticsType.CALL_LOG_ANALYTICS,
   );
@@ -28,7 +29,10 @@ export const UserAnalyticsScreen: React.FC = () => {
     data: dashboards,
     isLoading: isLoadingDashboards,
     error,
-  } = useGetDashboardsQuery();
+  } = useGetDashboardsQuery(undefined, {
+    skip: !userData?.id,
+    refetchOnMountOrArgChange: true,
+  });
 
   const [dashboardUrls, setDashboardUrls] = useState<{[id: string]: string}>(
     {},
@@ -55,6 +59,10 @@ export const UserAnalyticsScreen: React.FC = () => {
       });
     }
   }, [dashboards, triggerDashboardUrl]);
+
+  useEffect(() => {
+    setDashboardUrls({});
+  }, [userData?.id]);
 
   const presentTypes = useMemo(() => {
     const types = new Set<AnalyticsType>();
