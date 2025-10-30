@@ -32,11 +32,11 @@ def get_default_tts_config(gender: Gender) -> object:
     try:
 
         if gender == Gender.MALE:
-            model = settings.DEFAULT_MALE_MODEL
+            model = settings.DEFAULT_MALE_VOICE_MODEL
         elif gender == Gender.FEMALE:
-            model = settings.DEFAULT_FEMALE_MODEL
+            model = settings.DEFAULT_FEMALE_VOICE_MODEL
         else:
-            model = settings.DEFAULT_NON_BINARY_MODEL
+            model = settings.DEFAULT_NON_BINARY_VOICE_MODEL
 
         return deepgram.TTS(
             model=model,
