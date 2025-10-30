@@ -100,10 +100,20 @@ def create_provider_tts(provider: str, config):
     # Validate voice configuration
     validator = TTS_VALIDATORS.get(provider_lower)
     if validator:
-        voice_param = getattr(config, 'voice_id', None) or getattr(config, 'model', None) or getattr(config, 'speaker',
-                                                                                                     None)
-        if not validator(voice_param):
-            raise ValueError(f"Invalid {provider} voice configuration")
+        # Prepare validation parameters from config
+        validation_params = {}
+        
+        # Extract all available parameters from config
+        if hasattr(config, 'model') and config.model:
+            validation_params['model'] = config.model
+        if hasattr(config, 'voice_id') and config.voice_id:
+            validation_params['voice_id'] = config.voice_id
+        if hasattr(config, 'speaker') and config.speaker:
+            validation_params['speaker'] = config.speaker
+            
+        # Validate using kwargs - the validator will check for required parameters
+        if not validator(**validation_params):
+            raise ValueError(f"Invalid {provider} voice configuration: {validation_params}")
 
     return tts
 

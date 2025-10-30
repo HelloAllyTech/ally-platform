@@ -24,8 +24,13 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 
-def validate_deepgram_voice(model: str) -> bool:
+def validate_deepgram_voice(**kwargs) -> bool:
     """Validate Deepgram TTS model using SDK by generating a short audio sample."""
+    model = kwargs.get('model')
+    if not model:
+        logger.error("Deepgram validation requires 'model' parameter")
+        return False
+    
     logger.info(f"Validating Deepgram voice model='{model}'")
 
     try:
@@ -57,9 +62,16 @@ def validate_deepgram_voice(model: str) -> bool:
         return False
 
 
-def validate_sarvam_voice(model:str,speaker: str) -> bool:
+def validate_sarvam_voice(**kwargs) -> bool:
     """Validate Sarvam TTS speaker by generating a short audio sample."""
-    logger.info(f"Validating Sarvam voice speaker='{speaker}'")
+    model = kwargs.get('model')
+    speaker = kwargs.get('speaker')
+    
+    if not model or not speaker:
+        logger.error(f"Sarvam validation requires both 'model' and 'speaker' parameters. Got model='{model}', speaker='{speaker}'")
+        return False
+    
+    logger.info(f"Validating Sarvam voice model='{model}', speaker='{speaker}'")
 
     try:
         client = SarvamAI(api_subscription_key=settings.SARVAM_API_KEY)
@@ -90,11 +102,15 @@ def validate_sarvam_voice(model:str,speaker: str) -> bool:
         return False
 
 
-def validate_elevenlabs_voice(voice_id: str) -> bool:
+def validate_elevenlabs_voice(**kwargs) -> bool:
     """
     Validate an ElevenLabs voice by fetching metadata using the SDK.
-    model parameter included for interface consistency.
     """
+    voice_id = kwargs.get('voice_id')
+    if not voice_id:
+        logger.error("ElevenLabs validation requires 'voice_id' parameter")
+        return False
+    
     logger.info(f"Validating ElevenLabs voice voice_id='{voice_id}'")
 
     try:
@@ -123,11 +139,13 @@ def validate_current_voice() -> bool:
 
     try:
         if provider == TTSProvider.DEEPGRAM:
-            return validate_deepgram_voice(settings.VOICE_ID)
+            return validate_deepgram_voice(model=settings.VOICE_ID)
         elif provider == TTSProvider.SARVAM:
-            return validate_sarvam_voice(settings.VOICE_ID)
+            model = getattr(settings, 'SARVAM_MODEL', settings.VOICE_ID)
+            speaker = getattr(settings, 'SARVAM_SPEAKER', 'meera')
+            return validate_sarvam_voice(model=model, speaker=speaker)
         elif provider == TTSProvider.ELEVENLABS:
-            return validate_elevenlabs_voice(settings.VOICE_ID)
+            return validate_elevenlabs_voice(voice_id=settings.VOICE_ID)
         else:
             logger.error(f"Unsupported TTS provider: {provider}")
             return False
