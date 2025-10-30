@@ -52,11 +52,6 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
     }
   }, [visible, fadeAnim]);
 
-  const onPressDelete = () => {
-    setModalType('delete');
-    onClose();
-  };
-
   if (!visible) return null;
 
   return (

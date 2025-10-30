@@ -69,9 +69,7 @@ export const SecurityCarousel: React.FC<SecurityCarouselProps> = ({
           style={[
             styles.slideTitle,
             opacityStyle,
-            {
-              ...carouselConfig.titleCustomStyle,
-            },
+            carouselConfig.titleCustomStyle,
           ]}>
           {t(item.textKey)}
         </Animated.Text>

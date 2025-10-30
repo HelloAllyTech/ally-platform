@@ -4,10 +4,10 @@ import {
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
-  RoomDeletionResponse,
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
+  SimulationCredits,
   SimulationSummaryData,
 } from '@/types';
 
@@ -17,35 +17,28 @@ export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
     listRooms: builder.query<RoomListResponse, void>({
       query: () => ({
-        url: API_ROUTES.ROOMS,
+        url: API_ROUTES.LEARN.ROOMS,
         method: API_METHODS.GET,
-      }),
-    }),
-
-    deleteRoom: builder.mutation<RoomDeletionResponse, string>({
-      query: roomId => ({
-        url: `${API_ROUTES.ROOMS}/${roomId}`,
-        method: API_METHODS.DELETE,
       }),
     }),
 
     getScenarios: builder.query<Scenario[], void>({
       query: () => ({
-        url: API_ROUTES.SCENARIOS,
+        url: API_ROUTES.LEARN.SCENARIOS,
         method: API_METHODS.GET,
       }),
     }),
 
-    getScenarioById: builder.query<Scenario, {id: string | number}>({
+    getScenarioById: builder.query<Scenario, {id: string}>({
       query: ({id}) => ({
-        url: `${API_ROUTES.SCENARIOS}/${id}`,
+        url: API_ROUTES.LEARN.SCENARIO_BY_ID(id),
         method: API_METHODS.GET,
       }),
     }),
 
     addSimulationFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
       query: ({scenarioSessionId, rating, comment}) => ({
-        url: `/learn/scenario-session/${scenarioSessionId}/feedback`,
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_FEEDBACK(scenarioSessionId),
         method: API_METHODS.POST,
         body: {
           rating: Number(rating),
@@ -54,11 +47,10 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    getSimulationDetails: builder.query<
-      SimulationSummaryData,
-      {id: string | number}
-    >({
-      query: ({id}) => ({url: `${API_ROUTES.SIMULATION_DETAILS}/${id}`}),
+    getSimulationDetails: builder.query<SimulationSummaryData, {id: string}>({
+      query: ({id}) => ({
+        url: API_ROUTES.LEARN.SIMULATION_DETAILS(id),
+      }),
     }),
 
     getSimulationLogs: builder.query<
@@ -66,7 +58,7 @@ export const simulationsApi = api.injectEndpoints({
       {limit: number; offset: number}
     >({
       query: ({limit, offset}) => ({
-        url: API_ROUTES.SIMULATION_LOGS,
+        url: API_ROUTES.LEARN.SIMULATION_LOGS,
         params: {limit, offset, sortBy: 'createdAt', order: SortOrder.DESC},
       }),
     }),
@@ -76,7 +68,7 @@ export const simulationsApi = api.injectEndpoints({
       {scenarioId: number}
     >({
       query: ({scenarioId}) => ({
-        url: API_ROUTES.SCENARIO_SESSION_START,
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
         body: {scenarioId},
       }),
@@ -87,9 +79,18 @@ export const simulationsApi = api.injectEndpoints({
       {scenarioSessionId: string}
     >({
       query: ({scenarioSessionId}) => ({
-        url: `${API_ROUTES.END_SCENARIO_SESSION}/${scenarioSessionId}/end`,
+        url: API_ROUTES.LEARN.END_SCENARIO_SESSION(scenarioSessionId),
         method: API_METHODS.POST,
       }),
+      invalidatesTags: ['SimulationCredits'],
+    }),
+
+    getSimulationCredits: builder.query<SimulationCredits, void>({
+      query: () => ({
+        url: API_ROUTES.LEARN.SIMULATION_CREDITS,
+        method: API_METHODS.GET,
+      }),
+      providesTags: ['SimulationCredits'],
     }),
   }),
 });
@@ -103,4 +104,5 @@ export const {
   useStartScenarioSessionMutation,
   useEndScenarioSessionMutation,
   useLazyGetSimulationDetailsQuery,
+  useLazyGetSimulationCreditsQuery,
 } = simulationsApi;

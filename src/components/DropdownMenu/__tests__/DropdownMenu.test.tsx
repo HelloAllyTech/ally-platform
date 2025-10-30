@@ -9,8 +9,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 describe('DropdownMenu', () => {
   const items = [
-    {text: 'One', onPress: jest.fn()},
-    {text: 'Two', onPress: jest.fn()},
+    {icon: <></>, text: 'One', onPress: jest.fn()},
+    {icon: <></>, text: 'Two', onPress: jest.fn()},
   ];
 
   it('does not render when not visible', () => {
@@ -28,8 +28,8 @@ describe('DropdownMenu', () => {
         visible
         onClose={onClose}
         items={[
-          {text: 'One', onPress: onItemPress},
-          {text: 'Two', onPress: jest.fn()},
+          {icon: <></>, text: 'One', onPress: onItemPress},
+          {icon: <></>, text: 'Two', onPress: jest.fn()},
         ]}
       />,
     );

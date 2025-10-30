@@ -11,14 +11,25 @@ import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon, ShareIcon} from '@/assets';
-import {PrimaryButton, useErrorToast, useToast} from '@/components';
+import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
+import {
+  IllustratedModal,
+  PrimaryButton,
+  useErrorToast,
+  useToast,
+} from '@/components';
 import {env} from '@/config/env';
-import {isIOS, MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
+import {
+  isIOS,
+  LOW_CREDITS_MODAL_DISPLAY_MS,
+  MICROPHONE_PERMISSION,
+  SCREEN_NAMES,
+} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
   usePermissionAlert,
+  useSimulationCredits,
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -37,8 +48,10 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {showErrorToast} = useErrorToast();
   const {showToast} = useToast();
+  const {credits, getCreditsInfo} = useSimulationCredits();
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
   const [startScenarioSession] = useStartScenarioSessionMutation();
   const [showActiveSimulationModal, setShowActiveSimulationModal] =
     useState(false);
@@ -54,6 +67,15 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       setIsMicPermissionGranted(status === RESULTS.GRANTED);
     });
   }, []);
+
+  useEffect(() => {
+    if (getCreditsInfo?.isLow) {
+      setShowLowCreditsModal(true);
+      setTimeout(() => {
+        setShowLowCreditsModal(false);
+      }, LOW_CREDITS_MODAL_DISPLAY_MS);
+    }
+  }, [getCreditsInfo?.isLow]);
 
   useHardwareBackPressHandler(() => {
     navigation.goBack();
@@ -142,14 +164,16 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
-        {!!scenario.scenario && (
-          <Text style={styles.fieldValue}>
-            {scenario.scenario}. {scenario.description}
-          </Text>
-        )}
+        <Text style={styles.fieldValue}>{scenario.description}</Text>
       </ScrollView>
     );
   };
+
+  const isStartSimulationDisabled = !!(
+    credits &&
+    getCreditsInfo &&
+    getCreditsInfo.isLow
+  );
 
   const renderCtaSection = () => {
     return (
@@ -158,6 +182,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
+          isDisabled={isStartSimulationDisabled}
         />
       </View>
     );
@@ -198,6 +223,16 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           visible={showActiveSimulationModal}
           onClose={() => setShowActiveSimulationModal(false)}
           scenarioSessionId={activeSimulationId}
+        />
+      )}
+      {credits && getCreditsInfo && (
+        <IllustratedModal
+          visible={showLowCreditsModal}
+          onClose={() => setShowLowCreditsModal(false)}
+          titleMain={t('Credits.lowCreditsTitle')}
+          description={t('Credits.lowCreditsDescription')}
+          illustration={<NoCreditsIcon />}
+          descriptionStyle={styles.lowCreditsDescription}
         />
       )}
     </View>
@@ -302,5 +337,10 @@ const styles = ScaledSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingRight: '4@ms',
+  },
+  lowCreditsDescription: {
+    fontSize: '14@ms',
+    marginHorizontal: '10@ms',
+    marginBottom: '-2@ms',
   },
 });

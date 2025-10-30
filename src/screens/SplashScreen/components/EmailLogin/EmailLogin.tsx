@@ -7,14 +7,13 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {PrimaryButton} from '@/components';
 import {
   isIOS,
-  isValidEmail,
   PRIVACY_POLICY_URL,
   TERMS_AND_CONDITIONS_URL,
 } from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, isValidEmail} from '@/utils';
 
 import {styles} from './styles';
 import type {EmailLoginProps} from './types';

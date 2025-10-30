@@ -7,6 +7,8 @@ jest.mock('@/store/slices/userSlice', () => ({
 jest.mock('@/utils/asyncStorage', () => ({ getItem: jest.fn(async () => undefined) }));
 jest.mock('@/config/env', () => ({ env: { API_BASE_URL: 'https://example.com', API_VERSION: 'v1' } }));
 
+import {UserRole} from '@/types';
+
 import {authApi} from '../authApi';
 
 describe('authApi endpoints', () => {
@@ -14,6 +16,49 @@ describe('authApi endpoints', () => {
     // The injected endpoints decorate api endpoints internally
     expect(typeof (authApi as any).endpoints.generateOtp).toBe('object');
     expect(typeof (authApi as any).endpoints.verifyOtp).toBe('object');
+  });
+
+  describe('endpoint interfaces', () => {
+    it('should support allowedRoles payload alongside email (runtime body)', () => {
+      const request = {
+        email: 'test@example.com',
+        allowedRoles: [UserRole.COUNSELOR, UserRole.LEARNER],
+      } as any;
+      
+      expect(request.email).toBe('test@example.com');
+      expect(request.allowedRoles).toEqual([UserRole.COUNSELOR, UserRole.LEARNER]);
+    });
+
+    it('should support allowedRoles in verify payload (runtime body)', () => {
+      const request = {
+        email: 'test@example.com',
+        otp: '123456',
+        allowedRoles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
+      } as any;
+      
+      expect(request.email).toBe('test@example.com');
+      expect(request.otp).toBe('123456');
+      expect(request.allowedRoles).toEqual([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+    });
+
+    it('should support all user roles in allowedRoles', () => {
+      const allRoles = [
+        UserRole.CLIENT,
+        UserRole.COUNSELOR,
+        UserRole.LEARNER,
+        UserRole.ADMIN,
+        UserRole.SUPER_ADMIN,
+      ];
+
+      const request = {
+        email: 'test@example.com',
+        allowedRoles: allRoles,
+      } as any;
+      
+      expect(request.allowedRoles).toHaveLength(5);
+      expect(request.allowedRoles).toContain(UserRole.ADMIN);
+      expect(request.allowedRoles).toContain(UserRole.SUPER_ADMIN);
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import {API_METHODS} from '@/constants';
+import {API_METHODS, API_ROUTES} from '@/constants';
 import {Chat, ChatStatus, FeedbackResponse} from '@/types';
 
 import {api} from './api';
@@ -27,11 +27,11 @@ interface UpdateNotesInput {
 export const chatApi = api.injectEndpoints({
   endpoints: builder => ({
     getCounsellorChat: builder.query<[] | Chat, void>({
-      query: () => '/chats/counsellor-chat',
+      query: () => API_ROUTES.CHATS.COUNSELLOR_CHAT,
     }),
     endCall: builder.mutation<EndCallResponse, {chatId: number}>({
       query: ({chatId}) => ({
-        url: `/chats/${chatId}/end`,
+        url: API_ROUTES.CHATS.END(chatId),
         method: API_METHODS.POST,
       }),
     }),
@@ -40,7 +40,7 @@ export const chatApi = api.injectEndpoints({
       {id: number; feedback: FeedbackInput}
     >({
       query: ({id, feedback}) => ({
-        url: `chats/messages/${id}/feedback`,
+        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK(id),
         method: API_METHODS.POST,
         body: feedback,
       }),
@@ -50,7 +50,7 @@ export const chatApi = api.injectEndpoints({
       {feedbackId: number; feedback: FeedbackInput}
     >({
       query: ({feedbackId, feedback}) => ({
-        url: `chats/messages/feedback/${feedbackId}`,
+        url: API_ROUTES.CHATS.MESSAGES_FEEDBACK_BY_ID(feedbackId),
         method: API_METHODS.PATCH,
         body: feedback,
       }),
@@ -60,7 +60,7 @@ export const chatApi = api.injectEndpoints({
       {chatId: number; notes: UpdateNotesInput}
     >({
       query: ({chatId, notes}) => ({
-        url: `/chats/${chatId}/notes`,
+        url: API_ROUTES.CHATS.NOTES(chatId),
         method: API_METHODS.POST,
         body: notes,
       }),

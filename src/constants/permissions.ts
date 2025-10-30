@@ -2,18 +2,23 @@ import {Platform} from 'react-native';
 import {PERMISSIONS} from 'react-native-permissions';
 
 export enum USER_PERMISSIONS {
-  VIEW_NAVBAR_CALLS = 'view:navbar:calls',
-  VIEW_NAVBAR_CALENDAR = 'view:navbar:calendar',
-  VIEW_NAVBAR_LEARN = 'view:navbar:learn',
-  VIEW_NAVBAR_STRESS_BUSTER = 'view:navbar:stress-buster',
-  VIEW_NAVBAR_SETTINGS = 'view:navbar:settings',
+  VIEW_CALL_LOGS = 'view:call:logs',
   EDIT_SUMMARY = 'edit:summary',
-  VIEW_START_CALL_PAGE = 'view:button:start-call',
-  VIEW_NAVBAR_SEARCH = 'view:navbar:search',
-  VIEW_NAVBAR_COMMUNITY = 'view:navbar:community',
+  VIEW_REFERENCE_DOCUMENT = 'view:reference-document',
+  VIEW_COMMUNITY = 'view:community',
   VIEW_SCENARIO_SESSION = 'view:scenario-session',
-  VIEW_ADMIN_SCENARIO_SESSION = 'view:admin:scenario-session',
   VIEW_ANALYTICS_DASHBOARD = 'view:analytics:dashboard',
+  START_MICROPHONE_CHAT = 'start:microphone-chat',
+  START_CLOUD_TELEPHONY_CHAT = 'start:cloud-telephony-chat',
+  VIEW_CHAT_DETAILS = 'view:chat:details',
+  EXPORT_CHAT_SUMMARY = 'export:chat:summary',
+  EDIT_SUMMARY_FEEDBACK = 'edit:summary:feedback',
+  VIEW_SCENARIO_SESSION_DETAILS = 'view:scenario-session:details',
+  EDIT_SCENARIO_SESSION = 'edit:scenario-session',
+  VIEW_SESSION_SCENARIO_MESSAGES = 'view:session-scenario:messages',
+  VIEW_COUNSELOR_CHAT = 'view:chat:counselor',
+  VIEW_MESSAGES = 'view:messages',
+  EDIT_MESSAGE_FEEDBACK = 'edit:message:feedback',
 }
 
 export const MICROPHONE_PERMISSION =
