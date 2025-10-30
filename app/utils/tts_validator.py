@@ -57,7 +57,7 @@ def validate_deepgram_voice(model: str) -> bool:
         return False
 
 
-def validate_sarvam_voice(speaker: str) -> bool:
+def validate_sarvam_voice(model:str,speaker: str) -> bool:
     """Validate Sarvam TTS speaker by generating a short audio sample."""
     logger.info(f"Validating Sarvam voice speaker='{speaker}'")
 
@@ -66,7 +66,7 @@ def validate_sarvam_voice(speaker: str) -> bool:
         response = client.text_to_speech.convert(
             target_language_code="en-IN",
             text="Hello from Sarvam AI!",
-            model="bulbul:v2",
+            model=model,
             speaker=speaker,
         )
 
