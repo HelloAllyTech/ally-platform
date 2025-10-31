@@ -110,7 +110,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: ${test_timeout_minutes}
     needs: [prepare-env]
     if: 'true' == 'true'
     steps:
