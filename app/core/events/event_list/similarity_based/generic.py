@@ -4,7 +4,7 @@ Generic similarity event for runtime instantiation from YAML sentences.
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Dict, override
+from typing import List, Optional, Tuple, Dict, ClassVar, override
 
 from pydantic import PrivateAttr
 
@@ -41,7 +41,7 @@ class GenericSimilarityEvent(BaseEvent):
     _instance_built: bool = PrivateAttr(default=False)
 
     # Shared cache across instances: (sentences_hash, threshold, min_tokens, stopwords_hash) -> patterns
-    _PATTERN_CACHE: Dict[Tuple[int, float, int, int], List[TargetPattern]] = {}
+    _PATTERN_CACHE: ClassVar[Dict[Tuple[int, float, int, int], List[TargetPattern]]] = {}
 
     @classmethod
     def create(
