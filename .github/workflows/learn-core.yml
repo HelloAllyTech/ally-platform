@@ -31,7 +31,7 @@ env:
   TEST_RUNTIME: python
   TEST_RUNTIME_VERSION: 3.12
   TEST_PACKAGE_MANAGER: poetry
-  TEST_INSTALL_COMMAND: poetry install --no-interaction --no-root --with dev
+  TEST_INSTALL_COMMAND: poetry install --no-interaction
   TEST_RUN_COMMAND: poetry run pytest tests/
   TEST_CACHE_PATHS: .venv
   TEST_TIMEOUT_MINUTES: 15
