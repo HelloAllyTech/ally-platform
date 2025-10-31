@@ -34,7 +34,6 @@ env:
   TEST_INSTALL_COMMAND: poetry install --no-interaction --no-root --with dev
   TEST_RUN_COMMAND: poetry run pytest tests/
   TEST_CACHE_PATHS: .venv
-  TEST_CACHE_KEY: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
   TEST_TIMEOUT_MINUTES: 15
 
 jobs:
@@ -111,9 +110,9 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-22.04
-    timeout-minutes: ${{ fromJSON(env.TEST_TIMEOUT_MINUTES) }}
+    timeout-minutes: 15
     needs: [prepare-env]
-    if: ${{ env.ENABLE_TESTS == 'true' }}
+    if: true == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -149,7 +148,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.TEST_CACHE_PATHS }}
-          key: ${{ env.TEST_CACHE_KEY }}
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
         if: steps.cached-dependencies.outputs.cache-hit != 'true'
