@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     needs: [prepare-env]
-    if: true == 'true'
+    if: 'true' == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -165,6 +165,7 @@ jobs:
       pull-requests: write
       contents: read
     needs: [prepare-env, test]
+    if: always() && needs.prepare-env.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     outputs:
       APP_IMAGE: ${{ steps.build_and_push.outputs.APP_IMAGE }}
     steps:
