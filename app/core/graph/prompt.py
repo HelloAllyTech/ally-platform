@@ -63,13 +63,12 @@ def generate_system_message(
     # Handle the 'next_instruction' block
     next_instruction_block = ""
     if next_instruction:
-        next_instruction_block = f"""---
-        ## Next Conversation Instruction
-        Follow this conversation-specific guidance for your next replies:
-        ```
-        {next_instruction}
-        ```
-        """
+        next_instruction_block  = f"""---
+        ##  CRITICAL INSTRUCTION FOR YOUR NEXT REPLY 
+        **This is a one-time directive for your immediate next response. You MUST follow this instruction, even if it contradicts your general personality or other guidelines.**
+        
+        **Instruction:** {next_instruction}
+        ---"""
 
     # Hardcoded system instruction as requested
     system_instruction = """"You are an AI roleplay assistant for counselor training. In this simulation, you must act ONLY as the **client** in a therapy session. Stay fully in character, provide realistic dialogue, and do not switch roles unless explicitly instructed.
@@ -91,6 +90,11 @@ def generate_system_message(
     # Assemble the final prompt
     system_prompt = f"""
     {system_instruction}
+    
+    {next_instruction_block}
+    
+    ## Your Client Persona Details
+    This is the background information for your character.
     
     **Your name:**
     {prompt_data.name}
@@ -122,8 +126,6 @@ def generate_system_message(
     {emotional_needs_block}
     {tone_block}
     
-    
-    {next_instruction_block}
     """
 
     return SystemMessage(content=system_prompt.strip())
