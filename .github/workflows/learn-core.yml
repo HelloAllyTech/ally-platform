@@ -31,8 +31,8 @@ env:
   TEST_RUNTIME: python
   TEST_RUNTIME_VERSION: 3.12
   TEST_PACKAGE_MANAGER: poetry
-  TEST_INSTALL_COMMAND: poetry install --no-interaction
-  TEST_RUN_COMMAND: poetry run pytest tests/
+  TEST_INSTALL_COMMAND: poetry install --no-interaction && poetry run pip install pytest
+  TEST_RUN_COMMAND: poetry run python -m pytest tests/ -v
   TEST_CACHE_PATHS: .venv
   TEST_TIMEOUT_MINUTES: 15
 
@@ -153,6 +153,11 @@ jobs:
       - name: Install dependencies
         if: steps.cached-dependencies.outputs.cache-hit != 'true'
         run: ${{ env.TEST_INSTALL_COMMAND }}
+
+      - name: Verify Poetry environment
+        run: |
+          poetry env info
+          poetry show
 
       - name: Run tests
         run: ${{ env.TEST_RUN_COMMAND }}
