@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     needs: [prepare-env]
-    if: 'true' == 'true'
+    if: ${{ "true" == "true" }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
