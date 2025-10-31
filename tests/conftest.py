@@ -1,8 +1,76 @@
 """Shared test fixtures and configuration."""
-import json
+import os
 import pytest
+
+# CRITICAL: Set environment variables at MODULE LEVEL before any app imports
+# This ensures they are set before Settings class is instantiated
+_original_env_vars = {}
+
+def _set_test_env_vars():
+    """Set all required environment variables for testing."""
+    test_env_vars = {
+        # Slack settings
+        "SLACK_ALERTS_API_TOKEN": "test-slack-token",
+        "SLACK_ALERTS_CHANNEL_ID": "test-channel-id",
+        
+        # LiveKit settings
+        "LIVEKIT_LOG_LEVEL": "INFO",
+        "LIVEKIT_API_KEY": "test-livekit-key",
+        "LIVEKIT_API_SECRET": "test-livekit-secret",
+        "LIVEKIT_URL": "wss://test.livekit.cloud",
+        
+        # OpenAI settings
+        "OPENAI_API_KEY": "test-openai-key",
+        
+        # Deepgram settings
+        "DEEPGRAM_API_KEY": "test-deepgram-key",
+        
+        # AWS settings
+        "AWS_ACCESS_KEY_ID": "test-aws-access-key",
+        "AWS_SECRET_ACCESS_KEY": "test-aws-secret-key",
+        "SQS_MESSAGE_EVENT_QUEUE_NAME": "test-queue",
+        
+        # Voice API settings
+        "ELEVEN_API_KEY": "test-eleven-key",
+        "SARVAM_API_KEY": "test-sarvam-key",
+        
+        # LLM settings
+        "LLM_TEMPERATURE": "0.7",
+        
+        # Voice model settings
+        "DEFAULT_MALE_VOICE_MODEL": "test-male-voice",
+        "DEFAULT_FEMALE_VOICE_MODEL": "test-female-voice",
+        "DEFAULT_NON_BINARY_VOICE_MODEL": "test-nonbinary-voice",
+    }
+    
+    # Set environment variables and store originals
+    for key, value in test_env_vars.items():
+        if key not in _original_env_vars:
+            _original_env_vars[key] = os.environ.get(key)
+        os.environ[key] = value
+
+# Set test environment variables immediately when conftest is imported
+_set_test_env_vars()
+
+# Now safe to import other modules
+import json
 from typing import Dict, Any
 from unittest.mock import Mock, AsyncMock, patch
+
+
+# Cleanup fixture to restore environment variables
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_env_vars():
+    """Restore original environment variables after all tests complete."""
+    yield  # All tests run here
+    
+    # Restore original environment variables
+    for key, original_value in _original_env_vars.items():
+        if original_value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original_value
+
 
 # Test data fixtures
 @pytest.fixture

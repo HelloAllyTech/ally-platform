@@ -67,7 +67,7 @@ class TestPrompt:
             "Your talking stye/tone",
             "Your gender identity:",
             "Your sexual orientation:",
-            "Next Conversation Instruction",
+            "CRITICAL INSTRUCTION FOR YOUR NEXT REPLY",
             "Focus on rapport.",
         ]:
             assert text in content
