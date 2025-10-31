@@ -118,12 +118,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up runtime
-        uses: ${{ env.TEST_RUNTIME == 'python' && 'actions/setup-python@v4' || env.TEST_RUNTIME == 'node' && 'actions/setup-node@v4' || 'actions/setup-java@v4' }}
+      - name: Set up Python
+        if: ${{ env.TEST_RUNTIME == 'python' }}
+        uses: actions/setup-python@v4
         with:
-          ${{ env.TEST_RUNTIME == 'python' && 'python-version' || env.TEST_RUNTIME == 'node' && 'node-version' || 'java-version' }}: ${{ env.TEST_RUNTIME_VERSION }}
+          python-version: ${{ env.TEST_RUNTIME_VERSION }}
 
-      - name: Setup package manager
+      - name: Set up Node.js
+        if: ${{ env.TEST_RUNTIME == 'node' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Set up Java
+        if: ${{ env.TEST_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Setup Poetry
         if: ${{ env.TEST_PACKAGE_MANAGER == 'poetry' }}
         uses: snok/install-poetry@v1
         with:
@@ -152,7 +165,7 @@ jobs:
       id-token: write
       pull-requests: write
       contents: read
-    needs: ${{ env.ENABLE_TESTS == 'true' && '[prepare-env, test]' || '[prepare-env]' }}
+    needs: [prepare-env, test]
     outputs:
       APP_IMAGE: ${{ steps.build_and_push.outputs.APP_IMAGE }}
     steps:
