@@ -7,21 +7,41 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (k: string) => k}),
 }));
 
+jest.mock('@/hooks', () => ({
+  useTranslate: () => ({t: (k: string) => k}),
+}));
+
 jest.mock('@/assets', () => ({
   __esModule: true,
+  ChevronDown: () => null,
+  MicIcon: () => null,
+  ShieldIcon: () => null,
   MicOffIcon: () => null,
   MicOnIcon: () => null,
 }));
 
 describe('ControlButtons', () => {
+  const defaultProps = {
+    isMaximized: true,
+    onToggleMaximized: jest.fn(),
+    isFocusMode: false,
+    onFocusModeButtonPress: jest.fn(),
+    isSimulationEndDisabled: false,
+    onSimulationEndPress: jest.fn(),
+    isMicDisabled: false,
+    onMicButtonPress: jest.fn(),
+    isMuted: false,
+  };
+
   it('renders mute/unmute label based on isMuted and triggers callbacks', () => {
-    const onMicPress = jest.fn();
-    const onStopPress = jest.fn();
+    const onMicButtonPress = jest.fn();
+    const onSimulationEndPress = jest.fn();
 
     const {getByText, rerender} = render(
       <ControlButtons
-        onMicPress={onMicPress}
-        onStopPress={onStopPress}
+        {...defaultProps}
+        onMicButtonPress={onMicButtonPress}
+        onSimulationEndPress={onSimulationEndPress}
         isMuted={false}
       />,
     );
@@ -32,14 +52,15 @@ describe('ControlButtons', () => {
     // Press mic and stop
     fireEvent.press(getByText('SimulationAssistant.mute'));
     fireEvent.press(getByText('SimulationAssistant.endSession'));
-    expect(onMicPress).toHaveBeenCalled();
-    expect(onStopPress).toHaveBeenCalled();
+    expect(onMicButtonPress).toHaveBeenCalled();
+    expect(onSimulationEndPress).toHaveBeenCalled();
 
     // Rerender as muted
     rerender(
       <ControlButtons
-        onMicPress={onMicPress}
-        onStopPress={onStopPress}
+        {...defaultProps}
+        onMicButtonPress={onMicButtonPress}
+        onSimulationEndPress={onSimulationEndPress}
         isMuted
       />,
     );
@@ -47,22 +68,23 @@ describe('ControlButtons', () => {
   });
 
   it('respects disabled states', () => {
-    const onMicPress = jest.fn();
-    const onStopPress = jest.fn();
+    const onMicButtonPress = jest.fn();
+    const onSimulationEndPress = jest.fn();
     const {getByText} = render(
       <ControlButtons
-        onMicPress={onMicPress}
-        onStopPress={onStopPress}
+        {...defaultProps}
+        onMicButtonPress={onMicButtonPress}
+        onSimulationEndPress={onSimulationEndPress}
         isMuted={false}
-        isDisableMic
-        isDisableStop
+        isMicDisabled
+        isSimulationEndDisabled
       />,
     );
 
     fireEvent.press(getByText('SimulationAssistant.mute'));
     fireEvent.press(getByText('SimulationAssistant.endSession'));
-    expect(onMicPress).not.toHaveBeenCalled();
-    expect(onStopPress).not.toHaveBeenCalled();
+    expect(onMicButtonPress).not.toHaveBeenCalled();
+    expect(onSimulationEndPress).not.toHaveBeenCalled();
   });
 });
 
