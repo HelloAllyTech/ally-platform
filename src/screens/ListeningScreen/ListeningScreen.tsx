@@ -17,7 +17,6 @@ import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
 import {
-  AllyPlatforms,
   AUDIO_INACTIVE_TIMEOUT,
   SCREEN_NAMES,
   USER_PERMISSIONS,
@@ -27,6 +26,7 @@ import {
   useCounselorChat,
   useDebounce,
   useHardwareBackPressHandler,
+  useListeningScreen,
   useLiveAudioStream,
   useNetworkConnectivity,
   useSocketConnection,
@@ -44,7 +44,6 @@ import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {colors, globalStyles} from '@/theme';
 import {
   ChatProvider,
-  ConferenceCallProviders,
   DisconnectedType,
   FeedbackResponse,
   Nudge,
@@ -90,20 +89,28 @@ export const ListeningScreen = ({
   const chatData = useAppSelector(state => state.chat.currentChat);
   const permissions = useAppSelector(state => state.user.permissions);
 
-  const callProvider = chatData?.provider;
-
   const isMicrophoneMode =
     route.params?.isMicrophoneMode ||
     chatData?.provider === ChatProvider.MICROPHONE;
-  const isWebMicrophoneMode =
-    callProvider === ChatProvider.MICROPHONE &&
-    chatData?.platform === AllyPlatforms.WEB;
-  const isConferenceCall =
-    callProvider && ConferenceCallProviders.includes(callProvider);
 
   const [isFocusMode, setIsFocusMode] = useState(true);
   const [currentNudge, setCurrentNudge] = useState<Maybe<Nudge>>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
+    useState(false);
+
+  const {
+    isWebMicrophoneMode,
+    isConferenceCall,
+    tooltipContentList,
+    tooltipDisplayInsets,
+    startTime,
+  } = useListeningScreen({
+    isMicrophoneMode,
+    isFocusMode,
+    chatData,
+  });
+
   const [isCallPaused, setIsCallPaused] = useState(isWebMicrophoneMode);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [showCallEndConfirmation, setShowCallEndConfirmation] = useState(false);
@@ -112,8 +119,6 @@ export const ListeningScreen = ({
   const [isPrivacyTooltipVisible, setIsPrivacyTooltipVisible] = useState(false);
   const [isControlSectionMaximized, setIsControlSectionMaximized] =
     useState(true);
-  const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
-    useState(false);
   const [disconnectedType, setDisconnectedType] =
     useState<DisconnectedType | null>(null);
 
@@ -130,20 +135,6 @@ export const ListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
   const chatIdRef = useRef(chatData?.chatId);
-  const tooltipContentList = [
-    t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
-    t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
-    t('ListeningScreen.dataSafeTooltip.noTrainingData'),
-    t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
-  ];
-
-  const startTime = useMemo(
-    () =>
-      chatData?.startedAt
-        ? new Date(chatData?.startedAt).getTime()
-        : Date.now(),
-    [chatData?.startedAt],
-  );
 
   const handleCallEndRedirection = useCallback(() => {
     // Only navigate if the ListeningScreen is still focused
@@ -353,19 +344,19 @@ export const ListeningScreen = ({
       enableLiveAudio: isMicrophoneMode && !isWebMicrophoneMode,
     });
 
-  const isAudioSessionReady = useMemo(() => {
-    return (
+  const isAudioSessionReady = useMemo(
+    () =>
       isMicrophoneMode &&
       isPermissionGranted &&
       isMicrophoneModeSessionCreated &&
-      !isWebMicrophoneMode
-    );
-  }, [
-    isMicrophoneMode,
-    isPermissionGranted,
-    isMicrophoneModeSessionCreated,
-    isWebMicrophoneMode,
-  ]);
+      !isWebMicrophoneMode,
+    [
+      isMicrophoneMode,
+      isPermissionGranted,
+      isMicrophoneModeSessionCreated,
+      isWebMicrophoneMode,
+    ],
+  );
 
   useEffect(() => {
     if (
@@ -533,13 +524,6 @@ export const ListeningScreen = ({
       ))}
     </View>
   );
-
-  const tooltipDisplayInsets = {
-    left: isFocusMode ? 40 : 10,
-    right: isFocusMode ? 40 : 10,
-    top: 10,
-    bottom: 10,
-  };
 
   const renderTakingNotes = () => {
     return (

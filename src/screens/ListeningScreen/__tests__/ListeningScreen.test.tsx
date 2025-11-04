@@ -63,6 +63,14 @@ jest.mock('@/hooks', () => ({
   useSocketConnection: () => ({emitSocketEvent: jest.fn()}),
   useUser: () => ({userData: {id: 'u1'}}),
   useDebounce: (fn: any) => fn,
+  useListeningScreen: () => ({
+    isWebMicrophoneMode: false,
+    isConferenceCall: false,
+    callProvider: undefined,
+    tooltipContentList: ['tooltip1', 'tooltip2', 'tooltip3', 'tooltip4'],
+    tooltipDisplayInsets: {left: 40, right: 40, top: 10, bottom: 10},
+    startTime: Date.now(),
+  }),
 }));
 
 // RTK Query services

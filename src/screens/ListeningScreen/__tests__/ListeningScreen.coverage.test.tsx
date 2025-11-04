@@ -65,6 +65,14 @@ jest.mock('@/hooks', () => ({
     isConnecting: false,
   }),
   useUser: () => ({userData: {id: 1}}),
+  useListeningScreen: () => ({
+    isWebMicrophoneMode: false,
+    isConferenceCall: false,
+    callProvider: undefined,
+    tooltipContentList: ['tooltip1', 'tooltip2', 'tooltip3', 'tooltip4'],
+    tooltipDisplayInsets: {left: 40, right: 40, top: 10, bottom: 10},
+    startTime: Date.now(),
+  }),
 }));
 
 jest.mock('@/store/hooks', () => ({
