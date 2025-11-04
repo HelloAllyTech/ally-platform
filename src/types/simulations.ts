@@ -68,11 +68,15 @@ export interface CircleWaveVisualizerProps {
 }
 
 export interface ControlButtonsProps {
-  onMicPress: () => void;
-  onStopPress: () => void;
+  isMaximized: boolean;
+  onToggleMaximized: () => void;
+  isFocusMode: boolean;
+  onFocusModeButtonPress: () => void;
+  isSimulationEndDisabled?: boolean;
+  onSimulationEndPress: () => void;
+  isMicDisabled?: boolean;
+  onMicButtonPress: () => void;
   isMuted: boolean;
-  isDisableMic?: boolean;
-  isDisableStop?: boolean;
 }
 
 export interface SimulationTimerProps {

@@ -62,6 +62,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -271,15 +273,17 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 {!!scenario?.title && (
                   <Text style={styles.personaLabel}>{scenario.title}</Text>
                 )}
-                <View style={styles.liveFeedbackWrapper}>
-                  {feedback && (
-                    <LiveFeedback
-                      key={feedbackKey}
-                      message={feedback.text}
-                      emoji={feedback.emoji}
-                    />
-                  )}
-                </View>
+                {!isFocusMode && (
+                  <View style={styles.liveFeedbackWrapper}>
+                    {feedback && (
+                      <LiveFeedback
+                        key={feedbackKey}
+                        message={feedback.text}
+                        emoji={feedback.emoji}
+                      />
+                    )}
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -290,13 +294,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             </View>
           )}
 
-          <ControlButtons
-            onMicPress={handleToggleMic}
-            onStopPress={handleDisconnect}
-            isDisableMic={showSimulationLoading}
-            isDisableStop={isDisconnecting}
-            isMuted={!isMicEnabled}
-          />
           <EndingSoonModal
             visible={showEndingSoon && !showSimulationLoading}
             titleMain={t('SimulationAssistant.session')}
@@ -306,6 +303,17 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             onEndSession={handleDisconnect}
           />
         </View>
+        <ControlButtons
+          isMaximized={isMaximized}
+          onToggleMaximized={() => setIsMaximized(!isMaximized)}
+          isFocusMode={isFocusMode}
+          onFocusModeButtonPress={() => setIsFocusMode(!isFocusMode)}
+          isSimulationEndDisabled={isDisconnecting}
+          onSimulationEndPress={handleDisconnect}
+          isMicDisabled={showSimulationLoading}
+          onMicButtonPress={handleToggleMic}
+          isMuted={!isMicEnabled}
+        />
       </RoomContext.Provider>
     </SafeAreaView>
   );
@@ -361,7 +369,7 @@ const styles = ScaledSheet.create({
     fontSize: '14@ms',
     color: colors.white,
     textAlign: 'left',
-    marginLeft: '20@ms',
+    marginHorizontal: '20@ms',
     marginBottom: '16@ms',
     width: '100%',
   },
