@@ -1,0 +1,20 @@
+from langgraph.graph import StateGraph
+from langgraph.checkpoint.memory import MemorySaver
+
+from app.core.graph.graph_builder import build_graph
+from app.core.graph.state import SimulationState
+from app.core.graph import agent_graph
+
+
+class TestGraphBuilder:
+    def test_build_graph_returns_state_graph(self):
+        graph = build_graph()
+        assert isinstance(graph, StateGraph)
+
+    def test_compile_graph_produces_compiled_graph(self):
+        # Ensure the exported compiled graph exists and is callable with checkpointer
+        assert agent_graph is not None
+        # Build/compile locally as well
+        compiled = build_graph().compile(checkpointer=MemorySaver())
+        # compiled is a CompiledStateGraph; we just check it has an invoke method
+        assert hasattr(compiled, "ainvoke") or hasattr(compiled, "invoke")
