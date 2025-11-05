@@ -125,5 +125,26 @@ describe('VideoPreview', () => {
     videoComponent = UNSAFE_getByType('Video' as any);
     expect(videoComponent.props.muted).toBe(false);
   });
+
+  it('stops playing video when component unmounts', () => {
+    const {UNSAFE_getByType, unmount} = render(
+      <VideoPreview videoUrl={mockVideoUrl} autoPlay testID="video-preview" />,
+    );
+
+    // Initially playing
+    let videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(false);
+
+    // Unmount the component
+    unmount();
+
+    // After unmount, if we render again, it should start paused (not auto-play)
+    const {UNSAFE_getByType: getByTypeAfter} = render(
+      <VideoPreview videoUrl={mockVideoUrl} testID="video-preview" />,
+    );
+
+    videoComponent = getByTypeAfter('Video' as any);
+    expect(videoComponent.props.paused).toBe(true);
+  });
 });
 

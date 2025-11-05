@@ -163,7 +163,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         {hasVideo && (
           <VideoPreview
             videoUrl={videoUrl}
-            autoPlay
+            autoPlay={false}
             testID="scenario-video-preview"
           />
         )}
