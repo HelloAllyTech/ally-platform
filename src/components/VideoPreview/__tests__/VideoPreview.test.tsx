@@ -1,0 +1,129 @@
+import React from 'react';
+import {fireEvent, render} from '@testing-library/react-native';
+
+import {VideoPreview} from '../VideoPreview';
+
+jest.mock('react-native-video', () => 'Video');
+
+describe('VideoPreview', () => {
+  const mockVideoUrl = 'https://example.com/video.mp4';
+
+  it('renders video component with correct props', () => {
+    const {UNSAFE_getByType} = render(<VideoPreview videoUrl={mockVideoUrl} />);
+
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.source).toEqual({uri: mockVideoUrl});
+    expect(videoComponent.props.paused).toBe(true); // Default is not playing
+    expect(videoComponent.props.repeat).toBe(true);
+    expect(videoComponent.props.muted).toBe(false); // Default is unmuted
+    expect(videoComponent.props.controls).toBe(false);
+  });
+
+  it('shows play button overlay when video is paused', () => {
+    const {getByTestId} = render(
+      <VideoPreview videoUrl={mockVideoUrl} testID="video-preview" />,
+    );
+
+    expect(getByTestId('video-preview-play-button')).toBeTruthy();
+  });
+
+  it('toggles video playback when play button is pressed', () => {
+    const onPlayStateChange = jest.fn();
+    const {getByTestId, queryByTestId, UNSAFE_getByType} = render(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        testID="video-preview"
+        onPlayStateChange={onPlayStateChange}
+      />,
+    );
+
+    // Initially paused
+    expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+
+    // Press play
+    fireEvent.press(getByTestId('video-preview-play-button'));
+
+    // Now playing
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(false);
+    expect(onPlayStateChange).toHaveBeenCalledWith(true);
+    expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+    expect(queryByTestId('video-preview-play-button')).toBeNull();
+  });
+
+  it('pauses video when pause overlay is pressed', () => {
+    const onPlayStateChange = jest.fn();
+    const {getByTestId, queryByTestId, UNSAFE_getByType} = render(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        testID="video-preview"
+        autoPlay
+        onPlayStateChange={onPlayStateChange}
+      />,
+    );
+
+    // Initially playing
+    expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+
+    // Press pause
+    fireEvent.press(getByTestId('video-preview-pause-button'));
+
+    // Now paused
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(true);
+    expect(onPlayStateChange).toHaveBeenCalledWith(false);
+    expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+    expect(queryByTestId('video-preview-pause-button')).toBeNull();
+  });
+
+  it('autoplays when autoPlay prop is true', () => {
+    const {UNSAFE_getByType, queryByTestId} = render(
+      <VideoPreview videoUrl={mockVideoUrl} autoPlay testID="video-preview" />,
+    );
+
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(false);
+    expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+  });
+
+  it('hides play icon when showPlayIcon is false', () => {
+    const {queryByTestId} = render(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        showPlayIcon={false}
+        testID="video-preview"
+      />,
+    );
+
+    expect(queryByTestId('video-preview-play-button')).toBeNull();
+  });
+
+  it('applies custom styles', () => {
+    const customStyle = {height: 300, borderRadius: 16};
+    const {getByTestId} = render(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        style={customStyle}
+        testID="video-preview"
+      />,
+    );
+
+    const container = getByTestId('video-preview');
+    expect(container.props.style).toContainEqual(customStyle);
+  });
+
+  it('respects muted prop', () => {
+    const {UNSAFE_getByType, rerender} = render(
+      <VideoPreview videoUrl={mockVideoUrl} muted />,
+    );
+
+    let videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.muted).toBe(true);
+
+    // Test unmuted
+    rerender(<VideoPreview videoUrl={mockVideoUrl} muted={false} />);
+    videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.muted).toBe(false);
+  });
+});
+

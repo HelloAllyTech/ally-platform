@@ -39,8 +39,6 @@ export const SimulationsScreen: React.FC = () => {
   };
 
   const renderItem = ({item}: {item: Scenario}) => {
-    // TODO: Move this after the API is updated and add enum
-
     return (
       <TouchableOpacity
         activeOpacity={0.8}
@@ -52,7 +50,6 @@ export const SimulationsScreen: React.FC = () => {
               source={{uri: item.coverImageUrl}}
               style={styles.cover}
               resizeMode="cover"
-              onError={() => {}}
             />
           </View>
         )}
@@ -167,7 +164,7 @@ const styles = ScaledSheet.create({
   },
   list: {
     paddingTop: '10@ms',
-    paddingBottom: '90@ms',
+    paddingBottom: '110@ms',
     gap: '12@ms',
   },
   card: {
@@ -219,11 +216,13 @@ const styles = ScaledSheet.create({
     color: colors.darkGray12,
     fontSize: '15@ms',
     marginBottom: '6@ms',
+    marginRight: '10@ms',
   },
   cardDesc: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.darkCharcoal,
     fontSize: '12@ms',
+    marginRight: '8@ms',
   },
   empty: {
     alignItems: 'center',

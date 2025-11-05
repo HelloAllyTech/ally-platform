@@ -63,7 +63,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
-  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+  const [isControlButtonMaximized, setIsControlButtonMaximized] =
+    useState<boolean>(false);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -274,7 +275,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                   <Text style={styles.personaLabel}>{scenario.title}</Text>
                 )}
                 {!isFocusMode && (
-                  <View style={styles.liveFeedbackWrapper}>
+                  <View
+                    style={[
+                      styles.liveFeedbackWrapper,
+                      isControlButtonMaximized && styles.bottom51,
+                    ]}>
                     {feedback && (
                       <LiveFeedback
                         key={feedbackKey}
@@ -304,10 +309,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           />
         </View>
         <ControlButtons
-          isMaximized={isMaximized}
-          onToggleMaximized={() => setIsMaximized(!isMaximized)}
+          isMaximized={isControlButtonMaximized}
+          onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
           isFocusMode={isFocusMode}
-          onFocusModeButtonPress={() => setIsFocusMode(!isFocusMode)}
+          onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
           isSimulationEndDisabled={isDisconnecting}
           onSimulationEndPress={handleDisconnect}
           isMicDisabled={showSimulationLoading}
@@ -342,6 +347,9 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
     bottom: '81@mvs',
+  },
+  bottom51: {
+    bottom: '51@mvs',
   },
   loadingWrapper: {
     justifyContent: 'center',
