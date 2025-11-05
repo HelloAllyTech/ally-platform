@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   StyleSheet,
   Text,
@@ -31,6 +31,12 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   testID,
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlay);
+
+  useEffect(() => {
+    return () => {
+      setIsPlaying(false);
+    };
+  }, []);
 
   const handlePlayPress = () => {
     const newPlayState = true;
