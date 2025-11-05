@@ -100,12 +100,24 @@ jest.mock('@/components', () => {
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     // simple stand-ins used by the screen
     AudioWave: () => <View testID="audio-wave" />,
-    ControlButtons: ({onMicPress, onStopPress, isDisableMic, isDisableStop, isMuted}: any) => (
+    ControlButtons: ({
+      onMicButtonPress,
+      onSimulationEndPress,
+      isMicDisabled,
+      isSimulationEndDisabled,
+      isMuted,
+    }: any) => (
       <View>
-        <TouchableOpacity accessibilityLabel="mic" disabled={!!isDisableMic} onPress={onMicPress}>
+        <TouchableOpacity
+          accessibilityLabel="mic"
+          disabled={!!isMicDisabled}
+          onPress={onMicButtonPress}>
           <Text>{isMuted ? 'muted' : 'unmuted'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="stop" disabled={!!isDisableStop} onPress={onStopPress}>
+        <TouchableOpacity
+          accessibilityLabel="stop"
+          disabled={!!isSimulationEndDisabled}
+          onPress={onSimulationEndPress}>
           <Text>stop</Text>
         </TouchableOpacity>
       </View>
@@ -126,12 +138,24 @@ jest.mock('../components', () => {
   return {
     __esModule: true,
     AudioWave: () => <View testID="audio-wave" />,
-    ControlButtons: ({onMicPress, onStopPress, isDisableMic, isDisableStop, isMuted}: any) => (
+    ControlButtons: ({
+      onMicButtonPress,
+      onSimulationEndPress,
+      isMicDisabled,
+      isSimulationEndDisabled,
+      isMuted,
+    }: any) => (
       <View>
-        <TouchableOpacity accessibilityLabel="mic" disabled={!!isDisableMic} onPress={onMicPress}>
+        <TouchableOpacity
+          accessibilityLabel="mic"
+          disabled={!!isMicDisabled}
+          onPress={onMicButtonPress}>
           <Text>{isMuted ? 'muted' : 'unmuted'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="stop" disabled={!!isDisableStop} onPress={onStopPress}>
+        <TouchableOpacity
+          accessibilityLabel="stop"
+          disabled={!!isSimulationEndDisabled}
+          onPress={onSimulationEndPress}>
           <Text>stop</Text>
         </TouchableOpacity>
       </View>

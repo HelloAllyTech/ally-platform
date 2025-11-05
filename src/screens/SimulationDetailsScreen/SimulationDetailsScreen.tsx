@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -17,6 +18,7 @@ import {
   PrimaryButton,
   useErrorToast,
   useToast,
+  VideoPreview,
 } from '@/components';
 import {env} from '@/config/env';
 import {
@@ -43,6 +45,7 @@ type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {scenario} = route.params;
+  const isFocused = useIsFocused();
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -152,11 +155,26 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   const renderDetailsSection = () => {
+    const videoUrl = scenario.coverVideoUrl;
+    const imageUrl = scenario.coverImageUrl;
+    const hasVideo = !!videoUrl;
+    const hasImage = !!imageUrl;
+
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {!!scenario.coverImageUrl && (
-          <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
+        {hasVideo && (
+          <VideoPreview
+            videoUrl={videoUrl}
+            autoPlay={false}
+            shouldPause={!isFocused}
+            testID="scenario-video-preview"
+          />
         )}
+
+        {!hasVideo && hasImage && (
+          <Image source={{uri: imageUrl}} style={styles.cover} />
+        )}
+
         <View style={styles.row}>
           <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
           <TouchableOpacity onPress={linkCopyToClipboard}>

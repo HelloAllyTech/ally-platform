@@ -62,6 +62,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  const [isControlButtonMaximized, setIsControlButtonMaximized] =
+    useState<boolean>(false);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -249,7 +252,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
-  const showSimulationLoading = isConnecting || isDisconnecting;
+  const isSimulationInProgress = !isConnecting && !isDisconnecting;
 
   return (
     <SafeAreaView
@@ -259,11 +262,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       ]}>
       <RoomContext.Provider value={room}>
         <View style={styles.contentContainer}>
-          {!showSimulationLoading && startTime && (
+          {isSimulationInProgress && startTime && (
             <SimulationTimer startTime={startTime} />
           )}
           <View style={styles.centralContainer}>
-            {showSimulationLoading ? (
+            {!isSimulationInProgress ? (
               renderLoader()
             ) : (
               <>
@@ -271,34 +274,33 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 {!!scenario?.title && (
                   <Text style={styles.personaLabel}>{scenario.title}</Text>
                 )}
-                <View style={styles.liveFeedbackWrapper}>
-                  {feedback && (
-                    <LiveFeedback
-                      key={feedbackKey}
-                      message={feedback.text}
-                      emoji={feedback.emoji}
-                    />
-                  )}
-                </View>
+                {!isFocusMode && (
+                  <View
+                    style={[
+                      styles.liveFeedbackWrapper,
+                      isControlButtonMaximized && styles.bottom51,
+                    ]}>
+                    {feedback && (
+                      <LiveFeedback
+                        key={feedbackKey}
+                        message={feedback.text}
+                        emoji={feedback.emoji}
+                      />
+                    )}
+                  </View>
+                )}
               </>
             )}
           </View>
 
-          {!showSimulationLoading && (
+          {isSimulationInProgress && (
             <View style={styles.scoreMeterContainer}>
               <SessionScoreMeter score={accumulatedScore} />
             </View>
           )}
 
-          <ControlButtons
-            onMicPress={handleToggleMic}
-            onStopPress={handleDisconnect}
-            isDisableMic={showSimulationLoading}
-            isDisableStop={isDisconnecting}
-            isMuted={!isMicEnabled}
-          />
           <EndingSoonModal
-            visible={showEndingSoon && !showSimulationLoading}
+            visible={showEndingSoon && isSimulationInProgress}
             titleMain={t('SimulationAssistant.session')}
             titleItalic={t('SimulationAssistant.endingSoon')}
             description={t('SimulationAssistant.sessionWillEnd')}
@@ -306,6 +308,18 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             onEndSession={handleDisconnect}
           />
         </View>
+        <ControlButtons
+          isMaximized={isControlButtonMaximized}
+          onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
+          isFocusMode={isFocusMode}
+          isFocusModeDisabled={!isSimulationInProgress}
+          onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
+          isSimulationEndDisabled={!isSimulationInProgress}
+          onSimulationEndPress={handleDisconnect}
+          isMicDisabled={!isSimulationInProgress}
+          onMicButtonPress={handleToggleMic}
+          isMuted={!isMicEnabled}
+        />
       </RoomContext.Provider>
     </SafeAreaView>
   );
@@ -335,6 +349,9 @@ const styles = ScaledSheet.create({
     right: 0,
     bottom: '81@mvs',
   },
+  bottom51: {
+    bottom: '51@mvs',
+  },
   loadingWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -361,7 +378,7 @@ const styles = ScaledSheet.create({
     fontSize: '14@ms',
     color: colors.white,
     textAlign: 'left',
-    marginLeft: '20@ms',
+    marginHorizontal: '20@ms',
     marginBottom: '16@ms',
     width: '100%',
   },
