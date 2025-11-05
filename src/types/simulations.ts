@@ -72,6 +72,7 @@ export interface ControlButtonsProps {
   isMaximized: boolean;
   onToggleMaximized: () => void;
   isFocusMode: boolean;
+  isFocusModeDisabled?: boolean;
   onFocusModeButtonPress: () => void;
   isSimulationEndDisabled?: boolean;
   onSimulationEndPress: () => void;

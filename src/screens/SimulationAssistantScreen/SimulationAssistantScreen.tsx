@@ -252,7 +252,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
-  const showSimulationLoading = isConnecting || isDisconnecting;
+  const isSimulationInProgress = !isConnecting && !isDisconnecting;
 
   return (
     <SafeAreaView
@@ -262,11 +262,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       ]}>
       <RoomContext.Provider value={room}>
         <View style={styles.contentContainer}>
-          {!showSimulationLoading && startTime && (
+          {isSimulationInProgress && startTime && (
             <SimulationTimer startTime={startTime} />
           )}
           <View style={styles.centralContainer}>
-            {showSimulationLoading ? (
+            {!isSimulationInProgress ? (
               renderLoader()
             ) : (
               <>
@@ -293,14 +293,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             )}
           </View>
 
-          {!showSimulationLoading && (
+          {isSimulationInProgress && (
             <View style={styles.scoreMeterContainer}>
               <SessionScoreMeter score={accumulatedScore} />
             </View>
           )}
 
           <EndingSoonModal
-            visible={showEndingSoon && !showSimulationLoading}
+            visible={showEndingSoon && isSimulationInProgress}
             titleMain={t('SimulationAssistant.session')}
             titleItalic={t('SimulationAssistant.endingSoon')}
             description={t('SimulationAssistant.sessionWillEnd')}
@@ -312,10 +312,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           isMaximized={isControlButtonMaximized}
           onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
           isFocusMode={isFocusMode}
+          isFocusModeDisabled={!isSimulationInProgress}
           onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
-          isSimulationEndDisabled={isDisconnecting}
+          isSimulationEndDisabled={!isSimulationInProgress}
           onSimulationEndPress={handleDisconnect}
-          isMicDisabled={showSimulationLoading}
+          isMicDisabled={!isSimulationInProgress}
           onMicButtonPress={handleToggleMic}
           isMuted={!isMicEnabled}
         />
