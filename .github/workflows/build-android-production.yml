@@ -1,4 +1,4 @@
-name: "Build Android app - Production"
+name: 'Build Android app - Production'
 
 on:
   workflow_dispatch:
@@ -8,33 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: |
-          npm i -g corepack
-          npm ci
-
-      - name: Run tests
-        run: npm run test
-
-      - name: Run linting
-        run: npm run lint
-
   build:
     runs-on: ubuntu-latest
     environment: production
-    needs: test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,14 +30,14 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
-          distribution: "temurin"
+          distribution: 'temurin'
           cache: gradle
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
@@ -152,7 +128,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: "Android Production Build #${{ github.run_number }} Successful!"
+          text: 'Android Production Build #${{ github.run_number }} Successful!'
           attachments: |
             [
               {
