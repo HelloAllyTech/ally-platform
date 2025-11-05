@@ -18,6 +18,7 @@ export interface VideoPreviewProps {
   showPlayIcon?: boolean;
   muted?: boolean;
   onPlayStateChange?: (isPlaying: boolean) => void;
+  shouldPause?: boolean;
   testID?: string;
 }
 
@@ -28,9 +29,17 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   showPlayIcon = true,
   muted = false,
   onPlayStateChange,
+  shouldPause = false,
   testID,
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlay);
+
+  useEffect(() => {
+    if (shouldPause && isPlaying) {
+      setIsPlaying(false);
+      onPlayStateChange?.(false);
+    }
+  }, [shouldPause, isPlaying, onPlayStateChange]);
 
   useEffect(() => {
     return () => {
