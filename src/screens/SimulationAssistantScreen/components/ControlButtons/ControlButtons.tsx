@@ -51,7 +51,8 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
       <TouchableOpacity
         style={styles.toggleIconContainer}
         onPress={onToggleMaximized}
-        activeOpacity={0.8}>
+        activeOpacity={0.8}
+        hitSlop={DEFAULT_HIT_SLOP}>
         <Animated.View
           style={{
             transform: [{rotate: rotateInterpolate}],
@@ -187,5 +188,6 @@ const styles = ScaledSheet.create({
   },
   endSessionButton: {
     backgroundColor: colors.darkGray10,
+    marginBottom: '10@mvs',
   },
 });
