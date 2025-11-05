@@ -146,5 +146,37 @@ describe('VideoPreview', () => {
     videoComponent = getByTypeAfter('Video' as any);
     expect(videoComponent.props.paused).toBe(true);
   });
+
+  it('pauses video when shouldPause prop is true', () => {
+    const onPlayStateChange = jest.fn();
+    const {UNSAFE_getByType, rerender} = render(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        autoPlay
+        onPlayStateChange={onPlayStateChange}
+        testID="video-preview"
+      />,
+    );
+
+    // Initially playing
+    let videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(false);
+
+    // Set shouldPause to true
+    rerender(
+      <VideoPreview
+        videoUrl={mockVideoUrl}
+        autoPlay
+        shouldPause
+        onPlayStateChange={onPlayStateChange}
+        testID="video-preview"
+      />,
+    );
+
+    // Video should now be paused
+    videoComponent = UNSAFE_getByType('Video' as any);
+    expect(videoComponent.props.paused).toBe(true);
+    expect(onPlayStateChange).toHaveBeenCalledWith(false);
+  });
 });
 

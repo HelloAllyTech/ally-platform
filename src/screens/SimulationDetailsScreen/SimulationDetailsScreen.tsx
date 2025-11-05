@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -44,6 +45,7 @@ type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {scenario} = route.params;
+  const isFocused = useIsFocused();
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -164,6 +166,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           <VideoPreview
             videoUrl={videoUrl}
             autoPlay={false}
+            shouldPause={!isFocused}
             testID="scenario-video-preview"
           />
         )}
