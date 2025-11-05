@@ -12,6 +12,7 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
   isMaximized,
   onToggleMaximized,
   isFocusMode,
+  isFocusModeDisabled = false,
   onFocusModeButtonPress,
   isSimulationEndDisabled = false,
   onSimulationEndPress,
@@ -101,8 +102,10 @@ export const ControlButtons: React.FC<ControlButtonsProps> = ({
               style={[
                 styles.buttonContainer,
                 isFocusMode && {backgroundColor: colors.white},
+                isFocusModeDisabled && styles.disabledOpacity,
               ]}
               onPress={onFocusModeButtonPress}
+              disabled={isFocusModeDisabled}
               activeOpacity={0.85}
               hitSlop={DEFAULT_HIT_SLOP}>
               <MicIcon color={isFocusMode ? colors.black : colors.white} />
