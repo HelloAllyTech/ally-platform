@@ -27,7 +27,7 @@ jobs:
 
       - name: Download Firebase config from S3 (iOS Prod)
         run: |
-          aws s3 cp "${{ secrets.IOS_GOOGLE_SERVICE_INFO_S3_URI_PROD }}" "ios/GoogleService-Info.plist"
+          aws s3 cp "${{ secrets.IOS_GOOGLE_SERVICES_S3_URI_PROD }}" "ios/GoogleService-Info.plist"
 
       - name: Set up Node
         uses: actions/setup-node@v4
