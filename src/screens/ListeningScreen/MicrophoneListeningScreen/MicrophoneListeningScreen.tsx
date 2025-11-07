@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {RouteProp} from '@react-navigation/native';
 import {
   ActivityIndicator,
   StatusBar,
@@ -20,7 +19,6 @@ import {
   useTranslate,
   useUser,
 } from '@/hooks';
-import {RootStackParamList} from '@/navigation';
 import {useGetNudgeStatusQuery} from '@/services';
 import {colors, globalStyles} from '@/theme';
 import {DisconnectedType, SocketEvent, SocketMessage} from '@/types';
@@ -42,19 +40,11 @@ import {
   recorderAudioToAmplitudes,
 } from '../utils';
 
-interface MicrophoneListeningScreenProps {
-  route: RouteProp<RootStackParamList, 'Listening'>;
-}
-
-export const MicrophoneListeningScreen = ({
-  route: _route,
-}: MicrophoneListeningScreenProps) => {
+export const MicrophoneListeningScreen = () => {
   const {t} = useTranslate();
   const {isOffline} = useNetworkConnectivity();
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const {userData} = useUser();
-
-  const isMicrophoneMode = true; // Always true for this screen
 
   const [isFocusModeLocal, setIsFocusModeLocal] = useState(true);
   const [isCallPaused, setIsCallPaused] = useState(false);
@@ -64,7 +54,6 @@ export const MicrophoneListeningScreen = ({
   const [isPermissionGrantedLocal, setIsPermissionGrantedLocal] =
     useState(false);
 
-  // Get chatData and isWebMicrophoneMode from common hook
   const {
     chatData,
     isWebMicrophoneMode,
@@ -90,19 +79,17 @@ export const MicrophoneListeningScreen = ({
     checkCounselorChat,
     canShowFocusModeButton,
   } = useListeningCommon({
-    isMicrophoneMode,
+    isMicrophoneMode: true,
     isPermissionGranted: isPermissionGrantedLocal,
   });
 
-  // Use chatData from common hook in useListeningScreen
   const {tooltipContentList, tooltipDisplayInsets, startTime} =
     useListeningScreen({
-      isMicrophoneMode,
+      isMicrophoneMode: true,
       isFocusMode: isFocusModeLocal,
       chatData,
     });
 
-  // Sync local focus mode with common
   useEffect(() => {
     setIsFocusModeLocal(commonFocusMode);
   }, [commonFocusMode]);
@@ -116,7 +103,6 @@ export const MicrophoneListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
 
-  // Update refs
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
   }, [isCallPaused]);
@@ -129,14 +115,12 @@ export const MicrophoneListeningScreen = ({
     chatIdRef.current = chatData?.chatId;
   }, [chatData?.chatId]);
 
-  // Handle offline state
   useEffect(() => {
     if (isOffline && !isWebMicrophoneMode) {
       setDisconnectedType(DisconnectedType.NETWORK);
     }
   }, [isOffline, isWebMicrophoneMode, setDisconnectedType]);
 
-  // Handle chatId timeout for connection failure
   useEffect(() => {
     const clearChatIdTimeout = () => {
       if (chatIdTimeoutRef.current) {
@@ -156,7 +140,6 @@ export const MicrophoneListeningScreen = ({
     return clearChatIdTimeout;
   }, [chatData?.chatId, setDisconnectedType]);
 
-  // Socket event callbacks
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.SESSION_CREATED]: () => {
@@ -207,7 +190,6 @@ export const MicrophoneListeningScreen = ({
     }
   }, [isWebMicrophoneMode, setDisconnectedType]);
 
-  // Socket connection
   const {emitSocketEvent} = useSocketConnection({
     path: env.MICROPHONE_SOCKET_PATH,
     userId: userData?.id,
@@ -216,7 +198,6 @@ export const MicrophoneListeningScreen = ({
     onConnectionError: onConnectionError,
   });
 
-  // Audio data handler
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
@@ -242,12 +223,10 @@ export const MicrophoneListeningScreen = ({
       enableLiveAudio: !isWebMicrophoneMode,
     });
 
-  // Sync permission state
   useEffect(() => {
     setIsPermissionGrantedLocal(isPermissionGranted);
   }, [isPermissionGranted]);
 
-  // Audio session ready check
   const isAudioSessionReady = useMemo(
     () =>
       isPermissionGranted &&
@@ -256,7 +235,6 @@ export const MicrophoneListeningScreen = ({
     [isPermissionGranted, isMicrophoneModeSessionCreated, isWebMicrophoneMode],
   );
 
-  // Start streaming on mount
   useEffect(() => {
     if (!isWebMicrophoneMode && !streamingInitialized.current) {
       streamingInitialized.current = true;
@@ -265,7 +243,6 @@ export const MicrophoneListeningScreen = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Emit START_AUDIO_CHAT when session is ready
   useEffect(() => {
     if (isAudioSessionReady && !isAudioChatEmitted) {
       setTimeout(() => {
@@ -278,7 +255,6 @@ export const MicrophoneListeningScreen = ({
     }
   }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
 
-  // Handle call end
   const handleEndCall = useCallback(() => {
     handleEndCallCommon(() => {
       stopStreaming();
@@ -286,7 +262,6 @@ export const MicrophoneListeningScreen = ({
     });
   }, [handleEndCallCommon, stopStreaming]);
 
-  // Pause/Resume handler
   const handlePlayPauseCallPress = useDebounce(
     () => {
       setIsCallPaused(prev => !prev);
@@ -294,7 +269,6 @@ export const MicrophoneListeningScreen = ({
     {delay: 500},
   );
 
-  // Retry handler
   const handleTryAgain = useCallback(() => {
     setDisconnectedType(null);
     handleGoBack();
@@ -333,7 +307,6 @@ export const MicrophoneListeningScreen = ({
     );
   };
 
-  // Disconnected state
   if (disconnectedType) {
     return (
       <View style={styles.container}>
@@ -346,7 +319,6 @@ export const MicrophoneListeningScreen = ({
     );
   }
 
-  // Loading state
   if (!chatData?.chatId) {
     return (
       <View style={styles.loadingContainer}>
@@ -414,7 +386,7 @@ export const MicrophoneListeningScreen = ({
           visible={showCallEndConfirmation}
           onClose={() => setShowCallEndConfirmation(false)}
           onConfirm={handleEndCall}
-          isMicrophoneMode={isMicrophoneMode}
+          isMicrophoneMode
         />
       )}
       <StatusBar
