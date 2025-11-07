@@ -32,8 +32,8 @@ export const ListeningScreen = ({route}: ListeningScreenProps) => {
 
   // Route to the appropriate screen
   if (isMicrophoneMode) {
-    return <MicrophoneListeningScreen route={route} />;
+    return <MicrophoneListeningScreen />;
   }
 
-  return <ConferenceListeningScreen route={route} />;
+  return <ConferenceListeningScreen />;
 };

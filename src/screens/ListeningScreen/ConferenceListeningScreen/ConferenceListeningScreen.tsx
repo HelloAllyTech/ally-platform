@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {RouteProp} from '@react-navigation/native';
 import {
   ActivityIndicator,
   StatusBar,
@@ -15,15 +14,13 @@ import {AUDIO_INACTIVE_TIMEOUT} from '@/constants';
 import {
   useDebounce,
   useListeningScreen,
-  useNetworkConnectivity,
   useSocketConnection,
   useTranslate,
   useUser,
 } from '@/hooks';
-import {RootStackParamList} from '@/navigation';
 import {useGetNudgeStatusQuery} from '@/services';
 import {colors, globalStyles} from '@/theme';
-import {DisconnectedType, SocketEvent, SocketMessage} from '@/types';
+import {SocketEvent, SocketMessage} from '@/types';
 
 import {
   AudioWaveformContainer,
@@ -38,25 +35,16 @@ import {useListeningCommon} from '../hooks';
 import {styles} from '../styles';
 import {exotelAudioDataToAmplitudes, NUM_BARS} from '../utils';
 
-interface ConferenceListeningScreenProps {
-  route: RouteProp<RootStackParamList, 'Listening'>;
-}
-
-export const ConferenceListeningScreen = ({
-  route: _route,
-}: ConferenceListeningScreenProps) => {
+export const ConferenceListeningScreen = () => {
   const {t} = useTranslate();
-  const {isOffline} = useNetworkConnectivity();
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const {userData} = useUser();
-
-  const isMicrophoneMode = false; // Always false for conference calls
+  const isMicrophoneMode = false;
 
   const [isFocusMode, setIsFocusMode] = useState(true);
   const [isCallPaused, setIsCallPaused] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
 
-  // Get chatData and isWebMicrophoneMode from common hook
   const {
     chatData,
     isWebMicrophoneMode: _isWebMicrophoneMode,
@@ -70,7 +58,6 @@ export const ConferenceListeningScreen = ({
     setShowCallEndConfirmation,
     setIsBannerDismissed,
     setIsControlSectionMaximized,
-    setDisconnectedType,
     setCurrentNudge,
     setIsLoading,
     handleCallEndRedirection,
@@ -85,7 +72,6 @@ export const ConferenceListeningScreen = ({
     isMicrophoneMode,
   });
 
-  // Use chatData from common hook in useListeningScreen
   const {
     isConferenceCall,
     tooltipContentList,
@@ -97,7 +83,6 @@ export const ConferenceListeningScreen = ({
     chatData,
   });
 
-  // Sync local focus mode with common
   useEffect(() => {
     setIsFocusMode(commonFocusMode);
   }, [commonFocusMode]);
@@ -107,14 +92,6 @@ export const ConferenceListeningScreen = ({
     new Array(NUM_BARS).fill(0),
   );
 
-  // Handle offline state
-  useEffect(() => {
-    if (isOffline) {
-      setDisconnectedType(DisconnectedType.NETWORK);
-    }
-  }, [isOffline, setDisconnectedType]);
-
-  // Socket event callbacks
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.CHAT_ENDED]: () => {
@@ -173,19 +150,12 @@ export const ConferenceListeningScreen = ({
     ],
   );
 
-  const onConnectionError = useCallback(() => {
-    setDisconnectedType(DisconnectedType.SOCKET);
-  }, [setDisconnectedType]);
-
-  // Socket connection
   const {emitSocketEvent} = useSocketConnection({
     path: env.CLOUD_TELEPHONY_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
-    onConnectionError: onConnectionError,
   });
 
-  // Clear audio timeout on unmount
   useEffect(() => {
     return () => {
       if (audioTimeoutRef.current) {
@@ -194,12 +164,10 @@ export const ConferenceListeningScreen = ({
     };
   }, []);
 
-  // Handle call end
   const handleEndCall = useCallback(() => {
     handleEndCallCommon();
   }, [handleEndCallCommon]);
 
-  // Pause/Resume handler
   const handlePlayPauseCallPress = useDebounce(
     () => {
       emitSocketEvent(
@@ -246,7 +214,6 @@ export const ConferenceListeningScreen = ({
     );
   };
 
-  // Loading state
   if (!chatData?.chatId) {
     return (
       <View style={styles.loadingContainer}>
