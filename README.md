@@ -298,3 +298,7 @@ The container runs both the FastAPI server (port 8000) and LiveKit worker simult
 - Verify AWS credentials and SQS queue name
 - Check LocalStack is running for local development
 - Review logs for SQS connection errors
+
+## Contributing
+
+Please see the CONTRIBUTING.md to get started.
