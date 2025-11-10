@@ -23,7 +23,9 @@ from app.core.scenario.base import Scenario
 from app.utils.logger import logger
 
 
-async def process_events(state: SimulationState, config: Optional[RunnableConfig] = None) -> SimulationState:
+async def process_events(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> SimulationState:
     """Process events in the state (async version, detect_event is async)"""
 
     async def detect_single_event(event: BaseEvent, chat_messages: List[ChatMessage]):
@@ -32,7 +34,10 @@ async def process_events(state: SimulationState, config: Optional[RunnableConfig
         return None
 
     chat_messages = convert_messages_to_chat_messages(state.messages)
-    tasks = [asyncio.create_task(detect_single_event(e, chat_messages)) for e in state.permitted_events]
+    tasks = [
+        asyncio.create_task(detect_single_event(e, chat_messages))
+        for e in state.permitted_events
+    ]
 
     # Preserve completion order (like as_completed in threads)
     detected_events = []
@@ -46,7 +51,7 @@ async def process_events(state: SimulationState, config: Optional[RunnableConfig
     logger.debug(f"Detected Event number: {len(detected_events)}")
 
     new_events = [event for _, event in detected_events]
-    
+
     # Calculate the score change from new events
     score_change = sum(event.score for event in new_events if event.score)
     new_current_score = state.current_score + score_change
@@ -60,25 +65,33 @@ async def process_events(state: SimulationState, config: Optional[RunnableConfig
     )
 
 
-async def send_events_to_ui(state: SimulationState, config: Optional[RunnableConfig] = None) -> SimulationState:
+async def send_events_to_ui(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> SimulationState:
     logger.info("Sending events to UI")
     room = cast(rtc.Room, config["configurable"].get("room"))
     logger.debug(f"New events: {state.new_events}")
 
     if state.new_events:
         # Filter events to only include ACTIVE events for UI
-        active_events = [event for event in state.new_events if event.visibility_type == VisibilityType.ACTIVE]
-        logger.debug(f"Active events for UI: {len(active_events)} out of {len(state.new_events)} total events")
-        
+        active_events = [
+            event
+            for event in state.new_events
+            if event.visibility_type == VisibilityType.ACTIVE
+        ]
+        logger.debug(
+            f"Active events for UI: {len(active_events)} out of {len(state.new_events)} total events"
+        )
+
         if active_events:
             # Log event summary for debugging only if debug level is enabled
             if logger.isEnabledFor(logging.DEBUG):
                 event_summary = EventProcessor.get_events_summary(active_events)
                 logger.debug(f"Active events summary: {event_summary}")
-            
+
             # Process only ACTIVE events using the two-part logic
             ui_message_type = EventProcessor.process_events_for_ui(active_events)
-            
+
             # Only send event if it is identified
             if ui_message_type is not None:
                 await send_event(ui_message_type, room)
@@ -88,7 +101,9 @@ async def send_events_to_ui(state: SimulationState, config: Optional[RunnableCon
     return state
 
 
-async def generate_response(state: SimulationState, config: Optional[RunnableConfig] = None) -> SimulationState:
+async def generate_response(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> SimulationState:
     logger.info("Generating response")
 
     # Determine next conversation-specific instruction (if any)
@@ -96,11 +111,14 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
     events_with_branching = [e for e in state.new_events if e.branching_instruction]
     next_instruction = (
         random.choice(events_with_branching).branching_instruction
-        if events_with_branching else None
+        if events_with_branching
+        else None
     )
 
     # Build system message from scenario and prepend only for the LLM call
-    scenario = cast(Scenario, config["configurable"].get("scenario")) if config else None
+    scenario = (
+        cast(Scenario, config["configurable"].get("scenario")) if config else None
+    )
     system_message = None
     if scenario is not None:
         system_message = generate_system_message(
@@ -115,7 +133,11 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
     messages_to_send.extend(state.messages)
 
     # Create response from LLM
-    llm_response = ChatOpenAI(model=settings.OPENAI_MODEL, temperature=settings.LLM_TEMPERATURE, api_key=settings.OPENAI_API_KEY)
+    llm_response = ChatOpenAI(
+        model=settings.OPENAI_MODEL,
+        temperature=settings.LLM_TEMPERATURE,
+        api_key=settings.OPENAI_API_KEY,
+    )
     response = await llm_response.ainvoke(messages_to_send)
 
     # Prepare the final messages (do not persist system or instruction in state)
@@ -130,13 +152,23 @@ async def generate_response(state: SimulationState, config: Optional[RunnableCon
     )
 
 
-async def send_events_to_core(state: SimulationState, config: Optional[RunnableConfig] = None) -> SimulationState:
+async def send_events_to_core(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> SimulationState:
     logger.debug("Sending events to core")
     room = cast(rtc.Room, config["configurable"].get("room"))
-    logger.debug(f"Sending all events to core: {len(state.new_events)} events (both ACTIVE and PASSIVE)")
-    
+    logger.debug(
+        f"Sending all events to core: {len(state.new_events)} events (both ACTIVE and PASSIVE)"
+    )
+
     for event in state.new_events:
-        logger.debug(f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})")
-        core_event_message = CoreEventMessageType.create(event_id=event.event_id, room_id=room.name)
-        await msg_event_queue.send_message(message_body=core_event_message.model_dump_json())
+        logger.debug(
+            f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})"
+        )
+        core_event_message = CoreEventMessageType.create(
+            room_id=room.name, event_data=event
+        )
+        await msg_event_queue.send_message(
+            message_body=core_event_message.model_dump_json()
+        )
     return state

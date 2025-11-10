@@ -4,23 +4,31 @@ from typing import Optional, Literal
 
 from pydantic import BaseModel, Field
 
-from app.core.events.base import ChatMessage
+from app.core.events.base import ChatMessage, BaseEvent
 from app.utils import get_current_iso_timestamp
 
 
 class CoreEventType(BaseModel):
-    event_id: Optional[str] = None
+    event_data: BaseEvent = None
     timestamp: Optional[str] = None  # store as ISO string for consistency
 
     @classmethod
-    def create(cls, event_id: Optional[str] = None, timestamp: Optional[str] = None) -> "CoreEventType":
+    def create(
+        cls, timestamp: Optional[str] = None, event_data: BaseEvent = None
+    ) -> "CoreEventType":
         if timestamp is None:
             timestamp = get_current_iso_timestamp()
-        return cls(event_id=event_id, timestamp=timestamp)
+        return cls(timestamp=timestamp, event_data=event_data)
+
 
 class CoreEventMessageTypeData(BaseModel):
-    chat_message: Optional[ChatMessage] = Field(default=None, description="Message from user or agent")
-    event: Optional[CoreEventType] = Field(default=None, description="Event ID of an event")
+    chat_message: Optional[ChatMessage] = Field(
+        default=None, description="Message from user or agent"
+    )
+    event: Optional[CoreEventType] = Field(
+        default=None, description="Event ID of an event"
+    )
+
 
 class CoreEventMessageType(BaseModel):
     message_type: Literal["message", "event"]
@@ -29,14 +37,19 @@ class CoreEventMessageType(BaseModel):
     timestamp: int
 
     @classmethod
-    def create(cls, room_id: str, chat_message: Optional[ChatMessage] = None, event_id: Optional[str] = None) -> "CoreEventMessageType":
+    def create(
+        cls,
+        room_id: str,
+        chat_message: Optional[ChatMessage] = None,
+        event_data: BaseEvent = None,
+    ) -> "CoreEventMessageType":
         event = None
-        if event_id:
-            event = CoreEventType.create(event_id=event_id)
+        if event_data:
+            event = CoreEventType.create(event_data=event_data)
 
         return cls(
             message_type="message" if chat_message else "event",
             data=CoreEventMessageTypeData(chat_message=chat_message, event=event),
             room_id=room_id,
-            timestamp=int(time.time())
+            timestamp=int(time.time()),
         )
