@@ -4,7 +4,7 @@ import {ms} from 'react-native-size-matters';
 import {carousel1, carousel2, carousel3, carousel4} from '@/assets';
 import {CarouselItem} from '@/components';
 import {CarouselConfig} from '@/components/Carousel/types';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {UserRole} from '@/types';
 
 import {USER_PERMISSIONS} from './permissions';
@@ -170,9 +170,8 @@ export const drawerSecurityCarouselConfig: CarouselConfig = {
     borderLeftWidth: 1,
   },
   titleCustomStyle: {
-    color: colors.darkGray2,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: ms(18),
+    color: colors.ds.typography.highEmphasis,
+    ...typography.headline.tiny,
   },
 };
 
@@ -189,7 +188,9 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
     overflow: 'hidden',
   },
   titleCustomStyle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.white,
+    ...typography.headline.tiny,
   },
 };
 

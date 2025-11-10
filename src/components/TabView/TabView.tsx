@@ -1,7 +1,7 @@
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 export interface GenericTabMeta<T extends string = string> {
   key: T;
@@ -71,11 +71,10 @@ const styles = ScaledSheet.create({
   },
   tabText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '18@ms',
-    color: colors.darkGray2,
+    ...typography.label.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   activeTabText: {
-    color: colors.darkSlate,
+    color: colors.ds.typography.highEmphasis,
   },
 });
