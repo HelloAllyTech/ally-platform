@@ -15,7 +15,7 @@ import {
 } from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {fontWeights, typography} from '@/theme/typography';
 
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
@@ -211,8 +211,9 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@s',
-    color: colors.darkSlate,
+    color: colors.ds.typography.highEmphasis,
+    ...typography.headline.tiny,
+    fontWeight: fontWeights.medium,
     marginLeft: '16@s',
     textAlign: 'left',
   },
