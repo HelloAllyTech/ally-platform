@@ -61,11 +61,18 @@ jest.mock('react-native', () => {
   };
 
   // Mock basic React Native components
-  RN.TouchableOpacity = ({children, ...props}) =>
-    React.createElement('TouchableOpacity', props, children);
-  RN.Text = ({children, ...props}) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RN.TouchableOpacity = (props: any) =>
+    React.createElement('TouchableOpacity', props, props.children);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RN.View = (props: any) => React.createElement('View', props, props.children);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RN.Text = ({children, ...props}: any) =>
     React.createElement('Text', props, children);
-  RN.ActivityIndicator = ({...props}) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RN.Image = (props: any) => React.createElement('Image', props);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RN.ActivityIndicator = ({...props}: any) =>
     React.createElement('ActivityIndicator', props);
 
   return RN;
@@ -76,14 +83,27 @@ jest.mock('react-native-reanimated', () =>
   require('react-native-reanimated/mock'),
 );
 
-// Basic mock for react-native-svg import of svgs
+// Mock react-native-svg
+/* eslint-disable @typescript-eslint/no-explicit-any */
 jest.mock('react-native-svg', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: (props: any) => React.createElement('svg', props),
+    default: (props: any) => React.createElement('Svg', props, props.children),
+    Svg: (props: any) => React.createElement('Svg', props, props.children),
+    Circle: (props: any) => React.createElement('Circle', props),
+    Rect: (props: any) => React.createElement('Rect', props),
+    Path: (props: any) => React.createElement('Path', props),
+    Line: (props: any) => React.createElement('Line', props),
+    G: (props: any) => React.createElement('G', props, props.children),
+    Text: (props: any) => React.createElement('SvgText', props, props.children),
+    Defs: (props: any) => React.createElement('Defs', props, props.children),
+    LinearGradient: (props: any) =>
+      React.createElement('LinearGradient', props, props.children),
+    Stop: (props: any) => React.createElement('Stop', props),
   };
 });
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // Note: NativeAnimatedHelper mock is not needed on RN 0.79
 
@@ -118,7 +138,7 @@ jest.mock('react-native-size-matters', () => ({
   ScaledSheet: {
     create: jest.fn(styles => {
       // Process the styles to handle the @ms and @vs annotations
-      const processedStyles: Record<string, Record<string, any>> = {};
+      const processedStyles: Record<string, Record<string, unknown>> = {};
       Object.entries(styles).forEach(([key, value]) => {
         processedStyles[key] = {};
         Object.entries(value as object).forEach(([propKey, propValue]) => {
