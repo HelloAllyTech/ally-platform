@@ -13,6 +13,7 @@ export type RootStackParamList = {
   LiveKitTest: undefined;
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
+  SimulationPathDetails: {pathId: string};
   SimulationAssistant: {roomData: RoomData; scenario?: Scenario};
   SimulationFeedback: {simulationId?: string; fromLogs?: boolean};
 };
