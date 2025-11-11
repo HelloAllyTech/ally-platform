@@ -155,3 +155,60 @@ jest.mock('react-native-size-matters', () => ({
     }),
   },
 }));
+
+// Mock @/components
+jest.mock('@/components', () => {
+  const React = require('react');
+  return {
+    PrimaryButton: jest.fn(({label, onPress, isDisabled}) =>
+      React.createElement(
+        'TouchableOpacity',
+        {
+          onPress,
+          disabled: isDisabled,
+          testID: 'primary-button',
+        },
+        React.createElement('Text', {}, label),
+      ),
+    ),
+    EmptyState: jest.fn(({title, description, icon: Icon, iconProps, containerStyle}) =>
+      React.createElement(
+        'View',
+        {testID: 'empty-state', style: containerStyle},
+        [
+          Icon && React.createElement(Icon, {key: 'icon', ...iconProps}),
+          title &&
+            React.createElement('Text', {key: 'title', testID: 'empty-state-title'}, title),
+          description &&
+            React.createElement(
+              'Text',
+              {key: 'description', testID: 'empty-state-description'},
+              description,
+            ),
+        ].filter(Boolean),
+      ),
+    ),
+  };
+});
+
+// Mock @/components/EmptyState/EmptyState
+jest.mock('@/components/EmptyState/EmptyState', () => ({
+  EmptyState: jest.fn(({title, description, icon: Icon, iconProps, containerStyle}) => {
+    const React = require('react');
+    return React.createElement(
+      'View',
+      {testID: 'empty-state', style: containerStyle},
+      [
+        Icon && React.createElement(Icon, {key: 'icon', ...iconProps}),
+        title &&
+          React.createElement('Text', {key: 'title', testID: 'empty-state-title'}, title),
+        description &&
+          React.createElement(
+            'Text',
+            {key: 'description', testID: 'empty-state-description'},
+            description,
+          ),
+      ].filter(Boolean),
+    );
+  }),
+}));

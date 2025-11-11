@@ -8,6 +8,7 @@ import {
   Scenario,
   ScenarioSessionStartResponse,
   SimulationCredits,
+  SimulationPath,
   SimulationSummaryData,
 } from '@/types';
 
@@ -92,6 +93,129 @@ export const simulationsApi = api.injectEndpoints({
       }),
       providesTags: ['SimulationCredits'],
     }),
+
+    /**
+     * Get simulation paths - Placeholder for future API integration
+     * Currently uses scenarios data as a temporary solution
+     * When the actual API is ready, only the query URL needs to be updated
+     */
+    getSimulationPaths: builder.query<SimulationPath[], void>({
+      queryFn: async (_arg, _queryApi, _extraOptions, fetchWithBQ) => {
+        // TODO: Replace this with actual API call when endpoint is ready
+        // Temporary: Use scenarios data to populate paths
+        try {
+          const result = await fetchWithBQ({
+            url: API_ROUTES.LEARN.SCENARIOS,
+            method: API_METHODS.GET,
+          });
+
+          if (result.error) {
+            return {error: result.error};
+          }
+
+          // Transform scenarios into path format temporarily
+          const scenarios = result.data as Scenario[];
+          const mockPaths: SimulationPath[] = scenarios.map(scenario => ({
+            id: scenario.id,
+            title: scenario.title || 'Untitled Path',
+            description: scenario.description,
+            coverImageUrl: scenario.coverImageUrl,
+            simulations: [
+              {
+                id: scenario.id,
+                title: scenario.title,
+                description: scenario.description,
+                completed: false,
+              },
+            ],
+            completedCount: 0,
+            totalCount: 1,
+          }));
+
+          return {data: mockPaths};
+        } catch (error) {
+          return {
+            error: {
+              status: 'CUSTOM_ERROR',
+              error: String(error),
+            },
+          };
+        }
+      },
+    }),
+
+    /**
+     * Get simulation path details by ID
+     *
+     * MOCK IMPLEMENTATION - Reuses scenarios API
+     *
+     * TODO: When real API is ready, replace with:
+     * ```
+     * getSimulationPathDetails: builder.query<SimulationPath, {pathId: string}>({
+     *   query: ({pathId}) => ({
+     *     url: API_ROUTES.LEARN.SIMULATION_PATH_DETAILS(pathId), // Update route
+     *     method: API_METHODS.GET,
+     *   }),
+     * }),
+     * ```
+     *
+     * The API should return SimulationPath with:
+     * - Basic path info (id, title, description, coverImageUrl)
+     * - Array of simulations with their status (completed, locked, etc.)
+     * - Progress stats (completedCount, totalCount)
+     */
+    getSimulationPathDetails: builder.query<SimulationPath, {pathId: string}>({
+      queryFn: async ({pathId}, _queryApi, _extraOptions, fetchWithBQ) => {
+        // TODO: Replace this entire queryFn with actual API call (see above)
+        // For now, fetch all scenarios and create mock path data
+        try {
+          const result = await fetchWithBQ({
+            url: API_ROUTES.LEARN.SCENARIOS,
+            method: API_METHODS.GET,
+          });
+
+          if (result.error) {
+            return {error: result.error};
+          }
+
+          const scenarios = result.data as Scenario[];
+
+          // Mock: Use first 4 scenarios as simulations in path
+          const pathSimulations = scenarios
+            .slice(0, 4)
+            .map((scenario, index) => ({
+              id: scenario.id,
+              order: index + 1,
+              title: scenario.title || 'Untitled Simulation',
+              description: scenario.description,
+              thumbnailUrl: scenario.coverImageUrl,
+              completed: index === 0, // First one is completed
+              locked: index > 1, // 3rd and 4th are locked
+            }));
+
+          // Create mock path
+          const mockPath: SimulationPath = {
+            id: pathId,
+            title: 'Stress management',
+            description:
+              'This course provides practical techniques for managing stress. It covers identifying stressors, developing coping mechanisms, and building resilience. Learn to regain control and improve your overall well-being.',
+            coverImageUrl: scenarios[0]?.coverImageUrl || null,
+            simulations: pathSimulations,
+            completedCount: 1,
+            totalCount: 4,
+          };
+
+          return {data: mockPath};
+        } catch (error) {
+          return {
+            error: {
+              status: 'CUSTOM_ERROR',
+              error: String(error),
+            },
+          };
+        }
+      },
+    }),
   }),
 });
 
@@ -105,4 +229,6 @@ export const {
   useEndScenarioSessionMutation,
   useLazyGetSimulationDetailsQuery,
   useLazyGetSimulationCreditsQuery,
+  useGetSimulationPathsQuery,
+  useGetSimulationPathDetailsQuery,
 } = simulationsApi;

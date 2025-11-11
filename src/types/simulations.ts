@@ -4,7 +4,7 @@ import {AudioTrackRef} from './audio';
 
 export interface Scenario {
   id: string;
-  title?: string;
+  title: string;
   scenario?: string;
   description?: string;
   coverImageUrl?: string | null;
@@ -170,3 +170,54 @@ export type LiveEventPayload = {
   } | null;
   timestamp?: string;
 } | null;
+
+/**
+ * Simulation Path Types
+ * These types are prepared for the upcoming simulation path feature
+ */
+
+/**
+ * Represents a single simulation within a path
+ */
+export interface PathSimulation {
+  id: string;
+  order?: number;
+  title?: string;
+  description?: string;
+  thumbnailUrl?: string | null;
+  completed?: boolean;
+  locked?: boolean;
+}
+
+/**
+ * Represents a simulation path with multiple simulations
+ */
+export interface SimulationPath {
+  id: string;
+  title: string;
+  description?: string;
+  coverImageUrl?: string | null;
+  /**
+   * Array of simulations in this path
+   */
+  simulations: PathSimulation[];
+  /**
+   * Number of completed simulations
+   */
+  completedCount?: number;
+  /**
+   * Total number of simulations in the path
+   */
+  totalCount?: number;
+  /**
+   * Metadata for additional information
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Response type for simulation paths API
+ */
+export interface SimulationPathsResponse {
+  paths: SimulationPath[];
+}
