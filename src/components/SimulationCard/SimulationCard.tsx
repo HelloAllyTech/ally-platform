@@ -109,7 +109,7 @@ const styles = ScaledSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 1,
     overflow: 'hidden',
     paddingTop: '8@ms',
     paddingBottom: '16@ms',
@@ -120,7 +120,7 @@ const styles = ScaledSheet.create({
   cover: {
     minHeight: '180@ms',
     backgroundColor: colors.ds.grey[100],
-    borderRadius: '24@ms',
+    borderRadius: radius.xl2,
     marginBottom: '8@ms',
     marginHorizontal: '8@ms',
   },

@@ -103,7 +103,7 @@ describe('SimulationsScreen', () => {
 
     const {getByText} = renderWithSafeArea(<SimulationsScreen />);
     await waitFor(() =>
-      expect(getByText('Simulations.noSimulations')).toBeTruthy(),
+      expect(getByText('Simulations.noSimulationsAvailable')).toBeTruthy(),
     );
   });
 

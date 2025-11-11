@@ -45,3 +45,8 @@ export const FEEDBACK_OPTIONS = {
 export enum ScenarioStatus {
   ACTIVE = 'ACTIVE',
 }
+
+export enum SimulationTabs {
+  SIMULATIONS = 'SIMULATIONS',
+  PATHS = 'PATHS',
+}
