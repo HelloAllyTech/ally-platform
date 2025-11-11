@@ -455,14 +455,16 @@ export const CallLogScreen: React.FC = () => {
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
-        <TabView
-          tabs={[
-            {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
-            {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
-          ]}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+        <View style={styles.tabMargin}>
+          <TabView
+            tabs={[
+              {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
+              {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </View>
       )}
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />
@@ -530,6 +532,10 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  tabMargin: {
+    marginHorizontal: '20@ms',
+    marginVertical: '16@ms',
   },
   listContainer: {
     flex: 1,

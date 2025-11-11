@@ -50,8 +50,6 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.lightGray19,
     borderRadius: '8@ms',
-    marginHorizontal: '20@ms',
-    marginVertical: '16@ms',
     borderWidth: 0.5,
     borderColor: colors.lightGray4,
   },
