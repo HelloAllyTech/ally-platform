@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  ally-ai-learn-core:
+  app:
     build:
       context: .
       dockerfile: dockerfile
