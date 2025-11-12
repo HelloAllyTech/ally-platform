@@ -45,6 +45,15 @@ jest.mock('@/hooks', () => ({
     credits: {consumedCredits: 5, creditLimit: 10},
     getCreditsInfo: {isLow: false},
   })),
+  useStartSimulation: jest.fn(() => ({
+    isCreatingRoom: false,
+    isMicPermissionGranted: true,
+    activeSimulationId: null,
+    showActiveSimulationModal: false,
+    startSimulation: jest.fn(),
+    closeActiveSimulationModal: jest.fn(),
+    setShowActiveSimulationModal: jest.fn(),
+  })),
 }));
 
 jest.mock('@/services', () => ({

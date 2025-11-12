@@ -2,7 +2,7 @@ import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LockIcon, TickRoundIcon} from '@/assets';
+import {FileIcon, LockIcon, TickRoundIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
@@ -107,6 +107,13 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
           {title}
         </Text>
       </View>
+
+      {/* FileIcon for completed simulations - placed at right end */}
+      {isCompleted && (
+        <View style={styles.fileIconContainer}>
+          <FileIcon width={18} height={18} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -128,6 +135,12 @@ const styles = ScaledSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: '4@ms',
+    backgroundColor: colors.ds.grey[200],
+  },
+  fileIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingRight: '12@ms',
   },
   lockedOverlay: {
     position: 'absolute',
