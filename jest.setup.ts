@@ -188,6 +188,9 @@ jest.mock('@/components', () => {
         ].filter(Boolean),
       ),
     ),
+    IllustratedModal: jest.fn(({visible}) =>
+      visible ? React.createElement('View', {testID: 'illustrated-modal'}) : null,
+    ),
   };
 });
 
