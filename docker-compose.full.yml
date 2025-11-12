@@ -1,11 +1,10 @@
 version: '3.8'
 
 services:
-  ally-core:
+  ally-ai-learn-core:
     build:
       context: .
       dockerfile: dockerfile
-    container_name: ally_learn_core
     # Copy env_sample to .env before running to provide all required variables
     env_file:
       - .env
