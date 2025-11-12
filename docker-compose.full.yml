@@ -11,7 +11,7 @@ services:
     environment:
       AWS_ENDPOINT_URL: http://localstack:4566
     ports:
-      - '8000:8000'
+      - '8002:8000'
     depends_on:
       localstack:
         condition: service_healthy
