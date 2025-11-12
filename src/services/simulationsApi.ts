@@ -181,17 +181,24 @@ export const simulationsApi = api.injectEndpoints({
           const scenarios = result.data as Scenario[];
 
           // Mock: Use first 4 scenarios as simulations in path
+          // Logic: First is completed, second is next (unlocked), rest are locked
           const pathSimulations = scenarios
             .slice(0, 4)
-            .map((scenario, index) => ({
-              id: scenario.id,
-              order: index + 1,
-              title: scenario.title || 'Untitled Simulation',
-              description: scenario.description,
-              thumbnailUrl: scenario.coverImageUrl,
-              completed: index === 0, // First one is completed
-              locked: index > 1, // 3rd and 4th are locked
-            }));
+            .map((scenario, index) => {
+              const isCompleted = index === 0; // First one is completed
+              // Second one is next (unlocked), rest are locked
+              const isLocked = index > 1; // 3rd and 4th are locked
+
+              return {
+                id: scenario.id,
+                order: index + 1,
+                title: scenario.title || 'Untitled Simulation',
+                description: scenario.description,
+                thumbnailUrl: scenario.coverImageUrl,
+                completed: isCompleted,
+                locked: isLocked,
+              };
+            });
 
           // Create mock path
           const mockPath: SimulationPath = {

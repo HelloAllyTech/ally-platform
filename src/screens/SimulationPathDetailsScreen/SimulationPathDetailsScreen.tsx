@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,17 +10,24 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {BoltIcon, DataUnavailableIcon, LeftArrowIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {
+  BoltIcon,
+  DataUnavailableIcon,
+  LeftArrowIcon,
+  NoCreditsIcon,
+} from '@/assets';
+import {IllustratedModal, PrimaryButton} from '@/components';
 import {EmptyState} from '@/components/EmptyState/EmptyState';
-import {SCREEN_NAMES} from '@/constants';
-import {useSimulationCredits, useTranslate} from '@/hooks';
+import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
+import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useGetSimulationPathDetailsQuery} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import type {Scenario} from '@/types';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
+import {SimulationDetailsModal} from './components/SimulationDetailsModal';
 
 export const SimulationPathDetailsScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.SIMULATION_PATH_DETAILS>
@@ -28,6 +35,7 @@ export const SimulationPathDetailsScreen: React.FC<
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {pathId} = route.params;
+
   /**
    * TODO: When path details API is ready, this will automatically use it
    * Currently uses mock implementation that fetches scenarios internally
@@ -39,10 +47,34 @@ export const SimulationPathDetailsScreen: React.FC<
     error,
   } = useGetSimulationPathDetailsQuery({pathId});
 
+  const [selectedSimulation, setSelectedSimulation] = useState<{
+    simulation: NonNullable<typeof pathData>['simulations'][0];
+    scenario: Scenario;
+  } | null>(null);
+
+  const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
+
   /**
    * Credits display logic - matches SimulationsScreen implementation
    */
   const {credits, getCreditsInfo} = useSimulationCredits();
+
+  useEffect(() => {
+    if (getCreditsInfo?.isLow) {
+      setShowLowCreditsModal(true);
+      setTimeout(() => {
+        setShowLowCreditsModal(false);
+      }, LOW_CREDITS_MODAL_DISPLAY_MS);
+    }
+  }, [getCreditsInfo?.isLow]);
+
+  const {
+    isCreatingRoom,
+    startSimulation,
+    showActiveSimulationModal,
+    activeSimulationId,
+    closeActiveSimulationModal,
+  } = useStartSimulation();
 
   // Determine next simulation (first incomplete, unlocked simulation)
   const nextSimulation = pathData?.simulations?.find(
@@ -51,50 +83,79 @@ export const SimulationPathDetailsScreen: React.FC<
 
   const isPathStarted = (pathData?.completedCount ?? 0) > 0;
 
+  const isStartPathDisabled =
+    !nextSimulation || !!(credits && getCreditsInfo && getCreditsInfo.isLow);
+
   const handleBack = () => {
     navigation.goBack();
   };
 
   /**
-   * TODO: Implement Start/Continue button navigation
-   * This will navigate to the next available simulation
+   * Open modal with the next available simulation
+   * Called when user clicks Start (path not started) or Continue (path started)
    */
   const handleStartPath = () => {
-    if (nextSimulation) {
-      // eslint-disable-next-line no-console
-      console.log('Starting/Continuing simulation:', nextSimulation.title);
-      // TODO: When simulation details integration is ready, uncomment:
-      // navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {
-      //   scenario: {
-      //     id: nextSimulation.id,
-      //     title: nextSimulation.title,
-      //     description: nextSimulation.description,
-      //     coverImageUrl: nextSimulation.thumbnailUrl,
-      //   },
-      // });
+    if (nextSimulation && pathData) {
+      const scenario: Scenario = {
+        id: nextSimulation.id,
+        title: nextSimulation.title || '',
+        description: nextSimulation.description || '',
+        coverImageUrl: nextSimulation.thumbnailUrl || pathData.coverImageUrl,
+        coverVideoUrl: null,
+      };
+      setSelectedSimulation({simulation: nextSimulation, scenario});
     }
   };
 
   /**
-   * TODO: Implement simulation card press navigation
-   * This will navigate to the selected simulation if it's unlocked
+   * Handle simulation card press
+   * - If completed: Navigate to simulation feedback screen
+   * - Otherwise: Open simulation details modal
+   * Only unlocked simulations are clickable (locked ones have disabled press)
    */
   const handleSimulationPress = (simulationId: string) => {
     const simulation = pathData?.simulations?.find(
       sim => sim.id === simulationId,
     );
-    if (simulation && !simulation.locked) {
-      // eslint-disable-next-line no-console
-      console.log('Opening simulation:', simulation.title);
-      // TODO: When simulation details integration is ready, uncomment:
-      // navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {
-      //   scenario: {
-      //     id: simulation.id,
-      //     title: simulation.title,
-      //     description: simulation.description,
-      //     coverImageUrl: simulation.thumbnailUrl,
-      //   },
+    if (!simulation || simulation.locked) {
+      return;
+    }
+
+    // For completed simulations, navigate to feedback screen
+    if (simulation.completed) {
+      // TODO: Uncomment once API provides the scenario session ID for completed simulations
+      // navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+      //   scenarioSessionId: simulation.scenarioSessionId, // This field needs to be added to PathSimulation type
       // });
+      return;
+    }
+
+    // For non-completed simulations, open the modal to start
+    if (pathData) {
+      const scenario: Scenario = {
+        id: simulation.id,
+        title: simulation.title || '',
+        description: simulation.description || '',
+        coverImageUrl: simulation.thumbnailUrl || pathData.coverImageUrl,
+        coverVideoUrl: null,
+      };
+      setSelectedSimulation({simulation, scenario});
+    }
+  };
+
+  /**
+   * Close the simulation details modal
+   */
+  const handleCloseModal = () => {
+    setSelectedSimulation(null);
+  };
+
+  /**
+   * Start the selected simulation
+   */
+  const handleStartSimulation = () => {
+    if (selectedSimulation) {
+      startSimulation(selectedSimulation.scenario);
     }
   };
 
@@ -151,7 +212,7 @@ export const SimulationPathDetailsScreen: React.FC<
               isPathStarted ? t('Simulations.continue') : t('Simulations.start')
             }
             onPress={handleStartPath}
-            isDisabled={!nextSimulation}
+            isDisabled={isStartPathDisabled}
           />
         </View>
       </View>
@@ -209,6 +270,29 @@ export const SimulationPathDetailsScreen: React.FC<
           ListHeaderComponent={renderListHeaderComponent}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      <SimulationDetailsModal
+        visible={!!selectedSimulation}
+        simulation={selectedSimulation?.simulation || null}
+        coverVideoUrl={selectedSimulation?.scenario.coverVideoUrl}
+        onClose={handleCloseModal}
+        onStartSimulation={handleStartSimulation}
+        isCreatingRoom={isCreatingRoom}
+        showActiveSimulationModal={showActiveSimulationModal}
+        activeSimulationId={activeSimulationId}
+        onCloseActiveSimulationModal={closeActiveSimulationModal}
+      />
+
+      {/* Low Credits Modal */}
+      {credits && getCreditsInfo && (
+        <IllustratedModal
+          visible={showLowCreditsModal}
+          onClose={() => setShowLowCreditsModal(false)}
+          titleMain={t('Credits.lowCreditsTitle')}
+          description={t('Credits.lowCreditsDescription')}
+          illustration={<NoCreditsIcon />}
         />
       )}
     </View>
@@ -270,7 +354,6 @@ const styles = ScaledSheet.create({
     paddingBottom: '32@ms',
   },
   listHeaderSection: {
-    marginTop: '16@ms',
     marginBottom: '16@ms',
   },
   coverImage: {
