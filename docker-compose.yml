@@ -8,7 +8,7 @@ services:
       # LocalStack configuration
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
-      AWS_DEFAULT_REGION: us-south-1
+      AWS_DEFAULT_REGION: ap-southeast-1
       AWS_DEFAULT_OUTPUT: json
       SERVICES: ses,s3,lambda,logs,sqs
       DEBUG: 1
