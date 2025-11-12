@@ -81,8 +81,8 @@ class TestUIEventSender:
         assert payload["reliable"] is True
 
     @pytest.mark.asyncio
-    async def test_send_event_skips_when_show_feedback_false(self):
-        """Test that the standalone function respects the show_feedback flag."""
+    async def test_send_event_sets_emoji_and_message_null_when_show_feedback_false(self):
+        """Test that the standalone function sets emoji and message to null when show_feedback is False."""
         room = FakeRoom()
         # Create event with show_feedback=False
         evt = CustomUIEventMessageType.create(
@@ -94,9 +94,20 @@ class TestUIEventSender:
 
         ok = await send_event(evt, room)
 
-        # Should return False (skipped) AND not have published anything
-        assert ok is False
-        assert len(room.local_participant.published) == 0
+        # Should return True (sent) and emoji should be null
+        assert ok is True
+        assert len(room.local_participant.published) == 1
+        
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+        
+        assert sent["version"] == "1.0"
+        assert sent["data"]["score"] == 1
+        assert sent["data"]["emoji"] is None  # emoji should be null
+        assert sent["data"]["message"] is None
+        assert sent["data"]["show_feedback"] is False
+        assert payload["topic"] == "events"
+        assert payload["reliable"] is True
 
     @pytest.mark.asyncio
     async def test_send_event_function_failure(self):
@@ -107,6 +118,46 @@ class TestUIEventSender:
         room.local_participant.raise_error = True
         ok = await send_event(evt, room)
         assert ok is False
+
+    @pytest.mark.asyncio
+    async def test_send_event_with_null_emoji_initially(self):
+        """Test that event can be created with null emoji from the start."""
+        room = FakeRoom()
+        evt = CustomUIEventMessageType.create(
+            score=2,
+            emoji=None,
+            message="no emoji",
+            show_feedback=True
+        )
+
+        ok = await send_event(evt, room)
+        assert ok is True
+        
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+        
+        assert sent["data"]["emoji"] is None
+        assert sent["data"]["show_feedback"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_event_preserves_emoji_when_show_feedback_true(self):
+        """Test that emoji is preserved when show_feedback is True."""
+        room = FakeRoom()
+        evt = CustomUIEventMessageType.create(
+            score=5,
+            emoji="🎉",
+            message="celebration",
+            show_feedback=True
+        )
+
+        ok = await send_event(evt, room)
+        assert ok is True
+        
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+        
+        assert sent["data"]["emoji"] == "🎉"
+        assert sent["data"]["show_feedback"] is True
 
     @pytest.mark.asyncio
     async def test_custom_ui_event_sender_class_wrapper(self):

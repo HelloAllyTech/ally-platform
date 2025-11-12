@@ -15,8 +15,8 @@ class CustomUIEventMessageTypeData(BaseModel):
     """Schema for custom event data payload."""
 
     score: Optional[int] = Field(None, description="Event score")
-    emoji: str = Field(..., description="Event emoji")
-    message: str = Field(..., description="Event message")
+    emoji: Optional[str] = Field(..., description="Event emoji")
+    message: Optional[str] = Field(..., description="Event message")
     show_feedback: bool = Field(..., description="Show feedback button")
 
 
@@ -31,8 +31,8 @@ class CustomUIEventMessageType(BaseModel):
     def create(
             cls,
             score: Optional[int],
-            emoji: str,
-            message: str,
+            emoji: Optional[str],
+            message: Optional[str],
             timestamp: Optional[str] = None,
             show_feedback: Optional[bool] = True,
     ) -> "CustomUIEventMessageType":
@@ -101,8 +101,9 @@ async def send_event(event_data: CustomUIEventMessageType, room: rtc.Room) -> bo
     try:
 
         if not event_data.data.show_feedback:
-            logger.debug("Skipping event: show_feedback is False")
-            return False
+            # Set emoji to null when show_feedback is False
+            event_data.data.emoji = None
+            event_data.data.message = None
 
         event_data_bytes = json.dumps(event_data.model_dump()).encode('utf-8')
         await room.local_participant.publish_data(
