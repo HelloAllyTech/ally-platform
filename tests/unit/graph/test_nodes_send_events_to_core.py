@@ -21,20 +21,26 @@ class TestSendEventsToCore:
         # capture calls
         calls = {"create": [], "send_message": []}
 
-        # Updated fake CoreEventMessageType.create to match new signature
+        # Updated fake CoreEventMessageType.create to match dict-based event_data
         def fake_create(room_id: str, chat_message=None, event_data=None):
-            calls["create"].append((event_data.event_id, room_id))
-            # return object with model_dump_json() method
+            # event_data is now a dict, not a BaseEvent
+            assert isinstance(event_data, dict)
+            calls["create"].append((event_data.get("id"), room_id))
+
+            # return a dummy object with model_dump_json() method
             class Msg:
                 def model_dump_json(self):
-                    return f"{{'event_id': '{event_data.event_id}', 'room_id': '{room_id}'}}"
+                    return (
+                        f"{{'event_id': '{event_data.get('id')}', 'room_id': '{room_id}'}}"
+                    )
+
             return Msg()
 
         # Fake async send_message to capture payloads
         async def fake_send_message(message_body: str):
             calls["send_message"].append(message_body)
 
-        # Patch the dependencies used inside send_events_to_core
+        # Patch dependencies used inside send_events_to_core
         monkeypatch.setattr(
             "app.core.graph.nodes.CoreEventMessageType.create", fake_create
         )

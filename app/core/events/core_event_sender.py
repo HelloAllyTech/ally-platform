@@ -9,12 +9,12 @@ from app.utils import get_current_iso_timestamp
 
 
 class CoreEventType(BaseModel):
-    event_data: BaseEvent = None
+    event_data: dict = None
     timestamp: Optional[str] = None  # store as ISO string for consistency
 
     @classmethod
     def create(
-        cls, timestamp: Optional[str] = None, event_data: BaseEvent = None
+        cls, timestamp: Optional[str] = None, event_data: dict = None
     ) -> "CoreEventType":
         if timestamp is None:
             timestamp = get_current_iso_timestamp()
@@ -41,7 +41,7 @@ class CoreEventMessageType(BaseModel):
         cls,
         room_id: str,
         chat_message: Optional[ChatMessage] = None,
-        event_data: BaseEvent = None,
+        event_data: dict = None,
     ) -> "CoreEventMessageType":
         event = None
         if event_data:

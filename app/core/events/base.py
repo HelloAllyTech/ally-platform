@@ -40,6 +40,7 @@ class BaseEvent(BaseModel, ABC):
     emoji: Optional[str] = None
     emoji_message: Optional[str] = None
     branching_instruction: Optional[str] = None
+    show_feedback: Optional[bool] = True
 
     model_config = {"arbitrary_types_allowed": True}
 

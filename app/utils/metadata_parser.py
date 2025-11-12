@@ -1,6 +1,5 @@
 """Room metadata parsing utilities."""
 import json
-from typing import Mapping,Any
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.utils.logger import get_logger
 

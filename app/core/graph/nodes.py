@@ -17,7 +17,7 @@ from app.core.events.ui_event_sender import send_event, CustomUIEventMessageType
 from app.core.events.event_processor import EventProcessor
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import SimulationState
-from app.core.graph.utils import convert_messages_to_chat_messages
+from app.core.graph.utils import convert_messages_to_chat_messages, serialize_event
 from app.core.queue import msg_event_queue
 from app.core.scenario.base import Scenario
 from app.utils.logger import logger
@@ -165,8 +165,11 @@ async def send_events_to_core(
         logger.debug(
             f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})"
         )
+
+        event_dict=serialize_event(event)
+
         core_event_message = CoreEventMessageType.create(
-            room_id=room.name, event_data=event
+            room_id=room.name, event_data=event_dict
         )
         await msg_event_queue.send_message(
             message_body=core_event_message.model_dump_json()

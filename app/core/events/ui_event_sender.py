@@ -17,6 +17,7 @@ class CustomUIEventMessageTypeData(BaseModel):
     score: Optional[int] = Field(None, description="Event score")
     emoji: str = Field(..., description="Event emoji")
     message: str = Field(..., description="Event message")
+    show_feedback: bool = Field(..., description="Show feedback button")
 
 
 class CustomUIEventMessageType(BaseModel):
@@ -32,7 +33,8 @@ class CustomUIEventMessageType(BaseModel):
             score: Optional[int],
             emoji: str,
             message: str,
-            timestamp: Optional[str] = None
+            timestamp: Optional[str] = None,
+            show_feedback: Optional[bool] = True,
     ) -> "CustomUIEventMessageType":
         """Create a custom event with current timestamp."""
         if timestamp is None:
@@ -40,7 +42,7 @@ class CustomUIEventMessageType(BaseModel):
 
         return cls(
             version="1.0",
-            data=CustomUIEventMessageTypeData(score=score, emoji=emoji, message=message),
+            data=CustomUIEventMessageTypeData(score=score, emoji=emoji, message=message,show_feedback=show_feedback),
             timestamp=timestamp
         )
 
@@ -97,6 +99,11 @@ async def send_event(event_data: CustomUIEventMessageType, room: rtc.Room) -> bo
         bool: True if event was sent successfully, False otherwise
     """
     try:
+
+        if not event_data.data.show_feedback:
+            logger.debug("Skipping event: show_feedback is False")
+            return False
+
         event_data_bytes = json.dumps(event_data.model_dump()).encode('utf-8')
         await room.local_participant.publish_data(
             event_data_bytes,

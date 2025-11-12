@@ -55,7 +55,9 @@ class EventProcessor:
             score=cumulative_score,
             emoji=selected_event.emoji,
             message=selected_event.emoji_message,
-            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            show_feedback=selected_event.show_feedback
+
         )
         
         return ui_message
