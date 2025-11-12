@@ -28,7 +28,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       disabled={isDisabled || isLoading}
       onPress={onPress}>
       {isLoading ? (
-        <ActivityIndicator color={colors.white} />
+        <ActivityIndicator color={colors.white} style={styles.loader} />
       ) : (
         <Text style={[styles.buttonText, customTextStyle]}>{label}</Text>
       )}
@@ -40,7 +40,7 @@ const styles = ScaledSheet.create({
   button: {
     width: '100%',
     backgroundColor: colors.azureBlue,
-    paddingVertical: '11@vs',
+    paddingVertical: '10@vs',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: '24@ms',
@@ -54,5 +54,8 @@ const styles = ScaledSheet.create({
   buttonText: {
     ...typography.body.large,
     color: colors.white,
+  },
+  loader: {
+    marginVertical: '2.5@ms',
   },
 });
