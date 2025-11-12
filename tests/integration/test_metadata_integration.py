@@ -16,7 +16,7 @@ from tests.fixtures.scenario_fixtures import (
 
 class TestMetadataParsingIntegration:
     """Integration tests for the complete metadata parsing flow."""
-    
+
     @pytest.mark.integration
     def test_full_metadata_parsing_flow(self):
         """Test the complete flow from JSON to parsed scenario."""
@@ -33,49 +33,49 @@ class TestMetadataParsingIntegration:
                 }
             }
         )
-        
+
         # Convert to JSON
         json_metadata = json.dumps(payload)
-        
+
         # Parse through the complete flow
         envelope = parse_room_metadata(json_metadata)
-        
+
         # Verify envelope structure
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "2.0"
-        
+
         # Verify scenario was created correctly
         scenario = envelope.scenario
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Integration Test Scenario"
         assert scenario.learning_objective == "Full integration test"
-        
+
         # Verify voice integration
         assert isinstance(scenario.voice, ScenarioVoice)
         assert scenario.voice.name == "integration_voice"
         assert scenario.voice.provider == "deepgram"
         assert scenario.voice.config.model == "nova-2"
-        
+
         # Verify prompt data integration
         assert isinstance(scenario.prompt_data, VoicePromptData)
         assert scenario.prompt_data.name == "Test Character"
-    
+
     @pytest.mark.integration
     def test_minimal_metadata_integration(self):
         """Test integration with minimal metadata."""
         payload = {"scenario": MINIMAL_SCENARIO_PAYLOAD}
         json_metadata = json.dumps(payload)
-        
+
         envelope = parse_room_metadata(json_metadata)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "1.0"  # Default version
-        
+
         scenario = envelope.scenario
         assert scenario.name == "Minimal Scenario"
         assert isinstance(scenario.voice, ScenarioVoice)  # Minimal voice present
         assert isinstance(scenario.prompt_data, VoicePromptData)
-    
+
     @pytest.mark.integration
     def test_complex_metadata_integration(self):
         """Test integration with complex metadata."""
@@ -84,32 +84,32 @@ class TestMetadataParsingIntegration:
             "scenario": COMPLEX_SCENARIO_PAYLOAD
         }
         json_metadata = json.dumps(payload)
-        
+
         envelope = parse_room_metadata(json_metadata)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "3.0"
-        
+
         scenario = envelope.scenario
         assert scenario.name == "Complex Scenario"
         assert scenario.metadata["complexity"] == "high"
         assert "advanced" in scenario.metadata["tags"]
-        
+
         # Verify voice configuration
         assert isinstance(scenario.voice, ScenarioVoice)
         assert scenario.voice.provider == "elevenlabs"
         assert scenario.voice.config.model == "eleven_multilingual_v2"
-    
+
     @pytest.mark.integration
     def test_error_recovery_integration(self):
         """Test error recovery in the complete integration flow."""
         # Test with invalid JSON
         invalid_json = '{"invalid": json}'
-        # Since `promptData` and `voice` are mandatory, parsing invalid JSON
-        # that falls back to an empty payload should raise validation error.
-        with pytest.raises(ValidationError):
+        # With the updated parse_room_metadata behavior, invalid/missing metadata in non-LOCAL
+        # environments raises ValueError before model creation.
+        with pytest.raises(ValueError):
             parse_room_metadata(invalid_json)
-    
+
     @pytest.mark.integration
     def test_unicode_handling_integration(self):
         """Test Unicode character handling in integration."""
@@ -123,10 +123,10 @@ class TestMetadataParsingIntegration:
                 }
             }
         )
-        
+
         json_metadata = json.dumps(payload, ensure_ascii=False)
         envelope = parse_room_metadata(json_metadata)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         scenario = envelope.scenario
         assert "测试" in scenario.name
@@ -134,7 +134,7 @@ class TestMetadataParsingIntegration:
         assert "café" in scenario.learning_objective
         assert "角色" in scenario.prompt_data.name
         assert "🇧🇷" in scenario.prompt_data.current_location
-    
+
     @pytest.mark.integration
     @pytest.mark.parametrize("provider", ["deepgram", "elevenlabs", "sarvam"])
     def test_voice_provider_integration(self, provider):
@@ -144,7 +144,7 @@ class TestMetadataParsingIntegration:
             "elevenlabs": {"model": "eleven_multilingual_v2", "voice_id": "test_id"},
             "sarvam": {"model": "bulbul:v2", "voice_id": "karun"}
         }
-        
+
         payload = create_room_metadata_envelope_payload(
             scenario={
                 "voice": {
@@ -154,15 +154,15 @@ class TestMetadataParsingIntegration:
                 }
             }
         )
-        
+
         json_metadata = json.dumps(payload)
         envelope = parse_room_metadata(json_metadata)
-        
+
         scenario = envelope.scenario
         assert isinstance(scenario.voice, ScenarioVoice)
         assert scenario.voice.provider == provider
         assert scenario.voice.config.model == voice_configs[provider]["model"]
-    
+
     @pytest.mark.integration
     def test_large_payload_integration(self):
         """Test integration with large payload."""
@@ -176,7 +176,7 @@ class TestMetadataParsingIntegration:
             "lifeHistory": "B" * 2000,  # Large history
             "openingStatements": [f"Statement {i}" for i in range(50)]  # Many statements
         }
-        
+
         payload = create_room_metadata_envelope_payload(
             scenario={
                 "title": "Large Scenario",
@@ -186,12 +186,12 @@ class TestMetadataParsingIntegration:
                 "metadata": {f"key_{i}": f"value_{i}" for i in range(100)}  # Large metadata
             }
         )
-        
+
         json_metadata = json.dumps(payload)
-        
+
         # Should handle large payload without issues
         envelope = parse_room_metadata(json_metadata)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         scenario = envelope.scenario
         assert len(scenario.learning_objective) == 500
@@ -199,7 +199,7 @@ class TestMetadataParsingIntegration:
         assert len(scenario.prompt_data.context) == 1000
         assert len(scenario.prompt_data.opening_statements) == 50
         assert len(scenario.metadata) == 100
-    
+
     @pytest.mark.integration
     def test_nested_scenario_extraction_integration(self):
         """Test integration with deeply nested scenario data."""
@@ -227,72 +227,72 @@ class TestMetadataParsingIntegration:
                 }
             }
         }
-        
+
         json_metadata = json.dumps(nested_payload)
         # Current implementation does not support extracting scenario data from
         # non-standard nested keys (e.g., "outer_wrapper"). Expect a validation error.
         with pytest.raises(ValidationError):
             parse_room_metadata(json_metadata)
-    
+
     @pytest.mark.integration
     def test_concurrent_parsing_integration(self):
         """Test concurrent parsing of metadata (thread safety)."""
         import threading
         import time
-        
+
         payload = create_room_metadata_envelope_payload()
         json_metadata = json.dumps(payload)
-        
+
         results = []
         errors = []
-        
+
         def worker():
             try:
                 envelope = parse_room_metadata(json_metadata)
                 results.append(envelope)
             except Exception as e:
                 errors.append(e)
-        
+
         # Run multiple threads concurrently
         threads = []
         for _ in range(10):
             thread = threading.Thread(target=worker)
             threads.append(thread)
             thread.start()
-        
+
         # Wait for all threads
         for thread in threads:
             thread.join()
-        
+
         # Verify all succeeded
         assert len(errors) == 0
         assert len(results) == 10
-        
+
         # Verify all results are valid
         for envelope in results:
             assert isinstance(envelope, RoomMetadataEnvelope)
             assert isinstance(envelope.scenario, Scenario)
-    
+
     @pytest.mark.integration
     def test_memory_usage_integration(self):
         """Test memory usage with repeated parsing."""
         import gc
-        
+
         payload = create_room_metadata_envelope_payload()
         json_metadata = json.dumps(payload)
-        
+
         # Parse multiple times to check for memory leaks
         envelopes = []
         for _ in range(100):
             envelope = parse_room_metadata(json_metadata)
             envelopes.append(envelope)
-        
+
         # Force garbage collection
         gc.collect()
-        
+
         # Verify all envelopes are still valid
         for envelope in envelopes:
             assert isinstance(envelope, RoomMetadataEnvelope)
             assert isinstance(envelope.scenario, Scenario)
-        
+
         # This test mainly ensures no exceptions occur during repeated parsing
