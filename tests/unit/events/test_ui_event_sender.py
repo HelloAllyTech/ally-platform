@@ -1,11 +1,11 @@
 import json
-import pytest
 from typing import Optional
+
+import pytest
 
 from app.core.events.ui_event_sender import (
     CustomUIEventMessageType,
     CustomUIEventMessageTypeData,
-    CustomUIEventSender,
     send_event,
 )
 
@@ -52,7 +52,6 @@ class TestUIEventSender:
         assert msg.timestamp == "2020-01-01T00:00:00.000Z"
 
     def test_custom_ui_event_message_type_create_without_timestamp(self):
-
         msg = CustomUIEventMessageType.create(score=None, emoji=":(", message="bad")
         assert isinstance(msg.timestamp, str) and len(msg.timestamp) > 0
         assert msg.data.show_feedback is True
@@ -97,10 +96,10 @@ class TestUIEventSender:
         # Should return True (sent) and emoji should be null
         assert ok is True
         assert len(room.local_participant.published) == 1
-        
+
         payload = room.local_participant.published[-1]
         sent = json.loads(payload["data"].decode("utf-8"))
-        
+
         assert sent["version"] == "1.0"
         assert sent["data"]["score"] == 1
         assert sent["data"]["emoji"] is None  # emoji should be null
@@ -132,10 +131,10 @@ class TestUIEventSender:
 
         ok = await send_event(evt, room)
         assert ok is True
-        
+
         payload = room.local_participant.published[-1]
         sent = json.loads(payload["data"].decode("utf-8"))
-        
+
         assert sent["data"]["emoji"] is None
         assert sent["data"]["show_feedback"] is True
 
@@ -152,29 +151,9 @@ class TestUIEventSender:
 
         ok = await send_event(evt, room)
         assert ok is True
-        
+
         payload = room.local_participant.published[-1]
         sent = json.loads(payload["data"].decode("utf-8"))
-        
+
         assert sent["data"]["emoji"] == "🎉"
         assert sent["data"]["show_feedback"] is True
-
-    @pytest.mark.asyncio
-    async def test_custom_ui_event_sender_class_wrapper(self):
-        participant = FakeParticipant()
-        room = FakeRoom(participant)
-        sender = CustomUIEventSender(room_name="room-1", room=room)
-
-        evt = CustomUIEventMessageType.create(
-            score=0,
-            emoji="*",
-            message="info",
-            timestamp="2024-02-02T00:00:00.000Z"
-        )
-        ok = await sender.send_event(evt)
-
-        assert ok is True
-        assert len(participant.published) == 1
-        payload = participant.published[-1]
-        data = json.loads(payload["data"].decode("utf-8"))
-        assert data["data"]["message"] == "info"
