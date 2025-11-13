@@ -1,6 +1,8 @@
 """Room metadata parsing utilities."""
 import json
-from typing import Mapping,Any
+
+from app.core.config import settings
+from app.core.constants import Environment
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.utils.logger import get_logger
 
@@ -13,14 +15,16 @@ def parse_room_metadata(metadata) -> RoomMetadataEnvelope:
     Returns empty envelope on error.
     """
     try:
-        logger.debug("Parsing job metadata: %s", metadata)
-        metadata_dict = json.loads(metadata) if metadata else {}
-        return RoomMetadataEnvelope.create(metadata_dict)
+        parsed = json.loads(metadata or "")
+    except json.JSONDecodeError:
+        parsed = None
 
-    except json.JSONDecodeError as e:
-        logger.error("Invalid JSON in metadata: %s", e)
-        return RoomMetadataEnvelope.create({})
+    if parsed is None:
+        if settings.ENV == Environment.LOCAL:
+            logger.warning("Missing/invalid metadata in local; using SCENARIO_SAMPLE.")
+            from scenario_sample import SCENARIO_SAMPLE
+            parsed = SCENARIO_SAMPLE
+        else:
+            raise ValueError("Metadata missing or invalid.")
 
-    except Exception as e:
-        logger.exception("Unexpected error parsing metadata")
-        return RoomMetadataEnvelope.create({})
+    return RoomMetadataEnvelope.create(parsed)

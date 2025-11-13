@@ -1,11 +1,11 @@
-import asyncio
 import json
+from typing import Optional
+
 import pytest
 
 from app.core.events.ui_event_sender import (
     CustomUIEventMessageType,
     CustomUIEventMessageTypeData,
-    CustomUIEventSender,
     send_event,
 )
 
@@ -27,51 +27,133 @@ class FakeParticipant:
 
 
 class FakeRoom:
-    def __init__(self, participant: FakeParticipant | None = None):
+    def __init__(self, participant: Optional[FakeParticipant] = None):
         self.local_participant = participant or FakeParticipant()
 
 
+# --- Tests ---
 class TestUIEventSender:
-    def test_custom_ui_event_message_type_create_with_and_without_timestamp(self):
-        # Explicit timestamp passed through
-        msg = CustomUIEventMessageType.create(score=3, emoji=":)", message="ok", timestamp="2020-01-01T00:00:00.000Z")
+    def test_custom_ui_event_message_type_create_with_defaults(self):
+        # Test standard creation with defaults (show_feedback=True)
+        msg = CustomUIEventMessageType.create(
+            score=3,
+            emoji=":)",
+            message="ok",
+            timestamp="2020-01-01T00:00:00.000Z"
+        )
         assert msg.version == "1.0"
-        assert msg.data == CustomUIEventMessageTypeData(score=3, emoji=":)", message="ok")
+
+        assert msg.data == CustomUIEventMessageTypeData(
+            score=3,
+            emoji=":)",
+            message="ok",
+            show_feedback=True
+        )
         assert msg.timestamp == "2020-01-01T00:00:00.000Z"
 
-        # No assertion on actual now() value, just ensure a non-empty string when omitted
-        msg2 = CustomUIEventMessageType.create(score=None, emoji=":(", message="bad")
-        assert isinstance(msg2.timestamp, str) and len(msg2.timestamp) > 0
+    def test_custom_ui_event_message_type_create_without_timestamp(self):
+        msg = CustomUIEventMessageType.create(score=None, emoji=":(", message="bad")
+        assert isinstance(msg.timestamp, str) and len(msg.timestamp) > 0
+        assert msg.data.show_feedback is True
 
     @pytest.mark.asyncio
-    async def test_send_event_function_success_and_failure(self):
+    async def test_send_event_function_success(self):
         room = FakeRoom()
-        evt = CustomUIEventMessageType.create(score=1, emoji=":)", message="yay", timestamp="2024-01-01T00:00:00.000Z")
+        evt = CustomUIEventMessageType.create(
+            score=1,
+            emoji=":)",
+            message="yay",
+            timestamp="2024-01-01T00:00:00.000Z"
+        )
 
         ok = await send_event(evt, room)
         assert ok is True
 
-        # Validate payload contents
+        assert len(room.local_participant.published) == 1
         payload = room.local_participant.published[-1]
         sent = json.loads(payload["data"].decode("utf-8"))
+
         assert sent["version"] == "1.0"
         assert sent["data"]["score"] == 1
-        assert payload["topic"] == "events" and payload["reliable"] is True
+        assert sent["data"]["show_feedback"] is True
+        assert payload["topic"] == "events"
+        assert payload["reliable"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_event_sets_emoji_and_message_null_when_show_feedback_false(self):
+        """Test that the standalone function sets emoji and message to null when show_feedback is False."""
+        room = FakeRoom()
+        # Create event with show_feedback=False
+        evt = CustomUIEventMessageType.create(
+            score=1,
+            emoji=":)",
+            message="hidden",
+            show_feedback=False
+        )
+
+        ok = await send_event(evt, room)
+
+        # Should return True (sent) and emoji should be null
+        assert ok is True
+        assert len(room.local_participant.published) == 1
+
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+
+        assert sent["version"] == "1.0"
+        assert sent["data"]["score"] == 1
+        assert sent["data"]["emoji"] is None  # emoji should be null
+        assert sent["data"]["message"] is None
+        assert sent["data"]["show_feedback"] is False
+        assert payload["topic"] == "events"
+        assert payload["reliable"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_event_function_failure(self):
+        room = FakeRoom()
+        evt = CustomUIEventMessageType.create(score=1, emoji=":)", message="yay")
 
         # Failure path
         room.local_participant.raise_error = True
-        ok2 = await send_event(evt, room)
-        assert ok2 is False
+        ok = await send_event(evt, room)
+        assert ok is False
 
     @pytest.mark.asyncio
-    async def test_custom_ui_event_sender_class_wrapper(self):
-        participant = FakeParticipant()
-        room = FakeRoom(participant)
-        sender = CustomUIEventSender(room_name="room-1", room=room)
+    async def test_send_event_with_null_emoji_initially(self):
+        """Test that event can be created with null emoji from the start."""
+        room = FakeRoom()
+        evt = CustomUIEventMessageType.create(
+            score=2,
+            emoji=None,
+            message="no emoji",
+            show_feedback=True
+        )
 
-        evt = CustomUIEventMessageType.create(score=0, emoji="*", message="info", timestamp="2024-02-02T00:00:00.000Z")
-        ok = await sender.send_event(evt)
+        ok = await send_event(evt, room)
         assert ok is True
-        payload = participant.published[-1]
-        data = json.loads(payload["data"].decode("utf-8"))
-        assert data["data"]["message"] == "info"
+
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+
+        assert sent["data"]["emoji"] is None
+        assert sent["data"]["show_feedback"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_event_preserves_emoji_when_show_feedback_true(self):
+        """Test that emoji is preserved when show_feedback is True."""
+        room = FakeRoom()
+        evt = CustomUIEventMessageType.create(
+            score=5,
+            emoji="🎉",
+            message="celebration",
+            show_feedback=True
+        )
+
+        ok = await send_event(evt, room)
+        assert ok is True
+
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+
+        assert sent["data"]["emoji"] == "🎉"
+        assert sent["data"]["show_feedback"] is True

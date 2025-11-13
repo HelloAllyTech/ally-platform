@@ -69,6 +69,7 @@ def build_events_from_metadata(
                     emoji=ev.get("emoji"),
                     emoji_message=ev.get("message"),
                     branching_instruction=ev.get("branchInstruction"),
+                    show_feedback=ev.get("feedbackStatus"),
                 )
                 events.append(instance)
                 continue

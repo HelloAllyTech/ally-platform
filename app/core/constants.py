@@ -1,6 +1,10 @@
 from enum import Enum
 from typing import Final
 
+class Environment(str, Enum):
+    DEV = "DEV"
+    LOCAL = "LOCAL"
+    PROD = "PROD"
 
 class TTSProvider(str, Enum):
     ELEVENLABS = "elevenlabs"

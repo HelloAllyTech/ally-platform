@@ -21,17 +21,26 @@ class TestSendEventsToCore:
         # capture calls
         calls = {"create": [], "send_message": []}
 
-        def fake_create(event_id: str, room_id: str):
-            calls["create"].append((event_id, room_id))
-            # return object with model_dump_json()
+        # Updated fake CoreEventMessageType.create to match dict-based event_data
+        def fake_create(room_id: str, chat_message=None, event_data=None):
+            # event_data is now a dict, not a BaseEvent
+            assert isinstance(event_data, dict)
+            calls["create"].append((event_data.get("id"), room_id))
+
+            # return a dummy object with model_dump_json() method
             class Msg:
                 def model_dump_json(self):
-                    return f"{{'event_id':'{event_id}','room_id':'{room_id}'}}"
+                    return (
+                        f"{{'event_id': '{event_data.get('id')}', 'room_id': '{room_id}'}}"
+                    )
+
             return Msg()
 
+        # Fake async send_message to capture payloads
         async def fake_send_message(message_body: str):
             calls["send_message"].append(message_body)
 
+        # Patch dependencies used inside send_events_to_core
         monkeypatch.setattr(
             "app.core.graph.nodes.CoreEventMessageType.create", fake_create
         )
@@ -39,9 +48,11 @@ class TestSendEventsToCore:
             "app.core.graph.nodes.msg_event_queue.send_message", fake_send_message
         )
 
+        # Create dummy events
         e1 = AnyEvent(event_id="e1")
         e2 = AnyEvent(event_id="e2")
 
+        # Setup simulation state
         state = SimulationState(
             messages=[],
             permitted_events=[],
@@ -53,11 +64,17 @@ class TestSendEventsToCore:
         room = FakeRoom()
         config = {"configurable": {"room": room}}
 
+        # Call the function under test
         new_state = await send_events_to_core(state, config=config)
 
-        # Assert message factory called per event
+        # Verify CoreEventMessageType.create() called once per event
         assert calls["create"] == [("e1", room.name), ("e2", room.name)]
-        # Assert messages sent twice
+
+        # Verify send_message called twice (once per event)
         assert len(calls["send_message"]) == 2
-        # State is preserved/passthrough
+        for payload in calls["send_message"]:
+            assert "event_id" in payload
+            assert "room_id" in payload
+
+        # Ensure state integrity (pass-through)
         assert new_state is state or new_state.new_events == state.new_events

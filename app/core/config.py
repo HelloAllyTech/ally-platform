@@ -1,14 +1,12 @@
 """
 Configuration settings for the application.
 """
-import os
-from typing import Any, Dict, Optional, Literal
-from urllib.parse import quote_plus
+from typing import Optional
 
-from pydantic import Field, computed_field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.core.constants import TTSProvider
+from app.core.constants import Environment
 
 
 class Settings(BaseSettings):
@@ -17,6 +15,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=[".env", "./.env", "../.env"])
 
     # Log settings
+    ENV: Environment = Field(default=Environment.DEV, description="App environment")
+
     LOG_LEVEL: str = "INFO"
     SLACK_ALERTS_ENABLED: bool = False
     SLACK_ALERTS_API_TOKEN: str = Field(...)
