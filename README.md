@@ -116,6 +116,21 @@ docker-compose up -d
 
 This starts LocalStack with SES, S3, Lambda, CloudWatch Logs, and SQS.
 
+### Full Dev Stack with Compose
+
+Spin up the application along with LocalStack:
+
+```bash
+docker compose -f docker-compose.full.yml up --build
+```
+
+Before running:
+- copy `env_sample` to `.env` and fill in required secrets.
+- ensure AWS entries target LocalStack (`AWS_ACCESS_KEY_ID=test`, `AWS_ENDPOINT_URL=http://localhost:4566`, etc.).
+
+Within the compose network the app reaches LocalStack at `http://localstack:4566`; when running the app outside compose, switch back to `http://localhost:4566`.
+The service is exposed on host port `8002` (`http://localhost:8002`) to avoid clashing with other Ally services.
+
 ## API Endpoints
 
 - **Health Check**: `GET /api/health` - Service health status
