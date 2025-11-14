@@ -110,13 +110,13 @@ describe('SimulationsScreen', () => {
   it('sorts scenarios: available first, then COMING_SOON, and navigates on press', async () => {
     const scenarios: Scenario[] = [
       {
-        id: '1',
+        id: 1,
         title: 'B Coming Soon',
         description: 'desc',
         coverImageUrl: 'http://image',
       },
       {
-        id: '2',
+        id: 2,
         title: 'A Available',
         description: 'desc',
         coverImageUrl: 'http://image2',
@@ -138,7 +138,7 @@ describe('SimulationsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith(
       SCREEN_NAMES.SIMULATION_DETAILS,
       expect.objectContaining({
-        scenario: expect.objectContaining({id: '2'}),
+        scenario: expect.objectContaining({id: 2}),
       }),
     );
 

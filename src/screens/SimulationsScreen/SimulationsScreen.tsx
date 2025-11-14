@@ -43,7 +43,7 @@ export const SimulationsScreen: React.FC = () => {
 
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  const keyExtractor = (item: Scenario | SimulationPath) => item.id;
+  const keyExtractor = (item: Scenario | SimulationPath) => item.id?.toString();
 
   useTabBackToHomeHandler();
 
@@ -77,8 +77,8 @@ export const SimulationsScreen: React.FC = () => {
   };
 
   const renderPathItem = ({item}: {item: SimulationPath}) => {
-    const progress = item.completedCount ?? 0;
-    const total = item.totalCount ?? 1;
+    const progress = item.completedScenarios;
+    const total = item.totalScenarios;
 
     return (
       <SimulationCard
@@ -87,7 +87,7 @@ export const SimulationsScreen: React.FC = () => {
         coverImageUrl={item.coverImageUrl}
         onPress={() => handlePathPress(item)}
         rightAccessory={
-          progress > 0 ? (
+          progress > 0 && total > 0 ? (
             <View style={styles.progressContainer}>
               <CircularProgress
                 progress={progress}

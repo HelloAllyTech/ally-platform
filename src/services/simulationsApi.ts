@@ -1,4 +1,9 @@
-import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
+import {
+  API_METHODS,
+  API_ROUTES,
+  SortOrder,
+  USE_MOCK_SCENARIO_PATHS,
+} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
   EndScenarioSessionResponse,
@@ -9,10 +14,15 @@ import {
   ScenarioSessionStartResponse,
   SimulationCredits,
   SimulationPath,
+  SimulationPathDetails,
   SimulationSummaryData,
 } from '@/types';
 
 import {api} from './api';
+import {
+  getMockPathDetailsById,
+  MOCK_SCENARIO_PATHS,
+} from './mockScenarioPathsData';
 
 export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
@@ -101,11 +111,13 @@ export const simulationsApi = api.injectEndpoints({
      */
     getSimulationPaths: builder.query<SimulationPath[], void>({
       queryFn: async (_arg, _queryApi, _extraOptions, fetchWithBQ) => {
-        // TODO: Replace this with actual API call when endpoint is ready
-        // Temporary: Use scenarios data to populate paths
+        if (USE_MOCK_SCENARIO_PATHS) {
+          return {data: MOCK_SCENARIO_PATHS};
+        }
+
         try {
           const result = await fetchWithBQ({
-            url: API_ROUTES.LEARN.SCENARIOS,
+            url: API_ROUTES.LEARN.SCENARIO_PATHS,
             method: API_METHODS.GET,
           });
 
@@ -113,26 +125,7 @@ export const simulationsApi = api.injectEndpoints({
             return {error: result.error};
           }
 
-          // Transform scenarios into path format temporarily
-          const scenarios = result.data as Scenario[];
-          const mockPaths: SimulationPath[] = scenarios.map(scenario => ({
-            id: scenario.id,
-            title: scenario.title || 'Untitled Path',
-            description: scenario.description,
-            coverImageUrl: scenario.coverImageUrl,
-            simulations: [
-              {
-                id: scenario.id,
-                title: scenario.title,
-                description: scenario.description,
-                completed: false,
-              },
-            ],
-            completedCount: 0,
-            totalCount: 1,
-          }));
-
-          return {data: mockPaths};
+          return {data: result.data as SimulationPath[]};
         } catch (error) {
           return {
             error: {
@@ -164,13 +157,35 @@ export const simulationsApi = api.injectEndpoints({
      * - Array of simulations with their status (completed, locked, etc.)
      * - Progress stats (completedCount, totalCount)
      */
-    getSimulationPathDetails: builder.query<SimulationPath, {pathId: string}>({
+    getSimulationPathDetails: builder.query<
+      SimulationPathDetails,
+      {pathId: string}
+    >({
       queryFn: async ({pathId}, _queryApi, _extraOptions, fetchWithBQ) => {
-        // TODO: Replace this entire queryFn with actual API call (see above)
-        // For now, fetch all scenarios and create mock path data
+        if (USE_MOCK_SCENARIO_PATHS) {
+          const mockData = getMockPathDetailsById(pathId);
+          if (!mockData) {
+            return {
+              error: {
+                status: 'CUSTOM_ERROR' as const,
+                error: 'Path not found',
+              },
+            };
+          }
+          // Flatten the data structure and sort scenarios by order
+          return {
+            data: {
+              ...mockData,
+              scenarios: [...mockData.scenarios].sort(
+                (a, b) => a.order - b.order,
+              ),
+            },
+          };
+        }
+
         try {
           const result = await fetchWithBQ({
-            url: API_ROUTES.LEARN.SCENARIOS,
+            url: API_ROUTES.LEARN.SIMULATION_PATH_DETAILS(pathId),
             method: API_METHODS.GET,
           });
 
@@ -178,41 +193,16 @@ export const simulationsApi = api.injectEndpoints({
             return {error: result.error};
           }
 
-          const scenarios = result.data as Scenario[];
-
-          // Mock: Use first 4 scenarios as simulations in path
-          // Logic: First is completed, second is next (unlocked), rest are locked
-          const pathSimulations = scenarios
-            .slice(0, 4)
-            .map((scenario, index) => {
-              const isCompleted = index === 0; // First one is completed
-              // Second one is next (unlocked), rest are locked
-              const isLocked = index > 1; // 3rd and 4th are locked
-
-              return {
-                id: scenario.id,
-                order: index + 1,
-                title: scenario.title || 'Untitled Simulation',
-                description: scenario.description,
-                thumbnailUrl: scenario.coverImageUrl,
-                completed: isCompleted,
-                locked: isLocked,
-              };
-            });
-
-          // Create mock path
-          const mockPath: SimulationPath = {
-            id: pathId,
-            title: 'Stress management',
-            description:
-              'This course provides practical techniques for managing stress. It covers identifying stressors, developing coping mechanisms, and building resilience. Learn to regain control and improve your overall well-being.',
-            coverImageUrl: scenarios[0]?.coverImageUrl || null,
-            simulations: pathSimulations,
-            completedCount: 1,
-            totalCount: 4,
+          const response = result.data as SimulationPathDetails;
+          // Flatten the data structure and sort scenarios by order
+          return {
+            data: {
+              ...response,
+              scenarios: [...response.scenarios].sort(
+                (a, b) => a.order - b.order,
+              ),
+            },
           };
-
-          return {data: mockPath};
         } catch (error) {
           return {
             error: {

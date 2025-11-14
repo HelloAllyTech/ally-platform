@@ -23,7 +23,7 @@ import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useGetSimulationPathDetailsQuery} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import type {Scenario} from '@/types';
+import {PathScenario, ScenarioPathStatus} from '@/types';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
@@ -40,6 +40,9 @@ export const SimulationPathDetailsScreen: React.FC<
    * TODO: When path details API is ready, this will automatically use it
    * Currently uses mock implementation that fetches scenarios internally
    * See src/services/simulationsApi.ts for API integration instructions
+   *
+   * Note: The API hook returns flattened data (not wrapped in .data) and
+   * scenarios are pre-sorted by order field via transformResponse
    */
   const {
     data: pathData,
@@ -47,10 +50,8 @@ export const SimulationPathDetailsScreen: React.FC<
     error,
   } = useGetSimulationPathDetailsQuery({pathId});
 
-  const [selectedSimulation, setSelectedSimulation] = useState<{
-    simulation: NonNullable<typeof pathData>['simulations'][0];
-    scenario: Scenario;
-  } | null>(null);
+  const [selectedSimulation, setSelectedSimulation] =
+    useState<PathScenario | null>(null);
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
 
@@ -77,11 +78,14 @@ export const SimulationPathDetailsScreen: React.FC<
   } = useStartSimulation();
 
   // Determine next simulation (first incomplete, unlocked simulation)
-  const nextSimulation = pathData?.simulations?.find(
-    sim => !sim.completed && !sim.locked,
+  const nextSimulation = pathData?.scenarios?.find(
+    scenario =>
+      scenario.status !== ScenarioPathStatus.COMPLETED &&
+      scenario.status !== ScenarioPathStatus.LOCKED,
   );
 
-  const isPathStarted = (pathData?.completedCount ?? 0) > 0;
+  const isPathStarted = (pathData?.completedScenarios ?? 0) > 0;
+  const isPathCompleted = !!pathData?.completedAt;
 
   const isStartPathDisabled =
     !nextSimulation || !!(credits && getCreditsInfo && getCreditsInfo.isLow);
@@ -95,52 +99,24 @@ export const SimulationPathDetailsScreen: React.FC<
    * Called when user clicks Start (path not started) or Continue (path started)
    */
   const handleStartPath = () => {
-    if (nextSimulation && pathData) {
-      const scenario: Scenario = {
-        id: nextSimulation.id,
-        title: nextSimulation.title || '',
-        description: nextSimulation.description || '',
-        coverImageUrl: nextSimulation.thumbnailUrl || pathData.coverImageUrl,
-        coverVideoUrl: null,
-      };
-      setSelectedSimulation({simulation: nextSimulation, scenario});
+    if (nextSimulation) {
+      setSelectedSimulation(nextSimulation);
     }
   };
 
   /**
    * Handle simulation card press
-   * - If completed: Navigate to simulation feedback screen
+   * - If completed: Show modal to allow retry
    * - Otherwise: Open simulation details modal
    * Only unlocked simulations are clickable (locked ones have disabled press)
    */
-  const handleSimulationPress = (simulationId: string) => {
-    const simulation = pathData?.simulations?.find(
-      sim => sim.id === simulationId,
-    );
-    if (!simulation || simulation.locked) {
+  const handleSimulationPress = (scenario: PathScenario) => {
+    if (scenario.status === ScenarioPathStatus.LOCKED) {
       return;
     }
 
-    // For completed simulations, navigate to feedback screen
-    if (simulation.completed) {
-      // TODO: Uncomment once API provides the scenario session ID for completed simulations
-      // navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-      //   scenarioSessionId: simulation.scenarioSessionId, // This field needs to be added to PathSimulation type
-      // });
-      return;
-    }
-
-    // For non-completed simulations, open the modal to start
-    if (pathData) {
-      const scenario: Scenario = {
-        id: simulation.id,
-        title: simulation.title || '',
-        description: simulation.description || '',
-        coverImageUrl: simulation.thumbnailUrl || pathData.coverImageUrl,
-        coverVideoUrl: null,
-      };
-      setSelectedSimulation({simulation, scenario});
-    }
+    // For all clickable simulations (including completed), open the modal
+    setSelectedSimulation(scenario);
   };
 
   /**
@@ -155,7 +131,13 @@ export const SimulationPathDetailsScreen: React.FC<
    */
   const handleStartSimulation = () => {
     if (selectedSimulation) {
-      startSimulation(selectedSimulation.scenario);
+      startSimulation({
+        id: selectedSimulation.scenarioId,
+        title: selectedSimulation.scenarioTitle || '',
+        description: selectedSimulation.description || '',
+        coverImageUrl: selectedSimulation.coverImageUrl,
+        coverVideoUrl: selectedSimulation.coverVideoUrl,
+      });
     }
   };
 
@@ -182,12 +164,15 @@ export const SimulationPathDetailsScreen: React.FC<
     </View>
   );
 
+  const showProgressBar =
+    !!pathData?.completedScenarios && !!pathData?.totalScenarios;
+
   const renderListHeaderComponent = () => {
     if (!pathData) return null;
 
     return (
       <View style={styles.listHeaderSection}>
-        {pathData.coverImageUrl && (
+        {!!pathData.coverImageUrl && (
           <Image
             source={{uri: pathData.coverImageUrl}}
             style={styles.coverImage}
@@ -195,25 +180,33 @@ export const SimulationPathDetailsScreen: React.FC<
           />
         )}
         <View style={styles.listHeaderContent}>
-          <Text style={styles.pathTitle}>{pathData.title}</Text>
-          <Text style={styles.pathDescription}>{pathData.description}</Text>
+          <Text style={styles.pathTitle}>{pathData.name}</Text>
+          <Text style={styles.pathDescription}>
+            {pathData.description ?? ''}
+          </Text>
 
           {/* Progress bar - shows completion status */}
-          <View style={styles.progressBarContainer}>
-            <ProgressBar
-              current={pathData.completedCount ?? 0}
-              total={pathData.totalCount ?? 1}
-            />
-          </View>
+          {showProgressBar && (
+            <View style={styles.progressBarContainer}>
+              <ProgressBar
+                current={pathData.completedScenarios}
+                total={pathData.totalScenarios}
+              />
+            </View>
+          )}
 
-          {/* Start/Continue button */}
-          <PrimaryButton
-            label={
-              isPathStarted ? t('Simulations.continue') : t('Simulations.start')
-            }
-            onPress={handleStartPath}
-            isDisabled={isStartPathDisabled}
-          />
+          {/* Start/Continue button - only show if path is not completed */}
+          {!isPathCompleted && (
+            <PrimaryButton
+              label={
+                isPathStarted
+                  ? t('Simulations.continue')
+                  : t('Simulations.start')
+              }
+              onPress={handleStartPath}
+              isDisabled={isStartPathDisabled}
+            />
+          )}
         </View>
       </View>
     );
@@ -221,22 +214,21 @@ export const SimulationPathDetailsScreen: React.FC<
 
   const renderSimulationItem = ({
     item,
-    index,
   }: {
-    item: NonNullable<typeof pathData>['simulations'][0];
+    item: PathScenario;
     index: number;
   }) => {
-    const isNext = nextSimulation?.id === item.id;
+    const isNext = nextSimulation?.sessionItemId === item.sessionItemId;
 
     return (
       <PathSimulationCard
-        order={item.order ?? index + 1}
-        title={item.title ?? ''}
-        thumbnailUrl={item.thumbnailUrl}
-        isLocked={item.locked ?? false}
-        isCompleted={item.completed ?? false}
+        order={item.order}
+        title={item.scenarioTitle ?? ''}
+        thumbnailUrl={item.coverImageUrl}
+        isLocked={item.status === ScenarioPathStatus.LOCKED}
+        isCompleted={item.status === ScenarioPathStatus.COMPLETED}
         isNext={isNext}
-        onPress={() => handleSimulationPress(item.id)}
+        onPress={() => handleSimulationPress(item)}
       />
     );
   };
@@ -255,7 +247,7 @@ export const SimulationPathDetailsScreen: React.FC<
           style={styles.loadingContainer}
           testID="activity-indicator"
         />
-      ) : error || !pathData?.simulations ? (
+      ) : error || !pathData?.scenarios ? (
         <View style={[styles.container, styles.centerContent]}>
           <EmptyState
             icon={DataUnavailableIcon}
@@ -264,8 +256,8 @@ export const SimulationPathDetailsScreen: React.FC<
         </View>
       ) : (
         <FlatList
-          data={pathData?.simulations || []}
-          keyExtractor={item => item.id}
+          data={pathData?.scenarios || []}
+          keyExtractor={item => item.sessionItemId.toString()}
           renderItem={renderSimulationItem}
           ListHeaderComponent={renderListHeaderComponent}
           contentContainerStyle={styles.scrollContent}
@@ -275,8 +267,7 @@ export const SimulationPathDetailsScreen: React.FC<
 
       <SimulationDetailsModal
         visible={!!selectedSimulation}
-        simulation={selectedSimulation?.simulation || null}
-        coverVideoUrl={selectedSimulation?.scenario.coverVideoUrl}
+        simulation={selectedSimulation}
         onClose={handleCloseModal}
         onStartSimulation={handleStartSimulation}
         isCreatingRoom={isCreatingRoom}
@@ -361,7 +352,7 @@ const styles = ScaledSheet.create({
     height: '177@ms',
     borderRadius: '4@ms',
     backgroundColor: colors.ds.grey[200],
-    marginBottom: '12@ms',
+    marginBottom: '16@ms',
   },
   listHeaderContent: {
     gap: '12@ms',

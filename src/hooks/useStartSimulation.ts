@@ -85,7 +85,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
 
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
-        scenarioId: Number(scenario.id),
+        scenarioId: scenario.id,
       }).unwrap();
 
       if (startResp) {
