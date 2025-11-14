@@ -15,13 +15,12 @@ import {PrimaryButton, VideoPreview} from '@/components';
 import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import type {PathSimulation} from '@/types';
+import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
+import type {PathScenario} from '@/types';
 
 export interface SimulationDetailsModalProps {
   visible: boolean;
-  simulation: PathSimulation | null;
-  coverVideoUrl?: string | null;
+  simulation: PathScenario | null;
   onClose: () => void;
   onStartSimulation: () => void;
   isCreatingRoom: boolean;
@@ -33,7 +32,6 @@ export interface SimulationDetailsModalProps {
 export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   visible,
   simulation,
-  coverVideoUrl,
   onClose,
   onStartSimulation,
   isCreatingRoom,
@@ -46,9 +44,8 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   if (!simulation) {
     return null;
   }
-
-  const hasVideo = !!coverVideoUrl;
-  const hasImage = !!simulation.thumbnailUrl;
+  const {coverImageUrl, coverVideoUrl, scenarioTitle, description, order} =
+    simulation;
 
   return (
     <>
@@ -96,15 +93,15 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
             <View style={styles.contentContainer}>
               {/* Fixed Media Section (Video or Image) - Not Scrollable */}
               <View style={styles.mediaContainer}>
-                {hasVideo ? (
+                {coverVideoUrl ? (
                   <VideoPreview
                     videoUrl={coverVideoUrl}
                     autoPlay={false}
                     shouldPause={false}
                   />
-                ) : hasImage && simulation.thumbnailUrl ? (
+                ) : coverImageUrl ? (
                   <Image
-                    source={{uri: simulation.thumbnailUrl}}
+                    source={{uri: coverImageUrl}}
                     style={styles.coverImage}
                     resizeMode="cover"
                   />
@@ -117,17 +114,20 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 bounces={false}>
+                <Text style={styles.orderLabel}>
+                  {t('Simulations.simulation')} {order}
+                </Text>
                 {/* Title */}
-                <Text style={styles.title}>{simulation.title}</Text>
+                <Text style={styles.title}>{scenarioTitle}</Text>
 
                 {/* Label */}
-                <Text style={styles.fieldLabel}>
+                <Text style={styles.scenarioLabel}>
                   {t('Simulations.scenarioLabel')}
                 </Text>
 
                 {/* Description */}
                 {/* TODO: Replace with actual description when ready */}
-                {/* <Text style={styles.description}>{simulation.description}</Text> */}
+                {/* <Text style={styles.description}>{description}</Text> */}
                 <Text style={styles.description}>
                   This is a dummy description to demonstrate scrolling behavior.
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
@@ -186,7 +186,7 @@ const styles = ScaledSheet.create({
     maxWidth: '500@ms',
     height: '80%',
     backgroundColor: colors.ds.neutral.white,
-    borderRadius: '12@ms',
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
   header: {
@@ -194,7 +194,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: '16@ms',
-    paddingVertical: '12@ms',
+    paddingTop: '16@ms',
   },
   headerTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
@@ -214,9 +214,9 @@ const styles = ScaledSheet.create({
     marginHorizontal: '16@ms',
     marginTop: '16@ms',
     marginBottom: '16@ms',
-    borderWidth: 1,
+    borderWidth: 0.35,
     borderColor: colors.ds.stroke.primary,
-    borderRadius: '12@ms',
+    borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: colors.ds.neutral.white,
   },
@@ -227,7 +227,7 @@ const styles = ScaledSheet.create({
   coverImage: {
     width: '100%',
     height: '180@ms',
-    borderRadius: '8@ms',
+    borderRadius: radius.lg,
     backgroundColor: colors.ds.grey[200],
   },
   scrollContainer: {
@@ -235,35 +235,36 @@ const styles = ScaledSheet.create({
   },
   scrollContent: {
     paddingHorizontal: '16@ms',
-    paddingTop: '8@ms',
     paddingBottom: '16@ms',
   },
-  title: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.headline.small,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
-    marginTop: '10@ms',
-    marginBottom: '16@ms',
+  orderLabel: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.lowEmphasis,
+    marginTop: '12@ms',
   },
-  fieldLabel: {
+  title: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.large,
+    color: colors.ds.typography.highEmphasis,
+    marginVertical: '8@ms',
+  },
+  scenarioLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '2@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    marginBottom: '4@ms',
   },
   description: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.mediumEmphasis,
-    lineHeight: '22@ms',
     marginBottom: '6@ms',
   },
   buttonContainer: {
     backgroundColor: colors.ds.neutral.white,
-    paddingTop: '12@ms',
     paddingBottom: '16@ms',
   },
   ctaWrapper: {
@@ -279,7 +280,7 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    borderRadius: '12@ms',
+    borderRadius: radius.lg,
   },
   loadingText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

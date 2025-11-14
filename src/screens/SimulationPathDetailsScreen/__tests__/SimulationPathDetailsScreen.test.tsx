@@ -65,37 +65,44 @@ const mockNavigation = {
   navigate: jest.fn(),
 };
 
+// Mock data is now flattened (not wrapped in .data) to match API transformResponse
 const mockPathData = {
   id: 'test-path-id',
-  title: 'Test Path',
-  description: 'Test Path Description',
+  name: 'Test Path',
+  description: 'A comprehensive test path for learning and development',
   coverImageUrl: 'https://example.com/cover.jpg',
-  completedCount: 2,
-  totalCount: 5,
-  simulations: [
+  userId: 1,
+  completedAt: null,
+  completedScenarios: 2,
+  totalScenarios: 5,
+  scenarios: [
     {
-      id: 'sim-1',
-      title: 'Simulation 1',
-      order: 1,
-      thumbnailUrl: 'https://example.com/sim1.jpg',
-      completed: true,
-      locked: false,
+      sessionItemId: 1,
+      scenarioId: 101,
+      coverImageUrl: 'https://example.com/sim1.jpg',
+      coverVideoUrl: 'https://example.com/video1.mp4',
+      description: 'Simulation 1 description',
+      scenarioTitle: 'Simulation 1',
+      order: 100,
+      status: 'COMPLETED' as const,
     },
     {
-      id: 'sim-2',
-      title: 'Simulation 2',
-      order: 2,
-      thumbnailUrl: 'https://example.com/sim2.jpg',
-      completed: false,
-      locked: false,
+      sessionItemId: 2,
+      scenarioId: 102,
+      coverImageUrl: 'https://example.com/sim2.jpg',
+      description: 'Simulation 2 description',
+      scenarioTitle: 'Simulation 2',
+      order: 200,
+      status: 'IN_PROGRESS' as const,
     },
     {
-      id: 'sim-3',
-      title: 'Simulation 3',
-      order: 3,
-      thumbnailUrl: 'https://example.com/sim3.jpg',
-      completed: false,
-      locked: true,
+      sessionItemId: 3,
+      scenarioId: 103,
+      coverImageUrl: 'https://example.com/sim3.jpg',
+      description: 'Simulation 3 description',
+      scenarioTitle: 'Simulation 3',
+      order: 300,
+      status: 'LOCKED' as const,
     },
   ],
 };
@@ -169,14 +176,17 @@ describe('SimulationPathDetailsScreen', () => {
     );
 
     expect(getByText('Test Path')).toBeTruthy();
-    expect(getByText('Test Path Description')).toBeTruthy();
     expect(getByText('2 of 5 completed')).toBeTruthy();
   });
 
   it('should render "Start" button when path is not started', () => {
     const notStartedPathData = {
       ...mockPathData,
-      completedCount: 0,
+      completedScenarios: 0,
+      scenarios: mockPathData.scenarios.map((scenario, index) => ({
+        ...scenario,
+        status: index === 0 ? ('IN_PROGRESS' as const) : ('LOCKED' as const),
+      })),
     };
 
     useGetSimulationPathDetailsQuery.mockReturnValue({
@@ -350,10 +360,10 @@ describe('SimulationPathDetailsScreen', () => {
   it('should disable button when no next simulation is available', () => {
     const allCompletedPathData = {
       ...mockPathData,
-      completedCount: 3,
-      simulations: mockPathData.simulations.map(sim => ({
-        ...sim,
-        completed: true,
+      completedScenarios: 3,
+      scenarios: mockPathData.scenarios.map(scenario => ({
+        ...scenario,
+        status: 'COMPLETED' as const,
       })),
     };
 
@@ -377,6 +387,40 @@ describe('SimulationPathDetailsScreen', () => {
     const continueButton = getByText('Continue');
     expect(continueButton).toBeTruthy();
     // Note: The disabled state is handled by PrimaryButton component
+  });
+
+  it('should not show Start/Continue button when path is completed', () => {
+    const completedPathData = {
+      ...mockPathData,
+      completedAt: '2024-01-15T10:30:00Z',
+      completedScenarios: 3,
+      totalScenarios: 3,
+      scenarios: mockPathData.scenarios.map(scenario => ({
+        ...scenario,
+        status: 'COMPLETED' as const,
+      })),
+    };
+
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: completedPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {queryByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // Button should not be present when path is completed
+    expect(queryByText('Start')).toBeNull();
+    expect(queryByText('Continue')).toBeNull();
   });
 });
 

@@ -89,12 +89,10 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderDetailsSection = () => {
     const videoUrl = scenario.coverVideoUrl;
     const imageUrl = scenario.coverImageUrl;
-    const hasVideo = !!videoUrl;
-    const hasImage = !!imageUrl;
 
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {hasVideo && (
+        {!!videoUrl && (
           <VideoPreview
             videoUrl={videoUrl}
             autoPlay={false}
@@ -103,7 +101,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           />
         )}
 
-        {!hasVideo && hasImage && (
+        {!videoUrl && !!imageUrl && (
           <Image source={{uri: imageUrl}} style={styles.cover} />
         )}
 

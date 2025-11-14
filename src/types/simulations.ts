@@ -3,7 +3,7 @@ import {ScenarioStatus} from '@/constants';
 import {AudioTrackRef} from './audio';
 
 export interface Scenario {
-  id: string;
+  id: number;
   title: string;
   scenario?: string;
   description?: string;
@@ -172,52 +172,56 @@ export type LiveEventPayload = {
 } | null;
 
 /**
- * Simulation Path Types
- * These types are prepared for the upcoming simulation path feature
+ * Simulation Path Types - API Contract
+ * These types match the exact API contract for scenario paths
  */
 
 /**
- * Represents a single simulation within a path
+ * Status of a scenario within a path
  */
-export interface PathSimulation {
-  id: string;
-  order?: number;
-  title?: string;
-  description?: string;
-  thumbnailUrl?: string | null;
-  completed?: boolean;
-  locked?: boolean;
+export enum ScenarioPathStatus {
+  COMPLETED = 'COMPLETED',
+  LOCKED = 'LOCKED',
+  IN_PROGRESS = 'IN_PROGRESS',
 }
 
 /**
- * Represents a simulation path with multiple simulations
+ * Represents a single scenario within a path (from API)
+ * API Endpoint: GET /scenario-paths/:pathId
  */
+export interface PathScenario {
+  sessionItemId: number;
+  scenarioId: number;
+  coverImageUrl: string;
+  coverVideoUrl?: string;
+  description: string;
+  scenarioTitle: string;
+  order: number;
+  status: ScenarioPathStatus;
+}
+
+/**
+ * Represents a simulation path with multiple scenarios (from API)
+ * API Endpoint: GET /scenario-paths/:pathId
+ */
+export interface SimulationPathDetails {
+  id: string;
+  name: string;
+  description: string;
+  coverImageUrl: string;
+  userId: number;
+  completedAt: string | null;
+  completedScenarios: number;
+  totalScenarios: number;
+  scenarios: PathScenario[];
+}
+
 export interface SimulationPath {
   id: string;
   title: string;
   description?: string;
-  coverImageUrl?: string | null;
-  /**
-   * Array of simulations in this path
-   */
-  simulations: PathSimulation[];
-  /**
-   * Number of completed simulations
-   */
-  completedCount?: number;
-  /**
-   * Total number of simulations in the path
-   */
-  totalCount?: number;
-  /**
-   * Metadata for additional information
-   */
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Response type for simulation paths API
- */
-export interface SimulationPathsResponse {
-  paths: SimulationPath[];
+  coverImageUrl: string;
+  totalScenarios: number;
+  sessionStatus: ScenarioPathStatus;
+  completedScenarios: number;
 }
