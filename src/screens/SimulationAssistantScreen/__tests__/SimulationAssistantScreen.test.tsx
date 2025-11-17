@@ -19,8 +19,10 @@ jest.mock('@livekit/react-native', () => ({
   __esModule: true,
   AudioSession: {
     startAudioSession: jest.fn().mockResolvedValue(undefined),
+    stopAudioSession: jest.fn().mockResolvedValue(undefined),
     selectAudioOutput: jest.fn().mockResolvedValue(undefined),
     configureAudio: jest.fn().mockResolvedValue(undefined),
+    setAppleAudioConfiguration: jest.fn().mockResolvedValue(undefined),
   },
   AndroidAudioTypePresets: {
     media: {},
