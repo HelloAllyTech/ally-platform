@@ -38,7 +38,7 @@ const styles = ScaledSheet.create({
   label: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
-    color: colors.mediumGray2,
+    color: colors.ds.typography.lowEmphasis,
     marginRight: '8@ms',
   },
   value: {

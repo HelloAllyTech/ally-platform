@@ -14,7 +14,7 @@ import {
 import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
-import {colors, typography} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {SectionItem} from '@/types';
 
 import {SectionWrapper} from '../SectionWrapper/SectionWrapper';
@@ -226,7 +226,9 @@ const styles = ScaledSheet.create({
     marginTop: '10@ms',
     marginHorizontal: '10@s',
     alignSelf: 'center',
-    backgroundColor: colors.floralWhite,
+    backgroundColor: colors.ds.amber[50],
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.orange[400],
     borderRadius: '8@s',
     padding: '10@s',
   },
@@ -234,15 +236,16 @@ const styles = ScaledSheet.create({
     width: '32@s',
     height: '32@s',
     borderColor: colors.carrotOrange,
-    borderWidth: '1@s',
+    borderWidth: '0.5@ms',
     borderRadius: '16@s',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: '10@s',
   },
   alertText: {
-    ...typography.body.medium,
-    color: colors.russetBrown,
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.red[700],
     flex: 1,
     width: '100%',
   },

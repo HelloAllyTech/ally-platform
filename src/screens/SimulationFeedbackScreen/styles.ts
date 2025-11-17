@@ -1,7 +1,7 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, stroke, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -30,16 +30,14 @@ export const styles = ScaledSheet.create({
     paddingRight: '1@ms',
   },
   title: {
-    ...typography.headline.large,
+    ...typography.headline.tiny,
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.darkGray2,
-    fontSize: '18@ms',
+    color: colors.ds.typography.highEmphasis,
   },
   subTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.charcoal2,
-    fontSize: '14@ms',
-    marginTop: '-4@ms',
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -65,9 +63,9 @@ export const styles = ScaledSheet.create({
     right: '16@ms',
     zIndex: 1000,
     borderRadius: '50%',
-    backgroundColor: colors.whiteTransparent10,
+    backgroundColor: colors.ds.whiteAlpha[500],
     borderWidth: 1,
-    borderColor: colors.lightGray4,
+    borderColor: stroke.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: '30@ms',
