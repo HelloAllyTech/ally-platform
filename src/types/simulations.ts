@@ -116,6 +116,15 @@ interface SummaryMetadata {
   sessionName?: string;
 }
 
+export interface UpNextSimulation {
+  scenarioId: number;
+  scenarioTitle: string;
+  description: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  order: number;
+}
+
 export interface SimulationSummaryData {
   events?: SimulationEvent[];
   whatWentWell?: string[];

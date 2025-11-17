@@ -339,7 +339,8 @@
     "whatWentWell": "What went well",
     "areasForImprovement": "Areas for improvement",
     "noDataAvailable": "No Data Available",
-    "benchmark": "(Benchmark: {{benchmark}})"
+    "benchmark": "(Benchmark: {{benchmark}})",
+    "upNext": "Up next"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
