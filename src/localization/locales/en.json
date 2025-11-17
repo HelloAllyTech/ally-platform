@@ -266,7 +266,9 @@
     "endingSoon": "Ending Soon",
     "sessionWillEnd": "Your session will end in 30 seconds.",
     "practiceSessionScore": "Practice Session Score",
-    "linkCopiedToClipboard": "Link copied to clipboard"
+    "linkCopiedToClipboard": "Link copied to clipboard",
+    "endSimulation": "End Simulation",
+    "endSimulationConfirmation": "Are you sure you want to end this simulation?"
   },
   "NetworkLogs": {
     "logs": "Logs"
