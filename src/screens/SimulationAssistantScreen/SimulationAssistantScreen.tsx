@@ -208,15 +208,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
-      const response = await endScenarioSession({
+      await endScenarioSession({
         scenarioSessionId: roomId,
       });
-      if (!response.error) {
-        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-          simulationId: roomId,
-        });
-      }
     } finally {
+      navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+        simulationId: roomId,
+      });
       setIsMicEnabled(false);
       setIsDisconnecting(false);
     }
