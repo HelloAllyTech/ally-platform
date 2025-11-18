@@ -12,7 +12,7 @@ import {TranslationType} from '@/localization/locales/type';
 
 import {Toast} from './Toast';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error';
 export type ToastPosition = 'top' | 'bottom';
 
 export interface ShowToastOptions {
@@ -51,7 +51,10 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({
   const [toastState, setToastState] = useState<ToastState | null>(null);
 
   const showToast = useCallback(
-    (options: ShowToastOptions | string, fallbackType?: ToastType) => {
+    (
+      options: ShowToastOptions | string,
+      fallbackType: ToastType = 'success',
+    ) => {
       const finalOptions: ShowToastOptions =
         typeof options === 'string'
           ? {message: options, type: fallbackType}
@@ -60,7 +63,7 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({
       setToastState({
         visible: true,
         message: finalOptions.message,
-        type: finalOptions.type || 'info',
+        type: finalOptions.type ?? fallbackType,
         duration: finalOptions.duration ?? 3000,
         position: finalOptions.position || 'bottom',
         onHide: finalOptions.onHide,
