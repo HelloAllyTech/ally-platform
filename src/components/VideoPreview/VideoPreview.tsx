@@ -69,6 +69,7 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
         repeat
         muted={muted}
         controls={false}
+        disableAudioSessionManagement
       />
 
       {/* Play overlay - shown when video is paused */}

@@ -1,39 +1,142 @@
-## Contributing to Ally
+# Contributing Guidelines
 
-Thanks for your interest in contributing! We welcome issues, feature requests, and pull requests. Please note we have a code of conduct, please follow it in all your interactions with the project.
+Thank you for contributing to this project! Please follow these guidelines to maintain consistency across the codebase.
 
-### Getting Started
+## Git Conventions
 
-1. Fork the repo and create your branch from `main` (or the active development branch).
-2. Install dependencies: `npm install`
-3. iOS setup: `cd ios && pod install`
-4. Create `.env` from `env/.env.example`.
+### Branch Naming
 
-### Development Workflow
+Branches should follow this naming convention:
 
-- Write clear, focused commits following Conventional Commits.
-- Ensure code passes linting and type-checks: `npm run lint`.
-- Prefer small, incremental PRs with a clear scope.
+```
+<type>/<short-description>
+```
 
-### Coding Standards
+**Rules:**
 
-- TypeScript throughout the codebase.
-- Import order and grouping as described in `README.md`.
-- Avoid overly complex functions; prefer small, testable modules.
+- Use **hyphens** to separate words in the description (not underscores)
+- Keep descriptions short and descriptive
+- Use lowercase letters
 
-### Testing
+#### Branch Types
 
-- Add/adjust tests where meaningful. Run with `npm test`.
+| Type       | Purpose                                           |
+| ---------- | ------------------------------------------------- |
+| `feat`     | New feature implementation                        |
+| `fix`      | Bug fixes                                         |
+| `chore`    | Maintenance tasks, dependency updates             |
+| `refactor` | Code restructuring without changing functionality |
+| `docs`     | Documentation updates                             |
+| `test`     | Adding or updating tests                          |
+| `style`    | Code formatting, missing semicolons, etc.         |
+| `perf`     | Performance improvements                          |
+| `build`    | Build system or external dependency changes       |
+| `ci`       | CI/CD pipeline changes                            |
+| `revert`   | Reverting previous commits                        |
+| `hotfix`   | Critical fixes for production                     |
+
+#### Examples
+
+```
+feat/add-user-profile
+fix/login-error
+chore/update-dependencies
+refactor/auth-service
+docs/update-readme
+test/add-api-tests
+```
+
+### Commit Messages
+
+Follow the conventional commit format:
+
+```
+<type>: short summary
+```
+
+#### Guidelines
+
+- Use **imperative tone** (e.g., "add" not "added")
+- Keep the summary short and descriptive
+- First letter lowercase after the type
+- No period at the end
+
+#### Examples
+
+```
+feat: add user profile page
+fix: handle invalid token error
+refactor: optimize data fetching
+perf: improve image loading speed
+docs: update contribution guide
+test: add missing unit tests
+ci: update build pipeline
+style: fix code formatting
+chore: update dependencies to latest versions
+```
 
 ### Pull Requests
 
-When opening a PR, please:
+#### PR Title
 
-- Describe the problem and the solution.
-- Include screenshots or recordings for UI changes.
-- Link related issues using keywords (Fixes #123).
-- Check the PR template checklist.
+Use the same format as commit messages:
 
-### License
+```
+<type>: short summary
+```
 
-By contributing, you agree that your contributions will be licensed under the MIT License included in this repository.
+#### PR Description
+
+List your changes as clear bullet points:
+
+```markdown
+- Added user profile form and API integration
+- Updated validation for age and email
+- Fixed UI alignment in profile section
+```
+
+**Guidelines:**
+
+- Focus on **what** changed and **why** it matters
+- Keep points concise and actionable
+- Use past tense for completed work
+- Mention any breaking changes
+- Reference related issues if applicable
+
+#### Example PR
+
+**Title:**
+
+```
+feat: add user authentication system
+```
+
+**Description:**
+
+```markdown
+- Implemented JWT-based authentication
+- Added login and registration endpoints
+- Created middleware for protected routes
+- Updated user model with password hashing
+- Added authentication tests
+
+Closes #123
+```
+
+## Getting Started
+
+1. Fork the repository
+2. Create a new branch following the naming convention
+3. Make your changes
+4. Write clear commit messages
+5. Push your branch and create a pull request
+6. Wait for review and address any feedback
+
+## Code Review Process
+
+- All PRs require at least one approval
+- Address review comments promptly
+- Keep PRs focused and reasonably sized
+- Ensure all tests pass before requesting review
+
+Thank you for your contributions!

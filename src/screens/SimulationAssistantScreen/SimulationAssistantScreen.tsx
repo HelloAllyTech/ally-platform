@@ -57,9 +57,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
-  // Create a fresh Room instance per session (roomId) to avoid resource accumulation
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const room = useMemo(() => new Room(), [roomId]);
+  const [room] = useState<Room>(() => new Room());
 
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
@@ -140,19 +138,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const attempts = 3;
     for (let currAttempt = 0; currAttempt < attempts; currAttempt++) {
       try {
-        // Only start audio session on first attempt to avoid conflicts
-        if (currAttempt === 0) {
-          await AudioSession.startAudioSession();
-        }
+        await AudioSession.startAudioSession();
         await AudioSession.selectAudioOutput('speaker');
         break;
       } catch (error) {
         logger.error(`Failed to ensure speaker output: ${error}`);
-        // If first attempt fails, we may need to start session again
-        if (currAttempt > 0) {
-          await new Promise(res => setTimeout(res, 200));
-        }
       }
+      await new Promise(res => setTimeout(res, 200));
     }
   }, []);
 
@@ -201,28 +193,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
-  // Cleanup on component unmount to prevent resource leaks
-  useEffect(() => {
-    return () => {
-      const cleanup = async () => {
-        try {
-          // Disconnect room if still connected
-          if (room.state === 'connected' || room.state === 'connecting') {
-            await room.disconnect(true);
-          }
-          // Stop audio session to release resources
-          await AudioSession.stopAudioSession();
-        } catch (error) {
-          logger.error(`Cleanup error on unmount: ${error}`);
-        }
-      };
-      cleanup();
-    };
-  }, [room]);
-
   const configureAudioSession = async () => {
     try {
-      // Configure audio for both platforms
       await AudioSession.configureAudio({
         // Keep speaker output but engage inCommunication mode to help AEC
         android: {
@@ -254,13 +226,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const handleDisconnect = async () => {
     try {
       setIsDisconnecting(true);
-      await room.disconnect(true);
-      // Stop audio session to release iOS audio resources
-      try {
-        await AudioSession.stopAudioSession();
-      } catch (error) {
-        logger.error(`Failed to stop audio session: ${error}`);
-      }
+      await room.disconnect();
       await endScenarioSession({
         scenarioSessionId: roomId,
       });
