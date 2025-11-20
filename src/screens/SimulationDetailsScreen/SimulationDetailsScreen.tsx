@@ -264,7 +264,7 @@ const styles = ScaledSheet.create({
   },
   container: {
     paddingHorizontal: '16@ms',
-    paddingBottom: '16@ms',
+    paddingBottom: '90@ms',
   },
   cover: {
     width: '100%',
