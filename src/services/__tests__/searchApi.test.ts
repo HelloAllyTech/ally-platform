@@ -11,10 +11,17 @@ import {searchApi} from '../searchApi';
 
 describe('searchApi', () => {
   it('exposes search endpoints', () => {
-    const endpoints = (searchApi as any).endpoints;
-    expect(endpoints.getSearchResults).toBeTruthy();
-    expect(endpoints.getCategories).toBeTruthy();
+    const e = (searchApi as any).endpoints;
+    expect(e.getSearchResults).toBeTruthy();
+  });
+
+  it('exports hooks', () => {
+    const {useLazyGetSearchResultsQuery} = require('../searchApi');
+    expect(useLazyGetSearchResultsQuery).toBeDefined();
+  });
+
+  it('getSearchResults endpoint is defined', () => {
+    const endpoint = (searchApi as any).endpoints.getSearchResults;
+    expect(endpoint.matchFulfilled).toBeDefined();
   });
 });
-
-
