@@ -24,7 +24,7 @@ jest.mock('@/services', () => ({
   useLazyGetSimulationCreditsQuery: () => [mockGetSimulationCredits, {data: {creditLimit: 10, consumedCredits: 5, secondsAllowedPerCredit: 60}}],
 }));
 
-describe('useSimulationCredits extra', () => {
+describe('useSimulationCredits', () => {
   beforeEach(() => {
     mockDispatch.mockClear();
     mockGetSimulationCredits.mockClear();
@@ -42,5 +42,4 @@ describe('useSimulationCredits extra', () => {
 
   // Additional permission-absent scenarios are verified in slice tests; keep this suite focused and deterministic.
 });
-
 

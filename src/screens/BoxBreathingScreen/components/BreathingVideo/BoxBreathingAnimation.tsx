@@ -101,13 +101,16 @@ export const BoxBreathingAnimation = ({
   // Initialize track player
   useEffect(() => {
     const setup = async () => {
+      // Enable mix with others so audio doesn't interfere with microphone
+      SoundPlayer.setMixAudio(true);
       SoundPlayer.playAsset(require('../../../../assets/sounds/breath.mp3'));
-      SoundPlayer.setSpeaker(false);
       setIsPlayerReady(true);
     };
     setup();
     return () => {
       SoundPlayer.stop();
+      // Reset mix audio setting
+      SoundPlayer.setMixAudio(false);
     };
   }, []);
 
