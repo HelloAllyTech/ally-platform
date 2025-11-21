@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {
+  ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,13 +27,13 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   videoUrl,
   style,
   autoPlay = false,
-  showPlayIcon = true,
   muted = false,
   onPlayStateChange,
   shouldPause = false,
   testID,
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlay);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (shouldPause && isPlaying) {
@@ -56,7 +57,37 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   const handlePausePress = () => {
     const newPlayState = false;
     setIsPlaying(newPlayState);
+    setIsLoading(false);
     onPlayStateChange?.(newPlayState);
+  };
+
+  const handleVideoReady = () => {
+    setIsLoading(false);
+  };
+
+  const renderPlayPauseOverlay = () => {
+    if (isPlaying) {
+      return (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handlePausePress}
+          style={styles.videoPauseOverlay}
+          testID={`${testID}-pause-button`}
+        />
+      );
+    } else {
+      return (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handlePlayPress}
+          style={styles.videoOverlay}
+          testID={`${testID}-play-button`}>
+          <View style={styles.playIconContainer}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
   };
 
   return (
@@ -69,30 +100,17 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
         repeat
         muted={muted}
         controls={false}
-        disableAudioSessionManagement
+        audioOutput="speaker"
+        ignoreSilentSwitch="ignore"
+        onReadyForDisplay={handleVideoReady}
       />
 
-      {/* Play overlay - shown when video is paused */}
-      {!isPlaying && showPlayIcon && (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handlePlayPress}
-          style={styles.videoOverlay}
-          testID={`${testID}-play-button`}>
-          <View style={styles.playIconContainer}>
-            <Text style={styles.playIcon}>▶</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* Pause overlay - shown when video is playing */}
-      {isPlaying && (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handlePausePress}
-          style={styles.videoPauseOverlay}
-          testID={`${testID}-pause-button`}
-        />
+      {isLoading ? (
+        <View style={styles.videoOverlay} pointerEvents="none">
+          <ActivityIndicator size="large" color={colors.white} />
+        </View>
+      ) : (
+        renderPlayPauseOverlay()
       )}
     </View>
   );

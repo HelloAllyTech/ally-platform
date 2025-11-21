@@ -128,13 +128,16 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                   <Text style={styles.ratingText}>{getRatingText}</Text>
                 )}
                 {rating !== 5 && rating !== 0 && showChips && (
-                  <ChipGroup
-                    options={issueOptions}
-                    selectedValues={selectedIssues}
-                    onSelectionChange={handleIssueSelectionChange}
-                    title={t('FeedbackPopup.issueSelectionTitle')}
-                    testID={`${testID}-issue-chips`}
-                  />
+                  <>
+                    <ChipGroup
+                      options={issueOptions}
+                      selectedValues={selectedIssues}
+                      onSelectionChange={handleIssueSelectionChange}
+                      title={t('FeedbackPopup.issueSelectionTitle')}
+                      testID={`${testID}-issue-chips`}
+                    />
+                    <View style={styles.separator} />
+                  </>
                 )}
                 {(rating === 5 ||
                   !showChips ||
@@ -146,10 +149,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                     !placeholder && selectedIssues.length < 1,
                   )}
                 {note && note?.length > 0 && (
-                  <>
-                    <View style={styles.separator} />
-                    <Text style={styles.instructionText}>{note}</Text>
-                  </>
+                  <Text style={styles.instructionText}>{note}</Text>
                 )}
                 <PrimaryButton
                   label={t('FeedbackPopup.submitButton')}
