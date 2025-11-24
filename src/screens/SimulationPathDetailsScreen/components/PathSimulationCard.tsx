@@ -7,33 +7,12 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export interface PathSimulationCardProps {
-  /**
-   * Simulation order number (1, 2, 3, etc.)
-   */
   order: number;
-  /**
-   * Simulation title
-   */
   title: string;
-  /**
-   * Thumbnail image URL
-   */
   thumbnailUrl?: string | null;
-  /**
-   * Whether the simulation is locked
-   */
   isLocked?: boolean;
-  /**
-   * Whether the simulation is completed
-   */
   isCompleted?: boolean;
-  /**
-   * Whether this is the next simulation to do
-   */
   isNext?: boolean;
-  /**
-   * Callback when card is pressed
-   */
   onPress?: () => void;
 }
 

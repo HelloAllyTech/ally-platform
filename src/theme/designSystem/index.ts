@@ -2,14 +2,12 @@
  * Design System - Central Export
  *
  * This module exports all design system tokens:
- * - Colors (ACTIVE - integrated)
- * - Typography (declared, pending font setup)
- * - Spacing (declared for future use)
- * - Radius (declared for future use)
- * - Size (declared for future use)
+ * - Colors
+ * - Typography
+ * - Radius
+ * - Size
  */
 
-// Export color tokens (ACTIVE)
 export {
   dsColors,
   neutral,
@@ -49,10 +47,8 @@ export type {
   TypographyColors,
 } from './colors';
 
-// Export radius tokens (for future use)
 export {radius} from './radius';
 export type {Radius, RadiusKey, RadiusValue} from './radius';
 
-// Export size tokens (for future use)
 export {size} from './size';
 export type {Size, SizeKey, SizeValue} from './size';

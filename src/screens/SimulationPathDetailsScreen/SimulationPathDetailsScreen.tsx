@@ -36,14 +36,6 @@ export const SimulationPathDetailsScreen: React.FC<
   const {t} = useTranslate();
   const {pathId} = route.params;
 
-  /**
-   * TODO: When path details API is ready, this will automatically use it
-   * Currently uses mock implementation that fetches scenarios internally
-   * See src/services/simulationsApi.ts for API integration instructions
-   *
-   * Note: The API hook returns flattened data (not wrapped in .data) and
-   * scenarios are pre-sorted by order field via transformResponse
-   */
   const {
     data: pathData,
     isLoading,
@@ -54,10 +46,6 @@ export const SimulationPathDetailsScreen: React.FC<
     useState<PathScenario | null>(null);
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
-
-  /**
-   * Credits display logic - matches SimulationsScreen implementation
-   */
   const {credits, getCreditsInfo} = useSimulationCredits();
 
   useEffect(() => {
@@ -77,7 +65,6 @@ export const SimulationPathDetailsScreen: React.FC<
     closeActiveSimulationModal,
   } = useStartSimulation();
 
-  // Determine next simulation (first incomplete, unlocked simulation)
   const nextSimulation = pathData?.scenarios?.find(
     scenario =>
       scenario.status !== SessionItemStatus.COMPLETED &&
@@ -94,10 +81,6 @@ export const SimulationPathDetailsScreen: React.FC<
     navigation.goBack();
   };
 
-  /**
-   * Open modal with the next available simulation
-   * Called when user clicks Start (path not started) or Continue (path started)
-   */
   const handleStartPath = () => {
     if (nextSimulation) {
       setSelectedSimulation(nextSimulation);
