@@ -5,6 +5,12 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {SimulationDetailsScreen} from '../SimulationDetailsScreen';
 import {SCREEN_NAMES} from '../../../constants';
 
+// Mock React Navigation hooks
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useIsFocused: jest.fn(() => true),
+}));
+
 jest.mock('@/hooks', () => {
   const mockNavigate = jest.fn();
   const mockGoBack = jest.fn();

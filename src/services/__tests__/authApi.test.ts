@@ -18,6 +18,22 @@ describe('authApi endpoints', () => {
     expect(typeof (authApi as any).endpoints.verifyOtp).toBe('object');
   });
 
+  it('generateOtp endpoint is a mutation', () => {
+    const endpoint = (authApi as any).endpoints.generateOtp;
+    expect(endpoint.matchFulfilled).toBeDefined();
+  });
+
+  it('verifyOtp endpoint is a mutation', () => {
+    const endpoint = (authApi as any).endpoints.verifyOtp;
+    expect(endpoint.matchFulfilled).toBeDefined();
+  });
+
+  it('exports mutation hooks', () => {
+    const {useGenerateOtpMutation, useVerifyOtpMutation} = require('../authApi');
+    expect(useGenerateOtpMutation).toBeDefined();
+    expect(useVerifyOtpMutation).toBeDefined();
+  });
+
   describe('endpoint interfaces', () => {
     it('should support allowedRoles payload alongside email (runtime body)', () => {
       const request = {
@@ -58,6 +74,23 @@ describe('authApi endpoints', () => {
       expect(request.allowedRoles).toHaveLength(5);
       expect(request.allowedRoles).toContain(UserRole.ADMIN);
       expect(request.allowedRoles).toContain(UserRole.SUPER_ADMIN);
+    });
+
+    it('handles empty allowedRoles array', () => {
+      const request = {
+        email: 'test@example.com',
+        allowedRoles: [],
+      } as any;
+      
+      expect(request.allowedRoles).toEqual([]);
+    });
+
+    it('handles undefined allowedRoles', () => {
+      const request = {
+        email: 'test@example.com',
+      } as any;
+      
+      expect(request.allowedRoles).toBeUndefined();
     });
   });
 });

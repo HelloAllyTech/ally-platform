@@ -143,4 +143,41 @@ describe('useSearch extended', () => {
   });
 });
 
+describe('useSearch more cases', () => {
+  it('runs search via suggestion, pagination, and category flows', async () => {
+    const {result} = renderHook(() => useSearch());
+
+    await act(async () => {
+      await result.current.onPressSuggestion('ally');
+    });
+
+    expect(result.current.showSearchResults).toBe(true);
+    expect(result.current.resources.length).toBeGreaterThan(0);
+    expect(result.current.hasMore).toBe(true);
+
+    await act(async () => {
+      await result.current.onCategoryChange('General');
+    });
+
+    await act(async () => {
+      await result.current.handleEndReached();
+    });
+
+    // After loading more, resources should have appended
+    expect(result.current.resources.length).toBeGreaterThanOrEqual(5);
+
+    // Tab meta and handlers
+    act(() => {
+      result.current.handleTabChange(0);
+    });
+
+    // Reset and ensure state is cleared
+    act(() => {
+      result.current.resetSearch();
+    });
+    expect(result.current.resources.length).toBe(0);
+    expect(result.current.selectedCategory).toBe('All');
+  });
+});
+
 
