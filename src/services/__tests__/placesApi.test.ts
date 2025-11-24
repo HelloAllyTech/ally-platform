@@ -11,10 +11,24 @@ import {placesApi} from '../placesApi';
 
 describe('placesApi', () => {
   it('exposes places endpoints', () => {
-    const endpoints = (placesApi as any).endpoints;
-    expect(endpoints.getPlaces).toBeTruthy();
-    expect(endpoints.searchPlaces).toBeTruthy();
+    const e = (placesApi as any).endpoints;
+    expect(e.getPlaces).toBeTruthy();
+    expect(e.searchPlaces).toBeTruthy();
+  });
+
+  it('exports hooks', () => {
+    const {useGetPlacesQuery, useLazySearchPlacesQuery} = require('../placesApi');
+    expect(useGetPlacesQuery).toBeDefined();
+    expect(useLazySearchPlacesQuery).toBeDefined();
+  });
+
+  it('getPlaces endpoint is defined', () => {
+    const endpoint = (placesApi as any).endpoints.getPlaces;
+    expect(endpoint.matchFulfilled).toBeDefined();
+  });
+
+  it('searchPlaces endpoint is defined', () => {
+    const endpoint = (placesApi as any).endpoints.searchPlaces;
+    expect(endpoint.matchFulfilled).toBeDefined();
   });
 });
-
-

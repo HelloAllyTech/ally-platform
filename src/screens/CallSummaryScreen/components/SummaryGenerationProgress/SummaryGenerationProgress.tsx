@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import LottieView from 'lottie-react-native';
 import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
-import Video from 'react-native-video';
 
 import {
   HexagonCloseIcon,
@@ -116,11 +116,11 @@ export const SummaryGenerationProgress = ({
         <Image source={summaryGenerated} style={styles.marginV40} />
       ) : (
         <View style={styles.videoContainer}>
-          <Video
-            source={require('@/assets/videos/summaryLoading.mp4')}
+          <LottieView
+            source={require('@/assets/animations/summaryLoading.json')}
             style={styles.video}
-            repeat
-            muted
+            autoPlay
+            loop
             resizeMode="contain"
           />
         </View>
