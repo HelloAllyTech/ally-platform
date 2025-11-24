@@ -6,33 +6,12 @@ import Svg, {Circle} from 'react-native-svg';
 import {colors} from '@/theme';
 
 export interface CircularProgressProps {
-  /**
-   * Progress value from 0 to max
-   */
   progress: number;
-  /**
-   * Maximum value for progress (default: 100)
-   */
   max?: number;
-  /**
-   * Size of the circular progress in pixels (default: 40)
-   */
   size?: number;
-  /**
-   * Stroke width of the progress circle (default: 3)
-   */
   strokeWidth?: number;
-  /**
-   * Color of the progress arc (default: colors.blue)
-   */
   progressColor?: string;
-  /**
-   * Color of the background track (default: colors.lightGray4)
-   */
   trackColor?: string;
-  /**
-   * Optional content to render in the center
-   */
   children?: React.ReactNode;
 }
 
