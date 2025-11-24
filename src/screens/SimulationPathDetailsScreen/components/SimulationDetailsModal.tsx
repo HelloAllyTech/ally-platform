@@ -138,7 +138,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
         </View>
       </Modal>
 
-      {showActiveSimulationModal && activeSimulationId && (
+      {showActiveSimulationModal && !!activeSimulationId && (
         <ActiveSimulationModal
           visible={showActiveSimulationModal}
           onClose={onCloseActiveSimulationModal}

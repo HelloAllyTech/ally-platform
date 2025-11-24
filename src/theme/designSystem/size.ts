@@ -24,7 +24,6 @@ export const size = {
   xl5: 48,
 } as const;
 
-// Type export for TypeScript autocomplete
 export type Size = typeof size;
 export type SizeKey = keyof typeof size;
 export type SizeValue = (typeof size)[SizeKey];

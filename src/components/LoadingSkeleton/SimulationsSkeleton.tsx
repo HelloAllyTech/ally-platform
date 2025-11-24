@@ -95,7 +95,7 @@ const styles = ScaledSheet.create({
   coverSkeleton: {
     minHeight: '180@ms',
     backgroundColor: colors.ds.grey[100],
-    borderRadius: '16@ms', // xl2 radius
+    borderRadius: '16@ms',
     marginBottom: '8@ms',
     marginHorizontal: '8@ms',
     overflow: 'hidden',
@@ -107,7 +107,7 @@ const styles = ScaledSheet.create({
   titleSkeleton: {
     height: '20@ms',
     width: '80%',
-    backgroundColor: colors.lightGray8,
+    backgroundColor: colors.ds.grey[100],
     borderRadius: '4@ms',
     marginBottom: '4@ms',
     overflow: 'hidden',
@@ -115,7 +115,7 @@ const styles = ScaledSheet.create({
   titleSkeletonShort: {
     height: '20@ms',
     width: '60%',
-    backgroundColor: colors.lightGray8,
+    backgroundColor: colors.ds.grey[100],
     borderRadius: '4@ms',
     marginBottom: '8@ms',
     overflow: 'hidden',
@@ -126,6 +126,6 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: colors.ds.whiteAlpha[500],
   },
 });
