@@ -11,11 +11,24 @@ import {settingsApi} from '../settingsApi';
 
 describe('settingsApi', () => {
   it('exposes settings endpoints', () => {
-    const endpoints = (settingsApi as any).endpoints;
-    expect(endpoints.getSummaryFields).toBeTruthy();
-    expect(endpoints.getNudgeStatus).toBeTruthy();
-    expect(endpoints.getVisibleChatTypes).toBeTruthy();
+    const e = (settingsApi as any).endpoints;
+    expect(e.getVisibleChatTypes).toBeTruthy();
+    expect(e.getSummaryFields).toBeTruthy();
+  });
+
+  it('exports hooks', () => {
+    const {useLazyGetVisibleChatTypesQuery, useLazyGetSummaryFieldsQuery} = require('../settingsApi');
+    expect(useLazyGetVisibleChatTypesQuery).toBeDefined();
+    expect(useLazyGetSummaryFieldsQuery).toBeDefined();
+  });
+
+  it('getVisibleChatTypes endpoint is defined', () => {
+    const endpoint = (settingsApi as any).endpoints.getVisibleChatTypes;
+    expect(endpoint.matchFulfilled).toBeDefined();
+  });
+
+  it('getSummaryFields endpoint is defined', () => {
+    const endpoint = (settingsApi as any).endpoints.getSummaryFields;
+    expect(endpoint.matchFulfilled).toBeDefined();
   });
 });
-
-

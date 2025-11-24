@@ -37,3 +37,5 @@ export {DropdownMenu} from './DropdownMenu';
 export {EmptyState} from './EmptyState';
 export {FeedbackPopup} from './FeedbackPopup';
 export {TabView} from './TabView';
+export {VideoPreview} from './VideoPreview';
+export type {VideoPreviewProps} from './VideoPreview';

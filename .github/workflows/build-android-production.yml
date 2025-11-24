@@ -15,6 +15,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download Firebase config from S3 (Android Prod)
+        run: |
+          mkdir -p android/app/src/prod
+          aws s3 cp "${{ secrets.ANDROID_GOOGLE_SERVICES_S3_URI_PROD }}" "android/app/src/prod/google-services.json"
+
       - name: Install Java
         uses: actions/setup-java@v3
         with:
