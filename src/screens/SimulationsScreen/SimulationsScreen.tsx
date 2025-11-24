@@ -79,6 +79,7 @@ export const SimulationsScreen: React.FC = () => {
   const renderPathItem = ({item}: {item: SimulationPath}) => {
     const progress = item.completedScenarios;
     const total = item.totalScenarios;
+    const showProgress = !!progress && !!total;
 
     return (
       <SimulationCard
@@ -87,7 +88,7 @@ export const SimulationsScreen: React.FC = () => {
         coverImageUrl={item.coverImageUrl}
         onPress={() => handlePathPress(item)}
         rightAccessory={
-          progress > 0 && total > 0 ? (
+          showProgress ? (
             <View style={styles.progressContainer}>
               <CircularProgress
                 progress={progress}

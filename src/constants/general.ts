@@ -130,8 +130,9 @@ export const API_ROUTES = {
     SIMULATION_MESSAGES: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/messages`,
     SIMULATION_CREDITS: '/simulation-credits',
-    SCENARIO_PATHS: '/scenario-paths',
-    SIMULATION_PATH_DETAILS: (pathId: string) => `/scenario-paths/${pathId}`,
+    SCENARIO_PATHS: '/learn/scenario-paths',
+    SIMULATION_PATH_DETAILS: (pathId: string) =>
+      `/learn/scenario-paths/${pathId}`,
   },
 } as const;
 

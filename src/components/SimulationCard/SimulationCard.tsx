@@ -12,33 +12,12 @@ import {
 } from '@/theme';
 
 export interface SimulationCardProps {
-  /**
-   * Card title
-   */
   title: string;
-  /**
-   * Card description/subtitle
-   */
   description?: string;
-  /**
-   * Cover image URL
-   */
   coverImageUrl?: string | null;
-  /**
-   * Optional right accessory component (e.g., circular progress)
-   */
   rightAccessory?: React.ReactNode;
-  /**
-   * Callback when card is pressed
-   */
   onPress?: () => void;
-  /**
-   * Number of lines for title (default: 2)
-   */
   titleNumberOfLines?: number;
-  /**
-   * Number of lines for description (default: 3)
-   */
   descriptionNumberOfLines?: number;
 }
 

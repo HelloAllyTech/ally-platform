@@ -15,7 +15,10 @@ interface UseStartSimulationReturn {
   isMicPermissionGranted: boolean;
   activeSimulationId: string | null;
   showActiveSimulationModal: boolean;
-  startSimulation: (scenario: Scenario) => Promise<void>;
+  startSimulation: (
+    scenario: Scenario,
+    scenarioPathId?: string,
+  ) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
 }
@@ -56,7 +59,10 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
     setActiveSimulationId(null);
   };
 
-  const startSimulation = async (scenario: Scenario) => {
+  const startSimulation = async (
+    scenario: Scenario,
+    scenarioPathId?: string,
+  ) => {
     try {
       if (!isMicPermissionGranted) {
         const result = await request(MICROPHONE_PERMISSION);
@@ -86,6 +92,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
         scenarioId: scenario.id,
+        ...(scenarioPathId && {scenarioPathId}),
       }).unwrap();
 
       if (startResp) {

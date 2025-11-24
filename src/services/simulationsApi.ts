@@ -1,9 +1,4 @@
-import {
-  API_METHODS,
-  API_ROUTES,
-  SortOrder,
-  USE_MOCK_SCENARIO_PATHS,
-} from '@/constants';
+import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
   EndScenarioSessionResponse,
@@ -15,14 +10,11 @@ import {
   SimulationCredits,
   SimulationPath,
   SimulationPathDetails,
+  SimulationPathsResponse,
   SimulationSummaryData,
 } from '@/types';
 
 import {api} from './api';
-import {
-  getMockPathDetailsById,
-  MOCK_SCENARIO_PATHS,
-} from './mockScenarioPathsData';
 
 export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
@@ -76,12 +68,12 @@ export const simulationsApi = api.injectEndpoints({
 
     startScenarioSession: builder.mutation<
       ScenarioSessionStartResponse,
-      {scenarioId: number}
+      {scenarioId: number; scenarioPathId?: string}
     >({
-      query: ({scenarioId}) => ({
+      query: ({scenarioId, scenarioPathId}) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
-        body: {scenarioId},
+        body: {scenarioId, ...(scenarioPathId && {scenarioPathId})},
       }),
     }),
 
@@ -104,114 +96,26 @@ export const simulationsApi = api.injectEndpoints({
       providesTags: ['SimulationCredits'],
     }),
 
-    /**
-     * Get simulation paths - Placeholder for future API integration
-     * Currently uses scenarios data as a temporary solution
-     * When the actual API is ready, only the query URL needs to be updated
-     */
     getSimulationPaths: builder.query<SimulationPath[], void>({
-      queryFn: async (_arg, _queryApi, _extraOptions, fetchWithBQ) => {
-        if (USE_MOCK_SCENARIO_PATHS) {
-          return {data: MOCK_SCENARIO_PATHS};
-        }
-
-        try {
-          const result = await fetchWithBQ({
-            url: API_ROUTES.LEARN.SCENARIO_PATHS,
-            method: API_METHODS.GET,
-          });
-
-          if (result.error) {
-            return {error: result.error};
-          }
-
-          return {data: result.data as SimulationPath[]};
-        } catch (error) {
-          return {
-            error: {
-              status: 'CUSTOM_ERROR',
-              error: String(error),
-            },
-          };
-        }
-      },
+      query: () => ({
+        url: API_ROUTES.LEARN.SCENARIO_PATHS,
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: SimulationPathsResponse) => response.data,
     }),
 
-    /**
-     * Get simulation path details by ID
-     *
-     * MOCK IMPLEMENTATION - Reuses scenarios API
-     *
-     * TODO: When real API is ready, replace with:
-     * ```
-     * getSimulationPathDetails: builder.query<SimulationPath, {pathId: string}>({
-     *   query: ({pathId}) => ({
-     *     url: API_ROUTES.LEARN.SIMULATION_PATH_DETAILS(pathId), // Update route
-     *     method: API_METHODS.GET,
-     *   }),
-     * }),
-     * ```
-     *
-     * The API should return SimulationPath with:
-     * - Basic path info (id, title, description, coverImageUrl)
-     * - Array of simulations with their status (completed, locked, etc.)
-     * - Progress stats (completedCount, totalCount)
-     */
     getSimulationPathDetails: builder.query<
       SimulationPathDetails,
       {pathId: string}
     >({
-      queryFn: async ({pathId}, _queryApi, _extraOptions, fetchWithBQ) => {
-        if (USE_MOCK_SCENARIO_PATHS) {
-          const mockData = getMockPathDetailsById(pathId);
-          if (!mockData) {
-            return {
-              error: {
-                status: 'CUSTOM_ERROR' as const,
-                error: 'Path not found',
-              },
-            };
-          }
-          // Flatten the data structure and sort scenarios by order
-          return {
-            data: {
-              ...mockData,
-              scenarios: [...mockData.scenarios].sort(
-                (a, b) => a.order - b.order,
-              ),
-            },
-          };
-        }
-
-        try {
-          const result = await fetchWithBQ({
-            url: API_ROUTES.LEARN.SIMULATION_PATH_DETAILS(pathId),
-            method: API_METHODS.GET,
-          });
-
-          if (result.error) {
-            return {error: result.error};
-          }
-
-          const response = result.data as SimulationPathDetails;
-          // Flatten the data structure and sort scenarios by order
-          return {
-            data: {
-              ...response,
-              scenarios: [...response.scenarios].sort(
-                (a, b) => a.order - b.order,
-              ),
-            },
-          };
-        } catch (error) {
-          return {
-            error: {
-              status: 'CUSTOM_ERROR',
-              error: String(error),
-            },
-          };
-        }
-      },
+      query: ({pathId}) => ({
+        url: API_ROUTES.LEARN.SIMULATION_PATH_DETAILS(pathId),
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: SimulationPathDetails) => ({
+        ...response,
+        scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+      }),
     }),
   }),
 });

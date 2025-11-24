@@ -31,7 +31,7 @@ export const UpNextSimulationCard: React.FC<UpNextSimulationCardProps> = ({
             {upNext.order}
           </Text>
           <Text style={styles.title} numberOfLines={2}>
-            {upNext.scenarioTitle}
+            {upNext.title}
           </Text>
         </View>
       </View>
