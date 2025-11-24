@@ -23,7 +23,7 @@ import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useGetSimulationPathDetailsQuery} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import {PathScenario, ScenarioPathStatus} from '@/types';
+import {PathScenario, SessionItemStatus} from '@/types';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
@@ -80,8 +80,8 @@ export const SimulationPathDetailsScreen: React.FC<
   // Determine next simulation (first incomplete, unlocked simulation)
   const nextSimulation = pathData?.scenarios?.find(
     scenario =>
-      scenario.status !== ScenarioPathStatus.COMPLETED &&
-      scenario.status !== ScenarioPathStatus.LOCKED,
+      scenario.status !== SessionItemStatus.COMPLETED &&
+      scenario.status !== SessionItemStatus.LOCKED,
   );
 
   const isPathStarted = (pathData?.completedScenarios ?? 0) > 0;
@@ -111,7 +111,7 @@ export const SimulationPathDetailsScreen: React.FC<
    * Only unlocked simulations are clickable (locked ones have disabled press)
    */
   const handleSimulationPress = (scenario: PathScenario) => {
-    if (scenario.status === ScenarioPathStatus.LOCKED) {
+    if (scenario.status === SessionItemStatus.LOCKED) {
       return;
     }
 
@@ -131,13 +131,18 @@ export const SimulationPathDetailsScreen: React.FC<
    */
   const handleStartSimulation = () => {
     if (selectedSimulation) {
-      startSimulation({
-        id: selectedSimulation.scenarioId,
-        title: selectedSimulation.scenarioTitle || '',
-        description: selectedSimulation.description || '',
-        coverImageUrl: selectedSimulation.coverImageUrl,
-        coverVideoUrl: selectedSimulation.coverVideoUrl,
-      });
+      handleCloseModal();
+
+      startSimulation(
+        {
+          id: selectedSimulation.scenarioId,
+          title: selectedSimulation.title || '',
+          description: selectedSimulation.description || '',
+          coverImageUrl: selectedSimulation.coverImageUrl,
+          coverVideoUrl: selectedSimulation.coverVideoUrl,
+        },
+        pathId,
+      );
     }
   };
 
@@ -164,8 +169,8 @@ export const SimulationPathDetailsScreen: React.FC<
     </View>
   );
 
-  const showProgressBar =
-    !!pathData?.completedScenarios && !!pathData?.totalScenarios;
+  const totalScenarios = pathData?.scenarios?.length ?? 0;
+  const showProgressBar = !!pathData?.completedScenarios && totalScenarios > 0;
 
   const renderListHeaderComponent = () => {
     if (!pathData) return null;
@@ -180,7 +185,7 @@ export const SimulationPathDetailsScreen: React.FC<
           />
         )}
         <View style={styles.listHeaderContent}>
-          <Text style={styles.pathTitle}>{pathData.name}</Text>
+          <Text style={styles.pathTitle}>{pathData.title}</Text>
           <Text style={styles.pathDescription}>
             {pathData.description ?? ''}
           </Text>
@@ -190,7 +195,7 @@ export const SimulationPathDetailsScreen: React.FC<
             <View style={styles.progressBarContainer}>
               <ProgressBar
                 current={pathData.completedScenarios}
-                total={pathData.totalScenarios}
+                total={totalScenarios}
               />
             </View>
           )}
@@ -218,15 +223,15 @@ export const SimulationPathDetailsScreen: React.FC<
     item: PathScenario;
     index: number;
   }) => {
-    const isNext = nextSimulation?.sessionItemId === item.sessionItemId;
+    const isNext = nextSimulation?.id === item.id;
 
     return (
       <PathSimulationCard
         order={item.order}
-        title={item.scenarioTitle ?? ''}
+        title={item.title ?? ''}
         thumbnailUrl={item.coverImageUrl}
-        isLocked={item.status === ScenarioPathStatus.LOCKED}
-        isCompleted={item.status === ScenarioPathStatus.COMPLETED}
+        isLocked={item.status === SessionItemStatus.LOCKED}
+        isCompleted={item.status === SessionItemStatus.COMPLETED}
         isNext={isNext}
         onPress={() => handleSimulationPress(item)}
       />
@@ -257,7 +262,7 @@ export const SimulationPathDetailsScreen: React.FC<
       ) : (
         <FlatList
           data={pathData?.scenarios || []}
-          keyExtractor={item => item.sessionItemId.toString()}
+          keyExtractor={item => item.id.toString()}
           renderItem={renderSimulationItem}
           ListHeaderComponent={renderListHeaderComponent}
           contentContainerStyle={styles.scrollContent}

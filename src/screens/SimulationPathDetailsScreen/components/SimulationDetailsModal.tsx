@@ -44,8 +44,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   if (!simulation) {
     return null;
   }
-  const {coverImageUrl, coverVideoUrl, scenarioTitle, description, order} =
-    simulation;
+  const {coverImageUrl, coverVideoUrl, title, description, order} = simulation;
 
   return (
     <>
@@ -56,7 +55,6 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
         onRequestClose={onClose}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContainer}>
-            {/* Loading Overlay */}
             {isCreatingRoom && (
               <View style={styles.loadingOverlay}>
                 <ActivityIndicator
@@ -69,7 +67,6 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               </View>
             )}
 
-            {/* Header - Fixed */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>
                 {t('Simulations.start')}{' '}
@@ -89,9 +86,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Content Container - Bordered card with image, title, description */}
             <View style={styles.contentContainer}>
-              {/* Fixed Media Section (Video or Image) - Not Scrollable */}
               <View style={styles.mediaContainer}>
                 {coverVideoUrl ? (
                   <VideoPreview
@@ -108,7 +103,6 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
                 ) : null}
               </View>
 
-              {/* Scrollable Content (Title + Description only) */}
               <ScrollView
                 style={styles.scrollContainer}
                 contentContainerStyle={styles.scrollContent}
@@ -117,8 +111,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
                 <Text style={styles.orderLabel}>
                   {t('Simulations.simulation')} {order}
                 </Text>
-                {/* Title */}
-                <Text style={styles.title}>{scenarioTitle}</Text>
+                <Text style={styles.title}>{title}</Text>
 
                 {/* Label */}
                 <Text style={styles.scenarioLabel}>
@@ -126,23 +119,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
                 </Text>
 
                 {/* Description */}
-                {/* TODO: Replace with actual description when ready */}
-                {/* <Text style={styles.description}>{description}</Text> */}
-                <Text style={styles.description}>
-                  This is a dummy description to demonstrate scrolling behavior.
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-                  do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                  Ut enim ad minim veniam, quis nostrud exercitation ullamco
-                  laboris nisi ut aliquip ex ea commodo consequat. Duis aute
-                  irure dolor in reprehenderit in voluptate velit esse cillum
-                  dolore eu fugiat nulla pariatur. Excepteur sint occaecat
-                  cupidatat non proident, sunt in culpa qui officia deserunt
-                  mollit anim id est laborum. Sed ut perspiciatis unde omnis
-                  iste natus error sit voluptatem accusantium doloremque
-                  laudantium, totam rem aperiam, eaque ipsa quae ab illo
-                  inventore veritatis et quasi architecto beatae vitae dicta
-                  sunt explicabo.
-                </Text>
+                <Text style={styles.description}>{description}</Text>
               </ScrollView>
             </View>
 
@@ -161,7 +138,6 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
         </View>
       </Modal>
 
-      {/* Active Simulation Conflict Modal */}
       {showActiveSimulationModal && activeSimulationId && (
         <ActiveSimulationModal
           visible={showActiveSimulationModal}

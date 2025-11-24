@@ -50,6 +50,3 @@ export enum SimulationTabs {
   SIMULATIONS = 'SIMULATIONS',
   PATHS = 'PATHS',
 }
-
-// TODO: Remove this once the real API endpoints are ready
-export const USE_MOCK_SCENARIO_PATHS = true;

@@ -118,7 +118,7 @@ interface SummaryMetadata {
 
 export interface UpNextSimulation {
   scenarioId: number;
-  scenarioTitle: string;
+  title: string;
   description: string;
   coverImageUrl?: string;
   coverVideoUrl?: string;
@@ -180,48 +180,36 @@ export type LiveEventPayload = {
   timestamp?: string;
 } | null;
 
-/**
- * Simulation Path Types - API Contract
- * These types match the exact API contract for scenario paths
- */
-
-/**
- * Status of a scenario within a path
- */
-export enum ScenarioPathStatus {
-  COMPLETED = 'COMPLETED',
+export enum SessionItemStatus {
   LOCKED = 'LOCKED',
-  IN_PROGRESS = 'IN_PROGRESS',
+  UNLOCKED = 'UNLOCKED',
+  COMPLETED = 'COMPLETED',
 }
 
-/**
- * Represents a single scenario within a path (from API)
- * API Endpoint: GET /scenario-paths/:pathId
- */
 export interface PathScenario {
-  sessionItemId: number;
+  id: string;
   scenarioId: number;
-  coverImageUrl: string;
-  coverVideoUrl?: string;
-  description: string;
-  scenarioTitle: string;
   order: number;
-  status: ScenarioPathStatus;
+  messageTitle?: string;
+  messageContent?: string;
+  minimumScore?: number;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  sessionId: string | null;
+  status: SessionItemStatus;
 }
 
-/**
- * Represents a simulation path with multiple scenarios (from API)
- * API Endpoint: GET /scenario-paths/:pathId
- */
 export interface SimulationPathDetails {
   id: string;
-  name: string;
-  description: string;
-  coverImageUrl: string;
-  userId: number;
-  completedAt: string | null;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  status: string;
+  isGlobal: boolean;
   completedScenarios: number;
-  totalScenarios: number;
+  completedAt: Date | null;
   scenarios: PathScenario[];
 }
 
@@ -229,8 +217,12 @@ export interface SimulationPath {
   id: string;
   title: string;
   description?: string;
-  coverImageUrl: string;
+  coverImageUrl?: string;
   totalScenarios: number;
-  sessionStatus: ScenarioPathStatus;
-  completedScenarios: number;
+  completedScenarios?: number;
+}
+
+export interface SimulationPathsResponse {
+  data: SimulationPath[];
+  count: number;
 }

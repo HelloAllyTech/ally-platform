@@ -65,43 +65,46 @@ const mockNavigation = {
   navigate: jest.fn(),
 };
 
-// Mock data is now flattened (not wrapped in .data) to match API transformResponse
+// Mock data matches backend API structure
 const mockPathData = {
   id: 'test-path-id',
-  name: 'Test Path',
+  title: 'Test Path',
   description: 'A comprehensive test path for learning and development',
   coverImageUrl: 'https://example.com/cover.jpg',
-  userId: 1,
+  status: 'ACTIVE',
+  isGlobal: true,
   completedAt: null,
   completedScenarios: 2,
-  totalScenarios: 5,
   scenarios: [
     {
-      sessionItemId: 1,
+      id: 'item-1',
       scenarioId: 101,
+      order: 1,
       coverImageUrl: 'https://example.com/sim1.jpg',
       coverVideoUrl: 'https://example.com/video1.mp4',
       description: 'Simulation 1 description',
-      scenarioTitle: 'Simulation 1',
-      order: 100,
+      title: 'Simulation 1',
+      sessionId: 'session-1',
       status: 'COMPLETED' as const,
     },
     {
-      sessionItemId: 2,
+      id: 'item-2',
       scenarioId: 102,
+      order: 2,
       coverImageUrl: 'https://example.com/sim2.jpg',
       description: 'Simulation 2 description',
-      scenarioTitle: 'Simulation 2',
-      order: 200,
-      status: 'IN_PROGRESS' as const,
+      title: 'Simulation 2',
+      sessionId: 'session-2',
+      status: 'UNLOCKED' as const,
     },
     {
-      sessionItemId: 3,
+      id: 'item-3',
       scenarioId: 103,
+      order: 3,
       coverImageUrl: 'https://example.com/sim3.jpg',
       description: 'Simulation 3 description',
-      scenarioTitle: 'Simulation 3',
-      order: 300,
+      title: 'Simulation 3',
+      sessionId: null,
       status: 'LOCKED' as const,
     },
   ],
@@ -176,7 +179,7 @@ describe('SimulationPathDetailsScreen', () => {
     );
 
     expect(getByText('Test Path')).toBeTruthy();
-    expect(getByText('2 of 5 completed')).toBeTruthy();
+    expect(getByText('2 of 3 completed')).toBeTruthy();
   });
 
   it('should render "Start" button when path is not started', () => {
