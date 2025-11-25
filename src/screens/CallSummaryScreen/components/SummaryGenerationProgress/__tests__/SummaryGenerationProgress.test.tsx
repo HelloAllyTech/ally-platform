@@ -3,7 +3,7 @@ import {render} from '@testing-library/react-native';
 
 import {SummaryGenerationProgress} from '../SummaryGenerationProgress';
 
-jest.mock('react-native-video', () => 'Video');
+jest.mock('lottie-react-native', () => 'LottieView');
 
 jest.mock('@/assets', () => ({
   HexagonCloseIcon: () => null,

@@ -10,11 +10,12 @@ import {
 } from '@sayem314/react-native-keep-awake';
 import {Room, RoomEvent} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {SafeAreaView, Text, View} from 'react-native';
+import {BackHandler, SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {useErrorToast} from '@/components';
+import {EndSessionIcon} from '@/assets/icons';
+import {IllustratedModal, useErrorToast} from '@/components';
 import {
   MINUTES_IN_MS,
   SCREEN_NAMES,
@@ -65,6 +66,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isControlButtonMaximized, setIsControlButtonMaximized] =
     useState<boolean>(false);
+  const [showBackPressConfirmation, setShowBackPressConfirmation] =
+    useState<boolean>(false);
+  const isSimulationInProgress = !isConnecting && !isDisconnecting;
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -83,6 +87,21 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       deactivateKeepAwake();
     };
   }, []);
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (isSimulationInProgress) {
+          setShowBackPressConfirmation(true);
+          return true;
+        }
+        return false;
+      },
+    );
+
+    return () => backHandler.remove();
+  }, [isSimulationInProgress]);
 
   useEffect(() => {
     // Show the ending-soon modal at 29 minutes 30 seconds from the start time
@@ -117,7 +136,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const ensureSpeakerOutput = useCallback(async () => {
     // Try a few times with small delays; OEM skins sometimes override routing during focus changes
     const attempts = 3;
-    for (let i = 0; i < attempts; i++) {
+    for (let currAttempt = 0; currAttempt < attempts; currAttempt++) {
       try {
         await AudioSession.startAudioSession();
         await AudioSession.selectAudioOutput('speaker');
@@ -208,15 +227,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
-      const response = await endScenarioSession({
+      await endScenarioSession({
         scenarioSessionId: roomId,
       });
-      if (!response.error) {
-        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-          simulationId: roomId,
-        });
-      }
     } finally {
+      navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+        simulationId: roomId,
+      });
       setIsMicEnabled(false);
       setIsDisconnecting(false);
     }
@@ -251,8 +268,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       </View>
     );
   };
-
-  const isSimulationInProgress = !isConnecting && !isDisconnecting;
 
   return (
     <SafeAreaView
@@ -306,6 +321,18 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             description={t('SimulationAssistant.sessionWillEnd')}
             onContinue={() => setShowEndingSoon(false)}
             onEndSession={handleDisconnect}
+          />
+
+          <IllustratedModal
+            visible={showBackPressConfirmation}
+            onClose={() => setShowBackPressConfirmation(false)}
+            description={t('SimulationAssistant.endSimulationConfirmation')}
+            actionButtonText={t('SimulationAssistant.endSimulation')}
+            titleMain={t('ListeningScreen.end')}
+            titleItalic={t('Simulations.simulation')}
+            onActionPress={handleDisconnect}
+            actionButtonColor={colors.brightRed}
+            illustration={<EndSessionIcon />}
           />
         </View>
         <ControlButtons

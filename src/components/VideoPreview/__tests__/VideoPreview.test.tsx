@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {VideoPreview} from '../VideoPreview';
 
@@ -19,15 +19,23 @@ describe('VideoPreview', () => {
     expect(videoComponent.props.controls).toBe(false);
   });
 
-  it('shows play button overlay when video is paused', () => {
-    const {getByTestId} = render(
+  it('shows play button overlay when video is paused', async () => {
+    const {getByTestId, UNSAFE_getByType} = render(
       <VideoPreview videoUrl={mockVideoUrl} testID="video-preview" />,
     );
 
-    expect(getByTestId('video-preview-play-button')).toBeTruthy();
+    // Simulate video ready
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    await act(async () => {
+      videoComponent.props.onReadyForDisplay();
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('video-preview-play-button')).toBeTruthy();
+    });
   });
 
-  it('toggles video playback when play button is pressed', () => {
+  it('toggles video playback when play button is pressed', async () => {
     const onPlayStateChange = jest.fn();
     const {getByTestId, queryByTestId, UNSAFE_getByType} = render(
       <VideoPreview
@@ -37,21 +45,28 @@ describe('VideoPreview', () => {
       />,
     );
 
-    // Initially paused
-    expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+    // Simulate video ready
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    await act(async () => {
+      videoComponent.props.onReadyForDisplay();
+    });
+
+    // Wait for loading to finish and play button to appear
+    await waitFor(() => {
+      expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+    });
 
     // Press play
     fireEvent.press(getByTestId('video-preview-play-button'));
 
     // Now playing
-    const videoComponent = UNSAFE_getByType('Video' as any);
     expect(videoComponent.props.paused).toBe(false);
     expect(onPlayStateChange).toHaveBeenCalledWith(true);
     expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
     expect(queryByTestId('video-preview-play-button')).toBeNull();
   });
 
-  it('pauses video when pause overlay is pressed', () => {
+  it('pauses video when pause overlay is pressed', async () => {
     const onPlayStateChange = jest.fn();
     const {getByTestId, queryByTestId, UNSAFE_getByType} = render(
       <VideoPreview
@@ -62,28 +77,47 @@ describe('VideoPreview', () => {
       />,
     );
 
-    // Initially playing
-    expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+    // Simulate video ready (this will hide loading and show pause button)
+    const videoComponent = UNSAFE_getByType('Video' as any);
+    await act(async () => {
+      videoComponent.props.onReadyForDisplay();
+    });
+
+    // Wait for pause button to appear
+    await waitFor(() => {
+      expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+    });
 
     // Press pause
     fireEvent.press(getByTestId('video-preview-pause-button'));
 
     // Now paused
-    const videoComponent = UNSAFE_getByType('Video' as any);
     expect(videoComponent.props.paused).toBe(true);
     expect(onPlayStateChange).toHaveBeenCalledWith(false);
-    expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+    
+    await waitFor(() => {
+      expect(queryByTestId('video-preview-play-button')).toBeTruthy();
+    });
     expect(queryByTestId('video-preview-pause-button')).toBeNull();
   });
 
-  it('autoplays when autoPlay prop is true', () => {
+  it('autoplays when autoPlay prop is true', async () => {
     const {UNSAFE_getByType, queryByTestId} = render(
       <VideoPreview videoUrl={mockVideoUrl} autoPlay testID="video-preview" />,
     );
 
     const videoComponent = UNSAFE_getByType('Video' as any);
     expect(videoComponent.props.paused).toBe(false);
-    expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+
+    // Simulate video ready
+    await act(async () => {
+      videoComponent.props.onReadyForDisplay();
+    });
+
+    // Wait for pause button to appear (loading should be hidden)
+    await waitFor(() => {
+      expect(queryByTestId('video-preview-pause-button')).toBeTruthy();
+    });
   });
 
   it('hides play icon when showPlayIcon is false', () => {

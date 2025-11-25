@@ -19,8 +19,10 @@ jest.mock('@livekit/react-native', () => ({
   __esModule: true,
   AudioSession: {
     startAudioSession: jest.fn().mockResolvedValue(undefined),
+    stopAudioSession: jest.fn().mockResolvedValue(undefined),
     selectAudioOutput: jest.fn().mockResolvedValue(undefined),
     configureAudio: jest.fn().mockResolvedValue(undefined),
+    setAppleAudioConfiguration: jest.fn().mockResolvedValue(undefined),
   },
   AndroidAudioTypePresets: {
     media: {},
@@ -123,6 +125,7 @@ jest.mock('@/components', () => {
       </View>
     ),
     IllustratedActionModal: () => null,
+    IllustratedModal: (props: any) => (props.visible ? <View testID="illustrated-modal" /> : null),
     EndingSoonModal: (props: any) => (props.visible ? <View testID="ending-soon" /> : null),
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
@@ -185,6 +188,15 @@ jest.mock('@/utils', () => ({
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (k: string) => k}),
 }));
+
+jest.mock('@/assets/icons', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    __esModule: true,
+    EndSessionIcon: () => <View testID="end-session-icon" />,
+  };
+});
 
 const baseRouteParams = {
   roomData: {
