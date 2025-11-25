@@ -1,6 +1,6 @@
 import React from 'react';
 import {act, render, waitFor} from '@testing-library/react-native';
-import {Animated} from 'react-native';
+import {Animated, Platform} from 'react-native';
 
 import {BoxBreathingAnimation} from '../BoxBreathingAnimation';
 
@@ -24,7 +24,7 @@ jest.mock('react-native-reanimated', () => {
 jest.mock('react-native-sound-player', () => {
   const mockSoundPlayer = {
     playAsset: jest.fn(),
-    setSpeaker: jest.fn(),
+    setMixAudio: jest.fn(),
     seek: jest.fn(),
     play: jest.fn(),
     pause: jest.fn(),
@@ -50,13 +50,25 @@ describe('BoxBreathingAnimation', () => {
     animationDuration: 4000,
   };
 
+  const originalPlatformOS = Platform.OS;
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+
+    // Ensure tests run with Android platform semantics so SoundPlayer logic is exercised
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      get: () => 'android',
+    });
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      get: () => originalPlatformOS,
+    });
   });
 
   it('renders correctly with default props', () => {
@@ -73,8 +85,8 @@ describe('BoxBreathingAnimation', () => {
     const SoundPlayer = require('react-native-sound-player');
     render(<BoxBreathingAnimation {...defaultProps} />);
 
+    expect(SoundPlayer.setMixAudio).toHaveBeenCalledWith(true);
     expect(SoundPlayer.playAsset).toHaveBeenCalledWith('test-audio-file');
-    expect(SoundPlayer.setSpeaker).toHaveBeenCalledWith(false);
   });
 
   it('handles play/pause state changes', () => {
@@ -153,5 +165,6 @@ describe('BoxBreathingAnimation', () => {
     unmount();
 
     expect(SoundPlayer.stop).toHaveBeenCalled();
+    expect(SoundPlayer.setMixAudio).toHaveBeenCalledWith(false);
   });
 });
