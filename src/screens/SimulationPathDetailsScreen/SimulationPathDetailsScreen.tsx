@@ -21,9 +21,11 @@ import {EmptyState} from '@/components/EmptyState/EmptyState';
 import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
 import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {
   useCreatePathSessionMutation,
   useGetSimulationPathDetailsQuery,
+  useLazyGetScenarioSessionByPathItemQuery,
 } from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {PathScenario, SessionItemStatus} from '@/types';
@@ -49,6 +51,9 @@ export const SimulationPathDetailsScreen: React.FC<
 
   const [createPathSession, {isLoading: isCreatingSession}] =
     useCreatePathSessionMutation();
+
+  const [getScenarioSessionByPathItem] =
+    useLazyGetScenarioSessionByPathItemQuery();
 
   const [selectedSimulation, setSelectedSimulation] =
     useState<PathScenario | null>(null);
@@ -122,7 +127,7 @@ export const SimulationPathDetailsScreen: React.FC<
    * Handle file icon press - navigate to simulation feedback screen
    * Only available for completed simulations
    */
-  const handleFileIconPress = (scenario: PathScenario) => {
+  const handleFileIconPress = async (scenario: PathScenario) => {
     if (
       scenario.status !== SessionItemStatus.COMPLETED ||
       !scenario.sessionId
@@ -130,11 +135,26 @@ export const SimulationPathDetailsScreen: React.FC<
       return;
     }
 
-    navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-      pathSessionItemId: scenario.sessionId,
-      pathId,
-      fromLogs: true,
-    });
+    try {
+      // Fetch the actual scenario session ID using the path session item ID
+      const response = await getScenarioSessionByPathItem({
+        pathSessionItemId: scenario.sessionId,
+      }).unwrap();
+
+      if (response?.id) {
+        // Navigate to feedback screen with the actual scenario session ID
+        navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          scenarioSessionId: response.id,
+          pathSessionItemId: scenario.sessionId,
+          pathId,
+          fromLogs: true,
+        });
+      } else {
+        showToast('Failed to load simulation details', 'error');
+      }
+    } catch (err) {
+      showToast(getErrorDetails(err)?.message, 'error');
+    }
   };
 
   /**
@@ -159,13 +179,9 @@ export const SimulationPathDetailsScreen: React.FC<
         },
         selectedSimulation.sessionId || undefined,
         pathId,
-      )
-        .then(() => {
-          handleCloseModal();
-        })
-        .catch(err => {
-          showToast(getErrorDetails(err)?.message, 'error');
-        });
+      ).finally(() => {
+        handleCloseModal();
+      });
     }
   };
 
@@ -301,10 +317,16 @@ export const SimulationPathDetailsScreen: React.FC<
         onClose={handleCloseModal}
         onStartSimulation={handleStartSimulation}
         isCreatingRoom={isCreatingRoom}
-        showActiveSimulationModal={showActiveSimulationModal}
-        activeSimulationId={activeSimulationId}
-        onCloseActiveSimulationModal={closeActiveSimulationModal}
       />
+
+      {/* Active Simulation Modal - Separate from Details Modal */}
+      {showActiveSimulationModal && !!activeSimulationId && (
+        <ActiveSimulationModal
+          visible={showActiveSimulationModal}
+          onClose={closeActiveSimulationModal}
+          scenarioSessionId={activeSimulationId}
+        />
+      )}
 
       {/* Low Credits Modal */}
       {credits && getCreditsInfo && (
