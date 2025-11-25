@@ -14,6 +14,7 @@ export interface PathSimulationCardProps {
   isCompleted?: boolean;
   isNext?: boolean;
   onPress?: () => void;
+  onFileIconPress?: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
   isCompleted = false,
   isNext = false,
   onPress,
+  onFileIconPress,
 }) => {
   const {t} = useTranslate();
 
@@ -78,7 +80,7 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
           )}
           {isNext && (
             <View style={styles.nextBadge}>
-              <Text style={styles.nextBadgeText}>{t('Simulations.next')}</Text>
+              <Text style={styles.nextBadgeText}>{t('Common.next')}</Text>
             </View>
           )}
         </View>
@@ -89,9 +91,13 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
 
       {/* FileIcon for completed simulations - placed at right end */}
       {isCompleted && (
-        <View style={styles.fileIconContainer}>
+        <TouchableOpacity
+          style={styles.fileIconContainer}
+          onPress={onFileIconPress}
+          disabled={!onFileIconPress}
+          activeOpacity={0.7}>
           <FileIcon width={18} height={18} />
-        </View>
+        </TouchableOpacity>
       )}
     </TouchableOpacity>
   );
