@@ -39,3 +39,5 @@ export {FeedbackPopup} from './FeedbackPopup';
 export {TabView} from './TabView';
 export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
+export {CircularProgress} from './CircularProgress';
+export {SimulationCard} from './SimulationCard';

@@ -10,7 +10,7 @@ import Animated, {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SummaryFieldKey} from '@/constants/summary';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface EditableFieldProps {
   fieldKey: SummaryFieldKey;
@@ -104,9 +104,8 @@ const styles = ScaledSheet.create({
   },
   editableText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
-    color: colors.black,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
     marginRight: '20@ms',
     maxHeight: '200@ms',
   },

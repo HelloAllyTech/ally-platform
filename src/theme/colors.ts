@@ -1,4 +1,23 @@
-export const colors = {
+import {dsColors} from './designSystem';
+
+/**
+ * Application Colors
+ *
+ * This file maintains backward compatibility with existing color names
+ * while integrating the new design system colors.
+ *
+ * Structure:
+ * 1. Legacy colors (for backward compatibility)
+ * 2. Design system colors (new semantic tokens)
+ */
+
+// ==================== LEGACY COLORS (Backward Compatibility) ====================
+
+/**
+ * @deprecated Use dsColors.neutral.white or design system tokens instead
+ * Maintaining for backward compatibility during migration
+ */
+export const legacyColors = {
   // Whites
   white: '#FFFFFF',
   white2: '#E3E4E5',
@@ -131,4 +150,25 @@ export const colors = {
 
   // Warning/Alert colors
   warning: '#FFF3CD',
-};
+} as const;
+
+// ==================== UNIFIED COLOR EXPORT ====================
+
+/**
+ * Unified color palette combining legacy and design system colors
+ *
+ * Usage:
+ * - Prefer dsColors.* for new components (e.g., dsColors.theme.primary)
+ * - Legacy names maintained for existing components during migration
+ */
+export const colors = {
+  // Spread legacy colors for backward compatibility
+  ...legacyColors,
+
+  // Design system color palettes (Material colors)
+  ds: dsColors,
+} as const;
+
+// Type exports
+export type Colors = typeof colors;
+export type LegacyColors = typeof legacyColors;

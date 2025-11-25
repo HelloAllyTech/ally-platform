@@ -10,6 +10,7 @@ export const SCREEN_NAMES = {
   LIVE_KIT_TEST: 'LiveKitTest',
   SIMULATIONS: 'Simulations',
   SIMULATION_DETAILS: 'SimulationDetails',
+  SIMULATION_PATH_DETAILS: 'SimulationPathDetails',
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
 
