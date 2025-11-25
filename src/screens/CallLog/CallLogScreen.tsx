@@ -296,7 +296,7 @@ export const CallLogScreen: React.FC = () => {
       });
     } else {
       navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-        simulationId: item?.id?.toString(),
+        scenarioSessionId: item?.id?.toString(),
         fromLogs: true,
       });
     }

@@ -44,11 +44,12 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {roomData, scenario} = route.params;
-  const {liveKitServerUrl, accessToken, id: roomId} = roomData;
+  const {sessionData, scenario, pathSessionItemId, pathId} = route.params;
+  const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const startTime = useMemo(
-    () => (roomData?.createdAt ? new Date(roomData?.createdAt) : new Date()),
-    [roomData?.createdAt],
+    () =>
+      sessionData?.createdAt ? new Date(sessionData?.createdAt) : new Date(),
+    [sessionData?.createdAt],
   );
   const navigation = useAppNavigation();
   const {t} = useTranslation();
@@ -228,11 +229,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       setIsDisconnecting(true);
       await room.disconnect();
       await endScenarioSession({
-        scenarioSessionId: roomId,
+        scenarioSessionId: sessionId,
       });
     } finally {
       navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-        simulationId: roomId,
+        scenarioSessionId: sessionId,
+        pathSessionItemId,
+        pathId,
       });
       setIsMicEnabled(false);
       setIsDisconnecting(false);

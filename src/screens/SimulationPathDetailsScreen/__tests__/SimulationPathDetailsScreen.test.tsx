@@ -35,8 +35,9 @@ jest.mock('@/hooks', () => ({
         'Simulations.pathWay': 'Path way',
         'Simulations.start': 'Start',
         'Simulations.continue': 'Continue',
-        'Simulations.next': 'Next',
+        'Common.next': 'Next',
         'Simulations.failedToLoadPathDetails': 'Failed to load path details',
+        'Errors.startSimulation': 'Failed to start simulation',
       };
       return translations[key] || key;
     },
@@ -56,8 +57,40 @@ jest.mock('@/hooks', () => ({
   })),
 }));
 
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {View, TouchableOpacity, Text} = require('react-native');
+  return {
+    IllustratedModal: ({visible, children}: any) =>
+      visible ? <View testID="illustrated-modal">{children}</View> : null,
+    PrimaryButton: ({label, onPress, isLoading, isDisabled}: any) => (
+      <TouchableOpacity
+        testID="primary-button"
+        onPress={onPress}
+        disabled={isDisabled || isLoading}>
+        <Text>{isLoading ? 'Loading...' : label}</Text>
+      </TouchableOpacity>
+    ),
+    EmptyState: ({title}: any) => <Text testID="empty-state">{title}</Text>,
+    useToast: jest.fn(() => ({
+      showToast: mockShowToast,
+    })),
+  };
+});
+
+const mockShowToast = jest.fn();
+const mockCreatePathSession = jest.fn();
+const mockGetScenarioSessionByPathItem = jest.fn();
+
 jest.mock('@/services', () => ({
   useGetSimulationPathDetailsQuery: jest.fn(),
+  useCreatePathSessionMutation: jest.fn(() => [
+    mockCreatePathSession,
+    {isLoading: false},
+  ]),
+  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
+    mockGetScenarioSessionByPathItem,
+  ]),
 }));
 
 const mockNavigation = {
@@ -75,6 +108,7 @@ const mockPathData = {
   isGlobal: true,
   completedAt: null,
   completedScenarios: 2,
+  scenarioPathSessionId: 'session-123',
   scenarios: [
     {
       id: 'item-1',
@@ -361,9 +395,10 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should disable button when no next simulation is available', () => {
-    const allCompletedPathData = {
+    const allCompletedButNotMarkedPathData = {
       ...mockPathData,
       completedScenarios: 3,
+      completedAt: null, // Not marked as completed yet
       scenarios: mockPathData.scenarios.map(scenario => ({
         ...scenario,
         status: 'COMPLETED' as const,
@@ -371,12 +406,12 @@ describe('SimulationPathDetailsScreen', () => {
     };
 
     useGetSimulationPathDetailsQuery.mockReturnValue({
-      data: allCompletedPathData,
+      data: allCompletedButNotMarkedPathData,
       isLoading: false,
       error: undefined,
     });
 
-    const {getByText} = render(
+    const {queryByText} = render(
       <SimulationPathDetailsScreen
         navigation={mockNavigation as any}
         route={{
@@ -387,9 +422,9 @@ describe('SimulationPathDetailsScreen', () => {
       />,
     );
 
-    const continueButton = getByText('Continue');
-    expect(continueButton).toBeTruthy();
-    // Note: The disabled state is handled by PrimaryButton component
+    // When all scenarios are completed, there's no next simulation, so button should not appear
+    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Start')).toBeNull();
   });
 
   it('should not show Start/Continue button when path is completed', () => {

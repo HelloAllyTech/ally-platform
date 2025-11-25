@@ -8,6 +8,8 @@
     "viewMore": "View more",
     "viewLess": "View less",
     "somethingWentWrong": "Something went wrong. Please try again.",
+    "back": "Back",
+    "next": "Next",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
@@ -317,7 +319,6 @@
     "detected": "detected",
     "activeSimulationDescription": "You have a running simulation. End the existing session to start a new one.",
     "progressCompleted": "{{current}} of {{total}} completed",
-    "next": "Next",
     "failedToLoadPathDetails": "Failed to load path details",
     "noActiveSimulation": "No active simulation found",
     "sessionEndedSuccessfully": "Session ended successfully"

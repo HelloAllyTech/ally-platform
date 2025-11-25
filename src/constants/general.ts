@@ -131,8 +131,14 @@ export const API_ROUTES = {
       `/learn/scenario-session/${scenarioSessionId}/messages`,
     SIMULATION_CREDITS: '/simulation-credits',
     SCENARIO_PATHS: '/learn/scenario-paths',
+    CREATE_PATH_SESSION: (pathId: string) =>
+      `/learn/scenario-paths/${pathId}/create-session`,
     SIMULATION_PATH_DETAILS: (pathId: string) =>
       `/learn/scenario-paths/${pathId}`,
+    UPCOMING_SCENARIO: (scenarioPathSessionId: string) =>
+      `/learn/scenario-paths/${scenarioPathSessionId}/upcoming-scenario`,
+    SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
+      `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
   },
 } as const;
 
