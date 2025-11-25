@@ -16,14 +16,18 @@ import {
   LeftArrowIcon,
   NoCreditsIcon,
 } from '@/assets';
-import {IllustratedModal, PrimaryButton} from '@/components';
+import {IllustratedModal, PrimaryButton, useToast} from '@/components';
 import {EmptyState} from '@/components/EmptyState/EmptyState';
 import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
 import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useGetSimulationPathDetailsQuery} from '@/services';
+import {
+  useCreatePathSessionMutation,
+  useGetSimulationPathDetailsQuery,
+} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {PathScenario, SessionItemStatus} from '@/types';
+import {getErrorDetails} from '@/utils';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
@@ -35,12 +39,16 @@ export const SimulationPathDetailsScreen: React.FC<
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {pathId} = route.params;
+  const {showToast} = useToast();
 
   const {
     data: pathData,
     isLoading,
     error,
   } = useGetSimulationPathDetailsQuery({pathId});
+
+  const [createPathSession, {isLoading: isCreatingSession}] =
+    useCreatePathSessionMutation();
 
   const [selectedSimulation, setSelectedSimulation] =
     useState<PathScenario | null>(null);
@@ -56,6 +64,15 @@ export const SimulationPathDetailsScreen: React.FC<
       }, LOW_CREDITS_MODAL_DISPLAY_MS);
     }
   }, [getCreditsInfo?.isLow]);
+
+  useEffect(() => {
+    if (pathData && !pathData.scenarioPathSessionId) {
+      createPathSession({pathId}).catch(err => {
+        showToast(getErrorDetails(err)?.message, 'error');
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathData]);
 
   const {
     isCreatingRoom,
@@ -82,9 +99,8 @@ export const SimulationPathDetailsScreen: React.FC<
   };
 
   const handleStartPath = () => {
-    if (nextSimulation) {
-      setSelectedSimulation(nextSimulation);
-    }
+    if (!nextSimulation) return;
+    setSelectedSimulation(nextSimulation);
   };
 
   /**
@@ -103,6 +119,25 @@ export const SimulationPathDetailsScreen: React.FC<
   };
 
   /**
+   * Handle file icon press - navigate to simulation feedback screen
+   * Only available for completed simulations
+   */
+  const handleFileIconPress = (scenario: PathScenario) => {
+    if (
+      scenario.status !== SessionItemStatus.COMPLETED ||
+      !scenario.sessionId
+    ) {
+      return;
+    }
+
+    navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+      pathSessionItemId: scenario.sessionId,
+      pathId,
+      fromLogs: true,
+    });
+  };
+
+  /**
    * Close the simulation details modal
    */
   const handleCloseModal = () => {
@@ -114,8 +149,6 @@ export const SimulationPathDetailsScreen: React.FC<
    */
   const handleStartSimulation = () => {
     if (selectedSimulation) {
-      handleCloseModal();
-
       startSimulation(
         {
           id: selectedSimulation.scenarioId,
@@ -124,8 +157,15 @@ export const SimulationPathDetailsScreen: React.FC<
           coverImageUrl: selectedSimulation.coverImageUrl,
           coverVideoUrl: selectedSimulation.coverVideoUrl,
         },
+        selectedSimulation.sessionId || undefined,
         pathId,
-      );
+      )
+        .then(() => {
+          handleCloseModal();
+        })
+        .catch(err => {
+          showToast(getErrorDetails(err)?.message, 'error');
+        });
     }
   };
 
@@ -184,7 +224,7 @@ export const SimulationPathDetailsScreen: React.FC<
           )}
 
           {/* Start/Continue button - only show if path is not completed */}
-          {!isPathCompleted && (
+          {!isPathCompleted && nextSimulation && (
             <PrimaryButton
               label={
                 isPathStarted
@@ -193,6 +233,7 @@ export const SimulationPathDetailsScreen: React.FC<
               }
               onPress={handleStartPath}
               isDisabled={isStartPathDisabled}
+              isLoading={isCreatingSession}
             />
           )}
         </View>
@@ -217,6 +258,7 @@ export const SimulationPathDetailsScreen: React.FC<
         isCompleted={item.status === SessionItemStatus.COMPLETED}
         isNext={isNext}
         onPress={() => handleSimulationPress(item)}
+        onFileIconPress={() => handleFileIconPress(item)}
       />
     );
   };
@@ -254,7 +296,7 @@ export const SimulationPathDetailsScreen: React.FC<
       )}
 
       <SimulationDetailsModal
-        visible={!!selectedSimulation}
+        visible={!!selectedSimulation?.sessionId}
         simulation={selectedSimulation}
         onClose={handleCloseModal}
         onStartSimulation={handleStartSimulation}

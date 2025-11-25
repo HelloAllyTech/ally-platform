@@ -10,7 +10,7 @@ jest.mock('@/hooks', () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
         'Simulations.simulation': 'Simulation',
-        'Simulations.next': 'Next',
+        'Common.next': 'Next',
       };
       return translations[key] || key;
     },
