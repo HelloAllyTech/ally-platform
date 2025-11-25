@@ -17,7 +17,8 @@ interface UseStartSimulationReturn {
   showActiveSimulationModal: boolean;
   startSimulation: (
     scenario: Scenario,
-    scenarioPathId?: string,
+    scenarioPathSessionItemId?: string,
+    pathId?: string,
   ) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
@@ -61,7 +62,8 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
 
   const startSimulation = async (
     scenario: Scenario,
-    scenarioPathId?: string,
+    scenarioPathSessionItemId?: string,
+    pathId?: string,
   ) => {
     try {
       if (!isMicPermissionGranted) {
@@ -92,18 +94,22 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
         scenarioId: scenario.id,
-        ...(scenarioPathId && {scenarioPathId}),
+        ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
       }).unwrap();
 
       if (startResp) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: {
+          sessionData: {
             id: startResp.scenarioSession.id,
             createdAt: startResp.scenarioSession.createdAt,
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },
           scenario,
+          ...(scenarioPathSessionItemId && {
+            pathSessionItemId: scenarioPathSessionItemId,
+          }),
+          ...(pathId && {pathId}),
         });
       }
     } catch (error) {

@@ -8,7 +8,7 @@ describe('navigation types', () => {
 
   it('RootStackParamList contains expected routes', () => {
     const params: RootStackParamList['SimulationAssistant'] = {
-      roomData: {} as any,
+      sessionData: {} as any,
       scenario: undefined,
     };
     expect(params).toBeTruthy();

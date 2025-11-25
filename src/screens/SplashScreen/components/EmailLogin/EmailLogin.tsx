@@ -122,7 +122,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
         </View>
 
         <PrimaryButton
-          label={t('SplashScreen.next')}
+          label={t('Common.next')}
           onPress={handleSubmit}
           isDisabled={!isValidEmail(email)}
           isLoading={isLoading}
