@@ -47,7 +47,7 @@ export const useStoragePermissions = (): UseStoragePermissionsResult => {
     }
 
     if (!hasPermission) {
-      showToast(t('CallSummary.info.storagePermissionDenied'), 'info');
+      showToast(t('CallSummary.info.storagePermissionDenied'), 'error');
       await openSettings();
       return false;
     }

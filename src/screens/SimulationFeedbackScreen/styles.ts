@@ -1,7 +1,7 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, stroke, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -26,20 +26,18 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  backButton: {
+  backArrowButton: {
     paddingRight: '1@ms',
   },
   title: {
-    ...typography.headline.large,
+    ...typography.headline.tiny,
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.darkGray2,
-    fontSize: '18@ms',
+    color: colors.ds.typography.highEmphasis,
   },
   subTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.charcoal2,
-    fontSize: '14@ms',
-    marginTop: '-4@ms',
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -59,15 +57,24 @@ export const styles = ScaledSheet.create({
     marginTop: '10@vs',
     paddingVertical: '8@vs',
   },
+  pathNavigationContainer: {
+    flexDirection: 'row',
+    gap: '12@ms',
+    marginTop: '20@vs',
+  },
+  nextButton: {
+    flex: 1,
+    // paddingVertical: '8@vs',
+  },
   scrollToBottomButton: {
     position: 'absolute',
     bottom: '60@vs',
     right: '16@ms',
     zIndex: 1000,
     borderRadius: '50%',
-    backgroundColor: colors.whiteTransparent10,
+    backgroundColor: colors.ds.whiteAlpha[500],
     borderWidth: 1,
-    borderColor: colors.lightGray4,
+    borderColor: stroke.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: '30@ms',
@@ -76,5 +83,36 @@ export const styles = ScaledSheet.create({
   },
   titleExtraPadding: {
     paddingLeft: '10@vs',
+  },
+  backButton: {
+    flex: 1,
+    paddingVertical: '8@vs',
+    borderRadius: '100@ms',
+    borderWidth: 1,
+    borderColor: colors.ds.stroke.primary,
+    backgroundColor: colors.ds.neutral.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '16@ms',
+    lineHeight: '24@ms',
+    color: colors.ds.typography.highEmphasis,
+  },
+  transitionMessageContainer: {
+    marginBottom: '16@vs',
+  },
+  transitionMessageTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
+    marginBottom: '8@vs',
+    textTransform: 'lowercase',
+  },
+  transitionMessageContent: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
 });

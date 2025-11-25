@@ -279,6 +279,7 @@ const styles = ScaledSheet.create({
   },
   inlineTextInput: {
     flex: 1,
+    color: colors.ds.typography.highEmphasis,
     marginRight: '10@ms',
   },
 });

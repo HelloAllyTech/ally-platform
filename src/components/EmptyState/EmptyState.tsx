@@ -8,7 +8,7 @@ import {colors, fontFamily} from '@/theme';
 interface EmptyStateProps {
   icon: React.ComponentType<SvgProps>;
   title: string;
-  description: string;
+  description?: string;
   iconProps?: SvgProps;
   containerStyle?: object;
 }
@@ -24,7 +24,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     <View style={[styles.container, containerStyle]}>
       <Icon style={styles.icon} {...iconProps} />
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      {!!description && <Text style={styles.description}>{description}</Text>}
     </View>
   );
 };

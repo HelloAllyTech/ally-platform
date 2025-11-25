@@ -16,7 +16,7 @@ import {
   EditSquareIcon,
   WandStarsIcon,
 } from '@/assets/icons';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface SectionHeaderProps {
   label: string;
@@ -169,9 +169,9 @@ const styles = ScaledSheet.create({
   },
   sectionTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.black,
-    width: '85%',
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
+    width: '95%',
   },
   iconContainer: {
     marginRight: '8@ms',

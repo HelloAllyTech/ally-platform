@@ -37,12 +37,12 @@ describe('EmailLogin', () => {
     const invalid = 'a@';
     const input = UNSAFE_getAllByType(TextInput)[0];
     fireEvent.changeText(input, invalid);
-    fireEvent.press(getByText('SplashScreen.next'));
+    fireEvent.press(getByText('Common.next'));
     // No crash; button was disabled (onPress no-op)
 
     // Enter valid email and expect button to be actionable
     fireEvent.changeText(input, 'user@example.com');
-    fireEvent.press(getByText('SplashScreen.next'));
+    fireEvent.press(getByText('Common.next'));
   });
 
   it('opens T&C and Privacy links', () => {

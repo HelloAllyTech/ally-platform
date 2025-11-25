@@ -7,7 +7,7 @@ import {env} from '@/config/env';
 import {CarouselVariant, USER_PERMISSIONS} from '@/constants';
 import {useSimulationCredits, useTranslate, useUser} from '@/hooks';
 import {useAppSelector} from '@/store/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {getAppVersion} from '@/utils';
 
 interface DrawerContentProps {
@@ -135,16 +135,14 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   name: {
+    ...typography.body.large,
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
-    lineHeight: '24@mvs',
-    color: colors.darkGray2,
+    color: colors.ds.typography.highEmphasis,
   },
   email: {
+    ...typography.body.small,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    lineHeight: '16@mvs',
-    color: colors.darkCharcoal,
+    color: colors.ds.typography.mediumEmphasis,
   },
   emailSmall: {
     fontSize: '9@ms',
@@ -159,8 +157,9 @@ const styles = ScaledSheet.create({
     marginBottom: '8@mvs',
   },
   creditTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
+    ...typography.label.large,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.typography.highEmphasis,
   },
   creditInfo: {
     flexDirection: 'row',
@@ -169,18 +168,19 @@ const styles = ScaledSheet.create({
     marginBottom: '8@mvs',
   },
   creditConsumedText: {
+    ...typography.body.large,
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '18@ms',
+    color: colors.ds.typography.highEmphasis,
   },
   creditLimitText: {
+    ...typography.body.small,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    color: colors.darkCharcoal,
+    color: colors.ds.typography.mediumEmphasis,
   },
   creditPercentage: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '12@ms',
-    color: colors.darkCharcoal,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
   },
   progressBarContainer: {
     height: '6@mvs',
@@ -211,9 +211,8 @@ const styles = ScaledSheet.create({
   },
   logoutText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    lineHeight: '24@mvs',
-    color: colors.black,
+    ...typography.label.large,
+    color: colors.ds.typography.highEmphasis,
   },
   carouselWrapper: {
     flex: 1,
@@ -227,8 +226,7 @@ const styles = ScaledSheet.create({
   },
   versionText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    lineHeight: '16@mvs',
-    color: colors.darkCharcoal,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });

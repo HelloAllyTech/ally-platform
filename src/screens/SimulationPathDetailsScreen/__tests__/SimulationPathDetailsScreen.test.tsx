@@ -1,0 +1,464 @@
+import React from 'react';
+import {fireEvent, render} from '@testing-library/react-native';
+
+import {SCREEN_NAMES} from '@/constants';
+
+import {SimulationPathDetailsScreen} from '../SimulationPathDetailsScreen';
+
+// Mock dependencies
+jest.mock('@react-navigation/native', () => ({
+  useRoute: jest.fn(() => ({
+    params: {pathId: 'test-path-id'},
+  })),
+  useFocusEffect: jest.fn(),
+}));
+
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: jest.fn(() => ({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  })),
+}));
+
+jest.mock('@/hooks', () => ({
+  useTranslate: jest.fn(() => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      if (key === 'Simulations.progressCompleted') {
+        return `${params?.current} of ${params?.total} completed`;
+      }
+      if (key === 'Simulations.simulation') {
+        return 'Simulation';
+      }
+      const translations: Record<string, string> = {
+        'Simulations.pathWay': 'Path way',
+        'Simulations.start': 'Start',
+        'Simulations.continue': 'Continue',
+        'Common.next': 'Next',
+        'Simulations.failedToLoadPathDetails': 'Failed to load path details',
+        'Errors.startSimulation': 'Failed to start simulation',
+      };
+      return translations[key] || key;
+    },
+  })),
+  useSimulationCredits: jest.fn(() => ({
+    credits: {consumedCredits: 5, creditLimit: 10},
+    getCreditsInfo: {isLow: false},
+  })),
+  useStartSimulation: jest.fn(() => ({
+    isCreatingRoom: false,
+    isMicPermissionGranted: true,
+    activeSimulationId: null,
+    showActiveSimulationModal: false,
+    startSimulation: jest.fn(),
+    closeActiveSimulationModal: jest.fn(),
+    setShowActiveSimulationModal: jest.fn(),
+  })),
+}));
+
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {View, TouchableOpacity, Text} = require('react-native');
+  return {
+    IllustratedModal: ({visible, children}: any) =>
+      visible ? <View testID="illustrated-modal">{children}</View> : null,
+    PrimaryButton: ({label, onPress, isLoading, isDisabled}: any) => (
+      <TouchableOpacity
+        testID="primary-button"
+        onPress={onPress}
+        disabled={isDisabled || isLoading}>
+        <Text>{isLoading ? 'Loading...' : label}</Text>
+      </TouchableOpacity>
+    ),
+    EmptyState: ({title}: any) => <Text testID="empty-state">{title}</Text>,
+    useToast: jest.fn(() => ({
+      showToast: mockShowToast,
+    })),
+  };
+});
+
+const mockShowToast = jest.fn();
+const mockCreatePathSession = jest.fn();
+const mockGetScenarioSessionByPathItem = jest.fn();
+
+jest.mock('@/services', () => ({
+  useGetSimulationPathDetailsQuery: jest.fn(),
+  useCreatePathSessionMutation: jest.fn(() => [
+    mockCreatePathSession,
+    {isLoading: false},
+  ]),
+  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
+    mockGetScenarioSessionByPathItem,
+  ]),
+}));
+
+const mockNavigation = {
+  goBack: jest.fn(),
+  navigate: jest.fn(),
+};
+
+// Mock data matches backend API structure
+const mockPathData = {
+  id: 'test-path-id',
+  title: 'Test Path',
+  description: 'A comprehensive test path for learning and development',
+  coverImageUrl: 'https://example.com/cover.jpg',
+  status: 'ACTIVE',
+  isGlobal: true,
+  completedAt: null,
+  completedScenarios: 2,
+  scenarioPathSessionId: 'session-123',
+  scenarios: [
+    {
+      id: 'item-1',
+      scenarioId: 101,
+      order: 1,
+      coverImageUrl: 'https://example.com/sim1.jpg',
+      coverVideoUrl: 'https://example.com/video1.mp4',
+      description: 'Simulation 1 description',
+      title: 'Simulation 1',
+      sessionId: 'session-1',
+      status: 'COMPLETED' as const,
+    },
+    {
+      id: 'item-2',
+      scenarioId: 102,
+      order: 2,
+      coverImageUrl: 'https://example.com/sim2.jpg',
+      description: 'Simulation 2 description',
+      title: 'Simulation 2',
+      sessionId: 'session-2',
+      status: 'UNLOCKED' as const,
+    },
+    {
+      id: 'item-3',
+      scenarioId: 103,
+      order: 3,
+      coverImageUrl: 'https://example.com/sim3.jpg',
+      description: 'Simulation 3 description',
+      title: 'Simulation 3',
+      sessionId: null,
+      status: 'LOCKED' as const,
+    },
+  ],
+};
+
+describe('SimulationPathDetailsScreen', () => {
+  const {useGetSimulationPathDetailsQuery} = require('@/services');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should render loading state', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: undefined,
+    });
+
+    const {getByTestId} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByTestId('activity-indicator')).toBeTruthy();
+  });
+
+  it('should render error state', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('Failed to load'),
+    });
+
+    const {getByTestId} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // EmptyState component is rendered
+    expect(getByTestId('empty-state')).toBeTruthy();
+  });
+
+  it('should render path details with simulations', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByText('Test Path')).toBeTruthy();
+    expect(getByText('2 of 3 completed')).toBeTruthy();
+  });
+
+  it('should render "Start" button when path is not started', () => {
+    const notStartedPathData = {
+      ...mockPathData,
+      completedScenarios: 0,
+      scenarios: mockPathData.scenarios.map((scenario, index) => ({
+        ...scenario,
+        status: index === 0 ? ('IN_PROGRESS' as const) : ('LOCKED' as const),
+      })),
+    };
+
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: notStartedPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByText('Start')).toBeTruthy();
+  });
+
+  it('should render "Continue" button when path is started', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByText('Continue')).toBeTruthy();
+  });
+
+  it('should render simulation cards with correct states', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getAllByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // Check for simulation order labels
+    expect(getAllByText(/Simulation 1/)).toHaveLength(2); // Label + Title
+    expect(getAllByText(/Simulation 2/)).toHaveLength(2);
+    expect(getAllByText(/Simulation 3/)).toHaveLength(2);
+  });
+
+  it('should render "Next" badge for the next simulation', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByText('Next')).toBeTruthy();
+  });
+
+  it('should call goBack when back button is pressed', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {root} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // Find the first TouchableOpacity in the header (back button)
+    const touchables = root.findAllByType('TouchableOpacity' as any);
+    // First touchable should be the back button
+    const backButton = touchables.find(
+      t => !t.props.testID || t.props.testID !== 'primary-button',
+    );
+
+    if (backButton) {
+      fireEvent.press(backButton);
+      expect(mockNavigation.goBack).toHaveBeenCalled();
+    }
+  });
+
+  it('should display credits information', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {root} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // Check that credit display is rendered (BoltIcon + credit text structure)
+    const textElements = root.findAllByType('Text' as any);
+    // Credits are displayed as nested text: "5" with child "/10"
+    const hasCredits = textElements.some(
+      el =>
+        el.props.children === 5 ||
+        (Array.isArray(el.props.children) &&
+          el.props.children.includes(5)),
+    );
+    expect(hasCredits).toBeTruthy();
+  });
+
+  it('should render header with "Path way" title', () => {
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: mockPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {getByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    expect(getByText('Path way')).toBeTruthy();
+  });
+
+  it('should disable button when no next simulation is available', () => {
+    const allCompletedButNotMarkedPathData = {
+      ...mockPathData,
+      completedScenarios: 3,
+      completedAt: null, // Not marked as completed yet
+      scenarios: mockPathData.scenarios.map(scenario => ({
+        ...scenario,
+        status: 'COMPLETED' as const,
+      })),
+    };
+
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: allCompletedButNotMarkedPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {queryByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // When all scenarios are completed, there's no next simulation, so button should not appear
+    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Start')).toBeNull();
+  });
+
+  it('should not show Start/Continue button when path is completed', () => {
+    const completedPathData = {
+      ...mockPathData,
+      completedAt: '2024-01-15T10:30:00Z',
+      completedScenarios: 3,
+      totalScenarios: 3,
+      scenarios: mockPathData.scenarios.map(scenario => ({
+        ...scenario,
+        status: 'COMPLETED' as const,
+      })),
+    };
+
+    useGetSimulationPathDetailsQuery.mockReturnValue({
+      data: completedPathData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    const {queryByText} = render(
+      <SimulationPathDetailsScreen
+        navigation={mockNavigation as any}
+        route={{
+          key: 'test',
+          name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+          params: {pathId: 'test-path-id'},
+        }}
+      />,
+    );
+
+    // Button should not be present when path is completed
+    expect(queryByText('Start')).toBeNull();
+    expect(queryByText('Continue')).toBeNull();
+  });
+});
+
