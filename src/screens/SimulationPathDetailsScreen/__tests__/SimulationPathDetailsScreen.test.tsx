@@ -80,12 +80,16 @@ jest.mock('@/components', () => {
 
 const mockShowToast = jest.fn();
 const mockCreatePathSession = jest.fn();
+const mockGetScenarioSessionByPathItem = jest.fn();
 
 jest.mock('@/services', () => ({
   useGetSimulationPathDetailsQuery: jest.fn(),
   useCreatePathSessionMutation: jest.fn(() => [
     mockCreatePathSession,
     {isLoading: false},
+  ]),
+  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
+    mockGetScenarioSessionByPathItem,
   ]),
 }));
 

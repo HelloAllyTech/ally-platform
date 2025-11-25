@@ -148,6 +148,18 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
     }),
+
+    getScenarioSessionByPathItem: builder.query<
+      {
+        id: string;
+      },
+      {pathSessionItemId: string}
+    >({
+      query: ({pathSessionItemId}) => ({
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_PATH_ITEM(pathSessionItemId),
+        method: API_METHODS.GET,
+      }),
+    }),
   }),
 });
 
@@ -165,4 +177,5 @@ export const {
   useGetSimulationPathDetailsQuery,
   useCreatePathSessionMutation,
   useLazyGetUpcomingScenarioQuery,
+  useLazyGetScenarioSessionByPathItemQuery,
 } = simulationsApi;

@@ -75,7 +75,7 @@ export const SimulationFeedbackScreen: React.FC<
   const fetchSimulationDetailsWithRetry = async (
     currentRetryCount: number = 0,
   ) => {
-    // Use scenarioSessionId if available, otherwise use pathSessionItemId
+    // Use scenarioSessionId (always provided for path simulations after API call)
     const sessionId = scenarioSessionId || pathSessionItemId;
     if (!sessionId) return;
 
@@ -251,15 +251,18 @@ export const SimulationFeedbackScreen: React.FC<
     }
 
     // For normal simulations, show "Try Another" button
-    return (
-      <View style={styles.buttonContainer}>
-        <PrimaryButton
-          label={t('SimulationFeedback.tryAnother')}
-          onPress={handleSubmit}
-          customContainerStyle={styles.submitButton}
-        />
-      </View>
-    );
+    if (!fromLogs) {
+      return (
+        <View style={styles.buttonContainer}>
+          <PrimaryButton
+            label={t('SimulationFeedback.tryAnother')}
+            onPress={handleSubmit}
+            customContainerStyle={styles.submitButton}
+          />
+        </View>
+      );
+    }
+    return null;
   };
 
   const renderTitle = () => {
@@ -358,7 +361,7 @@ export const SimulationFeedbackScreen: React.FC<
                   <UpNextSimulationCard upNext={upNextData} />
                 </>
               )}
-              {!fromLogs && simulationDetails && renderButtonContainer()}
+              {simulationDetails && renderButtonContainer()}
             </>
           )}
         </KeyboardAwareScrollView>

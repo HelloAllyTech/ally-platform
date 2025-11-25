@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   Image,
   Modal,
   ScrollView,
@@ -14,7 +13,6 @@ import {CloseIcon} from '@/assets';
 import {PrimaryButton, VideoPreview} from '@/components';
 import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import type {PathScenario} from '@/types';
 
@@ -24,9 +22,6 @@ export interface SimulationDetailsModalProps {
   onClose: () => void;
   onStartSimulation: () => void;
   isCreatingRoom: boolean;
-  showActiveSimulationModal: boolean;
-  activeSimulationId: string | null;
-  onCloseActiveSimulationModal: () => void;
 }
 
 export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
@@ -35,9 +30,6 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   onClose,
   onStartSimulation,
   isCreatingRoom,
-  showActiveSimulationModal,
-  activeSimulationId,
-  onCloseActiveSimulationModal,
 }) => {
   const {t} = useTranslate();
 
@@ -47,105 +39,83 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   const {coverImageUrl, coverVideoUrl, title, description, order} = simulation;
 
   return (
-    <>
-      <Modal
-        visible={visible}
-        animationType="fade"
-        transparent
-        onRequestClose={onClose}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContainer}>
-            {isCreatingRoom && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator
-                  size="large"
-                  color={colors.ds.neutral.white}
-                />
-                <Text style={styles.loadingText}>
-                  {t('Simulations.creatingRoom')}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>
-                {t('Simulations.start')}{' '}
-                <Text style={styles.headerTitleItalic}>
-                  {t('Simulations.simulation')}
-                </Text>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalContainer}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>
+              {t('Simulations.start')}{' '}
+              <Text style={styles.headerTitleItalic}>
+                {t('Simulations.simulation')}
               </Text>
-              <TouchableOpacity
-                onPress={onClose}
-                style={styles.closeButton}
-                disabled={isCreatingRoom}>
-                <CloseIcon
-                  width={20}
-                  height={20}
-                  color={colors.ds.typography.mediumEmphasis}
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              disabled={isCreatingRoom}>
+              <CloseIcon
+                width={20}
+                height={20}
+                color={colors.ds.typography.mediumEmphasis}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.contentContainer}>
+            <View style={styles.mediaContainer}>
+              {coverVideoUrl ? (
+                <VideoPreview
+                  videoUrl={coverVideoUrl}
+                  autoPlay={false}
+                  shouldPause={false}
                 />
-              </TouchableOpacity>
+              ) : coverImageUrl ? (
+                <Image
+                  source={{uri: coverImageUrl}}
+                  style={styles.coverImage}
+                  resizeMode="cover"
+                />
+              ) : null}
             </View>
 
-            <View style={styles.contentContainer}>
-              <View style={styles.mediaContainer}>
-                {coverVideoUrl ? (
-                  <VideoPreview
-                    videoUrl={coverVideoUrl}
-                    autoPlay={false}
-                    shouldPause={false}
-                  />
-                ) : coverImageUrl ? (
-                  <Image
-                    source={{uri: coverImageUrl}}
-                    style={styles.coverImage}
-                    resizeMode="cover"
-                  />
-                ) : null}
-              </View>
+            <ScrollView
+              style={styles.scrollContainer}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              bounces={false}>
+              <Text style={styles.orderLabel}>
+                {t('Simulations.simulation')} {order}
+              </Text>
+              <Text style={styles.title}>{title}</Text>
 
-              <ScrollView
-                style={styles.scrollContainer}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                bounces={false}>
-                <Text style={styles.orderLabel}>
-                  {t('Simulations.simulation')} {order}
-                </Text>
-                <Text style={styles.title}>{title}</Text>
+              {/* Label */}
+              <Text style={styles.scenarioLabel}>
+                {t('Simulations.scenarioLabel')}
+              </Text>
 
-                {/* Label */}
-                <Text style={styles.scenarioLabel}>
-                  {t('Simulations.scenarioLabel')}
-                </Text>
+              {/* Description */}
+              <Text style={styles.description}>{description}</Text>
+            </ScrollView>
+          </View>
 
-                {/* Description */}
-                <Text style={styles.description}>{description}</Text>
-              </ScrollView>
-            </View>
-
-            {/* Fixed Button Container at Bottom - Clips content above */}
-            <View style={styles.buttonContainer}>
-              <View style={styles.ctaWrapper}>
-                <PrimaryButton
-                  label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
-                  onPress={onStartSimulation}
-                  isLoading={isCreatingRoom}
-                  isDisabled={isCreatingRoom}
-                />
-              </View>
+          {/* Fixed Button Container at Bottom - Clips content above */}
+          <View style={styles.buttonContainer}>
+            <View style={styles.ctaWrapper}>
+              <PrimaryButton
+                label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
+                onPress={onStartSimulation}
+                isLoading={isCreatingRoom}
+                isDisabled={isCreatingRoom}
+              />
             </View>
           </View>
         </View>
-      </Modal>
-
-      {showActiveSimulationModal && !!activeSimulationId && (
-        <ActiveSimulationModal
-          visible={showActiveSimulationModal}
-          onClose={onCloseActiveSimulationModal}
-          scenarioSessionId={activeSimulationId}
-        />
-      )}
-    </>
+      </View>
+    </Modal>
   );
 };
 
@@ -199,6 +169,7 @@ const styles = ScaledSheet.create({
   mediaContainer: {
     width: '100%',
     padding: '12@ms',
+    overflow: 'hidden',
   },
   coverImage: {
     width: '100%',
