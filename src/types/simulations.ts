@@ -117,12 +117,15 @@ interface SummaryMetadata {
 }
 
 export interface UpNextSimulation {
-  scenarioId: number;
-  title: string;
-  description: string;
+  id: number;
+  title?: string;
+  description?: string;
   coverImageUrl?: string;
   coverVideoUrl?: string;
-  order: number;
+  order?: number;
+  transitionMessageTitle?: string;
+  transitionMessageContent?: string;
+  scenarioPathSessionItemId?: string;
 }
 
 export interface SimulationSummaryData {
@@ -142,6 +145,7 @@ export interface SimulationSummaryData {
   score: number | null;
   metadata: SummaryMetadata | null;
   hasFeedback: boolean;
+  scenarioPathSessionId?: string | null;
   scenario?: {
     title?: string;
   };
@@ -161,7 +165,7 @@ export interface SimulationSummaryData {
   };
 }
 
-export type RoomData = {
+export type SessionData = {
   id: string;
   createdAt: string;
   accessToken: string;
@@ -210,6 +214,7 @@ export interface SimulationPathDetails {
   isGlobal: boolean;
   completedScenarios: number;
   completedAt: Date | null;
+  scenarioPathSessionId: string | null;
   scenarios: PathScenario[];
 }
 

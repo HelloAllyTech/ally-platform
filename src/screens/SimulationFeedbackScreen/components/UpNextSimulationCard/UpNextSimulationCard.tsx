@@ -35,31 +35,33 @@ export const UpNextSimulationCard: React.FC<UpNextSimulationCardProps> = ({
           </Text>
         </View>
       </View>
-
-      <Text style={styles.scenarioLabel}>{t('Simulations.scenario')}:</Text>
-      <Text style={styles.description}>{upNext.description}</Text>
+      <View style={styles.content}>
+        <Text style={styles.scenarioLabel}>{t('Simulations.scenario')}:</Text>
+        <Text style={styles.description}>{upNext.description}</Text>
+      </View>
     </View>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {},
   card: {
     backgroundColor: colors.white,
     borderRadius: radius.lg,
     borderWidth: '0.5@ms',
     borderColor: stroke.primary,
-    padding: '14@ms',
     overflow: 'hidden',
+  },
+  content: {
+    padding: '14@ms',
   },
   header: {
     flexDirection: 'row',
     gap: '16@ms',
-    marginBottom: '28@ms',
+    backgroundColor: colors.ds.grey[50],
+    padding: '14@ms',
   },
   thumbnail: {
-    width: '120@ms',
-    height: '100%',
+    aspectRatio: 16 / 9,
     borderRadius: '8@ms',
     backgroundColor: colors.ds.grey[200],
   },

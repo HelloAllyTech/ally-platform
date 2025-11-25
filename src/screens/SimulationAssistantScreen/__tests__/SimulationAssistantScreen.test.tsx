@@ -199,7 +199,7 @@ jest.mock('@/assets/icons', () => {
 });
 
 const baseRouteParams = {
-  roomData: {
+  sessionData: {
     id: 'room-1',
     createdAt: new Date().toISOString(),
     accessToken: 'token',
