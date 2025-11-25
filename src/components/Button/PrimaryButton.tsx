@@ -49,7 +49,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.state.disabledContainer,
   },
   buttonLoading: {
-    paddingVertical: '13@vs',
+    paddingVertical: '10@vs',
   },
   buttonText: {
     ...typography.body.medium,

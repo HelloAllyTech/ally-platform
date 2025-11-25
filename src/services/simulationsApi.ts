@@ -12,6 +12,7 @@ import {
   SimulationPathDetails,
   SimulationPathsResponse,
   SimulationSummaryData,
+  UpNextSimulation,
 } from '@/types';
 
 import {api} from './api';
@@ -68,12 +69,15 @@ export const simulationsApi = api.injectEndpoints({
 
     startScenarioSession: builder.mutation<
       ScenarioSessionStartResponse,
-      {scenarioId: number; scenarioPathId?: string}
+      {scenarioId: number; scenarioPathSessionItemId?: string}
     >({
-      query: ({scenarioId, scenarioPathId}) => ({
+      query: ({scenarioId, scenarioPathSessionItemId}) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
-        body: {scenarioId, ...(scenarioPathId && {scenarioPathId})},
+        body: {
+          scenarioId,
+          ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
+        },
       }),
     }),
 
@@ -85,7 +89,11 @@ export const simulationsApi = api.injectEndpoints({
         url: API_ROUTES.LEARN.END_SCENARIO_SESSION(scenarioSessionId),
         method: API_METHODS.POST,
       }),
-      invalidatesTags: ['SimulationCredits'],
+      invalidatesTags: [
+        'SimulationCredits',
+        'SimulationPaths',
+        'SimulationPathDetails',
+      ],
     }),
 
     getSimulationCredits: builder.query<SimulationCredits, void>({
@@ -102,6 +110,7 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
       transformResponse: (response: SimulationPathsResponse) => response.data,
+      providesTags: ['SimulationPaths'],
     }),
 
     getSimulationPathDetails: builder.query<
@@ -115,6 +124,28 @@ export const simulationsApi = api.injectEndpoints({
       transformResponse: (response: SimulationPathDetails) => ({
         ...response,
         scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+      }),
+      providesTags: ['SimulationPathDetails'],
+    }),
+
+    createPathSession: builder.mutation<
+      {scenarioPathSessionItemId: string},
+      {pathId: string}
+    >({
+      query: ({pathId}) => ({
+        url: API_ROUTES.LEARN.CREATE_PATH_SESSION(pathId),
+        method: API_METHODS.POST,
+      }),
+      invalidatesTags: ['SimulationPathDetails', 'SimulationPaths'],
+    }),
+
+    getUpcomingScenario: builder.query<
+      UpNextSimulation | null,
+      {scenarioSessionId: string}
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: API_ROUTES.LEARN.UPCOMING_SCENARIO(scenarioSessionId),
+        method: API_METHODS.GET,
       }),
     }),
   }),
@@ -132,4 +163,6 @@ export const {
   useLazyGetSimulationCreditsQuery,
   useGetSimulationPathsQuery,
   useGetSimulationPathDetailsQuery,
+  useCreatePathSessionMutation,
+  useLazyGetUpcomingScenarioQuery,
 } = simulationsApi;
