@@ -39,11 +39,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   const {coverImageUrl, coverVideoUrl, title, description, order} = simulation;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalContainer}>
           <View style={styles.header}>
