@@ -266,17 +266,17 @@ export const SimulationFeedbackScreen: React.FC<
     // Path simulations: show Finish / Retry / Next
     if (pathId) {
       // Path completed: show a single Finish button
-      // if (isPathCompleted) {
-      //   return (
-      //     <View style={styles.buttonContainer}>
-      //       <PrimaryButton
-      //         label={t('Common.finish')}
-      //         onPress={handleBackToPath}
-      //         customContainerStyle={styles.submitButton}
-      //       />
-      //     </View>
-      //   );
-      // }
+      if (isPathCompleted) {
+        return (
+          <View style={styles.buttonContainer}>
+            <PrimaryButton
+              label={t('Common.finish')}
+              onPress={handleFeedbackAndNavigate}
+              customContainerStyle={styles.submitButton}
+            />
+          </View>
+        );
+      }
 
       return (
         <View style={styles.buttonContainer}>
@@ -416,13 +416,12 @@ export const SimulationFeedbackScreen: React.FC<
                     )}
                   </View>
                 )}
-                {/* Almost there copy when retry is available */}
                 {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
                   <>
-                    <Text style={styles.almostThereTitle}>
+                    <Text style={styles.transitionMessageTitle}>
                       {t('SimulationFeedback.almostThereTitle')}
                     </Text>
-                    <Text style={styles.almostThereDescription}>
+                    <Text style={styles.transitionMessageContent}>
                       {t('SimulationFeedback.almostThereDescription')}
                     </Text>
                   </>
