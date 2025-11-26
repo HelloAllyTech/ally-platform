@@ -70,10 +70,11 @@ export const SimulationFeedbackScreen: React.FC<
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
+  const isCurrentSessionCompleted =
+    currentSession?.scenarioPathSessionItemStatus ===
+    SessionItemStatus.COMPLETED;
   const canRetryCurrent =
-    !!currentSession?.scenarioPathSessionItemId &&
-    currentSession?.scenarioPathSessionItemStatus !==
-      SessionItemStatus.COMPLETED;
+    !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
   const isPathCompleted = !!currentSession?.scenarioPathSessionStatus;
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
@@ -123,16 +124,32 @@ export const SimulationFeedbackScreen: React.FC<
     }
   }, [scenarioSessionId, getUpcomingScenario]);
 
-  useHardwareBackPressHandler(() => {
-    if (fromLogs) {
-      onBackPress();
-      return true;
+  const handleBack = () => {
+    if (pathId) {
+      // When coming from a simulation path, always collapse back to the
+      // pathway details screen and drop any intermediate feedback/assistant
+      // screens from the stack.
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+            params: {pathId},
+          },
+        ],
+      });
+      return;
     }
-    navigateToLearnTab(navigation);
-    return true;
-  });
 
-  const onBackPress = () => {
+    if (fromLogs) {
+      navigation.goBack();
+      return;
+    }
+
+    navigateToLearnTab(navigation);
+  };
+
+  const handleFeedbackAndNavigate = () => {
     const currentTime = Date.now();
     const timeElapsed = currentTime - mountTime;
 
@@ -140,8 +157,11 @@ export const SimulationFeedbackScreen: React.FC<
       setIsFeedbackPopupVisible(true);
       return true;
     }
-    navigation.goBack();
+    handleBack();
+    return true;
   };
+
+  useHardwareBackPressHandler(handleFeedbackAndNavigate);
 
   const submitFeedback = async (
     rating: number,
@@ -163,11 +183,7 @@ export const SimulationFeedbackScreen: React.FC<
       showToast(t('Errors.submitFeedback'), 'error');
       hideFeedbackPopup();
     }
-    if (fromLogs) {
-      navigation.goBack();
-    } else {
-      navigateToLearnTab(navigation);
-    }
+    handleBack();
   };
 
   useEffect(() => {
@@ -210,15 +226,6 @@ export const SimulationFeedbackScreen: React.FC<
   const onHeaderPress = () => setIsDropdownVisible(true);
   const hideHeaderDropdown = () => setIsDropdownVisible(false);
 
-  const handleBackToPath = () => {
-    if (pathId) {
-      navigation.navigate(SCREEN_NAMES.SIMULATION_PATH_DETAILS, {pathId});
-    } else {
-      // Fallback to Learn tab if no pathId
-      navigateToLearnTab(navigation);
-    }
-  };
-
   const handleRetrySimulation = () => {
     const current = currentSession;
     if (!current || !current.scenarioId || !current.scenarioPathSessionItemId) {
@@ -259,24 +266,24 @@ export const SimulationFeedbackScreen: React.FC<
     // Path simulations: show Finish / Retry / Next
     if (pathId) {
       // Path completed: show a single Finish button
-      if (isPathCompleted) {
-        return (
-          <View style={styles.buttonContainer}>
-            <PrimaryButton
-              label={t('Common.finish')}
-              onPress={handleBackToPath}
-              customContainerStyle={styles.submitButton}
-            />
-          </View>
-        );
-      }
+      // if (isPathCompleted) {
+      //   return (
+      //     <View style={styles.buttonContainer}>
+      //       <PrimaryButton
+      //         label={t('Common.finish')}
+      //         onPress={handleBackToPath}
+      //         customContainerStyle={styles.submitButton}
+      //       />
+      //     </View>
+      //   );
+      // }
 
       return (
         <View style={styles.buttonContainer}>
           <View style={styles.pathNavigationContainer}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={handleBackToPath}
+              onPress={handleFeedbackAndNavigate}
               activeOpacity={0.7}>
               <Text style={styles.backButtonText}>{t('Common.back')}</Text>
             </TouchableOpacity>
@@ -289,7 +296,7 @@ export const SimulationFeedbackScreen: React.FC<
                 isLoading={isStartingSimulation}
               />
             )}
-            {hasUpcoming && (
+            {isCurrentSessionCompleted && hasUpcoming && (
               <PrimaryButton
                 label={t('Common.next')}
                 onPress={handleNextSimulation}
@@ -346,7 +353,7 @@ export const SimulationFeedbackScreen: React.FC<
         <View style={styles.titleRow}>
           {fromLogs && (
             <TouchableOpacity
-              onPress={onBackPress}
+              onPress={handleFeedbackAndNavigate}
               style={styles.backArrowButton}>
               <LeftArrowIcon color={colors.black} />
             </TouchableOpacity>
@@ -420,7 +427,7 @@ export const SimulationFeedbackScreen: React.FC<
                     </Text>
                   </>
                 )}
-                {!!upcomingScenario && (
+                {isCurrentSessionCompleted && !!upcomingScenario && (
                   <UpNextSimulationCard upNext={upcomingScenario} />
                 )}
               </>
