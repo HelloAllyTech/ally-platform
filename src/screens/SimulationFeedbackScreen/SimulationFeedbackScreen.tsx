@@ -74,8 +74,7 @@ export const SimulationFeedbackScreen: React.FC<
     !!currentSession?.scenarioPathSessionItemId &&
     currentSession?.scenarioPathSessionItemStatus !==
       SessionItemStatus.COMPLETED;
-  const isPathCompleted =
-    currentSession?.scenarioPathSessionStatus === SessionItemStatus.COMPLETED;
+  const isPathCompleted = !!currentSession?.scenarioPathSessionStatus;
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
