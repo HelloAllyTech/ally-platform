@@ -62,9 +62,11 @@ export const styles = ScaledSheet.create({
     gap: '12@ms',
     marginTop: '20@vs',
   },
+  retryButton: {
+    flex: 1,
+  },
   nextButton: {
     flex: 1,
-    // paddingVertical: '8@vs',
   },
   scrollToBottomButton: {
     position: 'absolute',
@@ -114,5 +116,17 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  almostThereTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '16@ms',
+    lineHeight: '24@ms',
+    color: colors.ds.typography.highEmphasis,
+    marginBottom: '4@vs',
+  },
+  almostThereDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });

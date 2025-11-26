@@ -10,6 +10,7 @@
     "somethingWentWrong": "Something went wrong. Please try again.",
     "back": "Back",
     "next": "Next",
+    "finish": "Finish",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
@@ -343,7 +344,9 @@
     "areasForImprovement": "Areas for improvement",
     "noDataAvailable": "No Data Available",
     "benchmark": "(Benchmark: {{benchmark}})",
-    "upNext": "Up next"
+    "upNext": "Up next",
+    "almostThereTitle": "Almost there",
+    "almostThereDescription": "You didn’t meet the benchmark score or minimum time yet, but you’re improving. Try again when you’re ready."
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
