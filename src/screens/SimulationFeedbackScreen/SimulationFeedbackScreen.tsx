@@ -203,8 +203,7 @@ export const SimulationFeedbackScreen: React.FC<
 
   const handleBackToPath = () => {
     if (pathId) {
-      // Navigate to path details screen using replace to clear the stack
-      navigation.replace(SCREEN_NAMES.SIMULATION_PATH_DETAILS, {pathId});
+      navigation.navigate(SCREEN_NAMES.SIMULATION_PATH_DETAILS, {pathId});
     } else {
       // Fallback to Learn tab if no pathId
       navigateToLearnTab(navigation);
