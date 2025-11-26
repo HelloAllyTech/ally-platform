@@ -155,7 +155,6 @@ export const SimulationPathDetailsScreen: React.FC<
         // Navigate to feedback screen with the actual scenario session ID
         navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: response.id,
-          pathSessionItemId: scenario.sessionId,
           pathId,
           fromLogs: true,
         });

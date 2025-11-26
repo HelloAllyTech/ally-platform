@@ -44,7 +44,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {sessionData, scenario, pathSessionItemId, pathId} = route.params;
+  const {sessionData, scenario, pathId} = route.params;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const startTime = useMemo(
     () =>
@@ -234,7 +234,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     } finally {
       navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         scenarioSessionId: sessionId,
-        pathSessionItemId,
         pathId,
       });
       setIsMicEnabled(false);
@@ -371,6 +370,7 @@ const styles = ScaledSheet.create({
     borderRadius: '8@ms',
     marginTop: '10@mvs',
     marginBottom: '16@mvs',
+    paddingHorizontal: '16@ms',
     backgroundColor: colors.darkGray3,
   },
   liveFeedbackWrapper: {

@@ -27,6 +27,7 @@ import {
 } from '@/services';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
+import {SessionItemStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
@@ -45,7 +46,7 @@ const FEEDBACK_THRESHOLD = 30 * 1000;
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathSessionItemId, pathId} = route.params;
+  const {fromLogs, scenarioSessionId, pathId} = route.params;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -64,8 +65,18 @@ export const SimulationFeedbackScreen: React.FC<
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
   ] = useLazyGetSimulationDetailsQuery();
-  const [getUpcomingScenario, {data: upNextData}] =
+  const [getUpcomingScenario, {data: upcomingData}] =
     useLazyGetUpcomingScenarioQuery();
+  const upcomingScenario = upcomingData?.upcomingScenario;
+  const currentSession = upcomingData?.currentSession;
+  const hasUpcoming = !!upcomingScenario;
+  const canRetryCurrent =
+    !!currentSession?.scenarioPathSessionItemId &&
+    currentSession?.scenarioPathSessionItemStatus !==
+      SessionItemStatus.COMPLETED;
+  const isPathCompleted =
+    currentSession?.scenarioPathSessionStatus === SessionItemStatus.COMPLETED;
+
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
   const {showToast} = useToast();
@@ -75,8 +86,7 @@ export const SimulationFeedbackScreen: React.FC<
   const fetchSimulationDetailsWithRetry = async (
     currentRetryCount: number = 0,
   ) => {
-    // Use scenarioSessionId (always provided for path simulations after API call)
-    const sessionId = scenarioSessionId || pathSessionItemId;
+    const sessionId = scenarioSessionId;
     if (!sessionId) return;
 
     try {
@@ -107,12 +117,12 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   useEffect(() => {
-    if (scenarioSessionId && pathSessionItemId) {
+    if (scenarioSessionId) {
       getUpcomingScenario({
         scenarioSessionId: scenarioSessionId,
       });
     }
-  }, [scenarioSessionId, pathSessionItemId, getUpcomingScenario]);
+  }, [scenarioSessionId, getUpcomingScenario]);
 
   useHardwareBackPressHandler(() => {
     if (fromLogs) {
@@ -210,41 +220,85 @@ export const SimulationFeedbackScreen: React.FC<
     }
   };
 
+  const handleRetrySimulation = () => {
+    const current = currentSession;
+    if (!current || !current.scenarioId || !current.scenarioPathSessionItemId) {
+      return;
+    }
+
+    startSimulation(
+      {
+        id: current.scenarioId,
+        title: current.title || '',
+        description: current.description || '',
+        coverImageUrl: current.coverImageUrl,
+        coverVideoUrl: current.coverVideoUrl,
+      },
+      current.scenarioPathSessionItemId,
+      pathId,
+    );
+  };
+
   const handleNextSimulation = () => {
-    if (upNextData && upNextData.scenarioPathSessionItemId) {
+    const next = upcomingScenario;
+    if (next && next.scenarioPathSessionItemId && next.id) {
       startSimulation(
         {
-          id: upNextData.id,
-          title: upNextData.title || '',
-          description: upNextData.description || '',
-          coverImageUrl: upNextData.coverImageUrl,
-          coverVideoUrl: upNextData.coverVideoUrl,
+          id: next.id,
+          title: next.title || '',
+          description: next.description || '',
+          coverImageUrl: next.coverImageUrl,
+          coverVideoUrl: next.coverVideoUrl,
         },
-        upNextData.scenarioPathSessionItemId,
+        next.scenarioPathSessionItemId,
         pathId,
       );
     }
   };
 
   const renderButtonContainer = () => {
-    // For scenarios part of a path, show Back and Next buttons
-    if (pathSessionItemId) {
-      return (
-        <View style={styles.pathNavigationContainer}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBackToPath}
-            activeOpacity={0.7}>
-            <Text style={styles.backButtonText}>{t('Common.back')}</Text>
-          </TouchableOpacity>
-          {upNextData && (
+    // Path simulations: show Finish / Retry / Next
+    if (pathId) {
+      // Path completed: show a single Finish button
+      if (isPathCompleted) {
+        return (
+          <View style={styles.buttonContainer}>
             <PrimaryButton
-              label={t('Common.next')}
-              onPress={handleNextSimulation}
-              customContainerStyle={styles.nextButton}
-              isLoading={isStartingSimulation}
+              label={t('Common.finish')}
+              onPress={handleBackToPath}
+              customContainerStyle={styles.submitButton}
             />
-          )}
+          </View>
+        );
+      }
+
+      return (
+        <View style={styles.buttonContainer}>
+          <View style={styles.pathNavigationContainer}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBackToPath}
+              activeOpacity={0.7}>
+              <Text style={styles.backButtonText}>{t('Common.back')}</Text>
+            </TouchableOpacity>
+            {/* Show either Retry or Next, but never both */}
+            {!hasUpcoming && canRetryCurrent && (
+              <PrimaryButton
+                label={t('CallSummaryProgress.retry')}
+                onPress={handleRetrySimulation}
+                customContainerStyle={styles.retryButton}
+                isLoading={isStartingSimulation}
+              />
+            )}
+            {hasUpcoming && (
+              <PrimaryButton
+                label={t('Common.next')}
+                onPress={handleNextSimulation}
+                customContainerStyle={styles.nextButton}
+                isLoading={isStartingSimulation}
+              />
+            )}
+          </View>
         </View>
       );
     }
@@ -339,27 +393,38 @@ export const SimulationFeedbackScreen: React.FC<
               {simulationDetails && (
                 <SimulationSummary data={simulationDetails} />
               )}
-              {!!pathSessionItemId && upNextData && (
-                <>
-                  {/* Transition message section */}
-                  {(upNextData.transitionMessageTitle ||
-                    upNextData.transitionMessageContent) && (
-                    <View style={styles.transitionMessageContainer}>
-                      {upNextData.transitionMessageTitle && (
-                        <Text style={styles.transitionMessageTitle}>
-                          {upNextData.transitionMessageTitle}
-                        </Text>
-                      )}
-                      {upNextData.transitionMessageContent && (
-                        <Text style={styles.transitionMessageContent}>
-                          {upNextData.transitionMessageContent}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                  <UpNextSimulationCard upNext={upNextData} />
-                </>
-              )}
+              <>
+                {/* Transition message section */}
+                {(currentSession?.transitionMessageTitle ||
+                  currentSession?.transitionMessageContent) && (
+                  <View style={styles.transitionMessageContainer}>
+                    {currentSession?.transitionMessageTitle && (
+                      <Text style={styles.transitionMessageTitle}>
+                        {currentSession.transitionMessageTitle}
+                      </Text>
+                    )}
+                    {currentSession?.transitionMessageContent && (
+                      <Text style={styles.transitionMessageContent}>
+                        {currentSession.transitionMessageContent}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {/* Almost there copy when retry is available */}
+                {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
+                  <>
+                    <Text style={styles.almostThereTitle}>
+                      {t('SimulationFeedback.almostThereTitle')}
+                    </Text>
+                    <Text style={styles.almostThereDescription}>
+                      {t('SimulationFeedback.almostThereDescription')}
+                    </Text>
+                  </>
+                )}
+                {!!upcomingScenario && (
+                  <UpNextSimulationCard upNext={upcomingScenario} />
+                )}
+              </>
               {simulationDetails && renderButtonContainer()}
             </>
           )}
