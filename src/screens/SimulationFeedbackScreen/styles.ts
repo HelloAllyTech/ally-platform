@@ -110,23 +110,10 @@ export const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
     marginBottom: '8@vs',
-    textTransform: 'lowercase',
   },
   transitionMessageContent: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
-  },
-  almostThereTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
-    lineHeight: '24@ms',
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '4@vs',
-  },
-  almostThereDescription: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.ds.typography.mediumEmphasis,
   },
 });
