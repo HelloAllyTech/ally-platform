@@ -46,6 +46,7 @@ jest.mock('@/hooks', () => ({
     credits: {consumedCredits: 5, creditLimit: 10},
     getCreditsInfo: {isLow: false},
   })),
+  useHardwareBackPressHandler: jest.fn(),
   useStartSimulation: jest.fn(() => ({
     isCreatingRoom: false,
     isMicPermissionGranted: true,

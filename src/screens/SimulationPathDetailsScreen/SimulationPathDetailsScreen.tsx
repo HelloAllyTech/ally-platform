@@ -19,7 +19,12 @@ import {
 import {IllustratedModal, PrimaryButton, useToast} from '@/components';
 import {EmptyState} from '@/components/EmptyState/EmptyState';
 import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
-import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
+import {
+  useHardwareBackPressHandler,
+  useSimulationCredits,
+  useStartSimulation,
+  useTranslate,
+} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {
@@ -102,6 +107,11 @@ export const SimulationPathDetailsScreen: React.FC<
   const handleBack = () => {
     navigation.goBack();
   };
+
+  useHardwareBackPressHandler(() => {
+    handleBack();
+    return true;
+  });
 
   const handleStartPath = () => {
     if (!nextSimulation) return;
@@ -263,7 +273,8 @@ export const SimulationPathDetailsScreen: React.FC<
     item: PathScenario;
     index: number;
   }) => {
-    const isNext = nextSimulation?.id === item.id;
+    // Only show "Next" badge if path has been started and this is the next item
+    const isNext = isPathStarted && nextSimulation?.id === item.id;
 
     return (
       <PathSimulationCard
