@@ -126,12 +126,10 @@ export const SimulationFeedbackScreen: React.FC<
 
   const handleBack = () => {
     if (pathId) {
-      // When coming from a simulation path, always collapse back to the
-      // pathway details screen and drop any intermediate feedback/assistant
-      // screens from the stack.
       navigation.reset({
-        index: 0,
+        index: 1,
         routes: [
+          {name: SCREEN_NAMES.SIMULATIONS},
           {
             name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
             params: {pathId},
