@@ -34,7 +34,7 @@ import {
 } from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {PathScenario, SessionItemStatus} from '@/types';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, navigateToLearnTab} from '@/utils';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
@@ -111,7 +111,12 @@ export const SimulationPathDetailsScreen: React.FC<
     !nextSimulation || !!(credits && getCreditsInfo && getCreditsInfo.isLow);
 
   const handleBack = () => {
-    navigation.goBack();
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigateToLearnTab(navigation);
   };
 
   useHardwareBackPressHandler(() => {
