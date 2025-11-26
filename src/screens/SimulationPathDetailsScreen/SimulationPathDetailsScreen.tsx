@@ -52,6 +52,7 @@ export const SimulationPathDetailsScreen: React.FC<
     data: pathData,
     isLoading,
     error,
+    refetch: refetchPathDetails,
   } = useGetSimulationPathDetailsQuery({pathId});
 
   const [createPathSession, {isLoading: isCreatingSession}] =
@@ -75,14 +76,19 @@ export const SimulationPathDetailsScreen: React.FC<
     }
   }, [getCreditsInfo?.isLow]);
 
-  useEffect(() => {
+  const checkAndCreatePathSession = async () => {
     if (pathData && !pathData.scenarioPathSessionId) {
-      createPathSession({pathId}).catch(err => {
+      try {
+        await createPathSession({pathId}).unwrap();
+        const result = await refetchPathDetails();
+        if (result.data?.scenarioPathSessionId) {
+          setSelectedSimulation(result.data.scenarios[0]);
+        }
+      } catch (err) {
         showToast(getErrorDetails(err)?.message, 'error');
-      });
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathData]);
+  };
 
   const {
     isCreatingRoom,
@@ -113,7 +119,11 @@ export const SimulationPathDetailsScreen: React.FC<
     return true;
   });
 
-  const handleStartPath = () => {
+  const handleStartPath = async () => {
+    if (!pathData?.scenarioPathSessionId) {
+      await checkAndCreatePathSession();
+      return;
+    }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
   };
@@ -124,7 +134,11 @@ export const SimulationPathDetailsScreen: React.FC<
    * - Otherwise: Open simulation details modal
    * Only unlocked simulations are clickable (locked ones have disabled press)
    */
-  const handleSimulationPress = (scenario: PathScenario) => {
+  const handleSimulationPress = async (scenario: PathScenario) => {
+    if (!pathData?.scenarioPathSessionId) {
+      await checkAndCreatePathSession();
+      return;
+    }
     if (scenario.status === SessionItemStatus.LOCKED) {
       return;
     }
