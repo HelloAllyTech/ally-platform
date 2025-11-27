@@ -5,6 +5,7 @@ import {useErrorToast} from '@/components';
 import {MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
 import {useStartScenarioSessionMutation} from '@/services';
 import type {Scenario} from '@/types';
+import {getErrorDetails} from '@/utils';
 
 import {useAppNavigation} from './useAppNavigation';
 import {usePermissionAlert} from './usePermissionAlert';
@@ -118,7 +119,10 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         setActiveSimulationId(err.data?.entityId || null);
         setShowActiveSimulationModal(true);
       } else {
-        showErrorToast(error, 'Errors.startSimulation');
+        showErrorToast(
+          getErrorDetails(error)?.message,
+          'Errors.startSimulation',
+        );
       }
     } finally {
       setIsCreatingRoom(false);

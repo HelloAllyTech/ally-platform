@@ -268,7 +268,7 @@ export const SimulationPathDetailsScreen: React.FC<
           )}
 
           {/* Start/Continue button - only show if path is not completed */}
-          {!isPathCompleted && nextSimulation && (
+          {!isPathCompleted && (
             <PrimaryButton
               label={
                 isPathStarted

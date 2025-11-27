@@ -80,6 +80,7 @@ export const SimulationsScreen: React.FC = () => {
     const progress = item.completedScenarios;
     const total = item.totalScenarios;
     const showProgress = !!progress && !!total;
+    const isCompleted = !!progress && progress >= total;
 
     return (
       <SimulationCard
@@ -95,7 +96,9 @@ export const SimulationsScreen: React.FC = () => {
                 max={total}
                 size={33}
                 strokeWidth={3}
-                progressColor={colors.blue}>
+                progressColor={
+                  isCompleted ? colors.ds.green[400] : colors.blue
+                }>
                 <Text style={styles.progressText}>
                   {progress}/{total}
                 </Text>
