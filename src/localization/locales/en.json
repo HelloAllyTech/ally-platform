@@ -346,7 +346,7 @@
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
     "almostThereTitle": "Almost there",
-    "almostThereDescription": "You didn’t meet the benchmark score or minimum time yet, but you’re improving. Try again when you’re ready."
+    "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready."
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
