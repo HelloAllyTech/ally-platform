@@ -75,7 +75,7 @@ export const SimulationFeedbackScreen: React.FC<
     SessionItemStatus.COMPLETED;
   const canRetryCurrent =
     !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
-  const isPathCompleted = !!currentSession?.scenarioPathSessionStatus;
+  const isPathCompleted = !!currentSession?.isScenarioPathSessionCompleted;
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();

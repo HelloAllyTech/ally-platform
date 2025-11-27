@@ -137,7 +137,7 @@ export interface CurrentSessionInfo {
   scenarioPathSessionItemId?: string;
   transitionMessageTitle?: string;
   transitionMessageContent?: string;
-  scenarioPathSessionStatus?: boolean;
+  isScenarioPathSessionCompleted?: boolean;
 }
 
 export interface UpcomingScenarioResponse {
