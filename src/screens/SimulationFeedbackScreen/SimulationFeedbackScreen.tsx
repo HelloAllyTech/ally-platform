@@ -127,9 +127,8 @@ export const SimulationFeedbackScreen: React.FC<
   const handleBack = () => {
     if (pathId) {
       navigation.reset({
-        index: 1,
+        index: 0,
         routes: [
-          {name: SCREEN_NAMES.SIMULATIONS},
           {
             name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
             params: {pathId},
