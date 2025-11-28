@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
+from app.core.language_config import DEFAULT_LANGUAGE_CODE
 from app.utils import get_logger
 
 logger = get_logger(__name__)
@@ -42,6 +43,13 @@ class ScenarioVoice(BaseModel):
     config : VoiceConfig = Field(alias="config")
 
 
+class LanguageConfig(BaseModel):
+    """Language-specific configuration for STT and LLM providers."""
+    language_code: str = Field(default=DEFAULT_LANGUAGE_CODE)
+    stt_config: Optional[Dict[str, Any]] = Field(default=None)
+    llm_config: Optional[Dict[str, Any]] = Field(default=None)
+
+
 
 class Scenario(BaseModel):
     """
@@ -54,8 +62,9 @@ class Scenario(BaseModel):
     prompt: str
     events: List[BaseEvent] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    voice: ScenarioVoice = Field(default_factory=ScenarioVoice)
+    voice: Optional[ScenarioVoice] = Field(default=None)
     prompt_data : VoicePromptData = Field(default_factory=VoicePromptData)
+    language_config: Optional[LanguageConfig] = Field(default=None)
 
     model_config = {
         "populate_by_name": True,     # allow both alias and field name on input
@@ -82,6 +91,7 @@ class Scenario(BaseModel):
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
         prompt_data = cls._build_prompt_data(raw)
+        language_config = cls._build_language_config(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
@@ -90,7 +100,8 @@ class Scenario(BaseModel):
             metadata=normalized.get("metadata", {}),
             events=built_events,
             voice=voice_obj,
-            prompt_data=prompt_data
+            prompt_data=prompt_data,
+            language_config=language_config
         )
 
     # ---------------------------
@@ -171,6 +182,32 @@ class Scenario(BaseModel):
         except Exception as e:
             logger.error(f"Error instantiating VoicePromptData from mapped data: {e}")
             return None
+
+    @staticmethod
+    def _build_language_config(raw: Mapping[str, Any]) -> LanguageConfig:
+        """
+        Extract language configuration from metadata.
+        
+        Parses:
+        - languageCode: BCP 47 language code (defaults to "en-IN")
+        - stt: Optional STT provider override {provider: "...", config: {...}}
+        - llm: Optional LLM provider override {provider: "...", model: "...", temperature: ..., config: {...}}
+        
+        Args:
+            raw: Raw scenario dictionary from metadata
+            
+        Returns:
+            LanguageConfig object with language code and optional STT/LLM overrides
+        """
+        language_code = raw.get("languageCode", DEFAULT_LANGUAGE_CODE)
+        stt_config = raw.get("stt")
+        llm_config = raw.get("llm")
+        
+        return LanguageConfig(
+            language_code=language_code,
+            stt_config=stt_config,
+            llm_config=llm_config
+        )
 
 
 
