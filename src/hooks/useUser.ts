@@ -29,8 +29,8 @@ export const useUser = () => {
   const [getUser] = useLazyGetUserQuery();
   const [getPermissions] = useLazyGetPermissionsQuery();
 
-  const handleUserLogout = () => {
-    store.dispatch(handleLogout());
+  const handleUserLogout = async () => {
+    await store.dispatch(handleLogout());
     store.dispatch(api.util.resetApiState());
   };
 
