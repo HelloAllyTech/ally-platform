@@ -162,6 +162,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
     const onDisconnected = () => {
       setIsConnecting(false);
+      if (!isDisconnecting) {
+        setIsDisconnecting(true);
+        setIsMicEnabled(false);
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          scenarioSessionId: sessionId,
+          pathId,
+        });
+        setIsDisconnecting(false);
+      }
     };
     const onDataReceived = (payload: unknown) => {
       const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
@@ -190,7 +199,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp, ensureSpeakerOutput]);
+  }, [
+    room,
+    ensureSpeakerOutput,
+    showErrorToast,
+    isDisconnecting,
+    navigation,
+    sessionId,
+    pathId,
+    clamp,
+  ]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
