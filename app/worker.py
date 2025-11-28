@@ -9,6 +9,7 @@ from livekit.plugins.langchain import LLMAdapter
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from app.core.config import settings
+from app.core.constants import Environment
 from app.core.graph import agent_graph
 from app.utils.logger import get_logger
 from app.utils.tts_manager import get_tts_for_scenario, get_default_tts_config
@@ -115,9 +116,10 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
+    agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME
     agents.cli.run_app(
         agents.WorkerOptions(
-            agent_name=settings.AGENT_NAME,
+            agent_name=agent_name,
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
             num_idle_processes=1,
