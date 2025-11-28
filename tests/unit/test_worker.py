@@ -103,7 +103,7 @@ class TestWorker:
 
         # TTS config
         tts_called = {}
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda voice, gender: tts_called.setdefault("ok", True) or "TTS")
+        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda voice, gender, language_code=None: tts_called.setdefault("ok", True) or "TTS")
 
         # Graph update already tested; still keep it deterministic
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)

@@ -64,6 +64,9 @@ SCENARIO_SAMPLE = {
                 "speaker":"anushka",
             }
         },
+        # Language code for STT, LLM, and TTS providers (BCP 47 format)
+        # This will be passed to TTS providers that need it (e.g., Sarvam uses it for target_language_code)
+        "languageCode": "en-IN",
         "metadata": {}
     }
 }

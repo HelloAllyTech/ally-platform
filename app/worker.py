@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.constants import Environment
 from app.core.graph import agent_graph
 from app.utils.logger import get_logger
-from app.utils.tts_manager import get_tts_for_scenario, get_default_tts_config
+from app.tts import get_tts_for_scenario, get_default_tts_config
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
 
@@ -65,7 +65,11 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Configure TTS
     try:
-        tts_config = get_tts_for_scenario(scenario.voice, scenario.prompt_data.gender)
+        # Pass language_code if available from scenario's language_config
+        language_code = None
+        if scenario.language_config:
+            language_code = scenario.language_config.language_code
+        tts_config = get_tts_for_scenario(scenario.voice, scenario.prompt_data.gender, language_code=language_code)
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
         tts_config = get_default_tts_config(scenario.prompt_data.gender)
