@@ -6,10 +6,10 @@ from typing import Optional, cast, List
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 from livekit import rtc
 
-from app.core.config import settings
+from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.llms import get_llm_for_language
 from app.core.constants import VisibilityType
 from app.core.events.base import ChatMessage, BaseEvent
 from app.core.events.core_event_sender import CoreEventMessageType
@@ -126,18 +126,24 @@ async def generate_response(
             next_instruction=next_instruction,
         )
 
+    # Get language code from scenario for LLM selection
+    language_code = DEFAULT_LANGUAGE_CODE
+    if scenario and scenario.language_config:
+        language_code = scenario.language_config.language_code
+
     # Prepare the messages for the LLM call without mutating the state
     messages_to_send = []
     if system_message is not None:
         messages_to_send.append(system_message)
     messages_to_send.extend(state.messages)
 
-    # Create response from LLM
-    llm_response = ChatOpenAI(
-        model=settings.OPENAI_MODEL,
-        temperature=settings.LLM_TEMPERATURE,
-        api_key=settings.OPENAI_API_KEY,
-    )
+    # Create response from LLM using language-based abstraction
+    try:
+        llm_response = get_llm_for_language(language_code)
+    except Exception as e:
+        logger.warning(f"LLM config failed for {language_code}, using default: {e}")
+        llm_response = get_llm_for_language(DEFAULT_LANGUAGE_CODE)
+    
     response = await llm_response.ainvoke(messages_to_send)
 
     # Prepare the final messages (do not persist system or instruction in state)
