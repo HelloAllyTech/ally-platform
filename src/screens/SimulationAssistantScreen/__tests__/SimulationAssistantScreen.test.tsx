@@ -272,6 +272,17 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
+    (mockOff as jest.Mock).mockImplementation((event: string, cb: any) => {
+       if (event === 'connected') {
+         const index = connectedHandlers.indexOf(cb);
+         if (index > -1) connectedHandlers.splice(index, 1);
+       }
+       if (event === 'data') {
+         const index = dataHandlers.indexOf(cb);
+         if (index > -1) dataHandlers.splice(index, 1);
+       }
+    });
+
     const {getByTestId} = renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
