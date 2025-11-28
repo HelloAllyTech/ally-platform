@@ -18,11 +18,11 @@ class FakeLLM:
 class TestGenerateResponse:
     @pytest.mark.asyncio
     async def test_generate_response_builds_system_message_and_returns_ai_only(self, monkeypatch):
-        # Monkeypatch ChatOpenAI constructor to return FakeLLM
-        def fake_ctor(model, temperature, api_key):
+        # Monkeypatch get_llm_for_language to return FakeLLM
+        def fake_get_llm(language_code):
             return FakeLLM(content="hello from llm")
 
-        monkeypatch.setattr("app.core.graph.nodes.ChatOpenAI", fake_ctor)
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
 
         # Minimal BaseEvent subclass for new_events validation
         class FakeEvent(BaseEvent):
@@ -63,7 +63,12 @@ class TestGenerateResponse:
             "agent_goal": None,
         })()
 
-        scenario = type("Scenario", (), {"prompt_data": prompt_data})()
+        # Add language_config to scenario
+        language_config = type("LanguageConfig", (), {"language_code": "en-IN"})()
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": language_config
+        })()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
