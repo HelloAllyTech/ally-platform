@@ -9,7 +9,7 @@ LANGUAGE_DEFAULTS: Dict[str, Dict[str, Dict[str, Any]]] = {
         "llm": {"provider": "openai", "model": "gpt-4o-mini"}
     },
     "hi-IN": {
-        "stt": {"provider": "deepgram", "model": "nova-2"},
+        "stt": {"provider": "deepgram", "model": "nova-3"},
         "llm": {"provider": "openai", "model": "gpt-4o-mini"}
     },
     # Add more languages as needed

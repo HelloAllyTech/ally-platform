@@ -11,6 +11,9 @@ class TTSProvider(str, Enum):
     DEEPGRAM = "deepgram"
     SARVAM = "sarvam"
 
+class STTProvider(str, Enum):
+    DEEPGRAM = "deepgram"
+
 class VisibilityType(str, Enum):
     ACTIVE = "ACTIVE"
     PASSIVE = "PASSIVE"

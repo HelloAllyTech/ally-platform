@@ -4,15 +4,17 @@ from datetime import datetime, timezone
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
 from livekit.agents.cli.log import setup_logging
-from livekit.plugins import deepgram, noise_cancellation, silero
+from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from app.core.config import settings
 from app.core.constants import Environment
+from app.core.language_config import DEFAULT_LANGUAGE_CODE
 from app.core.graph import agent_graph
 from app.utils.logger import get_logger
 from app.tts import get_tts_for_scenario, get_default_tts_config
+from app.stt import get_stt_for_language
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
 
@@ -41,14 +43,10 @@ def initialize_agent_state(room_name: str, scenario) -> None:
     )
 
 
-def create_agent_session(tts_config, vad) -> AgentSession:
+def create_agent_session(tts_config, vad, stt_config) -> AgentSession:
     """Create and configure agent session with STT, TTS, and VAD."""
     return AgentSession(
-        stt=deepgram.STT(
-            model="nova-3",
-            language="en-IN",
-            api_key=settings.DEEPGRAM_API_KEY,
-        ),
+        stt=stt_config,
         tts=tts_config,
         vad=vad,
         turn_detection=MultilingualModel(),
@@ -63,12 +61,21 @@ async def entrypoint(ctx: agents.JobContext):
     scenario = rm_md_envelope.scenario
     logger.debug(f"Events in scenario: {str(scenario.events)}")
 
+    # Get language code from scenario
+    language_code = DEFAULT_LANGUAGE_CODE
+    if scenario.language_config:
+        language_code = scenario.language_config.language_code
+    
+    # Configure STT
+    try:
+        stt_config = get_stt_for_language(language_code)
+    except Exception as e:
+        logger.warning(f"STT config failed, using default: {e}")
+        stt_config = get_stt_for_language(DEFAULT_LANGUAGE_CODE)
+
     # Configure TTS
     try:
         # Pass language_code if available from scenario's language_config
-        language_code = None
-        if scenario.language_config:
-            language_code = scenario.language_config.language_code
         tts_config = get_tts_for_scenario(scenario.voice, scenario.prompt_data.gender, language_code=language_code)
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
@@ -93,7 +100,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Setup session
     vad = ctx.proc.userdata.get("vad")
-    session = create_agent_session(tts_config, vad)
+    session = create_agent_session(tts_config, vad, stt_config)
     agent = Assistant(llm=agent_adapter)
 
     # Register conversation handler

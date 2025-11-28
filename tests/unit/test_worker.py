@@ -31,12 +31,6 @@ class TestWorker:
         # Dummy components to capture inputs
         created = {}
 
-        class DummySTT:
-            def __init__(self, model, language, api_key):
-                created["stt"] = {"model": model, "language": language, "api_key": bool(api_key)}
-
-        monkeypatch.setattr(worker.deepgram, "STT", DummySTT)
-
         class DummyTD:
             pass
 
@@ -54,12 +48,11 @@ class TestWorker:
 
         tts_config = "TTS"
         vad = "VAD"
-        session = worker.create_agent_session(tts_config, vad)
+        stt_config = "STT"
+        session = worker.create_agent_session(tts_config, vad, stt_config)
 
         assert isinstance(session, DummyAgentSession)
-        assert created["stt"]["model"] == "nova-3"
-        assert created["stt"]["language"] == "en-IN"
-        assert created["stt"]["api_key"] is True
+        assert session.stt == "STT"
         assert session.tts == "TTS"
         assert session.vad == "VAD"
         assert isinstance(session.turn_detection, DummyTD)
@@ -96,11 +89,16 @@ class TestWorker:
             voice="en",
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello", "hi"]),
             events=["E1"],
+            language_config=None,  # Can be None, will default to DEFAULT_LANGUAGE_CODE
         )
 
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md: rm_md_envelope)
 
+        # STT config
+        stt_called = {}
+        monkeypatch.setattr(worker, "get_stt_for_language", lambda language_code: stt_called.setdefault("ok", True) or "STT")
+        
         # TTS config
         tts_called = {}
         monkeypatch.setattr(worker, "get_tts_for_scenario", lambda voice, gender, language_code=None: tts_called.setdefault("ok", True) or "TTS")
@@ -121,7 +119,7 @@ class TestWorker:
 
         # Session factory
         dummy_session = self.DummySession()
-        monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad: dummy_session)
+        monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
 
         # Conversation handler factory (just return passthrough fn)
         called_handler = {}
@@ -169,9 +167,13 @@ class TestWorker:
             voice="en",
             prompt_data=types.SimpleNamespace(gender="female", opening_statements=["hello"]),
             events=[],
+            language_config=None,
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md: rm_md_envelope)
+
+        # STT should work fine
+        monkeypatch.setattr(worker, "get_stt_for_language", lambda lang: "STT")
 
         def boom(*a, **k):
             raise RuntimeError("tts fail")
@@ -186,7 +188,7 @@ class TestWorker:
         monkeypatch.setattr(worker, "get_default_tts_config", fake_default_tts)
 
         dummy_session = self.DummySession()
-        monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad: dummy_session)
+        monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
         monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
