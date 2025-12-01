@@ -5,9 +5,15 @@ from pydantic import BaseModel, Field
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
 from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.core.embeddings import BaseEmbeddingClient
 from app.utils import get_logger
 
 logger = get_logger(__name__)
+
+class TerminationEvent(BaseModel):
+    """Configuration for auto-termination event."""
+    id: str = Field(..., description="Event ID that triggers termination")
+    termination_message: str = Field(..., alias="terminationMessage", description="Custom message to speak on termination")
 
 class VoicePromptData(BaseModel):
     name : str = Field(...)
@@ -61,6 +67,8 @@ class Scenario(BaseModel):
     learning_objective: str = Field(alias="learningObjective")
     prompt: str
     events: List[BaseEvent] = Field(default_factory=list)
+    trigger_events: List[str] = Field(default_factory=list, description="List of event IDs that should be sent to UI/Core")
+    termination_event: Optional[TerminationEvent] = Field(default=None, alias="terminationEvent", description="Configuration for auto-termination event")
     metadata: Dict[str, Any] = Field(default_factory=dict)
     voice: Optional[ScenarioVoice] = Field(default=None)
     prompt_data : VoicePromptData = Field(default_factory=VoicePromptData)
@@ -75,7 +83,7 @@ class Scenario(BaseModel):
     # Public constructor
     # ---------------------------
     @classmethod
-    def create(cls, payload: Mapping[str, Any]) -> "Scenario":
+    def create(cls, payload: Mapping[str, Any], embedding_client: Optional[BaseEmbeddingClient] = None) -> "Scenario":
         """
         Build a Scenario from:
           - a top-level BE payload: {"version": "...", "scenario": {...}}
@@ -83,15 +91,23 @@ class Scenario(BaseModel):
 
         Ensures `events` are BaseEvent instances resolved via your registry.
         (Only events whose `id` exists in the registry are instantiated.)
+
+        Args:
+            payload: Scenario metadata
+            embedding_client: Optional shared embedding client for semantic similarity events
         """
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
         # built_events = cls._build_events(raw)
-        built_events = build_events_from_metadata(raw)
+        built_events = build_events_from_metadata(raw, embedding_client=embedding_client)
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
         prompt_data = cls._build_prompt_data(raw)
         language_config = cls._build_language_config(raw)
+        # Extract trigger_events (list of event IDs that should be sent)
+        trigger_events = raw.get("trigger_events") or []
+        # Extract termination event configuration
+        termination_event = cls._build_termination_event(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
@@ -99,6 +115,8 @@ class Scenario(BaseModel):
             prompt=normalized["prompt"],
             metadata=normalized.get("metadata", {}),
             events=built_events,
+            trigger_events=trigger_events if isinstance(trigger_events, list) else [],
+            terminationEvent=termination_event,
             voice=voice_obj,
             prompt_data=prompt_data,
             language_config=language_config
@@ -184,25 +202,38 @@ class Scenario(BaseModel):
             return None
 
     @staticmethod
+    def _build_termination_event(raw: Mapping[str, Any]) -> Optional[TerminationEvent]:
+        """Extract termination event configuration from scenario-level `autoTerminationEvent` key."""
+        termination_event_data = raw.get("autoTerminationEvent")
+        if not termination_event_data:
+            return None
+
+        try:
+            return TerminationEvent(**termination_event_data)
+        except Exception as e:
+            logger.error(f"Error instantiating TerminationEvent from data: {e}")
+            return None
+
+    @staticmethod
     def _build_language_config(raw: Mapping[str, Any]) -> LanguageConfig:
         """
         Extract language configuration from metadata.
-        
+
         Parses:
         - languageCode: BCP 47 language code (defaults to "en-IN")
         - stt: Optional STT provider override {provider: "...", config: {...}}
         - llm: Optional LLM provider override {provider: "...", model: "...", temperature: ..., config: {...}}
-        
+
         Args:
             raw: Raw scenario dictionary from metadata
-            
+
         Returns:
             LanguageConfig object with language code and optional STT/LLM overrides
         """
         language_code = raw.get("languageCode", DEFAULT_LANGUAGE_CODE)
         stt_config = raw.get("stt")
         llm_config = raw.get("llm")
-        
+
         return LanguageConfig(
             language_code=language_code,
             stt_config=stt_config,

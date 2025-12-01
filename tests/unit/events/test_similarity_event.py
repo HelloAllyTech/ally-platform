@@ -1,13 +1,13 @@
 import pytest
 
-from app.core.events.event_list.similarity_based.generic import GenericSimilarityEvent
+from app.core.events.event_types.similarity_based.similarity_event import SimilarityEvent
 from app.core.events.base import ChatMessage
 
 
-class TestGenericSimilarityEvent:
+class TestSimilarityEvent:
     @pytest.mark.asyncio
     async def test_generic_similarity_detects_on_counselor_last_message(self):
-        ev = GenericSimilarityEvent.create(
+        ev = SimilarityEvent.create(
             event_id="g1",
             custom_sentences=["please slow down", "great explanation"],
             score=5,
@@ -23,13 +23,13 @@ class TestGenericSimilarityEvent:
 
     @pytest.mark.asyncio
     async def test_generic_similarity_no_sentences_never_matches(self):
-        ev = GenericSimilarityEvent.create(event_id="g2", custom_sentences=[])
+        ev = SimilarityEvent.create(event_id="g2", custom_sentences=[])
         # No sentences list is allowed but should never match
         assert await ev.detect_event([ChatMessage(role="counselor", content="anything")]) is False
 
     def test_generic_similarity_cache_reuse_between_instances(self):
-        ev1 = GenericSimilarityEvent.create(event_id="g3", custom_sentences=["hello there", "hello there"], match_threshold=0.7)
-        ev2 = GenericSimilarityEvent.create(event_id="g4", custom_sentences=["hello there"], match_threshold=0.7)
+        ev1 = SimilarityEvent.create(event_id="g3", custom_sentences=["hello there", "hello there"], match_threshold=0.7)
+        ev2 = SimilarityEvent.create(event_id="g4", custom_sentences=["hello there"], match_threshold=0.7)
 
         # Build patterns for both
         assert ev1._instance_built is False
@@ -40,7 +40,7 @@ class TestGenericSimilarityEvent:
         assert ev1._instance_built is True
 
         # Before matching on ev2, cache should have an entry
-        assert len(GenericSimilarityEvent._PATTERN_CACHE) >= 1
+        assert len(SimilarityEvent._PATTERN_CACHE) >= 1
 
         # After matching on ev2 with same config, patterns should reference cached list
         assert ev2._match("hello there") is True
@@ -49,5 +49,5 @@ class TestGenericSimilarityEvent:
         # Build the same cache key by reusing internal logic inputs
         # Ensure at least one cache entry list object is reused across instances
         # Find any cached value equal to ev2 patterns list and check identity with ev2's patterns
-        cached_lists = list(GenericSimilarityEvent._PATTERN_CACHE.values())
+        cached_lists = list(SimilarityEvent._PATTERN_CACHE.values())
         assert any(pl is ev2._instance_patterns for pl in cached_lists)

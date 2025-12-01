@@ -44,6 +44,8 @@ class TestUtils:
             "branchInstruction": "ask_about_progress",
             "sentences": ["one", "two"],
             "feedbackStatus": False,
+            "autoTerminationStatus": None,
+            "terminationMessage": None,
         }
 
     def test_serialize_event_with_defaults_and_nones(self):

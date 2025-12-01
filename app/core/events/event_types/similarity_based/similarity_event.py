@@ -1,5 +1,5 @@
 """
-Generic similarity event for runtime instantiation from YAML sentences.
+Similarity event for runtime instantiation from YAML sentences.
 """
 import re
 import unicodedata
@@ -10,7 +10,7 @@ from pydantic import PrivateAttr
 
 from app.core.constants import SimilarityEventConfig
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_list.similarity_based.constants import DEFAULT_STOPWORDS
+from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS, MATCH_THRESHOLD, MIN_MATCH_TOKENS
 
 
 @dataclass(frozen=True)
@@ -22,9 +22,9 @@ class TargetPattern:
     informative_tokens: frozenset[str]
 
 
-class GenericSimilarityEvent(BaseEvent):
+class SimilarityEvent(BaseEvent):
     """
-    Generic similarity-based event instantiated from YAML sentences.
+    Similarity-based event instantiated from YAML sentences.
     
     Uses shared pattern cache for performance across instances with identical configurations.
     """
@@ -52,19 +52,19 @@ class GenericSimilarityEvent(BaseEvent):
         match_threshold: Optional[float] = SimilarityEventConfig.match_threshold,
         min_match_tokens: Optional[int] = SimilarityEventConfig.min_match_tokens,
         **kwargs,
-    ) -> "GenericSimilarityEvent":
+    ) -> "SimilarityEvent":
         """
-        Create a GenericSimilarityEvent with Pydantic-safe construction.
+        Create a SimilarityEvent with Pydantic-safe construction.
         
-        BaseEvent fields (event_id, visibility_type, score, emoji, etc.) are passed via kwargs.
+        BaseEvent fields (event_id, visibility_type, score, emoji, show_feedback, etc.) are passed via kwargs.
         """
-        inst: GenericSimilarityEvent = cls.model_construct(
+        inst: SimilarityEvent = cls.model_construct(
             event_id=event_id,
             sentences=list(custom_sentences or []),
             **kwargs
         )
-        inst._match_threshold = match_threshold if match_threshold is not None else 0.6
-        inst._min_match_tokens = min_match_tokens if min_match_tokens is not None else 2
+        inst._match_threshold = match_threshold if match_threshold is not None else MATCH_THRESHOLD
+        inst._min_match_tokens = min_match_tokens if min_match_tokens is not None else MIN_MATCH_TOKENS
         inst._stopwords = DEFAULT_STOPWORDS
         inst._instance_patterns = []
         inst._instance_built = False

@@ -40,6 +40,7 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[ev1, ev2],
             current_score=0,
+            branching_instructions=[],
         )
 
         # Provide scenario with prompt_data via config
@@ -82,3 +83,294 @@ class TestGenerateResponse:
         assert new_state.new_events == []
         # permitted/events_accumulator/current_score preserved
         assert new_state.current_score == state.current_score
+
+    @pytest.mark.asyncio
+    async def test_generate_response_selects_max_magnitude_branching_instruction(self, monkeypatch):
+        def fake_get_llm(language_code):
+            return FakeLLM(content="response")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+
+        # Multiple branching instructions with different scores
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_instructions=[
+                ("low positive", 2),
+                ("high negative", -10),  # Highest magnitude
+                ("medium positive", 5),
+            ],
+        )
+
+        prompt_data = type("PD", (), {
+            "name": "Test",
+            "age": "30",
+            "gender": "Male",
+            "gender_identity": None,
+            "sexual_orientation": None,
+            "current_location": "NYC",
+            "profession": None,
+            "context": "Context",
+            "session_behavior_guidelines": None,
+            "life_history_summary": "History",
+            "core_memories": None,
+            "personality": None,
+            "starting_state": None,
+            "emotional_needs": None,
+            "tone": None,
+            "opening_statements": ["Hi"],
+            "agent_goal": None,
+        })()
+
+        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": language_config
+        })()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        # Branching instructions should be cleared after use
+        assert new_state.branching_instructions == []
+
+    @pytest.mark.asyncio
+    async def test_generate_response_filters_empty_branching_instructions(self, monkeypatch):
+        def fake_get_llm(language_code):
+            return FakeLLM(content="response")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+
+        # Mix of valid and invalid instructions
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_instructions=[
+                ("", 5),  # Empty string
+                ("  ", 3),  # Whitespace only
+                ("valid instruction", 2),
+            ],
+        )
+
+        prompt_data = type("PD", (), {
+            "name": "Test",
+            "age": "30",
+            "gender": "Male",
+            "gender_identity": None,
+            "sexual_orientation": None,
+            "current_location": "NYC",
+            "profession": None,
+            "context": "Context",
+            "session_behavior_guidelines": None,
+            "life_history_summary": "History",
+            "core_memories": None,
+            "personality": None,
+            "starting_state": None,
+            "emotional_needs": None,
+            "tone": None,
+            "opening_statements": ["Hi"],
+            "agent_goal": None,
+        })()
+
+        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": language_config
+        })()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        assert new_state.branching_instructions == []
+
+    @pytest.mark.asyncio
+    async def test_generate_response_handles_llm_fallback(self, monkeypatch):
+        call_count = {"primary": 0, "fallback": 0}
+
+        def fake_get_llm(language_code):
+            if language_code == "unsupported-lang":
+                call_count["primary"] += 1
+                raise ValueError("Unsupported language")
+            else:
+                call_count["fallback"] += 1
+                return FakeLLM(content="fallback response")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_instructions=[],
+        )
+
+        prompt_data = type("PD", (), {
+            "name": "Test",
+            "age": "30",
+            "gender": "Male",
+            "gender_identity": None,
+            "sexual_orientation": None,
+            "current_location": "NYC",
+            "profession": None,
+            "context": "Context",
+            "session_behavior_guidelines": None,
+            "life_history_summary": "History",
+            "core_memories": None,
+            "personality": None,
+            "starting_state": None,
+            "emotional_needs": None,
+            "tone": None,
+            "opening_statements": ["Hi"],
+            "agent_goal": None,
+        })()
+
+        language_config = type("LanguageConfig", (), {"language_code": "unsupported-lang"})()
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": language_config
+        })()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        assert call_count["primary"] == 1
+        assert call_count["fallback"] == 1
+        assert new_state.messages[0].content == "fallback response"
+
+    @pytest.mark.asyncio
+    async def test_generate_response_without_scenario(self, monkeypatch):
+        def fake_get_llm(language_code):
+            return FakeLLM(content="response without scenario")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_instructions=[],
+        )
+
+        # No scenario in config
+        config = {"configurable": {}}
+
+        new_state = await generate_response(state, config=config)
+
+        assert len(new_state.messages) == 1
+        assert new_state.messages[0].content == "response without scenario"
+
+    @pytest.mark.asyncio
+    async def test_generate_response_with_no_language_config(self, monkeypatch):
+        def fake_get_llm(language_code):
+            return FakeLLM(content=f"response in {language_code}")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_instructions=[],
+        )
+
+        prompt_data = type("PD", (), {
+            "name": "Test",
+            "age": "30",
+            "gender": "Male",
+            "gender_identity": None,
+            "sexual_orientation": None,
+            "current_location": "NYC",
+            "profession": None,
+            "context": "Context",
+            "session_behavior_guidelines": None,
+            "life_history_summary": "History",
+            "core_memories": None,
+            "personality": None,
+            "starting_state": None,
+            "emotional_needs": None,
+            "tone": None,
+            "opening_statements": ["Hi"],
+            "agent_goal": None,
+        })()
+
+        # No language_config
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": None
+        })()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        assert "en-US" in new_state.messages[0].content
+
+    @pytest.mark.asyncio
+    async def test_generate_response_preserves_state_fields(self, monkeypatch):
+        def fake_get_llm(language_code):
+            return FakeLLM(content="response")
+
+        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+
+        class FakeEvent(BaseEvent):
+            async def detect_event(self, conversations):
+                return False
+
+        e1 = FakeEvent(event_id="e1")
+        accumulated = [("2024-01-01T00:00:00.000Z", e1)]
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[e1],
+            events_accumulator=accumulated,
+            new_events=[],
+            current_score=42,
+            branching_instructions=[],
+        )
+
+        prompt_data = type("PD", (), {
+            "name": "Test",
+            "age": "30",
+            "gender": "Male",
+            "gender_identity": None,
+            "sexual_orientation": None,
+            "current_location": "NYC",
+            "profession": None,
+            "context": "Context",
+            "session_behavior_guidelines": None,
+            "life_history_summary": "History",
+            "core_memories": None,
+            "personality": None,
+            "starting_state": None,
+            "emotional_needs": None,
+            "tone": None,
+            "opening_statements": ["Hi"],
+            "agent_goal": None,
+        })()
+
+        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        scenario = type("Scenario", (), {
+            "prompt_data": prompt_data,
+            "language_config": language_config
+        })()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        # Verify preserved fields
+        assert new_state.permitted_events == [e1]
+        assert new_state.events_accumulator == accumulated
+        assert new_state.current_score == 42

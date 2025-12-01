@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from abc import ABC
 
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_list.similarity_based.constants import DEFAULT_STOPWORDS
+from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS
 
 
 # ---------- Data model ----------

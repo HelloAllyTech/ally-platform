@@ -1,7 +1,7 @@
 import pytest
 from typing import List
 
-from app.core.events.event_list.similarity_based.base import SimilarityBaseEvent
+from app.core.events.event_types.similarity_based.base import SimilarityBaseEvent
 from app.core.events.base import ChatMessage
 
 

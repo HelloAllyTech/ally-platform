@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import VisibilityType
+from app.core.constants import VisibilityType, DetectionType
 
 
 class ChatMessage(BaseModel):
@@ -34,6 +34,11 @@ class BaseEvent(BaseModel, ABC):
     
     # Instance-level visibility type
     visibility_type: VisibilityType = VisibilityType.ACTIVE
+    
+    # Detection type and data (optional for backward compatibility)
+    # Default to SENTENCE_SIMILARITY with empty sentences list
+    detection_type: DetectionType = DetectionType.SENTENCE_SIMILARITY
+    data: Any = Field(default_factory=lambda: {})
 
     # Per-scenario values (come from metadata)
     score: Optional[int] = None

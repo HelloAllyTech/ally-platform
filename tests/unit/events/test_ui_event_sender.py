@@ -3,10 +3,10 @@ from typing import Optional
 
 import pytest
 
-from app.core.events.ui_event_sender import (
+from app.utils.event_handler import send_event_to_ui
+from app.core.events.schemas import (
     CustomUIEventMessageType,
     CustomUIEventMessageTypeData,
-    send_event,
 )
 
 
@@ -66,7 +66,7 @@ class TestUIEventSender:
             timestamp="2024-01-01T00:00:00.000Z"
         )
 
-        ok = await send_event(evt, room)
+        ok = await send_event_to_ui(evt, room)
         assert ok is True
 
         assert len(room.local_participant.published) == 1
@@ -91,7 +91,7 @@ class TestUIEventSender:
             show_feedback=False
         )
 
-        ok = await send_event(evt, room)
+        ok = await send_event_to_ui(evt, room)
 
         # Should return True (sent) and emoji should be null
         assert ok is True
@@ -115,7 +115,7 @@ class TestUIEventSender:
 
         # Failure path
         room.local_participant.raise_error = True
-        ok = await send_event(evt, room)
+        ok = await send_event_to_ui(evt, room)
         assert ok is False
 
     @pytest.mark.asyncio
@@ -129,7 +129,7 @@ class TestUIEventSender:
             show_feedback=True
         )
 
-        ok = await send_event(evt, room)
+        ok = await send_event_to_ui(evt, room)
         assert ok is True
 
         payload = room.local_participant.published[-1]
@@ -149,7 +149,7 @@ class TestUIEventSender:
             show_feedback=True
         )
 
-        ok = await send_event(evt, room)
+        ok = await send_event_to_ui(evt, room)
         assert ok is True
 
         payload = room.local_participant.published[-1]

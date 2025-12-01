@@ -30,6 +30,7 @@ livekit-plugins-elevenlabs = "^1.2.9"
 sarvamai = "^0.1.21"
 deepgram-sdk = "^5.2.0"
 elevenlabs = "^2.20.0"
+numpy = "^2.3.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

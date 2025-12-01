@@ -3,7 +3,7 @@ import random
 
 from app.core.events.event_processor import EventProcessor
 from app.core.events.base import BaseEvent
-from app.core.events.ui_event_sender import CustomUIEventMessageType
+from app.core.events.schemas import CustomUIEventMessageType
 
 
 class DummyEvent(BaseEvent):

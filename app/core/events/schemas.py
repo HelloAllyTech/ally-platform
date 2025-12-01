@@ -1,0 +1,127 @@
+"""
+Centralized schemas for event registry and related structures.
+"""
+import time
+from livekit import rtc
+from app.core.constants import DetectionType
+from app.core.events.event_types.combination.constants import ExpressionNode
+from pydantic import BaseModel, Field
+from app.utils import get_logger, get_current_iso_timestamp
+from app.utils.datetime_utils import get_current_iso_timestamp as get_iso_timestamp
+from typing import Optional, Literal, TypedDict
+from app.core.events.base import ChatMessage
+
+
+class EventRegistryEntry(TypedDict):
+    """
+    Structure for an event registry entry.
+    
+    Attributes:
+        happened: Whether the event has occurred/is active
+        trigger_multiple: True for sentence similarity events (can trigger multiple times),
+                         False for time/score/combination events (trigger once)
+    """
+    happened: bool
+    trigger_multiple: bool
+
+
+class ExpressionListEntry(TypedDict):
+    """
+    Structure for an expression list entry (combination events).
+    
+    Attributes:
+        event_id: The event ID this expression belongs to
+        type: The detection type (should be COMBINATION)
+        expression: The expression node to evaluate
+    """
+    event_id: str
+    type: DetectionType
+    expression: ExpressionNode
+
+class CustomUIEventMessageTypeData(BaseModel):
+    """Schema for custom event data payload."""
+
+    score: Optional[int] = Field(None, description="Event score")
+    emoji: Optional[str] = Field(..., description="Event emoji")
+    message: Optional[str] = Field(..., description="Event message")
+    show_feedback: bool = Field(..., description="Show feedback button")
+
+class CoreEventType(BaseModel):
+    """Core event data structure."""
+    event_data: dict = None
+    timestamp: Optional[str] = None  # store as ISO string for consistency
+
+    @classmethod
+    def create(
+        cls, timestamp: Optional[str] = None, event_data: dict = None
+    ) -> "CoreEventType":
+        if timestamp is None:
+            timestamp = get_current_iso_timestamp()
+        return cls(timestamp=timestamp, event_data=event_data)
+
+
+class CoreEventMessageTypeData(BaseModel):
+    """Data payload for core event messages."""
+    chat_message: Optional[ChatMessage] = Field(
+        default=None, description="Message from user or agent"
+    )
+    event: Optional[CoreEventType] = Field(
+        default=None, description="Event ID of an event"
+    )
+
+
+class CoreEventMessageType(BaseModel):
+    """Schema for core event messages."""
+    message_type: Literal["message", "event"]
+    data: CoreEventMessageTypeData
+    room_id: str
+    timestamp: int
+
+    @classmethod
+    def create(
+        cls,
+        room_id: str,
+        chat_message: Optional[ChatMessage] = None,
+        event_data: dict = None,
+    ) -> "CoreEventMessageType":
+        event = None
+        if event_data:
+            event = CoreEventType.create(event_data=event_data)
+
+        return cls(
+            message_type="message" if chat_message else "event",
+            data=CoreEventMessageTypeData(chat_message=chat_message, event=event),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+class CustomUIEventMessageType(BaseModel):
+    """Schema for custom event sent to frontend."""
+
+    version: str = Field(default="1.0", description="Event format version")
+    data: CustomUIEventMessageTypeData = Field(..., description="Event data payload")
+    timestamp: str = Field(..., description="ISO timestamp when event occurred")
+
+    @classmethod
+    def create(
+            cls,
+            score: Optional[int],
+            emoji: Optional[str],
+            message: Optional[str],
+            timestamp: Optional[str] = None,
+            show_feedback: Optional[bool] = True,
+    ) -> "CustomUIEventMessageType":
+        """Create a custom event with current timestamp."""
+        if timestamp is None:
+            timestamp = get_iso_timestamp()
+
+        return cls(
+            version="1.0",
+            data=CustomUIEventMessageTypeData(
+                score=score, 
+                emoji=emoji, 
+                message=message,
+                show_feedback=show_feedback
+            ),
+            timestamp=timestamp
+        )
