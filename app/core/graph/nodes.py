@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from livekit import rtc
 
-from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.core.language import DEFAULT_LANGUAGE_CODE
 from app.llms import get_llm_for_language
 from app.core.constants import VisibilityType
 from app.core.config import settings

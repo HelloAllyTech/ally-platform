@@ -10,14 +10,14 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from app.core.config import settings
 from app.core.constants import Environment
-from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.core.language import DEFAULT_LANGUAGE_CODE
 from app.core.graph import agent_graph
 from app.core.events.base import BaseEvent
 from app.core.events.event_registry.event_registry import EventRegistry
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.utils.logger import get_logger
 from app.tts import get_tts_for_scenario, get_default_tts_config
-from app.stt import get_stt_for_language
+from app.stt import create_stt_client
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
 
@@ -121,10 +121,12 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Configure STT
     try:
-        stt_config = get_stt_for_language(language_code)
+        stt_client = create_stt_client(language_code)
+        stt_config = stt_client.stt_instance
     except Exception as e:
         logger.warning(f"STT config failed, using default: {e}")
-        stt_config = get_stt_for_language(DEFAULT_LANGUAGE_CODE)
+        stt_client = create_stt_client(DEFAULT_LANGUAGE_CODE)
+        stt_config = stt_client.stt_instance
 
     # Configure TTS
     try:

@@ -1,7 +1,11 @@
 """STT provider abstractions."""
-from app.stt.stt import get_stt_for_language
+from app.stt.base import BaseSTTClient
+from app.stt.deepgram import DeepgramSTTClient
+from app.stt.factory import create_stt_client
 
 __all__ = [
-    "get_stt_for_language",
+    "BaseSTTClient",
+    "DeepgramSTTClient",
+    "create_stt_client",
 ]
 

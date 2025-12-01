@@ -2,76 +2,72 @@
 from typing import Optional
 from livekit.plugins import deepgram
 from app.core.config import settings
-from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.stt.base import BaseSTTClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def _convert_to_deepgram_language_code(language_code: str) -> str:
+class DeepgramSTTClient(BaseSTTClient):
     """
-    Convert BCP 47 language code to Deepgram's ISO 639-1 format.
+    Deepgram STT client implementation.
     
-    Deepgram uses ISO 639-1 language codes (e.g., "en", "hi") instead of 
-    BCP 47 format (e.g., "en-IN", "hi-IN"). This function extracts the 
-    base language code from BCP 47 format.
-    
-    Args:
-        language_code: BCP 47 language code (e.g., "en-IN", "hi-IN", "en-US")
-    
-    Returns:
-        ISO 639-1 language code (e.g., "en", "hi")
-    
-    Examples:
-        "en-IN" -> "en"
-        "hi-IN" -> "hi"
-        "en-US" -> "en"
-        "en" -> "en" (already in correct format)
+    Uses Deepgram's speech-to-text service via LiveKit plugins.
+    Deepgram requires ISO 639-1 format (e.g., "en", "hi").
+    Language conversion is handled automatically via convert_language_code().
     """
-    # Split by hyphen and take the first part (base language code)
-    # "en-IN" -> "en", "hi-IN" -> "hi"
-    base_language = language_code.split("-")[0].lower()
-    return base_language
-
-
-def create_deepgram_stt(
-    model: str,
-    language_code: Optional[str] = None,
-    api_key: Optional[str] = None,
-) -> deepgram.STT:
-    """
-    Create Deepgram STT instance.
     
-    Args:
-        model: Deepgram model name (e.g., "nova-3", "nova-2")
-        language_code: Optional BCP 47 language code (e.g., "en-IN", "hi-IN")
-            Will be converted to ISO 639-1 format (e.g., "en", "hi") for Deepgram
-            Defaults to DEFAULT_LANGUAGE_CODE if not provided
-        api_key: Optional Deepgram API key. If not provided, uses settings.DEEPGRAM_API_KEY
+    # Declare language format requirement
+    LANGUAGE_FORMAT = "iso6391"
     
-    Returns:
-        Deepgram STT instance
-    """
-    if not model:
-        raise ValueError("Deepgram STT requires 'model' parameter")
+    def __init__(
+        self,
+        model: str,
+        language_code: str,  # BCP 47 format, will be converted
+        api_key: Optional[str] = None,
+    ) -> None:
+        """
+        Initialize Deepgram STT client.
+        
+        Args:
+            model: Deepgram model name (e.g., "nova-3", "nova-2")
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+                Will be converted to ISO 639-1 format automatically
+            api_key: Optional Deepgram API key. If not provided, uses settings.DEEPGRAM_API_KEY
+        """
+        if not model:
+            raise ValueError("Deepgram STT requires 'model' parameter")
+        
+        if not language_code:
+            raise ValueError("Deepgram STT requires 'language_code' parameter")
+        
+        self._model = model
+        
+        # Convert language code to Deepgram's required format
+        self._language_code = self.convert_language_code(language_code)
+        
+        # Use provided API key or fall back to settings
+        self._api_key = api_key or settings.DEEPGRAM_API_KEY
+        
+        if not self._api_key:
+            raise ValueError("Deepgram STT requires 'api_key' parameter or DEEPGRAM_API_KEY in settings")
+        
+        logger.debug(f"Creating Deepgram STT with model: {model}, language: {self._language_code} (from {language_code})")
+        
+        # Create the underlying STT instance
+        self._stt_instance = deepgram.STT(
+            model=self._model,
+            language=self._language_code,
+            api_key=self._api_key,
+        )
     
-    # Use default language code if not provided
-    bcp47_code = language_code or DEFAULT_LANGUAGE_CODE
-    
-    # Convert BCP 47 to Deepgram's ISO 639-1 format
-    deepgram_language = _convert_to_deepgram_language_code(bcp47_code)
-    
-    logger.debug(f"Converting language code: {bcp47_code} -> {deepgram_language} for Deepgram")
-    
-    # Use provided API key or fall back to settings
-    api_key = api_key or settings.DEEPGRAM_API_KEY
-    
-    if not api_key:
-        raise ValueError("Deepgram STT requires 'api_key' parameter or DEEPGRAM_API_KEY in settings")
-    
-    return deepgram.STT(
-        model=model,
-        language=deepgram_language,
-        api_key=api_key,
-    )
+    @property
+    def stt_instance(self) -> deepgram.STT:
+        """
+        Get the underlying Deepgram STT instance.
+        
+        Returns:
+            Deepgram STT instance
+        """
+        return self._stt_instance
 

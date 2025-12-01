@@ -1,7 +1,7 @@
 """LLM provider management and configuration."""
 from typing import Optional, Dict, Any
 from app.core.constants import LLMProvider
-from app.core.language_config import get_language_defaults, DEFAULT_LANGUAGE_CODE
+from app.core.language import get_language_defaults, DEFAULT_LANGUAGE_CODE
 from app.utils.logger import get_logger
 from app.llms.openai import create_openai_llm
 

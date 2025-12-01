@@ -3,7 +3,7 @@ from typing import Optional
 from livekit.plugins import sarvam
 from app.core.config import settings
 from app.core.scenario.base import VoiceConfig
-from app.core.language_config import DEFAULT_LANGUAGE_CODE
+from app.core.language import DEFAULT_LANGUAGE_CODE
 from app.utils.logger import get_logger
 from app.utils.tts_validator import validate_sarvam_voice
 
