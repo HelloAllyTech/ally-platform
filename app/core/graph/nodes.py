@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from livekit import rtc
 
 from app.core.language import DEFAULT_LANGUAGE_CODE
-from app.llms import get_llm_for_language
+from app.llms import create_llm_client
 from app.core.constants import VisibilityType
 from app.core.config import settings
 from app.core.events.base import ChatMessage, BaseEvent
@@ -147,12 +147,14 @@ async def generate_response(
 
     # Create response from LLM using language-based abstraction
     try:
-        llm_response = get_llm_for_language(language_code)
+        llm_client = create_llm_client(language_code)
+        llm_instance = llm_client.llm_instance
     except Exception as e:
         logger.warning(f"LLM config failed for {language_code}, using default: {e}")
-        llm_response = get_llm_for_language(DEFAULT_LANGUAGE_CODE)
+        llm_client = create_llm_client(DEFAULT_LANGUAGE_CODE)
+        llm_instance = llm_client.llm_instance
 
-    response = await llm_response.ainvoke(messages_to_send)
+    response = await llm_instance.ainvoke(messages_to_send)
 
     # Prepare the final messages (do not persist system or instruction in state)
     messages = [AIMessage(response.content)]

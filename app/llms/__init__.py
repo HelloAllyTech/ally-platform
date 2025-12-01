@@ -1,7 +1,11 @@
 """LLM provider abstractions."""
-from app.llms.llm import get_llm_for_language
+from app.llms.base import BaseLLMClient
+from app.llms.openai import OpenAILLMClient
+from app.llms.factory import create_llm_client
 
 __all__ = [
-    "get_llm_for_language",
+    "BaseLLMClient",
+    "OpenAILLMClient",
+    "create_llm_client",
 ]
 
