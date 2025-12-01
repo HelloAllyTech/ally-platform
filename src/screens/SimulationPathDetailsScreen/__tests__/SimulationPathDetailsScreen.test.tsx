@@ -46,6 +46,7 @@ jest.mock('@/hooks', () => ({
     credits: {consumedCredits: 5, creditLimit: 10},
     getCreditsInfo: {isLow: false},
   })),
+  useHardwareBackPressHandler: jest.fn(),
   useStartSimulation: jest.fn(() => ({
     isCreatingRoom: false,
     isMicPermissionGranted: true,
@@ -411,7 +412,7 @@ describe('SimulationPathDetailsScreen', () => {
       error: undefined,
     });
 
-    const {queryByText} = render(
+    const {getByText, getByTestId} = render(
       <SimulationPathDetailsScreen
         navigation={mockNavigation as any}
         route={{
@@ -422,9 +423,12 @@ describe('SimulationPathDetailsScreen', () => {
       />,
     );
 
-    // When all scenarios are completed, there's no next simulation, so button should not appear
-    expect(queryByText('Continue')).toBeNull();
-    expect(queryByText('Start')).toBeNull();
+    // When all scenarios are completed, there's no next simulation, so button should be disabled
+    expect(getByText('Continue')).toBeTruthy();
+    const button = getByTestId('primary-button');
+    // Check for disabled prop or accessibilityState.disabled
+    const isDisabled = button.props.disabled || button.props.accessibilityState?.disabled;
+    expect(isDisabled).toBeTruthy();
   });
 
   it('should not show Start/Continue button when path is completed', () => {

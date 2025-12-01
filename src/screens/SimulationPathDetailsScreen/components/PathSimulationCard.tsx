@@ -3,6 +3,7 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {FileIcon, LockIcon, TickRoundIcon} from '@/assets';
+import {DEFAULT_HIT_SLOP} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
@@ -95,7 +96,8 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
           style={styles.fileIconContainer}
           onPress={onFileIconPress}
           disabled={!onFileIconPress}
-          activeOpacity={0.7}>
+          activeOpacity={0.7}
+          hitSlop={DEFAULT_HIT_SLOP}>
           <FileIcon width={18} height={18} />
         </TouchableOpacity>
       )}

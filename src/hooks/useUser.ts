@@ -2,6 +2,7 @@ import {useCallback} from 'react';
 import {useSelector} from 'react-redux';
 
 import {AsyncStorageKeys} from '@/constants/asyncStorage';
+import {api} from '@/services/api';
 import {
   useLazyGetPermissionsQuery,
   useLazyGetUserQuery,
@@ -28,8 +29,9 @@ export const useUser = () => {
   const [getUser] = useLazyGetUserQuery();
   const [getPermissions] = useLazyGetPermissionsQuery();
 
-  const handleUserLogout = () => {
-    store.dispatch(handleLogout());
+  const handleUserLogout = async () => {
+    await store.dispatch(handleLogout());
+    store.dispatch(api.util.resetApiState());
   };
 
   const checkAuth = useCallback(async () => {

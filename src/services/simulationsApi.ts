@@ -12,7 +12,7 @@ import {
   SimulationPathDetails,
   SimulationPathsResponse,
   SimulationSummaryData,
-  UpNextSimulation,
+  UpcomingScenarioResponse,
 } from '@/types';
 
 import {api} from './api';
@@ -140,7 +140,7 @@ export const simulationsApi = api.injectEndpoints({
     }),
 
     getUpcomingScenario: builder.query<
-      UpNextSimulation | null,
+      UpcomingScenarioResponse | null,
       {scenarioSessionId: string}
     >({
       query: ({scenarioSessionId}) => ({

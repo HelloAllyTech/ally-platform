@@ -31,7 +31,18 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({current, total}) => {
       {/* Progress bar track */}
       <View style={styles.track}>
         {/* Progress bar fill */}
-        <View style={[styles.fill, {width: `${progressPercentage}%`}]} />
+        <View
+          style={[
+            styles.fill,
+            {
+              width: `${progressPercentage}%`,
+              backgroundColor:
+                current >= total
+                  ? colors.ds.green[400]
+                  : colors.ds.theme.primary,
+            },
+          ]}
+        />
       </View>
       {/* Progress text - inline with bar */}
       <Text style={styles.progressText}>

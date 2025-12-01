@@ -19,7 +19,12 @@ import {
 import {IllustratedModal, PrimaryButton, useToast} from '@/components';
 import {EmptyState} from '@/components/EmptyState/EmptyState';
 import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
-import {useSimulationCredits, useStartSimulation, useTranslate} from '@/hooks';
+import {
+  useHardwareBackPressHandler,
+  useSimulationCredits,
+  useStartSimulation,
+  useTranslate,
+} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {
@@ -29,7 +34,7 @@ import {
 } from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {PathScenario, SessionItemStatus} from '@/types';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, navigateToLearnTab} from '@/utils';
 
 import {PathSimulationCard} from './components/PathSimulationCard';
 import {ProgressBar} from './components/ProgressBar';
@@ -47,6 +52,7 @@ export const SimulationPathDetailsScreen: React.FC<
     data: pathData,
     isLoading,
     error,
+    refetch: refetchPathDetails,
   } = useGetSimulationPathDetailsQuery({pathId});
 
   const [createPathSession, {isLoading: isCreatingSession}] =
@@ -70,14 +76,19 @@ export const SimulationPathDetailsScreen: React.FC<
     }
   }, [getCreditsInfo?.isLow]);
 
-  useEffect(() => {
+  const checkAndCreatePathSession = async () => {
     if (pathData && !pathData.scenarioPathSessionId) {
-      createPathSession({pathId}).catch(err => {
+      try {
+        await createPathSession({pathId}).unwrap();
+        const result = await refetchPathDetails();
+        if (result.data?.scenarioPathSessionId) {
+          setSelectedSimulation(result.data.scenarios[0]);
+        }
+      } catch (err) {
         showToast(getErrorDetails(err)?.message, 'error');
-      });
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathData]);
+  };
 
   const {
     isCreatingRoom,
@@ -100,10 +111,24 @@ export const SimulationPathDetailsScreen: React.FC<
     !nextSimulation || !!(credits && getCreditsInfo && getCreditsInfo.isLow);
 
   const handleBack = () => {
-    navigation.goBack();
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigateToLearnTab(navigation);
   };
 
-  const handleStartPath = () => {
+  useHardwareBackPressHandler(() => {
+    handleBack();
+    return true;
+  });
+
+  const handleStartPath = async () => {
+    if (!pathData?.scenarioPathSessionId) {
+      await checkAndCreatePathSession();
+      return;
+    }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
   };
@@ -114,7 +139,11 @@ export const SimulationPathDetailsScreen: React.FC<
    * - Otherwise: Open simulation details modal
    * Only unlocked simulations are clickable (locked ones have disabled press)
    */
-  const handleSimulationPress = (scenario: PathScenario) => {
+  const handleSimulationPress = async (scenario: PathScenario) => {
+    if (!pathData?.scenarioPathSessionId) {
+      await checkAndCreatePathSession();
+      return;
+    }
     if (scenario.status === SessionItemStatus.LOCKED) {
       return;
     }
@@ -145,7 +174,6 @@ export const SimulationPathDetailsScreen: React.FC<
         // Navigate to feedback screen with the actual scenario session ID
         navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: response.id,
-          pathSessionItemId: scenario.sessionId,
           pathId,
           fromLogs: true,
         });
@@ -240,7 +268,7 @@ export const SimulationPathDetailsScreen: React.FC<
           )}
 
           {/* Start/Continue button - only show if path is not completed */}
-          {!isPathCompleted && nextSimulation && (
+          {!isPathCompleted && (
             <PrimaryButton
               label={
                 isPathStarted
@@ -263,7 +291,8 @@ export const SimulationPathDetailsScreen: React.FC<
     item: PathScenario;
     index: number;
   }) => {
-    const isNext = nextSimulation?.id === item.id;
+    // Only show "Next" badge if path has been started and this is the next item
+    const isNext = isPathStarted && nextSimulation?.id === item.id;
 
     return (
       <PathSimulationCard
