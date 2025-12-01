@@ -6,7 +6,6 @@ from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from app.core.config import settings
 from app.core.constants import Environment
@@ -53,7 +52,7 @@ def create_agent_session(tts_config, vad, stt_config) -> AgentSession:
         stt=stt_config,
         tts=tts_config,
         vad=vad,
-        turn_detection=MultilingualModel(),
+        turn_detection="vad",
     )
 
 

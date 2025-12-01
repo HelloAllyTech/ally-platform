@@ -56,18 +56,26 @@ def generate_system_message(
 
     # If we have a branching instruction, use simplified minimal prompt
     if next_instruction:
-        minimal_prompt = f"""You are roleplaying as **{prompt_data.name}**, a {prompt_data.age}-year-old client in a counseling session.
-
-**CRITICAL - FOLLOW THIS INSTRUCTION:**
-{next_instruction}
-
-**Essential Character Details:**
-- Name: {prompt_data.name}
-- Age: {prompt_data.age}
-- Gender: {prompt_data.gender}
-- Context: {prompt_data.context}
-
-"""
+        minimal_prompt = f"""<SYSTEM>
+            You are roleplaying as {prompt_data.name} in a counseling session.
+            You should only act as the client.
+            </SYSTEM>
+            
+            <CRITICAL_INSTRUCTION>
+            {next_instruction}
+            
+            This instruction takes ABSOLUTE PRIORITY over all other guidelines.
+            You MUST follow this instruction exactly in your next response.
+            </CRITICAL_INSTRUCTION>
+            
+            <CONTEXT>
+            - Name: {prompt_data.name}
+            - Age: {prompt_data.age}
+            - Gender: {prompt_data.gender}
+            - Situation: {prompt_data.context}
+            </CONTEXT>
+            
+            Respond as {prompt_data.name} while strictly following the critical instruction above."""
         return SystemMessage(content=minimal_prompt.strip())
 
     # Otherwise, use the full detailed prompt (original behavior)
