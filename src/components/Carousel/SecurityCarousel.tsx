@@ -151,9 +151,7 @@ const styles = ScaledSheet.create({
     borderColor: colors.black,
   },
   slideTitle: {
-    ...fontFamily.REPLAY_PRO.BOLD,
-    minHeight: '46@ms',
-    fontSize: '22@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     marginHorizontal: '10@ms',
     color: colors.white,
     textAlign: 'center',

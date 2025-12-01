@@ -199,7 +199,7 @@ jest.mock('@/assets/icons', () => {
 });
 
 const baseRouteParams = {
-  roomData: {
+  sessionData: {
     id: 'room-1',
     createdAt: new Date().toISOString(),
     accessToken: 'token',
@@ -270,6 +270,17 @@ describe('SimulationAssistantScreen', () => {
       if (event === 'connected') connectedHandlers.push(cb);
       if (event === 'data') dataHandlers.push(cb);
       return undefined;
+    });
+
+    (mockOff as jest.Mock).mockImplementation((event: string, cb: any) => {
+       if (event === 'connected') {
+         const index = connectedHandlers.indexOf(cb);
+         if (index > -1) connectedHandlers.splice(index, 1);
+       }
+       if (event === 'data') {
+         const index = dataHandlers.indexOf(cb);
+         if (index > -1) dataHandlers.splice(index, 1);
+       }
     });
 
     const {getByTestId} = renderWithProviders(

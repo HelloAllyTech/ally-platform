@@ -21,21 +21,46 @@ jest.mock('@/hooks', () => {
 
 jest.mock('@/components', () => {
   const React = require('react');
-  const {View} = require('react-native');
+  const {View, Text, TouchableOpacity} = require('react-native');
   return {
     SimulationsSkeleton: ({count}: any) => (
       <View testID="skeleton" accessibilityLabel={String(count)} />
+    ),
+    TabView: ({tabs, activeTab, onTabChange}: any) => (
+      <View testID="tab-view">
+        {tabs.map((tab: any) => (
+          <TouchableOpacity
+            key={tab.key}
+            onPress={() => onTabChange(tab.key)}
+            testID={`tab-${tab.key}`}>
+            <Text>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ),
+    CircularProgress: ({progress}: any) => (
+      <View testID="circular-progress">
+        <Text>{progress}</Text>
+      </View>
+    ),
+    SimulationCard: ({title, onPress}: any) => (
+      <TouchableOpacity onPress={onPress} testID="simulation-card">
+        <Text>{title}</Text>
+      </TouchableOpacity>
     ),
   };
 });
 
 jest.mock('@/services', () => ({
   useGetScenariosQuery: jest.fn(),
+  useGetSimulationPathsQuery: jest.fn(),
 }));
 
 describe('SimulationsScreen', () => {
   const useGetScenariosQueryMock = require('@/services')
     .useGetScenariosQuery as jest.Mock;
+  const useGetSimulationPathsQueryMock = require('@/services')
+    .useGetSimulationPathsQuery as jest.Mock;
 
   const renderWithSafeArea = (ui: React.ReactElement) =>
     render(
@@ -50,6 +75,12 @@ describe('SimulationsScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Provide default mock for useGetSimulationPathsQuery
+    useGetSimulationPathsQueryMock.mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
   });
 
   it('shows skeleton when loading', () => {
@@ -72,20 +103,20 @@ describe('SimulationsScreen', () => {
 
     const {getByText} = renderWithSafeArea(<SimulationsScreen />);
     await waitFor(() =>
-      expect(getByText('Simulations.noSimulations')).toBeTruthy(),
+      expect(getByText('Simulations.noSimulationsAvailable')).toBeTruthy(),
     );
   });
 
   it('sorts scenarios: available first, then COMING_SOON, and navigates on press', async () => {
     const scenarios: Scenario[] = [
       {
-        id: '1',
+        id: 1,
         title: 'B Coming Soon',
         description: 'desc',
         coverImageUrl: 'http://image',
       },
       {
-        id: '2',
+        id: 2,
         title: 'A Available',
         description: 'desc',
         coverImageUrl: 'http://image2',
@@ -107,7 +138,7 @@ describe('SimulationsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith(
       SCREEN_NAMES.SIMULATION_DETAILS,
       expect.objectContaining({
-        scenario: expect.objectContaining({id: '2'}),
+        scenario: expect.objectContaining({id: 2}),
       }),
     );
 

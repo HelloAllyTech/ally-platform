@@ -10,7 +10,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {ArrowDown, LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface HeaderProps {
   onBackPress: () => void;
@@ -102,7 +102,8 @@ const styles = ScaledSheet.create({
   },
   expandedSummaryTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
+    ...typography.headline.tiny,
+    color: colors.ds.typography.highEmphasis,
   },
   arrowDownContainer: {
     width: '24@ms',
@@ -136,8 +137,8 @@ const styles = ScaledSheet.create({
   },
   summaryNameText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.charcoal2,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
     marginRight: '10@ms',
   },
 });

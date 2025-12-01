@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, KeyEventsIcon, LightBulbIcon, ThumbUpIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, radius, stroke, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
 import {
@@ -15,6 +15,16 @@ import {
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
 }
+
+const MetricCard: React.FC<{
+  label: string;
+  children: React.ReactNode;
+}> = ({label, children}) => (
+  <View style={styles.metricCard}>
+    <Text style={styles.metricLabel}>{label}</Text>
+    {children}
+  </View>
+);
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   const MAX_SUMMARY_SCORE = 50;
@@ -43,16 +53,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
     }));
   };
 
-  const renderMetricCard = (label: string, value: string | number) => (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-
   const renderEventItem = (item: FormattedEvent, index: number) => (
     <View key={index} style={styles.eventItem}>
-      <View style={styles.bulletPoinEvents} />
+      <View style={styles.bulletPointEvents} />
       <View style={styles.eventHeader}>
         <Text style={styles.eventTimestamp}>{item.time}</Text>
         <View style={styles.dot} />
@@ -137,14 +140,23 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
         <Text style={styles.scenarioName}>{data.scenario.title}</Text>
       )}
       <View style={styles.metricsContainer}>
-        {renderMetricCard(
-          t('SimulationFeedback.sessionDuration'),
-          getDuration(data.startedAt, data.endedAt),
-        )}
-        {renderMetricCard(
-          t('SimulationFeedback.totalScore'),
-          `${data.score ?? '0'} ${t('SimulationFeedback.benchmark', {benchmark: MAX_SUMMARY_SCORE})}`,
-        )}
+        <MetricCard label={t('SimulationFeedback.sessionDuration')}>
+          <Text style={styles.metricValue}>
+            {getDuration(data.startedAt, data.endedAt)}
+          </Text>
+        </MetricCard>
+        <MetricCard label={t('SimulationFeedback.totalScore')}>
+          <View style={styles.metricValueContainer}>
+            <Text style={styles.metricValue}>
+              {`${data.score ?? '0'} `}
+              <Text style={styles.metricBenchmark}>
+                {t('SimulationFeedback.benchmark', {
+                  benchmark: MAX_SUMMARY_SCORE,
+                })}
+              </Text>
+            </Text>
+          </View>
+        </MetricCard>
       </View>
       {renderExpandableSection(
         t('SimulationFeedback.keyEvents'),
@@ -183,20 +195,33 @@ const styles = ScaledSheet.create({
   metricCard: {
     flex: 1,
     backgroundColor: colors.white,
-    borderRadius: '8@ms',
+    borderRadius: radius.lg,
     padding: '10@ms',
     borderWidth: '0.5@ms',
-    borderColor: colors.lightGray4,
+    borderColor: stroke.primary,
   },
   metricLabel: {
-    fontSize: '12@ms',
-    color: colors.lightGray3,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
     marginBottom: '4@vs',
   },
   metricValue: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,
     fontSize: '14@ms',
+  },
+  metricValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+    marginTop: '2@ms',
+  },
+  metricBenchmark: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    paddingTop: '4@ms',
+    color: colors.ds.typography.highEmphasis,
   },
   section: {
     paddingBottom: '12@vs',
@@ -209,8 +234,8 @@ const styles = ScaledSheet.create({
   },
   scenarioName: {
     ...fontFamily.REPLAY_PRO.BOLD,
-    fontSize: '16@ms',
-    color: colors.black,
+    ...typography.body.large,
+    color: colors.ds.typography.highEmphasis,
     marginTop: '16@vs',
     marginBottom: '24@vs',
   },
@@ -224,8 +249,8 @@ const styles = ScaledSheet.create({
   },
   sectionTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '14@ms',
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
   sectionContent: {
     gap: '12@vs',
@@ -243,18 +268,19 @@ const styles = ScaledSheet.create({
     marginBottom: '4@vs',
   },
   eventTimestamp: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '13@ms',
-    color: colors.darkGray2,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
   },
   eventScore: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '13@ms',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
   },
   eventDescription: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.darkGray2,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
   feedbackItem: {
     backgroundColor: colors.white,
@@ -264,8 +290,8 @@ const styles = ScaledSheet.create({
   },
   feedbackText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.darkGray2,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
   viewMoreButton: {
     flexDirection: 'row',
@@ -274,32 +300,32 @@ const styles = ScaledSheet.create({
   },
   viewMoreText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.black,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   arrowIconRotated: {
     transform: [{rotate: '180deg'}],
   },
   dot: {
-    width: '3@ms',
-    height: '3@ms',
-    backgroundColor: colors.lightGray4,
-    borderRadius: '50%',
+    width: '4@ms',
+    height: '4@ms',
+    backgroundColor: colors.ds.typography.lowEmphasis,
+    borderRadius: '2@ms',
     marginTop: '3@ms',
   },
   bulletPoint: {
     width: '4@ms',
     height: '4@ms',
-    backgroundColor: colors.black,
+    backgroundColor: colors.ds.typography.mediumEmphasis,
     borderRadius: '50%',
     position: 'absolute',
     left: '4@ms',
     top: '12@ms',
   },
-  bulletPoinEvents: {
+  bulletPointEvents: {
     width: '4@ms',
     height: '4@ms',
-    backgroundColor: colors.black,
+    backgroundColor: colors.ds.typography.mediumEmphasis,
     borderRadius: '50%',
     position: 'absolute',
     left: '4@ms',
@@ -307,7 +333,7 @@ const styles = ScaledSheet.create({
   },
   noItemsText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.darkGray2,
+    ...typography.body.medium,
+    color: colors.ds.typography.lowEmphasis,
   },
 });

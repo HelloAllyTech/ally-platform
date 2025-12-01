@@ -15,7 +15,7 @@ import {
 } from '@/services/analyticsApi';
 import {colors} from '@/theme/colors';
 import {fontFamily} from '@/theme/fonts';
-import {typography} from '@/theme/typography';
+import {fontWeights, typography} from '@/theme/typography';
 
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
@@ -137,20 +137,22 @@ export const UserAnalyticsScreen: React.FC = () => {
       )}
       {presentTypes.has(AnalyticsType.CALL_LOG_ANALYTICS) &&
         presentTypes.has(AnalyticsType.SIMULATION_ANALYTICS) && (
-          <TabView<AnalyticsType>
-            tabs={[
-              {
-                key: AnalyticsType.CALL_LOG_ANALYTICS,
-                label: t('Analytics.sessionAnalytics'),
-              },
-              {
-                key: AnalyticsType.SIMULATION_ANALYTICS,
-                label: t('Analytics.simulationAnalytics'),
-              },
-            ]}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+          <View style={styles.tabMargin}>
+            <TabView<AnalyticsType>
+              tabs={[
+                {
+                  key: AnalyticsType.CALL_LOG_ANALYTICS,
+                  label: t('Analytics.sessionAnalytics'),
+                },
+                {
+                  key: AnalyticsType.SIMULATION_ANALYTICS,
+                  label: t('Analytics.simulationAnalytics'),
+                },
+              ]}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          </View>
         )}
 
       {!!dashboards?.length && (
@@ -211,8 +213,9 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@s',
-    color: colors.darkSlate,
+    color: colors.ds.typography.highEmphasis,
+    ...typography.headline.tiny,
+    fontWeight: fontWeights.medium,
     marginLeft: '16@s',
     textAlign: 'left',
   },
@@ -266,5 +269,9 @@ const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'center',
     marginHorizontal: '24@s',
+  },
+  tabMargin: {
+    width: '90%',
+    marginVertical: '16@ms',
   },
 });

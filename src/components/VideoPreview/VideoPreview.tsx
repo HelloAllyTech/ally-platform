@@ -102,6 +102,7 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
         controls={false}
         audioOutput="speaker"
         ignoreSilentSwitch="ignore"
+        useTextureView
         onReadyForDisplay={handleVideoReady}
       />
 
