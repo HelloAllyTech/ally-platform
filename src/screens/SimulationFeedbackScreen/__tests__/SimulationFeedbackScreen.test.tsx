@@ -8,8 +8,19 @@ let mockGoBack = jest.fn();
 jest.mock('@/hooks', () => ({
   useAppNavigation: () => ({
     goBack: (...args: any[]) => mockGoBack(...args),
+    navigate: jest.fn(),
+    replace: jest.fn(),
   }),
   useHardwareBackPressHandler: () => {},
+  useStartSimulation: () => ({
+    startSimulation: jest.fn(),
+    isCreatingRoom: false,
+    isMicPermissionGranted: true,
+    activeSimulationId: null,
+    showActiveSimulationModal: false,
+    closeActiveSimulationModal: jest.fn(),
+    setShowActiveSimulationModal: jest.fn(),
+  }),
 }));
 
 // Mock Redux hooks
@@ -68,12 +79,17 @@ jest.mock('@/services', () => {
       isLoading: false,
     },
   ]);
+  const useLazyGetUpcomingScenarioQuery = jest.fn(() => [
+    jest.fn(),
+    {data: null},
+  ]);
   return {
     __esModule: true,
     useAddSimulationFeedbackMutation: () => [
       jest.fn().mockResolvedValue({data: {success: true}}),
     ],
     useLazyGetSimulationDetailsQuery,
+    useLazyGetUpcomingScenarioQuery,
   };
 });
 
@@ -114,7 +130,7 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
         navigation={{} as any}
-        route={{params: {simulationId: '1'}} as any}
+        route={{params: {scenarioSessionId: '1'}} as any}
       />,
     );
     expect(getByTestId('summary-comp')).toBeTruthy();
@@ -122,7 +138,7 @@ describe('SimulationFeedbackScreen', () => {
 
   it('opens feedback popup on button press', () => {
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     fireEvent.press(getByTestId('primary-button'));
     // Popup rendered by mocked component within screen
@@ -137,7 +153,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     expect(getByTestId('summary-skeleton')).toBeTruthy();
   });
@@ -149,7 +165,7 @@ describe('SimulationFeedbackScreen', () => {
       {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
     ]);
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
     // Press arrow icon within header to open dropdown (bubbles to Touchable)
     fireEvent.press(getByTestId('arrow-down'));
@@ -171,7 +187,7 @@ describe('SimulationFeedbackScreen', () => {
       {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
     ]);
     const {UNSAFE_getByType, getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     const {KeyboardAwareScrollView} = require('react-native-keyboard-aware-scroll-view');
     const scrollView = UNSAFE_getByType(KeyboardAwareScrollView);
@@ -202,7 +218,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
 
     // advance beyond FEEDBACK_THRESHOLD (30s)
@@ -228,7 +244,7 @@ describe('SimulationFeedbackScreen', () => {
     ]);
 
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
 
     // immediately press back (below threshold)
@@ -249,7 +265,7 @@ describe('SimulationFeedbackScreen', () => {
     showToastMock.mockClear();
 
     renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {simulationId: '1'}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
 
     // RETRY_COUNT_LIMIT is 4, each after 5000ms; advance enough time

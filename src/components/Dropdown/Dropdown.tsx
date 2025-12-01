@@ -12,7 +12,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown} from '@/assets/icons';
 import commonStyles from '@/components/styles';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface DropdownProps {
   value: string;
@@ -235,8 +235,8 @@ const styles = ScaledSheet.create({
   },
   itemText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.lightGray3,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
   selectedItem: {
     color: colors.teal,
