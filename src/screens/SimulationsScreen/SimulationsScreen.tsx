@@ -1,80 +1,127 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {Trans, useTranslation} from 'react-i18next';
-import {
-  FlatList,
-  Image,
-  RefreshControl,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {FlatList, RefreshControl, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {BoltIcon} from '@/assets';
-import {SimulationsSkeleton} from '@/components';
-import {isIOS, SCREEN_NAMES} from '@/constants';
+import {
+  CircularProgress,
+  SimulationCard,
+  SimulationsSkeleton,
+  TabView,
+} from '@/components';
+import {isIOS, SCREEN_NAMES, SimulationTabs} from '@/constants';
 import {
   useAppNavigation,
   useSimulationCredits,
   useTabBackToHomeHandler,
 } from '@/hooks';
-import {useGetScenariosQuery} from '@/services';
-import {colors, fontFamily} from '@/theme';
-import type {Scenario} from '@/types';
+import {useGetScenariosQuery, useGetSimulationPathsQuery} from '@/services';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import type {Scenario, SimulationPath} from '@/types';
 
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const {data, isFetching, refetch} = useGetScenariosQuery();
+  const [activeTab, setActiveTab] = useState<SimulationTabs>(
+    SimulationTabs.SIMULATIONS,
+  );
+
+  const {
+    data: scenariosData,
+    isFetching: isFetchingScenarios,
+    refetch: refetchScenarios,
+  } = useGetScenariosQuery();
+
+  const {
+    data: pathsData,
+    isFetching: isFetchingPaths,
+    refetch: refetchPaths,
+  } = useGetSimulationPathsQuery();
+
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  const keyExtractor = (item: Scenario) => item.id;
+  const keyExtractor = (item: Scenario | SimulationPath) => item.id?.toString();
 
   useTabBackToHomeHandler();
 
-  const handleStart = (scenario: Scenario) => {
+  const handleScenarioPress = (scenario: Scenario) => {
     navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario});
   };
 
-  const renderItem = ({item}: {item: Scenario}) => {
+  const handlePathPress = (path: SimulationPath) => {
+    navigation.navigate(SCREEN_NAMES.SIMULATION_PATH_DETAILS, {
+      pathId: path.id,
+    });
+  };
+
+  const handleRefresh = () => {
+    if (activeTab === SimulationTabs.SIMULATIONS) {
+      refetchScenarios();
+    } else {
+      refetchPaths();
+    }
+  };
+
+  const renderSimulationItem = ({item}: {item: Scenario}) => {
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={styles.card}
-        onPress={() => handleStart(item)}>
-        {!!item.coverImageUrl && (
-          <View>
-            <Image
-              source={{uri: item.coverImageUrl}}
-              style={styles.cover}
-              resizeMode="cover"
-            />
-          </View>
-        )}
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {item.title || '-'}
-          </Text>
-          {!!item.description && (
-            <Text style={styles.cardDesc} numberOfLines={3}>
-              {item.description}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+      <SimulationCard
+        title={item.title}
+        description={item.description || ''}
+        coverImageUrl={item.coverImageUrl}
+        onPress={() => handleScenarioPress(item)}
+      />
+    );
+  };
+
+  const renderPathItem = ({item}: {item: SimulationPath}) => {
+    const progress = item.completedScenarios;
+    const total = item.totalScenarios;
+    const showProgress = !!progress && !!total;
+    const isCompleted = !!progress && progress >= total;
+
+    return (
+      <SimulationCard
+        title={item.title}
+        description={`${total} ${t('CallLogs.simulations')}`}
+        coverImageUrl={item.coverImageUrl}
+        onPress={() => handlePathPress(item)}
+        rightAccessory={
+          showProgress ? (
+            <View style={styles.progressContainer}>
+              <CircularProgress
+                progress={progress}
+                max={total}
+                size={33}
+                strokeWidth={3}
+                progressColor={
+                  isCompleted ? colors.ds.green[400] : colors.blue
+                }>
+                <Text style={styles.progressText}>
+                  {progress}/{total}
+                </Text>
+              </CircularProgress>
+            </View>
+          ) : null
+        }
+      />
     );
   };
 
   const ListEmptyElement = useMemo(
     () => (
       <View style={styles.empty}>
-        <Text style={styles.emptyTitle}>{t('Simulations.noSimulations')}</Text>
+        <Text style={styles.emptyTitle}>
+          {activeTab === SimulationTabs.SIMULATIONS
+            ? t('Simulations.noSimulationsAvailable')
+            : 'No paths available'}
+        </Text>
       </View>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [activeTab],
   );
 
   const renderHeader = () => {
@@ -103,32 +150,57 @@ export const SimulationsScreen: React.FC = () => {
             </View>
           )}
         </View>
-        <View style={styles.marginH22}>
-          <View style={styles.introWrapper}>
-            <Text style={styles.introText}>
-              <Trans
-                i18nKey="Simulations.learnIntro"
-                components={{
-                  blue: <Text style={styles.blueBold} />,
-                }}
+      </>
+    );
+  };
+
+  const renderTabContent = () => {
+    const isSimulationsTab = activeTab === SimulationTabs.SIMULATIONS;
+    const isFetching = isSimulationsTab ? isFetchingScenarios : isFetchingPaths;
+
+    return (
+      <>
+        <Text style={styles.listTitle}>
+          {t('Simulations.chooseYour')}{' '}
+          <Text style={styles.pageTitleItalic}>
+            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'path'}`)}
+          </Text>
+        </Text>
+        {isSimulationsTab ? (
+          <FlatList
+            contentContainerStyle={styles.list}
+            data={scenariosData ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderSimulationItem}
+            ListEmptyComponent={
+              !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
+            }
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching}
+                onRefresh={handleRefresh}
               />
-            </Text>
-          </View>
-          <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>
-              {t('Simulations.chooseYour')}{' '}
-              <Text style={styles.pageTitleItalic}>
-                {t('Simulations.scenarioWord')}
-              </Text>
-            </Text>
-          </View>
-          <View style={styles.listHeaderRow}>
-            <Text style={styles.scenariosText}>
-              {t('Simulations.scenariosCaps')}
-            </Text>
-            <View style={styles.sectionRule} />
-          </View>
-        </View>
+            }
+          />
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.list}
+            data={pathsData ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderPathItem}
+            ListEmptyComponent={
+              !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
+            }
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching}
+                onRefresh={handleRefresh}
+              />
+            }
+          />
+        )}
       </>
     );
   };
@@ -140,19 +212,35 @@ export const SimulationsScreen: React.FC = () => {
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       {renderHeader()}
-      <FlatList
-        contentContainerStyle={[styles.list, styles.marginH22]}
-        data={data ?? []}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        ListEmptyComponent={
-          !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
-        }
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} />
-        }
-      />
+      <View style={styles.marginH21}>
+        <View style={styles.introWrapper}>
+          <Text style={styles.introText}>
+            <Trans
+              i18nKey="Simulations.learnIntro"
+              components={{
+                blue: <Text style={styles.blueBold} />,
+              }}
+            />
+          </Text>
+        </View>
+        <View style={styles.tabMargin}>
+          <TabView
+            tabs={[
+              {
+                key: SimulationTabs.SIMULATIONS,
+                label: t('CallLogs.simulations'),
+              },
+              {
+                key: SimulationTabs.PATHS,
+                label: t('Simulations.pathWay'),
+              },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </View>
+        {renderTabContent()}
+      </View>
     </View>
   );
 };
@@ -164,65 +252,8 @@ const styles = ScaledSheet.create({
   },
   list: {
     paddingTop: '10@ms',
-    paddingBottom: '110@ms',
-    gap: '12@ms',
-  },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderColor: colors.lightGray5,
-    borderRadius: '8@ms',
-    width: '100%',
-    shadowColor: colors.darkGray12,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  cover: {
-    width: '35%',
-    minWidth: '130@ms',
-    height: '120@ms',
-    borderTopLeftRadius: '8@ms',
-    borderBottomLeftRadius: '8@ms',
-    backgroundColor: colors.lightGray4,
-  },
-  grayscaleWrapper: {
-    filter: 'grayscale(100%)',
-  },
-  comingSoonBadge: {
-    position: 'absolute',
-    top: '8@ms',
-    left: '8@ms',
-    backgroundColor: colors.white,
-    paddingVertical: '4@ms',
-    paddingHorizontal: '8@ms',
-    borderRadius: '6@ms',
-    borderWidth: 1,
-    borderColor: colors.lightGray8,
-  },
-  comingSoonText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkSlate,
-    fontSize: '12@ms',
-  },
-  cardBody: {
-    margin: '12@ms',
-    width: '55%',
-    flexDirection: 'column',
-  },
-  cardTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray12,
-    fontSize: '15@ms',
-    marginBottom: '6@ms',
-    marginRight: '10@ms',
-  },
-  cardDesc: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkCharcoal,
-    fontSize: '12@ms',
-    marginRight: '8@ms',
+    paddingBottom: '360@ms',
+    gap: '10@ms',
   },
   empty: {
     alignItems: 'center',
@@ -234,34 +265,33 @@ const styles = ScaledSheet.create({
     color: colors.darkGray12,
     fontSize: '16@ms',
   },
-  emptyDesc: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray14,
-  },
   listTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...typography.display.small,
+    fontWeight: fontWeights.medium,
     color: colors.darkGray12,
-    fontSize: '22@ms',
+    textAlign: 'center',
+    marginBottom: '10@ms',
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.medium,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   introWrapper: {
     marginTop: '22@ms',
-    marginBottom: '16@ms',
   },
   introText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
     color: colors.darkSlate,
-    fontSize: '18@ms',
+    textAlign: 'center',
   },
   blueBold: {
     ...fontFamily.REPLAY_PRO.BOLD,
+    fontWeight: fontWeights.medium,
     color: colors.azureBlue,
-  },
-  listHeader: {
-    marginBottom: '16@ms',
   },
   brandHeader: {
     flexDirection: 'row',
@@ -276,12 +306,14 @@ const styles = ScaledSheet.create({
   brandTitle: {
     flex: 1,
     ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
     color: colors.darkGray2,
-    fontSize: '18@ms',
     marginBottom: '6@ms',
   },
   brandTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   creditDisplay: {
@@ -291,34 +323,30 @@ const styles = ScaledSheet.create({
   },
   creditText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
+    ...typography.display.small,
+    fontWeight: fontWeights.medium,
   },
   creditTextLow: {
-    color: colors.softCoralRed,
+    color: colors.ds.red[300],
   },
   creditLimitText: {
+    ...typography.body.tiny,
     color: colors.darkGray,
-    fontSize: '10@ms',
   },
-  listHeaderRow: {
-    flexDirection: 'row',
+  marginH21: {
+    marginHorizontal: '21@ms',
+  },
+  progressContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: '4@ms',
-    paddingBottom: '6@ms',
   },
-  scenariosText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    color: colors.darkGray8,
-    fontSize: '12@ms',
-    letterSpacing: 4,
+  progressText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.nano,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
-  sectionRule: {
-    flex: 1,
-    height: 0.6,
-    marginRight: '4@ms',
-    backgroundColor: colors.lightGray10,
-  },
-  marginH22: {
-    marginHorizontal: '22@ms',
+  tabMargin: {
+    marginVertical: '16@ms',
   },
 });

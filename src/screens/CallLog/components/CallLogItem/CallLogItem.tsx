@@ -9,7 +9,7 @@ import {
 } from '@/assets/icons';
 import {DEFAULT_HIT_SLOP, LogType, TAG_COLORS} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {getLogSourceLabelConfig} from '@/utils/callLog';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
 
@@ -219,8 +219,8 @@ const styles = ScaledSheet.create({
   },
   logId: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.black,
+    ...typography.label.large,
+    color: colors.ds.typography.highEmphasis,
     flexShrink: 1,
     marginRight: '3@ms',
   },
@@ -234,8 +234,8 @@ const styles = ScaledSheet.create({
   },
   logDate: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    color: colors.darkCharcoal,
+    ...typography.label.medium,
+    color: colors.ds.typography.mediumEmphasis,
     marginLeft: '30@ms',
   },
   logDetails: {
@@ -248,17 +248,18 @@ const styles = ScaledSheet.create({
     marginBottom: '8@ms',
   },
   separator: {
-    color: colors.lightGray2,
+    color: colors.ds.stroke.primary,
     marginHorizontal: '4@ms',
   },
   duration: {
-    color: colors.darkCharcoal,
-    fontSize: '12@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.label.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   sourceText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
+    ...typography.label.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
   tagsRow: {
     flexDirection: 'row',

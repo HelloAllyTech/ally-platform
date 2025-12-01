@@ -59,8 +59,9 @@ const baseQuery: BaseQueryFn<
   return originalBaseQuery(versionedArgs, api, extraOptions);
 };
 
-const handleUserLogout = () => {
-  store.dispatch(handleLogout());
+const handleUserLogout = async () => {
+  await store.dispatch(handleLogout());
+  store.dispatch({type: 'api/resetApiState'});
 };
 
 const baseQueryWithReauth: BaseQueryFn<
@@ -131,6 +132,6 @@ const baseQueryWithReauth: BaseQueryFn<
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['SimulationCredits'],
+  tagTypes: ['SimulationCredits', 'SimulationPaths', 'SimulationPathDetails'],
   endpoints: () => ({}),
 });

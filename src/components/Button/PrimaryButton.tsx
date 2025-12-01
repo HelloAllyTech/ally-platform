@@ -2,7 +2,7 @@ import React from 'react';
 import {ActivityIndicator, Text, TouchableOpacity} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, typography} from '@/theme';
+import {colors, radius, typography} from '@/theme';
 
 import type {PrimaryButtonProps} from './types';
 
@@ -28,7 +28,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       disabled={isDisabled || isLoading}
       onPress={onPress}>
       {isLoading ? (
-        <ActivityIndicator color={colors.white} />
+        <ActivityIndicator color={colors.white} style={styles.loader} />
       ) : (
         <Text style={[styles.buttonText, customTextStyle]}>{label}</Text>
       )}
@@ -39,20 +39,23 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 const styles = ScaledSheet.create({
   button: {
     width: '100%',
-    backgroundColor: colors.azureBlue,
-    paddingVertical: '11@vs',
+    backgroundColor: colors.ds.theme.primary,
+    paddingVertical: '10@vs',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: '24@ms',
+    borderRadius: radius.full,
   },
   buttonDisabled: {
-    backgroundColor: colors.ashGray,
+    backgroundColor: colors.ds.state.disabledContainer,
   },
   buttonLoading: {
-    paddingVertical: '13@vs',
+    paddingVertical: '10@vs',
   },
   buttonText: {
-    ...typography.body.large,
-    color: colors.white,
+    ...typography.body.medium,
+    color: colors.ds.neutral.white,
+  },
+  loader: {
+    marginVertical: '2.5@ms',
   },
 });

@@ -22,6 +22,7 @@ import {
   SimulationAssistantScreen,
   SimulationDetailsScreen,
   SimulationFeedbackScreen,
+  SimulationPathDetailsScreen,
   SimulationsScreen,
   SplashScreen,
   SuspendedAccountScreen,
@@ -223,6 +224,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_DETAILS}
             component={SimulationDetailsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SIMULATION_PATH_DETAILS}
+            component={SimulationPathDetailsScreen}
           />
           <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
           <Stack.Screen

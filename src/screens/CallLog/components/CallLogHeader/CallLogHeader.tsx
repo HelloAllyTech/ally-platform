@@ -5,7 +5,8 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {DrawerMenuIcon, ReplayIcon} from '@/assets/icons';
 import {isIOS} from '@/constants/general';
 import {useDrawerNavigation, useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
+import {fontWeights} from '@/theme/typography';
 
 interface CallLogHeaderProps {
   search: string;
@@ -101,10 +102,9 @@ const styles = ScaledSheet.create({
   },
   headerTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
-    lineHeight: '24@ms',
-    color: colors.darkSlate,
-    fontWeight: '400',
+    color: colors.ds.typography.highEmphasis,
+    ...typography.headline.tiny,
+    fontWeight: fontWeights.medium,
   },
   headerItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

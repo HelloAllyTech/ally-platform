@@ -2,7 +2,7 @@ import React, {useEffect, useMemo} from 'react';
 import {Animated, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors} from '@/theme';
+import {colors, radius} from '@/theme';
 
 interface SimulationsSkeletonProps {
   count?: number;
@@ -57,17 +57,6 @@ export const SimulationsSkeleton: React.FC<SimulationsSkeletonProps> = ({
         <View style={styles.titleSkeletonShort}>
           <Animated.View style={[styles.shimmer, shimmerStyle]} />
         </View>
-
-        {/* Description skeleton */}
-        <View style={styles.descSkeleton}>
-          <Animated.View style={[styles.shimmer, shimmerStyle]} />
-        </View>
-        <View style={styles.descSkeletonMedium}>
-          <Animated.View style={[styles.shimmer, shimmerStyle]} />
-        </View>
-        <View style={styles.descSkeletonShort}>
-          <Animated.View style={[styles.shimmer, shimmerStyle]} />
-        </View>
       </View>
     </View>
   );
@@ -88,69 +77,47 @@ const styles = ScaledSheet.create({
     gap: '12@ms',
   },
   card: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     backgroundColor: colors.white,
-    borderColor: colors.lightGray5,
-    borderRadius: '8@ms',
-    width: '100%',
-    shadowColor: colors.darkGray12,
+    borderColor: colors.ds.stroke.primary,
+    borderWidth: 0.5,
+    borderRadius: radius.xl3,
+    shadowColor: colors.ds.grey[900],
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 2,
+    elevation: 1,
+    overflow: 'hidden',
+    paddingTop: '8@ms',
+    paddingBottom: '16@ms',
+    marginHorizontal: '2@ms',
   },
   coverSkeleton: {
-    width: '35%',
-    minWidth: '130@ms',
-    height: '120@ms',
-    borderTopLeftRadius: '8@ms',
-    borderBottomLeftRadius: '8@ms',
-    backgroundColor: colors.lightGray4,
+    minHeight: '180@ms',
+    backgroundColor: colors.ds.grey[100],
+    borderRadius: '16@ms',
+    marginBottom: '8@ms',
+    marginHorizontal: '8@ms',
     overflow: 'hidden',
   },
   cardBody: {
-    margin: '12@ms',
-    width: '55%',
+    marginHorizontal: '18@ms',
     flexDirection: 'column',
-    justifyContent: 'center',
   },
   titleSkeleton: {
-    height: '18@ms',
-    width: '90%',
-    backgroundColor: colors.lightGray8,
+    height: '20@ms',
+    width: '80%',
+    backgroundColor: colors.ds.grey[100],
     borderRadius: '4@ms',
     marginBottom: '4@ms',
     overflow: 'hidden',
   },
   titleSkeletonShort: {
-    height: '18@ms',
+    height: '20@ms',
     width: '60%',
-    backgroundColor: colors.lightGray8,
+    backgroundColor: colors.ds.grey[100],
     borderRadius: '4@ms',
-    marginBottom: '6@ms',
-    overflow: 'hidden',
-  },
-  descSkeleton: {
-    height: '12@ms',
-    width: '100%',
-    backgroundColor: colors.lightGray8,
-    borderRadius: '4@ms',
-    marginBottom: '4@ms',
-    overflow: 'hidden',
-  },
-  descSkeletonMedium: {
-    height: '12@ms',
-    width: '85%',
-    backgroundColor: colors.lightGray8,
-    borderRadius: '4@ms',
-    marginBottom: '4@ms',
-    overflow: 'hidden',
-  },
-  descSkeletonShort: {
-    height: '12@ms',
-    width: '70%',
-    backgroundColor: colors.lightGray8,
-    borderRadius: '4@ms',
+    marginBottom: '8@ms',
     overflow: 'hidden',
   },
   shimmer: {
@@ -159,6 +126,6 @@ const styles = ScaledSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: colors.ds.whiteAlpha[500],
   },
 });

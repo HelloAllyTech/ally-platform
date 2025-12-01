@@ -6,9 +6,9 @@ import {typography} from '../typography';
 
 describe('theme/typography', () => {
   it('provides display/headline/body/label scales', () => {
-    expect(typography.display.large.fontSize).toBe(57);
+    expect(typography.display.large.fontSize).toBe(56);
     expect(typography.headline.small.lineHeight).toBe(32);
-    expect(typography.body.medium.letterSpacing).toBe(0.25);
-    expect(typography.label.small.fontWeight).toBe('500');
+    expect(typography.body.medium.letterSpacing).toBe(0.2);
+    expect(typography.label.small.letterSpacing).toBe(0.5);
   });
 });
