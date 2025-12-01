@@ -50,7 +50,7 @@ class TestLanguageDefaults:
         hi_in_config = LANGUAGE_DEFAULTS["hi-IN"]
         
         assert hi_in_config["stt"]["provider"] == "deepgram"
-        assert hi_in_config["stt"]["model"] == "nova-2"
+        assert hi_in_config["stt"]["model"] == "nova-3"
         assert hi_in_config["llm"]["provider"] == "openai"
         assert hi_in_config["llm"]["model"] == "gpt-4o-mini"
 
@@ -74,7 +74,7 @@ class TestGetLanguageDefaults:
         result = get_language_defaults("hi-IN")
         
         assert result["stt"]["provider"] == "deepgram"
-        assert result["stt"]["model"] == "nova-2"
+        assert result["stt"]["model"] == "nova-3"
         assert result["llm"]["provider"] == "openai"
     
     @pytest.mark.unit

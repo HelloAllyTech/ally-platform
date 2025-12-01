@@ -24,7 +24,7 @@ class TestDeepgramSTTProvider:
         
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language="en-IN",
+            language="en",
             api_key="test-api-key"
         )
         assert result == mock_stt_instance
@@ -38,11 +38,11 @@ class TestDeepgramSTTProvider:
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        result = create_deepgram_stt(model="nova-2", language_code="hi-IN")
+        result = create_deepgram_stt(model="nova-3", language_code="hi-IN")
         
         mock_stt_class.assert_called_once_with(
-            model="nova-2",
-            language="hi-IN",
+            model="nova-3",
+            language="hi",
             api_key="test-api-key"
         )
         assert result == mock_stt_instance
@@ -58,10 +58,10 @@ class TestDeepgramSTTProvider:
         
         result = create_deepgram_stt(model="nova-3", language_code=None)
         
-        # Should default to DEFAULT_LANGUAGE_CODE
+        # Should default to DEFAULT_LANGUAGE_CODE (en-IN) converted to "en"
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language=DEFAULT_LANGUAGE_CODE,
+            language="en",
             api_key="test-api-key"
         )
         assert result == mock_stt_instance
@@ -81,7 +81,7 @@ class TestDeepgramSTTProvider:
         
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language="en-IN",
+            language="en",
             api_key="custom-api-key"
         )
         assert result == mock_stt_instance
@@ -131,9 +131,9 @@ class TestGetSTTForLanguage:
         
         result = get_stt_for_language("hi-IN")
         
-        # Should use hi-IN defaults (nova-2 model)
+        # Should use hi-IN defaults (nova-3 model)
         mock_create.assert_called_once_with(
-            model="nova-2",
+            model="nova-3",
             language_code="hi-IN",
             api_key=None
         )
@@ -255,7 +255,7 @@ class TestSTTAbstractionIntegration:
         assert stt == mock_stt_instance
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language="en-IN",
+            language="en",
             api_key="test-key"
         )
     
@@ -271,7 +271,7 @@ class TestSTTAbstractionIntegration:
         # Test en-IN
         stt1 = get_stt_for_language("en-IN")
         assert mock_stt_class.call_args_list[0][1]["model"] == "nova-3"
-        assert mock_stt_class.call_args_list[0][1]["language"] == "en-IN"
+        assert mock_stt_class.call_args_list[0][1]["language"] == "en"
         
         # Reset mock
         mock_stt_class.reset_mock()
@@ -279,8 +279,8 @@ class TestSTTAbstractionIntegration:
         
         # Test hi-IN
         stt2 = get_stt_for_language("hi-IN")
-        assert mock_stt_class.call_args_list[0][1]["model"] == "nova-2"
-        assert mock_stt_class.call_args_list[0][1]["language"] == "hi-IN"
+        assert mock_stt_class.call_args_list[0][1]["model"] == "nova-3"
+        assert mock_stt_class.call_args_list[0][1]["language"] == "hi"
     
     @pytest.mark.integration
     @patch('app.stt.stt.create_deepgram_stt')
@@ -290,7 +290,7 @@ class TestSTTAbstractionIntegration:
         mock_create.return_value = mock_stt
         
         # Test that language defaults are used correctly
-        for lang_code, expected_model in [("en-IN", "nova-3"), ("hi-IN", "nova-2")]:
+        for lang_code, expected_model in [("en-IN", "nova-3"), ("hi-IN", "nova-3")]:
             mock_create.reset_mock()
             result = get_stt_for_language(lang_code)
             
