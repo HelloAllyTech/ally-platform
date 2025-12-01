@@ -58,9 +58,9 @@ class TestPrompt:
 
         # When next_instruction is provided, minimal prompt is used
         # It should contain the critical instruction and essential details only
-        assert "CRITICAL - FOLLOW THIS INSTRUCTION" in content
+        assert "<CRITICAL_INSTRUCTION>" in content
         assert "Focus on rapport." in content
-        assert "Essential Character Details" in content
+        assert "<CONTEXT>" in content
         assert pd.name in content
         assert str(pd.age) in content
         assert pd.gender in content

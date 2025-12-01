@@ -2,61 +2,85 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from app.llms.llm import get_llm_for_language
-from app.llms.openai import create_openai_llm
+from app.llms.base import BaseLLMClient
+from app.llms.openai import OpenAILLMClient
+from app.llms.factory import create_llm_client
 from app.core.constants import LLMProvider
-from app.core.language import DEFAULT_LANGUAGE_CODE, LANGUAGE_DEFAULTS
+from app.core.language.factory import resolve_config
+from app.core.language import DEFAULT_LANGUAGE_CODE
 
 
-class TestOpenAILLMProvider:
-    """Test cases for OpenAI LLM provider."""
+class TestBaseLLMClient:
+    """Test cases for BaseLLMClient abstract class."""
+    
+    @pytest.mark.unit
+    def test_cannot_instantiate_base_class(self):
+        """Test that BaseLLMClient cannot be instantiated directly."""
+        with pytest.raises(TypeError):
+            BaseLLMClient()
+    
+    @pytest.mark.unit
+    def test_base_class_has_llm_instance_property(self):
+        """Test that BaseLLMClient defines llm_instance property."""
+        assert hasattr(BaseLLMClient, 'llm_instance')
+
+
+class TestOpenAILLMClient:
+    """Test cases for OpenAILLMClient class."""
     
     @pytest.mark.unit
     @patch('app.llms.openai.ChatOpenAI')
     @patch('app.llms.openai.settings')
-    def test_create_openai_llm_success(self, mock_settings, mock_chat_openai_class):
-        """Test successful OpenAI LLM creation."""
+    def test_openai_llm_client_init_success(self, mock_settings, mock_chat_openai_class):
+        """Test successful OpenAILLMClient initialization."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
         
-        result = create_openai_llm(model="gpt-4o-mini", language_code="en-IN")
+        client = OpenAILLMClient(
+            model="gpt-4o-mini",
+            language_code="en-IN"
+        )
+        
+        assert isinstance(client, BaseLLMClient)
+        mock_chat_openai_class.assert_called_once_with(
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-api-key"
+        )
+        assert client.llm_instance == mock_llm_instance
+    
+    @pytest.mark.unit
+    @patch('app.llms.openai.ChatOpenAI')
+    @patch('app.llms.openai.settings')
+    def test_openai_llm_client_with_hi_in(self, mock_settings, mock_chat_openai_class):
+        """Test OpenAILLMClient with Hindi language code."""
+        mock_settings.OPENAI_API_KEY = "test-api-key"
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_llm_instance = Mock()
+        mock_chat_openai_class.return_value = mock_llm_instance
+        
+        client = OpenAILLMClient(
+            model="gpt-4o-mini",
+            language_code="hi-IN"
+        )
         
         mock_chat_openai_class.assert_called_once_with(
             model="gpt-4o-mini",
             temperature=0.7,
             api_key="test-api-key"
         )
-        assert result == mock_llm_instance
+        assert client.llm_instance == mock_llm_instance
     
     @pytest.mark.unit
     @patch('app.llms.openai.ChatOpenAI')
-    @patch('app.llms.openai.settings')
-    def test_create_openai_llm_with_hi_in(self, mock_settings, mock_chat_openai_class):
-        """Test OpenAI LLM creation with Hindi language code."""
-        mock_settings.OPENAI_API_KEY = "test-api-key"
-        mock_settings.LLM_TEMPERATURE = "0.7"
+    def test_openai_llm_client_custom_temperature(self, mock_chat_openai_class):
+        """Test OpenAILLMClient with custom temperature."""
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
         
-        result = create_openai_llm(model="gpt-4o-mini", language_code="hi-IN")
-        
-        mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4o-mini",
-            temperature=0.7,
-            api_key="test-api-key"
-        )
-        assert result == mock_llm_instance
-    
-    @pytest.mark.unit
-    @patch('app.llms.openai.ChatOpenAI')
-    def test_create_openai_llm_custom_temperature(self, mock_chat_openai_class):
-        """Test OpenAI LLM creation with custom temperature."""
-        mock_llm_instance = Mock()
-        mock_chat_openai_class.return_value = mock_llm_instance
-        
-        result = create_openai_llm(
+        client = OpenAILLMClient(
             model="gpt-4o-mini",
             language_code="en-IN",
             temperature=0.9,
@@ -68,88 +92,59 @@ class TestOpenAILLMProvider:
             temperature=0.9,
             api_key="custom-key"
         )
-        assert result == mock_llm_instance
+        assert client.llm_instance == mock_llm_instance
     
     @pytest.mark.unit
-    def test_create_openai_llm_missing_model(self):
-        """Test OpenAI LLM creation with missing model."""
+    def test_openai_llm_client_missing_model(self):
+        """Test OpenAILLMClient with missing model."""
         with pytest.raises(ValueError, match="OpenAI LLM requires 'model' parameter"):
-            create_openai_llm(model="", language_code="en-IN")
+            OpenAILLMClient(model="", language_code="en-IN")
+    
+    @pytest.mark.unit
+    def test_openai_llm_client_missing_language_code(self):
+        """Test OpenAILLMClient with missing language code."""
+        with pytest.raises(ValueError, match="OpenAI LLM requires 'language_code' parameter"):
+            OpenAILLMClient(model="gpt-4o-mini", language_code="")
     
     @pytest.mark.unit
     @patch('app.llms.openai.settings')
-    def test_create_openai_llm_missing_api_key(self, mock_settings):
-        """Test OpenAI LLM creation with missing API key."""
+    def test_openai_llm_client_missing_api_key(self, mock_settings):
+        """Test OpenAILLMClient with missing API key."""
         mock_settings.OPENAI_API_KEY = None
         mock_settings.LLM_TEMPERATURE = "0.7"
         
         with pytest.raises(ValueError, match="OpenAI LLM requires 'api_key' parameter"):
-            create_openai_llm(model="gpt-4o-mini", language_code="en-IN")
+            OpenAILLMClient(model="gpt-4o-mini", language_code="en-IN")
 
 
-class TestGetLLMForLanguage:
-    """Test cases for get_llm_for_language function."""
+class TestResolveConfig:
+    """Test cases for resolve_config function (used by LLM factory)."""
     
     @pytest.mark.unit
-    @patch('app.llms.llm.create_openai_llm')
-    def test_get_llm_for_language_en_in(self, mock_create):
-        """Test getting LLM for en-IN language."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_from_language_defaults(self, mock_get_defaults):
+        """Test resolve_config resolves config from unified registry."""
+        mock_get_defaults.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini"
+        }
         
-        result = get_llm_for_language("en-IN")
+        config = resolve_config("llm", "en-IN")
         
-        # Should use defaults from LANGUAGE_DEFAULTS
-        mock_create.assert_called_once_with(
-            model="gpt-4o-mini",
-            language_code="en-IN",
-            temperature=None,
-            api_key=None
-        )
-        assert result == mock_llm
+        assert config["provider"] == "openai"
+        assert config["model"] == "gpt-4o-mini"
+        assert config["language_code"] == "en-IN"
+        assert config["api_key"] is None
+        assert config.get("temperature") is None
     
     @pytest.mark.unit
-    @patch('app.llms.llm.create_openai_llm')
-    def test_get_llm_for_language_hi_in(self, mock_create):
-        """Test getting LLM for hi-IN language."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
-        
-        result = get_llm_for_language("hi-IN")
-        
-        # Should use hi-IN defaults (same as en-IN for now)
-        mock_create.assert_called_once_with(
-            model="gpt-4o-mini",
-            language_code="hi-IN",
-            temperature=None,
-            api_key=None
-        )
-        assert result == mock_llm
-    
-    @pytest.mark.unit
-    @patch('app.llms.llm.create_openai_llm')
-    def test_get_llm_for_language_fallback(self, mock_create):
-        """Test fallback to default language when language not found."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
-        
-        result = get_llm_for_language("unknown-language")
-        
-        # Should fallback to DEFAULT_LANGUAGE_CODE (en-IN) defaults
-        mock_create.assert_called_once_with(
-            model="gpt-4o-mini",  # en-IN default
-            language_code="unknown-language",  # Still pass the requested language
-            temperature=None,
-            api_key=None
-        )
-        assert result == mock_llm
-    
-    @pytest.mark.unit
-    @patch('app.llms.llm.create_openai_llm')
-    def test_get_llm_for_language_with_override(self, mock_create):
-        """Test getting LLM with override configuration."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_with_override(self, mock_get_defaults):
+        """Test resolve_config with override configuration."""
+        mock_get_defaults.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini"
+        }
         
         override_config = {
             "provider": "openai",
@@ -158,75 +153,110 @@ class TestGetLLMForLanguage:
             "config": {"api_key": "custom-key"}
         }
         
-        result = get_llm_for_language("en-IN", override_config=override_config)
+        config = resolve_config("llm", "en-IN", override_config)
         
-        # Should use override config
-        mock_create.assert_called_once_with(
+        assert config["provider"] == "openai"
+        assert config["model"] == "gpt-4"
+        assert config["temperature"] == 0.9
+        assert config["api_key"] == "custom-key"
+        assert config["language_code"] == "en-IN"
+    
+    @pytest.mark.unit
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_fallback_to_default_language(self, mock_get_defaults):
+        """Test resolve_config falls back to DEFAULT_LANGUAGE_CODE."""
+        # First call returns empty (unknown language)
+        # Second call returns defaults (DEFAULT_LANGUAGE_CODE)
+        mock_get_defaults.side_effect = [
+            {},  # Unknown language
+            {"provider": "openai", "model": "gpt-4o-mini"}  # Default language
+        ]
+        
+        config = resolve_config("llm", "unknown-language")
+        
+        assert config["provider"] == "openai"
+        assert config["model"] == "gpt-4o-mini"
+        assert config["language_code"] == "unknown-language"
+
+
+class TestLLMFactory:
+    """Test cases for create_llm_client factory function."""
+    
+    @pytest.mark.unit
+    @patch('app.llms.factory.resolve_config')
+    @patch('app.llms.factory.OpenAILLMClient')
+    def test_create_llm_client_auto_selects_provider(
+        self, mock_llm_class, mock_resolve_config
+    ):
+        """Test create_llm_client automatically selects provider from config."""
+        mock_resolve_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "language_code": "en-IN",
+            "api_key": None,
+            "temperature": None,
+        }
+        mock_client = Mock()
+        mock_llm_class.return_value = mock_client
+        
+        result = create_llm_client("en-IN")
+        
+        mock_resolve_config.assert_called_once_with("llm", "en-IN", None)
+        mock_llm_class.assert_called_once_with(
+            model="gpt-4o-mini",
+            language_code="en-IN",
+            temperature=None,
+            api_key=None,
+        )
+        assert result == mock_client
+    
+    @pytest.mark.unit
+    @patch('app.llms.factory.resolve_config')
+    @patch('app.llms.factory.OpenAILLMClient')
+    def test_create_llm_client_with_override(
+        self, mock_llm_class, mock_resolve_config
+    ):
+        """Test create_llm_client with override configuration."""
+        mock_resolve_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4",
+            "language_code": "en-IN",
+            "api_key": "custom-key",
+            "temperature": 0.9,
+        }
+        mock_client = Mock()
+        mock_llm_class.return_value = mock_client
+        
+        override_config = {
+            "provider": "openai",
+            "model": "gpt-4",
+            "temperature": 0.9,
+            "config": {"api_key": "custom-key"}
+        }
+        
+        result = create_llm_client("en-IN", override_config)
+        
+        mock_resolve_config.assert_called_once_with("llm", "en-IN", override_config)
+        mock_llm_class.assert_called_once_with(
             model="gpt-4",
             language_code="en-IN",
             temperature=0.9,
-            api_key="custom-key"
+            api_key="custom-key",
         )
-        assert result == mock_llm
+        assert result == mock_client
     
     @pytest.mark.unit
-    @patch('app.llms.llm.create_openai_llm')
-    def test_get_llm_for_language_override_provider_only(self, mock_create):
-        """Test override with provider only (should use language defaults for model)."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
-        
-        override_config = {
-            "provider": "openai",
-            # No model specified, should use language default
-        }
-        
-        result = get_llm_for_language("en-IN", override_config=override_config)
-        
-        # Should use language default model
-        mock_create.assert_called_once_with(
-            model="gpt-4o-mini",  # en-IN default
-            language_code="en-IN",
-            temperature=None,
-            api_key=None
-        )
-        assert result == mock_llm
-    
-    @pytest.mark.unit
-    def test_get_llm_for_language_unsupported_provider(self):
-        """Test error handling for unsupported provider."""
-        override_config = {
+    @patch('app.llms.factory.resolve_config')
+    def test_create_llm_client_unsupported_provider(self, mock_resolve_config):
+        """Test create_llm_client with unsupported provider."""
+        mock_resolve_config.return_value = {
             "provider": "unsupported",
-            "model": "test-model"
+            "model": "test-model",
+            "language_code": "en-IN",
         }
         
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
-            get_llm_for_language("en-IN", override_config=override_config)
-    
-    @pytest.mark.unit
-    def test_get_llm_for_language_missing_model(self):
-        """Test error handling when model is missing."""
-        override_config = {
-            "provider": "openai",
-            # No model specified
-        }
-        
-        # This should fallback to language defaults, so let's test with a language that has defaults
-        with patch('app.llms.llm.create_openai_llm') as mock_create:
-            mock_llm = Mock()
-            mock_create.return_value = mock_llm
-            
-            # Override with provider but no model - should use language default
-            override_config = {"provider": "openai"}
-            result = get_llm_for_language("en-IN", override_config=override_config)
-            
-            # Should use en-IN default model
-            mock_create.assert_called_once_with(
-                model="gpt-4o-mini",
-                language_code="en-IN",
-                temperature=None,
-                api_key=None
-            )
+            create_llm_client("en-IN")
 
 
 class TestLLMAbstractionIntegration:
@@ -235,15 +265,27 @@ class TestLLMAbstractionIntegration:
     @pytest.mark.integration
     @patch('app.llms.openai.ChatOpenAI')
     @patch('app.llms.openai.settings')
-    def test_full_llm_creation_flow(self, mock_settings, mock_chat_openai_class):
+    @patch('app.llms.factory.resolve_config')
+    def test_full_llm_creation_flow(
+        self, mock_resolve_config, mock_settings, mock_chat_openai_class
+    ):
         """Test complete LLM creation flow."""
         mock_settings.OPENAI_API_KEY = "test-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_resolve_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "language_code": "en-IN",
+            "api_key": None,
+            "temperature": None,
+        }
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
         
-        llm = get_llm_for_language("en-IN")
+        client = create_llm_client("en-IN")
+        llm = client.llm_instance
         
+        assert isinstance(client, OpenAILLMClient)
         assert llm == mock_llm_instance
         mock_chat_openai_class.assert_called_once_with(
             model="gpt-4o-mini",
@@ -254,7 +296,10 @@ class TestLLMAbstractionIntegration:
     @pytest.mark.integration
     @patch('app.llms.openai.ChatOpenAI')
     @patch('app.llms.openai.settings')
-    def test_llm_with_different_languages(self, mock_settings, mock_chat_openai_class):
+    @patch('app.llms.factory.resolve_config')
+    def test_llm_with_different_languages(
+        self, mock_resolve_config, mock_settings, mock_chat_openai_class
+    ):
         """Test LLM creation with different language codes."""
         mock_settings.OPENAI_API_KEY = "test-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
@@ -262,34 +307,23 @@ class TestLLMAbstractionIntegration:
         mock_chat_openai_class.return_value = mock_llm_instance
         
         # Test en-IN
-        llm1 = get_llm_for_language("en-IN")
-        assert mock_chat_openai_class.call_args_list[0].kwargs["model"] == "gpt-4o-mini"
-        
-        # Reset mock
-        mock_chat_openai_class.reset_mock()
-        mock_chat_openai_class.return_value = mock_llm_instance
+        mock_resolve_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "language_code": "en-IN",
+            "api_key": None,
+            "temperature": None,
+        }
+        client1 = create_llm_client("en-IN")
+        assert client1.llm_instance == mock_llm_instance
         
         # Test hi-IN
-        llm2 = get_llm_for_language("hi-IN")
-        assert mock_chat_openai_class.call_args_list[0].kwargs["model"] == "gpt-4o-mini"
-    
-    @pytest.mark.integration
-    @patch('app.llms.llm.create_openai_llm')
-    def test_language_defaults_integration(self, mock_create):
-        """Test integration with LANGUAGE_DEFAULTS."""
-        mock_llm = Mock()
-        mock_create.return_value = mock_llm
-        
-        # Test that language defaults are used correctly
-        for lang_code in ["en-IN", "hi-IN"]:
-            mock_create.reset_mock()
-            result = get_llm_for_language(lang_code)
-            
-            mock_create.assert_called_once_with(
-                model="gpt-4o-mini",
-                language_code=lang_code,
-                temperature=None,
-                api_key=None
-            )
-            assert result == mock_llm
-
+        mock_resolve_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "language_code": "hi-IN",
+            "api_key": None,
+            "temperature": None,
+        }
+        client2 = create_llm_client("hi-IN")
+        assert client2.llm_instance == mock_llm_instance

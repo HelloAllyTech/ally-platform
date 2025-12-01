@@ -15,14 +15,24 @@ class FakeLLM:
         return AIMessage(self._content)
 
 
+class FakeLLMClient:
+    """Mock LLM client that returns a FakeLLM instance."""
+    def __init__(self, content: str = "OK"):
+        self._llm_instance = FakeLLM(content)
+    
+    @property
+    def llm_instance(self):
+        return self._llm_instance
+
+
 class TestGenerateResponse:
     @pytest.mark.asyncio
     async def test_generate_response_builds_system_message_and_returns_ai_only(self, monkeypatch):
-        # Monkeypatch get_llm_for_language to return FakeLLM
-        def fake_get_llm(language_code):
-            return FakeLLM(content="hello from llm")
+        # Monkeypatch create_llm_client to return FakeLLMClient
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content="hello from llm")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
 
         # Minimal BaseEvent subclass for new_events validation
         class FakeEvent(BaseEvent):
@@ -86,10 +96,10 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_selects_max_magnitude_branching_instruction(self, monkeypatch):
-        def fake_get_llm(language_code):
-            return FakeLLM(content="response")
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
 
         # Multiple branching instructions with different scores
         state = SimulationState(
@@ -139,10 +149,10 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_filters_empty_branching_instructions(self, monkeypatch):
-        def fake_get_llm(language_code):
-            return FakeLLM(content="response")
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
 
         # Mix of valid and invalid instructions
         state = SimulationState(
@@ -193,15 +203,15 @@ class TestGenerateResponse:
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):
         call_count = {"primary": 0, "fallback": 0}
 
-        def fake_get_llm(language_code):
+        def fake_create_llm_client(language_code):
             if language_code == "unsupported-lang":
                 call_count["primary"] += 1
                 raise ValueError("Unsupported language")
             else:
                 call_count["fallback"] += 1
-                return FakeLLM(content="fallback response")
+                return FakeLLMClient(content="fallback response")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
         monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
 
         state = SimulationState(
@@ -248,10 +258,10 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_without_scenario(self, monkeypatch):
-        def fake_get_llm(language_code):
-            return FakeLLM(content="response without scenario")
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content="response without scenario")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
 
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
@@ -272,10 +282,10 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_language_config(self, monkeypatch):
-        def fake_get_llm(language_code):
-            return FakeLLM(content=f"response in {language_code}")
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content=f"response in {language_code}")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
         monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
 
         state = SimulationState(
@@ -320,10 +330,10 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_preserves_state_fields(self, monkeypatch):
-        def fake_get_llm(language_code):
-            return FakeLLM(content="response")
+        def fake_create_llm_client(language_code):
+            return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.get_llm_for_language", fake_get_llm)
+        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
 
         class FakeEvent(BaseEvent):
             async def detect_event(self, conversations):

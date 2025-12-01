@@ -31,11 +31,6 @@ class TestWorker:
         # Dummy components to capture inputs
         created = {}
 
-        class DummyTD:
-            pass
-
-        monkeypatch.setattr(worker, "MultilingualModel", DummyTD)
-
         class DummyAgentSession:
             def __init__(self, stt, tts, vad, turn_detection):
                 self.stt = stt
@@ -55,7 +50,7 @@ class TestWorker:
         assert session.stt == "STT"
         assert session.tts == "TTS"
         assert session.vad == "VAD"
-        assert isinstance(session.turn_detection, DummyTD)
+        assert session.turn_detection == "vad"  # Worker now uses "vad" string
 
     # -------------------- entrypoint --------------------
     class DummySession:
