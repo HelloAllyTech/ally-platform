@@ -105,7 +105,7 @@ class Scenario(BaseModel):
         prompt_data = cls._build_prompt_data(raw)
         language_config = cls._build_language_config(raw)
         # Extract trigger_events (list of event IDs that should be sent)
-        trigger_events = raw.get("trigger_events") or []
+        trigger_events = raw.get("triggerEvents") or []
         # Extract termination event configuration
         termination_event = cls._build_termination_event(raw)
 

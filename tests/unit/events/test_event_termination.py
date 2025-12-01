@@ -20,7 +20,7 @@ def create_mock_scenario(events, trigger_events=None, termination_event_id=None,
     """Helper to create a mock scenario for testing."""
     mock_scenario = MagicMock()
     mock_scenario.events = events
-    mock_scenario.trigger_events = trigger_events or []
+    mock_scenario.trigger_events = trigger_events
     
     if termination_event_id:
         mock_scenario.termination_event = MagicMock()
@@ -68,7 +68,7 @@ class TestEventTermination:
             ]
         }
         events = build_events_from_metadata(metadata)
-        scenario = create_mock_scenario(events)
+        scenario = create_mock_scenario(events, trigger_events=["event-1"])
         
         callback = AsyncMock()
         mock_room = MagicMock()
@@ -85,7 +85,7 @@ class TestEventTermination:
             ]
         }
         events = build_events_from_metadata(metadata)
-        scenario = create_mock_scenario(events)
+        scenario = create_mock_scenario(events, trigger_events=["event-1"])
         
         mock_room = MagicMock()
         mock_room.name = "test-room"
@@ -108,6 +108,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [termination_event],
+            trigger_events=["term-event"],
             termination_event_id="term-event",
             termination_message="Custom termination message"
         )
@@ -144,7 +145,7 @@ class TestEventTermination:
         
         # Create callback mock
         callback = AsyncMock()
-        scenario = create_mock_scenario([normal_event])
+        scenario = create_mock_scenario([normal_event], trigger_events=["normal-event"])
         
         # Mock room
         mock_room = MagicMock()
@@ -181,6 +182,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
             termination_event_id="term-1",
             termination_message="Terminating"
         )
@@ -222,6 +224,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [normal_event, term_event],
+            trigger_events=["normal", "terminator"],
             termination_event_id="terminator",
             termination_message="Terminating"
         )
@@ -256,6 +259,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [term_event],
+            trigger_events=["term-event"],
             termination_event_id="term-event",
             termination_message="Terminating"
         )
@@ -383,6 +387,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
+            trigger_events=["event-1", "event-2", "combo-term"],
             termination_event_id="combo-term",
             termination_message="Combination event triggered termination."
         )
@@ -425,6 +430,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
+            trigger_events=["score-term"],
             termination_event_id="score-term",
             termination_message="Score threshold reached."
         )
@@ -468,6 +474,7 @@ class TestEventTermination:
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
+            trigger_events=["time-term"],
             termination_event_id="time-term",
             termination_message="Time limit reached."
         )

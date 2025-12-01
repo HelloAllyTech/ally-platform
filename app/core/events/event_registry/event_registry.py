@@ -274,7 +274,7 @@ class EventRegistry:
         events_to_send = []
         for event in successful_events:
             # First check if event is in trigger_events (if trigger_events is specified)
-            if self.trigger_events and event.event_id not in self.trigger_events:
+            if self.trigger_events is not None and event.event_id not in self.trigger_events:
                 logger.debug(f"Event {event.event_id} skipped (not in trigger_events list)")
                 continue
             
