@@ -14,7 +14,7 @@ def create_mock_scenario(events, trigger_events=None, termination_event_id=None,
     """Helper to create a mock scenario for testing."""
     mock_scenario = MagicMock()
     mock_scenario.events = events
-    mock_scenario.trigger_events = trigger_events or []
+    mock_scenario.trigger_events = trigger_events
     
     if termination_event_id:
         mock_scenario.termination_event = MagicMock()
@@ -76,6 +76,7 @@ class TestEventTerminationIntegration:
         # Initialize registry with termination callback
         scenario = create_mock_scenario(
             events,
+            trigger_events=["end-session", "normal-event"],
             termination_event_id="end-session",
             termination_message="Session is ending now."
         )
@@ -167,6 +168,7 @@ class TestEventTerminationIntegration:
         
         scenario = create_mock_scenario(
             events,
+            trigger_events=["max-score-reached", "combo-event", "greeting"],
             termination_event_id="max-score-reached",
             termination_message="Maximum score reached. Session ending."
         )
@@ -264,6 +266,7 @@ class TestEventTerminationIntegration:
         
         scenario = create_mock_scenario(
             events,
+            trigger_events=["final-event"],
             termination_event_id="final-event",
             termination_message="Final words spoken."
         )
@@ -394,6 +397,7 @@ class TestEventTerminationIntegration:
         # Create registry with termination callback
         scenario = create_mock_scenario(
             events,
+            trigger_events=["end-abruptly"],
             termination_event_id="end-abruptly",
             termination_message="I dont have time for this. I am leaving."
         )
