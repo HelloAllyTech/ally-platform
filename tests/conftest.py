@@ -33,6 +33,7 @@ def _set_test_env_vars():
         # Voice API settings
         "ELEVEN_API_KEY": "test-eleven-key",
         "SARVAM_API_KEY": "test-sarvam-key",
+        "HUME_API_KEY": "test-hume-key",
         
         # LLM settings
         "LLM_TEMPERATURE": "0.7",
