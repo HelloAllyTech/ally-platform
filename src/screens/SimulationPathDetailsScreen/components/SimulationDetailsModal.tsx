@@ -41,8 +41,8 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
       transparent
+      animationType="fade"
       onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalContainer}>

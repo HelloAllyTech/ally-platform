@@ -46,6 +46,14 @@ jest.mock('@reduxjs/toolkit/query/react', () => {
 });
 
 describe('api reauth flow', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('dispatches storeTokens on 401 then succeeds original request', async () => {
     mockCallCount = 0;
     const {api: apiReauth} = require('../api');
@@ -67,5 +75,3 @@ describe('api reauth flow', () => {
     expect(mockCallCount).toBeGreaterThanOrEqual(3);
   });
 });
-
-

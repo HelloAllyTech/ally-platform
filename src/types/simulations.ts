@@ -117,15 +117,32 @@ interface SummaryMetadata {
 }
 
 export interface UpNextSimulation {
-  id: number;
+  id?: number;
   title?: string;
   description?: string;
   coverImageUrl?: string;
   coverVideoUrl?: string;
+  scenarioPathSessionItemStatus?: SessionItemStatus;
   order?: number;
+  scenarioPathSessionItemId?: string;
+}
+
+export interface CurrentSessionInfo {
+  scenarioId?: number;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  scenarioPathSessionItemStatus?: SessionItemStatus;
+  scenarioPathSessionItemId?: string;
   transitionMessageTitle?: string;
   transitionMessageContent?: string;
-  scenarioPathSessionItemId?: string;
+  isScenarioPathSessionCompleted?: boolean;
+}
+
+export interface UpcomingScenarioResponse {
+  upcomingScenario?: UpNextSimulation;
+  currentSession?: CurrentSessionInfo;
 }
 
 export interface SimulationSummaryData {

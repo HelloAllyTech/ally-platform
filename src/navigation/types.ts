@@ -17,13 +17,11 @@ export type RootStackParamList = {
   SimulationAssistant: {
     sessionData: SessionData;
     scenario?: Scenario;
-    pathSessionItemId?: string;
     pathId?: string;
   };
   SimulationFeedback: {
     scenarioSessionId?: string;
     fromLogs?: boolean;
-    pathSessionItemId?: string;
     pathId?: string;
   };
 };

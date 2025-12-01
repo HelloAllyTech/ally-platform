@@ -62,9 +62,11 @@ export const styles = ScaledSheet.create({
     gap: '12@ms',
     marginTop: '20@vs',
   },
+  retryButton: {
+    flex: 1,
+  },
   nextButton: {
     flex: 1,
-    // paddingVertical: '8@vs',
   },
   scrollToBottomButton: {
     position: 'absolute',
@@ -108,7 +110,6 @@ export const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
     marginBottom: '8@vs',
-    textTransform: 'lowercase',
   },
   transitionMessageContent: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

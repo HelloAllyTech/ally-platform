@@ -44,7 +44,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {sessionData, scenario, pathSessionItemId, pathId} = route.params;
+  const {sessionData, scenario, pathId} = route.params;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const startTime = useMemo(
     () =>
@@ -162,6 +162,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
     const onDisconnected = () => {
       setIsConnecting(false);
+      if (!isDisconnecting) {
+        setIsDisconnecting(true);
+        setIsMicEnabled(false);
+        navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          scenarioSessionId: sessionId,
+          pathId,
+        });
+        setIsDisconnecting(false);
+      }
     };
     const onDataReceived = (payload: unknown) => {
       const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
@@ -190,7 +199,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
-  }, [room, showErrorToast, clamp, ensureSpeakerOutput]);
+  }, [
+    room,
+    ensureSpeakerOutput,
+    showErrorToast,
+    isDisconnecting,
+    navigation,
+    sessionId,
+    pathId,
+    clamp,
+  ]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
@@ -234,7 +252,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     } finally {
       navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         scenarioSessionId: sessionId,
-        pathSessionItemId,
         pathId,
       });
       setIsMicEnabled(false);
@@ -371,6 +388,7 @@ const styles = ScaledSheet.create({
     borderRadius: '8@ms',
     marginTop: '10@mvs',
     marginBottom: '16@mvs',
+    paddingHorizontal: '16@ms',
     backgroundColor: colors.darkGray3,
   },
   liveFeedbackWrapper: {

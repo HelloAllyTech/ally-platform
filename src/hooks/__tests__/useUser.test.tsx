@@ -26,7 +26,14 @@ jest.mock('@/services/authApi', () => ({
   useLazyGetPermissionsQuery: () => [mockGetPerms],
 }));
 
-jest.mock('react-redux', () => ({ useSelector: (sel: any) => sel({ user: { isAuthenticated: false, user: null, loading: false } }) }));
+jest.mock('react-redux', () => ({
+  useSelector: (sel: any) => sel({user: {isAuthenticated: false, user: null, loading: false}}),
+  useDispatch: () => jest.fn(),
+  useStore: () => ({
+    getState: jest.fn(() => ({user: {isAuthenticated: false, user: null, loading: false}})),
+    dispatch: jest.fn(),
+  }),
+}));
 
 jest.mock('@/utils/logger', () => ({ logger: { error: jest.fn() } }));
 
