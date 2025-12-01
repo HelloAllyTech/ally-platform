@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 from app.llms.llm import get_llm_for_language
 from app.llms.openai import create_openai_llm
 from app.core.constants import LLMProvider
-from app.core.language_config import DEFAULT_LANGUAGE_CODE, LANGUAGE_DEFAULTS
+from app.core.language import DEFAULT_LANGUAGE_CODE, LANGUAGE_DEFAULTS
 
 
 class TestOpenAILLMProvider:

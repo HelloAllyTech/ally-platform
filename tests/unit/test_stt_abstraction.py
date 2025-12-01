@@ -2,78 +2,63 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from app.stt.stt import get_stt_for_language
-from app.stt.deepgram import create_deepgram_stt
-from app.core.constants import STTProvider
-from app.core.language_config import DEFAULT_LANGUAGE_CODE, LANGUAGE_DEFAULTS
+from app.stt.deepgram import DeepgramSTTClient
+from app.stt.base import BaseSTTClient
+from app.stt.factory import create_stt_client
+from app.core.language.factory import resolve_config
 
 
-class TestDeepgramSTTProvider:
-    """Test cases for Deepgram STT provider."""
+class TestDeepgramSTTClient:
+    """Test cases for Deepgram STT client."""
     
     @pytest.mark.unit
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    def test_create_deepgram_stt_success(self, mock_settings, mock_stt_class):
-        """Test successful Deepgram STT creation."""
+    def test_deepgram_stt_client_init_success(self, mock_settings, mock_stt_class):
+        """Test successful Deepgram STT client initialization with BCP 47 code."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        result = create_deepgram_stt(model="nova-3", language_code="en-IN")
+        # Pass BCP 47 format - provider converts it internally
+        client = DeepgramSTTClient(model="nova-3", language_code="en-IN")
         
+        # Should convert "en-IN" to "en" (ISO 639-1)
         mock_stt_class.assert_called_once_with(
             model="nova-3",
             language="en",
             api_key="test-api-key"
         )
-        assert result == mock_stt_instance
+        assert client.stt_instance == mock_stt_instance
+        assert isinstance(client, BaseSTTClient)
     
     @pytest.mark.unit
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    def test_create_deepgram_stt_with_hi_in(self, mock_settings, mock_stt_class):
-        """Test Deepgram STT creation with Hindi language code."""
+    def test_deepgram_stt_client_with_hi(self, mock_settings, mock_stt_class):
+        """Test Deepgram STT client with Hindi BCP 47 code."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        result = create_deepgram_stt(model="nova-3", language_code="hi-IN")
+        # Pass BCP 47 format - provider converts to "hi"
+        client = DeepgramSTTClient(model="nova-3", language_code="hi-IN")
         
         mock_stt_class.assert_called_once_with(
             model="nova-3",
             language="hi",
             api_key="test-api-key"
         )
-        assert result == mock_stt_instance
+        assert client.stt_instance == mock_stt_instance
     
     @pytest.mark.unit
     @patch('livekit.plugins.deepgram.STT')
-    @patch('app.stt.deepgram.settings')
-    def test_create_deepgram_stt_default_language(self, mock_settings, mock_stt_class):
-        """Test Deepgram STT creation with default language when not provided."""
-        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+    def test_deepgram_stt_client_custom_api_key(self, mock_stt_class):
+        """Test Deepgram STT client with custom API key."""
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        result = create_deepgram_stt(model="nova-3", language_code=None)
-        
-        # Should default to DEFAULT_LANGUAGE_CODE (en-IN) converted to "en"
-        mock_stt_class.assert_called_once_with(
-            model="nova-3",
-            language="en",
-            api_key="test-api-key"
-        )
-        assert result == mock_stt_instance
-    
-    @pytest.mark.unit
-    @patch('livekit.plugins.deepgram.STT')
-    def test_create_deepgram_stt_custom_api_key(self, mock_stt_class):
-        """Test Deepgram STT creation with custom API key."""
-        mock_stt_instance = Mock()
-        mock_stt_class.return_value = mock_stt_instance
-        
-        result = create_deepgram_stt(
+        client = DeepgramSTTClient(
             model="nova-3",
             language_code="en-IN",
             api_key="custom-api-key"
@@ -81,87 +66,74 @@ class TestDeepgramSTTProvider:
         
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language="en",
+            language="en",  # Converted from "en-IN"
             api_key="custom-api-key"
         )
-        assert result == mock_stt_instance
+        assert client.stt_instance == mock_stt_instance
     
     @pytest.mark.unit
-    def test_create_deepgram_stt_missing_model(self):
-        """Test Deepgram STT creation with missing model."""
+    def test_deepgram_stt_client_missing_model(self):
+        """Test Deepgram STT client with missing model."""
         with pytest.raises(ValueError, match="Deepgram STT requires 'model' parameter"):
-            create_deepgram_stt(model="", language_code="en-IN")
+            DeepgramSTTClient(model="", language_code="en-IN")
+    
+    @pytest.mark.unit
+    def test_deepgram_stt_client_missing_language_code(self):
+        """Test Deepgram STT client with missing language code."""
+        with pytest.raises(ValueError, match="Deepgram STT requires 'language_code' parameter"):
+            DeepgramSTTClient(model="nova-3", language_code="")
     
     @pytest.mark.unit
     @patch('app.stt.deepgram.settings')
-    def test_create_deepgram_stt_missing_api_key(self, mock_settings):
-        """Test Deepgram STT creation with missing API key."""
+    def test_deepgram_stt_client_missing_api_key(self, mock_settings):
+        """Test Deepgram STT client with missing API key."""
         mock_settings.DEEPGRAM_API_KEY = None
         
         with pytest.raises(ValueError, match="Deepgram STT requires 'api_key' parameter"):
-            create_deepgram_stt(model="nova-3", language_code="en-IN")
+            DeepgramSTTClient(model="nova-3", language_code="en-IN")
+    
+    @pytest.mark.unit
+    def test_deepgram_language_format(self):
+        """Test that Deepgram declares ISO 639-1 format requirement."""
+        assert DeepgramSTTClient.LANGUAGE_FORMAT == "iso6391"
+    
+    @pytest.mark.unit
+    def test_deepgram_convert_language_code(self):
+        """Test language code conversion in Deepgram client."""
+        # Test BCP 47 to ISO 639-1 conversion
+        assert DeepgramSTTClient.convert_language_code("en-IN") == "en"
+        assert DeepgramSTTClient.convert_language_code("hi-IN") == "hi"
+        assert DeepgramSTTClient.convert_language_code("en-US") == "en"
+        assert DeepgramSTTClient.convert_language_code("en") == "en"
 
 
-class TestGetSTTForLanguage:
-    """Test cases for get_stt_for_language function."""
+class TestResolveConfig:
+    """Test cases for resolve_config function."""
     
     @pytest.mark.unit
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_get_stt_for_language_en_in(self, mock_create):
-        """Test getting STT for en-IN language."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_from_language_defaults(self, mock_get_defaults):
+        """Test resolve_config resolves config from unified registry."""
+        mock_get_defaults.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3"
+        }
         
-        result = get_stt_for_language("en-IN")
+        config = resolve_config("stt", "en-IN")
         
-        # Should use defaults from LANGUAGE_DEFAULTS
-        mock_create.assert_called_once_with(
-            model="nova-3",
-            language_code="en-IN",
-            api_key=None
-        )
-        assert result == mock_stt
+        assert config["provider"] == "deepgram"
+        assert config["model"] == "nova-3"
+        assert config["language_code"] == "en-IN"  # BCP 47 - providers convert it
+        assert config["api_key"] is None
     
     @pytest.mark.unit
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_get_stt_for_language_hi_in(self, mock_create):
-        """Test getting STT for hi-IN language."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
-        
-        result = get_stt_for_language("hi-IN")
-        
-        # Should use hi-IN defaults (nova-3 model)
-        mock_create.assert_called_once_with(
-            model="nova-3",
-            language_code="hi-IN",
-            api_key=None
-        )
-        assert result == mock_stt
-    
-    @pytest.mark.unit
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_get_stt_for_language_fallback(self, mock_create):
-        """Test fallback to default language when language not found."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
-        
-        result = get_stt_for_language("unknown-language")
-        
-        # Should fallback to DEFAULT_LANGUAGE_CODE (en-IN) defaults
-        mock_create.assert_called_once_with(
-            model="nova-3",  # en-IN default
-            language_code="unknown-language",  # Still pass the requested language
-            api_key=None
-        )
-        assert result == mock_stt
-    
-    @pytest.mark.unit
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_get_stt_for_language_with_override(self, mock_create):
-        """Test getting STT with override configuration."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_with_override(self, mock_get_defaults):
+        """Test resolve_config with override configuration."""
+        mock_get_defaults.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3"
+        }
         
         override_config = {
             "provider": "deepgram",
@@ -169,73 +141,115 @@ class TestGetSTTForLanguage:
             "config": {"api_key": "custom-key"}
         }
         
-        result = get_stt_for_language("en-IN", override_config=override_config)
+        config = resolve_config("stt", "en-IN", override_config)
         
-        # Should use override config
-        mock_create.assert_called_once_with(
-            model="nova-2",
-            language_code="en-IN",
-            api_key="custom-key"
-        )
-        assert result == mock_stt
+        assert config["provider"] == "deepgram"
+        assert config["model"] == "nova-2"
+        assert config["api_key"] == "custom-key"
+        assert config["language_code"] == "en-IN"
     
     @pytest.mark.unit
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_get_stt_for_language_override_provider_only(self, mock_create):
-        """Test override with provider only (should use language defaults for model)."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
+    @patch('app.core.language.factory.get_capability_defaults')
+    def test_resolve_config_fallback_to_default_language(self, mock_get_defaults):
+        """Test resolve_config falls back to default language when language not found."""
+        # First call returns empty (language not found)
+        # Second call returns default language config
+        mock_get_defaults.side_effect = [
+            {},  # Language not found
+            {"provider": "deepgram", "model": "nova-3"}  # Default language
+        ]
+        
+        config = resolve_config("stt", "unknown-language")
+        
+        assert config["provider"] == "deepgram"
+        assert config["model"] == "nova-3"
+
+
+class TestSTTFactory:
+    """Test cases for create_stt_client factory function."""
+    
+    @pytest.mark.unit
+    @patch('livekit.plugins.deepgram.STT')
+    @patch('app.stt.deepgram.settings')
+    @patch('app.stt.factory.resolve_config')
+    def test_create_stt_client_auto_selects_provider(
+        self, mock_resolve_config, mock_settings, mock_stt_class
+    ):
+        """Test that factory function uses resolve_config to resolve config."""
+        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+        mock_resolve_config.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3",
+            "language_code": "en-IN",
+            "api_key": None,
+        }
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+        
+        client = create_stt_client("en-IN")
+        
+        # Verify resolve_config was called
+        mock_resolve_config.assert_called_once_with("stt", "en-IN", None)
+        
+        # Verify DeepgramSTTClient was instantiated with BCP 47 code (provider converts it)
+        mock_stt_class.assert_called_once_with(
+            model="nova-3",
+            language="en",  # Provider converted "en-IN" to "en"
+            api_key="test-api-key"
+        )
+        assert client.stt_instance == mock_stt_instance
+        assert isinstance(client, DeepgramSTTClient)
+    
+    @pytest.mark.unit
+    @patch('livekit.plugins.deepgram.STT')
+    @patch('app.stt.deepgram.settings')
+    @patch('app.stt.factory.resolve_config')
+    def test_create_stt_client_with_override(
+        self, mock_resolve_config, mock_settings, mock_stt_class
+    ):
+        """Test factory function with override configuration."""
+        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+        mock_resolve_config.return_value = {
+            "provider": "deepgram",
+            "model": "nova-2",
+            "language_code": "en-IN",
+            "api_key": "custom-key",
+        }
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
         
         override_config = {
             "provider": "deepgram",
-            # No model specified, should use language default
+            "model": "nova-2",
+            "config": {"api_key": "custom-key"}
         }
         
-        result = get_stt_for_language("en-IN", override_config=override_config)
+        client = create_stt_client("en-IN", override_config=override_config)
         
-        # Should use language default model
-        mock_create.assert_called_once_with(
-            model="nova-3",  # en-IN default
-            language_code="en-IN",
-            api_key=None
+        # Verify resolve_config was called with override
+        mock_resolve_config.assert_called_once_with("stt", "en-IN", override_config)
+        
+        # Verify client was created with override values
+        mock_stt_class.assert_called_once_with(
+            model="nova-2",
+            language="en",  # Provider converted "en-IN" to "en"
+            api_key="custom-key"
         )
-        assert result == mock_stt
+        assert client.stt_instance == mock_stt_instance
     
     @pytest.mark.unit
-    def test_get_stt_for_language_unsupported_provider(self):
+    @patch('app.stt.factory.resolve_config')
+    def test_create_stt_client_unsupported_provider(self, mock_resolve_config):
         """Test error handling for unsupported provider."""
-        override_config = {
+        mock_resolve_config.return_value = {
             "provider": "unsupported",
-            "model": "test-model"
+            "model": "test-model",
+            "language_code": "en-IN",
+            "api_key": None,
         }
         
         with pytest.raises(ValueError, match="Unsupported STT provider"):
-            get_stt_for_language("en-IN", override_config=override_config)
-    
-    @pytest.mark.unit
-    def test_get_stt_for_language_missing_model(self):
-        """Test error handling when model is missing."""
-        override_config = {
-            "provider": "deepgram",
-            # No model specified
-        }
-        
-        # This should fallback to language defaults, but if those are missing, it should raise
-        # Actually, it should use language defaults, so let's test with a language that has defaults
-        with patch('app.stt.stt.create_deepgram_stt') as mock_create:
-            mock_stt = Mock()
-            mock_create.return_value = mock_stt
-            
-            # Override with provider but no model - should use language default
-            override_config = {"provider": "deepgram"}
-            result = get_stt_for_language("en-IN", override_config=override_config)
-            
-            # Should use en-IN default model
-            mock_create.assert_called_once_with(
-                model="nova-3",
-                language_code="en-IN",
-                api_key=None
-            )
+            create_stt_client("en-IN")
 
 
 class TestSTTAbstractionIntegration:
@@ -244,60 +258,60 @@ class TestSTTAbstractionIntegration:
     @pytest.mark.integration
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    def test_full_stt_creation_flow(self, mock_settings, mock_stt_class):
-        """Test complete STT creation flow."""
+    @patch('app.stt.factory.resolve_config')
+    def test_full_stt_creation_flow(self, mock_resolve_config, mock_settings, mock_stt_class):
+        """Test complete STT creation flow using factory."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
+        mock_resolve_config.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3",
+            "language_code": "en-IN",
+            "api_key": None,
+        }
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        stt = get_stt_for_language("en-IN")
+        stt_client = create_stt_client("en-IN")
         
-        assert stt == mock_stt_instance
+        assert stt_client.stt_instance == mock_stt_instance
         mock_stt_class.assert_called_once_with(
             model="nova-3",
-            language="en",
+            language="en",  # Provider converted "en-IN" to "en"
             api_key="test-key"
         )
     
     @pytest.mark.integration
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    def test_stt_with_different_languages(self, mock_settings, mock_stt_class):
+    @patch('app.stt.factory.resolve_config')
+    def test_stt_with_different_languages(self, mock_resolve_config, mock_settings, mock_stt_class):
         """Test STT creation with different language codes."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
         # Test en-IN
-        stt1 = get_stt_for_language("en-IN")
-        assert mock_stt_class.call_args_list[0][1]["model"] == "nova-3"
-        assert mock_stt_class.call_args_list[0][1]["language"] == "en"
+        mock_resolve_config.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3",
+            "language_code": "en-IN",
+            "api_key": None,
+        }
+        stt1 = create_stt_client("en-IN")
+        assert mock_stt_class.call_args[1]["model"] == "nova-3"
+        assert mock_stt_class.call_args[1]["language"] == "en"  # Converted
         
         # Reset mock
         mock_stt_class.reset_mock()
         mock_stt_class.return_value = mock_stt_instance
         
         # Test hi-IN
-        stt2 = get_stt_for_language("hi-IN")
-        assert mock_stt_class.call_args_list[0][1]["model"] == "nova-3"
-        assert mock_stt_class.call_args_list[0][1]["language"] == "hi"
-    
-    @pytest.mark.integration
-    @patch('app.stt.stt.create_deepgram_stt')
-    def test_language_defaults_integration(self, mock_create):
-        """Test integration with LANGUAGE_DEFAULTS."""
-        mock_stt = Mock()
-        mock_create.return_value = mock_stt
-        
-        # Test that language defaults are used correctly
-        for lang_code, expected_model in [("en-IN", "nova-3"), ("hi-IN", "nova-3")]:
-            mock_create.reset_mock()
-            result = get_stt_for_language(lang_code)
-            
-            mock_create.assert_called_once_with(
-                model=expected_model,
-                language_code=lang_code,
-                api_key=None
-            )
-            assert result == mock_stt
-
+        mock_resolve_config.return_value = {
+            "provider": "deepgram",
+            "model": "nova-3",
+            "language_code": "hi-IN",
+            "api_key": None,
+        }
+        stt2 = create_stt_client("hi-IN")
+        assert mock_stt_class.call_args[1]["model"] == "nova-3"
+        assert mock_stt_class.call_args[1]["language"] == "hi"  # Converted

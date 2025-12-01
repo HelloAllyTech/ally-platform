@@ -2,7 +2,7 @@
 import pytest
 from typing import Dict, Any
 
-from app.core.language_config import (
+from app.core.language import (
     LANGUAGE_DEFAULTS,
     DEFAULT_LANGUAGE_CODE,
     get_language_defaults

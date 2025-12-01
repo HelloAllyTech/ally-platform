@@ -107,7 +107,13 @@ class TestWorker:
 
         # STT config
         stt_called = {}
-        monkeypatch.setattr(worker, "get_stt_for_language", lambda language_code: stt_called.setdefault("ok", True) or "STT")
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        def mock_create_stt_client(language_code):
+            stt_called["ok"] = True
+            return MockSTTClient()
+        monkeypatch.setattr(worker, "create_stt_client", mock_create_stt_client)
 
         # TTS config
         tts_called = {}
@@ -190,7 +196,10 @@ class TestWorker:
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
 
         # STT should work fine
-        monkeypatch.setattr(worker, "get_stt_for_language", lambda lang: "STT")
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
 
         def boom(*a, **k):
             raise RuntimeError("tts fail")
@@ -357,17 +366,21 @@ class TestWorker:
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
 
         # STT should fail and fallback
-        def boom(*a, **k):
-            raise RuntimeError("stt fail")
-
-        monkeypatch.setattr(worker, "get_stt_for_language", boom)
-
+        call_count = {"count": 0}
         fallback_used = {}
-        def fake_default_stt(lang):
-            fallback_used["used"] = lang
-            return "DEFAULT_STT"
+        
+        def fake_stt_with_fallback(lang):
+            call_count["count"] += 1
+            if call_count["count"] == 1:
+                raise RuntimeError("stt fail")
+            else:
+                fallback_used["used"] = lang
+                class MockSTTClient:
+                    def __init__(self):
+                        self.stt_instance = "DEFAULT_STT"
+                return MockSTTClient()
 
-        monkeypatch.setattr(worker, "get_stt_for_language", fake_default_stt)
+        monkeypatch.setattr(worker, "create_stt_client", fake_stt_with_fallback)
 
         monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
 
@@ -410,7 +423,10 @@ class TestWorker:
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
 
-        monkeypatch.setattr(worker, "get_stt_for_language", lambda lang: "STT")
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
         monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
 
         registry_init_called = {}
@@ -469,7 +485,10 @@ class TestWorker:
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
 
-        monkeypatch.setattr(worker, "get_stt_for_language", lambda lang: "STT")
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
         monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
 
         dummy_session = self.DummySession()
@@ -515,7 +534,10 @@ class TestWorker:
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
 
-        monkeypatch.setattr(worker, "get_stt_for_language", lambda lang: "STT")
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
         monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
 
         registry_instance = {}
