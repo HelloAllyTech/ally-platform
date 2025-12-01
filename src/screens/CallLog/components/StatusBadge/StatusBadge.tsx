@@ -5,7 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {HexagonCloseIcon} from '@/assets';
 import {ChatSummaryStatus, SUMMARY_STATUS_CONFIG} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface StatusBadgeProps {
   status: ChatSummaryStatus;
@@ -51,8 +51,9 @@ const styles = ScaledSheet.create({
     borderRadius: '2@vs',
   },
   statusText: {
-    fontSize: '8@ms',
     fontFamily: fontFamily.IBM_PLEX_SERIF.REGULAR.fontFamily,
+    ...typography.label.micro,
+    color: colors.ds.typography.highEmphasis,
     textTransform: 'capitalize',
   },
 });
