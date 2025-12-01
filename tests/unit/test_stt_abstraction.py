@@ -129,23 +129,17 @@ class TestResolveConfig:
     @pytest.mark.unit
     @patch('app.core.language.factory.get_capability_defaults')
     def test_resolve_config_with_override(self, mock_get_defaults):
-        """Test resolve_config with override configuration."""
+        """Test resolve_config uses language registry defaults."""
         mock_get_defaults.return_value = {
             "provider": "deepgram",
             "model": "nova-3"
         }
         
-        override_config = {
-            "provider": "deepgram",
-            "model": "nova-2",
-            "config": {"api_key": "custom-key"}
-        }
-        
-        config = resolve_config("stt", "en-IN", override_config)
+        config = resolve_config("stt", "en-IN")
         
         assert config["provider"] == "deepgram"
-        assert config["model"] == "nova-2"
-        assert config["api_key"] == "custom-key"
+        assert config["model"] == "nova-3"
+        assert config["api_key"] is None  # API keys come from settings, not registry
         assert config["language_code"] == "en-IN"
     
     @pytest.mark.unit
@@ -188,8 +182,8 @@ class TestSTTFactory:
         
         client = create_stt_client("en-IN")
         
-        # Verify resolve_config was called
-        mock_resolve_config.assert_called_once_with("stt", "en-IN", None)
+        # Verify resolve_config was called without override
+        mock_resolve_config.assert_called_once_with("stt", "en-IN")
         
         # Verify DeepgramSTTClient was instantiated with BCP 47 code (provider converts it)
         mock_stt_class.assert_called_once_with(
@@ -201,41 +195,35 @@ class TestSTTFactory:
         assert isinstance(client, DeepgramSTTClient)
     
     @pytest.mark.unit
-    @patch('livekit.plugins.deepgram.STT')
-    @patch('app.stt.deepgram.settings')
+    @patch('app.stt.factory.DeepgramSTTClient')
     @patch('app.stt.factory.resolve_config')
-    def test_create_stt_client_with_override(
-        self, mock_resolve_config, mock_settings, mock_stt_class
+    def test_create_stt_client_uses_language_registry(
+        self, mock_resolve_config, mock_stt_client_class
     ):
-        """Test factory function with override configuration."""
-        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+        """Test factory function uses language registry defaults."""
         mock_resolve_config.return_value = {
             "provider": "deepgram",
-            "model": "nova-2",
+            "model": "nova-3",
             "language_code": "en-IN",
-            "api_key": "custom-key",
+            "api_key": None,
         }
         mock_stt_instance = Mock()
-        mock_stt_class.return_value = mock_stt_instance
+        mock_client = Mock()
+        mock_client.stt_instance = mock_stt_instance
+        mock_stt_client_class.return_value = mock_client
         
-        override_config = {
-            "provider": "deepgram",
-            "model": "nova-2",
-            "config": {"api_key": "custom-key"}
-        }
+        client = create_stt_client("en-IN")
         
-        client = create_stt_client("en-IN", override_config=override_config)
+        # Verify resolve_config was called without override (uses language registry)
+        mock_resolve_config.assert_called_once_with("stt", "en-IN")
         
-        # Verify resolve_config was called with override
-        mock_resolve_config.assert_called_once_with("stt", "en-IN", override_config)
-        
-        # Verify client was created with override values
-        mock_stt_class.assert_called_once_with(
-            model="nova-2",
-            language="en",  # Provider converted "en-IN" to "en"
-            api_key="custom-key"
+        # Verify DeepgramSTTClient was created with language registry values
+        mock_stt_client_class.assert_called_once_with(
+            model="nova-3",
+            language_code="en-IN",
+            api_key=None,  # Will use settings.DEEPGRAM_API_KEY in actual client
         )
-        assert client.stt_instance == mock_stt_instance
+        assert client == mock_client
     
     @pytest.mark.unit
     @patch('app.stt.factory.resolve_config')

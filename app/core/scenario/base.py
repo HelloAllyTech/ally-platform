@@ -38,8 +38,10 @@ class VoicePromptData(BaseModel):
 class VoiceConfig(BaseModel):
     model: Optional[str] = Field(default=None)
     voice_id: Optional[str] = Field(default=None)
-
     speaker: Optional[str] = Field(default=None)
+    voice_name: Optional[str] = Field(default=None)  # For Google TTS
+    gender: Optional[str] = Field(default=None)  # For Google TTS ("male", "female", "neutral")
+    voice_cloning_key: Optional[str] = Field(default=None)  # For Google TTS custom voices
 
 
 
@@ -155,6 +157,9 @@ class Scenario(BaseModel):
             model=config_meta.get("model"),
             voice_id=config_meta.get("voice_id"),
             speaker=config_meta.get("speaker"),
+            voice_name=config_meta.get("voice_name"),
+            gender=config_meta.get("gender"),
+            voice_cloning_key=config_meta.get("voice_cloning_key"),
         )
 
         return ScenarioVoice(
@@ -221,8 +226,8 @@ class Scenario(BaseModel):
 
         Parses:
         - languageCode: BCP 47 language code (defaults to "en-IN")
-        - stt: Optional STT provider override {provider: "...", config: {...}}
-        - llm: Optional LLM provider override {provider: "...", model: "...", temperature: ..., config: {...}}
+        - stt: Optional STT provider configuration (currently unused - uses language registry)
+        - llm: Optional LLM provider configuration (currently unused - uses language registry)
 
         Args:
             raw: Raw scenario dictionary from metadata

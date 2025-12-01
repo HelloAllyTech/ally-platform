@@ -57,7 +57,12 @@ class Settings(BaseSettings):
     SARVAM_API_KEY: str = Field(...)
 
 
-    LLM_TEMPERATURE : str = Field(...)
+    LLM_TEMPERATURE: str = Field(...)
+    
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(
+        default=None,
+        description="Path to Google Cloud credentials JSON file (for Google TTS)"
+    )
 
     DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(...)
     DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)

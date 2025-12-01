@@ -10,6 +10,7 @@ class TTSProvider(str, Enum):
     ELEVENLABS = "elevenlabs"
     DEEPGRAM = "deepgram"
     SARVAM = "sarvam"
+    GOOGLE = "google"
 
 class STTProvider(str, Enum):
     DEEPGRAM = "deepgram"

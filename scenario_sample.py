@@ -106,16 +106,84 @@ SCENARIO_SAMPLE_HINDI = {
             }
         ],
         "voice": {
-            "name": "priya-adult-female-hindi",
-            "provider": "sarvam",
+            "name": "google-female-hindi-chirp3",
+            "provider": "google",
             "config": {
-                "model": "bulbul:v2",
-                "speaker": "anushka",
+                "voice_name": "hi-IN-Chirp3-HD-Aoede",
+                "gender": "female"
             }
         },
         # Language code for STT, LLM, and TTS providers (BCP 47 format)
-        # This will be passed to STT (Deepgram), LLM (OpenAI), and TTS (Sarvam) providers
+        # This will be passed to STT (Deepgram), LLM (OpenAI), and TTS (Google) providers
         "languageCode": "hi-IN",
+        "metadata": {}
+    }
+}
+
+# Google TTS scenario for testing Google Cloud TTS
+SCENARIO_SAMPLE_GOOGLE = {
+    "version": "1.0",
+    "scenario": {
+        "title": "Teenager in Academic Crisis - Google TTS",
+        "description": (
+            "Practice responding with empathy and validation to Ahana, a teenager in acute academic crisis, "
+            "reducing anxiety and building emotional safety. Guide Ahana toward constructive communication "
+            "with parents and a more optimistic, self-compassionate view of herself and the future."
+        ),
+        "prompt": (
+            "Your name is Ahana. You are a girl. You are 15 years old. You live in Kolkata, India. "
+            "You are a student who just received your 10th grade pre-board results. You are extremely "
+            "disappointed in yourself and feel very hopeless about your future. You studied to your full "
+            "capacity, but the results have disappointed you. Shame and sadness often overwhelm you. "
+            "You feel that your self-worth is defined by your academic success. You are struggling to tell "
+            "your parents because you fear their reaction. You are the oldest of three siblings and live "
+            "with your parents in Kolkata. Your tone is filled with anxiety and overwhelm. Your self-esteem "
+            "has been shaken, and you struggle to remain optimistic about your future."
+        ),
+        "promptData": {
+            "age": "16",
+            "name": "Ahana",
+            "tone": "Casual",
+            "gender": "female",
+            "context": "Context of the AI client persona",
+            "agentGoal": "Goal to generate the summary",
+            "profession": "Student",
+            "lifeHistory": "Life history of the AI client persona",
+            "personality": "Extraverted, anxious, open to new experiences, honest",
+            "coreMemories": "Core memories of the AI client persona",
+            "startingState": "Scared, hopeless",
+            "emotionalNeeds": "Emotional needs of the AI client persona",
+            "genderIdentity": "Female/Woman",
+            "currentLocation": "Kolkata, India",
+            "openingStatements": [
+                "Hi, I need some help."
+            ],
+            "sexualOrientation": "Heterosexual (straight)",
+            "sessionBehaviorGuidelines": "Session behavior guidelines of the AI client persona"
+        },
+        "events": [
+            {
+                "id": "superficial-hope",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": -5,
+                "emoji": ":confused:",
+                "message": "You wanted to encourage the client, instead try to validate their emotions so that they feel understood.",
+                "branchInstruction": "I am not sure if you understand what I am feeling.",
+                "sentences": ["Hi", "Hello"],
+                "feedbackStatus": "True"
+            }
+        ],
+        "voice": {
+            "name": "google-female-chirp3",
+            "provider": "google",
+            "config": {
+                "voice_name": "en-US-Chirp3-HD-Aoede",
+                "gender": "female"
+            }
+        },
+        # Language code for STT, LLM, and TTS providers (BCP 47 format)
+        "languageCode": "en-US",
         "metadata": {}
     }
 }

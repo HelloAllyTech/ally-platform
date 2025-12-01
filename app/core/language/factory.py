@@ -1,5 +1,5 @@
 """Language configuration factory - maps capability to registry."""
-from typing import Optional, Dict, Any, Literal
+from typing import Dict, Any, Literal
 from app.core.language.registry.language_registry import (
     DEFAULT_LANGUAGE_CODE,
     get_capability_defaults,
@@ -19,10 +19,9 @@ CAPABILITY_DEFAULTS: Dict[str, Dict[str, str]] = {
 def resolve_config(
     capability: Literal["stt", "llm", "tts"],
     language_code: str,
-    override_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Resolve configuration for any capability type.
+    Resolve configuration for any capability type from language registry.
     
     Maps capability → registry → resolved config.
     Similar to how events factory maps DetectionType → Event class.
@@ -30,10 +29,6 @@ def resolve_config(
     Args:
         capability: Capability type ("stt", "llm", "tts")
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
-        override_config: Optional override configuration dict with:
-            - provider: Provider name (e.g., "deepgram")
-            - model: Model name (e.g., "nova-3")
-            - config: Additional provider-specific config dict
     
     Returns:
         Dictionary with resolved configuration:
@@ -42,7 +37,6 @@ def resolve_config(
             "model": str,
             "language_code": str,  # BCP 47 code (providers will convert)
             "api_key": Optional[str],
-            # ... capability-specific fields
         }
     
     Raises:
@@ -51,22 +45,9 @@ def resolve_config(
     # Get capability defaults from unified registry
     defaults = get_capability_defaults(capability, language_code)
     
-    # Determine provider from override_config or language defaults
-    if override_config:
-        provider = override_config.get("provider")
-        model = override_config.get("model")
-        config = override_config.get("config", {})
-        
-        # If override doesn't have model/provider, fallback to language defaults
-        if not model:
-            model = defaults.get("model")
-        if not provider:
-            provider = defaults.get("provider")
-    else:
-        # Use defaults from unified registry
-        provider = defaults.get("provider")
-        model = defaults.get("model")
-        config = {}
+    # Use defaults from unified registry
+    provider = defaults.get("provider")
+    model = defaults.get("model")
     
     # Fallback to DEFAULT_LANGUAGE_CODE if provider or model still missing
     if not provider or not model:
@@ -86,20 +67,13 @@ def resolve_config(
     if not model:
         raise ValueError(f"{capability.upper()} model not specified for provider {provider}")
     
-    # Extract api_key from config if provided
-    api_key = config.get("api_key")
-    
     # Build result dict
     result = {
         "provider": provider,
         "model": model,
         "language_code": language_code,  # BCP 47 - providers convert it
-        "api_key": api_key,
+        "api_key": None,  # API keys come from settings, not registry
     }
-    
-    # Add capability-specific fields
-    if capability == "llm" and override_config:
-        result["temperature"] = override_config.get("temperature")
     
     return result
 

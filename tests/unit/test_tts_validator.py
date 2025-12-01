@@ -7,7 +7,7 @@ from app.utils.tts_validator import (
     validate_deepgram_voice,
     validate_sarvam_voice,
     validate_elevenlabs_voice,
-    validate_current_voice
+    validate_google_voice,
 )
 from app.core.constants import TTSProvider
 from tests.utils.test_helpers import DataBuilder, AssertionHelpers
@@ -273,128 +273,8 @@ class TestValidateElevenLabsVoice:
         assert result is False
 
 
-class TestValidateCurrentVoice:
-    """Test cases for validate_current_voice function."""
-    
-    @pytest.mark.unit
-    @patch('app.utils.tts_validator.validate_deepgram_voice')
-    @patch('app.utils.tts_validator.settings')
-    def test_validate_current_voice_deepgram(self, mock_settings, mock_validate_deepgram):
-        """Test current voice validation for Deepgram provider."""
-        mock_settings.TTS_PROVIDER = TTSProvider.DEEPGRAM
-        mock_settings.VOICE_ID = "aura-asteria-en"
-        mock_validate_deepgram.return_value = True
-        
-        result = validate_current_voice()
-        
-        assert result is True
-        mock_validate_deepgram.assert_called_once_with(model="aura-asteria-en")
-    
-    @pytest.mark.unit
-    @patch('app.utils.tts_validator.validate_sarvam_voice')
-    @patch('app.utils.tts_validator.settings')
-    def test_validate_current_voice_sarvam(self, mock_settings, mock_validate_sarvam):
-        """Test current voice validation for Sarvam provider."""
-        mock_settings.TTS_PROVIDER = TTSProvider.SARVAM
-        mock_settings.SARVAM_MODEL = "multilingual"
-        mock_settings.SARVAM_SPEAKER = "meera"
-        mock_validate_sarvam.return_value = True
-        
-        result = validate_current_voice()
-        
-        assert result is True
-        mock_validate_sarvam.assert_called_once_with(
-            model="multilingual",
-            speaker="meera"
-        )
-    
-    @pytest.mark.unit
-    @patch('app.utils.tts_validator.validate_elevenlabs_voice')
-    @patch('app.utils.tts_validator.settings')
-    def test_validate_current_voice_elevenlabs(self, mock_settings, mock_validate_elevenlabs):
-        """Test current voice validation for ElevenLabs provider."""
-        mock_settings.TTS_PROVIDER = TTSProvider.ELEVENLABS
-        mock_settings.VOICE_ID = "test-voice-id"
-        mock_validate_elevenlabs.return_value = True
-        
-        result = validate_current_voice()
-        
-        assert result is True
-        mock_validate_elevenlabs.assert_called_once_with(voice_id="test-voice-id")
-    
-    @pytest.mark.unit
-    @patch('app.utils.tts_validator.settings')
-    def test_validate_current_voice_unsupported_provider(self, mock_settings):
-        """Test current voice validation with unsupported provider."""
-        mock_settings.TTS_PROVIDER = "unknown_provider"
-        
-        result = validate_current_voice()
-        
-        assert result is False
-    
-    @pytest.mark.unit
-    @pytest.mark.parametrize("provider,expected_calls", [
-        (TTSProvider.DEEPGRAM, "validate_deepgram_voice"),
-        (TTSProvider.SARVAM, "validate_sarvam_voice"),
-        (TTSProvider.ELEVENLABS, "validate_elevenlabs_voice"),
-    ])
-    @patch('app.utils.tts_validator.validate_deepgram_voice')
-    @patch('app.utils.tts_validator.validate_sarvam_voice')
-    @patch('app.utils.tts_validator.validate_elevenlabs_voice')
-    @patch('app.utils.tts_validator.settings')
-    def test_validate_current_voice_provider_routing(self, mock_settings, mock_validate_elevenlabs, 
-                                                   mock_validate_sarvam, mock_validate_deepgram, 
-                                                   provider, expected_calls):
-        """Test that validate_current_voice routes to correct provider validator."""
-        mock_settings.TTS_PROVIDER = provider
-        mock_settings.VOICE_ID = "test-voice"
-        mock_settings.SARVAM_MODEL = "multilingual"
-        mock_settings.SARVAM_SPEAKER = "meera"
-        
-        # Set all validators to return True
-        mock_validate_deepgram.return_value = True
-        mock_validate_sarvam.return_value = True
-        mock_validate_elevenlabs.return_value = True
-        
-        result = validate_current_voice()
-        
-        assert result is True
-        
-        # Check that only the expected validator was called
-        if expected_calls == "validate_deepgram_voice":
-            mock_validate_deepgram.assert_called_once()
-            mock_validate_sarvam.assert_not_called()
-            mock_validate_elevenlabs.assert_not_called()
-        elif expected_calls == "validate_sarvam_voice":
-            mock_validate_deepgram.assert_not_called()
-            mock_validate_sarvam.assert_called_once()
-            mock_validate_elevenlabs.assert_not_called()
-        elif expected_calls == "validate_elevenlabs_voice":
-            mock_validate_deepgram.assert_not_called()
-            mock_validate_sarvam.assert_not_called()
-            mock_validate_elevenlabs.assert_called_once()
-
-
 class TestTTSValidatorIntegration:
     """Integration tests for TTS validator functionality."""
-    
-    @pytest.mark.integration
-    @patch('app.utils.tts_validator.settings')
-    def test_full_validation_flow_deepgram(self, mock_settings):
-        """Test complete validation flow for Deepgram."""
-        mock_settings.TTS_PROVIDER = TTSProvider.DEEPGRAM
-        mock_settings.VOICE_ID = "aura-asteria-en"
-        mock_settings.DEEPGRAM_API_KEY = "test-key"
-        
-        # This would normally make a real API call
-        # In integration tests, we might use a test API key or mock the external service
-        with patch('app.utils.tts_validator.DeepgramClient') as mock_client_class:
-            mock_client = Mock()
-            mock_client.speak.v1.audio.generate.return_value = iter([b"audio"])
-            mock_client_class.return_value = mock_client
-            
-            result = validate_current_voice()
-            assert result is True
     
     @pytest.mark.integration
     def test_error_handling_chain(self):

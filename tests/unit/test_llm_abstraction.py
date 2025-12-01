@@ -140,25 +140,18 @@ class TestResolveConfig:
     @pytest.mark.unit
     @patch('app.core.language.factory.get_capability_defaults')
     def test_resolve_config_with_override(self, mock_get_defaults):
-        """Test resolve_config with override configuration."""
+        """Test resolve_config uses language registry defaults."""
         mock_get_defaults.return_value = {
             "provider": "openai",
             "model": "gpt-4o-mini"
         }
         
-        override_config = {
-            "provider": "openai",
-            "model": "gpt-4",
-            "temperature": 0.9,
-            "config": {"api_key": "custom-key"}
-        }
-        
-        config = resolve_config("llm", "en-IN", override_config)
+        config = resolve_config("llm", "en-IN")
         
         assert config["provider"] == "openai"
-        assert config["model"] == "gpt-4"
-        assert config["temperature"] == 0.9
-        assert config["api_key"] == "custom-key"
+        assert config["model"] == "gpt-4o-mini"
+        assert config.get("temperature") is None  # Temperature not in registry
+        assert config["api_key"] is None  # API keys come from settings, not registry
         assert config["language_code"] == "en-IN"
     
     @pytest.mark.unit
@@ -201,7 +194,8 @@ class TestLLMFactory:
         
         result = create_llm_client("en-IN")
         
-        mock_resolve_config.assert_called_once_with("llm", "en-IN", None)
+        # Verify resolve_config was called without override (uses language registry)
+        mock_resolve_config.assert_called_once_with("llm", "en-IN")
         mock_llm_class.assert_called_once_with(
             model="gpt-4o-mini",
             language_code="en-IN",
@@ -213,35 +207,29 @@ class TestLLMFactory:
     @pytest.mark.unit
     @patch('app.llms.factory.resolve_config')
     @patch('app.llms.factory.OpenAILLMClient')
-    def test_create_llm_client_with_override(
+    def test_create_llm_client_uses_language_registry(
         self, mock_llm_class, mock_resolve_config
     ):
-        """Test create_llm_client with override configuration."""
+        """Test create_llm_client uses language registry defaults."""
         mock_resolve_config.return_value = {
             "provider": "openai",
-            "model": "gpt-4",
+            "model": "gpt-4o-mini",
             "language_code": "en-IN",
-            "api_key": "custom-key",
-            "temperature": 0.9,
+            "api_key": None,
+            "temperature": None,
         }
         mock_client = Mock()
         mock_llm_class.return_value = mock_client
         
-        override_config = {
-            "provider": "openai",
-            "model": "gpt-4",
-            "temperature": 0.9,
-            "config": {"api_key": "custom-key"}
-        }
+        result = create_llm_client("en-IN")
         
-        result = create_llm_client("en-IN", override_config)
-        
-        mock_resolve_config.assert_called_once_with("llm", "en-IN", override_config)
+        # Verify resolve_config was called without override (uses language registry)
+        mock_resolve_config.assert_called_once_with("llm", "en-IN")
         mock_llm_class.assert_called_once_with(
-            model="gpt-4",
+            model="gpt-4o-mini",
             language_code="en-IN",
-            temperature=0.9,
-            api_key="custom-key",
+            temperature=None,  # Not set in language registry
+            api_key=None,  # Will use settings.OPENAI_API_KEY in actual client
         )
         assert result == mock_client
     
