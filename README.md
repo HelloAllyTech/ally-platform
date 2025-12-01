@@ -311,6 +311,14 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 # See: https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types
 ```
 
+**Hume.ai TTS:**
+```env
+HUME_API_KEY=your_key
+# Use in scenario: {"provider": "hume", "config": {"model": "octave-2", "voice_id": "..."}}
+# Note: Supports multiple languages including English (en-IN) and Hindi (hi-IN)
+# See: https://docs.livekit.io/agents/integrations/tts/hume/
+```
+
 ### Logging
 
 Configure logging levels:

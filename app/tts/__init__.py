@@ -9,6 +9,7 @@ from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
 from app.tts.sarvam import SarvamTTSClient
 from app.tts.google import GoogleTTSClient
+from app.tts.hume import HumeTTSClient
 
 __all__ = [
     "BaseTTSClient",
@@ -19,5 +20,6 @@ __all__ = [
     "ElevenLabsTTSClient",
     "SarvamTTSClient",
     "GoogleTTSClient",
+    "HumeTTSClient",
 ]
 

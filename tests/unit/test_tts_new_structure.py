@@ -18,7 +18,7 @@ class TestDeepgramProvider:
     """Test cases for Deepgram TTS provider."""
     
     @pytest.mark.unit
-    @patch('app.tts.deepgram.validate_deepgram_voice')
+    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
     @patch('livekit.plugins.deepgram.TTS')
     @patch('app.tts.deepgram.settings')
     def test_create_deepgram_tts_success(self, mock_settings, mock_tts_class, mock_validate):
@@ -35,7 +35,7 @@ class TestDeepgramProvider:
         )
         result = client.tts_instance
         
-        mock_validate.assert_called_once_with(model="nova-2")
+        mock_validate.assert_called_once_with(model="nova-2", api_key="test-api-key")
         mock_tts_class.assert_called_once_with(
             model="nova-2",
             encoding="linear16",
@@ -45,7 +45,7 @@ class TestDeepgramProvider:
         assert result == mock_tts_instance
     
     @pytest.mark.unit
-    @patch('app.tts.deepgram.validate_deepgram_voice')
+    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
     def test_create_deepgram_tts_missing_model(self, mock_validate):
         """Test Deepgram TTS creation with missing model."""
         with pytest.raises(ValueError, match="Deepgram TTS requires 'model'"):
@@ -55,7 +55,7 @@ class TestDeepgramProvider:
             )
     
     @pytest.mark.unit
-    @patch('app.tts.deepgram.validate_deepgram_voice')
+    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
     def test_create_deepgram_tts_invalid_model(self, mock_validate):
         """Test Deepgram TTS creation with invalid model."""
         mock_validate.return_value = False
@@ -67,7 +67,7 @@ class TestDeepgramProvider:
             )
     
     @pytest.mark.unit
-    @patch('app.tts.deepgram.validate_deepgram_voice')
+    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
     @patch('livekit.plugins.deepgram.TTS')
     @patch('app.tts.deepgram.settings')
     def test_create_deepgram_tts_with_language_code(self, mock_settings, mock_tts_class, mock_validate):
@@ -98,7 +98,7 @@ class TestElevenLabsProvider:
     """Test cases for ElevenLabs TTS provider."""
     
     @pytest.mark.unit
-    @patch('app.tts.elevenlabs.validate_elevenlabs_voice')
+    @patch('app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice')
     @patch('livekit.plugins.elevenlabs.TTS')
     @patch('app.tts.elevenlabs.settings')
     def test_create_elevenlabs_tts_success(self, mock_settings, mock_tts_class, mock_validate):
@@ -116,7 +116,7 @@ class TestElevenLabsProvider:
         )
         result = client.tts_instance
         
-        mock_validate.assert_called_once_with(voice_id="test-voice-id")
+        mock_validate.assert_called_once_with(voice_id="test-voice-id", api_key="test-api-key")
         mock_tts_class.assert_called_once_with(
             voice_id="test-voice-id",
             model="eleven_multilingual_v2",
@@ -145,7 +145,7 @@ class TestElevenLabsProvider:
             )
     
     @pytest.mark.unit
-    @patch('app.tts.elevenlabs.validate_elevenlabs_voice')
+    @patch('app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice')
     def test_create_elevenlabs_tts_invalid_voice_id(self, mock_validate):
         """Test ElevenLabs TTS creation with invalid voice_id."""
         mock_validate.return_value = False
@@ -162,7 +162,7 @@ class TestSarvamProvider:
     """Test cases for Sarvam TTS provider."""
     
     @pytest.mark.unit
-    @patch('app.tts.sarvam.validate_sarvam_voice')
+    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
     @patch('livekit.plugins.sarvam.TTS')
     @patch('app.tts.sarvam.settings')
     def test_create_sarvam_tts_success(self, mock_settings, mock_tts_class, mock_validate):
@@ -180,7 +180,7 @@ class TestSarvamProvider:
         )
         result = client.tts_instance
         
-        mock_validate.assert_called_once_with(model="bulbul:v2", speaker="anushka")
+        mock_validate.assert_called_once_with(model="bulbul:v2", speaker="anushka", api_key="test-api-key")
         mock_tts_class.assert_called_once_with(
             target_language_code="en-IN",
             speaker="anushka",
@@ -189,7 +189,7 @@ class TestSarvamProvider:
         assert result == mock_tts_instance
     
     @pytest.mark.unit
-    @patch('app.tts.sarvam.validate_sarvam_voice')
+    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
     @patch('livekit.plugins.sarvam.TTS')
     @patch('app.tts.sarvam.settings')
     def test_create_sarvam_tts_with_hi_in(self, mock_settings, mock_tts_class, mock_validate):
@@ -215,7 +215,7 @@ class TestSarvamProvider:
         assert result == mock_tts_instance
     
     @pytest.mark.unit
-    @patch('app.tts.sarvam.validate_sarvam_voice')
+    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
     @patch('livekit.plugins.sarvam.TTS')
     @patch('app.tts.sarvam.settings')
     def test_create_sarvam_tts_default_language(self, mock_settings, mock_tts_class, mock_validate):
@@ -262,7 +262,7 @@ class TestSarvamProvider:
             )
     
     @pytest.mark.unit
-    @patch('app.tts.sarvam.validate_sarvam_voice')
+    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
     def test_create_sarvam_tts_invalid_config(self, mock_validate):
         """Test Sarvam TTS creation with invalid configuration."""
         mock_validate.return_value = False
@@ -465,7 +465,7 @@ class TestTTSNewStructureIntegration:
         mock_deepgram_client.assert_called_once()
     
     @pytest.mark.integration
-    @patch('app.tts.sarvam.validate_sarvam_voice')
+    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
     @patch('livekit.plugins.sarvam.TTS')
     @patch('app.tts.sarvam.settings')
     def test_sarvam_with_language_code_integration(self, mock_settings, mock_tts_class, mock_validate):

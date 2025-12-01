@@ -42,6 +42,8 @@ class VoiceConfig(BaseModel):
     voice_name: Optional[str] = Field(default=None)  # For Google TTS
     gender: Optional[str] = Field(default=None)  # For Google TTS ("male", "female", "neutral")
     voice_cloning_key: Optional[str] = Field(default=None)  # For Google TTS custom voices
+    instant_mode: Optional[bool] = Field(default=None)  # For Hume TTS
+    voice_provider: Optional[str] = Field(default=None)  # For Hume TTS: "HUME_AI" (pre-existing) or "CUSTOM_VOICE" (custom)
 
 
 
@@ -160,6 +162,8 @@ class Scenario(BaseModel):
             voice_name=config_meta.get("voice_name"),
             gender=config_meta.get("gender"),
             voice_cloning_key=config_meta.get("voice_cloning_key"),
+            instant_mode=config_meta.get("instant_mode"),
+            voice_provider=config_meta.get("voice_provider"),
         )
 
         return ScenarioVoice(

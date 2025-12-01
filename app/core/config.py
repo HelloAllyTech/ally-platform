@@ -55,6 +55,7 @@ class Settings(BaseSettings):
 
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
+    HUME_API_KEY: str = Field(...)
 
 
     LLM_TEMPERATURE: str = Field(...)

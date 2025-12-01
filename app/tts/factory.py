@@ -12,6 +12,7 @@ from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
 from app.tts.sarvam import SarvamTTSClient
 from app.tts.google import GoogleTTSClient
+from app.tts.hume import HumeTTSClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -105,6 +106,9 @@ def get_tts_for_scenario(
     elif provider == TTSProvider.SARVAM and not (voice.config.speaker and voice.config.model):
         logger.warning(f"Invalid {provider} config (missing speaker or model), using default")
         return get_default_tts_config(gender, language_code)
+    elif provider == TTSProvider.HUME and not voice.name:
+        logger.warning(f"Invalid {provider} config (missing voice name), using default")
+        return get_default_tts_config(gender, language_code)
     elif provider == TTSProvider.GOOGLE:
         # Google requires language_code (which we have), but voice_name and gender are optional
         # Google doesn't use "model" field - it uses voice_name instead
@@ -146,6 +150,16 @@ def get_tts_for_scenario(
                 voice_name=voice.config.voice_name,  # Optional
                 voice_cloning_key=voice.config.voice_cloning_key,  # Optional
                 credentials_file=getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None),  # Optional
+            )
+            return tts_client.tts_instance
+        
+        elif provider == TTSProvider.HUME:
+            tts_client = HumeTTSClient(
+                voice_name=voice.name,
+                instant_mode=voice.config.instant_mode,
+                language_code=lang_code,
+                voice_provider=voice.config.voice_provider,
+                api_key=settings.HUME_API_KEY,
             )
             return tts_client.tts_instance
         
