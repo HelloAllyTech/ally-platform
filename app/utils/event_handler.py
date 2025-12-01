@@ -1,11 +1,13 @@
 """Conversation event handlers for LiveKit sessions."""
 import asyncio
+import json
 from datetime import datetime
 from livekit.agents import ConversationItemAddedEvent
-from app.core.events.core_event_sender import CoreEventMessageType
+from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.events.base import ChatMessage
 from app.core.queue import msg_event_queue
 from app.utils.logger import get_logger
+from livekit import rtc
 
 logger = get_logger(__name__)
 
@@ -76,3 +78,35 @@ def create_conversation_handler(room_id: str, joined_iso: str):
             )
 
     return on_conversation_item_added
+
+async def send_event_to_ui(event_data: CustomUIEventMessageType, room: rtc.Room) -> bool:
+    """
+    Send a custom event to the frontend in the specified format.
+
+    Args:
+        event_data: CustomUIEventMessageType containing event information
+        room: Room object to send event to
+
+    Returns:
+        bool: True if event was sent successfully, False otherwise
+    """
+    try:
+        if not event_data.data.show_feedback:
+            # Set emoji to null when show_feedback is False
+            event_data.data.emoji = None
+            event_data.data.message = None
+
+        event_data_bytes = json.dumps(event_data.model_dump()).encode('utf-8')
+        await room.local_participant.publish_data(
+            event_data_bytes,
+            topic="events",
+            reliable=True
+        )
+
+        logger.debug(f"Custom event sent to UI: {event_data.model_dump()}")
+
+        return True
+
+    except Exception as e:
+        logger.debug(f"Failed to send custom event to frontend: {type(e).__name__}")
+        return False

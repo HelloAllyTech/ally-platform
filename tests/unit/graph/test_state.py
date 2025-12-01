@@ -43,7 +43,8 @@ class TestStateReducers:
         assert res == left  # left-biased unique merge
 
     def test_add_scores(self):
-        assert add_scores(2, 3) == 5
+        # add scores will take the right value
+        assert add_scores(2, 3) == 3
 
     def test_add_permitted_events_unique(self):
         e1 = FakeEvent(event_id="e1")
@@ -74,6 +75,7 @@ class TestSimulationStateModel:
             events_accumulator=acc,
             new_events=new,
             current_score=10,
+            branching_instructions=[],
         )
 
         # Sanity checks on fields
@@ -82,3 +84,4 @@ class TestSimulationStateModel:
         assert len(state.permitted_events) == 2
         assert len(state.events_accumulator) == 1
         assert len(state.new_events) == 1
+        assert len(state.branching_instructions) == 0

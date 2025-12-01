@@ -34,7 +34,7 @@ def add_events_accumulator(
 
 def add_scores(left: int, right: int) -> int:
     """Reducer to add scores"""
-    return left + right
+    return right
 
 
 def add_permitted_events(left: List[BaseEvent], right: List[BaseEvent]) -> List[BaseEvent]:
@@ -50,9 +50,24 @@ def add_new_events(left: List[BaseEvent], right: List[BaseEvent]) -> List[BaseEv
     # return []
     return right
 
+
+def add_branching_instructions(
+    left: List[Tuple[str, int]], 
+    right: List[Tuple[str, int]]
+) -> List[Tuple[str, int]]:
+    """Reducer to replace branching instructions (not accumulate).
+    
+    The process_events node is responsible for merging time-based instructions
+    from the state with new event-based instructions. This reducer simply
+    replaces the old list with the new one.
+    """
+    return right
+
+
 class SimulationState(BaseModel):
     messages: Annotated[List[AnyMessage], add_messages]
     permitted_events: Annotated[List[BaseEvent], add_permitted_events]
     events_accumulator: Annotated[List[Tuple[str, BaseEvent]], add_events_accumulator] # Tuple -> (timestamp, BaseEvent)
     new_events: Annotated[List[BaseEvent], add_new_events]
     current_score: Annotated[int, add_scores]
+    branching_instructions: Annotated[List[Tuple[str, int]], add_branching_instructions]  # Tuple -> (instruction, score)

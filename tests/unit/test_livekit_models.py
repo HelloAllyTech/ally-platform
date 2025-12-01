@@ -178,7 +178,7 @@ class TestRoomMetadataEnvelope:
             
             assert envelope.scenario == mock_scenario
             assert envelope.version == "1.0"  # Default
-            mock_create.assert_called_once_with(payload)
+            mock_create.assert_called_once_with(payload, embedding_client=None)
     
     @pytest.mark.unit
     def test_envelope_model_validation(self):

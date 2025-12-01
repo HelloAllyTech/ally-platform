@@ -9,7 +9,7 @@ Ally Learn Core is an intelligent conversation simulation platform that:
 - **Detects counseling events** in real-time (both positive skills and areas for improvement)
 - **Provides immediate feedback** through a scoring system
 - **Sends events to AWS SQS** for downstream processing and analytics
-- **Supports multiple TTS providers** (ElevenLabs, Deepgram, Sarvam) with voice customization
+- **Supports multiple TTS providers** (ElevenLabs, Deepgram, Sarvam, Google Cloud TTS) with voice customization
 
 ## Architecture
 
@@ -36,7 +36,7 @@ The system uses a **LangGraph-based agent** that processes conversations through
 - **LiveKit** account with API credentials
 - **OpenAI** API key (for LLM responses)
 - **AWS** credentials (for SQS event publishing)
-- **TTS Provider** API keys (ElevenLabs, Deepgram, or Sarvam)
+- **TTS Provider** API keys (ElevenLabs, Deepgram, Sarvam, or Google Cloud TTS)
 
 ## Installation
 
@@ -71,6 +71,7 @@ Edit `.env` with your configuration:
 **Optional Settings:**
 - `ELEVEN_API_KEY` - ElevenLabs TTS (if using ElevenLabs voices)
 - `SARVAM_API_KEY` - Sarvam TTS (if using Sarvam voices)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Google Cloud TTS credentials file path (optional, uses Application Default Credentials if not set)
 - `SLACK_ALERTS_ENABLED`, `SLACK_ALERTS_API_TOKEN` - Slack notifications
 - `LLM_TEMPERATURE` - LLM temperature (default: 0.7)
 - `DEFAULT_MALE_VOICE_MODEL`, `DEFAULT_FEMALE_VOICE_MODEL`, `DEFAULT_NON_BINARY_VOICE_MODEL` - Fallback voice models
@@ -166,9 +167,23 @@ ally-learn-core/
 │   │   ├── logger.py                    # Logging configuration
 │   │   ├── event_handler.py             # Conversation event handlers
 │   │   ├── metadata_parser.py           # Room metadata parsing
-│   │   ├── tts_manager.py               # TTS provider management
 │   │   ├── tts_validator.py             # TTS configuration validation
 │   │   └── datetime_utils.py            # Datetime utilities
+│   ├── tts/                             # TTS provider implementations
+│   │   ├── base.py                      # Base TTS client interface
+│   │   ├── factory.py                   # TTS factory for provider selection
+│   │   ├── deepgram.py                  # Deepgram TTS client
+│   │   ├── elevenlabs.py                # ElevenLabs TTS client
+│   │   ├── sarvam.py                    # Sarvam TTS client
+│   │   └── google.py                    # Google Cloud TTS client
+│   ├── stt/                             # STT provider implementations
+│   │   ├── base.py                      # Base STT client interface
+│   │   ├── factory.py                   # STT factory for provider selection
+│   │   └── deepgram.py                  # Deepgram STT client
+│   ├── llms/                            # LLM provider implementations
+│   │   ├── base.py                      # Base LLM client interface
+│   │   ├── factory.py                   # LLM factory for provider selection
+│   │   └── openai.py                    # OpenAI LLM client
 │   ├── main.py                          # FastAPI application
 │   ├── middleware.py                    # Request logging and CORS
 │   ├── worker.py                        # LiveKit agent worker
@@ -188,7 +203,8 @@ ally-learn-core/
    - LiveKit worker receives room connection request
    - Parses scenario metadata (client persona, events, voice config)
    - Initializes LangGraph state with scenario data
-   - Configures STT (Deepgram), TTS (provider-specific), and VAD (Silero)
+   - Configures STT (via factory), TTS (via factory based on scenario voice config), and VAD (Silero)
+   - TTS/STT/LLM providers are instantiated using factory pattern with language registry defaults
 
 2. **Conversation Loop**
    - User (counselor) speaks → Deepgram STT → Text
@@ -205,6 +221,7 @@ ally-learn-core/
    - **PASSIVE Events**: Logged for analytics only
    - **Scoring**: Cumulative score calculation with polarity-based event selection
    - **Publishing**: All events sent to SQS for downstream processing
+   - **Termination**: Events can trigger automatic session termination (see [Event Termination](docs/EVENT_TERMINATION.md))
 
 ### Scenario Configuration
 
@@ -233,9 +250,28 @@ Scenarios define the client persona and are passed as LiveKit room metadata:
         "voice_id": "voice_id_here"
       }
     },
+    "languageCode": "en-US",
     "events": [...]
   }
 }
+```
+
+**Google TTS Example:**
+```json
+{
+  "voice": {
+    "provider": "google",
+    "name": "google-female-chirp3",
+    "config": {
+      "voice_name": "en-US-Chirp3-HD-Aoede",
+      "gender": "female"
+    }
+  },
+  "languageCode": "en-US"
+}
+```
+
+**Note:** For Google TTS streaming synthesis, use Chirp 3 HD voices (format: `{language}-Chirp3-HD-{Name}`). See [Google Cloud TTS documentation](https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types) for available voices.
 ```
 
 ## Configuration
@@ -259,7 +295,20 @@ DEEPGRAM_API_KEY=your_key
 **Sarvam:**
 ```env
 SARVAM_API_KEY=your_key
-# Use in scenario: {"provider": "sarvam", "config": {"speaker": "meera"}}
+# Use in scenario: {"provider": "sarvam", "config": {"model": "bulbul:v2", "speaker": "anushka"}}
+```
+
+**Google Cloud TTS:**
+```env
+# Option 1: Use Application Default Credentials (recommended)
+# Run: gcloud auth application-default login
+
+# Option 2: Use credentials file
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# Use in scenario: {"provider": "google", "config": {"voice_name": "en-US-Chirp3-HD-Aoede", "gender": "female"}}
+# Note: For streaming synthesis, use Chirp 3 HD voices (e.g., en-US-Chirp3-HD-*, hi-IN-Chirp3-HD-*)
+# See: https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types
 ```
 
 ### Logging
@@ -292,6 +341,25 @@ The container runs both the FastAPI server (port 8000) and LiveKit worker simult
 2. Extend `BaseEvent` with custom detection logic
 3. Register in event factory (`app/core/events/factory.py`)
 
+### Event Termination
+
+Events can automatically terminate sessions when they occur. Add `"autoTerminationStatus": true` to any event:
+
+```json
+{
+  "id": "session-end",
+  "sentences": ["goodbye", "end session"],
+  "autoTerminationStatus": true,
+  "emoji": "👋",
+  "message": "Session ended",
+  "score": 0
+}
+```
+
+Supported by all event types: **Sentence Similarity**, **Time**, **Score**, and **Combination** events.
+
+See [Event Termination Documentation](docs/EVENT_TERMINATION.md) for detailed guide and examples.
+
 ### Customizing Agent Behavior
 
 - **System Prompt**: Edit `app/core/graph/prompt.py`
@@ -305,9 +373,11 @@ The container runs both the FastAPI server (port 8000) and LiveKit worker simult
 - Check `poetry run python -m app.worker download-files` completed successfully
 
 ### No audio output
-- Verify TTS API key is valid
+- Verify TTS API key is valid (or Google Cloud credentials are configured)
 - Check voice configuration in scenario metadata
+- For Google TTS: Ensure you're using Chirp 3 HD voices for streaming (e.g., `en-US-Chirp3-HD-Aoede`)
 - Ensure fallback voice models are set in `.env`
+- For Google TTS: Verify Application Default Credentials are set up (`gcloud auth application-default login`)
 
 ### Events not sending
 - Verify AWS credentials and SQS queue name

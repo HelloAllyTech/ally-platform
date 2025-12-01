@@ -33,6 +33,16 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str = Field(...)
     OPENAI_MODEL: str = Field(default="gpt-4o-mini", description="OpenAI model to use for LLM responses")
+    OPENAI_EMBEDDING_MODEL: str = Field(
+        default="text-embedding-3-small",
+        description="OpenAI model to use for embeddings"
+    )
+    
+    # Semantic similarity settings
+    SEMANTIC_SIMILARITY_THRESHOLD: float = Field(
+        default=0.6,
+        description="Similarity threshold for cosine similarity (0-1 range). Higher threshold means stricter matching"
+    )
 
     DEEPGRAM_API_KEY: str = Field(...)
 
@@ -47,7 +57,12 @@ class Settings(BaseSettings):
     SARVAM_API_KEY: str = Field(...)
 
 
-    LLM_TEMPERATURE : str = Field(...)
+    LLM_TEMPERATURE: str = Field(...)
+    
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(
+        default=None,
+        description="Path to Google Cloud credentials JSON file (for Google TTS)"
+    )
 
     DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(...)
     DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)

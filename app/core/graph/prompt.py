@@ -37,14 +37,49 @@ def generate_system_message(
     Generates a SystemMessage prompt for an AI roleplay assistant
     based on the structured VoicePromptData.
 
+    When a branching instruction is provided (next_instruction), this function
+    generates a minimal, directive-focused prompt that prioritizes the
+    branching instruction over the detailed script. This ensures the agent
+    strictly follows the branching instruction without conflicting signals.
+
+    When no branching instruction is provided, it generates a comprehensive
+    prompt with full character details, personality, and behavioral guidelines.
+
     Args:
         prompt_data: An instance of VoicePromptData containing all client info.
-        next_instruction: Optional, conversation-specific guidance.
+        next_instruction: Optional conversation-specific directive (branching instruction).
+                         If provided, triggers minimal prompt mode.
 
     Returns:
         A SystemMessage object with the complete, formatted prompt.
     """
 
+    # If we have a branching instruction, use simplified minimal prompt
+    if next_instruction:
+        minimal_prompt = f"""<SYSTEM>
+            You are roleplaying as {prompt_data.name} in a counseling session.
+            You should only act as the client.
+            </SYSTEM>
+            
+            <CRITICAL_INSTRUCTION>
+            {next_instruction}
+            
+            This instruction takes ABSOLUTE PRIORITY over all other guidelines.
+            You MUST follow this instruction exactly in your next response.
+            </CRITICAL_INSTRUCTION>
+            
+            <CONTEXT>
+            - Name: {prompt_data.name}
+            - Age: {prompt_data.age}
+            - Gender: {prompt_data.gender}
+            - Situation: {prompt_data.context}
+            </CONTEXT>
+            
+            Respond as {prompt_data.name} while strictly following the critical instruction above."""
+        return SystemMessage(content=minimal_prompt.strip())
+
+    # Otherwise, use the full detailed prompt (original behavior)
+    
     # Use helper functions to build optional sections
     gender_details_block = _get_gender_details(prompt_data)
     profession_block = _get_optional_block("Your profession", prompt_data.profession)
@@ -59,16 +94,6 @@ def generate_system_message(
     tone_block = _get_optional_block("Your talking stye/tone", prompt_data.tone)
     # agent_goal is omitted as per user's new example structure
     # system_instruction from prompt_data is ignored and overridden below
-
-    # Handle the 'next_instruction' block
-    next_instruction_block = ""
-    if next_instruction:
-        next_instruction_block  = f"""---
-        ##  CRITICAL INSTRUCTION FOR YOUR NEXT REPLY 
-        **This is a one-time directive for your immediate next response. You MUST follow this instruction, even if it contradicts your general personality or other guidelines.**
-        
-        **Instruction:** {next_instruction}
-        ---"""
 
     # Hardcoded system instruction as requested
     system_instruction = """"You are an AI roleplay assistant for counselor training. In this simulation, you must act ONLY as the **client** in a therapy session. Stay fully in character, provide realistic dialogue, and do not switch roles unless explicitly instructed.
@@ -87,11 +112,9 @@ def generate_system_message(
     - If sensitive topics arise, respond realistically but without graphic or explicit detail.
     - Keep each reply under ~120 words to simulate session pacing."""
 
-    # Assemble the final prompt
+    # Assemble the full detailed prompt (when no branching instruction is present)
     system_prompt = f"""
     {system_instruction}
-    
-    {next_instruction_block}
     
     ## Your Client Persona Details
     This is the background information for your character.

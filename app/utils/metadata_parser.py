@@ -1,18 +1,24 @@
 """Room metadata parsing utilities."""
 import json
+from typing import Optional
 
 from app.core.config import settings
 from app.core.constants import Environment
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
+from app.core.embeddings import BaseEmbeddingClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def parse_room_metadata(metadata) -> RoomMetadataEnvelope:
+def parse_room_metadata(metadata, embedding_client: Optional[BaseEmbeddingClient] = None) -> RoomMetadataEnvelope:
     """
     Parse room metadata JSON into RoomMetadataEnvelope.
     Returns empty envelope on error.
+
+    Args:
+        metadata: JSON string containing room metadata
+        embedding_client: Optional shared embedding client for semantic similarity events
     """
     try:
         parsed = json.loads(metadata or "")
@@ -27,4 +33,4 @@ def parse_room_metadata(metadata) -> RoomMetadataEnvelope:
         else:
             raise ValueError("Metadata missing or invalid.")
 
-    return RoomMetadataEnvelope.create(parsed)
+    return RoomMetadataEnvelope.create(parsed, embedding_client=embedding_client)

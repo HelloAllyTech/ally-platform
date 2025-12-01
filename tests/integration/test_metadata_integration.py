@@ -101,8 +101,14 @@ class TestMetadataParsingIntegration:
         assert scenario.voice.config.model == "eleven_multilingual_v2"
 
     @pytest.mark.integration
-    def test_error_recovery_integration(self):
+    def test_error_recovery_integration(self, monkeypatch):
         """Test error recovery in the complete integration flow."""
+        from app.core.config import settings
+        from app.core.constants import Environment
+        
+        # Ensure we're in PROD mode so ValueError is raised for invalid JSON
+        monkeypatch.setattr(settings, "ENV", Environment.PROD)
+        
         # Test with invalid JSON
         invalid_json = '{"invalid": json}'
         # With the updated parse_room_metadata behavior, invalid/missing metadata in non-LOCAL

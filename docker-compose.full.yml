@@ -12,6 +12,9 @@ services:
       AWS_ENDPOINT_URL: http://localstack:4566
     ports:
       - '8002:8000'
+    volumes:
+      - .:/app  # Mount code directory for live code changes
+      - ~/.config/gcloud:/root/.config/gcloud:ro  # Mount Application Default Credentials for Google Cloud
     depends_on:
       localstack:
         condition: service_healthy
@@ -33,6 +36,8 @@ services:
       LOCALSTACK_WEB_UI: 1
       SES_FROM_EMAIL: noreply@localhost.localstack.cloud
       SES_RETURN_PATH: noreply@localhost.localstack.cloud
+      # Pass queue name from .env file if available
+      SQS_MESSAGE_EVENT_QUEUE_NAME: ${SQS_MESSAGE_EVENT_QUEUE_NAME:-message-event-queue}
     ports:
       - '4566:4566'
       - '4510-4559:4510-4559'
@@ -40,6 +45,7 @@ services:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - localstack_data:/tmp/localstack-ally-learn
+      - './localstack_bootstrap:/etc/localstack/init/ready.d'
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
       interval: 10s

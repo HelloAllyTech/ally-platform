@@ -132,29 +132,60 @@ def validate_elevenlabs_voice(**kwargs) -> bool:
         return False
 
 
-def validate_current_voice() -> bool:
-    """Validate the currently configured TTS provider and voice."""
-    provider = settings.TTS_PROVIDER
-    logger.info(f"Starting voice validation for provider='{provider}'")
-
+def validate_google_voice(**kwargs) -> bool:
+    """
+    Validate Google TTS configuration.
+    
+    Validates that the language_code and voice_name combination is valid.
+    See: https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types
+    """
+    language_code = kwargs.get('language_code')
+    voice_name = kwargs.get('voice_name')
+    gender = kwargs.get('gender')
+    
+    if not language_code:
+        logger.error("Google validation requires 'language_code' parameter")
+        return False
+    
+    logger.info(
+        f"Validating Google TTS language_code='{language_code}', "
+        f"voice_name='{voice_name}', gender='{gender}'"
+    )
+    
     try:
-        if provider == TTSProvider.DEEPGRAM:
-            return validate_deepgram_voice(model=settings.VOICE_ID)
-        elif provider == TTSProvider.SARVAM:
-            model = getattr(settings, 'SARVAM_MODEL', settings.VOICE_ID)
-            speaker = getattr(settings, 'SARVAM_SPEAKER', 'meera')
-            return validate_sarvam_voice(model=model, speaker=speaker)
-        elif provider == TTSProvider.ELEVENLABS:
-            return validate_elevenlabs_voice(voice_id=settings.VOICE_ID)
-        else:
-            logger.error(f"Unsupported TTS provider: {provider}")
+        # Basic validation - check language code format (BCP 47)
+        # Format: language-REGION (e.g., "en-US", "hi-IN")
+        parts = language_code.split('-')
+        if len(parts) < 2:
+            logger.warning(f"Google TTS language_code should be in BCP 47 format (e.g., 'en-US'), got '{language_code}'")
+        
+        # If voice_name is provided, validate format
+        # Google voice names follow pattern: {language}-{region}-{type}-{variant}
+        # Examples: "en-US-Standard-H", "en-US-Neural2-A", "hi-IN-Neural2-A"
+        if voice_name:
+            voice_parts = voice_name.split('-')
+            if len(voice_parts) < 4:
+                logger.warning(
+                    f"Google voice_name should follow pattern '{{lang}}-{{region}}-{{type}}-{{variant}}', "
+                    f"got '{voice_name}'"
+                )
+            # Check if voice_name starts with language_code
+            if not voice_name.startswith(language_code.replace('-', '-')):
+                logger.warning(
+                    f"voice_name '{voice_name}' should start with language_code '{language_code}'"
+                )
+        
+        # Validate gender
+        if gender and gender not in ["male", "female", "neutral"]:
+            logger.error(f"Invalid gender '{gender}'. Must be 'male', 'female', or 'neutral'")
             return False
-
+        
+        # Note: Full validation would require calling Google Cloud API to list voices
+        # For now, we do basic format validation
+        return True
+        
     except Exception as e:
-        logger.exception(f"Unexpected error during voice validation: {e}")
+        logger.error(f"Google TTS validation failed: {e}")
         return False
 
 
-if __name__ == "__main__":
-    result = validate_current_voice()
-    logger.info(f"Final voice validation result: {result}")

@@ -37,7 +37,7 @@ class TestParseRoomMetadata:
             result = parse_room_metadata(sample_room_metadata_json)
 
             assert result == mock_envelope
-            mock_create.assert_called_once_with(parsed_expected)
+            mock_create.assert_called_once_with(parsed_expected, embedding_client=None)
 
     @pytest.mark.unit
     def test_parse_empty_metadata_in_prod_raises(self, mock_logger, monkeypatch):
@@ -62,7 +62,7 @@ class TestParseRoomMetadata:
 
             result = parse_room_metadata(None)
 
-            mock_create.assert_called_once_with(LOCAL_SCENARIO_SAMPLE)
+            mock_create.assert_called_once_with(LOCAL_SCENARIO_SAMPLE, embedding_client=None)
             assert result == mock_envelope
 
     @pytest.mark.unit
@@ -86,7 +86,7 @@ class TestParseRoomMetadata:
                 parse_room_metadata(sample_room_metadata_json)
 
             assert "creation failed" in str(exc.value)
-            mock_create.assert_called_once_with(parsed_expected)
+            mock_create.assert_called_once_with(parsed_expected, embedding_client=None)
 
     @pytest.mark.unit
     @pytest.mark.parametrize("metadata_input,should_raise,expected_dict", [
@@ -111,7 +111,7 @@ class TestParseRoomMetadata:
             mock_create.return_value = mock_envelope
 
             result = parse_room_metadata(metadata_input)
-            mock_create.assert_called_once_with(expected_dict)
+            mock_create.assert_called_once_with(expected_dict, embedding_client=None)
             assert result == mock_envelope
 
     @pytest.mark.unit
@@ -148,7 +148,7 @@ class TestParseRoomMetadata:
             mock_create.return_value = mock_envelope
 
             result = parse_room_metadata(metadata_json)
-            mock_create.assert_called_once_with(complex_metadata)
+            mock_create.assert_called_once_with(complex_metadata, embedding_client=None)
             assert result == mock_envelope
 
     @pytest.mark.unit
@@ -170,7 +170,7 @@ class TestParseRoomMetadata:
             mock_create.return_value = mock_envelope
 
             result = parse_room_metadata(metadata_json)
-            mock_create.assert_called_once_with(unicode_metadata)
+            mock_create.assert_called_once_with(unicode_metadata, embedding_client=None)
             assert result == mock_envelope
 
     @pytest.mark.unit
@@ -190,7 +190,7 @@ class TestParseRoomMetadata:
             execution_time = end_time - start_time
             assert execution_time < 1.0
 
-            mock_create.assert_called_once_with(large_metadata)
+            mock_create.assert_called_once_with(large_metadata, embedding_client=None)
             assert result == mock_envelope
 
     @pytest.mark.unit
@@ -266,7 +266,7 @@ class TestParseRoomMetadata:
             mock_create.return_value = mock_envelope
 
             result = parse_room_metadata(metadata_json)
-            mock_create.assert_called_once_with(metadata)
+            mock_create.assert_called_once_with(metadata, embedding_client=None)
             assert result == mock_envelope
 
 

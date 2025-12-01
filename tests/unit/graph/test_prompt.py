@@ -56,18 +56,12 @@ class TestPrompt:
         msg = generate_system_message(prompt_data=pd, next_instruction="Focus on rapport.")
         content = msg.content
 
-        # Optional sections
-        for text in [
-            "Your profession",
-            "How will you behave in this session",
-            "Your core memories influencing your beliefs & actions",
-            "Your personality",
-            "Your current thoughts",
-            "Your emotional needs from this counselling session",
-            "Your talking stye/tone",
-            "Your gender identity:",
-            "Your sexual orientation:",
-            "CRITICAL INSTRUCTION FOR YOUR NEXT REPLY",
-            "Focus on rapport.",
-        ]:
-            assert text in content
+        # When next_instruction is provided, minimal prompt is used
+        # It should contain the critical instruction and essential details only
+        assert "<CRITICAL_INSTRUCTION>" in content
+        assert "Focus on rapport." in content
+        assert "<CONTEXT>" in content
+        assert pd.name in content
+        assert str(pd.age) in content
+        assert pd.gender in content
+        assert pd.context in content

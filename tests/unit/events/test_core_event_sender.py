@@ -3,7 +3,7 @@ import pytest
 from typing import List
 
 from app.core.events.base import ChatMessage, BaseEvent, VisibilityType
-from app.core.events.core_event_sender import CoreEventType, CoreEventMessageType
+from app.core.events.schemas import CoreEventType, CoreEventMessageType
 from app.utils import get_current_iso_timestamp
 
 

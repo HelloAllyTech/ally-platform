@@ -3,8 +3,7 @@ from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 
 from app.core.events.base import BaseEvent
-from app.core.events.ui_event_sender import CustomUIEventMessageType
-from app.utils.logger import logger
+from app.core.events.schemas import CustomUIEventMessageType
 
 
 class EventProcessor:
@@ -56,8 +55,7 @@ class EventProcessor:
             emoji=selected_event.emoji,
             message=selected_event.emoji_message,
             timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            show_feedback=selected_event.show_feedback
-
+            show_feedback=selected_event.show_feedback if selected_event.show_feedback is not None else True
         )
         
         return ui_message
