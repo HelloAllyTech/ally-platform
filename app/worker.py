@@ -8,14 +8,13 @@ from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 
 from app.core.config import settings
-from app.core.constants import Environment
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import Environment, DEFAULT_LANGUAGE_CODE
 from app.core.graph import agent_graph
 from app.core.events.base import BaseEvent
 from app.core.events.event_registry.event_registry import EventRegistry
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.utils.logger import get_logger
-from app.tts import get_tts_for_scenario, get_default_tts_config
+from app.tts import create_tts_client, Gender
 from app.stt import create_stt_client
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
@@ -113,27 +112,61 @@ async def entrypoint(ctx: agents.JobContext):
     scenario = rm_md_envelope.scenario
     logger.debug(f"Events in scenario: {str(scenario.events)}")
 
-    # Get language code from scenario
+    # Get language code and configs from scenario
     language_code = DEFAULT_LANGUAGE_CODE
+    stt_config_from_metadata = None
     if scenario.language_config:
         language_code = scenario.language_config.language_code
+        stt_config_from_metadata = scenario.language_config.stt_config
 
     # Configure STT
     try:
-        stt_client = create_stt_client(language_code)
+        stt_client = create_stt_client(
+            stt_config=stt_config_from_metadata,
+            language_code=language_code
+        )
         stt_config = stt_client.stt_instance
     except Exception as e:
         logger.warning(f"STT config failed, using default: {e}")
-        stt_client = create_stt_client(DEFAULT_LANGUAGE_CODE)
+        stt_client = create_stt_client(language_code=language_code)
         stt_config = stt_client.stt_instance
 
     # Configure TTS
+    # Convert scenario.voice to dict format for create_tts_client
+    tts_config_from_metadata = None
+    if scenario.voice:
+        tts_config_from_metadata = {
+            "provider": scenario.voice.provider,
+            "name": scenario.voice.name,
+            "config": {
+                "model": scenario.voice.config.model,
+                "voice_id": scenario.voice.config.voice_id,
+                "speaker": scenario.voice.config.speaker,
+                "voice_name": scenario.voice.config.voice_name,
+                "gender": scenario.voice.config.gender,
+                "voice_cloning_key": scenario.voice.config.voice_cloning_key,
+                "instant_mode": scenario.voice.config.instant_mode,
+                "voice_provider": scenario.voice.config.voice_provider,
+            }
+        }
+    
+    # Convert gender string to Gender enum
+    gender_enum = Gender(scenario.prompt_data.gender.lower()) if scenario.prompt_data.gender else None
+    
     try:
-        # Pass language_code if available from scenario's language_config
-        tts_config = get_tts_for_scenario(scenario.voice, scenario.prompt_data.gender, language_code=language_code)
+        tts_client = create_tts_client(
+            tts_config=tts_config_from_metadata,
+            language_code=language_code,
+            gender=gender_enum
+        )
+        tts_config = tts_client.tts_instance
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
-        tts_config = get_default_tts_config(scenario.prompt_data.gender)
+        if gender_enum:
+            tts_client = create_tts_client(language_code=language_code, gender=gender_enum)
+            tts_config = tts_client.tts_instance
+        else:
+            raise ValueError("Cannot create TTS: gender is required for fallback")
 
     # Initialize state
     initialize_agent_state(ctx.room.name, scenario)

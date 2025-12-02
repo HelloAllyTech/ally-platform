@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from livekit import rtc
 
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.llms import create_llm_client
 from app.core.constants import VisibilityType
 from app.core.config import settings
@@ -134,10 +134,12 @@ async def generate_response(
             next_instruction=next_instruction,
         )
 
-    # Get language code from scenario for LLM selection
+    # Get language code and LLM config from scenario
     language_code = DEFAULT_LANGUAGE_CODE
+    llm_config_from_metadata = None
     if scenario and scenario.language_config:
         language_code = scenario.language_config.language_code
+        llm_config_from_metadata = scenario.language_config.llm_config
 
     # Prepare the messages for the LLM call without mutating the state
     messages_to_send = []
@@ -145,13 +147,16 @@ async def generate_response(
         messages_to_send.append(system_message)
     messages_to_send.extend(state.messages)
 
-    # Create response from LLM using language-based abstraction
+    # Create response from LLM using config from metadata or defaults
     try:
-        llm_client = create_llm_client(language_code)
+        llm_client = create_llm_client(
+            llm_config=llm_config_from_metadata,
+            language_code=language_code
+        )
         llm_instance = llm_client.llm_instance
     except Exception as e:
         logger.warning(f"LLM config failed for {language_code}, using default: {e}")
-        llm_client = create_llm_client(DEFAULT_LANGUAGE_CODE)
+        llm_client = create_llm_client(language_code=DEFAULT_LANGUAGE_CODE)
         llm_instance = llm_client.llm_instance
 
     response = await llm_instance.ainvoke(messages_to_send)

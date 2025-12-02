@@ -1,12 +1,8 @@
 """TTS provider factory for creating TTS clients based on configuration."""
 from enum import Enum
 from typing import Optional, Dict, Any
-from livekit.plugins import deepgram
-from app.core.constants import TTSProvider
+from app.core.constants import TTSProvider, DEFAULT_LANGUAGE_CODE
 from app.core.config import settings
-from app.core.language.factory import resolve_config
-from app.core.language import DEFAULT_LANGUAGE_CODE
-from app.core.scenario.base import ScenarioVoice
 from app.tts.base import BaseTTSClient
 from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
@@ -25,21 +21,19 @@ class Gender(str, Enum):
     NON_BINARY = "non-binary"
 
 
-def get_default_tts_config(gender: Gender, language_code: Optional[str] = None) -> deepgram.TTS:
+def _get_default_tts_client(gender: Gender, language_code: str = DEFAULT_LANGUAGE_CODE) -> BaseTTSClient:
     """
-    Get default Deepgram TTS provider based on gender.
+    Get default Deepgram TTS client based on gender.
     
-    Directly instantiates DeepgramTTSClient with gender-specific model.
+    Internal helper function used by create_tts_client for fallback defaults.
     
     Args:
         gender: Gender type for voice selection
-        language_code: Optional BCP 47 language code (defaults to DEFAULT_LANGUAGE_CODE)
+        language_code: BCP 47 language code (defaults to DEFAULT_LANGUAGE_CODE)
     
     Returns:
-        Default Deepgram TTS instance
+        Default Deepgram TTS client instance
     """
-    lang_code = language_code or DEFAULT_LANGUAGE_CODE
-    
     try:
         if gender == Gender.MALE:
             model = settings.DEFAULT_MALE_VOICE_MODEL
@@ -48,13 +42,11 @@ def get_default_tts_config(gender: Gender, language_code: Optional[str] = None) 
         else:
             model = settings.DEFAULT_NON_BINARY_VOICE_MODEL
 
-        # Direct instantiation
-        tts_client = DeepgramTTSClient(
+        return DeepgramTTSClient(
             model=model,
-            language_code=lang_code,
+            language_code=language_code,
             api_key=settings.DEEPGRAM_API_KEY,
         )
-        return tts_client.tts_instance
     except AttributeError as e:
         logger.error(f"Missing gender-specific default Deepgram setting: {e}")
         raise ValueError(
@@ -66,108 +58,108 @@ def get_default_tts_config(gender: Gender, language_code: Optional[str] = None) 
         raise
 
 
-def get_tts_for_scenario(
-    voice: Optional[ScenarioVoice],
-    gender: Gender,
-    language_code: Optional[str] = None,
-):
+def get_default_tts_config(gender: Gender, language_code: Optional[str] = None):
     """
-    Get TTS instance for scenario voice.
-    Falls back to default on error or invalid config.
+    Get default TTS instance based on gender.
     
-    Directly instantiates TTS clients from voice.config (metadata).
+    Convenience function that returns the TTS instance directly (for backward compatibility).
+    This is a wrapper around create_tts_client that returns the underlying TTS instance.
     
     Args:
-        voice: Optional scenario voice configuration from metadata
-        gender: Gender type for fallback default voice
-        language_code: Optional BCP 47 language code (e.g., "en-IN", "hi-IN")
-            Used by providers that require language parameter (e.g., Sarvam, Google)
+        gender: Gender type for voice selection
+        language_code: Optional BCP 47 language code (defaults to DEFAULT_LANGUAGE_CODE)
     
     Returns:
-        TTS instance for the scenario
-    """
-    if not voice:
-        return get_default_tts_config(gender, language_code)
-
-    provider = voice.provider.lower()
-    lang_code = language_code or DEFAULT_LANGUAGE_CODE
-
-    # Validate required fields
-    if not voice.config:
-        logger.warning(f"Missing voice config, using default")
-        return get_default_tts_config(gender, language_code)
+        Default TTS instance (e.g., deepgram.TTS)
     
-    if provider == TTSProvider.ELEVENLABS and not (voice.config.voice_id and voice.config.model):
-        logger.warning(f"Invalid {provider} config (missing voice_id or model), using default")
-        return get_default_tts_config(gender, language_code)
-    elif provider == TTSProvider.DEEPGRAM and not voice.config.model:
-        logger.warning(f"Invalid {provider} config (missing model), using default")
-        return get_default_tts_config(gender, language_code)
-    elif provider == TTSProvider.SARVAM and not (voice.config.speaker and voice.config.model):
-        logger.warning(f"Invalid {provider} config (missing speaker or model), using default")
-        return get_default_tts_config(gender, language_code)
-    elif provider == TTSProvider.HUME and not voice.name:
-        logger.warning(f"Invalid {provider} config (missing voice name), using default")
-        return get_default_tts_config(gender, language_code)
-    elif provider == TTSProvider.GOOGLE:
-        # Google requires language_code (which we have), but voice_name and gender are optional
-        # Google doesn't use "model" field - it uses voice_name instead
-        # No strict validation needed, will try to create and fall back on error
-        pass
+    Note:
+        For new code, prefer using create_tts_client() which returns BaseTTSClient wrapper.
+        This function is maintained for backward compatibility.
+    """
+    lang_code = language_code or DEFAULT_LANGUAGE_CODE
+    tts_client = create_tts_client(language_code=lang_code, gender=gender)
+    return tts_client.tts_instance
 
+
+def create_tts_client(
+    tts_config: Optional[Dict[str, Any]] = None,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
+    gender: Optional[Gender] = None,
+) -> BaseTTSClient:
+    """
+    Create TTS client instance from configuration.
+    
+    Args:
+        tts_config: Optional TTS config from metadata. If None, uses defaults.
+            Expected structure: {"provider": "sarvam", "name": "...", "config": {...}}
+        language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        gender: Optional gender for fallback defaults (required if tts_config is None)
+    
+    Returns:
+        TTS client instance
+    
+    Raises:
+        ValueError: If provider is unsupported, required parameters are missing, or gender is missing when using defaults
+    """
+    # Use provided config or fallback to defaults
+    if tts_config is None:
+        if gender is None:
+            raise ValueError("gender is required when tts_config is not provided")
+        logger.debug("No TTS config provided, using defaults")
+        return _get_default_tts_client(gender, language_code)
+    
+    provider = tts_config.get("provider", "").lower()
+    if not provider:
+        if gender is None:
+            raise ValueError("gender is required when tts_config.provider is missing")
+        logger.warning("Missing provider in TTS config, using defaults")
+        return _get_default_tts_client(gender, language_code)
+    
+    config_dict = tts_config.get("config", {}) or {}
+    voice_name = tts_config.get("name")
+    
     try:
-        # Direct instantiation from voice.config
+        # Instantiate TTS client based on provider using from_config
         if provider == TTSProvider.DEEPGRAM:
-            tts_client = DeepgramTTSClient(
-                model=voice.config.model,
-                language_code=lang_code,
-                api_key=settings.DEEPGRAM_API_KEY,
+            return DeepgramTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
             )
-            return tts_client.tts_instance
         
         elif provider == TTSProvider.ELEVENLABS:
-            tts_client = ElevenLabsTTSClient(
-                model=voice.config.model,
-                voice_id=voice.config.voice_id,
-                language_code=lang_code,
-                api_key=settings.ELEVEN_API_KEY,
+            return ElevenLabsTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
             )
-            return tts_client.tts_instance
         
         elif provider == TTSProvider.SARVAM:
-            tts_client = SarvamTTSClient(
-                model=voice.config.model,
-                speaker=voice.config.speaker,
-                language_code=lang_code,
-                api_key=settings.SARVAM_API_KEY,
+            return SarvamTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
             )
-            return tts_client.tts_instance
         
         elif provider == TTSProvider.GOOGLE:
-            tts_client = GoogleTTSClient(
-                language_code=lang_code,
-                gender=voice.config.gender,  # Optional
-                voice_name=voice.config.voice_name,  # Optional
-                voice_cloning_key=voice.config.voice_cloning_key,  # Optional
-                credentials_file=getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None),  # Optional
+            return GoogleTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
             )
-            return tts_client.tts_instance
         
         elif provider == TTSProvider.HUME:
-            tts_client = HumeTTSClient(
-                voice_name=voice.name,
-                instant_mode=voice.config.instant_mode,
-                language_code=lang_code,
-                voice_provider=voice.config.voice_provider,
-                api_key=settings.HUME_API_KEY,
+            return HumeTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
+                voice_name=voice_name,
             )
-            return tts_client.tts_instance
         
         else:
             logger.warning(f"Unsupported provider: {provider}, using default")
-            return get_default_tts_config(gender, language_code)
+            if gender is None:
+                raise ValueError(f"Unsupported TTS provider: {provider} and gender is required for fallback")
+            return _get_default_tts_client(gender, language_code)
             
     except Exception as e:
         logger.warning(f"Failed to create {provider} TTS: {e}")
-        return get_default_tts_config(gender, language_code)
+        if gender is None:
+            raise ValueError(f"Failed to create TTS client and gender is required for fallback: {e}")
+        return _get_default_tts_client(gender, language_code)
 

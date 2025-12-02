@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import BaseEmbeddingClient
 from app.utils import get_logger
 

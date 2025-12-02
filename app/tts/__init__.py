@@ -1,7 +1,7 @@
 """TTS provider abstractions."""
 from app.tts.base import BaseTTSClient
 from app.tts.factory import (
-    get_tts_for_scenario,
+    create_tts_client,
     get_default_tts_config,
     Gender,
 )
@@ -13,7 +13,7 @@ from app.tts.hume import HumeTTSClient
 
 __all__ = [
     "BaseTTSClient",
-    "get_tts_for_scenario",
+    "create_tts_client",
     "get_default_tts_config",
     "Gender",
     "DeepgramTTSClient",

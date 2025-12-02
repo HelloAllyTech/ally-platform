@@ -1,6 +1,7 @@
 """STT provider factory for creating STT clients based on configuration."""
-from app.core.constants import STTProvider
-from app.core.language.factory import resolve_config
+from typing import Optional, Dict, Any
+from app.core.constants import STTProvider, DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG
+from app.core.config import settings
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
 from app.utils.logger import get_logger
@@ -9,21 +10,16 @@ logger = get_logger(__name__)
 
 
 def create_stt_client(
-    language_code: str,
+    stt_config: Optional[Dict[str, Any]] = None,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
 ) -> BaseSTTClient:
     """
     Create STT client instance from configuration.
     
-    This function uses resolve_config to resolve configuration from language registry
-    and then instantiates the appropriate provider class. Providers handle their own
-    language code format conversion.
-    
-    Future: Can be extended with additional capabilities:
-    - emotional_understanding: bool
-    - code_switching: bool
-    - etc.
-    
     Args:
+        stt_config: Optional STT config from metadata. If None, uses defaults.
+            Expected structure: {"provider": "deepgram", "config": {"model": "nova-3"}}
+            Also supports backward compatibility with flat structure: {"provider": "deepgram", "model": "nova-3"}
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
     
     Returns:
@@ -32,18 +28,34 @@ def create_stt_client(
     Raises:
         ValueError: If provider is unsupported or required parameters are missing
     """
-    # Resolve configuration from language registry
-    config = resolve_config("stt", language_code)
+    # Use provided config or fallback to defaults
+    if stt_config is None:
+        logger.debug("No STT config provided, using defaults")
+        provider = DEFAULT_STT_CONFIG["provider"]
+        # Create default config dict for provider to parse
+        config_dict = {"model": DEFAULT_STT_CONFIG["model"]}
+    else:
+        provider = stt_config.get("provider", DEFAULT_STT_CONFIG["provider"])
+        # Support both nested config structure and backward-compatible flat structure
+        config_dict = stt_config.get("config", {})
+        if not config_dict:
+            # Backward compatibility: flat structure (model at top level)
+            # Convert to nested structure for provider
+            config_dict = {
+                "model": stt_config.get("model", DEFAULT_STT_CONFIG["model"]),
+            }
+        else:
+            # Ensure model has a default if missing
+            if "model" not in config_dict:
+                config_dict["model"] = DEFAULT_STT_CONFIG["model"]
     
-    # Map provider to class and instantiate
-    # Providers will handle language code conversion themselves
-    provider = config["provider"].lower()
+    # Map provider to class and instantiate using from_config
+    provider = provider.lower()
     
     if provider == STTProvider.DEEPGRAM:
-        return DeepgramSTTClient(
-            model=config["model"],
-            language_code=config["language_code"],  # BCP 47 - provider converts it
-            api_key=config["api_key"],
+        return DeepgramSTTClient.from_config(
+            config=config_dict,
+            language_code=language_code,
         )
     else:
         raise ValueError(f"Unsupported STT provider: {provider}")
