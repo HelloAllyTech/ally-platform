@@ -1,6 +1,7 @@
 import asyncio
 import types
 import pytest
+from unittest.mock import Mock
 
 import app.worker as worker
 
@@ -89,7 +90,7 @@ class TestWorker:
 
         # Parse metadata -> scenario
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,  # No voice config, will use defaults
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello", "hi"]),
             language_config=None,  # Can be None, will default to DEFAULT_LANGUAGE_CODE
             events=[mock_event],
@@ -105,14 +106,19 @@ class TestWorker:
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
-        def mock_create_stt_client(language_code):
+        def mock_create_stt_client(stt_config=None, language_code=None):
             stt_called["ok"] = True
             return MockSTTClient()
         monkeypatch.setattr(worker, "create_stt_client", mock_create_stt_client)
 
         # TTS config
         tts_called = {}
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda voice, gender, language_code=None: tts_called.setdefault("ok", True) or "TTS")
+        def mock_create_tts(*a, **k):
+            tts_called.setdefault("ok", True)
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         # Graph update already tested; still keep it deterministic
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
@@ -180,7 +186,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_tts_fallback(self, monkeypatch):
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,
             prompt_data=types.SimpleNamespace(gender="female", opening_statements=["hello"]),
             events=[],
             language_config=None,
@@ -194,19 +200,27 @@ class TestWorker:
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
-        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
+        monkeypatch.setattr(worker, "create_stt_client", lambda stt_config=None, language_code=None: MockSTTClient())
 
-        def boom(*a, **k):
-            raise RuntimeError("tts fail")
-
-        monkeypatch.setattr(worker, "get_tts_for_scenario", boom)
-
+        # First call fails, second call (fallback) succeeds
+        call_count = {"count": 0}
         fallback_used = {}
-        def fake_default_tts(gender):
-            fallback_used["used"] = gender
-            return "DEFAULT_TTS"
-
-        monkeypatch.setattr(worker, "get_default_tts_config", fake_default_tts)
+        
+        def mock_create_tts(*a, **k):
+            call_count["count"] += 1
+            if call_count["count"] == 1:
+                # First call fails
+                raise RuntimeError("tts fail")
+            else:
+                # Fallback call succeeds
+                gender = k.get("gender")
+                if gender:
+                    fallback_used["used"] = gender
+                mock_client = Mock()
+                mock_client.tts_instance = "DEFAULT_TTS"
+                return mock_client
+        
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
@@ -350,7 +364,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_stt_fallback(self, monkeypatch):
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
             events=[],
             language_config=None,
@@ -364,12 +378,12 @@ class TestWorker:
         call_count = {"count": 0}
         fallback_used = {}
         
-        def fake_stt_with_fallback(lang):
+        def fake_stt_with_fallback(stt_config=None, language_code=None):
             call_count["count"] += 1
             if call_count["count"] == 1:
                 raise RuntimeError("stt fail")
             else:
-                fallback_used["used"] = lang
+                fallback_used["used"] = language_code
                 class MockSTTClient:
                     def __init__(self):
                         self.stt_instance = "DEFAULT_STT"
@@ -377,7 +391,11 @@ class TestWorker:
 
         monkeypatch.setattr(worker, "create_stt_client", fake_stt_with_fallback)
 
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
@@ -408,7 +426,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_initializes_event_registry(self, monkeypatch):
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
             events=[],
             language_config=None,
@@ -421,8 +439,12 @@ class TestWorker:
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
-        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
+        monkeypatch.setattr(worker, "create_stt_client", lambda stt_config=None, language_code=None: MockSTTClient())
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         registry_init_called = {}
 
@@ -470,7 +492,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_registers_shutdown_callback(self, monkeypatch):
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
             events=[],
             language_config=None,
@@ -483,8 +505,12 @@ class TestWorker:
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
-        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
+        monkeypatch.setattr(worker, "create_stt_client", lambda stt_config=None, language_code=None: MockSTTClient())
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
@@ -519,7 +545,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_handle_termination_callback(self, monkeypatch):
         scenario = types.SimpleNamespace(
-            voice="en",
+            voice=None,
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
             events=[],
             language_config=None,
@@ -532,8 +558,12 @@ class TestWorker:
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
-        monkeypatch.setattr(worker, "create_stt_client", lambda lang: MockSTTClient())
-        monkeypatch.setattr(worker, "get_tts_for_scenario", lambda *a, **k: "TTS")
+        monkeypatch.setattr(worker, "create_stt_client", lambda stt_config=None, language_code=None: MockSTTClient())
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
         registry_instance = {}
 

@@ -3,15 +3,14 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 
 from app.tts import (
+    create_tts_client,
     get_default_tts_config,
-    get_tts_for_scenario,
     Gender,
 )
 from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
 from app.tts.sarvam import SarvamTTSClient
 from app.core.constants import TTSProvider
-from app.core.scenario.base import VoiceConfig, ScenarioVoice
 
 
 class TestDeepgramProvider:
@@ -275,24 +274,22 @@ class TestSarvamProvider:
             )
 
 
-class TestGetDefaultTTSConfig:
-    """Test cases for get_default_tts_config function."""
+class TestCreateTTSClientWithDefaults:
+    """Test cases for create_tts_client function with defaults."""
     
     @pytest.mark.unit
     @patch('app.tts.factory.DeepgramTTSClient')
     @patch('app.tts.factory.settings')
-    def test_get_default_config_male(self, mock_settings, mock_deepgram_client):
-        """Test getting default TTS config for male gender."""
+    def test_create_tts_client_default_male(self, mock_settings, mock_deepgram_client):
+        """Test creating TTS client with defaults for male gender."""
         mock_settings.DEFAULT_MALE_VOICE_MODEL = "nova-2-male"
         mock_settings.DEEPGRAM_API_KEY = "test-key"
-        mock_tts_instance = Mock()
         mock_client = Mock()
-        mock_client.tts_instance = mock_tts_instance
         mock_deepgram_client.return_value = mock_client
         
-        result = get_default_tts_config(Gender.MALE)
+        result = create_tts_client(language_code="en-IN", gender=Gender.MALE)
         
-        assert result == mock_tts_instance
+        assert result == mock_client
         mock_deepgram_client.assert_called_once_with(
             model="nova-2-male",
             language_code="en-IN",
@@ -302,18 +299,16 @@ class TestGetDefaultTTSConfig:
     @pytest.mark.unit
     @patch('app.tts.factory.DeepgramTTSClient')
     @patch('app.tts.factory.settings')
-    def test_get_default_config_female(self, mock_settings, mock_deepgram_client):
-        """Test getting default TTS config for female gender."""
+    def test_create_tts_client_default_female(self, mock_settings, mock_deepgram_client):
+        """Test creating TTS client with defaults for female gender."""
         mock_settings.DEFAULT_FEMALE_VOICE_MODEL = "nova-2-female"
         mock_settings.DEEPGRAM_API_KEY = "test-key"
-        mock_tts_instance = Mock()
         mock_client = Mock()
-        mock_client.tts_instance = mock_tts_instance
         mock_deepgram_client.return_value = mock_client
         
-        result = get_default_tts_config(Gender.FEMALE)
+        result = create_tts_client(language_code="en-IN", gender=Gender.FEMALE)
         
-        assert result == mock_tts_instance
+        assert result == mock_client
         mock_deepgram_client.assert_called_once_with(
             model="nova-2-female",
             language_code="en-IN",
@@ -321,127 +316,162 @@ class TestGetDefaultTTSConfig:
         )
     
     @pytest.mark.unit
+    def test_create_tts_client_requires_gender_when_no_config(self):
+        """Test that gender is required when tts_config is None."""
+        with pytest.raises(ValueError, match="gender is required"):
+            create_tts_client(language_code="en-IN")
+    
+    @pytest.mark.unit
     @patch('app.tts.factory.settings')
-    def test_get_default_config_missing_setting(self, mock_settings):
+    def test_create_tts_client_missing_setting(self, mock_settings):
         """Test handling missing settings attribute."""
         del mock_settings.DEFAULT_MALE_VOICE_MODEL
         
         with pytest.raises((ValueError, AttributeError), match="Missing|default"):
-            get_default_tts_config(Gender.MALE)
+            create_tts_client(language_code="en-IN", gender=Gender.MALE)
 
 
-class TestGetTTSForScenario:
-    """Test cases for get_tts_for_scenario function."""
-    
-    @pytest.mark.unit
-    @patch('app.tts.factory.get_default_tts_config')
-    def test_get_tts_none_voice_returns_default(self, mock_get_default):
-        """Test getting TTS for None voice returns default."""
-        mock_tts_instance = Mock()
-        mock_get_default.return_value = mock_tts_instance
-        
-        result = get_tts_for_scenario(None, Gender.MALE)
-        
-        mock_get_default.assert_called_once_with(Gender.MALE, None)
-        assert result == mock_tts_instance
-    
-    @pytest.mark.unit
-    @patch('app.tts.factory.get_default_tts_config')
-    def test_get_tts_invalid_config_falls_back(self, mock_get_default):
-        """Test fallback to default when voice config is invalid."""
-        mock_tts_instance = Mock()
-        mock_get_default.return_value = mock_tts_instance
-        
-        voice_config = VoiceConfig(voice_id="only")  # Missing model for ElevenLabs
-        scenario_voice = ScenarioVoice(
-            name="test",
-            provider=TTSProvider.ELEVENLABS,
-            config=voice_config
-        )
-        
-        result = get_tts_for_scenario(scenario_voice, Gender.FEMALE)
-        
-        mock_get_default.assert_called_once_with(Gender.FEMALE, None)
-        assert result == mock_tts_instance
+class TestCreateTTSClientWithConfig:
+    """Test cases for create_tts_client function with config."""
     
     @pytest.mark.unit
     @patch('app.tts.factory.SarvamTTSClient')
     @patch('app.tts.factory.settings')
-    def test_get_tts_success_with_language_code(self, mock_settings, mock_sarvam_client):
-        """Test successful TTS creation with language code."""
+    def test_create_tts_client_with_sarvam_config(self, mock_settings, mock_sarvam_client):
+        """Test creating TTS client with Sarvam config from metadata."""
         mock_settings.SARVAM_API_KEY = "test-key"
-        mock_tts_instance = Mock()
         mock_client = Mock()
-        mock_client.tts_instance = mock_tts_instance
-        mock_sarvam_client.return_value = mock_client
+        mock_sarvam_client.from_config.return_value = mock_client
         
-        voice_config = VoiceConfig(model="bulbul:v2", speaker="anushka")
-        scenario_voice = ScenarioVoice(
-            name="test",
-            provider=TTSProvider.SARVAM,
-            config=voice_config
-        )
+        tts_config = {
+            "provider": "sarvam",
+            "name": "test-voice",
+            "config": {
+                "model": "bulbul:v2",
+                "speaker": "anushka"
+            }
+        }
         
-        result = get_tts_for_scenario(scenario_voice, Gender.MALE, language_code="hi-IN")
+        result = create_tts_client(tts_config=tts_config, language_code="hi-IN")
         
-        mock_sarvam_client.assert_called_once_with(
-            model="bulbul:v2",
-            speaker="anushka",
+        mock_sarvam_client.from_config.assert_called_once_with(
+            config={"model": "bulbul:v2", "speaker": "anushka"},
             language_code="hi-IN",
-            api_key="test-key",
         )
-        assert result == mock_tts_instance
+        assert result == mock_client
     
     @pytest.mark.unit
     @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.get_default_tts_config')
+    @patch('app.tts.factory.settings')
+    def test_create_tts_client_with_deepgram_config(self, mock_settings, mock_deepgram_client):
+        """Test creating TTS client with Deepgram config."""
+        mock_settings.DEEPGRAM_API_KEY = "test-key"
+        mock_client = Mock()
+        mock_deepgram_client.from_config.return_value = mock_client
+        
+        tts_config = {
+            "provider": "deepgram",
+            "name": "test-voice",
+            "config": {
+                "model": "nova-2"
+            }
+        }
+        
+        result = create_tts_client(tts_config=tts_config, language_code="en-IN")
+        
+        mock_deepgram_client.from_config.assert_called_once_with(
+            config={"model": "nova-2"},
+            language_code="en-IN",
+        )
+        assert result == mock_client
+    
+    @pytest.mark.unit
+    @patch('app.tts.factory._get_default_tts_client')
+    @patch('app.tts.factory.logger')
+    def test_create_tts_client_invalid_config_falls_back(self, mock_logger, mock_get_default):
+        """Test fallback to default when config is invalid."""
+        mock_client = Mock()
+        mock_get_default.return_value = mock_client
+        
+        tts_config = {
+            "provider": "elevenlabs",
+            "config": {
+                "voice_id": "only"  # Missing model
+            }
+        }
+        
+        result = create_tts_client(tts_config=tts_config, language_code="en-IN", gender=Gender.FEMALE)
+        
+        mock_get_default.assert_called_once_with(Gender.FEMALE, "en-IN")
+        mock_logger.warning.assert_called_once()
+        assert result == mock_client
+    
+    @pytest.mark.unit
+    @patch('app.tts.factory.DeepgramTTSClient')
+    @patch('app.tts.factory._get_default_tts_client')
     @patch('app.tts.factory.logger')
     @patch('app.tts.factory.settings')
-    def test_get_tts_creation_failure_falls_back(self, mock_settings, mock_logger, mock_get_default, mock_deepgram_client):
+    def test_create_tts_client_creation_failure_falls_back(self, mock_settings, mock_logger, mock_get_default, mock_deepgram_client):
         """Test fallback to default when TTS creation fails."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
-        mock_deepgram_client.side_effect = RuntimeError("Creation failed")
-        mock_tts_instance = Mock()
-        mock_get_default.return_value = mock_tts_instance
+        mock_deepgram_client.from_config.side_effect = RuntimeError("Creation failed")
+        mock_client = Mock()
+        mock_get_default.return_value = mock_client
         
-        voice_config = VoiceConfig(model="test-model")
-        scenario_voice = ScenarioVoice(
-            name="test",
-            provider=TTSProvider.DEEPGRAM,
-            config=voice_config
-        )
+        tts_config = {
+            "provider": "deepgram",
+            "config": {
+                "model": "test-model"
+            }
+        }
         
-        result = get_tts_for_scenario(scenario_voice, Gender.NON_BINARY)
+        result = create_tts_client(tts_config=tts_config, language_code="en-IN", gender=Gender.NON_BINARY)
         
-        mock_get_default.assert_called_once_with(Gender.NON_BINARY, None)
+        mock_get_default.assert_called_once_with(Gender.NON_BINARY, "en-IN")
         mock_logger.warning.assert_called_once()
-        assert result == mock_tts_instance
+        assert result == mock_client
     
     @pytest.mark.unit
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.settings')
-    def test_get_tts_without_language_code(self, mock_settings, mock_deepgram_client):
-        """Test TTS creation without language code parameter."""
-        mock_settings.DEEPGRAM_API_KEY = "test-key"
+    def test_create_tts_client_missing_provider_falls_back(self):
+        """Test that missing provider falls back to defaults."""
+        tts_config = {
+            "name": "test-voice",
+            "config": {}
+        }
+        
+        with pytest.raises(ValueError, match="gender is required"):
+            create_tts_client(tts_config=tts_config, language_code="en-IN")
+
+
+class TestGetDefaultTTSConfig:
+    """Test cases for get_default_tts_config convenience function."""
+    
+    @pytest.mark.unit
+    @patch('app.tts.factory.create_tts_client')
+    def test_get_default_tts_config_returns_instance(self, mock_create_tts):
+        """Test that get_default_tts_config returns TTS instance directly."""
         mock_tts_instance = Mock()
         mock_client = Mock()
         mock_client.tts_instance = mock_tts_instance
-        mock_deepgram_client.return_value = mock_client
+        mock_create_tts.return_value = mock_client
         
-        voice_config = VoiceConfig(model="nova-2")
-        scenario_voice = ScenarioVoice(
-            name="test",
-            provider=TTSProvider.DEEPGRAM,
-            config=voice_config
-        )
+        result = get_default_tts_config(Gender.MALE, "en-IN")
         
-        result = get_tts_for_scenario(scenario_voice, Gender.MALE)
+        mock_create_tts.assert_called_once_with(language_code="en-IN", gender=Gender.MALE)
+        assert result == mock_tts_instance
+    
+    @pytest.mark.unit
+    @patch('app.tts.factory.create_tts_client')
+    def test_get_default_tts_config_uses_default_language(self, mock_create_tts):
+        """Test that get_default_tts_config uses DEFAULT_LANGUAGE_CODE when not provided."""
+        mock_tts_instance = Mock()
+        mock_client = Mock()
+        mock_client.tts_instance = mock_tts_instance
+        mock_create_tts.return_value = mock_client
         
-        mock_deepgram_client.assert_called_once_with(
-            model="nova-2",
-            language_code="en-IN",  # DEFAULT_LANGUAGE_CODE
-            api_key="test-key",
-        )
+        result = get_default_tts_config(Gender.FEMALE)
+        
+        mock_create_tts.assert_called_once_with(language_code="en-IN", gender=Gender.FEMALE)
         assert result == mock_tts_instance
 
 
@@ -460,8 +490,8 @@ class TestTTSNewStructureIntegration:
         mock_client_instance.tts_instance = mock_tts_instance
         mock_deepgram_client.return_value = mock_client_instance
         
-        tts_instance = get_default_tts_config(Gender.MALE)
-        assert tts_instance == mock_tts_instance
+        tts_client = create_tts_client(language_code="en-IN", gender=Gender.MALE)
+        assert tts_client == mock_client_instance
         mock_deepgram_client.assert_called_once()
     
     @pytest.mark.integration
