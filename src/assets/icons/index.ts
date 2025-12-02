@@ -36,6 +36,7 @@ import EmptyTranscriptIcon from './emptyTranscript.svg';
 import EndSessionIcon from './endSession.svg';
 import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
+import FileIcon from './file.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
 import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
@@ -138,6 +139,7 @@ export {
   EndSessionIcon,
   ExportIcon,
   EyeIcon,
+  FileIcon,
   FilterIcon,
   FlowIcon,
   GoldenShieldIcon,

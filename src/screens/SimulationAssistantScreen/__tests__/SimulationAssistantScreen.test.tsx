@@ -19,8 +19,10 @@ jest.mock('@livekit/react-native', () => ({
   __esModule: true,
   AudioSession: {
     startAudioSession: jest.fn().mockResolvedValue(undefined),
+    stopAudioSession: jest.fn().mockResolvedValue(undefined),
     selectAudioOutput: jest.fn().mockResolvedValue(undefined),
     configureAudio: jest.fn().mockResolvedValue(undefined),
+    setAppleAudioConfiguration: jest.fn().mockResolvedValue(undefined),
   },
   AndroidAudioTypePresets: {
     media: {},
@@ -100,17 +102,30 @@ jest.mock('@/components', () => {
     useErrorToast: () => ({showErrorToast: mockShowErrorToast}),
     // simple stand-ins used by the screen
     AudioWave: () => <View testID="audio-wave" />,
-    ControlButtons: ({onMicPress, onStopPress, isDisableMic, isDisableStop, isMuted}: any) => (
+    ControlButtons: ({
+      onMicButtonPress,
+      onSimulationEndPress,
+      isMicDisabled,
+      isSimulationEndDisabled,
+      isMuted,
+    }: any) => (
       <View>
-        <TouchableOpacity accessibilityLabel="mic" disabled={!!isDisableMic} onPress={onMicPress}>
+        <TouchableOpacity
+          accessibilityLabel="mic"
+          disabled={!!isMicDisabled}
+          onPress={onMicButtonPress}>
           <Text>{isMuted ? 'muted' : 'unmuted'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="stop" disabled={!!isDisableStop} onPress={onStopPress}>
+        <TouchableOpacity
+          accessibilityLabel="stop"
+          disabled={!!isSimulationEndDisabled}
+          onPress={onSimulationEndPress}>
           <Text>stop</Text>
         </TouchableOpacity>
       </View>
     ),
     IllustratedActionModal: () => null,
+    IllustratedModal: (props: any) => (props.visible ? <View testID="illustrated-modal" /> : null),
     EndingSoonModal: (props: any) => (props.visible ? <View testID="ending-soon" /> : null),
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
@@ -126,12 +141,24 @@ jest.mock('../components', () => {
   return {
     __esModule: true,
     AudioWave: () => <View testID="audio-wave" />,
-    ControlButtons: ({onMicPress, onStopPress, isDisableMic, isDisableStop, isMuted}: any) => (
+    ControlButtons: ({
+      onMicButtonPress,
+      onSimulationEndPress,
+      isMicDisabled,
+      isSimulationEndDisabled,
+      isMuted,
+    }: any) => (
       <View>
-        <TouchableOpacity accessibilityLabel="mic" disabled={!!isDisableMic} onPress={onMicPress}>
+        <TouchableOpacity
+          accessibilityLabel="mic"
+          disabled={!!isMicDisabled}
+          onPress={onMicButtonPress}>
           <Text>{isMuted ? 'muted' : 'unmuted'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="stop" disabled={!!isDisableStop} onPress={onStopPress}>
+        <TouchableOpacity
+          accessibilityLabel="stop"
+          disabled={!!isSimulationEndDisabled}
+          onPress={onSimulationEndPress}>
           <Text>stop</Text>
         </TouchableOpacity>
       </View>
@@ -162,8 +189,17 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (k: string) => k}),
 }));
 
+jest.mock('@/assets/icons', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    __esModule: true,
+    EndSessionIcon: () => <View testID="end-session-icon" />,
+  };
+});
+
 const baseRouteParams = {
-  roomData: {
+  sessionData: {
     id: 'room-1',
     createdAt: new Date().toISOString(),
     accessToken: 'token',
@@ -234,6 +270,17 @@ describe('SimulationAssistantScreen', () => {
       if (event === 'connected') connectedHandlers.push(cb);
       if (event === 'data') dataHandlers.push(cb);
       return undefined;
+    });
+
+    (mockOff as jest.Mock).mockImplementation((event: string, cb: any) => {
+       if (event === 'connected') {
+         const index = connectedHandlers.indexOf(cb);
+         if (index > -1) connectedHandlers.splice(index, 1);
+       }
+       if (event === 'data') {
+         const index = dataHandlers.indexOf(cb);
+         if (index > -1) dataHandlers.splice(index, 1);
+       }
     });
 
     const {getByTestId} = renderWithProviders(

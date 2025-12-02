@@ -83,3 +83,9 @@ yarn-error.log
 
 # Cursor
 .cursor/
+
+# Firebase config files (fetched from S3 in CI/local scripts)
+android/app/google-services.json
+android/app/src/dev/google-services.json
+android/app/src/prod/google-services.json
+ios/GoogleService-Info.plist

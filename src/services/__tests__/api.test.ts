@@ -19,4 +19,59 @@ describe('api baseQueryWithReauth', () => {
   });
 });
 
+// Mock store used internally by api.ts for token actions
+const mockDispatchSpy = jest.fn();
+jest.mock('@/store/store', () => ({store: {dispatch: (a: any) => mockDispatchSpy(a)}}));
 
+// Intercept fetchBaseQuery to simulate: 401 -> refresh success -> original success
+let mockCallCount = 0;
+jest.mock('@reduxjs/toolkit/query/react', () => {
+  const actual = jest.requireActual('@reduxjs/toolkit/query/react');
+  return {
+    ...actual,
+    fetchBaseQuery: () => async (args: any) => {
+      mockCallCount++;
+      if (mockCallCount === 1) {
+        return {error: {status: 401}} as any;
+      }
+      // Second call should be refresh
+      if (mockCallCount === 2) {
+        if (typeof args === 'object' && args.url) {
+          return {data: {accessToken: 'newA', refreshToken: 'newR'}} as any;
+        }
+      }
+      return {data: {ok: true}} as any;
+    },
+  };
+});
+
+describe('api reauth flow', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('dispatches storeTokens on 401 then succeeds original request', async () => {
+    mockCallCount = 0;
+    const {api: apiReauth} = require('../api');
+    const {callsAPI} = require('../callsApi');
+
+    const store = configureStore({
+      reducer: {[apiReauth.reducerPath]: apiReauth.reducer},
+      middleware: gDM => gDM().concat(apiReauth.middleware),
+    });
+
+    const action = callsAPI.endpoints.getCallLogs.initiate({limit: 1, offset: 0});
+    await store.dispatch(action as unknown as AnyAction);
+
+    expect(mockDispatchSpy).toHaveBeenCalledWith({
+      type: 'storeTokens',
+      payload: {accessToken: 'newA', refreshToken: 'newR'},
+    });
+    // final call returns ok:true
+    expect(mockCallCount).toBeGreaterThanOrEqual(3);
+  });
+});

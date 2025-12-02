@@ -6,7 +6,7 @@ const styles = ScaledSheet.create({
   fieldValueText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
-    color: colors.lightGray3,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });
 

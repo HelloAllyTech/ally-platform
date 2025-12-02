@@ -3,11 +3,12 @@ import {ScenarioStatus} from '@/constants';
 import {AudioTrackRef} from './audio';
 
 export interface Scenario {
-  id: string;
-  title?: string;
+  id: number;
+  title: string;
   scenario?: string;
   description?: string;
   coverImageUrl?: string | null;
+  coverVideoUrl?: string | null;
   status?: ScenarioStatus;
 }
 
@@ -68,11 +69,16 @@ export interface CircleWaveVisualizerProps {
 }
 
 export interface ControlButtonsProps {
-  onMicPress: () => void;
-  onStopPress: () => void;
+  isMaximized: boolean;
+  onToggleMaximized: () => void;
+  isFocusMode: boolean;
+  isFocusModeDisabled?: boolean;
+  onFocusModeButtonPress: () => void;
+  isSimulationEndDisabled?: boolean;
+  onSimulationEndPress: () => void;
+  isMicDisabled?: boolean;
+  onMicButtonPress: () => void;
   isMuted: boolean;
-  isDisableMic?: boolean;
-  isDisableStop?: boolean;
 }
 
 export interface SimulationTimerProps {
@@ -110,6 +116,35 @@ interface SummaryMetadata {
   sessionName?: string;
 }
 
+export interface UpNextSimulation {
+  id?: number;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  scenarioPathSessionItemStatus?: SessionItemStatus;
+  order?: number;
+  scenarioPathSessionItemId?: string;
+}
+
+export interface CurrentSessionInfo {
+  scenarioId?: number;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  scenarioPathSessionItemStatus?: SessionItemStatus;
+  scenarioPathSessionItemId?: string;
+  transitionMessageTitle?: string;
+  transitionMessageContent?: string;
+  isScenarioPathSessionCompleted?: boolean;
+}
+
+export interface UpcomingScenarioResponse {
+  upcomingScenario?: UpNextSimulation;
+  currentSession?: CurrentSessionInfo;
+}
+
 export interface SimulationSummaryData {
   events?: SimulationEvent[];
   whatWentWell?: string[];
@@ -127,6 +162,7 @@ export interface SimulationSummaryData {
   score: number | null;
   metadata: SummaryMetadata | null;
   hasFeedback: boolean;
+  scenarioPathSessionId?: string | null;
   scenario?: {
     title?: string;
   };
@@ -146,7 +182,7 @@ export interface SimulationSummaryData {
   };
 }
 
-export type RoomData = {
+export type SessionData = {
   id: string;
   createdAt: string;
   accessToken: string;
@@ -164,3 +200,51 @@ export type LiveEventPayload = {
   } | null;
   timestamp?: string;
 } | null;
+
+export enum SessionItemStatus {
+  LOCKED = 'LOCKED',
+  UNLOCKED = 'UNLOCKED',
+  COMPLETED = 'COMPLETED',
+}
+
+export interface PathScenario {
+  id: string;
+  scenarioId: number;
+  order: number;
+  messageTitle?: string;
+  messageContent?: string;
+  minimumScore?: number;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  sessionId: string | null;
+  status: SessionItemStatus;
+}
+
+export interface SimulationPathDetails {
+  id: string;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  status: string;
+  isGlobal: boolean;
+  completedScenarios: number;
+  completedAt: Date | null;
+  scenarioPathSessionId: string | null;
+  scenarios: PathScenario[];
+}
+
+export interface SimulationPath {
+  id: string;
+  title: string;
+  description?: string;
+  coverImageUrl?: string;
+  totalScenarios: number;
+  completedScenarios?: number;
+}
+
+export interface SimulationPathsResponse {
+  data: SimulationPath[];
+  count: number;
+}
