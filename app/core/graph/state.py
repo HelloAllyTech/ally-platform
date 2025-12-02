@@ -55,13 +55,20 @@ def add_branching_instructions(
     left: List[Tuple[str, int]], 
     right: List[Tuple[str, int]]
 ) -> List[Tuple[str, int]]:
-    """Reducer to replace branching instructions (not accumulate).
+    """Reducer to accumulate or clear branching instructions.
     
-    The process_events node is responsible for merging time-based instructions
-    from the state with new event-based instructions. This reducer simply
-    replaces the old list with the new one.
+    When multiple events (especially time-based events during initialization)
+    update the state with branching instructions, we need to accumulate them
+    all rather than replacing. However, when the generate_response node clears
+    them by passing an empty list, we should replace (clear) them.
+    
+    Logic:
+    - If right is empty: replace (clear) the instructions
+    - If right has items: accumulate with left
     """
-    return right
+    if not right:
+        return right  # Clear: replace with empty list
+    return left + right  # Accumulate: add new instructions to existing ones
 
 
 class SimulationState(BaseModel):

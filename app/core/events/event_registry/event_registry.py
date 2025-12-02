@@ -101,7 +101,20 @@ class EventRegistry:
 
     async def initialize(self) -> None:
         # Send initial score-based events to UI and Core (example: score < 5)
-        await self.handle_events(room=self.room, current_score=self.initial_score, detected_event_ids=None)
+        _, additional_score, branching_instructions = await self.handle_events(
+            room=self.room, 
+            current_score=self.initial_score, 
+            detected_event_ids=None
+        )
+
+        # Update graph state with initial branching instructions if any were triggered
+        if agent_graph and self.thread_id and branching_instructions:
+            logger.info(f"Updating graph state with {len(branching_instructions)} initial branching instructions")
+            agent_graph.update_state(
+                {"configurable": {"thread_id": self.thread_id}},
+                values={"branching_instructions": branching_instructions},
+            )
+
         # Start timers for all TIME events
         await self._scheduler.start_time_event_schedulers(
             events=self.events,

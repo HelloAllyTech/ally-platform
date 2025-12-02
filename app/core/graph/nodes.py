@@ -1,23 +1,16 @@
 import asyncio
-import logging
-import random
 from datetime import datetime, timezone
 from typing import Optional, cast, List, TYPE_CHECKING
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from livekit import rtc
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.llms import create_llm_client
-from app.core.constants import VisibilityType
-from app.core.config import settings
 from app.core.events.base import ChatMessage, BaseEvent
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import SimulationState
-from app.core.graph.utils import convert_messages_to_chat_messages, serialize_event
-from app.core.queue import msg_event_queue
+from app.core.graph.utils import convert_messages_to_chat_messages
 from app.core.scenario.base import Scenario
 from app.utils.logger import logger
 
@@ -27,7 +20,7 @@ if TYPE_CHECKING:
 
 async def process_events(
     state: SimulationState, config: Optional[RunnableConfig] = None
-) -> SimulationState:
+) -> dict:
     """Process events in the state (async version, detect_event is async)"""
 
     async def detect_single_event(event: BaseEvent, chat_messages: List[ChatMessage]):
@@ -85,19 +78,22 @@ async def process_events(
     if additional_score_from_triggered_events > 0:
         logger.info(f"Additional score from triggered events: {additional_score_from_triggered_events}. Total score: {new_current_score}")
 
-    # Merge time-based branching instructions from state with new event instructions
-    # Time events that fired between utterances should be included
-    # Old instructions from previous utterance should NOT be included (they were already used)
-    all_branching_instructions = branching_instruction + state.branching_instructions
+    # Only include branching_instructions if we have new ones.
+    # If we return [], the reducer clears the state.
+    # If we return state.branching_instructions + new, the reducer duplicates the state.
+    # By omitting the key when empty, we preserve the existing state.
+    update_dict = {
+        "messages": state.messages,
+        "permitted_events": state.permitted_events,
+        "events_accumulator": state.events_accumulator + detected_events,
+        "new_events": new_events,
+        "current_score": new_current_score,
+    }
+    
+    if branching_instruction:
+        update_dict["branching_instructions"] = branching_instruction
 
-    return SimulationState(
-        messages=state.messages,
-        permitted_events=state.permitted_events,
-        events_accumulator=state.events_accumulator + detected_events,
-        new_events=new_events,
-        current_score=new_current_score,
-        branching_instructions=all_branching_instructions
-    )
+    return update_dict
 
 
 async def generate_response(
