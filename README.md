@@ -63,8 +63,8 @@ Edit `.env` with your configuration:
 
 **Required Settings:**
 - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` - LiveKit credentials
-- `OPENAI_API_KEY` - OpenAI API key for LLM
-- `DEEPGRAM_API_KEY` - Deepgram API key for STT
+- `OPENAI_API_KEY` - OpenAI API key for LLM (used as default if not specified in metadata)
+- `DEEPGRAM_API_KEY` - Deepgram API key for STT (used as default if not specified in metadata)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` - AWS credentials
 - `SQS_MESSAGE_EVENT_QUEUE_NAME` - SQS queue name for event publishing
 
@@ -201,19 +201,19 @@ ally-learn-core/
 
 1. **Agent Initialization**
    - LiveKit worker receives room connection request
-   - Parses scenario metadata (client persona, events, voice config)
+   - Parses scenario metadata (client persona, events, voice config, STT/LLM config)
    - Initializes LangGraph state with scenario data
-   - Configures STT (via factory), TTS (via factory based on scenario voice config), and VAD (Silero)
-   - TTS/STT/LLM providers are instantiated using factory pattern with language registry defaults
+   - Configures STT (via factory from metadata or defaults), TTS (via factory based on scenario voice config), and VAD (Silero)
+   - TTS/STT/LLM providers are instantiated using factory pattern - can be configured per scenario via metadata or fallback to environment defaults
 
 2. **Conversation Loop**
-   - User (counselor) speaks → Deepgram STT → Text
+   - User (counselor) speaks → STT (configured from metadata or default) → Text
    - LangGraph processes:
      - **Event Detection**: Analyzes conversation for counseling events
      - **Event Processing**: Calculates scores and selects feedback
      - **UI Event Delivery**: Sends feedback to frontend
      - **Core Event Publishing**: Publishes to SQS
-     - **Response Generation**: OpenAI generates client response
+     - **Response Generation**: LLM (configured from metadata or default) generates client response
    - Client response → TTS → Audio → Played to user
 
 3. **Event System**
@@ -251,6 +251,19 @@ Scenarios define the client persona and are passed as LiveKit room metadata:
       }
     },
     "languageCode": "en-US",
+    "stt": {
+      "provider": "deepgram",
+      "config": {
+        "model": "nova-3"
+      }
+    },
+    "llm": {
+      "provider": "openai",
+      "config": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.7
+      }
+    },
     "events": [...]
   }
 }
@@ -272,6 +285,29 @@ Scenarios define the client persona and are passed as LiveKit room metadata:
 ```
 
 **Note:** For Google TTS streaming synthesis, use Chirp 3 HD voices (format: `{language}-Chirp3-HD-{Name}`). See [Google Cloud TTS documentation](https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types) for available voices.
+```
+
+**STT and LLM Configuration:**
+
+STT (Speech-to-Text) and LLM (Language Model) providers can be configured per scenario via metadata. If not specified, the system uses default providers from environment configuration.
+
+```json
+{
+  "languageCode": "hi-IN",
+  "stt": {
+    "provider": "deepgram",
+    "config": {
+      "model": "nova-3"
+    }
+  },
+  "llm": {
+    "provider": "openai",
+    "config": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.7
+    }
+  }
+}
 ```
 
 ## Configuration
@@ -318,6 +354,48 @@ HUME_API_KEY=your_key
 # Note: Supports multiple languages including English (en-IN) and Hindi (hi-IN)
 # See: https://docs.livekit.io/agents/integrations/tts/hume/
 ```
+
+### STT Providers
+
+STT (Speech-to-Text) providers can be configured per scenario via metadata or fallback to environment defaults.
+
+**Deepgram (Default):**
+```env
+DEEPGRAM_API_KEY=your_key
+# Use in scenario metadata:
+# {
+#   "stt": {
+#     "provider": "deepgram",
+#     "config": {
+#       "model": "nova-3"
+#     }
+#   }
+# }
+```
+
+If not specified in metadata, the system uses the default Deepgram configuration from environment settings.
+
+### LLM Providers
+
+LLM (Language Model) providers can be configured per scenario via metadata or fallback to environment defaults.
+
+**OpenAI (Default):**
+```env
+OPENAI_API_KEY=your_key
+LLM_TEMPERATURE=0.7  # Optional, defaults to 0.7
+# Use in scenario metadata:
+# {
+#   "llm": {
+#     "provider": "openai",
+#     "config": {
+#       "model": "gpt-4o-mini",
+#       "temperature": 0.7
+#     }
+#   }
+# }
+```
+
+If not specified in metadata, the system uses the default OpenAI configuration from environment settings (model and temperature from `OPENAI_API_KEY` and `LLM_TEMPERATURE`).
 
 ### Logging
 
