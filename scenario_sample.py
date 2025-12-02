@@ -113,9 +113,19 @@ SCENARIO_SAMPLE_HINDI = {
                 "gender": "female"
             }
         },
-        # Language code for STT, LLM, and TTS providers (BCP 47 format)
-        # This will be passed to STT (Deepgram), LLM (OpenAI), and TTS (Google) providers
         "languageCode": "hi-IN",
+        "stt": {
+            "provider": "deepgram",
+            "config": {
+                "model": "nova-3"
+            }
+        },
+        "llm": {
+            "provider": "openai",
+            "config": {
+                "model": "gpt-4o-mini"
+            }
+        },
         "metadata": {}
     }
 }
@@ -182,8 +192,19 @@ SCENARIO_SAMPLE_GOOGLE = {
                 "gender": "female"
             }
         },
-        # Language code for STT, LLM, and TTS providers (BCP 47 format)
         "languageCode": "en-US",
+        "stt": {
+            "provider": "deepgram",
+            "config": {
+                "model": "nova-3"
+            }
+        },
+        "llm": {
+            "provider": "openai",
+            "config": {
+                "model": "gpt-4o-mini"
+            }
+        },
         "metadata": {}
     }
 }
@@ -256,9 +277,19 @@ SCENARIO_SAMPLE_HUME_HINDI = {
                 # or a custom voice you've created. See: https://dev.hume.ai/docs/text-to-speech-tts/voices
             }
         },
-        # Language code for STT, LLM, and TTS providers (BCP 47 format)
-        # This will be passed to STT (Deepgram), LLM (OpenAI), and TTS (Hume) providers
         "languageCode": "hi-IN",
+        "stt": {
+            "provider": "deepgram",
+            "config": {
+                "model": "nova-3"
+            }
+        },
+        "llm": {
+            "provider": "openai",
+            "config": {
+                "model": "gpt-4o-mini"
+            }
+        },
         "metadata": {}
     }
 }
