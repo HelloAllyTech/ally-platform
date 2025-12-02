@@ -1,5 +1,5 @@
 """Hume.ai TTS provider implementation."""
-from typing import Optional
+from typing import Optional, Dict, Any
 from livekit.plugins.hume import TTS, VoiceByName, VoiceProvider
 from app.core.config import settings
 from app.core.scenario.base import VoiceConfig
@@ -91,6 +91,36 @@ class HumeTTSClient(BaseTTSClient):
         except Exception as e:
             logger.error(f"Hume TTS validation failed: {e}")
             return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+        voice_name: Optional[str] = None,
+    ) -> "HumeTTSClient":
+        """
+        Create Hume TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"instant_mode": False, "voice_provider": "HUME_AI"}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+            voice_name: Voice name from metadata (from "name" field, not config)
+        
+        Returns:
+            HumeTTSClient instance
+        """
+        if not voice_name:
+            raise ValueError("Hume TTS requires 'voice_name' parameter")
+        
+        return cls(
+            voice_name=voice_name,
+            instant_mode=config.get("instant_mode"),
+            language_code=language_code,
+            voice_provider=config.get("voice_provider"),
+            api_key=settings.HUME_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> TTS:

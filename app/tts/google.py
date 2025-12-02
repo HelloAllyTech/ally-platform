@@ -1,5 +1,5 @@
 """Google Cloud TTS provider implementation."""
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 from livekit.plugins import google
 from app.core.config import settings
 from app.tts.base import BaseTTSClient
@@ -158,6 +158,31 @@ class GoogleTTSClient(BaseTTSClient):
         except Exception as e:
             logger.error(f"Google TTS validation failed: {e}")
             return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "GoogleTTSClient":
+        """
+        Create Google TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"voice_name": "en-US-Chirp3-HD-Aoede", "gender": "female", "voice_cloning_key": "..."}
+            language_code: BCP 47 language code (e.g., "en-US", "hi-IN")
+        
+        Returns:
+            GoogleTTSClient instance
+        """
+        return cls(
+            language_code=language_code,
+            gender=config.get("gender"),  # Optional
+            voice_name=config.get("voice_name"),  # Optional
+            voice_cloning_key=config.get("voice_cloning_key"),  # Optional
+            credentials_file=getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None),  # Optional
+        )
     
     @property
     def tts_instance(self) -> google.TTS:

@@ -1,5 +1,5 @@
 """ElevenLabs TTS provider implementation."""
-from typing import Optional
+from typing import Optional, Dict, Any
 from livekit.plugins import elevenlabs
 from elevenlabs import ElevenLabs
 from elevenlabs.core import ApiError as ElevenLabsApiError
@@ -83,6 +83,38 @@ class ElevenLabsTTSClient(BaseTTSClient):
         except Exception as e:
             logger.exception(f"ElevenLabs validation error: {e}")
             return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "ElevenLabsTTSClient":
+        """
+        Create ElevenLabs TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "eleven_turbo_v2_5", "voice_id": "..."}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            ElevenLabsTTSClient instance
+        """
+        model = config.get("model")
+        voice_id = config.get("voice_id")
+        
+        if not model:
+            raise ValueError("ElevenLabs TTS requires 'model' in config")
+        if not voice_id:
+            raise ValueError("ElevenLabs TTS requires 'voice_id' in config")
+        
+        return cls(
+            model=model,
+            voice_id=voice_id,
+            language_code=language_code,
+            api_key=settings.ELEVEN_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> elevenlabs.TTS:

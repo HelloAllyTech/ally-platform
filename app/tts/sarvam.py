@@ -1,12 +1,12 @@
 """Sarvam TTS provider implementation."""
 import base64
-from typing import Optional
+from typing import Optional, Dict, Any
 from livekit.plugins import sarvam
 from sarvamai import SarvamAI
 from sarvamai.core import ApiError as SarvamaiApiError
 from app.core.config import settings
 from app.core.scenario.base import VoiceConfig
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.tts.base import BaseTTSClient
 from app.utils.logger import get_logger
 
@@ -121,6 +121,38 @@ class SarvamTTSClient(BaseTTSClient):
         except Exception as e:
             logger.exception(f"Sarvam TTS validation error: {e}")
             return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "SarvamTTSClient":
+        """
+        Create Sarvam TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "bulbul:v2", "speaker": "anushka"}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            SarvamTTSClient instance
+        """
+        model = config.get("model")
+        speaker = config.get("speaker")
+        
+        if not model:
+            raise ValueError("Sarvam TTS requires 'model' in config")
+        if not speaker:
+            raise ValueError("Sarvam TTS requires 'speaker' in config")
+        
+        return cls(
+            model=model,
+            speaker=speaker,
+            language_code=language_code,
+            api_key=settings.SARVAM_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> sarvam.TTS:

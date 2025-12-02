@@ -1,5 +1,5 @@
 """Deepgram TTS provider implementation."""
-from typing import Optional
+from typing import Optional, Dict, Any
 from livekit.plugins import deepgram
 from deepgram import DeepgramClient
 from deepgram.core import ApiError as DeepgramApiError
@@ -88,6 +88,33 @@ class DeepgramTTSClient(BaseTTSClient):
         except Exception as e:
             logger.exception(f"Deepgram validation error: {e}")
             return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "DeepgramTTSClient":
+        """
+        Create Deepgram TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "nova-2"}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            DeepgramTTSClient instance
+        """
+        model = config.get("model")
+        if not model:
+            raise ValueError("Deepgram TTS requires 'model' in config")
+        
+        return cls(
+            model=model,
+            language_code=language_code,
+            api_key=settings.DEEPGRAM_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> deepgram.TTS:
