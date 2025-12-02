@@ -22,6 +22,7 @@ export {useNetworkConnectivity} from './useNetworkConnectivity';
 export {useKeyboardState} from './useKeyboardState';
 export {useSearch} from './useSearch';
 export {useSimulationCredits} from './useSimulationCredits';
+export {useStartSimulation} from './useStartSimulation';
 export {useSummaryState} from './useSummaryState';
 export {useTranslate} from './useTranslate';
 export {useUser} from './useUser';

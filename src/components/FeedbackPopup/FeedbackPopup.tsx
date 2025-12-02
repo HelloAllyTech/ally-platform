@@ -12,7 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChipGroup, PrimaryButton, StarRating} from '@/components';
 import {FEEDBACK_ISSUE_OPTIONS, isIOS, RATING_TEXT_MAP} from '@/constants';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, stroke, typography} from '@/theme';
 
 import type {FeedbackPopupProps} from './types';
 
@@ -91,7 +91,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
           value={suggestion}
           onChangeText={setSuggestion}
           placeholder={placeholder || t('FeedbackPopup.suggestionPlaceholder')}
-          placeholderTextColor={colors.lightGray3}
+          placeholderTextColor={colors.ds.typography.lowEmphasis}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -128,13 +128,16 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                   <Text style={styles.ratingText}>{getRatingText}</Text>
                 )}
                 {rating !== 5 && rating !== 0 && showChips && (
-                  <ChipGroup
-                    options={issueOptions}
-                    selectedValues={selectedIssues}
-                    onSelectionChange={handleIssueSelectionChange}
-                    title={t('FeedbackPopup.issueSelectionTitle')}
-                    testID={`${testID}-issue-chips`}
-                  />
+                  <>
+                    <ChipGroup
+                      options={issueOptions}
+                      selectedValues={selectedIssues}
+                      onSelectionChange={handleIssueSelectionChange}
+                      title={t('FeedbackPopup.issueSelectionTitle')}
+                      testID={`${testID}-issue-chips`}
+                    />
+                    <View style={styles.separator} />
+                  </>
                 )}
                 {(rating === 5 ||
                   !showChips ||
@@ -146,10 +149,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                     !placeholder && selectedIssues.length < 1,
                   )}
                 {note && note?.length > 0 && (
-                  <>
-                    <View style={styles.separator} />
-                    <Text style={styles.instructionText}>{note}</Text>
-                  </>
+                  <Text style={styles.instructionText}>{note}</Text>
                 )}
                 <PrimaryButton
                   label={t('FeedbackPopup.submitButton')}
@@ -178,7 +178,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
   },
   container: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.ds.neutral.white,
     borderRadius: '12@ms',
     borderBottomEndRadius: '0@ms',
     borderBottomLeftRadius: '0@ms',
@@ -188,8 +188,8 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
-    color: colors.black,
+    ...typography.body.large,
+    color: colors.ds.typography.highEmphasis,
     textAlign: 'center',
     marginBottom: '4@vs',
   },
@@ -213,10 +213,10 @@ const styles = ScaledSheet.create({
     width: '100%',
     minHeight: '80@vs',
     borderWidth: 0.5,
-    borderColor: colors.lightGray4,
+    borderColor: stroke.primary,
     borderRadius: '8@ms',
     padding: '12@ms',
-    backgroundColor: colors.white,
+    backgroundColor: colors.ds.neutral.white,
     ...typography.body.medium,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.black,
@@ -225,13 +225,13 @@ const styles = ScaledSheet.create({
   separator: {
     width: '100%',
     height: 1,
-    backgroundColor: colors.lightGray4,
+    backgroundColor: colors.ds.typography.lowEmphasis,
     marginBottom: '16@vs',
   },
   instructionText: {
-    fontSize: '14@ms',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkGray16,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
     textAlign: 'center',
     marginBottom: '24@vs',
     lineHeight: '18@vs',

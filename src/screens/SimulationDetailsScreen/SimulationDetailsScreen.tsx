@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -15,25 +15,19 @@ import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
 import {
   IllustratedModal,
   PrimaryButton,
-  useErrorToast,
   useToast,
+  VideoPreview,
 } from '@/components';
 import {env} from '@/config/env';
-import {
-  isIOS,
-  LOW_CREDITS_MODAL_DISPLAY_MS,
-  MICROPHONE_PERMISSION,
-  SCREEN_NAMES,
-} from '@/constants';
+import {isIOS, LOW_CREDITS_MODAL_DISPLAY_MS} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
-  usePermissionAlert,
   useSimulationCredits,
+  useStartSimulation,
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useStartScenarioSessionMutation} from '@/services';
 import {colors, fontFamily} from '@/theme';
 import {copyToClipboard} from '@/utils';
 
@@ -43,30 +37,22 @@ type Props = RootStackScreenProps<'SimulationDetails'>;
 
 export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const {scenario} = route.params;
+  const isFocused = useIsFocused();
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const {showErrorToast} = useErrorToast();
   const {showToast} = useToast();
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const {
+    isCreatingRoom,
+    showActiveSimulationModal,
+    activeSimulationId,
+    startSimulation,
+    closeActiveSimulationModal,
+  } = useStartSimulation();
+
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
-  const [startScenarioSession] = useStartScenarioSessionMutation();
-  const [showActiveSimulationModal, setShowActiveSimulationModal] =
-    useState(false);
-  const [activeSimulationId, setActiveSimulationId] = useState<string | null>(
-    null,
-  );
-
-  const [isMicPermissionGranted, setIsMicPermissionGranted] = useState(false);
-  const {showSettingsAlert} = usePermissionAlert();
-
-  useEffect(() => {
-    check(MICROPHONE_PERMISSION).then(status => {
-      setIsMicPermissionGranted(status === RESULTS.GRANTED);
-    });
-  }, []);
 
   useEffect(() => {
     if (getCreditsInfo?.isLow) {
@@ -87,59 +73,8 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     showToast(t('SimulationAssistant.linkCopiedToClipboard'), 'success');
   };
 
-  const startSimulationPress = async () => {
-    try {
-      // Ensure mic permission before creating/joining room
-      if (!isMicPermissionGranted) {
-        const result = await request(MICROPHONE_PERMISSION);
-        if (result === RESULTS.BLOCKED) {
-          showSettingsAlert(
-            'Common.permissions.microphoneRequired',
-            'Common.permissions.microphoneMessage',
-            {
-              cancelKey: 'Common.cancel',
-              settingsKey: 'Common.ok',
-              onCancel: undefined,
-              onOpenSettings: () => openSettings(),
-            },
-          );
-          return;
-        }
-        if (result !== RESULTS.GRANTED) {
-          showErrorToast(
-            new Error(t('Common.permissions.microphoneMessage')),
-            'Errors.permission',
-          );
-          return;
-        }
-      }
-
-      setIsCreatingRoom(true);
-      const startResp = await startScenarioSession({
-        scenarioId: Number(scenario.id),
-      }).unwrap();
-      if (startResp) {
-        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          roomData: {
-            id: startResp.scenarioSession.id,
-            createdAt: startResp.scenarioSession.createdAt,
-            accessToken: startResp.accessToken.token,
-            liveKitServerUrl: startResp.accessToken.serverUrl,
-          },
-          scenario,
-        });
-      }
-    } catch (error) {
-      const err = error as {data?: {entityId?: string}};
-      if (err.data?.entityId) {
-        setActiveSimulationId(err.data?.entityId || null);
-        setShowActiveSimulationModal(true);
-      } else {
-        showErrorToast(error, 'Errors.startSimulation');
-      }
-    } finally {
-      setIsCreatingRoom(false);
-    }
+  const startSimulationPress = () => {
+    startSimulation(scenario);
   };
 
   const renderLoadingOverlay = () => {
@@ -152,11 +87,24 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   const renderDetailsSection = () => {
+    const videoUrl = scenario.coverVideoUrl;
+    const imageUrl = scenario.coverImageUrl;
+
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {!!scenario.coverImageUrl && (
-          <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
+        {!!videoUrl && (
+          <VideoPreview
+            videoUrl={videoUrl}
+            autoPlay={false}
+            shouldPause={!isFocused}
+            testID="scenario-video-preview"
+          />
         )}
+
+        {!videoUrl && !!imageUrl && (
+          <Image source={{uri: imageUrl}} style={styles.cover} />
+        )}
+
         <View style={styles.row}>
           <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
           <TouchableOpacity onPress={linkCopyToClipboard}>
@@ -221,7 +169,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
       {showActiveSimulationModal && activeSimulationId && (
         <ActiveSimulationModal
           visible={showActiveSimulationModal}
-          onClose={() => setShowActiveSimulationModal(false)}
+          onClose={closeActiveSimulationModal}
           scenarioSessionId={activeSimulationId}
         />
       )}
@@ -246,7 +194,7 @@ const styles = ScaledSheet.create({
   },
   container: {
     paddingHorizontal: '16@ms',
-    paddingBottom: '16@ms',
+    paddingBottom: '90@ms',
   },
   cover: {
     width: '100%',

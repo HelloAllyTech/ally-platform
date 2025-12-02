@@ -12,8 +12,11 @@ export const getLogSourceLabelConfig = (
 ): SourceLabelConfig => {
   switch (provider) {
     case ChatProvider.AUDIO_UPLOAD:
-      return {label: 'CallLogs.uploaded', color: colors.azureBlue};
+      return {label: 'CallLogs.uploaded', color: colors.ds.blue[500]};
     default:
-      return {label: 'CallLogs.liveSession', color: colors.deepPurple};
+      return {
+        label: 'CallLogs.liveSession',
+        color: colors.ds.deepPurple[500],
+      };
   }
 };
