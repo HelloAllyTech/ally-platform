@@ -1,4 +1,5 @@
 import random
+import asyncio
 
 from datetime import datetime, timezone
 from livekit import agents, rtc
@@ -18,6 +19,7 @@ from app.tts import create_tts_client, Gender
 from app.stt import create_stt_client
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
+from app.utils.queue_utils import send_final_score_to_core
 
 logger = get_logger(__name__)
 setup_logging(settings.LIVEKIT_LOG_LEVEL, devmode=settings.LIVEKIT_LOG_DEV_MODE, console=settings.LIVEKIT_LOG_CONSOLE)
@@ -171,6 +173,26 @@ async def entrypoint(ctx: agents.JobContext):
     # Initialize state
     initialize_agent_state(ctx.room.name, scenario)
     joined_iso = datetime.now(timezone.utc).isoformat()
+
+    # Listen to connection state changes and push total score on disconnect
+    @ctx.room.on("connection_state_changed")
+    def on_connection_state_changed(state: rtc.ConnectionState):
+        logger.info(f"LiveKit Event: Connection state changed: {state}")
+        
+        # Send final score when connection state changes to DISCONNECTED
+        if state == rtc.ConnectionState.CONN_DISCONNECTED:
+            logger.info("Connection state is DISCONNECTED, sending final score to backend")
+            try:
+                asyncio.create_task(
+                    send_final_score_to_core(
+                        room_id=ctx.room.name,
+                        thread_id=ctx.room.name,
+                        message_type="connection_state_disconnected"
+                    )
+                )
+                logger.info("Initiated queue push for connection state change to DISCONNECTED")
+            except Exception as e:
+                logger.error(f"Failed to initiate queue push on connection state change: {e}")
 
     # Setup session
     vad = ctx.proc.userdata.get("vad")

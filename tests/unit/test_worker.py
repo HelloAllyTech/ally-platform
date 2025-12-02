@@ -54,6 +54,19 @@ class TestWorker:
         assert session.turn_detection == "vad"  # Worker now uses "vad" string
 
     # -------------------- entrypoint --------------------
+    class DummyRoom:
+        """Mock room object with event listener support"""
+        def __init__(self, name="room-xyz"):
+            self.name = name
+            self._event_handlers = {}
+        
+        def on(self, event_name):
+            """Decorator to register event handlers"""
+            def decorator(fn):
+                self._event_handlers[event_name] = fn
+                return fn
+            return decorator
+    
     class DummySession:
         def __init__(self):
             self.started = False
@@ -163,7 +176,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
 
@@ -234,7 +247,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
 
@@ -409,7 +422,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
 
@@ -473,7 +486,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
 
@@ -524,7 +537,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
 
@@ -596,7 +609,7 @@ class TestWorker:
         class Ctx:
             def __init__(self):
                 self.job = types.SimpleNamespace(metadata="{}")
-                self.room = types.SimpleNamespace(name="room-xyz")
+                self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
                 self.shutdown_called = False
