@@ -290,7 +290,10 @@ class TestWorker:
                 wait_called["called"] = True
 
         class MockSession:
-            def say(self, message):
+            async def interrupt(self):
+                pass
+            
+            def say(self, message, allow_interruptions=True):
                 say_called["message"] = message
                 return MockHandler()
 
@@ -306,7 +309,10 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_publish_termination_audio_handles_exception(self, monkeypatch):
         class MockSession:
-            def say(self, message):
+            async def interrupt(self):
+                pass
+            
+            def say(self, message, allow_interruptions=True):
                 raise RuntimeError("TTS synthesis failed")
 
         message = "Session ended"

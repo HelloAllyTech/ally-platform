@@ -68,7 +68,8 @@ async def publish_termination_audio(message: str, session: AgentSession) -> None
     try:
         logger.info(f"Publishing termination audio: '{message}'")
 
-        handler = session.say(message)
+        await session.interrupt()
+        handler = session.say(message, allow_interruptions=False)
         await handler.wait_for_playout()
 
         logger.info("Termination audio playback completed")
