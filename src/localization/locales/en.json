@@ -135,6 +135,12 @@
     "login": "Login",
     "email": "Email"
   },
+  "TermsAndAgreement": {
+    "title": "Terms and agreement",
+    "scrollToBottom": "Scroll to bottom",
+    "iHaveReadAndAgree": "I have read and agree to these terms",
+    "agree": "Agree"
+  },
   "Carousel": {
     "slide1": "We do not save audio recordings",
     "slide2": "We do not use your client’s data to train our models",

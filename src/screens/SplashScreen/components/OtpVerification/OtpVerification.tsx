@@ -1,16 +1,23 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, Text, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
-import {PrimaryButton} from '@/components';
+import {PrimaryButton, useToast} from '@/components';
+import {env} from '@/config/env';
 import {ErrorCode, isIOS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
-import {useGenerateOtpMutation, useVerifyOtpMutation} from '@/services';
+import {
+  useAcceptTermsAndAgreementMutation,
+  useGenerateOtpMutation,
+  useLazyCheckTermsAndAgreementQuery,
+  useVerifyOtpMutation,
+} from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
 import {getErrorDetails} from '@/utils';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
+import {TermsAndAgreementModal} from '../TermsAndAgreementModal';
 import {styles} from './styles';
 import type {OtpVerificationProps} from './types';
 
@@ -24,15 +31,30 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(10);
   const [isResendDisabled, setIsResendDisabled] = useState(true);
+
+  const tempTokensRef = useRef<{
+    accessToken: string;
+    refreshToken: string;
+  } | null>(null);
+
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const otpInputRef = useRef<OtpInputRef>(null);
   const dispatch = useAppDispatch();
   const navigation = useAppNavigation();
+  const {showToast} = useToast();
 
   const [
     verifyOtp,
     {isLoading: isVerifying, isSuccess, isError, error: apiError, data},
   ] = useVerifyOtpMutation();
   const [generateOtp, {isLoading: isResending}] = useGenerateOtpMutation();
+
+  const [checkTermsAndAgreement, {isFetching: isCheckingTerms}] =
+    useLazyCheckTermsAndAgreementQuery();
+
+  const [acceptTermsAndAgreement, {isLoading: isAcceptingTerms}] =
+    useAcceptTermsAndAgreementMutation();
+
   const {t} = useTranslate();
 
   const isOtpComplete = otpValue.every(v => v !== '');
@@ -47,19 +69,51 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  useEffect(() => {
-    if (isSuccess && data) {
-      // Store tokens securely
+  const completeVerification = useCallback(
+    (tokens: {accessToken: string; refreshToken: string}) => {
       dispatch(
         storeTokens({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
         }),
       );
       onOtpVerificationSuccess(otp);
+    },
+    [dispatch, onOtpVerificationSuccess, otp],
+  );
+
+  const checkTerms = useCallback(
+    async (tokens: {accessToken: string; refreshToken: string}) => {
+      try {
+        const response = await checkTermsAndAgreement(tokens.accessToken);
+        if (response.data?.success) {
+          completeVerification(tokens);
+        } else {
+          setShowTermsModal(true);
+        }
+      } catch (err) {
+        showToast('Failed to check terms acceptance', 'error');
+      }
+    },
+    [checkTermsAndAgreement, completeVerification, showToast],
+  );
+
+  useEffect(() => {
+    if (isSuccess && data) {
+      const newTokens = {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      };
+      // Store tokens in ref to be used later if needed (e.g., in handleAgreeTerms)
+      tempTokensRef.current = newTokens;
+      if (env.TERMS_AND_CONDITION_FLAG) {
+        checkTerms(newTokens);
+      } else {
+        completeVerification(newTokens);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess, data, otp]);
+  }, [isSuccess, data]);
 
   useEffect(() => {
     if (isError && apiError) {
@@ -101,9 +155,26 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
       resetOtpState();
       otpInputRef.current?.focusFirst();
     } catch (err) {
-      Alert.alert('Error', getErrorDetails(err).message);
+      showToast(getErrorDetails(err).message, 'error');
     }
-  }, [email, generateOtp, resetOtpState]);
+  }, [email, generateOtp, resetOtpState, showToast]);
+
+  const handleAcceptTerms = async () => {
+    const tokens = tempTokensRef.current;
+    if (!tokens) return;
+
+    try {
+      const response = await acceptTermsAndAgreement(tokens.accessToken);
+      if (response.data?.success) {
+        setShowTermsModal(false);
+        completeVerification(tokens);
+      } else {
+        showToast('Failed to accept terms', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to accept terms', 'error');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -160,8 +231,14 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
       <PrimaryButton
         label={t('SplashScreen.verifyOtp')}
         onPress={handleSubmit}
-        isDisabled={!isOtpComplete}
-        isLoading={isVerifying}
+        isDisabled={!isOtpComplete || showTermsModal}
+        isLoading={isVerifying || isCheckingTerms}
+      />
+
+      <TermsAndAgreementModal
+        visible={showTermsModal}
+        onAgree={handleAcceptTerms}
+        isLoading={isAcceptingTerms}
       />
     </View>
   );
