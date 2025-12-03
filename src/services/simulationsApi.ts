@@ -176,6 +176,7 @@ export const {
   useGetSimulationPathsQuery,
   useGetSimulationPathDetailsQuery,
   useCreatePathSessionMutation,
+  useGetUpcomingScenarioQuery,
   useLazyGetUpcomingScenarioQuery,
   useLazyGetScenarioSessionByPathItemQuery,
 } = simulationsApi;
