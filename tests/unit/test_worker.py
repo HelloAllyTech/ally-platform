@@ -414,6 +414,9 @@ class TestWorker:
             async def initialize(self):
                 registry_init_called["initialized"] = True
 
+            def is_termination_initiated(self):
+                return False
+
         monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
 
         dummy_session = self.DummySession()
@@ -531,6 +534,9 @@ class TestWorker:
             async def initialize(self):
                 pass
 
+            def is_termination_initiated(self):
+                return False
+
         monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
 
         publish_called = {}
@@ -574,3 +580,70 @@ class TestWorker:
 
         assert publish_called["message"] == "Goodbye"
         assert ctx.shutdown_called is True
+
+    @pytest.mark.asyncio
+    async def test_entrypoint_skips_opening_statement_when_termination_initiated(self, monkeypatch):
+        """Test that opening statement is skipped when termination is initiated during initialization."""
+        scenario = types.SimpleNamespace(
+            voice=None,
+            prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
+            events=[],
+            language_config=None,
+            trigger_events=None,
+            termination_event=None
+        )
+        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+        monkeypatch.setattr(worker, "parse_room_metadata", lambda md, embedding_client=None: rm_md_envelope)
+
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+        monkeypatch.setattr(worker, "create_stt_client", lambda stt_config=None, language_code=None: MockSTTClient())
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            return mock_client
+        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+
+        class MockEventRegistry:
+            def __init__(self, scenario, termination_callback, room, thread_id):
+                self.termination_callback = termination_callback
+                self.termination_message = None
+                self._termination_initiated = False
+
+            async def initialize(self):
+                # Simulate termination being initiated during initialization
+                self._termination_initiated = True
+
+            def is_termination_initiated(self):
+                return self._termination_initiated
+
+        monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
+
+        dummy_session = self.DummySession()
+        monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
+        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
+        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
+        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "create_conversation_handler", lambda *a, **k: (lambda e: None))
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
+        monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+
+        class Ctx:
+            def __init__(self):
+                self.job = types.SimpleNamespace(metadata="{}")
+                self.room = TestWorker.DummyRoom()
+                self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
+                self._shutdown_callbacks = []
+
+            async def connect(self):
+                return None
+
+            def add_shutdown_callback(self, callback):
+                self._shutdown_callbacks.append(callback)
+
+        ctx = Ctx()
+        await worker.entrypoint(ctx)
+
+        # Opening statement should NOT be said because termination was initiated
+        assert len(dummy_session.said) == 0

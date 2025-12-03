@@ -207,8 +207,6 @@ async def entrypoint(ctx: agents.JobContext):
     # Set the termination callback
     event_registry.termination_callback = handle_termination
 
-    await event_registry.initialize()
-
     async def on_shutdown():
         """Cleanup callback when session is shutting down."""
         logger.debug("Shutdown callback triggered")
@@ -246,8 +244,14 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
 
-    await session.say(random.choice(scenario.prompt_data.opening_statements))
     await ctx.connect()
+
+    # Initialise only after session is connected
+    await event_registry.initialize()
+    
+    # Only say opening statement if termination hasn't been initiated
+    if not event_registry.is_termination_initiated():
+        await session.say(random.choice(scenario.prompt_data.opening_statements))
 
 
 def prewarm(proc: JobProcess):

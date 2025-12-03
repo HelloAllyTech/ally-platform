@@ -482,6 +482,15 @@ class EventRegistry:
             trigger_multiple = event_type in (DetectionType.SENTENCE_SIMILARITY, DetectionType.SEMANTIC_SIMILARITY)
             self.event_registry[event_id] = {"happened": state, "trigger_multiple": trigger_multiple}
 
+    def is_termination_initiated(self) -> bool:
+        """
+        Check if termination has been initiated for this session.
+        
+        Returns:
+            True if termination has been initiated, False otherwise
+        """
+        return self._termination_initiated
+
     def get_newly_triggered_score_events(self, current_score: int) -> Set[str]:
         """
         Get the set of event IDs for score-based events that are newly triggered.
