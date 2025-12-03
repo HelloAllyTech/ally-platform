@@ -282,96 +282,38 @@ class TestWorker:
     # -------------------- publish_termination_audio --------------------
     @pytest.mark.asyncio
     async def test_publish_termination_audio_success(self, monkeypatch):
-        published_track = {}
-        captured_frames = []
+        say_called = {}
+        wait_called = {}
 
-        class MockAudioFrame:
-            def __init__(self):
-                self.sample_rate = 48000
-                self.num_channels = 1
-
-        class MockSynthesizedAudio:
-            def __init__(self, frame):
-                self.frame = frame
-
-        class MockAudioStream:
-            def __init__(self):
-                self.frames = [MockSynthesizedAudio(MockAudioFrame()) for _ in range(3)]
-                self.index = 0
-
-            def __aiter__(self):
-                return self
-
-            async def __anext__(self):
-                if self.index == 0:
-                    self.index += 1
-                    return self.frames[0]
-                elif self.index < len(self.frames):
-                    self.index += 1
-                    return self.frames[self.index - 1]
-                raise StopAsyncIteration
-
-        class MockTTS:
-            def synthesize(self, text):
-                return MockAudioStream()
-
-        class MockAudioSource:
-            def __init__(self, sample_rate, num_channels):
-                self.sample_rate = sample_rate
-                self.num_channels = num_channels
-
-            async def capture_frame(self, frame):
-                captured_frames.append(frame)
-
+        class MockHandler:
             async def wait_for_playout(self):
-                pass
+                wait_called["called"] = True
 
-        class MockLocalAudioTrack:
-            @staticmethod
-            def create_audio_track(name, source):
-                return types.SimpleNamespace(name=name, source=source)
+        class MockSession:
+            def say(self, message):
+                say_called["message"] = message
+                return MockHandler()
 
-        class MockPublication:
-            def __init__(self):
-                self.sid = "pub-123"
-
-        class MockLocalParticipant:
-            async def publish_track(self, track):
-                published_track["track"] = track
-                return MockPublication()
-
-        class MockRoom:
-            def __init__(self):
-                self.local_participant = MockLocalParticipant()
-
-        monkeypatch.setattr(worker.rtc, "AudioSource", MockAudioSource)
-        monkeypatch.setattr(worker.rtc, "LocalAudioTrack", MockLocalAudioTrack)
-
-        room = MockRoom()
-        tts_config = MockTTS()
         message = "Session ended"
+        session = MockSession()
 
-        await worker.publish_termination_audio(room, tts_config, message)
+        await worker.publish_termination_audio(message, session)
 
-        assert "track" in published_track
-        assert published_track["track"].name == "termination_audio"
-        assert len(captured_frames) == 3
+        assert "message" in say_called
+        assert say_called["message"] == "Session ended"
+        assert "called" in wait_called
 
     @pytest.mark.asyncio
     async def test_publish_termination_audio_handles_exception(self, monkeypatch):
-        class MockTTS:
-            def synthesize(self, text):
+        class MockSession:
+            def say(self, message):
                 raise RuntimeError("TTS synthesis failed")
 
-        class MockRoom:
-            pass
-
-        room = MockRoom()
-        tts_config = MockTTS()
         message = "Session ended"
+        session = MockSession()
 
         with pytest.raises(RuntimeError, match="TTS synthesis failed"):
-            await worker.publish_termination_audio(room, tts_config, message)
+            await worker.publish_termination_audio(message, session)
 
     # -------------------- entrypoint additional tests --------------------
     @pytest.mark.asyncio
@@ -592,8 +534,8 @@ class TestWorker:
         monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
 
         publish_called = {}
-        async def mock_publish(room, tts, msg):
-            publish_called["message"] = msg
+        async def mock_publish(message, session):
+            publish_called["message"] = message
 
         monkeypatch.setattr(worker, "publish_termination_audio", mock_publish)
 

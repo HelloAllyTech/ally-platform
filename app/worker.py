@@ -57,40 +57,20 @@ def create_agent_session(tts_config, vad, stt_config) -> AgentSession:
     )
 
 
-async def publish_termination_audio(room: rtc.Room, tts_config, message: str) -> None:
+async def publish_termination_audio(message: str, session: AgentSession) -> None:
     """
     Synthesize and publish termination message as audio.
 
     Args:
-        room: LiveKit room instance
-        tts_config: TTS configuration (Deepgram/ElevenLabs/Sarvam)
         message: Termination message to convert to audio
+        session: Agent session instance
     """
     try:
         logger.info(f"Publishing termination audio: '{message}'")
 
-        # Synthesize text to audio using TTS
-        audio_stream = tts_config.synthesize(message)
+        handler = session.say(message)
+        await handler.wait_for_playout()
 
-        # Get the first frame to determine audio properties
-        first_synthesized_audio = await audio_stream.__anext__()
-        first_frame = first_synthesized_audio.frame
-
-        # Create audio source with matching sample rate and channels
-        audio_source = rtc.AudioSource(first_frame.sample_rate, first_frame.num_channels)
-        track = rtc.LocalAudioTrack.create_audio_track("termination_audio", audio_source)
-
-        # Publish the audio track
-        publication = await room.local_participant.publish_track(track)
-        logger.info(f"Audio track published: {publication.sid}")
-
-        # Capture and stream all audio frames
-        await audio_source.capture_frame(first_frame)
-        async for synthesized_audio in audio_stream:
-            await audio_source.capture_frame(synthesized_audio.frame)
-
-        # Wait for audio playback to complete
-        await audio_source.wait_for_playout()
         logger.info("Termination audio playback completed")
 
     except Exception as e:
@@ -214,7 +194,7 @@ async def entrypoint(ctx: agents.JobContext):
             # Publish termination audio message - use custom message from registry
             termination_message = event_registry.termination_message or ""
             logger.info(f"Using termination message: {termination_message}")
-            await publish_termination_audio(ctx.room, tts_config, termination_message)
+            await publish_termination_audio(termination_message, session)
 
 
         except Exception as e:
