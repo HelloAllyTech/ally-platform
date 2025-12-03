@@ -186,8 +186,7 @@ async def entrypoint(ctx: agents.JobContext):
                 asyncio.create_task(
                     send_final_score_to_core(
                         room_id=ctx.room.name,
-                        thread_id=ctx.room.name,
-                        message_type="connection_state_disconnected"
+                        thread_id=ctx.room.name
                     )
                 )
                 logger.info("Initiated queue push for connection state change to DISCONNECTED")
