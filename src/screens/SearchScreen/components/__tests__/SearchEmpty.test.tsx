@@ -43,5 +43,3 @@ describe('SearchEmpty', () => {
     expect(onPressSuggestion).toHaveBeenCalledWith('alpha');
   });
 });
-
-
