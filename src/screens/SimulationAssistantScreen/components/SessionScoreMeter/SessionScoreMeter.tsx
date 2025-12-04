@@ -91,7 +91,7 @@ export const SessionScoreMeter: React.FC<SessionScoreMeterProps> = ({
       style={[styles.container, styleOverrides?.container]}
       accessibilityElementsHidden>
       <Text style={styles.label}>
-        {t('SimulationAssistant.practiceSessionScore')}
+        {t('SimulationAssistant.simulationScore')}
       </Text>
 
       <View
@@ -143,7 +143,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     position: 'relative',
-    height: '4@vs',
+    height: '3@vs',
   },
   segment: {
     flexGrow: 1,
