@@ -14,6 +14,7 @@ import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import SoundPlayer from 'react-native-sound-player';
 
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
@@ -168,6 +169,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
         await ensureSpeakerOutput();
+        SoundPlayer.playAsset(
+          require('../../assets/sounds/startSimulation.mp3'),
+        );
       } catch (error) {
         showErrorToast(error, 'Errors.attachListeners');
       }
@@ -258,6 +262,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
+      SoundPlayer.playAsset(require('../../assets/sounds/endSimulation.mp3'));
       await endScenarioSession({
         scenarioSessionId: sessionId,
       });
