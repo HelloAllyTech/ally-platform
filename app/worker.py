@@ -20,6 +20,9 @@ from app.stt import create_stt_client
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
 from app.utils.queue_utils import send_final_score_to_core
+from app.core.graph.utils import serialize_event
+from app.core.events.schemas import CoreEventMessageType
+from app.core.queue import msg_event_queue
 
 logger = get_logger(__name__)
 setup_logging(settings.LIVEKIT_LOG_LEVEL, devmode=settings.LIVEKIT_LOG_DEV_MODE, console=settings.LIVEKIT_LOG_CONSOLE)
@@ -211,6 +214,40 @@ async def entrypoint(ctx: agents.JobContext):
     async def on_shutdown():
         """Cleanup callback when session is shutting down."""
         logger.debug("Shutdown callback triggered")
+        
+        # Send deferred termination event to Core (if any).
+        # Termination events are sent here AFTER the agent has finished speaking the termination
+        # message, ensuring the backend doesn't close the room prematurely when it receives
+        # the event with autoTerminationStatus=true.
+        if event_registry.deferred_termination_event:
+            logger.info(f"Sending deferred termination event {event_registry.deferred_termination_event.event_id} to Core")
+            try:
+                event_dict = serialize_event(
+                    event_registry.deferred_termination_event,
+                    termination_event_id=event_registry.termination_event_id,
+                    termination_message=event_registry.termination_message
+                )
+                core_event_message = CoreEventMessageType.create(
+                    room_id=ctx.room.name, event_data=event_dict
+                )
+                await msg_event_queue.send_message(
+                    message_body=core_event_message.model_dump_json()
+                )
+                logger.info("Deferred termination event sent to Core successfully")
+            except Exception as e:
+                logger.error(f"Failed to send deferred termination event: {e}")
+        
+        logger.info("Shutdown initiated, sending final score to backend")
+        try:
+            asyncio.create_task(
+                send_final_score_to_core(
+                    room_id=ctx.room.name,
+                    thread_id=ctx.room.name
+                )
+            )
+            logger.info("Initiated queue push for shutdown")
+        except Exception as e:
+            logger.error(f"Failed to initiate queue push on shutdown: {e}")
 
     ctx.add_shutdown_callback(on_shutdown)
 

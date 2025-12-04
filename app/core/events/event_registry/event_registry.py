@@ -74,6 +74,10 @@ class EventRegistry:
         self.room = room
         self.thread_id = thread_id
         self.score_based_events = [event for event in self.events if event.detection_type == DetectionType.SCORE]
+        # Track deferred termination events that should be sent only after shutdown.
+        # This prevents the backend from closing the room before the agent finishes speaking
+        # the termination message. The event will be sent in the shutdown callback after audio playback.
+        self.deferred_termination_event: Optional[BaseEvent] = None
         self.setup_initial_state()
 
     def setup_initial_state(self) -> None:
@@ -394,8 +398,20 @@ class EventRegistry:
                     await send_event_to_ui(ui_message_type, room)
 
             # Send to Core: All events to send (both ACTIVE and PASSIVE)
-            logger.info(f"Sending {len(events_to_send)} events to core")
+            # EXCEPT termination events - they are deferred and sent in shutdown callback.
+            # This ensures the agent completes speaking the termination message before
+            # the backend receives autoTerminationStatus=true and closes the room.
+            events_to_send_to_core = []
             for event in events_to_send:
+                # Check if this is a termination event
+                if self.termination_event_id and event.event_id == self.termination_event_id:
+                    logger.info(f"Deferring termination event {event.event_id} - will be sent after shutdown")
+                    self.deferred_termination_event = event
+                    continue
+                events_to_send_to_core.append(event)
+            
+            logger.info(f"Sending {len(events_to_send_to_core)} events to core")
+            for event in events_to_send_to_core:
                 logger.debug(
                     f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})"
                 )
