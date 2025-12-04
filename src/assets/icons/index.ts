@@ -16,6 +16,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
+import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
@@ -98,7 +99,6 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
-import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
@@ -122,6 +122,7 @@ export {
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CheckIcon,
+  CheckWhiteIcon,
   ChevronDown,
   CloseCircle,
   CloseIcon,
@@ -204,7 +205,6 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
-  UserIcon,
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
