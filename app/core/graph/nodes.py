@@ -68,7 +68,6 @@ async def process_events(
             # Returns additional score from triggered score-based/time/combination events
             _, additional_score_from_triggered_events,branching_instruction = await event_registry.handle_events(
                 room=room,
-                current_score=new_current_score,
                 detected_event_ids=detected_event_ids if detected_event_ids else None,
             )
 

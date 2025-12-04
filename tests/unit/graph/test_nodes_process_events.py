@@ -1,5 +1,3 @@
-import asyncio
-from datetime import datetime, timezone
 from typing import List
 
 import pytest
@@ -8,7 +6,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 from app.core.graph.nodes import process_events
 from app.core.graph.state import SimulationState
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.graph.utils import convert_messages_to_chat_messages
 
 
 class DetectingEvent(BaseEvent):
@@ -67,8 +64,7 @@ class TestProcessEvents:
 
         # Mock EventRegistry
         class MockEventRegistry:
-            async def handle_events(self, room, current_score, detected_event_ids):
-                # Return (events_sent, additional_score, branching_instructions)
+            async def handle_events(self, room, detected_event_ids):
                 return [], 7, [("probe deeper", 3)]
 
         mock_room = object()
@@ -102,7 +98,7 @@ class TestProcessEvents:
         )
 
         class MockEventRegistry:
-            async def handle_events(self, room, current_score, detected_event_ids):
+            async def handle_events(self, room, detected_event_ids):
                 return [], 0, [("event instruction", 3)]
 
         config = {
@@ -205,7 +201,7 @@ class TestProcessEvents:
         )
 
         class MockEventRegistry:
-            async def handle_events(self, room, current_score, detected_event_ids):
+            async def handle_events(self, room, detected_event_ids):
                 return [], 5, []  # Empty branching instructions
 
         config = {

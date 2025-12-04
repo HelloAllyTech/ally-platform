@@ -438,11 +438,12 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+
+        registry.live_score = 10
+
         # Update with score that triggers the event
         await registry.handle_events(
             room=mock_room,
-            current_score=10,
             detected_event_ids=None
         )
         

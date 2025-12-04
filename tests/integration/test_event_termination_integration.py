@@ -173,21 +173,22 @@ class TestEventTerminationIntegration:
             termination_message="Maximum score reached. Session ending."
         )
         registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
-        
+
+        registry.live_score = 10
         # First update with greeting - should not terminate
         await registry.handle_events(
             detected_event_ids={"greeting"},
             room=mock_room,
-            current_score=10
         )
         
         termination_callback.assert_not_awaited()
-        
+
+        registry.live_score = 50
+
         # Update with high score - should trigger termination
         await registry.handle_events(
             detected_event_ids=None,
             room=mock_room,
-            current_score=50
         )
         
         # Verify termination was triggered by score event

@@ -37,8 +37,8 @@ def create_test_scenario(metadata):
 
 
 class TestEventRegistry:
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_initialize_creates_registry_for_all_events(self, mock_score, mock_room, thread_id):
+
+    def test_initialize_creates_registry_for_all_events(self, mock_room, thread_id):
         """Test that initialize creates entries for all events."""
         metadata = {
             "events": [
@@ -60,8 +60,8 @@ class TestEventRegistry:
         assert registry.event_registry["event-3"]["happened"] is False
         assert len(registry.expression_list) == 0  # No combination events
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_initialize_adds_combination_events_to_expression_list(self, mock_score, mock_room, thread_id):
+
+    def test_initialize_adds_combination_events_to_expression_list(self, mock_room, thread_id):
         """Test that combination events are added to expression_list."""
         metadata = {
             "events": [
@@ -87,8 +87,7 @@ class TestEventRegistry:
         assert registry.expression_list[0]["type"] == DetectionType.COMBINATION
         assert isinstance(registry.expression_list[0]["expression"], ExpressionNode)
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_update_sets_detected_events_to_true(self, mock_score, mock_room, thread_id):
+    def test_update_sets_detected_events_to_true(self, mock_room, thread_id):
         """Test that update() sets detected event states to True."""
         metadata = {
             "events": [
@@ -112,8 +111,7 @@ class TestEventRegistry:
         assert result["event-1"]["happened"] is True
         assert result["event-2"]["happened"] is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_identifier_returns_event_state(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_identifier_returns_event_state(self, mock_room, thread_id):
         """Test evaluating an IDENTIFIER expression."""
         metadata = {
             "events": [
@@ -134,8 +132,7 @@ class TestEventRegistry:
         registry.set_event_state("event-1", True)
         assert evaluate_expression(expr, registry.event_registry) is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_identifier_unknown_event_returns_false(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_identifier_unknown_event_returns_false(self, mock_room, thread_id):
         """Test that unknown event IDs return False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
@@ -144,8 +141,7 @@ class TestEventRegistry:
         expr = ExpressionNode(type=ExpressionType.IDENTIFIER, id="unknown-event")
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_not_negates_operand(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_not_negates_operand(self, mock_room, thread_id):
         """Test evaluating a NOT expression."""
         metadata = {
             "events": [
@@ -167,8 +163,7 @@ class TestEventRegistry:
         registry.set_event_state("event-1", True)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_and_requires_both_true(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_and_requires_both_true(self, mock_room, thread_id):
         """Test evaluating an AND expression."""
         metadata = {
             "events": [
@@ -197,8 +192,7 @@ class TestEventRegistry:
         registry.set_event_state("event-2", True)
         assert evaluate_expression(expr, registry.event_registry) is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_or_requires_at_least_one_true(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_or_requires_at_least_one_true(self, mock_room, thread_id):
         """Test evaluating an OR expression."""
         metadata = {
             "events": [
@@ -227,8 +221,7 @@ class TestEventRegistry:
         registry.set_event_state("event-2", True)
         assert evaluate_expression(expr, registry.event_registry) is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_nested_expression(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_nested_expression(self, mock_room, thread_id):
         """Test evaluating a nested expression: AND(NOT(A), OR(B, C))"""
         metadata = {
             "events": [
@@ -269,8 +262,7 @@ class TestEventRegistry:
         registry.set_event_state("event-a", True)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_update_evaluates_combination_expressions(self, mock_score, mock_room, thread_id):
+    def test_update_evaluates_combination_expressions(self, mock_room, thread_id):
         """Test that update() evaluates combination expressions and updates their states."""
         metadata = {
             "events": [
@@ -312,8 +304,7 @@ class TestEventRegistry:
         # Now True because both are True
         assert registry.get_event_state("combo-1") is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_get_event_state_returns_current_state(self, mock_score, mock_room, thread_id):
+    def test_get_event_state_returns_current_state(self, mock_room, thread_id):
         """Test get_event_state() method."""
         metadata = {
             "events": [
@@ -328,8 +319,7 @@ class TestEventRegistry:
         registry.set_event_state("event-1", True)
         assert registry.get_event_state("event-1") is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_set_event_state_updates_state(self, mock_score, mock_room, thread_id):
+    def test_set_event_state_updates_state(self, mock_room, thread_id):
         """Test set_event_state() method."""
         metadata = {
             "events": [
@@ -347,8 +337,8 @@ class TestEventRegistry:
         assert registry.event_registry["event-1"]["happened"] is False
 
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_invalid_identifier_returns_false(self, mock_score, mock_room, thread_id):
+
+    def test_evaluate_expression_invalid_identifier_returns_false(self, mock_room, thread_id):
         """Test that invalid identifier (no name) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
@@ -357,8 +347,7 @@ class TestEventRegistry:
         expr = ExpressionNode(type=ExpressionType.IDENTIFIER, id=None)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_invalid_not_returns_false(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_invalid_not_returns_false(self, mock_room, thread_id):
         """Test that invalid NOT (no operand) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
@@ -367,8 +356,7 @@ class TestEventRegistry:
         expr = ExpressionNode(type=ExpressionType.NOT, operand=None)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_invalid_and_returns_false(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_invalid_and_returns_false(self, mock_room, thread_id):
         """Test that invalid AND (missing operands) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
@@ -377,8 +365,7 @@ class TestEventRegistry:
         expr = ExpressionNode(type=ExpressionType.AND, left=None, right=None)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_evaluate_expression_invalid_or_returns_false(self, mock_score, mock_room, thread_id):
+    def test_evaluate_expression_invalid_or_returns_false(self, mock_room, thread_id):
         """Test that invalid OR (missing operands) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
@@ -387,8 +374,7 @@ class TestEventRegistry:
         expr = ExpressionNode(type=ExpressionType.OR, left=None, right=None)
         assert evaluate_expression(expr, registry.event_registry) is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_initialize_sets_trigger_multiple_correctly(self, mock_score, mock_room, thread_id):
+    def test_initialize_sets_trigger_multiple_correctly(self, mock_room, thread_id):
         """Test that trigger_multiple is set correctly for different event types."""
         metadata = {
             "events": [
@@ -415,8 +401,7 @@ class TestEventRegistry:
         assert registry.event_registry["score-1"]["trigger_multiple"] is False
         assert registry.event_registry["combo-1"]["trigger_multiple"] is False
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_trigger_events_filtering(self, mock_score, mock_room, thread_id):
+    def test_trigger_events_filtering(self, mock_room, thread_id):
         """Test that trigger_events list filters which events are sent."""
         metadata = {
             "events": [

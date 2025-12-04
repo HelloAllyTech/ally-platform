@@ -123,24 +123,14 @@ class TimeEventScheduler:
 
                     # Notify and capture branching instructions and additional score
                     try:
-                        # Get current score from graph state
-                        current_score = 0
-                        if agent_graph and thread_id:
-                            try:
-                                current_score = get_current_score_from_graph(thread_id)
-                            except Exception:
-                                logger.warning(f"Failed to get current score from graph for event {event_id}, using 0")
                         
-                        _, additional_score, branching_instructions = await event_notifier(room, current_score=current_score, detected_event_ids={event_id})
+                        _, additional_score, branching_instructions = await event_notifier(room, detected_event_ids={event_id})
                         # Update graph state if graph and thread_id are provided
                         if agent_graph and thread_id:
                             state_updates = {}
                             if branching_instructions:
                                 state_updates["branching_instructions"] = branching_instructions
                                 logger.info(f"Updating graph state with {len(branching_instructions)} branching instructions from LT/LTE time event {event_id}")
-                            if additional_score > 0:
-                                state_updates["additional_score"] = additional_score
-                                logger.info(f"Updating graph state with additional score {additional_score} from LT/LTE time event {event_id}")
                             if state_updates:
                                 agent_graph.update_state(
                                     {"configurable": {"thread_id": thread_id}},
@@ -224,7 +214,7 @@ class TimeEventScheduler:
                     except Exception:
                         logger.warning(f"Failed to get current score from graph for event {event_id}, using 0")
                 
-                _, additional_score, branching_instructions = await event_notifier(room, current_score=current_score, detected_event_ids={event_id})
+                _, additional_score, branching_instructions = await event_notifier(room, detected_event_ids={event_id})
                 # Update graph state if graph and thread_id are provided
                 if agent_graph and thread_id:
                     state_updates = {}
@@ -305,7 +295,7 @@ class TimeEventScheduler:
                     except Exception:
                         logger.warning(f"Failed to get current score from graph for event {event_id}, using 0")
                 
-                await event_notifier(room, current_score=current_score, detected_event_ids=None)
+                await event_notifier(room, detected_event_ids=None)
             except Exception:
                 logger.exception("Error while event_notifier during revoke for %s", event_id)
 

@@ -158,25 +158,6 @@ async def entrypoint(ctx: agents.JobContext):
     initialize_agent_state(ctx.room.name, scenario)
     joined_iso = datetime.now(timezone.utc).isoformat()
 
-    # Listen to connection state changes and push total score on disconnect
-    @ctx.room.on("connection_state_changed")
-    def on_connection_state_changed(state: rtc.ConnectionState):
-        logger.info(f"LiveKit Event: Connection state changed: {state}")
-        
-        # Send final score when connection state changes to DISCONNECTED
-        if state == rtc.ConnectionState.CONN_DISCONNECTED:
-            logger.info("Connection state is DISCONNECTED, sending final score to backend")
-            try:
-                asyncio.create_task(
-                    send_final_score_to_core(
-                        room_id=ctx.room.name,
-                        thread_id=ctx.room.name
-                    )
-                )
-                logger.info("Initiated queue push for connection state change to DISCONNECTED")
-            except Exception as e:
-                logger.error(f"Failed to initiate queue push on connection state change: {e}")
-
     # Setup session
     vad = ctx.proc.userdata.get("vad")
     session = create_agent_session(tts_config, vad, stt_config)
@@ -189,6 +170,26 @@ async def entrypoint(ctx: agents.JobContext):
         thread_id=ctx.room.name
     )
     logger.info(f"Initialized EventRegistry with {len(scenario.events)} events")
+
+    # Listen to connection state changes and push total score on disconnect
+    @ctx.room.on("connection_state_changed")
+    def on_connection_state_changed(state: rtc.ConnectionState):
+        logger.info(f"LiveKit Event: Connection state changed: {state}")
+        
+        # Send final score when connection state changes to DISCONNECTED
+        if state == rtc.ConnectionState.CONN_DISCONNECTED:
+            logger.info("Connection state is DISCONNECTED, sending final score to backend")
+            try:
+                asyncio.create_task(
+                    send_final_score_to_core(
+                        room_id=ctx.room.name,
+                        thread_id=ctx.room.name,
+                        event_registry=event_registry
+                    )
+                )
+                logger.info("Initiated queue push for connection state change to DISCONNECTED")
+            except Exception as e:
+                logger.error(f"Failed to initiate queue push on connection state change: {e}")
 
     async def handle_termination(event: BaseEvent):
         """Handle session termination when a termination event occurs."""

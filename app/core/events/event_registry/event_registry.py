@@ -2,6 +2,7 @@
 Expression registry for tracking event states and evaluating combination expressions.
 Includes built-in scheduling for time-based events (no external registry needed).
 """
+import asyncio
 import logging
 from typing import List, Dict, Set, Optional, Any, Tuple
 
@@ -19,7 +20,7 @@ from app.core.queue import msg_event_queue
 from app.core.graph.utils import serialize_event
 from app.utils.logger import get_logger
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
-from app.utils.event_utils import evaluate_condition, evaluate_expression, get_current_score_from_graph
+from app.utils.event_utils import evaluate_condition, evaluate_expression
 from app.core.graph import agent_graph
 
 
@@ -58,7 +59,6 @@ class EventRegistry:
         # Set of event IDs that should be sent to UI/Core (for O(1) lookup)
         self.trigger_events: Set[str] = set(scenario.trigger_events) if scenario.trigger_events else set()
         self.initial_time = 0.0
-        self.initial_score = get_current_score_from_graph(thread_id)
         self.termination_callback = termination_callback
         # Store termination event configuration from scenario
         self.termination_event_id: Optional[str] = None
@@ -78,6 +78,10 @@ class EventRegistry:
         # This prevents the backend from closing the room before the agent finishes speaking
         # the termination message. The event will be sent in the shutdown callback after audio playback.
         self.deferred_termination_event: Optional[BaseEvent] = None
+        # Track cumulative score of events sent to core
+        self.live_score = 0
+        # Lock for thread-safe live_score updates
+        self._live_score_lock = asyncio.Lock()
         self.setup_initial_state()
 
     def setup_initial_state(self) -> None:
@@ -106,8 +110,7 @@ class EventRegistry:
     async def initialize(self) -> None:
         # Send initial score-based events to UI and Core (example: score < 5)
         _, additional_score, branching_instructions = await self.handle_events(
-            room=self.room, 
-            current_score=self.initial_score, 
+            room=self.room,
             detected_event_ids=None
         )
 
@@ -160,7 +163,6 @@ class EventRegistry:
 
     def _evaluate_and_handle_cascade_score_events(
         self,
-        current_score: int,
         detected_event_ids: Set[str]
     ) -> Tuple[Set[str], int]:
         """
@@ -170,7 +172,6 @@ class EventRegistry:
         which may trigger other score-based events.
 
         Args:
-            current_score: The current cumulative score.
             detected_event_ids: Set of already detected event IDs (will be modified in place).
 
         Returns:
@@ -180,7 +181,7 @@ class EventRegistry:
         """
         additional_score_from_triggered_events = 0
         
-        working_score = current_score
+        working_score = self.live_score
         newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
 
         # Keep checking for newly triggered score-based events until no more are triggered
@@ -236,7 +237,6 @@ class EventRegistry:
 
     def _update_registry_and_collect_event_data(
         self,
-        current_score: int,
         detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], List[BaseEvent], int, List[Tuple[str, int]]]:
         """
@@ -251,7 +251,6 @@ class EventRegistry:
         5. Collecting branching instructions from triggered events
 
         Args:
-            current_score: Current cumulative score. Score-based events will be checked against this value.
             detected_event_ids: Optional set of event IDs that have been detected.
                               If None, will still evaluate combination expressions.
 
@@ -267,7 +266,6 @@ class EventRegistry:
 
         # Process score-based events and get additional score
         all_detected_event_ids, additional_score_from_triggered_events = self._evaluate_and_handle_cascade_score_events(
-            current_score=current_score,
             detected_event_ids=all_detected_event_ids
         )
 
@@ -409,7 +407,7 @@ class EventRegistry:
                     self.deferred_termination_event = event
                     continue
                 events_to_send_to_core.append(event)
-            
+
             logger.info(f"Sending {len(events_to_send_to_core)} events to core")
             for event in events_to_send_to_core:
                 logger.debug(
@@ -426,14 +424,32 @@ class EventRegistry:
                 await msg_event_queue.send_message(
                     message_body=core_event_message.model_dump_json()
                 )
-        
+
         # Handle termination events after sending events (even if room is None)
         await self._handle_termination_events(events_to_send)
+
+    async def _update_live_score(self, events_to_send: List[BaseEvent]) -> None:
+        """
+        Update live_score with scores from events that were sent to core.
+
+        This method should be called after events have been successfully sent to core.
+        Uses asyncio.Lock to prevent race conditions during concurrent event processing.
+
+        Args:
+            events_to_send: List of events that were sent to core
+        """
+        async with self._live_score_lock:
+            for event in events_to_send:
+                if event.score is not None:
+                    self.live_score += event.score
+                    logger.debug(f"Live score updated: +{event.score} = {self.live_score}")
+
+        if events_to_send:
+            logger.info(f"Current live score: {self.live_score}")
 
     async def handle_events(
         self,
         room: rtc.Room,
-        current_score: int = 0,
         detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], int, List[Tuple[str, int]]]:
         """
@@ -442,11 +458,11 @@ class EventRegistry:
         This function coordinates the complete event workflow by:
         1. Calling `_update_registry_and_collect_event_data` to update registry and gather event data
         2. Calling `_send_events_to_ui_and_core` to send events to external systems
-        3. Returning the collected data for use by the caller
+        3. Updating live_score with scores from events sent to core
+        4. Returning the collected data for use by the caller
 
         Args:
             room: LiveKit room instance for sending events
-            current_score: Current cumulative score to check score-based events
             detected_event_ids: Set of event IDs that have been detected
 
         Returns:
@@ -458,12 +474,14 @@ class EventRegistry:
         # Update registry and collect all data
         successful_events, events_to_send, additional_score, branching_instructions = \
             self._update_registry_and_collect_event_data(
-                current_score=current_score,
                 detected_event_ids=detected_event_ids
             )
 
         # Send events to UI and Core
         await self._send_events_to_ui_and_core(events_to_send, room)
+
+        # Update live_score with scores from events sent to core
+        await self._update_live_score(events_to_send)
 
         return successful_events, additional_score, branching_instructions
 

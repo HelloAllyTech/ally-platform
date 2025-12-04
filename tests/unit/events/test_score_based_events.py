@@ -36,8 +36,8 @@ def create_test_scenario_with_events(events):
 class TestScoreBasedEvents:
     """Test score-based event detection and triggering."""
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_score_event_gt_condition(self, mock_score, mock_room, thread_id):
+
+    def test_score_event_gt_condition(self, mock_room, thread_id):
         """Test that GT condition triggers when score exceeds threshold."""
         # Create a score event that triggers when score > 10
         score_event = ScoreEvent.create(
@@ -68,8 +68,8 @@ class TestScoreBasedEvents:
         triggered = registry.get_newly_triggered_score_events(15)
         assert len(triggered) == 0  # Already triggered, no new triggers
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_score_event_gte_condition(self, mock_score, mock_room, thread_id):
+
+    def test_score_event_gte_condition(self, mock_room, thread_id):
         """Test that GTE condition triggers when score >= threshold."""
         score_event = ScoreEvent.create(
             event_id="score-gte-20",
@@ -89,8 +89,8 @@ class TestScoreBasedEvents:
         assert len(triggered) == 1
         assert "score-gte-20" in triggered
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_score_event_lt_condition(self, mock_score, mock_room, thread_id):
+
+    def test_score_event_lt_condition(self, mock_room, thread_id):
         """Test that LT condition triggers when score < threshold."""
         score_event = ScoreEvent.create(
             event_id="score-lt-5",
@@ -116,8 +116,8 @@ class TestScoreBasedEvents:
         assert len(triggered) == 0
         assert registry.event_registry["score-lt-5"]["happened"] is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_score_event_eq_condition(self, mock_score, mock_room, thread_id):
+
+    def test_score_event_eq_condition(self, mock_room, thread_id):
         """Test that EQ condition triggers when score == threshold."""
         score_event = ScoreEvent.create(
             event_id="score-eq-50",
@@ -143,8 +143,8 @@ class TestScoreBasedEvents:
         # Event stays True once triggered (it happened at score 50)
         assert registry.event_registry["score-eq-50"]["happened"] is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_multiple_score_events(self, mock_score, mock_room, thread_id):
+
+    def test_multiple_score_events(self, mock_room, thread_id):
         """Test multiple score events with different conditions."""
         event1 = ScoreEvent.create(
             event_id="score-gt-10",
@@ -190,8 +190,8 @@ class TestScoreBasedEvents:
         assert registry.event_registry["score-gt-10"]["happened"] is True
         assert registry.event_registry["score-gte-20"]["happened"] is True
 
-    @patch('app.core.events.event_registry.event_registry.get_current_score_from_graph', return_value=0)
-    def test_cascading_score_events(self, mock_score, mock_room, thread_id):
+
+    def test_cascading_score_events(self, mock_room, thread_id):
         """Test that score events can trigger other score events (cascading)."""
         # Event 1: Triggers when score > 10, adds 15 points
         event1 = ScoreEvent.create(
