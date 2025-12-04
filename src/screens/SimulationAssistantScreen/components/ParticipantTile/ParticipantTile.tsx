@@ -61,7 +61,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
           />
         ) : (
           <View style={styles.placeholderContainer}>
-            <UserIcon width={80} height={80} />
+            <UserIcon />
           </View>
         )}
 
