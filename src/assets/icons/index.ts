@@ -60,6 +60,7 @@ import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicOffIcon from './micOff.svg';
+import MicOffWhiteIcon from './micOffWhite.svg';
 import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
@@ -163,6 +164,7 @@ export {
   LogoutIcon,
   MagnifyEyeIcon,
   MicIcon,
+  MicOffWhiteIcon,
   MicOffIcon,
   MicOnIcon,
   NetworkDisconnectedIcon,
