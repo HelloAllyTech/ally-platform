@@ -238,17 +238,7 @@ async def entrypoint(ctx: agents.JobContext):
             except Exception as e:
                 logger.error(f"Failed to send deferred termination event: {e}")
         
-        logger.info("Shutdown initiated, sending final score to backend")
-        try:
-            asyncio.create_task(
-                send_final_score_to_core(
-                    room_id=ctx.room.name,
-                    thread_id=ctx.room.name
-                )
-            )
-            logger.info("Initiated queue push for shutdown")
-        except Exception as e:
-            logger.error(f"Failed to initiate queue push on shutdown: {e}")
+        logger.info("Shutdown initiated")
 
     ctx.add_shutdown_callback(on_shutdown)
 
