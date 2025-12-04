@@ -51,8 +51,7 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
 const styles = ScaledSheet.create({
   timerContainer: {
     alignItems: 'center',
-    marginTop: '16@mvs',
-    marginBottom: '6@mvs',
+    marginVertical: '8@vs',
   },
   durationText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
