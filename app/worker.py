@@ -191,7 +191,7 @@ async def entrypoint(ctx: agents.JobContext):
             except Exception as e:
                 logger.error(f"Failed to initiate queue push on connection state change: {e}")
 
-    async def handle_termination(event: BaseEvent):
+    async def handle_termination_task(event: BaseEvent):
         """Handle session termination when a termination event occurs."""
         logger.info(f"Termination event '{event.event_id}' triggered. Initiating shutdown...")
 
@@ -208,6 +208,14 @@ async def entrypoint(ctx: agents.JobContext):
             # Shutdown the session
             ctx.shutdown("Session terminated")
             logger.info("Session shutdown completed")
+
+    # This function creates a background task to handle session termination.
+    # This is done to handle the case where termination event coming from langgraph flow terminates without publishing audio.
+    async def handle_termination(event: BaseEvent):
+        """Wrapper to execute termination as a background task."""
+        task = asyncio.create_task(handle_termination_task(event))
+        logger.info(f"Termination background task created for event '{event.event_id}'")
+        return task
 
     # Set the termination callback
     event_registry.termination_callback = handle_termination

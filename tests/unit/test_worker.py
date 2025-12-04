@@ -582,7 +582,10 @@ class TestWorker:
 
         # Test termination callback - get it from the registry instance after it's been set
         mock_event = types.SimpleNamespace(event_id="term-event")
-        await registry_instance["instance"].termination_callback(mock_event)
+        task = registry_instance["instance"].termination_callback(mock_event)
+        
+        # Wait for the background task to complete
+        await task
 
         assert publish_called["message"] == "Goodbye"
         assert ctx.shutdown_called is True
