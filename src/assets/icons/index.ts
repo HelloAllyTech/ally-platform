@@ -47,6 +47,7 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
+import InfoBlackCircleIcon from './infoBlackCircle.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
 import LearnInactiveIcon from './learn.svg';
@@ -96,6 +97,7 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
@@ -148,6 +150,7 @@ export {
   HeadsetMicIcon,
   HexagonCloseIcon,
   HourGlassIcon,
+  InfoBlackCircleIcon,
   InfoIcon,
   KeyConcernIcon,
   KeyEventsIcon,
@@ -199,6 +202,7 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
+  UserIcon,
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
