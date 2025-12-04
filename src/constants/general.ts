@@ -75,10 +75,10 @@ export const API_ROUTES = {
     GENERATE_OTP: '/auth/generate-otp',
     VERIFY_OTP: '/auth/verify-otp',
     PERMISSIONS: '/auth/permissions',
-    TERMS_AND_AGREEMENT: '/auth/terms-and-agreement',
   },
   USERS: {
     ME: '/users/me',
+    TERMS_AND_AGREEMENT: '/users/terms-and-agreement-status',
   },
   CHATS: {
     ROOT: '/chats',

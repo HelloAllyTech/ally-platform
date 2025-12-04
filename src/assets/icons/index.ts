@@ -16,6 +16,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
+import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
@@ -120,6 +121,7 @@ export {
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CheckIcon,
+  CheckWhiteIcon,
   ChevronDown,
   CloseCircle,
   CloseIcon,

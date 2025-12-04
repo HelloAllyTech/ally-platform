@@ -44,7 +44,7 @@ export const authApi = api.injectEndpoints({
       string | undefined
     >({
       query: token => ({
-        url: API_ROUTES.AUTH.TERMS_AND_AGREEMENT,
+        url: API_ROUTES.USERS.TERMS_AND_AGREEMENT,
         method: API_METHODS.GET,
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
       }),
@@ -54,7 +54,7 @@ export const authApi = api.injectEndpoints({
       string | undefined
     >({
       query: token => ({
-        url: API_ROUTES.AUTH.TERMS_AND_AGREEMENT,
+        url: API_ROUTES.USERS.TERMS_AND_AGREEMENT,
         method: API_METHODS.PUT,
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
       }),

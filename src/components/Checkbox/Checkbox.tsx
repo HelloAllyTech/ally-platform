@@ -1,8 +1,7 @@
 import React from 'react';
 import {TouchableOpacity, View, ViewStyle} from 'react-native';
 
-import {TickIcon} from '@/assets';
-import {colors} from '@/theme';
+import {CheckWhiteIcon} from '@/assets';
 
 import {styles} from './styles';
 
@@ -34,7 +33,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
           checked && styles.checkboxChecked,
           disabled && styles.checkboxDisabled,
         ]}>
-        {checked && <TickIcon width={12} height={12} color={colors.white} />}
+        {checked && <CheckWhiteIcon />}
       </View>
     </TouchableOpacity>
   );
