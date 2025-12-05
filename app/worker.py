@@ -170,14 +170,22 @@ async def entrypoint(ctx: agents.JobContext):
         thread_id=ctx.room.name
     )
     logger.info(f"Initialized EventRegistry with {len(scenario.events)} events")
+    
+    # Track if final score has been sent to prevent duplicates
+    final_score_sent = False
 
     # Listen to connection state changes and push total score on disconnect
     @ctx.room.on("connection_state_changed")
     def on_connection_state_changed(state: rtc.ConnectionState):
+        nonlocal final_score_sent
         logger.info(f"LiveKit Event: Connection state changed: {state}")
         
         # Send final score when connection state changes to DISCONNECTED
         if state == rtc.ConnectionState.CONN_DISCONNECTED:
+            if final_score_sent:
+                logger.info("Final score already sent, skipping duplicate send on disconnect")
+                return
+            
             logger.info("Connection state is DISCONNECTED, sending final score to backend")
             try:
                 asyncio.create_task(
@@ -187,12 +195,14 @@ async def entrypoint(ctx: agents.JobContext):
                         event_registry=event_registry
                     )
                 )
+                final_score_sent = True
                 logger.info("Initiated queue push for connection state change to DISCONNECTED")
             except Exception as e:
                 logger.error(f"Failed to initiate queue push on connection state change: {e}")
 
     async def handle_termination_task(event: BaseEvent):
         """Handle session termination when a termination event occurs."""
+        nonlocal final_score_sent
         logger.info(f"Termination event '{event.event_id}' triggered. Initiating shutdown...")
 
         try:
@@ -201,6 +211,18 @@ async def entrypoint(ctx: agents.JobContext):
             logger.info(f"Using termination message: {termination_message}")
             await publish_termination_audio(termination_message, session)
 
+            # Send final score to backend before shutting down (auto-termination)
+            if not final_score_sent:
+                logger.info("Auto-termination: Sending final score to backend")
+                await send_final_score_to_core(
+                    room_id=ctx.room.name,
+                    thread_id=ctx.room.name,
+                    event_registry=event_registry
+                )
+                final_score_sent = True
+                logger.info("Final score sent successfully during auto-termination")
+            else:
+                logger.info("Final score already sent, skipping duplicate send in auto-termination")
 
         except Exception as e:
             logger.exception(f"Error during termination cleanup: {e}")
