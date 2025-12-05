@@ -161,6 +161,24 @@ class EventRegistry:
         ]
         return happened_events
 
+    def _calculate_score_from_event_ids(self, event_ids: Set[str]) -> int:
+        """
+        Calculate the total score from a set of event IDs.
+
+        Args:
+            event_ids: Set of event IDs to calculate score for
+
+        Returns:
+            Total score from all events in the set
+        """
+        event_map = {event.event_id: event for event in self.events}
+        total_score = sum(
+            event_map[event_id].score
+            for event_id in event_ids
+            if event_id in event_map and event_map[event_id].score is not None
+        )
+        return total_score
+
     def _evaluate_and_handle_cascade_score_events(
         self,
         detected_event_ids: Set[str]
@@ -170,6 +188,12 @@ class EventRegistry:
 
         This method handles the cascading effect where score-based events can have their own scores
         which may trigger other score-based events.
+
+        The method ensures score-based events trigger in the same cycle as the events that bring
+        the score to the threshold by:
+        1. Starting with live_score + score from current cycle's detected events
+        2. Evaluating score-based events against this working score
+        3. Cascading through any score-based events that trigger other score-based events
 
         Args:
             detected_event_ids: Set of already detected event IDs (will be modified in place).
@@ -181,30 +205,35 @@ class EventRegistry:
         """
         additional_score_from_triggered_events = 0
         
-        working_score = self.live_score
+        # Calculate the score contribution from currently detected events (similarity, time, combination, etc.)
+        # This excludes score-based events which will be evaluated in the cascade loop
+        current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
+        
+        # Start with live_score + current cycle's event scores
+        # This ensures score-based events can trigger on the same cycle as the events that bring the score to threshold
+        working_score = self.live_score + current_cycle_score
+        
+        if current_cycle_score != 0:
+            logger.info(f"Current cycle adding {current_cycle_score} to live_score {self.live_score}. Working score: {working_score}")
+        
+        # Evaluate score-based events against the working score
         newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
 
         # Keep checking for newly triggered score-based events until no more are triggered
+        # This handles cascading: score-based events triggering other score-based events
         while newly_triggered_score_event_ids:
             logger.info(f"Score-based events triggered at score {working_score}: {newly_triggered_score_event_ids}")
             detected_event_ids.update(newly_triggered_score_event_ids)
 
             # Calculate additional score from newly triggered score-based events
-            event_map = {event.event_id: event for event in self.events}
-            additional_score = sum(
-                event_map[event_id].score
-                for event_id in newly_triggered_score_event_ids
-                if event_id in event_map and event_map[event_id].score
-            )
-
+            additional_score = self._calculate_score_from_event_ids(newly_triggered_score_event_ids)
 
             if additional_score != 0:
                 additional_score_from_triggered_events += additional_score
                 working_score += additional_score
-                logger.info(f"Score changed by {additional_score} from triggered events. New score: {working_score}")
+                logger.info(f"Score changed by {additional_score} from triggered score-based events. New working score: {working_score}")
                 
-            # Check again with the new score
-            # Always check again for new events at the current score (even if score didn't change)
+            # Check again with the new score to handle cascading
             # Loop will exit naturally when no more events trigger
             newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
             
