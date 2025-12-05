@@ -70,7 +70,7 @@ async def send_final_score_to_core(room_id: str, thread_id: str, event_registry=
         core_message = create_session_end_message(room_id, final_score)
 
         # Send to queue
-        logger.info(f"Sending end-of-session message with final score: {final_score} to backend")
+        logger.info(f"Sending end-of-session message {core_message} with final score {final_score} to backend")
         await send_message_to_queue(core_message.model_dump_json())
 
     except Exception as e:
