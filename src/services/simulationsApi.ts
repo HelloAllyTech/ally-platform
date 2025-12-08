@@ -31,6 +31,7 @@ export const simulationsApi = api.injectEndpoints({
         url: API_ROUTES.LEARN.SCENARIOS,
         method: API_METHODS.GET,
       }),
+      transformResponse: (response: {data: Scenario[]}) => response.data,
     }),
 
     getScenarioById: builder.query<Scenario, {id: string}>({
