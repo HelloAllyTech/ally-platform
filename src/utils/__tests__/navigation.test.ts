@@ -60,14 +60,14 @@ describe('navigation utils', () => {
                   expect.objectContaining({
                     name: SCREEN_NAMES.BOTTOM_TABS,
                     state: expect.objectContaining({
-                      index: 3, // Learn tab index
+                      index: 0, // Learn tab index
                       routes: expect.arrayContaining([
+                        expect.objectContaining({name: SCREEN_NAMES.LEARN}),
                         expect.objectContaining({name: SCREEN_NAMES.CALL_LOG}),
                         expect.objectContaining({
                           name: SCREEN_NAMES.USER_ANALYTICS,
                         }),
                         expect.objectContaining({name: SCREEN_NAMES.SEARCH}),
-                        expect.objectContaining({name: SCREEN_NAMES.LEARN}),
                         expect.objectContaining({name: SCREEN_NAMES.COMMUNITY}),
                       ]),
                     }),
@@ -159,7 +159,7 @@ describe('navigation utils', () => {
                   expect.objectContaining({
                     name: SCREEN_NAMES.BOTTOM_TABS,
                     state: expect.objectContaining({
-                      index: 2, // Search tab index
+                      index: 3, // Search tab index
                       routes: expect.arrayContaining([
                         expect.objectContaining({name: SCREEN_NAMES.CALL_LOG}),
                         expect.objectContaining({
@@ -194,7 +194,7 @@ describe('navigation utils', () => {
                   expect.objectContaining({
                     name: SCREEN_NAMES.BOTTOM_TABS,
                     state: expect.objectContaining({
-                      index: 1, // User Analytics tab index
+                      index: 2, // User Analytics tab index
                       routes: expect.arrayContaining([
                         expect.objectContaining({name: SCREEN_NAMES.CALL_LOG}),
                         expect.objectContaining({
