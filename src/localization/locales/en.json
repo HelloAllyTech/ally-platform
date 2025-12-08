@@ -328,7 +328,8 @@
     "progressCompleted": "{{current}} of {{total}} completed",
     "failedToLoadPathDetails": "Failed to load path details",
     "noActiveSimulation": "No active simulation found",
-    "sessionEndedSuccessfully": "Session ended successfully"
+    "sessionEndedSuccessfully": "Session ended successfully",
+    "triggerWarnings": "Trigger warnings"
   },
   "SimulationFeedback": {
     "title": "Simulation",
