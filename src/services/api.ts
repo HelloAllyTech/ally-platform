@@ -20,7 +20,11 @@ import {logger} from '@/utils/logger';
 
 import {AuthResponse} from './authApi';
 
-const V2_ENDPOINTS = [API_ROUTES.AUTH.GENERATE_OTP, API_ROUTES.AUTH.VERIFY_OTP];
+const V2_ENDPOINTS = [
+  API_ROUTES.AUTH.GENERATE_OTP,
+  API_ROUTES.AUTH.VERIFY_OTP,
+  API_ROUTES.LEARN.SCENARIOS,
+];
 
 const baseQuery: BaseQueryFn<
   string | FetchArgs,
@@ -35,7 +39,7 @@ const baseQuery: BaseQueryFn<
   } else {
     url = args.url;
     // Check if this endpoint should use v2
-    if (V2_ENDPOINTS.some(v2Endpoint => url.includes(v2Endpoint))) {
+    if (V2_ENDPOINTS.some(v2Endpoint => url === v2Endpoint)) {
       version = APIVersion.V2;
     }
   }
