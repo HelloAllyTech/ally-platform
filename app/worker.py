@@ -135,10 +135,10 @@ async def entrypoint(ctx: agents.JobContext):
                 "voice_provider": scenario.voice.config.voice_provider,
             }
         }
-    
+
     # Convert gender string to Gender enum
     gender_enum = Gender(scenario.prompt_data.gender.lower()) if scenario.prompt_data.gender else None
-    
+
     try:
         tts_client = create_tts_client(
             tts_config=tts_config_from_metadata,
@@ -170,7 +170,7 @@ async def entrypoint(ctx: agents.JobContext):
         thread_id=ctx.room.name
     )
     logger.info(f"Initialized EventRegistry with {len(scenario.events)} events")
-    
+
     # Track if final score has been sent to prevent duplicates
     final_score_sent = False
 
@@ -179,13 +179,13 @@ async def entrypoint(ctx: agents.JobContext):
     def on_connection_state_changed(state: rtc.ConnectionState):
         nonlocal final_score_sent
         logger.info(f"LiveKit Event: Connection state changed: {state}")
-        
+
         # Send final score when connection state changes to DISCONNECTED
         if state == rtc.ConnectionState.CONN_DISCONNECTED:
             if final_score_sent:
                 logger.info("Final score already sent, skipping duplicate send on disconnect")
                 return
-            
+
             logger.info("Connection state is DISCONNECTED, sending final score to backend")
             try:
                 asyncio.create_task(
@@ -202,7 +202,6 @@ async def entrypoint(ctx: agents.JobContext):
 
     async def handle_termination_task(event: BaseEvent):
         """Handle session termination when a termination event occurs."""
-        nonlocal final_score_sent
         logger.info(f"Termination event '{event.event_id}' triggered. Initiating shutdown...")
 
         try:
@@ -211,23 +210,10 @@ async def entrypoint(ctx: agents.JobContext):
             logger.info(f"Using termination message: {termination_message}")
             await publish_termination_audio(termination_message, session)
 
-            # Send final score to backend before shutting down (auto-termination)
-            if not final_score_sent:
-                logger.info("Auto-termination: Sending final score to backend")
-                await send_final_score_to_core(
-                    room_id=ctx.room.name,
-                    thread_id=ctx.room.name,
-                    event_registry=event_registry
-                )
-                final_score_sent = True
-                logger.info("Final score sent successfully during auto-termination")
-            else:
-                logger.info("Final score already sent, skipping duplicate send in auto-termination")
-
         except Exception as e:
-            logger.exception(f"Error during termination cleanup: {e}")
+            logger.exception(f"Error during termination audio playback: {e}")
         finally:
-            # Shutdown the session
+            # Shutdown the session - final score will be sent in on_shutdown
             ctx.shutdown("Session terminated")
             logger.info("Session shutdown completed")
 
@@ -244,14 +230,16 @@ async def entrypoint(ctx: agents.JobContext):
 
     async def on_shutdown():
         """Cleanup callback when session is shutting down."""
+        nonlocal final_score_sent
         logger.debug("Shutdown callback triggered")
-        
+
         # Send deferred termination event to Core (if any).
         # Termination events are sent here AFTER the agent has finished speaking the termination
         # message, ensuring the backend doesn't close the room prematurely when it receives
         # the event with autoTerminationStatus=true.
         if event_registry.deferred_termination_event:
-            logger.info(f"Sending deferred termination event {event_registry.deferred_termination_event.event_id} to Core")
+            logger.info(
+                f"Sending deferred termination event {event_registry.deferred_termination_event.event_id} to Core")
             try:
                 event_dict = serialize_event(
                     event_registry.deferred_termination_event,
@@ -267,7 +255,23 @@ async def entrypoint(ctx: agents.JobContext):
                 logger.info("Deferred termination event sent to Core successfully")
             except Exception as e:
                 logger.error(f"Failed to send deferred termination event: {e}")
-        
+
+        # Send final score after speaking and after pushing termination event
+        if not final_score_sent:
+            logger.info("Sending final score to backend in on_shutdown")
+            try:
+                await send_final_score_to_core(
+                    room_id=ctx.room.name,
+                    thread_id=ctx.room.name,
+                    event_registry=event_registry
+                )
+                final_score_sent = True
+                logger.info("Final score sent successfully in on_shutdown")
+            except Exception as e:
+                logger.error(f"Failed to send final score in on_shutdown: {e}")
+        else:
+            logger.info("Final score already sent, skipping duplicate send in on_shutdown")
+
         logger.info("Shutdown initiated")
 
     ctx.add_shutdown_callback(on_shutdown)
@@ -307,7 +311,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Initialise only after session is connected
     await event_registry.initialize()
-    
+
     # Only say opening statement if termination hasn't been initiated
     if not event_registry.is_termination_initiated():
         await session.say(random.choice(scenario.prompt_data.opening_statements))
