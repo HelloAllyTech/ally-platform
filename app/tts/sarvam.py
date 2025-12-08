@@ -1,12 +1,14 @@
 """Sarvam TTS provider implementation."""
-from typing import Optional
+import base64
+from typing import Optional, Dict, Any
 from livekit.plugins import sarvam
+from sarvamai import SarvamAI
+from sarvamai.core import ApiError as SarvamaiApiError
 from app.core.config import settings
 from app.core.scenario.base import VoiceConfig
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.tts.base import BaseTTSClient
 from app.utils.logger import get_logger
-from app.utils.tts_validator import validate_sarvam_voice
 
 logger = get_logger(__name__)
 
@@ -62,7 +64,7 @@ class SarvamTTSClient(BaseTTSClient):
         target_language = _convert_language_code(language_code)
         
         # Validate configuration
-        if not validate_sarvam_voice(model=model, speaker=speaker):
+        if not self.validate_voice(model=model, speaker=speaker, api_key=api_key):
             raise ValueError(f"Invalid Sarvam configuration: model={model}, speaker={speaker}")
         
         self._model = model
@@ -71,6 +73,86 @@ class SarvamTTSClient(BaseTTSClient):
         self._target_language = target_language
         self._api_key = api_key or settings.SARVAM_API_KEY
         self._tts_instance = None
+    
+    @staticmethod
+    def validate_voice(model: str, speaker: str, api_key: Optional[str] = None) -> bool:
+        """
+        Validate Sarvam TTS speaker by generating a short audio sample.
+        
+        Args:
+            model: Sarvam model name
+            speaker: Sarvam speaker name
+            api_key: Optional API key (defaults to settings.SARVAM_API_KEY)
+        
+        Returns:
+            True if validation succeeds, False otherwise
+        """
+        if not model or not speaker:
+            logger.error(f"Sarvam validation requires both 'model' and 'speaker' parameters. Got model='{model}', speaker='{speaker}'")
+            return False
+        
+        logger.info(f"Validating Sarvam voice model='{model}', speaker='{speaker}'")
+
+        try:
+            key = api_key or settings.SARVAM_API_KEY
+            client = SarvamAI(api_subscription_key=key)
+            response = client.text_to_speech.convert(
+                target_language_code="en-IN",
+                text="Hello from Sarvam AI!",
+                model=model,
+                speaker=speaker,
+            )
+
+            if not getattr(response, "audios", None):
+                logger.warning("Sarvam validation failed | No audio found in response")
+                return False
+
+            try:
+                base64.b64decode(response.audios[0])
+                logger.info("Sarvam TTS validation passed")
+                return True
+            except Exception:
+                logger.warning("Sarvam validation failed | Invalid audio data")
+                return False
+
+        except SarvamaiApiError as api_err:
+            logger.warning(f"Sarvam validation failed | API error: {api_err}")
+            return False
+        except Exception as e:
+            logger.exception(f"Sarvam TTS validation error: {e}")
+            return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "SarvamTTSClient":
+        """
+        Create Sarvam TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "bulbul:v2", "speaker": "anushka"}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            SarvamTTSClient instance
+        """
+        model = config.get("model")
+        speaker = config.get("speaker")
+        
+        if not model:
+            raise ValueError("Sarvam TTS requires 'model' in config")
+        if not speaker:
+            raise ValueError("Sarvam TTS requires 'speaker' in config")
+        
+        return cls(
+            model=model,
+            speaker=speaker,
+            language_code=language_code,
+            api_key=settings.SARVAM_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> sarvam.TTS:

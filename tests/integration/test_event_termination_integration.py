@@ -173,21 +173,22 @@ class TestEventTerminationIntegration:
             termination_message="Maximum score reached. Session ending."
         )
         registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
-        
+
+        registry.live_score = 10
         # First update with greeting - should not terminate
         await registry.handle_events(
             detected_event_ids={"greeting"},
             room=mock_room,
-            current_score=10
         )
         
         termination_callback.assert_not_awaited()
-        
+
+        registry.live_score = 50
+
         # Update with high score - should trigger termination
         await registry.handle_events(
             detected_event_ids=None,
             room=mock_room,
-            current_score=50
         )
         
         # Verify termination was triggered by score event
@@ -234,7 +235,7 @@ class TestEventTerminationIntegration:
 
     @pytest.mark.asyncio
     async def test_termination_does_not_prevent_event_sending(self):
-        """Test that termination callback is called AFTER events are sent to UI/Core."""
+        """Test that termination events are deferred and UI events are sent before termination callback."""
         metadata = {
             "events": [
                 {
@@ -285,13 +286,110 @@ class TestEventTerminationIntegration:
                     room=mock_room
                 )
         
-        # Verify events were sent before termination
+        # Verify UI event was sent and termination callback was called
         assert "send_to_ui" in call_order
-        assert "send_to_core" in call_order
         assert "termination" in call_order
+        
+        # Termination event should NOT be sent to Core immediately (it's deferred)
+        # It will be sent later in the shutdown callback
+        assert "send_to_core" not in call_order
         
         # Termination should be last
         assert call_order[-1] == "termination"
+        
+        # Verify the termination event was deferred
+        assert registry.deferred_termination_event is not None
+        assert registry.deferred_termination_event.event_id == "final-event"
+
+    @pytest.mark.asyncio
+    async def test_deferred_termination_event_sent_in_shutdown(self):
+        """Test that termination events are deferred and can be sent in shutdown callback."""
+        metadata = {
+            "events": [
+                {
+                    "id": "session-end",
+                    "sentences": ["goodbye"],
+                    "score": 0,
+                    "emoji": "👋",
+                    "message": "Session ending",
+                    "feedbackStatus": True
+                }
+            ],
+            "autoTerminationEvent": {
+                "id": "session-end",
+                "terminationMessage": "Goodbye! Session is ending."
+            }
+        }
+        
+        events = build_events_from_metadata(metadata)
+        termination_callback = AsyncMock()
+        
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+        
+        scenario = create_mock_scenario(
+            events,
+            trigger_events=["session-end"],
+            termination_event_id="session-end",
+            termination_message="Goodbye! Session is ending."
+        )
+        registry = EventRegistry(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=termination_callback
+        )
+        
+        # Initially, no deferred event
+        assert registry.deferred_termination_event is None
+        
+        # Trigger the termination event
+        with patch('app.core.events.event_registry.event_registry.msg_event_queue') as mock_queue:
+            mock_queue.send_message = AsyncMock()
+            
+            await registry.handle_events(
+                detected_event_ids={"session-end"},
+                room=mock_room
+            )
+            
+            # Verify termination event was NOT sent to Core immediately
+            mock_queue.send_message.assert_not_called()
+        
+        # Verify the event was deferred
+        assert registry.deferred_termination_event is not None
+        assert registry.deferred_termination_event.event_id == "session-end"
+        
+        # Verify termination callback was still called
+        termination_callback.assert_awaited_once()
+        
+        # Now simulate sending the deferred event in shutdown callback
+        from app.core.graph.utils import serialize_event
+        from app.core.events.schemas import CoreEventMessageType
+        
+        with patch('app.core.events.event_registry.event_registry.msg_event_queue') as mock_queue:
+            mock_queue.send_message = AsyncMock()
+            
+            # This is what happens in the shutdown callback
+            event_dict = serialize_event(
+                registry.deferred_termination_event,
+                termination_event_id=registry.termination_event_id,
+                termination_message=registry.termination_message
+            )
+            core_event_message = CoreEventMessageType.create(
+                room_id=mock_room.name, event_data=event_dict
+            )
+            await mock_queue.send_message(
+                message_body=core_event_message.model_dump_json()
+            )
+            
+            # Verify the event was sent with autoTerminationStatus=true
+            mock_queue.send_message.assert_awaited_once()
+            sent_message = mock_queue.send_message.call_args[1]["message_body"]
+            import json
+            sent_data = json.loads(sent_message)
+            # The structure is: data -> event -> event_data
+            assert sent_data["data"]["event"]["event_data"]["autoTerminationStatus"] is True
+            assert sent_data["data"]["event"]["event_data"]["id"] == "session-end"
 
     @pytest.mark.asyncio
     async def test_termination_event_respects_trigger_events_filter(self):

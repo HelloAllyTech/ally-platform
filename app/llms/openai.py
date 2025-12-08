@@ -1,7 +1,8 @@
 """OpenAI LLM provider implementation."""
-from typing import Optional
+from typing import Optional, Dict, Any
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
+from app.core.constants import DEFAULT_LLM_CONFIG
 from app.llms.base import BaseLLMClient
 from app.utils.logger import get_logger
 
@@ -59,6 +60,42 @@ class OpenAILLMClient(BaseLLMClient):
             model=self._model,
             temperature=self._temperature,
             api_key=self._api_key,
+        )
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "OpenAILLMClient":
+        """
+        Create OpenAI LLM client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "gpt-4o-mini", "temperature": 0.7}
+                Supports both nested (from "config" key) and flat structure for backward compatibility
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            OpenAILLMClient instance
+        """
+        # Extract model and temperature from config
+        # Support both nested config structure and flat structure (backward compatibility)
+        if "config" in config and isinstance(config["config"], dict):
+            config_dict = config["config"]
+        else:
+            # Backward compatibility: treat entire config as flat structure
+            config_dict = config
+        
+        model = config_dict.get("model", DEFAULT_LLM_CONFIG["model"])
+        temperature = config_dict.get("temperature")
+        
+        return cls(
+            model=model,
+            language_code=language_code,
+            temperature=temperature,
+            api_key=settings.OPENAI_API_KEY,
         )
     
     @property

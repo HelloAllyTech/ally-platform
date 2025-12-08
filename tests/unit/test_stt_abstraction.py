@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch
 from app.stt.deepgram import DeepgramSTTClient
 from app.stt.base import BaseSTTClient
 from app.stt.factory import create_stt_client
-from app.core.language.factory import resolve_config
 
 
 class TestDeepgramSTTClient:
@@ -105,139 +104,106 @@ class TestDeepgramSTTClient:
         assert DeepgramSTTClient.convert_language_code("hi-IN") == "hi"
         assert DeepgramSTTClient.convert_language_code("en-US") == "en"
         assert DeepgramSTTClient.convert_language_code("en") == "en"
-
-
-class TestResolveConfig:
-    """Test cases for resolve_config function."""
     
     @pytest.mark.unit
-    @patch('app.core.language.factory.get_capability_defaults')
-    def test_resolve_config_from_language_defaults(self, mock_get_defaults):
-        """Test resolve_config resolves config from unified registry."""
-        mock_get_defaults.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3"
+    @patch('livekit.plugins.deepgram.STT')
+    @patch('app.stt.deepgram.settings')
+    def test_deepgram_stt_client_from_config(self, mock_settings, mock_stt_class):
+        """Test DeepgramSTTClient.from_config method."""
+        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+        
+        config = {"model": "nova-2"}
+        client = DeepgramSTTClient.from_config(config=config, language_code="en-IN")
+        
+        assert isinstance(client, DeepgramSTTClient)
+        mock_stt_class.assert_called_once_with(
+            model="nova-2",
+            language="en",  # Converted from "en-IN"
+            api_key="test-api-key"
+        )
+        assert client.stt_instance == mock_stt_instance
+    
+    @pytest.mark.unit
+    @patch('livekit.plugins.deepgram.STT')
+    @patch('app.stt.deepgram.settings')
+    def test_deepgram_stt_client_from_config_nested(self, mock_settings, mock_stt_class):
+        """Test DeepgramSTTClient.from_config with nested config structure."""
+        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+        
+        # Simulate nested config structure (from factory)
+        config = {
+            "config": {
+                "model": "nova-2"
+            }
         }
+        client = DeepgramSTTClient.from_config(config=config, language_code="hi-IN")
         
-        config = resolve_config("stt", "en-IN")
-        
-        assert config["provider"] == "deepgram"
-        assert config["model"] == "nova-3"
-        assert config["language_code"] == "en-IN"  # BCP 47 - providers convert it
-        assert config["api_key"] is None
-    
-    @pytest.mark.unit
-    @patch('app.core.language.factory.get_capability_defaults')
-    def test_resolve_config_with_override(self, mock_get_defaults):
-        """Test resolve_config uses language registry defaults."""
-        mock_get_defaults.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3"
-        }
-        
-        config = resolve_config("stt", "en-IN")
-        
-        assert config["provider"] == "deepgram"
-        assert config["model"] == "nova-3"
-        assert config["api_key"] is None  # API keys come from settings, not registry
-        assert config["language_code"] == "en-IN"
-    
-    @pytest.mark.unit
-    @patch('app.core.language.factory.get_capability_defaults')
-    def test_resolve_config_fallback_to_default_language(self, mock_get_defaults):
-        """Test resolve_config falls back to default language when language not found."""
-        # First call returns empty (language not found)
-        # Second call returns default language config
-        mock_get_defaults.side_effect = [
-            {},  # Language not found
-            {"provider": "deepgram", "model": "nova-3"}  # Default language
-        ]
-        
-        config = resolve_config("stt", "unknown-language")
-        
-        assert config["provider"] == "deepgram"
-        assert config["model"] == "nova-3"
+        assert isinstance(client, DeepgramSTTClient)
+        mock_stt_class.assert_called_once_with(
+            model="nova-2",
+            language="hi",  # Converted from "hi-IN"
+            api_key="test-api-key"
+        )
 
 
 class TestSTTFactory:
     """Test cases for create_stt_client factory function."""
     
     @pytest.mark.unit
-    @patch('livekit.plugins.deepgram.STT')
-    @patch('app.stt.deepgram.settings')
-    @patch('app.stt.factory.resolve_config')
-    def test_create_stt_client_auto_selects_provider(
-        self, mock_resolve_config, mock_settings, mock_stt_class
-    ):
-        """Test that factory function uses resolve_config to resolve config."""
-        mock_settings.DEEPGRAM_API_KEY = "test-api-key"
-        mock_resolve_config.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3",
-            "language_code": "en-IN",
-            "api_key": None,
-        }
-        mock_stt_instance = Mock()
-        mock_stt_class.return_value = mock_stt_instance
-        
-        client = create_stt_client("en-IN")
-        
-        # Verify resolve_config was called without override
-        mock_resolve_config.assert_called_once_with("stt", "en-IN")
-        
-        # Verify DeepgramSTTClient was instantiated with BCP 47 code (provider converts it)
-        mock_stt_class.assert_called_once_with(
-            model="nova-3",
-            language="en",  # Provider converted "en-IN" to "en"
-            api_key="test-api-key"
-        )
-        assert client.stt_instance == mock_stt_instance
-        assert isinstance(client, DeepgramSTTClient)
-    
-    @pytest.mark.unit
     @patch('app.stt.factory.DeepgramSTTClient')
-    @patch('app.stt.factory.resolve_config')
-    def test_create_stt_client_uses_language_registry(
-        self, mock_resolve_config, mock_stt_client_class
-    ):
-        """Test factory function uses language registry defaults."""
-        mock_resolve_config.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3",
-            "language_code": "en-IN",
-            "api_key": None,
-        }
+    def test_create_stt_client_with_defaults(self, mock_stt_client_class):
+        """Test factory function uses defaults when no config provided."""
         mock_stt_instance = Mock()
         mock_client = Mock()
         mock_client.stt_instance = mock_stt_instance
-        mock_stt_client_class.return_value = mock_client
+        mock_stt_client_class.from_config.return_value = mock_client
         
-        client = create_stt_client("en-IN")
+        client = create_stt_client(language_code="en-IN")
         
-        # Verify resolve_config was called without override (uses language registry)
-        mock_resolve_config.assert_called_once_with("stt", "en-IN")
-        
-        # Verify DeepgramSTTClient was created with language registry values
-        mock_stt_client_class.assert_called_once_with(
-            model="nova-3",
+        # Verify DeepgramSTTClient was created with defaults using from_config
+        mock_stt_client_class.from_config.assert_called_once_with(
+            config={"model": "nova-3"},
             language_code="en-IN",
-            api_key=None,  # Will use settings.DEEPGRAM_API_KEY in actual client
         )
         assert client == mock_client
     
     @pytest.mark.unit
-    @patch('app.stt.factory.resolve_config')
-    def test_create_stt_client_unsupported_provider(self, mock_resolve_config):
+    @patch('app.stt.factory.DeepgramSTTClient')
+    def test_create_stt_client_with_metadata_config(self, mock_stt_client_class):
+        """Test factory function uses config from metadata."""
+        mock_stt_instance = Mock()
+        mock_client = Mock()
+        mock_client.stt_instance = mock_stt_instance
+        mock_stt_client_class.from_config.return_value = mock_client
+        
+        stt_config = {
+            "provider": "deepgram",
+            "config": {"model": "nova-2"}
+        }
+        client = create_stt_client(stt_config=stt_config, language_code="en-IN")
+        
+        # Verify DeepgramSTTClient was created with metadata config using from_config
+        mock_stt_client_class.from_config.assert_called_once_with(
+            config={"model": "nova-2"},
+            language_code="en-IN",
+        )
+        assert client == mock_client
+    
+    @pytest.mark.unit
+    @patch('app.stt.factory.DeepgramSTTClient')
+    def test_create_stt_client_unsupported_provider(self, mock_stt_client_class):
         """Test error handling for unsupported provider."""
-        mock_resolve_config.return_value = {
+        stt_config = {
             "provider": "unsupported",
-            "model": "test-model",
-            "language_code": "en-IN",
-            "api_key": None,
+            "config": {"model": "test-model"}
         }
         
         with pytest.raises(ValueError, match="Unsupported STT provider"):
-            create_stt_client("en-IN")
+            create_stt_client(stt_config=stt_config, language_code="en-IN")
 
 
 class TestSTTAbstractionIntegration:
@@ -246,20 +212,13 @@ class TestSTTAbstractionIntegration:
     @pytest.mark.integration
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    @patch('app.stt.factory.resolve_config')
-    def test_full_stt_creation_flow(self, mock_resolve_config, mock_settings, mock_stt_class):
+    def test_full_stt_creation_flow(self, mock_settings, mock_stt_class):
         """Test complete STT creation flow using factory."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
-        mock_resolve_config.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3",
-            "language_code": "en-IN",
-            "api_key": None,
-        }
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
-        stt_client = create_stt_client("en-IN")
+        stt_client = create_stt_client(language_code="en-IN")
         
         assert stt_client.stt_instance == mock_stt_instance
         mock_stt_class.assert_called_once_with(
@@ -271,21 +230,14 @@ class TestSTTAbstractionIntegration:
     @pytest.mark.integration
     @patch('livekit.plugins.deepgram.STT')
     @patch('app.stt.deepgram.settings')
-    @patch('app.stt.factory.resolve_config')
-    def test_stt_with_different_languages(self, mock_resolve_config, mock_settings, mock_stt_class):
+    def test_stt_with_different_languages(self, mock_settings, mock_stt_class):
         """Test STT creation with different language codes."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
         
         # Test en-IN
-        mock_resolve_config.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3",
-            "language_code": "en-IN",
-            "api_key": None,
-        }
-        stt1 = create_stt_client("en-IN")
+        stt1 = create_stt_client(language_code="en-IN")
         assert mock_stt_class.call_args[1]["model"] == "nova-3"
         assert mock_stt_class.call_args[1]["language"] == "en"  # Converted
         
@@ -294,12 +246,6 @@ class TestSTTAbstractionIntegration:
         mock_stt_class.return_value = mock_stt_instance
         
         # Test hi-IN
-        mock_resolve_config.return_value = {
-            "provider": "deepgram",
-            "model": "nova-3",
-            "language_code": "hi-IN",
-            "api_key": None,
-        }
-        stt2 = create_stt_client("hi-IN")
+        stt2 = create_stt_client(language_code="hi-IN")
         assert mock_stt_class.call_args[1]["model"] == "nova-3"
         assert mock_stt_class.call_args[1]["language"] == "hi"  # Converted

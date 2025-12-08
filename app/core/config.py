@@ -12,7 +12,10 @@ from app.core.constants import Environment
 class Settings(BaseSettings):
     """Application settings."""
 
-    model_config = SettingsConfigDict(env_file=[".env", "./.env", "../.env"])
+    model_config = SettingsConfigDict(
+        env_file=[".env", "./.env", "../.env"],
+        extra="ignore",  # Ignore unknown environment variables (e.g., double-underscore vars from S3)
+    )
 
     # Log settings
     ENV: Environment = Field(default=Environment.DEV, description="App environment")
@@ -55,6 +58,7 @@ class Settings(BaseSettings):
 
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
+    HUME_API_KEY: str = Field(...)
 
 
     LLM_TEMPERATURE: str = Field(...)

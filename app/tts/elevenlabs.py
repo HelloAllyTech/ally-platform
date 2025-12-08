@@ -1,11 +1,12 @@
 """ElevenLabs TTS provider implementation."""
-from typing import Optional
+from typing import Optional, Dict, Any
 from livekit.plugins import elevenlabs
+from elevenlabs import ElevenLabs
+from elevenlabs.core import ApiError as ElevenLabsApiError
 from app.core.config import settings
 from app.core.scenario.base import VoiceConfig
 from app.tts.base import BaseTTSClient
 from app.utils.logger import get_logger
-from app.utils.tts_validator import validate_elevenlabs_voice
 
 logger = get_logger(__name__)
 
@@ -37,7 +38,7 @@ class ElevenLabsTTSClient(BaseTTSClient):
             raise ValueError("ElevenLabs TTS requires 'model'")
         
         # Validate configuration
-        if not validate_elevenlabs_voice(voice_id=voice_id):
+        if not self.validate_voice(voice_id=voice_id, api_key=api_key):
             raise ValueError(f"Invalid ElevenLabs voice_id: {voice_id}")
         
         self._model = model
@@ -45,6 +46,75 @@ class ElevenLabsTTSClient(BaseTTSClient):
         self._language_code = language_code
         self._api_key = api_key or settings.ELEVEN_API_KEY
         self._tts_instance = None
+    
+    @staticmethod
+    def validate_voice(voice_id: str, api_key: Optional[str] = None) -> bool:
+        """
+        Validate an ElevenLabs voice by fetching metadata using the SDK.
+        
+        Args:
+            voice_id: ElevenLabs voice ID
+            api_key: Optional API key (defaults to settings.ELEVEN_API_KEY)
+        
+        Returns:
+            True if validation succeeds, False otherwise
+        """
+        if not voice_id:
+            logger.error("ElevenLabs validation requires 'voice_id' parameter")
+            return False
+        
+        logger.info(f"Validating ElevenLabs voice voice_id='{voice_id}'")
+
+        try:
+            key = api_key or settings.ELEVEN_API_KEY
+            client = ElevenLabs(api_key=key)
+            voice = client.voices.get(voice_id=voice_id)
+
+            if voice and getattr(voice, "voice_id", None) == voice_id:
+                logger.info("ElevenLabs voice validation successful")
+                return True
+
+            logger.warning(f"ElevenLabs validation failed | Unexpected response: {voice!r}")
+            return False
+
+        except ElevenLabsApiError as api_err:
+            logger.warning(f"ElevenLabs validation failed | API error: {api_err}")
+            return False
+        except Exception as e:
+            logger.exception(f"ElevenLabs validation error: {e}")
+            return False
+    
+    @classmethod
+    def from_config(
+        cls,
+        config: Dict[str, Any],
+        language_code: str,
+    ) -> "ElevenLabsTTSClient":
+        """
+        Create ElevenLabs TTS client from config dictionary.
+        
+        Args:
+            config: Config dict from metadata. Expected structure:
+                {"model": "eleven_turbo_v2_5", "voice_id": "..."}
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        
+        Returns:
+            ElevenLabsTTSClient instance
+        """
+        model = config.get("model")
+        voice_id = config.get("voice_id")
+        
+        if not model:
+            raise ValueError("ElevenLabs TTS requires 'model' in config")
+        if not voice_id:
+            raise ValueError("ElevenLabs TTS requires 'voice_id' in config")
+        
+        return cls(
+            model=model,
+            voice_id=voice_id,
+            language_code=language_code,
+            api_key=settings.ELEVEN_API_KEY,
+        )
     
     @property
     def tts_instance(self) -> elevenlabs.TTS:

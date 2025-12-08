@@ -29,7 +29,7 @@ class TestGenerateResponse:
     @pytest.mark.asyncio
     async def test_generate_response_builds_system_message_and_returns_ai_only(self, monkeypatch):
         # Monkeypatch create_llm_client to return FakeLLMClient
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="hello from llm")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -75,7 +75,11 @@ class TestGenerateResponse:
         })()
 
         # Add language_config to scenario
-        language_config = type("LanguageConfig", (), {"language_code": "en-IN"})()
+        language_config = type("LanguageConfig", (), {
+            "language_code": "en-IN",
+            "llm_config": None,
+            "stt_config": None
+        })()
         scenario = type("Scenario", (), {
             "prompt_data": prompt_data,
             "language_config": language_config
@@ -96,7 +100,7 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_selects_max_magnitude_branching_instruction(self, monkeypatch):
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -135,7 +139,11 @@ class TestGenerateResponse:
             "agent_goal": None,
         })()
 
-        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        language_config = type("LanguageConfig", (), {
+            "language_code": "en-US",
+            "llm_config": None,
+            "stt_config": None
+        })()
         scenario = type("Scenario", (), {
             "prompt_data": prompt_data,
             "language_config": language_config
@@ -149,7 +157,7 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_filters_empty_branching_instructions(self, monkeypatch):
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -188,7 +196,11 @@ class TestGenerateResponse:
             "agent_goal": None,
         })()
 
-        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        language_config = type("LanguageConfig", (), {
+            "language_code": "en-US",
+            "llm_config": None,
+            "stt_config": None
+        })()
         scenario = type("Scenario", (), {
             "prompt_data": prompt_data,
             "language_config": language_config
@@ -203,7 +215,7 @@ class TestGenerateResponse:
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):
         call_count = {"primary": 0, "fallback": 0}
 
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             if language_code == "unsupported-lang":
                 call_count["primary"] += 1
                 raise ValueError("Unsupported language")
@@ -243,7 +255,11 @@ class TestGenerateResponse:
             "agent_goal": None,
         })()
 
-        language_config = type("LanguageConfig", (), {"language_code": "unsupported-lang"})()
+        language_config = type("LanguageConfig", (), {
+            "language_code": "unsupported-lang",
+            "llm_config": None,
+            "stt_config": None
+        })()
         scenario = type("Scenario", (), {
             "prompt_data": prompt_data,
             "language_config": language_config
@@ -258,7 +274,7 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_without_scenario(self, monkeypatch):
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response without scenario")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -282,7 +298,7 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_language_config(self, monkeypatch):
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content=f"response in {language_code}")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -330,7 +346,7 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_preserves_state_fields(self, monkeypatch):
-        def fake_create_llm_client(language_code):
+        def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
         monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
@@ -371,7 +387,11 @@ class TestGenerateResponse:
             "agent_goal": None,
         })()
 
-        language_config = type("LanguageConfig", (), {"language_code": "en-US"})()
+        language_config = type("LanguageConfig", (), {
+            "language_code": "en-US",
+            "llm_config": None,
+            "stt_config": None
+        })()
         scenario = type("Scenario", (), {
             "prompt_data": prompt_data,
             "language_config": language_config

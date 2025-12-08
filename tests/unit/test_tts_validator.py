@@ -1,24 +1,23 @@
-"""Comprehensive tests for tts_validator module."""
+"""Comprehensive tests for TTS validator methods in provider classes."""
 import pytest
 import base64
 from unittest.mock import Mock, patch, MagicMock
 
-from app.utils.tts_validator import (
-    validate_deepgram_voice,
-    validate_sarvam_voice,
-    validate_elevenlabs_voice,
-    validate_google_voice,
-)
+from app.tts.deepgram import DeepgramTTSClient
+from app.tts.elevenlabs import ElevenLabsTTSClient
+from app.tts.sarvam import SarvamTTSClient
+from app.tts.google import GoogleTTSClient
+from app.tts.hume import HumeTTSClient
 from app.core.constants import TTSProvider
 from tests.utils.test_helpers import DataBuilder, AssertionHelpers
 
 
 class TestValidateDeepgramVoice:
-    """Test cases for validate_deepgram_voice function."""
+    """Test cases for DeepgramTTSClient.validate_voice method."""
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.DeepgramClient')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.deepgram.DeepgramClient')
+    @patch('app.tts.deepgram.settings')
     def test_validate_deepgram_voice_success(self, mock_settings, mock_client_class):
         """Test successful Deepgram voice validation."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
@@ -28,7 +27,7 @@ class TestValidateDeepgramVoice:
         mock_client.speak.v1.audio.generate.return_value = iter([b"audio_data"])
         mock_client_class.return_value = mock_client
         
-        result = validate_deepgram_voice(model="aura-asteria-en")
+        result = DeepgramTTSClient.validate_voice(model="aura-asteria-en")
         
         assert result is True
         mock_client_class.assert_called_once_with(api_key="test-api-key")
@@ -42,7 +41,7 @@ class TestValidateDeepgramVoice:
     @pytest.mark.unit
     def test_validate_deepgram_voice_no_model(self):
         """Test Deepgram validation with no model provided."""
-        result = validate_deepgram_voice()
+        result = DeepgramTTSClient.validate_voice(model="")
         
         assert result is False
     
@@ -53,24 +52,24 @@ class TestValidateDeepgramVoice:
         (None, False),
         ("", False),
     ])
-    @patch('app.utils.tts_validator.DeepgramClient')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.deepgram.DeepgramClient')
+    @patch('app.tts.deepgram.settings')
     def test_validate_deepgram_voice_model_variations(self, mock_settings, mock_client_class, model, expected):
         """Test Deepgram validation with various model inputs."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
         
-        if expected:
+        if expected and model:
             mock_client = Mock()
             mock_client.speak.v1.audio.generate.return_value = iter([b"audio_data"])
             mock_client_class.return_value = mock_client
         
-        result = validate_deepgram_voice(model=model)
+        result = DeepgramTTSClient.validate_voice(model=model)
         
         assert result is expected
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.DeepgramClient')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.deepgram.DeepgramClient')
+    @patch('app.tts.deepgram.settings')
     def test_validate_deepgram_voice_api_error(self, mock_settings, mock_client_class):
         """Test handling Deepgram API errors."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
@@ -79,13 +78,13 @@ class TestValidateDeepgramVoice:
         mock_client.speak.v1.audio.generate.side_effect = Exception("API Error")
         mock_client_class.return_value = mock_client
         
-        result = validate_deepgram_voice(model="aura-asteria-en")
+        result = DeepgramTTSClient.validate_voice(model="aura-asteria-en")
         
         assert result is False
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.DeepgramClient')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.deepgram.DeepgramClient')
+    @patch('app.tts.deepgram.settings')
     def test_validate_deepgram_voice_general_exception(self, mock_settings, mock_client_class):
         """Test handling general exceptions during Deepgram validation."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
@@ -93,17 +92,17 @@ class TestValidateDeepgramVoice:
         mock_client.speak.v1.audio.generate.side_effect = RuntimeError("Connection error")
         mock_client_class.return_value = mock_client
         
-        result = validate_deepgram_voice(model="aura-asteria-en")
+        result = DeepgramTTSClient.validate_voice(model="aura-asteria-en")
         
         assert result is False
 
 
 class TestValidateSarvamVoice:
-    """Test cases for validate_sarvam_voice function."""
+    """Test cases for SarvamTTSClient.validate_voice method."""
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.SarvamAI')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.sarvam.SarvamAI')
+    @patch('app.tts.sarvam.settings')
     def test_validate_sarvam_voice_success(self, mock_settings, mock_sarvam_class):
         """Test successful Sarvam voice validation."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
@@ -116,7 +115,7 @@ class TestValidateSarvamVoice:
         mock_sarvam.text_to_speech.convert.return_value = mock_response
         mock_sarvam_class.return_value = mock_sarvam
         
-        result = validate_sarvam_voice(model="multilingual", speaker="meera")
+        result = SarvamTTSClient.validate_voice(model="multilingual", speaker="meera")
         
         assert result is True
         mock_sarvam_class.assert_called_once_with(api_subscription_key="test-api-key")
@@ -139,7 +138,7 @@ class TestValidateSarvamVoice:
     ])
     def test_validate_sarvam_voice_parameter_variations(self, model, speaker, expected):
         """Test Sarvam validation with various parameter combinations."""
-        result = validate_sarvam_voice(model=model, speaker=speaker)
+        result = SarvamTTSClient.validate_voice(model=model, speaker=speaker)
         
         if not expected:
             assert result is False
@@ -149,8 +148,8 @@ class TestValidateSarvamVoice:
             pass
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.SarvamAI')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.sarvam.SarvamAI')
+    @patch('app.tts.sarvam.settings')
     def test_validate_sarvam_voice_invalid_base64(self, mock_settings, mock_sarvam_class):
         """Test handling invalid base64 audio response."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
@@ -163,13 +162,13 @@ class TestValidateSarvamVoice:
         mock_sarvam.text_to_speech.convert.return_value = mock_response
         mock_sarvam_class.return_value = mock_sarvam
         
-        result = validate_sarvam_voice(model="multilingual", speaker="meera")
+        result = SarvamTTSClient.validate_voice(model="multilingual", speaker="meera")
         
         assert result is False
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.SarvamAI')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.sarvam.SarvamAI')
+    @patch('app.tts.sarvam.settings')
     def test_validate_sarvam_voice_api_error(self, mock_settings, mock_sarvam_class):
         """Test handling Sarvam API errors."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
@@ -178,17 +177,17 @@ class TestValidateSarvamVoice:
         mock_sarvam.text_to_speech.convert.side_effect = Exception("API Error")
         mock_sarvam_class.return_value = mock_sarvam
         
-        result = validate_sarvam_voice(model="multilingual", speaker="meera")
+        result = SarvamTTSClient.validate_voice(model="multilingual", speaker="meera")
         
         assert result is False
 
 
 class TestValidateElevenLabsVoice:
-    """Test cases for validate_elevenlabs_voice function."""
+    """Test cases for ElevenLabsTTSClient.validate_voice method."""
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.ElevenLabs')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.elevenlabs.ElevenLabs')
+    @patch('app.tts.elevenlabs.settings')
     def test_validate_elevenlabs_voice_success(self, mock_settings, mock_eleven_class):
         """Test successful ElevenLabs voice validation."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
@@ -201,7 +200,7 @@ class TestValidateElevenLabsVoice:
         mock_eleven.voices.get.return_value = mock_voice
         mock_eleven_class.return_value = mock_eleven
         
-        result = validate_elevenlabs_voice(voice_id="test-voice-id")
+        result = ElevenLabsTTSClient.validate_voice(voice_id="test-voice-id")
         
         assert result is True
         mock_eleven_class.assert_called_once_with(api_key="test-api-key")
@@ -210,7 +209,7 @@ class TestValidateElevenLabsVoice:
     @pytest.mark.unit
     def test_validate_elevenlabs_voice_no_voice_id(self):
         """Test ElevenLabs validation with no voice_id provided."""
-        result = validate_elevenlabs_voice()
+        result = ElevenLabsTTSClient.validate_voice(voice_id="")
         
         assert result is False
     
@@ -221,8 +220,8 @@ class TestValidateElevenLabsVoice:
         (None, False),
         ("", False),
     ])
-    @patch('app.utils.tts_validator.ElevenLabs')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.elevenlabs.ElevenLabs')
+    @patch('app.tts.elevenlabs.settings')
     def test_validate_elevenlabs_voice_id_variations(self, mock_settings, mock_eleven_class, voice_id, expected):
         """Test ElevenLabs validation with various voice_id inputs."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
@@ -234,13 +233,13 @@ class TestValidateElevenLabsVoice:
             mock_eleven.voices.get.return_value = mock_voice
             mock_eleven_class.return_value = mock_eleven
         
-        result = validate_elevenlabs_voice(voice_id=voice_id)
+        result = ElevenLabsTTSClient.validate_voice(voice_id=voice_id)
         
         assert result is expected
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.ElevenLabs')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.elevenlabs.ElevenLabs')
+    @patch('app.tts.elevenlabs.settings')
     def test_validate_elevenlabs_voice_unexpected_response(self, mock_settings, mock_eleven_class):
         """Test handling unexpected voice_id in response."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
@@ -253,13 +252,13 @@ class TestValidateElevenLabsVoice:
         mock_eleven.voices.get.return_value = mock_voice
         mock_eleven_class.return_value = mock_eleven
         
-        result = validate_elevenlabs_voice(voice_id="requested-voice-id")
+        result = ElevenLabsTTSClient.validate_voice(voice_id="requested-voice-id")
         
         assert result is False
     
     @pytest.mark.unit
-    @patch('app.utils.tts_validator.ElevenLabs')
-    @patch('app.utils.tts_validator.settings')
+    @patch('app.tts.elevenlabs.ElevenLabs')
+    @patch('app.tts.elevenlabs.settings')
     def test_validate_elevenlabs_voice_api_error(self, mock_settings, mock_eleven_class):
         """Test handling ElevenLabs API errors."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
@@ -268,7 +267,7 @@ class TestValidateElevenLabsVoice:
         mock_eleven.voices.get.side_effect = Exception("Voice not found")
         mock_eleven_class.return_value = mock_eleven
         
-        result = validate_elevenlabs_voice(voice_id="test-voice-id")
+        result = ElevenLabsTTSClient.validate_voice(voice_id="test-voice-id")
         
         assert result is False
 
@@ -280,11 +279,11 @@ class TestTTSValidatorIntegration:
     def test_error_handling_chain(self):
         """Test error handling throughout the validation chain."""
         # Test with invalid parameters
-        result = validate_deepgram_voice(model=None)
+        result = DeepgramTTSClient.validate_voice(model=None)
         assert result is False
         
-        result = validate_sarvam_voice(model=None, speaker=None)
+        result = SarvamTTSClient.validate_voice(model=None, speaker=None)
         assert result is False
         
-        result = validate_elevenlabs_voice(voice_id=None)
+        result = ElevenLabsTTSClient.validate_voice(voice_id=None)
         assert result is False

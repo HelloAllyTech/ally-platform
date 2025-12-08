@@ -1,5 +1,19 @@
 from enum import Enum
-from typing import Final
+from typing import Final, Dict
+
+# Default language code when not specified
+DEFAULT_LANGUAGE_CODE: Final[str] = "en-IN"
+
+# Default capability configurations (fallback when not provided in metadata)
+DEFAULT_STT_CONFIG: Final[Dict[str, str]] = {
+    "provider": "deepgram",
+    "model": "nova-3"
+}
+
+DEFAULT_LLM_CONFIG: Final[Dict[str, str]] = {
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+}
 
 class Environment(str, Enum):
     DEV = "DEV"
@@ -11,6 +25,7 @@ class TTSProvider(str, Enum):
     DEEPGRAM = "deepgram"
     SARVAM = "sarvam"
     GOOGLE = "google"
+    HUME = "hume"
 
 class STTProvider(str, Enum):
     DEEPGRAM = "deepgram"

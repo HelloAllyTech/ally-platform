@@ -1,4 +1,5 @@
 import random
+import asyncio
 
 from datetime import datetime, timezone
 from livekit import agents, rtc
@@ -8,17 +9,20 @@ from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 
 from app.core.config import settings
-from app.core.constants import Environment
-from app.core.language import DEFAULT_LANGUAGE_CODE
+from app.core.constants import Environment, DEFAULT_LANGUAGE_CODE
 from app.core.graph import agent_graph
 from app.core.events.base import BaseEvent
 from app.core.events.event_registry.event_registry import EventRegistry
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.utils.logger import get_logger
-from app.tts import get_tts_for_scenario, get_default_tts_config
+from app.tts import create_tts_client, Gender
 from app.stt import create_stt_client
 from app.utils.metadata_parser import parse_room_metadata
 from app.utils.event_handler import create_conversation_handler
+from app.utils.queue_utils import send_final_score_to_core
+from app.core.graph.utils import serialize_event
+from app.core.events.schemas import CoreEventMessageType
+from app.core.queue import msg_event_queue
 
 logger = get_logger(__name__)
 setup_logging(settings.LIVEKIT_LOG_LEVEL, devmode=settings.LIVEKIT_LOG_DEV_MODE, console=settings.LIVEKIT_LOG_CONSOLE)
@@ -56,40 +60,21 @@ def create_agent_session(tts_config, vad, stt_config) -> AgentSession:
     )
 
 
-async def publish_termination_audio(room: rtc.Room, tts_config, message: str) -> None:
+async def publish_termination_audio(message: str, session: AgentSession) -> None:
     """
     Synthesize and publish termination message as audio.
 
     Args:
-        room: LiveKit room instance
-        tts_config: TTS configuration (Deepgram/ElevenLabs/Sarvam)
         message: Termination message to convert to audio
+        session: Agent session instance
     """
     try:
         logger.info(f"Publishing termination audio: '{message}'")
 
-        # Synthesize text to audio using TTS
-        audio_stream = tts_config.synthesize(message)
+        await session.interrupt()
+        handler = session.say(message, allow_interruptions=False)
+        await handler.wait_for_playout()
 
-        # Get the first frame to determine audio properties
-        first_synthesized_audio = await audio_stream.__anext__()
-        first_frame = first_synthesized_audio.frame
-
-        # Create audio source with matching sample rate and channels
-        audio_source = rtc.AudioSource(first_frame.sample_rate, first_frame.num_channels)
-        track = rtc.LocalAudioTrack.create_audio_track("termination_audio", audio_source)
-
-        # Publish the audio track
-        publication = await room.local_participant.publish_track(track)
-        logger.info(f"Audio track published: {publication.sid}")
-
-        # Capture and stream all audio frames
-        await audio_source.capture_frame(first_frame)
-        async for synthesized_audio in audio_stream:
-            await audio_source.capture_frame(synthesized_audio.frame)
-
-        # Wait for audio playback to complete
-        await audio_source.wait_for_playout()
         logger.info("Termination audio playback completed")
 
     except Exception as e:
@@ -113,27 +98,61 @@ async def entrypoint(ctx: agents.JobContext):
     scenario = rm_md_envelope.scenario
     logger.debug(f"Events in scenario: {str(scenario.events)}")
 
-    # Get language code from scenario
+    # Get language code and configs from scenario
     language_code = DEFAULT_LANGUAGE_CODE
+    stt_config_from_metadata = None
     if scenario.language_config:
         language_code = scenario.language_config.language_code
+        stt_config_from_metadata = scenario.language_config.stt_config
 
     # Configure STT
     try:
-        stt_client = create_stt_client(language_code)
+        stt_client = create_stt_client(
+            stt_config=stt_config_from_metadata,
+            language_code=language_code
+        )
         stt_config = stt_client.stt_instance
     except Exception as e:
         logger.warning(f"STT config failed, using default: {e}")
-        stt_client = create_stt_client(DEFAULT_LANGUAGE_CODE)
+        stt_client = create_stt_client(language_code=language_code)
         stt_config = stt_client.stt_instance
 
     # Configure TTS
+    # Convert scenario.voice to dict format for create_tts_client
+    tts_config_from_metadata = None
+    if scenario.voice:
+        tts_config_from_metadata = {
+            "provider": scenario.voice.provider,
+            "name": scenario.voice.name,
+            "config": {
+                "model": scenario.voice.config.model,
+                "voice_id": scenario.voice.config.voice_id,
+                "speaker": scenario.voice.config.speaker,
+                "voice_name": scenario.voice.config.voice_name,
+                "gender": scenario.voice.config.gender,
+                "voice_cloning_key": scenario.voice.config.voice_cloning_key,
+                "instant_mode": scenario.voice.config.instant_mode,
+                "voice_provider": scenario.voice.config.voice_provider,
+            }
+        }
+
+    # Convert gender string to Gender enum
+    gender_enum = Gender(scenario.prompt_data.gender.lower()) if scenario.prompt_data.gender else None
+
     try:
-        # Pass language_code if available from scenario's language_config
-        tts_config = get_tts_for_scenario(scenario.voice, scenario.prompt_data.gender, language_code=language_code)
+        tts_client = create_tts_client(
+            tts_config=tts_config_from_metadata,
+            language_code=language_code,
+            gender=gender_enum
+        )
+        tts_config = tts_client.tts_instance
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
-        tts_config = get_default_tts_config(scenario.prompt_data.gender)
+        if gender_enum:
+            tts_client = create_tts_client(language_code=language_code, gender=gender_enum)
+            tts_config = tts_client.tts_instance
+        else:
+            raise ValueError("Cannot create TTS: gender is required for fallback")
 
     # Initialize state
     initialize_agent_state(ctx.room.name, scenario)
@@ -152,7 +171,36 @@ async def entrypoint(ctx: agents.JobContext):
     )
     logger.info(f"Initialized EventRegistry with {len(scenario.events)} events")
 
-    async def handle_termination(event: BaseEvent):
+    # Track if final score has been sent to prevent duplicates
+    final_score_sent = False
+
+    # Listen to connection state changes and push total score on disconnect
+    @ctx.room.on("connection_state_changed")
+    def on_connection_state_changed(state: rtc.ConnectionState):
+        nonlocal final_score_sent
+        logger.info(f"LiveKit Event: Connection state changed: {state}")
+
+        # Send final score when connection state changes to DISCONNECTED
+        if state == rtc.ConnectionState.CONN_DISCONNECTED:
+            if final_score_sent:
+                logger.info("Final score already sent, skipping duplicate send on disconnect")
+                return
+
+            logger.info("Connection state is DISCONNECTED, sending final score to backend")
+            try:
+                asyncio.create_task(
+                    send_final_score_to_core(
+                        room_id=ctx.room.name,
+                        thread_id=ctx.room.name,
+                        event_registry=event_registry
+                    )
+                )
+                final_score_sent = True
+                logger.info("Initiated queue push for connection state change to DISCONNECTED")
+            except Exception as e:
+                logger.error(f"Failed to initiate queue push on connection state change: {e}")
+
+    async def handle_termination_task(event: BaseEvent):
         """Handle session termination when a termination event occurs."""
         logger.info(f"Termination event '{event.event_id}' triggered. Initiating shutdown...")
 
@@ -160,24 +208,71 @@ async def entrypoint(ctx: agents.JobContext):
             # Publish termination audio message - use custom message from registry
             termination_message = event_registry.termination_message or ""
             logger.info(f"Using termination message: {termination_message}")
-            await publish_termination_audio(ctx.room, tts_config, termination_message)
-
+            await publish_termination_audio(termination_message, session)
 
         except Exception as e:
-            logger.exception(f"Error during termination cleanup: {e}")
+            logger.exception(f"Error during termination audio playback: {e}")
         finally:
-            # Shutdown the session
+            # Shutdown the session - final score will be sent in on_shutdown
             ctx.shutdown("Session terminated")
             logger.info("Session shutdown completed")
+
+    # This function creates a background task to handle session termination.
+    # This is done to handle the case where termination event coming from langgraph flow terminates without publishing audio.
+    async def handle_termination(event: BaseEvent):
+        """Wrapper to execute termination as a background task."""
+        task = asyncio.create_task(handle_termination_task(event))
+        logger.info(f"Termination background task created for event '{event.event_id}'")
+        return task
 
     # Set the termination callback
     event_registry.termination_callback = handle_termination
 
-    await event_registry.initialize()
-
     async def on_shutdown():
         """Cleanup callback when session is shutting down."""
+        nonlocal final_score_sent
         logger.debug("Shutdown callback triggered")
+
+        # Send deferred termination event to Core (if any).
+        # Termination events are sent here AFTER the agent has finished speaking the termination
+        # message, ensuring the backend doesn't close the room prematurely when it receives
+        # the event with autoTerminationStatus=true.
+        if event_registry.deferred_termination_event:
+            logger.info(
+                f"Sending deferred termination event {event_registry.deferred_termination_event.event_id} to Core")
+            try:
+                event_dict = serialize_event(
+                    event_registry.deferred_termination_event,
+                    termination_event_id=event_registry.termination_event_id,
+                    termination_message=event_registry.termination_message
+                )
+                core_event_message = CoreEventMessageType.create(
+                    room_id=ctx.room.name, event_data=event_dict
+                )
+                await msg_event_queue.send_message(
+                    message_body=core_event_message.model_dump_json()
+                )
+                logger.info("Deferred termination event sent to Core successfully")
+            except Exception as e:
+                logger.error(f"Failed to send deferred termination event: {e}")
+
+        # Send final score after speaking and after pushing termination event
+        if not final_score_sent:
+            logger.info("Sending final score to backend in on_shutdown")
+            try:
+                await send_final_score_to_core(
+                    room_id=ctx.room.name,
+                    thread_id=ctx.room.name,
+                    event_registry=event_registry
+                )
+                final_score_sent = True
+                logger.info("Final score sent successfully in on_shutdown")
+            except Exception as e:
+                logger.error(f"Failed to send final score in on_shutdown: {e}")
+        else:
+            logger.info("Final score already sent, skipping duplicate send in on_shutdown")
+
+        logger.info("Shutdown initiated")
 
     ctx.add_shutdown_callback(on_shutdown)
 
@@ -212,8 +307,14 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
 
-    await session.say(random.choice(scenario.prompt_data.opening_statements))
     await ctx.connect()
+
+    # Initialise only after session is connected
+    await event_registry.initialize()
+
+    # Only say opening statement if termination hasn't been initiated
+    if not event_registry.is_termination_initiated():
+        await session.say(random.choice(scenario.prompt_data.opening_statements))
 
 
 def prewarm(proc: JobProcess):

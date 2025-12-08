@@ -2,6 +2,7 @@
 Expression registry for tracking event states and evaluating combination expressions.
 Includes built-in scheduling for time-based events (no external registry needed).
 """
+import asyncio
 import logging
 from typing import List, Dict, Set, Optional, Any, Tuple
 
@@ -19,7 +20,7 @@ from app.core.queue import msg_event_queue
 from app.core.graph.utils import serialize_event
 from app.utils.logger import get_logger
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
-from app.utils.event_utils import evaluate_condition, evaluate_expression, get_current_score_from_graph
+from app.utils.event_utils import evaluate_condition, evaluate_expression
 from app.core.graph import agent_graph
 
 
@@ -58,7 +59,6 @@ class EventRegistry:
         # Set of event IDs that should be sent to UI/Core (for O(1) lookup)
         self.trigger_events: Set[str] = set(scenario.trigger_events) if scenario.trigger_events else set()
         self.initial_time = 0.0
-        self.initial_score = get_current_score_from_graph(thread_id)
         self.termination_callback = termination_callback
         # Store termination event configuration from scenario
         self.termination_event_id: Optional[str] = None
@@ -74,6 +74,14 @@ class EventRegistry:
         self.room = room
         self.thread_id = thread_id
         self.score_based_events = [event for event in self.events if event.detection_type == DetectionType.SCORE]
+        # Track deferred termination events that should be sent only after shutdown.
+        # This prevents the backend from closing the room before the agent finishes speaking
+        # the termination message. The event will be sent in the shutdown callback after audio playback.
+        self.deferred_termination_event: Optional[BaseEvent] = None
+        # Track cumulative score of events sent to core
+        self.live_score = 0
+        # Lock for thread-safe live_score updates
+        self._live_score_lock = asyncio.Lock()
         self.setup_initial_state()
 
     def setup_initial_state(self) -> None:
@@ -101,7 +109,19 @@ class EventRegistry:
 
     async def initialize(self) -> None:
         # Send initial score-based events to UI and Core (example: score < 5)
-        await self.handle_events(room=self.room, current_score=self.initial_score, detected_event_ids=None)
+        _, additional_score, branching_instructions = await self.handle_events(
+            room=self.room,
+            detected_event_ids=None
+        )
+
+        # Update graph state with initial branching instructions if any were triggered
+        if agent_graph and self.thread_id and branching_instructions:
+            logger.info(f"Updating graph state with {len(branching_instructions)} initial branching instructions")
+            agent_graph.update_state(
+                {"configurable": {"thread_id": self.thread_id}},
+                values={"branching_instructions": branching_instructions},
+            )
+
         # Start timers for all TIME events
         await self._scheduler.start_time_event_schedulers(
             events=self.events,
@@ -141,9 +161,26 @@ class EventRegistry:
         ]
         return happened_events
 
+    def _calculate_score_from_event_ids(self, event_ids: Set[str]) -> int:
+        """
+        Calculate the total score from a set of event IDs.
+
+        Args:
+            event_ids: Set of event IDs to calculate score for
+
+        Returns:
+            Total score from all events in the set
+        """
+        event_map = {event.event_id: event for event in self.events}
+        total_score = sum(
+            event_map[event_id].score
+            for event_id in event_ids
+            if event_id in event_map and event_map[event_id].score is not None
+        )
+        return total_score
+
     def _evaluate_and_handle_cascade_score_events(
         self,
-        current_score: int,
         detected_event_ids: Set[str]
     ) -> Tuple[Set[str], int]:
         """
@@ -152,8 +189,13 @@ class EventRegistry:
         This method handles the cascading effect where score-based events can have their own scores
         which may trigger other score-based events.
 
+        The method ensures score-based events trigger in the same cycle as the events that bring
+        the score to the threshold by:
+        1. Starting with live_score + score from current cycle's detected events
+        2. Evaluating score-based events against this working score
+        3. Cascading through any score-based events that trigger other score-based events
+
         Args:
-            current_score: The current cumulative score.
             detected_event_ids: Set of already detected event IDs (will be modified in place).
 
         Returns:
@@ -163,30 +205,35 @@ class EventRegistry:
         """
         additional_score_from_triggered_events = 0
         
-        working_score = current_score
+        # Calculate the score contribution from currently detected events (similarity, time, combination, etc.)
+        # This excludes score-based events which will be evaluated in the cascade loop
+        current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
+        
+        # Start with live_score + current cycle's event scores
+        # This ensures score-based events can trigger on the same cycle as the events that bring the score to threshold
+        working_score = self.live_score + current_cycle_score
+        
+        if current_cycle_score != 0:
+            logger.info(f"Current cycle adding {current_cycle_score} to live_score {self.live_score}. Working score: {working_score}")
+        
+        # Evaluate score-based events against the working score
         newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
 
         # Keep checking for newly triggered score-based events until no more are triggered
+        # This handles cascading: score-based events triggering other score-based events
         while newly_triggered_score_event_ids:
             logger.info(f"Score-based events triggered at score {working_score}: {newly_triggered_score_event_ids}")
             detected_event_ids.update(newly_triggered_score_event_ids)
 
             # Calculate additional score from newly triggered score-based events
-            event_map = {event.event_id: event for event in self.events}
-            additional_score = sum(
-                event_map[event_id].score
-                for event_id in newly_triggered_score_event_ids
-                if event_id in event_map and event_map[event_id].score
-            )
-
+            additional_score = self._calculate_score_from_event_ids(newly_triggered_score_event_ids)
 
             if additional_score != 0:
                 additional_score_from_triggered_events += additional_score
                 working_score += additional_score
-                logger.info(f"Score changed by {additional_score} from triggered events. New score: {working_score}")
+                logger.info(f"Score changed by {additional_score} from triggered score-based events. New working score: {working_score}")
                 
-            # Check again with the new score
-            # Always check again for new events at the current score (even if score didn't change)
+            # Check again with the new score to handle cascading
             # Loop will exit naturally when no more events trigger
             newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
             
@@ -219,7 +266,6 @@ class EventRegistry:
 
     def _update_registry_and_collect_event_data(
         self,
-        current_score: int,
         detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], List[BaseEvent], int, List[Tuple[str, int]]]:
         """
@@ -234,7 +280,6 @@ class EventRegistry:
         5. Collecting branching instructions from triggered events
 
         Args:
-            current_score: Current cumulative score. Score-based events will be checked against this value.
             detected_event_ids: Optional set of event IDs that have been detected.
                               If None, will still evaluate combination expressions.
 
@@ -250,7 +295,6 @@ class EventRegistry:
 
         # Process score-based events and get additional score
         all_detected_event_ids, additional_score_from_triggered_events = self._evaluate_and_handle_cascade_score_events(
-            current_score=current_score,
             detected_event_ids=all_detected_event_ids
         )
 
@@ -381,8 +425,20 @@ class EventRegistry:
                     await send_event_to_ui(ui_message_type, room)
 
             # Send to Core: All events to send (both ACTIVE and PASSIVE)
-            logger.info(f"Sending {len(events_to_send)} events to core")
+            # EXCEPT termination events - they are deferred and sent in shutdown callback.
+            # This ensures the agent completes speaking the termination message before
+            # the backend receives autoTerminationStatus=true and closes the room.
+            events_to_send_to_core = []
             for event in events_to_send:
+                # Check if this is a termination event
+                if self.termination_event_id and event.event_id == self.termination_event_id:
+                    logger.info(f"Deferring termination event {event.event_id} - will be sent after shutdown")
+                    self.deferred_termination_event = event
+                    continue
+                events_to_send_to_core.append(event)
+
+            logger.info(f"Sending {len(events_to_send_to_core)} events to core")
+            for event in events_to_send_to_core:
                 logger.debug(
                     f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})"
                 )
@@ -397,14 +453,32 @@ class EventRegistry:
                 await msg_event_queue.send_message(
                     message_body=core_event_message.model_dump_json()
                 )
-        
+
         # Handle termination events after sending events (even if room is None)
         await self._handle_termination_events(events_to_send)
+
+    async def _update_live_score(self, events_to_send: List[BaseEvent]) -> None:
+        """
+        Update live_score with scores from events that were sent to core.
+
+        This method should be called after events have been successfully sent to core.
+        Uses asyncio.Lock to prevent race conditions during concurrent event processing.
+
+        Args:
+            events_to_send: List of events that were sent to core
+        """
+        async with self._live_score_lock:
+            for event in events_to_send:
+                if event.score is not None:
+                    self.live_score += event.score
+                    logger.debug(f"Live score updated: +{event.score} = {self.live_score}")
+
+        if events_to_send:
+            logger.info(f"Current live score: {self.live_score}")
 
     async def handle_events(
         self,
         room: rtc.Room,
-        current_score: int = 0,
         detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], int, List[Tuple[str, int]]]:
         """
@@ -413,11 +487,11 @@ class EventRegistry:
         This function coordinates the complete event workflow by:
         1. Calling `_update_registry_and_collect_event_data` to update registry and gather event data
         2. Calling `_send_events_to_ui_and_core` to send events to external systems
-        3. Returning the collected data for use by the caller
+        3. Updating live_score with scores from events sent to core
+        4. Returning the collected data for use by the caller
 
         Args:
             room: LiveKit room instance for sending events
-            current_score: Current cumulative score to check score-based events
             detected_event_ids: Set of event IDs that have been detected
 
         Returns:
@@ -429,12 +503,14 @@ class EventRegistry:
         # Update registry and collect all data
         successful_events, events_to_send, additional_score, branching_instructions = \
             self._update_registry_and_collect_event_data(
-                current_score=current_score,
                 detected_event_ids=detected_event_ids
             )
 
         # Send events to UI and Core
         await self._send_events_to_ui_and_core(events_to_send, room)
+
+        # Update live_score with scores from events sent to core
+        await self._update_live_score(events_to_send)
 
         return successful_events, additional_score, branching_instructions
 
@@ -468,6 +544,15 @@ class EventRegistry:
             # SENTENCE_SIMILARITY and SEMANTIC_SIMILARITY events can trigger multiple times
             trigger_multiple = event_type in (DetectionType.SENTENCE_SIMILARITY, DetectionType.SEMANTIC_SIMILARITY)
             self.event_registry[event_id] = {"happened": state, "trigger_multiple": trigger_multiple}
+
+    def is_termination_initiated(self) -> bool:
+        """
+        Check if termination has been initiated for this session.
+        
+        Returns:
+            True if termination has been initiated, False otherwise
+        """
+        return self._termination_initiated
 
     def get_newly_triggered_score_events(self, current_score: int) -> Set[str]:
         """
