@@ -14,6 +14,7 @@ interface CallLogHeaderProps {
   onRefresh?: () => void;
   isFetching?: boolean;
   showTitle?: boolean;
+  showHamburger?: boolean;
 }
 
 export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
@@ -22,6 +23,7 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   onRefresh,
   isFetching = false,
   showTitle = true,
+  showHamburger = false,
 }) => {
   const {t} = useTranslate();
   const drawerNavigation = useDrawerNavigation();
@@ -53,11 +55,13 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   return (
     <View style={styles.headerRow}>
       <View style={styles.leftGroup}>
-        <TouchableOpacity
-          style={styles.hamburgerButton}
-          onPress={handleOpenDrawer}>
-          <DrawerMenuIcon />
-        </TouchableOpacity>
+        {showHamburger && (
+          <TouchableOpacity
+            style={styles.hamburgerButton}
+            onPress={handleOpenDrawer}>
+            <DrawerMenuIcon />
+          </TouchableOpacity>
+        )}
         {showTitle && (
           <Text style={styles.headerTitle}>
             {t('CallLogs.header.title')}{' '}
