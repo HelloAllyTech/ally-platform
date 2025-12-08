@@ -16,6 +16,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
+import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
@@ -47,6 +48,7 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
+import InfoBlackCircleIcon from './infoBlackCircle.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
 import LearnInactiveIcon from './learn.svg';
@@ -119,6 +121,7 @@ export {
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CheckIcon,
+  CheckWhiteIcon,
   ChevronDown,
   CloseCircle,
   CloseIcon,
@@ -148,6 +151,7 @@ export {
   HeadsetMicIcon,
   HexagonCloseIcon,
   HourGlassIcon,
+  InfoBlackCircleIcon,
   InfoIcon,
   KeyConcernIcon,
   KeyEventsIcon,

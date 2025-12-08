@@ -39,6 +39,26 @@ export const authApi = api.injectEndpoints({
     getPermissions: builder.query<string[], void>({
       query: () => API_ROUTES.AUTH.PERMISSIONS,
     }),
+    checkTermsAndAgreement: builder.query<
+      {success: boolean},
+      string | undefined
+    >({
+      query: token => ({
+        url: API_ROUTES.USERS.TERMS_AND_AGREEMENT,
+        method: API_METHODS.GET,
+        headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+      }),
+    }),
+    acceptTermsAndAgreement: builder.mutation<
+      {success: boolean},
+      string | undefined
+    >({
+      query: token => ({
+        url: API_ROUTES.USERS.TERMS_AND_AGREEMENT,
+        method: API_METHODS.PUT,
+        headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+      }),
+    }),
   }),
 });
 
@@ -47,4 +67,6 @@ export const {
   useVerifyOtpMutation,
   useLazyGetUserQuery,
   useLazyGetPermissionsQuery,
+  useLazyCheckTermsAndAgreementQuery,
+  useAcceptTermsAndAgreementMutation,
 } = authApi;
