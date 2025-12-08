@@ -1,0 +1,148 @@
+import React from 'react';
+import {Linking} from 'react-native';
+import {fireEvent, render} from '@testing-library/react-native';
+
+import {TermsAndAgreementModal} from '../TermsAndAgreementModal';
+import {TermsAndAgreementData} from '@/constants';
+
+// Mock useTranslate
+jest.mock('@/hooks', () => ({
+  useTranslate: () => ({t: (key: string) => key}),
+}));
+
+// Mock Checkbox and PrimaryButton
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {TouchableOpacity, Text} = require('react-native');
+  return {
+    Checkbox: ({checked, onPress}: any) => (
+      <TouchableOpacity onPress={onPress} testID="mock-checkbox">
+        <Text>{checked ? 'Checked' : 'Unchecked'}</Text>
+      </TouchableOpacity>
+    ),
+    PrimaryButton: ({label, onPress, isDisabled, isLoading}: any) => (
+      <TouchableOpacity
+        onPress={onPress}
+        testID="mock-primary-button"
+        accessibilityState={{disabled: isDisabled || isLoading}}>
+        <Text>{label}</Text>
+      </TouchableOpacity>
+    ),
+  };
+});
+
+// Mock Linking
+jest.spyOn(Linking, 'openURL').mockImplementation(() => Promise.resolve(true));
+
+describe('TermsAndAgreementModal', () => {
+  const mockOnAgree = jest.fn();
+
+  beforeEach(() => {
+    mockOnAgree.mockClear();
+    jest.clearAllMocks();
+  });
+
+  it('renders correctly when visible', () => {
+    const {getByText, getByTestId} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    expect(getByText('TermsAndAgreement.title')).toBeTruthy();
+    expect(getByTestId('terms-scroll-view')).toBeTruthy();
+    expect(getByText('TermsAndAgreement.scrollToBottom')).toBeTruthy();
+  });
+
+  it('renders terms content', () => {
+    const {getByText} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    TermsAndAgreementData.forEach((item) => {
+      expect(getByText(item.heading)).toBeTruthy();
+    });
+  });
+
+  it('switches to agreement view when scroll to bottom is pressed', () => {
+    const {getByText, getByTestId, queryByText} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    fireEvent.press(getByTestId('scroll-to-bottom-button'));
+
+    expect(queryByText('TermsAndAgreement.scrollToBottom')).toBeNull();
+    expect(getByText('TermsAndAgreement.iHaveReadAndAgree')).toBeTruthy();
+    expect(getByTestId('mock-primary-button')).toBeTruthy();
+  });
+
+  it('enables agree button only when checked', () => {
+    const {getByTestId} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    // Scroll to bottom first
+    fireEvent.press(getByTestId('scroll-to-bottom-button'));
+
+    const checkbox = getByTestId('agree-checkbox-container');
+    const button = getByTestId('mock-primary-button');
+
+    // Initially unchecked and disabled
+    expect(button.props.accessibilityState.disabled).toBe(true);
+
+    // Check
+    fireEvent.press(checkbox);
+    expect(button.props.accessibilityState.disabled).toBeFalsy();
+
+    // Uncheck
+    fireEvent.press(checkbox);
+    expect(button.props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('calls onAgree when agree button is pressed', () => {
+    const {getByTestId} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    // Scroll to bottom
+    fireEvent.press(getByTestId('scroll-to-bottom-button'));
+
+    // Check
+    fireEvent.press(getByTestId('agree-checkbox-container'));
+
+    // Press Agree
+    fireEvent.press(getByTestId('mock-primary-button'));
+
+    expect(mockOnAgree).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens link when link text is pressed', () => {
+    const {getByText} = render(
+      <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+    );
+
+    const linkItem = TermsAndAgreementData.find(item => item.link);
+    if (linkItem && linkItem.link) {
+        const linkText = getByText(linkItem.link.text + '.'); // The component adds a dot
+        fireEvent.press(linkText);
+        expect(Linking.openURL).toHaveBeenCalledWith(linkItem.link.href);
+    }
+  });
+
+  it('handles scroll event to detect bottom', () => {
+    const {getByTestId, getByText} = render(
+        <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
+      );
+
+      const scrollView = getByTestId('terms-scroll-view');
+
+      // Simulate scrolling to bottom
+      fireEvent.scroll(scrollView, {
+        nativeEvent: {
+            contentOffset: { y: 100 },
+            layoutMeasurement: { height: 100 },
+            contentSize: { height: 200 },
+        },
+      });
+
+      expect(getByText('TermsAndAgreement.iHaveReadAndAgree')).toBeTruthy();
+  });
+});
