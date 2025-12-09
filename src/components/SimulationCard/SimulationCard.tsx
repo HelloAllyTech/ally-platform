@@ -69,7 +69,7 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
                 {description}
               </Text>
             )}
-            {triggerWarnings?.length && (
+            {!!triggerWarnings?.length && (
               <>
                 <View style={styles.separator} />
                 <View>

@@ -119,6 +119,7 @@ export const SimulationsScreen: React.FC = () => {
         description={item.description || ''}
         coverImageUrl={item.coverImageUrl}
         onPress={() => handleScenarioPress(item)}
+        triggerWarnings={item.triggerWarnings?.map(tw => tw.name)}
       />
     );
   };
