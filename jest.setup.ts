@@ -174,6 +174,8 @@ jest.mock('react-native-config', () => {
       THIRD_PARTY_CALL_NUMBER: '+1234567890',
       MICROPHONE_SOCKET_PATH: '/test/socket',
       CLOUD_TELEPHONY_PATH: '/test/telephony',
+      TERMS_AND_CONDITION_FLAG: 'false',
+      ENABLE_LEARN_AS_INITIAL_TAB: 'false',
     },
   };
 });

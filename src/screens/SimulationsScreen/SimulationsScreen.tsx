@@ -177,11 +177,13 @@ export const SimulationsScreen: React.FC = () => {
       <>
         <View style={styles.brandHeader}>
           <View style={styles.leftGroup}>
-            <TouchableOpacity
-              style={styles.hamburgerButton}
-              onPress={handleOpenDrawer}>
-              <DrawerMenuIcon />
-            </TouchableOpacity>
+            {isFirstTab && (
+              <TouchableOpacity
+                style={styles.hamburgerButton}
+                onPress={handleOpenDrawer}>
+                <DrawerMenuIcon />
+              </TouchableOpacity>
+            )}
             <Text style={styles.brandTitle}>
               {t('Simulations.header.title')}{' '}
               <Text style={styles.brandTitleItalic}>
