@@ -2,6 +2,13 @@ import {ScenarioStatus} from '@/constants';
 
 import {AudioTrackRef} from './audio';
 
+export interface TriggerWarning {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Scenario {
   id: number;
   title: string;
@@ -10,6 +17,7 @@ export interface Scenario {
   coverImageUrl?: string | null;
   coverVideoUrl?: string | null;
   status?: ScenarioStatus;
+  triggerWarnings?: TriggerWarning[];
 }
 
 export interface ScenariosResponse {
