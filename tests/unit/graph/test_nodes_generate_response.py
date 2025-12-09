@@ -72,6 +72,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         # Add language_config to scenario
@@ -137,6 +138,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         language_config = type("LanguageConfig", (), {
@@ -194,6 +196,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         language_config = type("LanguageConfig", (), {
@@ -253,6 +256,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         language_config = type("LanguageConfig", (), {
@@ -331,6 +335,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         # No language_config
@@ -385,6 +390,7 @@ class TestGenerateResponse:
             "tone": None,
             "opening_statements": ["Hi"],
             "agent_goal": None,
+            "custom_fields": None,
         })()
 
         language_config = type("LanguageConfig", (), {

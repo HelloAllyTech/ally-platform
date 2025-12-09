@@ -33,6 +33,7 @@ class VoicePromptData(BaseModel):
     tone : Optional[str] = Field(default=None)
     opening_statements : List[str] = Field(...)
     agent_goal : Optional[str] = Field(default=None)
+    custom_fields : Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Dynamic custom fields")
 
 
 class VoiceConfig(BaseModel):
@@ -209,6 +210,7 @@ class Scenario(BaseModel):
                 "tone": prompt_data_dict.get("tone",None),
                 "opening_statements": prompt_data_dict.get("openingStatements"),
                 "agent_goal": prompt_data_dict.get("agentGoal"),
+                "custom_fields": prompt_data_dict.get("customFields"),
             }
 
             prompt_data_obj = VoicePromptData(**mapped_data)
