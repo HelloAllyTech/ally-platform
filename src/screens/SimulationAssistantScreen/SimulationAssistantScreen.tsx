@@ -346,6 +346,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                                 <ScenarioInfoOverlay
                                   ref={scenarioInfoRef}
                                   title={scenario?.title}
+                                  triggerWarnings={scenario?.triggerWarnings?.map(
+                                    tw => tw.name,
+                                  )}
                                 />
                               ),
                               overlayRef:

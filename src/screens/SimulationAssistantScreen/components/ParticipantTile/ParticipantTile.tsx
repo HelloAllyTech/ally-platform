@@ -106,7 +106,7 @@ const styles = ScaledSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: '11@ms',
+    borderRadius: '12@ms',
   },
   placeholderContainer: {
     flex: 1,
