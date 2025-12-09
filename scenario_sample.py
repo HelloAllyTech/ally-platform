@@ -17,7 +17,7 @@ SCENARIO_SAMPLE = {
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
             "openingStatements": [
-              "Hi, I need some help."
+                "Hi, I need some help."
             ],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Session behavior guidelines of theAI client persona"
@@ -31,16 +31,48 @@ SCENARIO_SAMPLE = {
                 "emoji": ":confused:",
                 "message": "You wanted to encourage the client, instead try to validate their emotions so that they feel understood.",
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
-                "sentences":["Hi", "Hello"],
-                "feedbackStatus":"True"
-            }
+                "sentences": ["Hi", "Hello"],
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "open-ended-question",
+                "name": "Open Ended Question",
+                "description": "Triggers when open ended question is detected",
+                "score": 8,
+                "emoji": "🎯",
+                "message": "Open ended question detected",
+                "branchInstruction": "Open up more",
+                "visibilityType": "ACTIVE",
+                "detectionType": "BINARY_CLASSIFIER",
+                "feedbackStatus": True,
+                "data": {
+                    "className": "Open-Ended Question",
+                    "positiveExamples": [
+                        {
+                            "text": "How are you feeling today?"
+                        },
+                        {
+                            "text": "How are you doing?"
+                        }
+                    ],
+                    "negativeExamples": [
+                        {
+                            "text": "Are you okay?"
+                        },
+                        {
+                            "text": "Are you doing well?"
+                        }
+                    ]
+                },
+            },
         ],
+        "triggerEvents": ["open-ended-question", "superficial-hope"],
         "voice": {
             "name": "priya-adult-female",
             "provider": "sarvam",
             "config": {
-                "model":"bulbul:v2",
-                "speaker":"anushka",
+                "model": "bulbul:v2",
+                "speaker": "anushka",
             }
         },
         "metadata": {}
@@ -87,7 +119,7 @@ SCENARIO_SAMPLE_HINDI = {
             "genderIdentity": "महिला/स्त्री",
             "currentLocation": "कोलकाता, भारत",
             "openingStatements": [
-              "नमस्ते, मुझे कुछ मदद चाहिए।"
+                "नमस्ते, मुझे कुछ मदद चाहिए।"
             ],
             "sexualOrientation": "विषमलैंगिक (सीधा)",
             "sessionBehaviorGuidelines": "एआई क्लाइंट व्यक्तित्व के सत्र व्यवहार दिशानिर्देश"

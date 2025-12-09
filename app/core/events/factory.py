@@ -1,12 +1,14 @@
 from typing import List, Literal, Mapping, Any, Optional, Dict
 
-from app.core.constants import VisibilityType, DetectionType, ConditionOperator
+from app.core.constants import VisibilityType, DetectionType
 from app.core.events.base import BaseEvent
 from app.core.events.event_types.similarity_based.similarity_event import SimilarityEvent
 from app.core.events.event_types.semantic_similarity.semantic_similarity_event import SemanticSimilarityEvent
 from app.core.events.event_types.time.time_event import TimeEvent, TimeData
 from app.core.events.event_types.score.score_event import ScoreEvent, ScoreData
 from app.core.events.event_types.combination.combination_event import CombinationEvent, CombinationData, ExpressionNode
+from app.core.events.event_types.binary_classifier.binary_classifier_event import BinaryClassifierEvent
+from app.core.events.event_types.binary_classifier.schemas import BinaryClassifierData, Example
 from app.core.embeddings import BaseEmbeddingClient
 from app.utils import get_logger
 
@@ -151,12 +153,75 @@ def _create_event_by_detection_type(
                 **common_fields,
             )
 
+        elif detection_type == DetectionType.BINARY_CLASSIFIER:
+            if not raw_data or not isinstance(raw_data, dict):
+                log.warning("Event '%s' (BINARY_CLASSIFIER) missing/invalid data: %r", event_id, raw_data)
+                return None
+            
+            classifier_data = _parse_binary_classifier_data(raw_data, event_id, log)
+            if not classifier_data:
+                return None
+            
+            return BinaryClassifierEvent.create(
+                event_id=event_id,
+                visibility_type=visibility_type,
+                detection_type=detection_type,
+                data=classifier_data,
+                **common_fields,
+            )
+
         else:
             log.warning("Event '%s' unknown detection type: %s", event_id, detection_type)
             return None
 
     except Exception as e:
         log.exception("Unhandled exception while creating event '%s' (type=%s): %s", event_id, detection_type, e)
+        return None
+
+
+def _parse_binary_classifier_data(raw_data: dict, event_id: str, log) -> Optional[BinaryClassifierData]:
+    """
+    Parse raw binary classifier data from metadata into BinaryClassifierData.
+    Handles camelCase keys from backend.
+    
+    Args:
+        raw_data: Raw data dictionary from metadata
+        event_id: Event ID for logging
+        log: Logger instance
+    
+    Returns:
+        BinaryClassifierData instance or None if parsing fails
+    """
+    class_name = raw_data.get("className")
+    if not class_name:
+        log.warning("Event '%s' (BINARY_CLASSIFIER) missing 'className' field: %r", event_id, raw_data)
+        return None
+    
+    positive_examples = None
+    negative_examples = None
+    
+    pos_examples_raw = raw_data.get("positiveExamples")
+    if pos_examples_raw and isinstance(pos_examples_raw, list):
+        positive_examples = [
+            Example(text=ex["text"]) if isinstance(ex, dict) else Example(text=str(ex))
+            for ex in pos_examples_raw
+        ]
+    
+    neg_examples_raw = raw_data.get("negativeExamples")
+    if neg_examples_raw and isinstance(neg_examples_raw, list):
+        negative_examples = [
+            Example(text=ex["text"]) if isinstance(ex, dict) else Example(text=str(ex))
+            for ex in neg_examples_raw
+        ]
+    
+    try:
+        return BinaryClassifierData(
+            class_name=class_name,
+            positive_examples=positive_examples,
+            negative_examples=negative_examples
+        )
+    except Exception as e:
+        log.warning("Event '%s' (BINARY_CLASSIFIER) invalid data: %s", event_id, e)
         return None
 
 
@@ -203,7 +268,11 @@ def build_events_from_metadata(
     """
     Convert a scenario dict to a list of BaseEvent instances.
 
-    This version is defensive and logs detailed reasons when events are skipped.
+    Args:
+        metadata: Scenario metadata from backend
+        on_unknown: How to handle unknown events ("ignore", "warn", or "error")
+        logger: Optional logger instance
+        embedding_client: Optional embedding client for semantic similarity events
     """
     import logging
     events: List[BaseEvent] = []
@@ -271,7 +340,7 @@ def build_events_from_metadata(
                 ev=ev,
                 detection_type=detection_type,
                 logger=log,
-                embedding_client=embedding_client
+                embedding_client=embedding_client,
             )
             if instance is None:
                 reason = "factory returned None (validation/parsing failed inside _create_event_by_detection_type)"

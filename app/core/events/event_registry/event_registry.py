@@ -23,7 +23,6 @@ from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.utils.event_utils import evaluate_condition, evaluate_expression
 from app.core.graph import agent_graph
 
-
 logger = get_logger(__name__)
 
 
@@ -38,7 +37,8 @@ class EventRegistry:
                                       # False for time/score/combination events (trigger once)
     """
 
-    def __init__(self, scenario: Scenario, room: rtc.Room, thread_id: str, termination_callback: Optional[callable] = None):
+    def __init__(self, scenario: Scenario, room: rtc.Room, thread_id: str,
+                 termination_callback: Optional[callable] = None):
         """
         Initialize the expression registry with a scenario.
         
@@ -106,7 +106,6 @@ class EventRegistry:
                         "expression": event.data.expression,
                     })
 
-
     async def initialize(self) -> None:
         # Send initial score-based events to UI and Core (example: score < 5)
         _, additional_score, branching_instructions = await self.handle_events(
@@ -146,11 +145,11 @@ class EventRegistry:
                 self.set_event_state(event_id, result, DetectionType.COMBINATION)
 
         return self.event_registry.copy()
-    
+
     def get_happened_events(self) -> List[BaseEvent]:
         # Get all events that have happened (happened=True) in the registry.
         happened_event_ids = {
-            event_id for event_id, event_data in self.event_registry.items() 
+            event_id for event_id, event_data in self.event_registry.items()
             if event_data.get("happened", False)
         }
         event_map = {event.event_id: event for event in self.events}
@@ -180,8 +179,8 @@ class EventRegistry:
         return total_score
 
     def _evaluate_and_handle_cascade_score_events(
-        self,
-        detected_event_ids: Set[str]
+            self,
+            detected_event_ids: Set[str]
     ) -> Tuple[Set[str], int]:
         """
         Evaluate score-based events and track cascading score changes.
@@ -208,14 +207,14 @@ class EventRegistry:
         # Calculate the score contribution from currently detected events (similarity, time, combination, etc.)
         # This excludes score-based events which will be evaluated in the cascade loop
         current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
-        
+
         # Start with live_score + current cycle's event scores
         # This ensures score-based events can trigger on the same cycle as the events that bring the score to threshold
         working_score = self.live_score + current_cycle_score
-        
+
         if current_cycle_score != 0:
             logger.info(f"Current cycle adding {current_cycle_score} to live_score {self.live_score}. Working score: {working_score}")
-        
+
         # Evaluate score-based events against the working score
         newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
 
@@ -232,11 +231,11 @@ class EventRegistry:
                 additional_score_from_triggered_events += additional_score
                 working_score += additional_score
                 logger.info(f"Score changed by {additional_score} from triggered score-based events. New working score: {working_score}")
-                
+
             # Check again with the new score to handle cascading
             # Loop will exit naturally when no more events trigger
             newly_triggered_score_event_ids = self.get_newly_triggered_score_events(working_score)
-            
+
         return detected_event_ids, additional_score_from_triggered_events
 
     def _collect_branching_instructions(self, events_to_send: List[BaseEvent]) -> List[Tuple[str, int]]:
@@ -257,7 +256,8 @@ class EventRegistry:
                 # Use event.score if available, otherwise 0
                 score = event.score if event.score is not None else 0
                 branching_instructions.append((event.branching_instruction, score))
-                logger.debug(f"Collected branching instruction from {event.event_id}: '{event.branching_instruction}' (score={score})")
+                logger.debug(
+                    f"Collected branching instruction from {event.event_id}: '{event.branching_instruction}' (score={score})")
 
         if branching_instructions:
             logger.info(f"Collected {len(branching_instructions)} branching instructions")
@@ -265,8 +265,8 @@ class EventRegistry:
         return branching_instructions
 
     def _update_registry_and_collect_event_data(
-        self,
-        detected_event_ids: Optional[Set[str]] = None
+            self,
+            detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], List[BaseEvent], int, List[Tuple[str, int]]]:
         """
         Update the event registry and collect all output data.
@@ -308,7 +308,7 @@ class EventRegistry:
             logger.debug(f"Expression registry updated (no new events detected). Registry state: {updated_states}")
 
         logger.debug(f"Expression registry details - Total events: {len(self.event_registry)}, "
-                    f"Combination expressions: {len(self.expression_list)}")
+                     f"Combination expressions: {len(self.expression_list)}")
 
         # Get all successful events
         successful_events = self.get_happened_events()
@@ -321,20 +321,20 @@ class EventRegistry:
             if self.trigger_events is not None and event.event_id not in self.trigger_events:
                 logger.debug(f"Event {event.event_id} skipped (not in trigger_events list)")
                 continue
-            
+
             event_data = self.event_registry.get(event.event_id)
             if event_data is None:
                 continue
-            
+
             # Get trigger_multiple from event_data, or derive from event type if missing
             trigger_multiple = event_data.get("trigger_multiple")
-            
+
             # Special case: termination events should only be sent once, even if trigger_multiple=True
             # This prevents duplicate termination callbacks
             if self.termination_event_id and event.event_id == self.termination_event_id and event.event_id in self._sent_events:
                 logger.debug(f"Event {event.event_id} skipped (termination event already sent)")
                 continue
-            
+
             # If trigger_multiple is True, always send
             # If trigger_multiple is False, only send if not sent before
             if trigger_multiple and event.event_id in all_detected_event_ids:
@@ -354,8 +354,8 @@ class EventRegistry:
         return successful_events, events_to_send, additional_score_from_triggered_events, branching_instructions
 
     async def _handle_termination_events(
-        self,
-        events_to_send: List[BaseEvent]
+            self,
+            events_to_send: List[BaseEvent]
     ) -> None:
         """
         Handle termination callback for events that should terminate the session.
@@ -369,7 +369,7 @@ class EventRegistry:
         # Check for termination events using registry's termination_event_id
         if not self.termination_event_id:
             return
-            
+
         termination_events = [
             event for event in events_to_send
             if event.event_id == self.termination_event_id
@@ -381,15 +381,16 @@ class EventRegistry:
             # Only call termination callback once per session
             if self.termination_callback and not self._termination_initiated:
                 self._termination_initiated = True
-                logger.info(f"Initiating termination for event: {termination_events[0].event_id} with message: {self.termination_message}")
+                logger.info(
+                    f"Initiating termination for event: {termination_events[0].event_id} with message: {self.termination_message}")
                 await self.termination_callback(termination_events[0])
             elif self._termination_initiated:
                 logger.debug(f"Termination already initiated, skipping callback for: {termination_events[0].event_id}")
 
     async def _send_events_to_ui_and_core(
-        self,
-        events_to_send: List[BaseEvent],
-        room: rtc.Room
+            self,
+            events_to_send: List[BaseEvent],
+            room: rtc.Room
     ) -> None:
         """
         Send events to UI and Core messaging systems.
@@ -443,10 +444,10 @@ class EventRegistry:
                     f"Sending event to core: {event.event_id} (visibility: {event.visibility_type})"
                 )
                 event_dict = serialize_event(
-                        event,
-                        termination_event_id=self.termination_event_id,
-                        termination_message=self.termination_message
-                    )
+                    event,
+                    termination_event_id=self.termination_event_id,
+                    termination_message=self.termination_message
+                )
                 core_event_message = CoreEventMessageType.create(
                     room_id=room.name, event_data=event_dict
                 )
@@ -477,9 +478,9 @@ class EventRegistry:
             logger.info(f"Current live score: {self.live_score}")
 
     async def handle_events(
-        self,
-        room: rtc.Room,
-        detected_event_ids: Optional[Set[str]] = None
+            self,
+            room: rtc.Room,
+            detected_event_ids: Optional[Set[str]] = None
     ) -> Tuple[List[BaseEvent], int, List[Tuple[str, int]]]:
         """
         Orchestrates the complete event processing workflow.
@@ -541,8 +542,9 @@ class EventRegistry:
             self.event_registry[event_id]["happened"] = state
         else:
             # If event not in registry, create entry with trigger_multiple based on event type
-            # SENTENCE_SIMILARITY and SEMANTIC_SIMILARITY events can trigger multiple times
-            trigger_multiple = event_type in (DetectionType.SENTENCE_SIMILARITY, DetectionType.SEMANTIC_SIMILARITY)
+            # SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, and BINARY_CLASSIFIER events can trigger multiple times
+            trigger_multiple = event_type in (DetectionType.SENTENCE_SIMILARITY, DetectionType.SEMANTIC_SIMILARITY,
+                                              DetectionType.BINARY_CLASSIFIER)
             self.event_registry[event_id] = {"happened": state, "trigger_multiple": trigger_multiple}
 
     def is_termination_initiated(self) -> bool:
@@ -570,7 +572,7 @@ class EventRegistry:
             Set of event IDs for score-based events that are newly triggered
         """
         newly_triggered_event_ids: Set[str] = set()
-        
+
         for event in self.score_based_events:
             # Check if the event has already been sent
             if event.event_id in self._sent_events:
@@ -594,4 +596,3 @@ class EventRegistry:
                 self.set_event_state(event.event_id, True, DetectionType.SCORE)
 
         return newly_triggered_event_ids
-
