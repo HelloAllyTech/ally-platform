@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -19,6 +20,7 @@ export interface SimulationCardProps {
   onPress?: () => void;
   titleNumberOfLines?: number;
   descriptionNumberOfLines?: number;
+  triggerWarnings?: string[];
 }
 
 /**
@@ -35,7 +37,10 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
   onPress,
   titleNumberOfLines = 2,
   descriptionNumberOfLines = 3,
+  triggerWarnings,
 }) => {
+  const {t} = useTranslation();
+
   return (
     <View style={styles.cardContainer}>
       <TouchableOpacity
@@ -63,6 +68,23 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
                 numberOfLines={descriptionNumberOfLines}>
                 {description}
               </Text>
+            )}
+            {!!triggerWarnings?.length && (
+              <>
+                <View style={styles.separator} />
+                <View>
+                  <Text style={styles.triggerWarningTitle}>
+                    {t('Simulations.triggerWarnings')}
+                  </Text>
+                  <View style={styles.chipsContainer}>
+                    {triggerWarnings.map((warning, index) => (
+                      <View key={index} style={styles.chip}>
+                        <Text style={styles.chipText}>{warning}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </>
             )}
           </View>
           {rightAccessory && (
@@ -122,6 +144,34 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
     fontWeight: fontWeights.regular,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  separator: {
+    height: '0.5@vs',
+    backgroundColor: colors.ds.stroke.primary,
+    marginVertical: '10@vs',
+  },
+  triggerWarningTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.highEmphasis,
+    marginBottom: '10@ms',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: '6@ms',
+  },
+  chip: {
+    backgroundColor: colors.ds.grey[50],
+    borderRadius: radius.full,
+    padding: '4@ms',
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.grey[300],
+  },
+  chipText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.label.small,
     color: colors.ds.typography.mediumEmphasis,
   },
 });
