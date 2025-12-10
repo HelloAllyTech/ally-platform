@@ -121,7 +121,7 @@ describe('SimulationDetailsScreen', () => {
     fireEvent.press(button);
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith(scenario);
+      expect(mockStartSimulation).toHaveBeenCalledWith(scenario.id);
     });
   });
 

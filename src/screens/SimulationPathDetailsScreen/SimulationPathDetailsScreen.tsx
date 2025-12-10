@@ -209,13 +209,7 @@ export const SimulationPathDetailsScreen: React.FC<
   const handleStartSimulation = () => {
     if (selectedSimulation) {
       startSimulation(
-        {
-          id: selectedSimulation.scenarioId,
-          title: selectedSimulation.title || '',
-          description: selectedSimulation.description || '',
-          coverImageUrl: selectedSimulation.coverImageUrl,
-          coverVideoUrl: selectedSimulation.coverVideoUrl,
-        },
+        selectedSimulation.scenarioId,
         selectedSimulation.sessionId || undefined,
         pathId,
       ).finally(() => {

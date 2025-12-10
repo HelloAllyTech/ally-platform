@@ -74,7 +74,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   const startSimulationPress = () => {
-    startSimulation(scenario);
+    startSimulation(scenario.id);
   };
 
   const renderLoadingOverlay = () => {
