@@ -4,6 +4,7 @@ from app.core.constants import LLMProvider, DEFAULT_LANGUAGE_CODE, DEFAULT_LLM_C
 from app.core.config import settings
 from app.llms.base import BaseLLMClient
 from app.llms.openai import OpenAILLMClient
+from app.llms.gemini import GeminiLLMClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -55,6 +56,11 @@ def create_llm_client(
     
     if provider == LLMProvider.OPENAI:
         return OpenAILLMClient.from_config(
+            config=config_dict,
+            language_code=language_code,
+        )
+    elif provider == LLMProvider.GEMINI:
+        return GeminiLLMClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
