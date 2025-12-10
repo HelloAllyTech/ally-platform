@@ -1,10 +1,11 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Trans} from 'react-i18next';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton, useToast} from '@/components';
 import {env} from '@/config/env';
-import {ErrorCode, isIOS, SCREEN_NAMES} from '@/constants';
+import {ErrorCode, isIOS, MINUTES_IN_SECONDS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {
   useAcceptTermsAndAgreementMutation,
@@ -22,15 +23,24 @@ import {styles} from './styles';
 import type {OtpVerificationProps} from './types';
 
 const DEFAULT_OTP = ['', '', '', ''];
+const DEFAULT_OTP_EXPIRY_MINUTES = 10;
+const RESEND_COUNTDOWN_SECONDS = 2 * MINUTES_IN_SECONDS;
 
 export const OtpVerification: React.FC<OtpVerificationProps> = ({
   email,
   onOtpVerificationSuccess,
+  initialExpiresIn,
 }) => {
   const [otpValue, setOtpValue] = useState(DEFAULT_OTP);
   const [error, setError] = useState('');
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(RESEND_COUNTDOWN_SECONDS);
   const [isResendDisabled, setIsResendDisabled] = useState(true);
+  const [otpExpiryMinutes, setOtpExpiryMinutes] = useState(() => {
+    if (initialExpiresIn) {
+      return Math.ceil(initialExpiresIn / MINUTES_IN_SECONDS);
+    }
+    return DEFAULT_OTP_EXPIRY_MINUTES;
+  });
 
   const tempTokensRef = useRef<{
     accessToken: string;
@@ -145,13 +155,17 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   const resetOtpState = useCallback(() => {
     setOtpValue(DEFAULT_OTP);
     setError('');
-    setCountdown(10);
+    setCountdown(RESEND_COUNTDOWN_SECONDS);
     setIsResendDisabled(true);
   }, []);
 
   const handleResendOtp = useCallback(async () => {
     try {
-      await generateOtp({email});
+      const response = await generateOtp({email});
+      if (response.data?.expiresIn) {
+        const expiryMinutes = Math.ceil(response.data.expiresIn / 60);
+        setOtpExpiryMinutes(expiryMinutes);
+      }
       resetOtpState();
       otpInputRef.current?.focusFirst();
     } catch (err) {
@@ -206,12 +220,18 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <View style={styles.resendContainer}>
-            <Text style={styles.helperText}>
-              {t('SplashScreen.didNotReceiveTheCode')}
+          <View style={styles.expiryContainer}>
+            <Text style={styles.expiryText}>
+              <Trans
+                i18nKey="SplashScreen.codeExpiryMessage"
+                values={{minutes: otpExpiryMinutes}}
+                components={{
+                  bold: <Text style={styles.expiryBoldText} />,
+                }}
+              />
             </Text>
             <TouchableOpacity
-              style={styles.resendButton}
+              style={styles.resendInlineButton}
               onPress={handleResendOtp}
               disabled={isResendDisabled || isResending}>
               <Text
