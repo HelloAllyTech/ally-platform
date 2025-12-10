@@ -163,19 +163,27 @@ class EventRegistry:
     def _calculate_score_from_event_ids(self, event_ids: Set[str]) -> int:
         """
         Calculate the total score from a set of event IDs.
+        Only includes events that are in the trigger_events list.
 
         Args:
             event_ids: Set of event IDs to calculate score for
 
         Returns:
-            Total score from all events in the set
+            Total score from all events in the set that are also in trigger_events
         """
         event_map = {event.event_id: event for event in self.events}
-        total_score = sum(
-            event_map[event_id].score
-            for event_id in event_ids
-            if event_id in event_map and event_map[event_id].score is not None
-        )
+        total_score = 0
+
+        for event_id in event_ids:
+
+            # Skip if event is not in trigger_events
+            if event_id not in self.trigger_events:
+                continue
+
+            event = event_map[event_id]
+            if event.score is not None:
+                total_score += event.score
+
         return total_score
 
     def _evaluate_and_handle_cascade_score_events(
