@@ -173,9 +173,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
         await ensureSpeakerOutput();
-        SoundPlayer.playAsset(
-          require('../../assets/sounds/startSimulation.mp3'),
-        );
+        setTimeout(() => {
+          SoundPlayer.playAsset(
+            require('../../assets/sounds/startSimulation.mp3'),
+          );
+        }, 2000);
       } catch (error) {
         showErrorToast(error, 'Errors.attachListeners');
       }
