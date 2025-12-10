@@ -150,6 +150,14 @@ class TestEventTerminationIntegration:
                             "id": "greeting"
                         }
                     }
+                },
+                {
+                    "id": "greeting",
+                    "sentences": ["hello", "hi"],
+                    "score": 5,
+                    "emoji": "👋",
+                    "message": "Greeting detected",
+                    "feedbackStatus": True
                 }
             ],
             "autoTerminationEvent": {
@@ -159,7 +167,7 @@ class TestEventTerminationIntegration:
         }
         
         events = build_events_from_metadata(metadata)
-        assert len(events) == 2
+        assert len(events) == 3
         
         termination_callback = AsyncMock()
         
