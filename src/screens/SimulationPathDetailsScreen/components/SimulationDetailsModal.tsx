@@ -15,6 +15,7 @@ import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import type {PathScenario} from '@/types';
+import {getTriggerWarningNames} from '@/utils';
 
 export interface SimulationDetailsModalProps {
   visible: boolean;
@@ -36,7 +37,15 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   if (!simulation) {
     return null;
   }
-  const {coverImageUrl, coverVideoUrl, title, description, order} = simulation;
+  const {
+    coverImageUrl,
+    coverVideoUrl,
+    title,
+    description,
+    order,
+    triggerWarnings,
+  } = simulation;
+  const triggerWarningNames = getTriggerWarningNames(triggerWarnings);
 
   return (
     <Modal
@@ -99,6 +108,22 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
 
               {/* Description */}
               <Text style={styles.description}>{description}</Text>
+
+              {/* Trigger Warnings */}
+              {triggerWarningNames.length > 0 && (
+                <>
+                  <Text style={styles.triggerWarningLabel}>
+                    {t('Simulations.triggerWarnings')}:
+                  </Text>
+                  <View style={styles.chipsContainer}>
+                    {triggerWarningNames.map((warning, index) => (
+                      <View key={index} style={styles.chip}>
+                        <Text style={styles.chipText}>{warning}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
             </ScrollView>
           </View>
 
@@ -209,6 +234,31 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.mediumEmphasis,
     marginBottom: '6@ms',
+  },
+  triggerWarningLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    marginBottom: '8@ms',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: '6@ms',
+    marginBottom: '8@ms',
+  },
+  chip: {
+    backgroundColor: colors.ds.grey[50],
+    borderRadius: radius.full,
+    paddingHorizontal: '8@ms',
+    paddingVertical: '4@ms',
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.grey[300],
+  },
+  chipText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.label.large,
+    color: colors.ds.typography.mediumEmphasis,
   },
   buttonContainer: {
     backgroundColor: colors.ds.neutral.white,

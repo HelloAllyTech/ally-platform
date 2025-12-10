@@ -68,6 +68,9 @@ jest.mock('../components', () => {
 jest.mock('@/utils', () => ({
   __esModule: true,
   copyToClipboard: jest.fn(),
+  getTriggerWarningNames: jest.fn((triggerWarnings) => 
+    triggerWarnings?.map((tw: any) => tw.name) || []
+  ),
 }));
 
 describe('SimulationDetailsScreen', () => {

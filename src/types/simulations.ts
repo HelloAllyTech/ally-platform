@@ -229,6 +229,7 @@ export interface PathScenario {
   coverVideoUrl?: string;
   sessionId: string | null;
   status: SessionItemStatus;
+  triggerWarnings?: TriggerWarning[];
 }
 
 export interface SimulationPathDetails {

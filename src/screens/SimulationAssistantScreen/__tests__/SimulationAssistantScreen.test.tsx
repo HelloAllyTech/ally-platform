@@ -204,6 +204,9 @@ jest.mock('@/services', () => {
 jest.mock('@/utils', () => ({
   __esModule: true,
   decodeFeedbackPayloadToJson: (payload: any) => payload,
+  getTriggerWarningNames: jest.fn((triggerWarnings) => 
+    triggerWarnings?.map((tw: any) => tw.name) || []
+  ),
   logger: {info: jest.fn(), error: jest.fn()},
 }));
 

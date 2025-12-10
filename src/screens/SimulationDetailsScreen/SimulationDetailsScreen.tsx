@@ -28,8 +28,8 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {colors, fontFamily} from '@/theme';
-import {copyToClipboard} from '@/utils';
+import {colors, fontFamily, radius, typography} from '@/theme';
+import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
 import {ActiveSimulationModal} from './components';
 
@@ -89,6 +89,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderDetailsSection = () => {
     const videoUrl = scenario.coverVideoUrl;
     const imageUrl = scenario.coverImageUrl;
+    const triggerWarnings = getTriggerWarningNames(scenario.triggerWarnings);
 
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
@@ -113,6 +114,21 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
         <Text style={styles.fieldValue}>{scenario.description}</Text>
+
+        {triggerWarnings.length > 0 && (
+          <>
+            <Text style={styles.fieldLabel}>
+              {t('Simulations.triggerWarnings')}:
+            </Text>
+            <View style={styles.chipsContainer}>
+              {triggerWarnings.map((warning, index) => (
+                <View key={index} style={styles.chip}>
+                  <Text style={styles.chipText}>{warning}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
     );
   };
@@ -290,5 +306,24 @@ const styles = ScaledSheet.create({
     fontSize: '14@ms',
     marginHorizontal: '10@ms',
     marginBottom: '-2@ms',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: '6@ms',
+    marginTop: '6@ms',
+  },
+  chip: {
+    backgroundColor: colors.ds.grey[50],
+    borderRadius: radius.full,
+    paddingVertical: '4@ms',
+    paddingHorizontal: '8@ms',
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.grey[300],
+  },
+  chipText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.label.large,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });
