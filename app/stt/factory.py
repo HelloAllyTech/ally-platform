@@ -4,6 +4,8 @@ from app.core.constants import STTProvider, DEFAULT_LANGUAGE_CODE, DEFAULT_STT_C
 from app.core.config import settings
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
+from app.stt.google import GoogleSTTClient
+from app.stt.sarvam import SarvamSTTClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -54,6 +56,16 @@ def create_stt_client(
     
     if provider == STTProvider.DEEPGRAM:
         return DeepgramSTTClient.from_config(
+            config=config_dict,
+            language_code=language_code,
+        )
+    elif provider == STTProvider.GOOGLE:
+        return GoogleSTTClient.from_config(
+            config=config_dict,
+            language_code=language_code,
+        )
+    elif provider == STTProvider.SARVAM:
+        return SarvamSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
