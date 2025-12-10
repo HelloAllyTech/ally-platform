@@ -345,7 +345,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                         participant={remoteParticipant}
                         publication={remoteAudioPub}
                         avatarUrl={scenario?.coverImageUrl ?? null}
-                        name={scenario?.title}
+                        name={scenario?.metadata?.name || scenario?.title}
                         {...(scenario?.title
                           ? {
                               topLeftOverlay: (
