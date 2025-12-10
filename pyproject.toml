@@ -23,6 +23,7 @@ pydantic = {extras = ["email"], version = "^2.11.7"}
 langgraph = "^0.6.7"
 livekit-plugins-langchain = "^1.2.8"
 langchain-openai = "^0.3.33"
+langchain-google-genai = "^2.0.0"
 livekit-plugins-openai = "~1.2"
 livekit-plugins-deepgram = "~1.2"
 livekit-plugins-silero = "~1.2"
@@ -33,6 +34,8 @@ sarvamai = "^0.1.21"
 deepgram-sdk = "^5.2.0"
 elevenlabs = "^2.20.0"
 numpy = "^2.3.5"
+stopwordsiso = "^0.6.1"
+advertools = "^0.15.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
