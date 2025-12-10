@@ -453,6 +453,25 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["നമസ്കാരം", "ഹലോ"],
                 "feedbackStatus": "True"
+            },
+            {
+                "id": "semantic-empathy-malayalam",
+                "name": "Semantic Empathy Detection - Malayalam",
+                "description": "Detects semantically similar empathetic responses in Malayalam using embeddings",
+                "score": 10,
+                "emoji": "💚",
+                "message": "Great! You showed empathy and understanding in your response.",
+                "branchInstruction": "Thank you for understanding me.",
+                "detectionType": "SEMANTIC_SIMILARITY",
+                "data": {
+                    "sentences": [
+                        "എനിക്ക് നിങ്ങളുടെ വികാരങ്ങൾ മനസ്സിലാകുന്നു",
+                        "നിങ്ങൾ എന്ത് അനുഭവിക്കുന്നുവെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു",
+                        "ഇത് നിങ്ങൾക്ക് എത്രയും ബുദ്ധിമുട്ടുള്ളതാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു"
+                    ],
+                    "threshold": 0.75
+                },
+                "feedbackStatus": "True"
             }
         ],
         "voice": {
