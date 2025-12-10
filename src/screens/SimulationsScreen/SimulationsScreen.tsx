@@ -38,6 +38,7 @@ import {useGetScenariosQuery, useGetSimulationPathsQuery} from '@/services';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import type {Scenario, SimulationPath} from '@/types';
+import {getTriggerWarningNames} from '@/utils';
 
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
@@ -119,7 +120,7 @@ export const SimulationsScreen: React.FC = () => {
         description={item.description || ''}
         coverImageUrl={item.coverImageUrl}
         onPress={() => handleScenarioPress(item)}
-        triggerWarnings={item.triggerWarnings?.map(tw => tw.name)}
+        triggerWarnings={getTriggerWarningNames(item.triggerWarnings)}
       />
     );
   };

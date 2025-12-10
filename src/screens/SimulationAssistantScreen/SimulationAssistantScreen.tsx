@@ -31,7 +31,11 @@ import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors} from '@/theme';
 import {Feedback, LiveEventPayload} from '@/types';
-import {decodeFeedbackPayloadToJson, logger} from '@/utils';
+import {
+  decodeFeedbackPayloadToJson,
+  getTriggerWarningNames,
+  logger,
+} from '@/utils';
 
 import {
   ControlButtons,
@@ -346,8 +350,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                                 <ScenarioInfoOverlay
                                   ref={scenarioInfoRef}
                                   title={scenario?.title}
-                                  triggerWarnings={scenario?.triggerWarnings?.map(
-                                    tw => tw.name,
+                                  triggerWarnings={getTriggerWarningNames(
+                                    scenario?.triggerWarnings,
                                   )}
                                 />
                               ),
