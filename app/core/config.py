@@ -41,6 +41,11 @@ class Settings(BaseSettings):
         description="OpenAI model to use for embeddings"
     )
     
+    GOOGLE_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Google API key for Gemini LLM (can also use GOOGLE_APPLICATION_CREDENTIALS)"
+    )
+    
     # Semantic similarity settings
     SEMANTIC_SIMILARITY_THRESHOLD: float = Field(
         default=0.6,
