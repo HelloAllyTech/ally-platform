@@ -82,7 +82,7 @@ SCENARIO_SAMPLE = {
                 "speaker":"anushka",
             }
         },
-        "languageCode": "en-US",
+        "languageCode": "en-IN",
         "stt": {
             "provider": "deepgram",
             "config": {
