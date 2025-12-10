@@ -20,7 +20,6 @@ import {
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {env} from '@/config/env';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
@@ -35,15 +34,11 @@ import {colors} from '@/theme';
 const Tab = createBottomTabNavigator();
 
 const ALL_TABS = [
-  ...(env.ENABLE_LEARN_AS_INITIAL_TAB
-    ? [
-        {
-          name: SCREEN_NAMES.LEARN,
-          component: SimulationsScreen,
-          requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
-        },
-      ]
-    : []),
+  {
+    name: SCREEN_NAMES.LEARN,
+    component: SimulationsScreen,
+    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
+  },
   {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
@@ -60,15 +55,6 @@ const ALL_TABS = [
     component: SearchScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT],
   },
-  ...(env.ENABLE_LEARN_AS_INITIAL_TAB
-    ? []
-    : [
-        {
-          name: SCREEN_NAMES.LEARN,
-          component: SimulationsScreen,
-          requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
-        },
-      ]),
   {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,

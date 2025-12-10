@@ -9,7 +9,6 @@ export interface Env {
   MICROPHONE_SOCKET_PATH: string;
   CLOUD_TELEPHONY_PATH: string;
   TERMS_AND_CONDITION_FLAG: boolean;
-  ENABLE_LEARN_AS_INITIAL_TAB: boolean;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -43,10 +42,5 @@ export const env: Env = {
     assertEnvVar(
       Config.TERMS_AND_CONDITION_FLAG,
       'TERMS_AND_CONDITION_FLAG',
-    ) === 'true',
-  ENABLE_LEARN_AS_INITIAL_TAB:
-    assertEnvVar(
-      Config.ENABLE_LEARN_AS_INITIAL_TAB,
-      'ENABLE_LEARN_AS_INITIAL_TAB',
     ) === 'true',
 };
