@@ -5,7 +5,14 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton, useToast} from '@/components';
 import {env} from '@/config/env';
-import {ErrorCode, isIOS, MINUTES_IN_SECONDS, SCREEN_NAMES} from '@/constants';
+import {
+  DEFAULT_OTP_EXPIRY_MINUTES,
+  ErrorCode,
+  isIOS,
+  MINUTES_IN_SECONDS,
+  RESEND_COUNTDOWN_SECONDS,
+  SCREEN_NAMES,
+} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {
   useAcceptTermsAndAgreementMutation,
@@ -23,8 +30,6 @@ import {styles} from './styles';
 import type {OtpVerificationProps} from './types';
 
 const DEFAULT_OTP = ['', '', '', ''];
-const DEFAULT_OTP_EXPIRY_MINUTES = 10;
-const RESEND_COUNTDOWN_SECONDS = 2 * MINUTES_IN_SECONDS;
 
 export const OtpVerification: React.FC<OtpVerificationProps> = ({
   email,
