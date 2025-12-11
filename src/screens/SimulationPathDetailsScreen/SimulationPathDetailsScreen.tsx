@@ -223,7 +223,7 @@ export const SimulationPathDetailsScreen: React.FC<
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
         <LeftArrowIcon color={colors.ds.typography.highEmphasis} />
       </TouchableOpacity>
-      <Text style={styles.pageTitle}>{t('Simulations.pathWay')}</Text>
+      <Text style={styles.pageTitle}>{t('Simulations.trackWay')}</Text>
       <View style={styles.headerSpacer} />
       {credits && getCreditsInfo && (
         <View style={styles.creditDisplay}>

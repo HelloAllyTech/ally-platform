@@ -107,13 +107,13 @@ const styles = ScaledSheet.create({
   headerTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
-    ...typography.headline.tiny,
-    fontWeight: fontWeights.medium,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
   },
   headerItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
-    fontWeight: '500',
   },
   actionsContainer: {
     flexDirection: 'row',

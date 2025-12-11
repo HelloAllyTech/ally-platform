@@ -367,6 +367,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                         participant={localParticipant}
                         publication={localAudioPub}
                         name={userData?.name}
+                        isMicEnabled={isMicEnabled}
                       />
                     </View>
                   </View>

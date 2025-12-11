@@ -32,7 +32,7 @@ jest.mock('@/hooks', () => ({
         return 'Simulation';
       }
       const translations: Record<string, string> = {
-        'Simulations.pathWay': 'Path way',
+        'Simulations.trackWay': 'Track way',
         'Simulations.start': 'Start',
         'Simulations.continue': 'Continue',
         'Common.next': 'Next',
@@ -374,7 +374,7 @@ describe('SimulationPathDetailsScreen', () => {
     expect(hasCredits).toBeTruthy();
   });
 
-  it('should render header with "Path way" title', () => {
+  it('should render header with "Track way" title', () => {
     useGetSimulationPathDetailsQuery.mockReturnValue({
       data: mockPathData,
       isLoading: false,
@@ -392,7 +392,7 @@ describe('SimulationPathDetailsScreen', () => {
       />,
     );
 
-    expect(getByText('Path way')).toBeTruthy();
+    expect(getByText('Track way')).toBeTruthy();
   });
 
   it('should disable button when no next simulation is available', () => {
