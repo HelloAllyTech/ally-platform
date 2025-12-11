@@ -311,16 +311,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
-  const isNonFocusModeAndMaximized = isControlButtonMaximized && !isFocusMode;
-
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
       <RoomContext.Provider value={room}>
-        <View
-          style={[
-            styles.contentContainer,
-            isNonFocusModeAndMaximized && styles.marginT12,
-          ]}>
+        <View style={styles.contentContainer}>
           {isSimulationInProgress && startTime && (
             <SimulationTimer startTime={startTime} />
           )}
