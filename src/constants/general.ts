@@ -23,6 +23,8 @@ export const DEFAULT_HIT_SLOP = {
 
 export const SCREEN_WIDTH = Dimensions.get('window').width;
 export const WINDOW_HEIGHT = Dimensions.get('window').height;
+export const DEFAULT_OTP_EXPIRY_MINUTES = 10;
+export const RESEND_COUNTDOWN_SECONDS = 1 * MINUTES_IN_SECONDS;
 
 export const isIOS = Platform.OS === 'ios';
 

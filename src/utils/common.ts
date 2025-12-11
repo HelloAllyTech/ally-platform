@@ -1,7 +1,11 @@
+import {AudioSession} from '@livekit/react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking, Platform} from 'react-native';
+import SoundPlayer from 'react-native-sound-player';
 
-import {APP_STORE_URLS} from '@/constants';
+import {APP_STORE_URLS, isIOS} from '@/constants';
+
+import {logger} from './logger';
 
 export type Maybe<T> = T | null;
 
@@ -38,5 +42,27 @@ export const openAppStore = async (): Promise<void> => {
 
   if (storeUrl) {
     await Linking.openURL(storeUrl);
+  }
+};
+
+export const playNotificationSound = async (soundFile: number) => {
+  try {
+    // Enable mix audio mode to play at full volume alongside voice session
+    SoundPlayer.setMixAudio(true);
+
+    // Ensure speaker output on iOS
+    if (isIOS) {
+      await AudioSession.configureAudio({
+        ios: {
+          defaultOutput: 'speaker',
+        },
+      });
+    }
+
+    SoundPlayer.playAsset(soundFile);
+
+    SoundPlayer.setMixAudio(false);
+  } catch (error) {
+    logger.error(`Failed to play notification sound: ${error}`);
   }
 };

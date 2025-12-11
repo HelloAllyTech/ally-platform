@@ -253,13 +253,7 @@ export const SimulationFeedbackScreen: React.FC<
     }
 
     startSimulation(
-      {
-        id: current.scenarioId,
-        title: current.title || '',
-        description: current.description || '',
-        coverImageUrl: current.coverImageUrl,
-        coverVideoUrl: current.coverVideoUrl,
-      },
+      current.scenarioId,
       current.scenarioPathSessionItemId,
       pathId,
     );
@@ -268,17 +262,7 @@ export const SimulationFeedbackScreen: React.FC<
   const handleNextSimulation = () => {
     const next = upcomingScenario;
     if (next && next.scenarioPathSessionItemId && next.id) {
-      startSimulation(
-        {
-          id: next.id,
-          title: next.title || '',
-          description: next.description || '',
-          coverImageUrl: next.coverImageUrl,
-          coverVideoUrl: next.coverVideoUrl,
-        },
-        next.scenarioPathSessionItemId,
-        pathId,
-      );
+      startSimulation(next.id, next.scenarioPathSessionItemId, pathId);
     }
   };
 

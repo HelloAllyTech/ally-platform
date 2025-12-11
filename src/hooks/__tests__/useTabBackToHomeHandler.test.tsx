@@ -2,30 +2,38 @@ import React from 'react';
 import {Text} from 'react-native';
 import {render} from '@testing-library/react-native';
 
-// Mock the hooks barrel to avoid importing other hooks/components/services and capture back handler
+// Mock the navigation tab helper
+jest.mock('@/navigation/TabNavigator', () => ({
+  getFirstVisibleTab: () => 'CallLog',
+}));
+
+// Mock Redux parts
+jest.mock('react-redux', () => ({
+  useSelector: (fn: any) => fn({ user: { permissions: ['VIEW_CALL_LOGS'] } }),
+}));
+
+// Mock the store so barrel file resolution does not crash
+jest.mock('@/store/store', () => ({ AppRootState: {} }));
+
+import {useTabBackToHomeHandler} from '../useTabBackToHomeHandler';
+
+// Mock navigation
 const mockNav = { navigate: jest.fn() };
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => mockNav,
+  useIsFocused: jest.fn(() => mockIsFocusedState),
+}));
+
+let mockIsFocusedState = true;
 let mockCapturedBackHandler: (() => boolean) | null = null;
+
+// Mock hooks barrel to avoid heavy imports
 jest.mock('@/hooks', () => ({
-  useAppNavigation: () => mockNav,
   useHardwareBackPressHandler: (cb: any) => {
     mockCapturedBackHandler = cb;
     return cb;
   },
 }));
-
-// Provide a controllable focus mock
-let mockIsFocusedState = true;
-jest.mock('@react-navigation/native', () => ({ useIsFocused: jest.fn(() => mockIsFocusedState) }));
-
-// Prevent native module import chain caused via components barrel indirectly
-jest.mock('react-native-network-logger', () => ({
-  __esModule: true,
-  default: () => null,
-  startNetworkLogging: jest.fn(),
-  stopNetworkLogging: jest.fn(),
-}));
-
-import {useTabBackToHomeHandler} from '../useTabBackToHomeHandler';
 
 describe('useTabBackToHomeHandler', () => {
   beforeEach(() => {

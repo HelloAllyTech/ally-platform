@@ -56,21 +56,4 @@ export const styles = ScaledSheet.create({
   inputFilled: {
     color: colors.black,
   },
-  resendContainer: {
-    marginTop: '24@ms',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  resendText: {
-    fontSize: '14@ms',
-    color: '#666',
-  },
-  resendButton: {
-    marginLeft: '4@ms',
-  },
-  resendButtonText: {
-    fontSize: '14@ms',
-    color: '#007AFF',
-    fontWeight: '500',
-  },
 });

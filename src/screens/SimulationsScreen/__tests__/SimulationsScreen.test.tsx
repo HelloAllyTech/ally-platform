@@ -6,19 +6,57 @@ import {SimulationsScreen} from '../SimulationsScreen';
 import {ScenarioStatus, SCREEN_NAMES} from '../../../constants';
 import type {Scenario} from '../../../types';
 
-jest.mock('@/hooks', () => {
-  const mockNavigate = jest.fn();
+// Mock Store hooks directly to avoid store.ts loading which causes issues
+jest.mock('@/store/hooks', () => ({
+  useAppSelector: (fn: any) => fn({ user: { permissions: [] } }),
+  useAppDispatch: () => jest.fn(),
+}));
+
+jest.mock('@/store/store', () => ({ AppRootState: {} }));
+jest.mock('react-redux', () => ({
+  useSelector: jest.fn(() => ['VIEW_SCENARIO_SESSION']),
+  useDispatch: jest.fn(),
+  useStore: jest.fn(),
+}));
+
+// Mock Navigation helpers
+jest.mock('@/navigation/TabNavigator', () => ({
+  getFirstVisibleTab: jest.fn(() => 'Simulations'),
+}));
+
+// Mock react-navigation
+jest.mock('@react-navigation/native', () => {
   return {
-    __esModule: true,
-    useAppNavigation: () => ({
-      navigate: mockNavigate,
-    }),
-    useTabBackToHomeHandler: () => {},
-    useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
-    mockNavigate,
+    useNavigation: () => ({ navigate: jest.fn() }),
+    useRoute: () => ({ name: 'Simulations', params: {} }),
+    useFocusEffect: jest.fn(),
+    useIsFocused: jest.fn(() => true),
   };
 });
 
+// Mock drawer
+jest.mock('@/hooks/useDrawerNavigation', () => ({
+  useDrawerNavigation: () => ({ openDrawer: jest.fn() }),
+}));
+
+// Mock hooks
+jest.mock('@/hooks/useAppNavigation', () => {
+  const mockNavigate = jest.fn();
+  return {
+    useAppNavigation: () => ({ navigate: mockNavigate }),
+    mockNavigate, // Export for assertion
+  };
+});
+
+jest.mock('@/hooks/useHardwareBackPressHandler', () => ({
+  useHardwareBackPressHandler: jest.fn(),
+}));
+
+jest.mock('@/hooks/useSimulationCredits', () => ({
+  useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
+}));
+
+// Mock Components
 jest.mock('@/components', () => {
   const React = require('react');
   const {View, Text, TouchableOpacity} = require('react-native');
@@ -134,7 +172,7 @@ describe('SimulationsScreen', () => {
     // Titles are rendered; available one should be tappable and navigate
     const available = getByText('A Available');
     fireEvent.press(available);
-    const {mockNavigate} = require('@/hooks');
+    const {mockNavigate} = require('@/hooks/useAppNavigation');
     expect(mockNavigate).toHaveBeenCalledWith(
       SCREEN_NAMES.SIMULATION_DETAILS,
       expect.objectContaining({

@@ -2,6 +2,34 @@ import {ScenarioStatus} from '@/constants';
 
 import {AudioTrackRef} from './audio';
 
+export interface TriggerWarning {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ScenarioMetadata {
+  age?: number;
+  name?: string;
+  tone?: string;
+  gender?: string;
+  context?: string;
+  voiceId?: string;
+  agentGoal?: string;
+  profession?: string;
+  lifeHistory?: string;
+  personality?: string;
+  coreMemories?: string;
+  startingState?: string;
+  emotionalNeeds?: string;
+  genderIdentity?: string;
+  currentLocation?: string;
+  openingStatements?: string[];
+  sexualOrientation?: string;
+  sessionBehaviorGuidelines?: string;
+}
+
 export interface Scenario {
   id: number;
   title: string;
@@ -10,6 +38,16 @@ export interface Scenario {
   coverImageUrl?: string | null;
   coverVideoUrl?: string | null;
   status?: ScenarioStatus;
+  triggerWarnings?: TriggerWarning[];
+  createdAt?: string;
+  updatedAt?: string;
+  prompt?: string | null;
+  metadata?: ScenarioMetadata;
+  createdBy?: number;
+  updatedBy?: number;
+  deletedAt?: string | null;
+  isGlobal?: boolean;
+  terminationEvent?: unknown;
 }
 
 export interface ScenariosResponse {
@@ -62,6 +100,7 @@ export interface ScenarioSessionStartResponse {
     roomName: string;
     serverUrl: string;
   };
+  scenario: Scenario;
 }
 
 export interface CircleWaveVisualizerProps {
@@ -221,6 +260,7 @@ export interface PathScenario {
   coverVideoUrl?: string;
   sessionId: string | null;
   status: SessionItemStatus;
+  triggerWarnings?: TriggerWarning[];
 }
 
 export interface SimulationPathDetails {

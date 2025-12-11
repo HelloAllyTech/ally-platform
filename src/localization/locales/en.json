@@ -129,9 +129,10 @@
     "next": "Next",
     "andAcknowledge": "and acknowledge",
     "enterTheCodeSentTo": "Enter the security code sent to",
+    "codeExpiryMessage": "This code will expire in <bold>{{minutes}} minutes</bold>. Need a new code?",
     "didNotReceiveTheCode": "Did not receive the code?",
     "resend": "Resend",
-    "verifyOtp": "Verify OTP",
+    "verifyOtp": "Verify",
     "login": "Login",
     "email": "Email"
   },
@@ -274,7 +275,7 @@
     "session": "Session",
     "endingSoon": "Ending Soon",
     "sessionWillEnd": "Your session will end in 30 seconds.",
-    "practiceSessionScore": "Practice Session Score",
+    "simulationScore": "Simulation Score",
     "linkCopiedToClipboard": "Link copied to clipboard",
     "endSimulation": "End Simulation",
     "endSimulationConfirmation": "Are you sure you want to end this simulation?"
@@ -299,8 +300,8 @@
     },
     "chooseYour": "Choose your",
     "scenario": "Scenario",
-    "path": "Path",
-    "pathWay": "Path way",
+    "track": "Track",
+    "trackWay": "Track way",
     "learnIntro": "Use <blue>AI-voice based</blue> hyper realistic training <blue>role plays</blue> to build mental healthcare skills.",
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Scenario:",
@@ -310,7 +311,6 @@
     "audioSimulation": "Audio Simulation",
     "verifyOtp": "Verify OTP",
     "enterTheCodeSentTo": "Enter the code sent to",
-    "didNotReceiveTheCode": "Did not receive the code?",
     "resend": "Resend",
     "noSimulationsAvailable": "No simulations available",
     "noPathsAvailable": "No paths available",
@@ -328,7 +328,8 @@
     "progressCompleted": "{{current}} of {{total}} completed",
     "failedToLoadPathDetails": "Failed to load path details",
     "noActiveSimulation": "No active simulation found",
-    "sessionEndedSuccessfully": "Session ended successfully"
+    "sessionEndedSuccessfully": "Session ended successfully",
+    "triggerWarnings": "Trigger warnings"
   },
   "SimulationFeedback": {
     "title": "Simulation",

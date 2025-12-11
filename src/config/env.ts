@@ -38,5 +38,9 @@ export const env: Env = {
     Config.CLOUD_TELEPHONY_PATH,
     'CLOUD_TELEPHONY_PATH',
   ),
-  TERMS_AND_CONDITION_FLAG: Config.TERMS_AND_CONDITION_FLAG === 'true',
+  TERMS_AND_CONDITION_FLAG:
+    assertEnvVar(
+      Config.TERMS_AND_CONDITION_FLAG,
+      'TERMS_AND_CONDITION_FLAG',
+    ) === 'true',
 };
