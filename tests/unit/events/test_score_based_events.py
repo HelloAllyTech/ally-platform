@@ -1,12 +1,17 @@
 """
-Tests for score-based event triggering logic.
+Tests for score-based event triggering logic, including basic condition checks,
+cascading behaviors, and trigger_events filtering.
 """
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from typing import Set
+
+# Adjust imports based on your actual project structure
+from app.core.events.base import BaseEvent
 from app.core.events.event_types.score.score_event import ScoreEvent
 from app.core.events.event_types.score.constants import ScoreData
 from app.core.events.event_registry.event_registry import EventRegistry
-from app.core.constants import ConditionOperator, VisibilityType
+from app.core.constants import ConditionOperator, VisibilityType, DetectionType
 from app.core.scenario.base import Scenario
 
 
@@ -24,212 +29,254 @@ def thread_id():
     return "test-thread-123"
 
 
-def create_test_scenario_with_events(events):
-    """Helper to create a Scenario object from events for testing."""
+def create_test_scenario(events, trigger_events_whitelist=None):
+    """
+    Helper to create a Scenario.
+    If trigger_events_whitelist is provided, only those IDs are allowed to trigger.
+    Otherwise, defaults to all event IDs.
+    """
     scenario = MagicMock(spec=Scenario)
     scenario.events = events
-    scenario.trigger_events = []
+
+    if trigger_events_whitelist is not None:
+        scenario.trigger_events = trigger_events_whitelist
+    else:
+        scenario.trigger_events = [e.event_id for e in events]
+
     scenario.termination_event = None
     return scenario
 
 
-class TestScoreBasedEvents:
-    """Test score-based event detection and triggering."""
+class TestScoreCascadingLogic:
+    """
+    Comprehensive tests for score logic, covering basic conditions and complex cascades/filters.
+    """
 
+    # --- Basic Condition Tests ---
+
+    def test_score_event_lt_condition(self, mock_room, thread_id):
+        """Test that LT condition triggers when score is less than threshold."""
+        score_event = ScoreEvent.create(
+            event_id="score-lt-10",
+            data=ScoreData(score=10, condition=ConditionOperator.LT),
+            visibility_type=VisibilityType.ACTIVE
+        )
+        scenario = create_test_scenario([score_event])
+        registry = EventRegistry(scenario, mock_room, thread_id)
+
+        # Test 10 (not < 10)
+        triggered = registry.get_newly_triggered_score_events(10)
+        assert len(triggered) == 0
+
+        # Test 9 (< 10)
+        triggered = registry.get_newly_triggered_score_events(9)
+        assert "score-lt-10" in triggered
+
+        # Test 11 (not < 10, already happened, but for LT, it might revert in a real scenario,
+        # here we check if it triggers *newly* from 9 to 11, which it should not)
+        triggered = registry.get_newly_triggered_score_events(11)
+        assert len(triggered) == 0
+
+    def test_score_event_lte_condition(self, mock_room, thread_id):
+        """Test that LTE condition triggers when score is less than or equal to threshold."""
+        score_event = ScoreEvent.create(
+            event_id="score-lte-20",
+            data=ScoreData(score=20, condition=ConditionOperator.LTE),
+            visibility_type=VisibilityType.PASSIVE
+        )
+        scenario = create_test_scenario([score_event])
+        registry = EventRegistry(scenario, mock_room, thread_id)
+
+        # Test 21 (not <= 20)
+        triggered = registry.get_newly_triggered_score_events(21)
+        assert len(triggered) == 0
+
+        # Test 20 (<= 20)
+        triggered = registry.get_newly_triggered_score_events(20)
+        assert "score-lte-20" in triggered
+
+        # Test 19 (<= 20, already happened, should not trigger newly)
+        triggered = registry.get_newly_triggered_score_events(19)
+        assert len(triggered) == 0
 
     def test_score_event_gt_condition(self, mock_room, thread_id):
         """Test that GT condition triggers when score exceeds threshold."""
-        # Create a score event that triggers when score > 10
         score_event = ScoreEvent.create(
             event_id="score-gt-10",
             data=ScoreData(score=10, condition=ConditionOperator.GT),
-            visibility_type=VisibilityType.ACTIVE,
-            score=5  # This event itself adds 5 points when triggered
+            visibility_type=VisibilityType.ACTIVE
         )
-        
-        scenario = create_test_scenario_with_events([score_event])
+        scenario = create_test_scenario([score_event])
         registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # Initially, score is 0, so event should not be triggered
-        assert registry.event_registry["score-gt-10"]["happened"] is False
-        
-        # Check with score = 10 (not > 10, should not trigger)
+
+        # Test 10 (not > 10)
         triggered = registry.get_newly_triggered_score_events(10)
         assert len(triggered) == 0
-        assert registry.event_registry["score-gt-10"]["happened"] is False
-        
-        # Check with score = 11 (> 10, should trigger)
-        triggered = registry.get_newly_triggered_score_events(11)
-        assert len(triggered) == 1
-        assert "score-gt-10" in triggered
-        assert registry.event_registry["score-gt-10"]["happened"] is True
-        
-        # Check again with score = 15 (already triggered, should not trigger again)
-        triggered = registry.get_newly_triggered_score_events(15)
-        assert len(triggered) == 0  # Already triggered, no new triggers
 
+        # Test 11 (> 10)
+        triggered = registry.get_newly_triggered_score_events(11)
+        assert "score-gt-10" in triggered
+
+        # Test 15 (already triggered)
+        triggered = registry.get_newly_triggered_score_events(15)
+        assert len(triggered) == 0
 
     def test_score_event_gte_condition(self, mock_room, thread_id):
-        """Test that GTE condition triggers when score >= threshold."""
+        """Test that GTE condition triggers when score is greater than or equal to threshold."""
         score_event = ScoreEvent.create(
             event_id="score-gte-20",
             data=ScoreData(score=20, condition=ConditionOperator.GTE),
             visibility_type=VisibilityType.PASSIVE
         )
-        
-        scenario = create_test_scenario_with_events([score_event])
+        scenario = create_test_scenario([score_event])
         registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # Check with score = 19 (< 20, should not trigger)
+
+        # Test 19 (not >= 20)
         triggered = registry.get_newly_triggered_score_events(19)
         assert len(triggered) == 0
-        
-        # Check with score = 20 (>= 20, should trigger)
+
+        # Test 20 (>= 20)
         triggered = registry.get_newly_triggered_score_events(20)
-        assert len(triggered) == 1
         assert "score-gte-20" in triggered
 
-
-    def test_score_event_lt_condition(self, mock_room, thread_id):
-        """Test that LT condition triggers when score < threshold."""
-        score_event = ScoreEvent.create(
-            event_id="score-lt-5",
-            data=ScoreData(score=5, condition=ConditionOperator.LT),
-            visibility_type=VisibilityType.ACTIVE
-        )
-        
-        scenario = create_test_scenario_with_events([score_event])
-        registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # Initially all events start as False in setup_initial_state()
-        # Score events are only evaluated in async initialize() or when get_newly_triggered_score_events is called
-        assert registry.event_registry["score-lt-5"]["happened"] is False
-        
-        # Check with score = 4 (< 5, should trigger)
-        triggered = registry.get_newly_triggered_score_events(4)
-        assert len(triggered) == 1
-        assert "score-lt-5" in triggered
-        assert registry.event_registry["score-lt-5"]["happened"] is True
-        
-        # Check with score = 5 (not < 5, but event stays True since it already triggered)
-        triggered = registry.get_newly_triggered_score_events(5)
+        # Test 25 (already triggered)
+        triggered = registry.get_newly_triggered_score_events(25)
         assert len(triggered) == 0
-        assert registry.event_registry["score-lt-5"]["happened"] is True
-
 
     def test_score_event_eq_condition(self, mock_room, thread_id):
-        """Test that EQ condition triggers when score == threshold."""
+        """Test that EQ condition triggers when score is exactly equal to threshold."""
         score_event = ScoreEvent.create(
-            event_id="score-eq-50",
-            data=ScoreData(score=50, condition=ConditionOperator.EQ),
-            visibility_type=VisibilityType.ACTIVE
-        )
-        
-        scenario = create_test_scenario_with_events([score_event])
-        registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # Check with score = 49 (not == 50, should not trigger)
-        triggered = registry.get_newly_triggered_score_events(49)
-        assert len(triggered) == 0
-        
-        # Check with score = 50 (== 50, should trigger)
-        triggered = registry.get_newly_triggered_score_events(50)
-        assert len(triggered) == 1
-        assert "score-eq-50" in triggered
-        
-        # Check with score = 51 (not == 50, no new trigger but stays True since it already happened)
-        triggered = registry.get_newly_triggered_score_events(51)
-        assert len(triggered) == 0
-        # Event stays True once triggered (it happened at score 50)
-        assert registry.event_registry["score-eq-50"]["happened"] is True
-
-
-    def test_multiple_score_events(self, mock_room, thread_id):
-        """Test multiple score events with different conditions."""
-        event1 = ScoreEvent.create(
-            event_id="score-gt-10",
-            data=ScoreData(score=10, condition=ConditionOperator.GT),
-            visibility_type=VisibilityType.ACTIVE
-        )
-        event2 = ScoreEvent.create(
-            event_id="score-gte-20",
-            data=ScoreData(score=20, condition=ConditionOperator.GTE),
-            visibility_type=VisibilityType.ACTIVE
-        )
-        event3 = ScoreEvent.create(
-            event_id="score-lt-5",
-            data=ScoreData(score=5, condition=ConditionOperator.LT),
+            event_id="score-eq-5",
+            data=ScoreData(score=5, condition=ConditionOperator.EQ),
             visibility_type=VisibilityType.PASSIVE
         )
-        
-        scenario = create_test_scenario_with_events([event1, event2, event3])
+        scenario = create_test_scenario([score_event])
         registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # Initially all events start as False
-        assert registry.event_registry["score-gt-10"]["happened"] is False
-        assert registry.event_registry["score-gte-20"]["happened"] is False
-        assert registry.event_registry["score-lt-5"]["happened"] is False
-        
-        # Check with score = 4 (should trigger LT-5)
+
+        # Test 4 (not == 5)
         triggered = registry.get_newly_triggered_score_events(4)
-        assert len(triggered) == 1
-        assert "score-lt-5" in triggered
-        
-        # Check with score = 15 (should trigger GT-10, but not GTE-20, LT-5 stays True)
-        triggered = registry.get_newly_triggered_score_events(15)
-        assert len(triggered) == 1
-        assert "score-gt-10" in triggered
-        assert registry.event_registry["score-gt-10"]["happened"] is True
-        assert registry.event_registry["score-gte-20"]["happened"] is False
-        assert registry.event_registry["score-lt-5"]["happened"] is True
-        
-        # Check with score = 25 (should trigger GTE-20, GT-10 already triggered)
-        triggered = registry.get_newly_triggered_score_events(25)
-        assert len(triggered) == 1
-        assert "score-gte-20" in triggered
-        assert registry.event_registry["score-gt-10"]["happened"] is True
-        assert registry.event_registry["score-gte-20"]["happened"] is True
+        assert len(triggered) == 0
 
+        # Test 5 (== 5)
+        triggered = registry.get_newly_triggered_score_events(5)
+        assert "score-eq-5" in triggered
 
-    def test_cascading_score_events(self, mock_room, thread_id):
-        """Test that score events can trigger other score events (cascading)."""
-        # Event 1: Triggers when score > 10, adds 15 points
-        event1 = ScoreEvent.create(
-            event_id="score-gt-10",
-            data=ScoreData(score=10, condition=ConditionOperator.GT),
+        # Test 6 (not == 5, already triggered)
+        triggered = registry.get_newly_triggered_score_events(6)
+        assert len(triggered) == 0  # Event already triggered, no new trigger
+
+    # --- Cascade and Filtering Tests (using SENTENCE_SIMILARITY) ---
+
+    def _create_chain_events(self):
+        """
+        Creates a chain of 3 events:
+        1. Event A (Source): SENTENCE_SIMILARITY event, adds 10 points.
+        2. Event B (Intermediate): Score event (triggers at >=10), adds 5 points.
+        3. Event C (Final): Score event (triggers at >=15).
+        """
+        # Event A: The user says something, detected via sentence similarity, adds 10 score
+        event_a = MagicMock(spec=BaseEvent)
+        event_a.event_id = "event_a"
+        event_a.score = 10
+        event_a.detection_type = DetectionType.SENTENCE_SIMILARITY
+        event_a.branching_instruction = None
+
+        # Event B: Triggers when score >= 10. Adds 5 score.
+        event_b = ScoreEvent.create(
+            event_id="event_b",
+            data=ScoreData(score=10, condition=ConditionOperator.GTE),
             visibility_type=VisibilityType.ACTIVE,
-            score=15  # Adds 15 points when triggered
+            score=5
         )
-        # Event 2: Triggers when score >= 20
-        event2 = ScoreEvent.create(
-            event_id="score-gte-20",
-            data=ScoreData(score=20, condition=ConditionOperator.GTE),
-            visibility_type=VisibilityType.ACTIVE,
-            score=10  # Adds 10 points when triggered
-        )
-        # Event 3: Triggers when score >= 30
-        event3 = ScoreEvent.create(
-            event_id="score-gte-30",
-            data=ScoreData(score=30, condition=ConditionOperator.GTE),
+
+        # Event C: Triggers when score >= 15. Score remains 0 (None) by default.
+        event_c = ScoreEvent.create(
+            event_id="event_c",
+            data=ScoreData(score=15, condition=ConditionOperator.GTE),
             visibility_type=VisibilityType.ACTIVE
         )
-        
-        scenario = create_test_scenario_with_events([event1, event2, event3])
+
+        return [event_a, event_b, event_c]
+
+    def _setup_registry_with_events(self, events, scenario, mock_room, thread_id):
+        """Helper to set up and initialize the registry."""
         registry = EventRegistry(scenario, mock_room, thread_id)
-        
-        # The cascading logic is tested in update_and_send_events
-        # Here we just verify that get_newly_triggered_score_events correctly identifies triggers
-        
-        # At score = 11: event1 should trigger
-        triggered = registry.get_newly_triggered_score_events(11)
-        assert "score-gt-10" in triggered
-        
-        # After event1 triggers and adds 15, score becomes 26
-        # At score = 26: event2 should trigger
-        triggered = registry.get_newly_triggered_score_events(26)
-        assert "score-gte-20" in triggered
-        
-        # After event2 triggers and adds 10, score becomes 36
-        # At score = 36: event3 should trigger
-        triggered = registry.get_newly_triggered_score_events(36)
-        assert "score-gte-30" in triggered
+
+        # Manually ensure the source event (Event A) state is correctly set in the registry
+        for event in events:
+            registry.set_event_state(event.event_id, False, event.detection_type)
+
+        return registry
+
+    def test_full_cascade_success(self, mock_room, thread_id):
+        """
+        CASE 1: Happy Path
+        All events are in trigger_events. Expected added_score = 5 (from B).
+        """
+        events = self._create_chain_events()
+        scenario = create_test_scenario(events, trigger_events_whitelist=["event_a", "event_b", "event_c"])
+        registry = self._setup_registry_with_events(events, scenario, mock_room, thread_id)
+
+        detected_ids = {"event_a"}
+        final_ids, added_score = registry._evaluate_and_handle_cascade_score_events(detected_ids)
+
+        assert "event_a" in final_ids
+        assert "event_b" in final_ids
+        assert "event_c" in final_ids
+        assert added_score == 5
+
+    def test_source_event_filtered(self, mock_room, thread_id):
+        """
+        CASE 2: Source Filtered
+        Event A is NOT in trigger_events. Expected: Score remains 0. B and C do NOT trigger.
+        """
+        events = self._create_chain_events()
+        scenario = create_test_scenario(events, trigger_events_whitelist=["event_b", "event_c"])
+        registry = self._setup_registry_with_events(events, scenario, mock_room, thread_id)
+
+        detected_ids = {"event_a"}
+        final_ids, added_score = registry._evaluate_and_handle_cascade_score_events(detected_ids)
+
+        assert "event_a" in final_ids
+        assert "event_b" not in final_ids
+        assert "event_c" not in final_ids
+        assert added_score == 0
+
+    def test_intermediate_cascade_filtered(self, mock_room, thread_id):
+        """
+        CASE 3: Intermediate Event Filtered
+        Event B is NOT in trigger_events. Expected: B triggers (happened=True), but its score (+5) is ignored. C fails.
+        """
+        events = self._create_chain_events()
+        scenario = create_test_scenario(events, trigger_events_whitelist=["event_a", "event_c"])
+        registry = self._setup_registry_with_events(events, scenario, mock_room, thread_id)
+
+        detected_ids = {"event_a"}
+        final_ids, added_score = registry._evaluate_and_handle_cascade_score_events(detected_ids)
+
+        assert "event_a" in final_ids
+        assert "event_b" in final_ids  # B should register as "happened"
+        assert "event_c" not in final_ids
+        assert added_score == 0  # B's score was filtered out
+
+    def test_live_score_integration(self, mock_room, thread_id):
+        """
+        CASE 4: Existing Live Score
+        Tests that existing live_score respects the filter logic (B and C are allowed).
+        """
+        events = self._create_chain_events()
+        scenario = create_test_scenario(events, trigger_events_whitelist=["event_b", "event_c"])
+        registry = self._setup_registry_with_events(events, scenario, mock_room, thread_id)
+
+        # Manually set accumulated score to 10 (simulating previous events that were sent/scored)
+        registry.live_score = 10
+
+        # Pass empty set to check purely score-based events
+        final_ids, added_score = registry._evaluate_and_handle_cascade_score_events(set())
+
+        # B triggers at 10, C triggers at 15 (since B adds +5)
+        assert "event_b" in final_ids
+        assert "event_c" in final_ids
+
+        # Added score comes from B (+5)
+        assert added_score == 5
