@@ -49,9 +49,8 @@ export const styles = ScaledSheet.create({
     marginBottom: '20@mvs',
   },
   participantsContent: {
-    flex: 1,
+    height: '100%',
     flexShrink: 1,
-    minHeight: '280@mvs',
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -60,6 +59,7 @@ export const styles = ScaledSheet.create({
     zIndex: 1,
   },
   participantsContainer: {
+    flexShrink: 1,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -84,9 +84,6 @@ export const styles = ScaledSheet.create({
     flex: 1,
     overflow: 'visible',
     zIndex: 10,
-  },
-  marginT12: {
-    marginTop: '12@vs',
   },
   liveFeedbackWrapper: {
     marginVertical: '10@mvs',
