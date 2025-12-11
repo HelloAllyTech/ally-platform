@@ -169,12 +169,13 @@ const styles = ScaledSheet.create({
   },
   headerTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
-    fontWeight: fontWeights.medium,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
     color: colors.ds.typography.highEmphasis,
   },
   headerTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   closeButton: {

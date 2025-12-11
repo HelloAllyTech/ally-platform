@@ -28,7 +28,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {colors, fontFamily, radius, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
 import {ActiveSimulationModal} from './components';
@@ -288,11 +288,13 @@ const styles = ScaledSheet.create({
   },
   pageTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.darkGray12,
-    fontSize: '18@ms',
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
+    color: colors.ds.typography.highEmphasis,
   },
   pageTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   row: {

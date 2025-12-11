@@ -221,7 +221,7 @@ export const SimulationsScreen: React.FC = () => {
         <Text style={styles.listTitle}>
           {t('Simulations.chooseYour')}{' '}
           <Text style={styles.pageTitleItalic}>
-            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'path'}`)}
+            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'track'}`)}
           </Text>
         </Text>
         {isSimulationsTab ? (
@@ -290,7 +290,7 @@ export const SimulationsScreen: React.FC = () => {
               },
               {
                 key: SimulationTabs.PATHS,
-                label: t('Simulations.pathWay'),
+                label: t('Simulations.trackWay'),
               },
             ]}
             activeTab={activeTab}

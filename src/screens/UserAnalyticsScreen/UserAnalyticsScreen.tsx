@@ -215,13 +215,14 @@ const styles = ScaledSheet.create({
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
-    ...typography.headline.tiny,
-    fontWeight: fontWeights.medium,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
     marginLeft: '16@s',
     textAlign: 'left',
   },
   boldItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   content: {
