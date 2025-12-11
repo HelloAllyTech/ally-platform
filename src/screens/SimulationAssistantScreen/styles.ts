@@ -85,4 +85,12 @@ export const styles = ScaledSheet.create({
     overflow: 'visible',
     zIndex: 10,
   },
+  marginT12: {
+    marginTop: '12@vs',
+  },
+  liveFeedbackWrapper: {
+    marginVertical: '10@mvs',
+    marginHorizontal: '14@ms',
+    flexShrink: 0,
+  },
 });

@@ -208,6 +208,7 @@ jest.mock('@/utils', () => ({
     triggerWarnings?.map((tw: any) => tw.name) || []
   ),
   logger: {info: jest.fn(), error: jest.fn()},
+  playNotificationSound: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('react-i18next', () => ({
