@@ -599,7 +599,7 @@ class EventRegistry:
         Get the set of event IDs for score-based events that are newly triggered.
         1. Iterates through all score-based events
         2. Evaluates their conditions against the current score
-        3. Updates their "happened" state if the condition is met
+        3. Updates their "happened" state based on whether the condition is met
         4. Returns the set of event IDs that newly became True (weren't True before)
         5. Events that are already in the _sent_events set are skipped
         
@@ -612,10 +612,6 @@ class EventRegistry:
         newly_triggered_event_ids: Set[str] = set()
 
         for event in self.score_based_events:
-            # Check if the event has already been sent
-            if event.event_id in self._sent_events:
-                continue
-
             # Check if event was already happened (prevents infinite loop)
             event_data = self.event_registry.get(event.event_id)
             was_happened = event_data.get("happened", False) if event_data else False
@@ -625,12 +621,26 @@ class EventRegistry:
                 condition=event.data.condition,
                 threshold=event.data.score
             )
-            # Only add if condition is met AND it wasn't already True (newly triggered)
-            if condition_met and not was_happened:
-                self.set_event_state(event.event_id, True, DetectionType.SCORE)
-                newly_triggered_event_ids.add(event.event_id)
-            elif condition_met:
-                # Condition is met but was already True - update state but don't add to newly triggered
-                self.set_event_state(event.event_id, True, DetectionType.SCORE)
+            
+            if condition_met:
+                # Only add to newly triggered if not already sent
+                if event.event_id not in self._sent_events:
+                    # Only add if condition is met AND it wasn't already True (newly triggered)
+                    if not was_happened:
+                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
+                        newly_triggered_event_ids.add(event.event_id)
+                    else:
+                        # Condition is met but was already True - update state but don't add to newly triggered
+                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
+                else:
+                    # Event was already sent, but still update state to True if condition is met
+                    self.set_event_state(event.event_id, True, DetectionType.SCORE)
+            else:
+                # Condition is NOT met - set happened to False
+                # This ensures combination events that depend on this score event are properly re-evaluated
+                # This must happen even for sent events, so combination events can re-evaluate correctly
+                if was_happened:
+                    logger.debug(f"Score event {event.event_id} condition no longer met at score {current_score}. Setting happened=False")
+                self.set_event_state(event.event_id, False, DetectionType.SCORE)
 
         return newly_triggered_event_ids

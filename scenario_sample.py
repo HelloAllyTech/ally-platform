@@ -35,6 +35,63 @@ SCENARIO_SAMPLE = {
                 "feedbackStatus": "True"
             },
             {
+                "id": "warm-greeting",
+                "name": "Offered warm greeting",
+                "description": "",
+                "score": 5,
+                "data": {
+                    "sentences": ["Welcome to the helpline"]
+                },
+                "emoji": "🔼",
+                "message": "Good greetings",
+                "detectionType": "SEMANTIC_SIMILARITY",
+                "branchInstruction": "start speaking",
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "score-lte-0",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": 0,
+                "data": {
+                    "score": 0,
+                    "condition": "LTE"
+                },
+                "emoji": "🔼",
+                "message": "Let's get started",
+                "detectionType": "SCORE",
+                "branchInstruction": "",
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "comb-score-lte-0_and_open-ended-question",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": 0,
+                "data": {
+                    "expression": {
+                        "left": {
+                            "id": "score-lte-0",
+                            "type": "IDENTIFIER"
+                        },
+                        "type": "AND",
+                        "right": {
+                            "id": "open-ended-question",
+                            "type": "IDENTIFIER"
+                        }
+                    },
+                    "dependentEvents": [
+                        "score-lte-0",
+                        "open-ended-question"
+                    ]
+                },
+                "emoji": "🔼",
+                "detectionType": "COMBINATION",
+                "message": "Let's get started",
+                "branchInstruction": "",
+                "feedbackStatus": "True"
+            },
+            {
                 "id": "open-ended-question",
                 "name": "Open Ended Question",
                 "description": "Triggers when open ended question is detected",
@@ -66,7 +123,8 @@ SCENARIO_SAMPLE = {
                 },
             },
         ],
-        "triggerEvents": ["open-ended-question", "superficial-hope"],
+        "triggerEvents": ["open-ended-question", "superficial-hope", "comb-score-lte-0_and_open-ended-question",
+                          "warm-greeting", "score-lte-0"],
         "voice": {
             "name": "priya-adult-female",
             "provider": "sarvam",
