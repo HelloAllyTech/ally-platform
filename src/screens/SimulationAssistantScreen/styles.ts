@@ -43,17 +43,21 @@ export const styles = ScaledSheet.create({
     textAlign: 'center',
   },
   scoreMeterContainer: {
+    flexShrink: 0,
     width: '80%',
     marginVertical: '10@mvs',
     marginBottom: '20@mvs',
   },
   participantsContent: {
     flex: 1,
+    flexShrink: 1,
+    minHeight: '280@mvs',
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: '8@mvs',
     marginBottom: '16@mvs',
+    zIndex: 1,
   },
   participantsContainer: {
     width: '100%',
@@ -61,7 +65,7 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
   },
   participantsVertical: {
-    flex: 1,
+    flexGrow: 1,
     gap: '12@vs',
   },
   participantsHorizontal: {
