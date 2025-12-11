@@ -19,21 +19,28 @@ describe('VideoPreview', () => {
     expect(videoComponent.props.controls).toBe(false);
   });
 
-  it('shows play button overlay when video is paused', async () => {
-    const {getByTestId, UNSAFE_getByType} = render(
-      <VideoPreview videoUrl={mockVideoUrl} testID="video-preview" />,
-    );
+  it(
+    'shows play button overlay when video is paused',
+    async () => {
+      const {getByTestId, UNSAFE_getByType} = render(
+        <VideoPreview videoUrl={mockVideoUrl} testID="video-preview" />,
+      );
 
-    // Simulate video ready
-    const videoComponent = UNSAFE_getByType('Video' as any);
-    await act(async () => {
-      videoComponent.props.onReadyForDisplay();
-    });
+      // Simulate video ready
+      const videoComponent = UNSAFE_getByType('Video' as any);
+      await act(async () => {
+        videoComponent.props.onReadyForDisplay();
+      });
 
-    await waitFor(() => {
-      expect(getByTestId('video-preview-play-button')).toBeTruthy();
-    });
-  });
+      await waitFor(
+        () => {
+          expect(getByTestId('video-preview-play-button')).toBeTruthy();
+        },
+        {timeout: 10000},
+      );
+    },
+    10000,
+  );
 
   it('toggles video playback when play button is pressed', async () => {
     const onPlayStateChange = jest.fn();

@@ -8,7 +8,7 @@ import {DataUnavailableIcon} from '@/assets/icons';
 import {EmptyState, TabView} from '@/components';
 import {AnalyticsType} from '@/constants/analytics';
 import {isIOS, SCREEN_WIDTH} from '@/constants/general';
-import {useTranslate, useUser} from '@/hooks';
+import {useTabBackToHomeHandler, useTranslate, useUser} from '@/hooks';
 import {
   useGetDashboardsQuery,
   useLazyGetDashboardUrlQuery,
@@ -20,6 +20,7 @@ import {fontWeights, typography} from '@/theme/typography';
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
   const {userData} = useUser();
+  useTabBackToHomeHandler();
   const [activeTab, setActiveTab] = useState<AnalyticsType>(
     AnalyticsType.CALL_LOG_ANALYTICS,
   );
@@ -214,13 +215,14 @@ const styles = ScaledSheet.create({
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
-    ...typography.headline.tiny,
-    fontWeight: fontWeights.medium,
+    ...typography.display.small,
+    fontWeight: fontWeights.light,
     marginLeft: '16@s',
     textAlign: 'left',
   },
   boldItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
+    fontWeight: fontWeights.light,
     fontStyle: isIOS ? 'italic' : 'normal',
   },
   content: {

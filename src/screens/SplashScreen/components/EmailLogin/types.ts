@@ -1,3 +1,3 @@
 export interface EmailLoginProps {
-  onOtpGenerationSuccess: (email: string) => void;
+  onOtpGenerationSuccess: (email: string, expiresIn?: number) => void;
 }

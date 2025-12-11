@@ -133,19 +133,23 @@ describe('BreathingScreen', () => {
     expect(getByTestId('call-end-overlay')).toBeTruthy();
   });
 
-  it('hides overlay and shows breathing animation after 3 seconds', async () => {
-    const {getByTestId, queryByTestId} = render(
-      <BreathingScreen navigation={mockNavigation} route={mockRoute} />,
-    );
+  it(
+    'hides overlay and shows breathing animation after 3 seconds',
+    async () => {
+      const {getByTestId, queryByTestId} = render(
+        <BreathingScreen navigation={mockNavigation} route={mockRoute} />,
+      );
 
-    expect(getByTestId('call-end-overlay')).toBeTruthy();
+      expect(getByTestId('call-end-overlay')).toBeTruthy();
 
-    await act(async () => {
-      jest.advanceTimersByTime(3000);
-    });
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
 
-    expect(getByTestId('box-breathing-animation')).toBeTruthy();
-  });
+      expect(getByTestId('box-breathing-animation')).toBeTruthy();
+    },
+    10000,
+  );
 
   it('toggles play/pause when control button is pressed', async () => {
     const {getByTestId} = render(

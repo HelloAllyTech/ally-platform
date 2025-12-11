@@ -4,6 +4,12 @@ import {fireEvent, render} from '@testing-library/react-native';
 
 import {SimulationCard} from '../SimulationCard';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
 describe('SimulationCard', () => {
   const mockOnPress = jest.fn();
 
@@ -251,6 +257,31 @@ describe('SimulationCard', () => {
     // Should be able to press the card
     fireEvent.press(getByText('Test Simulation'));
     expect(mockOnPress).toHaveBeenCalled();
+  });
+
+  it('renders trigger warnings when provided', () => {
+    const warnings = ['Warning 1', 'Warning 2'];
+    const {getByText} = render(
+      <SimulationCard title="Test Simulation" triggerWarnings={warnings} />,
+    );
+
+    expect(getByText('Simulations.triggerWarnings')).toBeTruthy();
+    expect(getByText('Warning 1')).toBeTruthy();
+    expect(getByText('Warning 2')).toBeTruthy();
+  });
+
+  it('does not render trigger warnings section when triggerWarnings is empty', () => {
+    const {queryByText} = render(
+      <SimulationCard title="Test Simulation" triggerWarnings={[]} />,
+    );
+
+    expect(queryByText('Simulations.triggerWarnings')).toBeNull();
+  });
+
+  it('does not render trigger warnings section when triggerWarnings is undefined', () => {
+    const {queryByText} = render(<SimulationCard title="Test Simulation" />);
+
+    expect(queryByText('Simulations.triggerWarnings')).toBeNull();
   });
 });
 

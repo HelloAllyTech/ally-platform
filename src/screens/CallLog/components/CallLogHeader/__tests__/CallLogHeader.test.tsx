@@ -19,7 +19,11 @@ jest.mock('@/hooks', () => {
 describe('CallLogHeader', () => {
   it('opens drawer on hamburger press', () => {
     const {UNSAFE_getAllByType} = render(
-      <CallLogHeader search="" onSearchChange={() => {}} />,
+      <CallLogHeader
+        search=""
+        onSearchChange={() => {}}
+        showHamburger={true}
+      />,
     );
     const buttons = UNSAFE_getAllByType(TouchableOpacity);
     fireEvent.press(buttons[0]);

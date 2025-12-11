@@ -16,6 +16,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import CheckIcon from './check.svg';
+import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
@@ -47,6 +48,7 @@ import HeadsetMicIcon from './headsetMic.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
+import InfoBlackCircleIcon from './infoBlackCircle.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
 import LearnInactiveIcon from './learn.svg';
@@ -59,6 +61,7 @@ import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicOffIcon from './micOff.svg';
+import MicOffWhiteIcon from './micOffWhite.svg';
 import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
@@ -96,6 +99,7 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
@@ -119,6 +123,7 @@ export {
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CheckIcon,
+  CheckWhiteIcon,
   ChevronDown,
   CloseCircle,
   CloseIcon,
@@ -148,6 +153,7 @@ export {
   HeadsetMicIcon,
   HexagonCloseIcon,
   HourGlassIcon,
+  InfoBlackCircleIcon,
   InfoIcon,
   KeyConcernIcon,
   KeyEventsIcon,
@@ -160,6 +166,7 @@ export {
   LogoutIcon,
   MagnifyEyeIcon,
   MicIcon,
+  MicOffWhiteIcon,
   MicOffIcon,
   MicOnIcon,
   NetworkDisconnectedIcon,
@@ -199,6 +206,7 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
+  UserIcon,
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,

@@ -4,7 +4,6 @@ import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 import {useErrorToast} from '@/components';
 import {MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
 import {useStartScenarioSessionMutation} from '@/services';
-import type {Scenario} from '@/types';
 import {getErrorDetails} from '@/utils';
 
 import {useAppNavigation} from './useAppNavigation';
@@ -17,7 +16,7 @@ interface UseStartSimulationReturn {
   activeSimulationId: string | null;
   showActiveSimulationModal: boolean;
   startSimulation: (
-    scenario: Scenario,
+    scenarioId: number,
     scenarioPathSessionItemId?: string,
     pathId?: string,
   ) => Promise<void>;
@@ -62,7 +61,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
   };
 
   const startSimulation = async (
-    scenario: Scenario,
+    scenarioId: number,
     scenarioPathSessionItemId?: string,
     pathId?: string,
   ) => {
@@ -94,7 +93,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
 
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
-        scenarioId: scenario.id,
+        scenarioId,
         ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
       }).unwrap();
 
@@ -106,7 +105,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },
-          scenario,
+          scenario: startResp.scenario,
           ...(scenarioPathSessionItemId && {
             pathSessionItemId: scenarioPathSessionItemId,
           }),

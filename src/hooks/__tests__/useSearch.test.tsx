@@ -88,20 +88,20 @@ describe('useSearch', () => {
     });
 
     // Load more
-    act(() => {
+    await act(async () => {
       getByTestId('handleEndReached').props.onPress();
     });
     // With our simple mock, handleEndReached will trigger another fetch; resourcesCount should increase
     // We cannot access internal state setters to set lastSearchedText, so endReached won't fetch without it; skip strict resource assertions
 
     // Change category
-    act(() => {
+    await act(async () => {
       getByTestId('handleTab0').props.onPress();
       getByTestId('handleTabGeneral').props.onPress();
     });
 
     // Reset search
-    act(() => {
+    await act(async () => {
       getByTestId('resetSearch').props.onPress();
     });
 
@@ -124,18 +124,18 @@ describe('useSearch', () => {
 });
 
 describe('useSearch extended', () => {
-  it('handles tabs change and end reached', () => {
+  it('handles tabs change and end reached', async () => {
     const flatListRef: any = { current: { scrollToOffset: jest.fn() } };
     const { result, rerender } = renderHook(() => useSearch(flatListRef));
     if (result.current.tabsMeta.length === 0) {
       // no tabs to change; just exercise handlers that are safe
-      require('@testing-library/react-native').act(() => {
+      await act(async () => {
         result.current.handleEndReached();
         result.current.resetSearch();
       });
       return;
     }
-    require('@testing-library/react-native').act(() => {
+    await act(async () => {
       result.current.handleTabChange(0);
       result.current.handleEndReached();
       result.current.resetSearch();
@@ -167,17 +167,15 @@ describe('useSearch more cases', () => {
     expect(result.current.resources.length).toBeGreaterThanOrEqual(5);
 
     // Tab meta and handlers
-    act(() => {
+    await act(async () => {
       result.current.handleTabChange(0);
     });
 
     // Reset and ensure state is cleared
-    act(() => {
+    await act(async () => {
       result.current.resetSearch();
     });
     expect(result.current.resources.length).toBe(0);
     expect(result.current.selectedCategory).toBe('All');
   });
 });
-
-

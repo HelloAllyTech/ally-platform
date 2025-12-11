@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  RefreshControl,
   Text,
   TouchableOpacity,
   View,
@@ -66,6 +67,16 @@ export const SimulationPathDetailsScreen: React.FC<
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
   const {credits, getCreditsInfo} = useSimulationCredits();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetchPathDetails();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchPathDetails]);
 
   useEffect(() => {
     if (getCreditsInfo?.isLow) {
@@ -198,13 +209,7 @@ export const SimulationPathDetailsScreen: React.FC<
   const handleStartSimulation = () => {
     if (selectedSimulation) {
       startSimulation(
-        {
-          id: selectedSimulation.scenarioId,
-          title: selectedSimulation.title || '',
-          description: selectedSimulation.description || '',
-          coverImageUrl: selectedSimulation.coverImageUrl,
-          coverVideoUrl: selectedSimulation.coverVideoUrl,
-        },
+        selectedSimulation.scenarioId,
         selectedSimulation.sessionId || undefined,
         pathId,
       ).finally(() => {
@@ -218,7 +223,7 @@ export const SimulationPathDetailsScreen: React.FC<
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
         <LeftArrowIcon color={colors.ds.typography.highEmphasis} />
       </TouchableOpacity>
-      <Text style={styles.pageTitle}>{t('Simulations.pathWay')}</Text>
+      <Text style={styles.pageTitle}>{t('Simulations.trackWay')}</Text>
       <View style={styles.headerSpacer} />
       {credits && getCreditsInfo && (
         <View style={styles.creditDisplay}>
@@ -323,12 +328,10 @@ export const SimulationPathDetailsScreen: React.FC<
           testID="activity-indicator"
         />
       ) : error || !pathData?.scenarios ? (
-        <View style={[styles.container, styles.centerContent]}>
-          <EmptyState
-            icon={DataUnavailableIcon}
-            title={t('Simulations.failedToLoadPathDetails')}
-          />
-        </View>
+        <EmptyState
+          icon={DataUnavailableIcon}
+          title={t('Simulations.failedToLoadPathDetails')}
+        />
       ) : (
         <FlatList
           data={pathData?.scenarios || []}
@@ -337,6 +340,9 @@ export const SimulationPathDetailsScreen: React.FC<
           ListHeaderComponent={renderListHeaderComponent}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       )}
 

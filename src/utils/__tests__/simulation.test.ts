@@ -1,4 +1,6 @@
-import {decodeFeedbackPayloadToJson} from '../simulation';
+import type {TriggerWarning} from '@/types';
+
+import {decodeFeedbackPayloadToJson, getTriggerWarningNames} from '../simulation';
 
 describe('decodeFeedbackPayloadToJson', () => {
   it('should decode a valid Uint8Array payload to JSON', () => {
@@ -19,5 +21,41 @@ describe('decodeFeedbackPayloadToJson', () => {
     const payload = 'invalid';
     const result = decodeFeedbackPayloadToJson(payload);
     expect(result).toBeNull();
+  });
+});
+
+describe('getTriggerWarningNames', () => {
+  it('should extract names from trigger warnings array', () => {
+    const triggerWarnings: TriggerWarning[] = [
+      {id: '1', name: 'Depression'},
+      {id: '2', name: 'Anxiety'},
+      {id: '3', name: 'Suicidal ideation'},
+    ];
+    const result = getTriggerWarningNames(triggerWarnings);
+    expect(result).toEqual(['Depression', 'Anxiety', 'Suicidal ideation']);
+  });
+
+  it('should return empty array when triggerWarnings is undefined', () => {
+    const result = getTriggerWarningNames(undefined);
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array when triggerWarnings is empty', () => {
+    const result = getTriggerWarningNames([]);
+    expect(result).toEqual([]);
+  });
+
+  it('should handle trigger warnings with additional optional fields', () => {
+    const triggerWarnings: TriggerWarning[] = [
+      {
+        id: '1',
+        name: 'Depression',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-02',
+      },
+      {id: '2', name: 'Anxiety'},
+    ];
+    const result = getTriggerWarningNames(triggerWarnings);
+    expect(result).toEqual(['Depression', 'Anxiety']);
   });
 });

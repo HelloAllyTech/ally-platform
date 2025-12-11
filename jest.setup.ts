@@ -107,6 +107,61 @@ jest.mock('react-native-svg', () => {
 
 // Note: NativeAnimatedHelper mock is not needed on RN 0.79
 
+// Mock @livekit/react-native
+jest.mock('@livekit/react-native', () => {
+  const React = require('react');
+
+  // Mock AudioSession
+  const AudioSession = {
+    configureAudio: jest.fn(),
+    startAudioSession: jest.fn(),
+    stopAudioSession: jest.fn(),
+  };
+
+  // Mock Room
+  class MockRoom {
+    localParticipant = {
+      setMicrophoneEnabled: jest.fn(),
+      setCameraEnabled: jest.fn(),
+      isMicrophoneEnabled: false,
+      isCameraEnabled: false,
+    };
+    participants = new Map();
+    state = 'disconnected';
+    connect = jest.fn();
+    disconnect = jest.fn();
+    addListener = jest.fn();
+    removeListener = jest.fn();
+    prepareConnection = jest.fn();
+  }
+
+  return {
+    AudioSession,
+    Room: MockRoom,
+    useRoomContext: jest.fn(() => new MockRoom()),
+    RoomContext: {
+      Provider: ({children}: {children: React.ReactNode}) => children,
+      Consumer: ({children}: {children: (room: any) => React.ReactNode}) =>
+        children(new MockRoom()),
+    },
+    useParticipant: jest.fn(() => ({
+      cameraPublication: null,
+      microphonePublication: null,
+      screenSharePublication: null,
+      isLocal: false,
+      isSpeaking: false,
+    })),
+    useToken: jest.fn(),
+    isTrackReference: jest.fn(),
+    isTrackReferencePlaceholder: jest.fn(),
+    isTrackReferenceSubscribed: jest.fn(),
+    AndroidAudioTypePresets: {
+      media: {},
+      communication: {},
+    },
+  };
+});
+
 // Mock react-native-config
 jest.mock('react-native-config', () => {
   return {
@@ -119,6 +174,7 @@ jest.mock('react-native-config', () => {
       THIRD_PARTY_CALL_NUMBER: '+1234567890',
       MICROPHONE_SOCKET_PATH: '/test/socket',
       CLOUD_TELEPHONY_PATH: '/test/telephony',
+      TERMS_AND_CONDITION_FLAG: 'false',
     },
   };
 });
@@ -227,4 +283,42 @@ jest.mock('@/components/EmptyState/EmptyState', () => ({
       );
     },
   ),
+}));
+
+// Mock react-native-webview
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  return {
+    WebView: (props: any) => React.createElement('WebView', props),
+    default: (props: any) => React.createElement('WebView', props),
+  };
+});
+
+// Mock react-native-live-audio-stream
+jest.mock('react-native-live-audio-stream', () => ({
+  init: jest.fn(),
+  start: jest.fn(),
+  stop: jest.fn(),
+  on: jest.fn(),
+}));
+
+// Mock @sayem314/react-native-keep-awake
+jest.mock('@sayem314/react-native-keep-awake', () => ({
+  activateKeepAwake: jest.fn(),
+  deactivateKeepAwake: jest.fn(),
+  useKeepAwake: jest.fn(),
+}));
+
+// Mock @react-native-community/netinfo
+jest.mock('@react-native-community/netinfo', () => ({
+  useNetInfo: jest.fn(() => ({
+    isConnected: true,
+  })),
+  fetch: jest.fn(() =>
+    Promise.resolve({
+      isConnected: true,
+    }),
+  ),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
 }));

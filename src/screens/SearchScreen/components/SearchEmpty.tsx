@@ -1,3 +1,4 @@
+import React from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -32,7 +33,7 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
       )}
       <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
       {trySuggestions.map(suggestion => (
-        <>
+        <React.Fragment key={suggestion.id}>
           <View style={themedStyles.marginL16}>
             <SearchSuggestion
               colorTheme={colorTheme}
@@ -52,7 +53,7 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
               suggestionId={suggestion.id}
             />
           </View>
-        </>
+        </React.Fragment>
       ))}
     </View>
   );
