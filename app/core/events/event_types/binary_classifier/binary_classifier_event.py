@@ -1,6 +1,6 @@
 from typing import List, Optional, override
 
-from openai.types.chat import ChatCompletionSystemMessageParam
+from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
 from openai import AsyncOpenAI
 
 from app.core.constants import DetectionType
@@ -68,14 +68,17 @@ class BinaryClassifierEvent(BaseEvent):
             # See: https://github.com/livekit/agents/issues/2836
             client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
             
-            prompt = get_binary_classifier_prompt(
+            system_prompt, user_prompt = get_binary_classifier_prompt(
                 self.data.class_name, 
                 text,
                 self.data.positive_examples,
                 self.data.negative_examples
             )
 
-            messages = [ChatCompletionSystemMessageParam(content=prompt, role="system")]
+            messages = [
+                ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
+                ChatCompletionUserMessageParam(content=user_prompt, role="user")
+            ]
             
             # Use beta.chat.completions.parse for structured output without streaming
             # This returns pure structured data that won't be spoken by the agent
