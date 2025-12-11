@@ -9,7 +9,7 @@ from typing import List, Dict, Set, Optional, Any, Tuple
 from livekit import rtc
 
 from app.core.events.base import BaseEvent
-from app.core.events.event_types.combination.constants import CombinationData
+from app.core.events.event_types.combination.constants import CombinationData, ExpressionNode
 from app.core.constants import DetectionType, VisibilityType
 from app.core.events.event_processor import EventProcessor
 from app.core.events.schedulers import TimeEventScheduler
@@ -21,6 +21,7 @@ from app.core.graph.utils import serialize_event
 from app.utils.logger import get_logger
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.utils.event_utils import evaluate_condition, evaluate_expression
+from app.core.constants import ExpressionType
 from app.core.graph import agent_graph
 
 logger = get_logger(__name__)
@@ -132,6 +133,32 @@ class EventRegistry:
             thread_id=self.thread_id
         )
 
+    def _extract_event_ids_from_expression(self, node: ExpressionNode) -> Set[str]:
+        """
+        Extract all event IDs referenced in an expression tree.
+        
+        Args:
+            node: The expression node to traverse
+            
+        Returns:
+            Set of all event IDs found in the expression
+        """
+        event_ids = set()
+        
+        if node.type == ExpressionType.IDENTIFIER:
+            if node.id:
+                event_ids.add(node.id)
+        elif node.type == ExpressionType.NOT:
+            if node.operand:
+                event_ids.update(self._extract_event_ids_from_expression(node.operand))
+        elif node.type in (ExpressionType.AND, ExpressionType.OR):
+            if node.left:
+                event_ids.update(self._extract_event_ids_from_expression(node.left))
+            if node.right:
+                event_ids.update(self._extract_event_ids_from_expression(node.right))
+        
+        return event_ids
+
     def update(self, detected_event_ids: Optional[Set[str]] = None) -> Dict[str, EventRegistryEntry]:
         if detected_event_ids:
             for event_id in detected_event_ids:
@@ -141,6 +168,20 @@ class EventRegistry:
             if expr_info["type"] == DetectionType.COMBINATION:
                 event_id = expr_info["event_id"]
                 expression = expr_info["expression"]
+                
+                # Check for circular dependency: extract all event IDs from the expression
+                # and check if this event references itself (directly or indirectly)
+                referenced_event_ids = self._extract_event_ids_from_expression(expression)
+                if event_id in referenced_event_ids:
+                    logger.warning(
+                        f"Circular dependency detected: combination event '{event_id}' references itself "
+                        f"in its expression. Referenced events: {referenced_event_ids}. "
+                        f"Returning False to prevent infinite recursion."
+                    )
+                    self.set_event_state(event_id, False, DetectionType.COMBINATION)
+                    continue
+                
+                # Evaluate expression (no need to pass visited set since we check cycles upfront)
                 result = evaluate_expression(expression, self.event_registry)
                 self.set_event_state(event_id, result, DetectionType.COMBINATION)
 
