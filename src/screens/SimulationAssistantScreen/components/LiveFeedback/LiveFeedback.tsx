@@ -67,12 +67,9 @@ const styles = ScaledSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     alignSelf: 'center',
-    maxWidth: '90%',
-    paddingVertical: '10@mvs',
-    paddingHorizontal: '14@ms',
     borderRadius: '24@ms',
-    backgroundColor: colors.darkGray5,
     shadowColor: colors.black,
     shadowOpacity: 0.25,
     shadowRadius: 8,

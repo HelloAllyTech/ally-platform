@@ -12,6 +12,11 @@ export interface GenerateOtpRequest {
   email: string;
 }
 
+export interface GenerateOtpResponse {
+  success: boolean;
+  expiresIn?: number;
+}
+
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
@@ -19,7 +24,7 @@ export interface VerifyOtpRequest {
 
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
-    generateOtp: builder.mutation<{success: boolean}, GenerateOtpRequest>({
+    generateOtp: builder.mutation<GenerateOtpResponse, GenerateOtpRequest>({
       query: ({email}) => ({
         url: API_ROUTES.AUTH.GENERATE_OTP,
         method: API_METHODS.POST,

@@ -36,6 +36,14 @@ jest.mock('@livekit/react-native', () => ({
       isSpeaking: false,
     },
   ],
+  useLocalParticipant: () => ({
+    localParticipant: {
+      getTrackPublications: () => [{kind: 'audio'}],
+      setMicrophoneEnabled: jest.fn(),
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  }),
 }));
 
 // Mock livekit-client Room and events
@@ -87,6 +95,13 @@ jest.mock('@/hooks', () => {
       credits: null,
       getCreditsInfo: null,
       refreshCredits: mockRefreshCredits,
+    }),
+    useHardwareBackPressHandler: jest.fn(),
+    useUser: () => ({
+      userData: {
+        name: 'Test User',
+        email: 'test@example.com',
+      },
     }),
     mockReplace,
     mockRefreshCredits,
@@ -144,9 +159,11 @@ jest.mock('../components', () => {
     ControlButtons: ({
       onMicButtonPress,
       onSimulationEndPress,
+      onFocusModeButtonPress,
       isMicDisabled,
       isSimulationEndDisabled,
       isMuted,
+      isFocusMode,
     }: any) => (
       <View>
         <TouchableOpacity
@@ -154,6 +171,11 @@ jest.mock('../components', () => {
           disabled={!!isMicDisabled}
           onPress={onMicButtonPress}>
           <Text>{isMuted ? 'muted' : 'unmuted'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityLabel="focus"
+          onPress={onFocusModeButtonPress}>
+          <Text>{isFocusMode ? 'focused' : 'unfocused'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           accessibilityLabel="stop"
@@ -182,7 +204,11 @@ jest.mock('@/services', () => {
 jest.mock('@/utils', () => ({
   __esModule: true,
   decodeFeedbackPayloadToJson: (payload: any) => payload,
+  getTriggerWarningNames: jest.fn((triggerWarnings) => 
+    triggerWarnings?.map((tw: any) => tw.name) || []
+  ),
   logger: {info: jest.fn(), error: jest.fn()},
+  playNotificationSound: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('react-i18next', () => ({
@@ -195,8 +221,42 @@ jest.mock('@/assets/icons', () => {
   return {
     __esModule: true,
     EndSessionIcon: () => <View testID="end-session-icon" />,
+    UserIcon: () => <View testID="user-icon" />,
+    InfoBlackCircleIcon: () => <View testID="info-icon" />,
   };
 });
+
+// Mock ParticipantTile
+jest.mock('../components/ParticipantTile/ParticipantTile', () => ({
+  ParticipantTile: ({name, avatarUrl, topLeftOverlay}: any) => {
+    const React = require('react');
+    const {View, Text} = require('react-native');
+    return (
+      <View testID="participant-tile">
+        <Text testID="participant-name">{name}</Text>
+        {avatarUrl && <Text testID="avatar-url">{avatarUrl}</Text>}
+        {topLeftOverlay}
+      </View>
+    );
+  },
+}));
+
+// Mock ScenarioInfoOverlay
+jest.mock('../components/ScenarioInfoOverlay', () => ({
+  ScenarioInfoOverlay: require('react').forwardRef(({title}: any, ref: any) => {
+    const React = require('react');
+    const {View, Text} = require('react-native');
+    React.useImperativeHandle(ref, () => ({
+      close: jest.fn(),
+      isOpen: false,
+    }));
+    return (
+      <View testID="scenario-info-overlay">
+        <Text>{title}</Text>
+      </View>
+    );
+  }),
+}));
 
 const baseRouteParams = {
   sessionData: {
@@ -309,6 +369,120 @@ describe('SimulationAssistantScreen', () => {
     expect(getByTestId('score').props.children).toBe('30');
 
     // No auto-hide assertion; screen keeps latest feedback visible
+  });
+
+  it('toggles focus mode when focus button is pressed', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getByLabelText, getByText} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Initial state should be non-focused (false)
+    expect(getByText('unfocused')).toBeDefined();
+
+    // Press focus button
+    fireEvent.press(getByLabelText('focus'));
+
+    // Should now be focused
+    expect(getByText('focused')).toBeDefined();
+
+    // Press again to toggle back
+    fireEvent.press(getByLabelText('focus'));
+
+    // Should be unfocused again
+    expect(getByText('unfocused')).toBeDefined();
+  });
+
+  it('renders participant tiles for remote and local participants', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getAllByTestId, getByTestId} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Should have 2 participant tiles
+    const tiles = getAllByTestId('participant-tile');
+    expect(tiles).toHaveLength(2);
+
+    // Should render scenario info overlay for remote participant
+    expect(getByTestId('scenario-info-overlay')).toBeDefined();
+  });
+
+  it('displays scenario title in info overlay', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const customParams = {
+      ...baseRouteParams,
+      scenario: {title: 'Custom Scenario Title', coverImageUrl: undefined},
+    };
+
+    const {getAllByText} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: customParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Should display scenario title in overlay (appears in both tile name and overlay)
+    const titles = getAllByText('Custom Scenario Title');
+    expect(titles.length).toBeGreaterThan(0);
+  });
+
+  it('shows simulation timer when connected', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getByTestId} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Should show timer when connected
+    expect(getByTestId('timer')).toBeDefined();
+  });
+
+  it('shows control buttons when simulation is in progress', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getByLabelText} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Control buttons should be visible when connected
+    expect(getByLabelText('mic')).toBeDefined();
+    expect(getByLabelText('stop')).toBeDefined();
+    expect(getByLabelText('focus')).toBeDefined();
   });
 });
 

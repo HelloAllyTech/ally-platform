@@ -35,6 +35,11 @@ const Tab = createBottomTabNavigator();
 
 const ALL_TABS = [
   {
+    name: SCREEN_NAMES.LEARN,
+    component: SimulationsScreen,
+    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
+  },
+  {
     name: SCREEN_NAMES.CALL_LOG,
     component: CallLogScreen,
     // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
@@ -51,16 +56,27 @@ const ALL_TABS = [
     requiredPermissions: [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT],
   },
   {
-    name: SCREEN_NAMES.LEARN,
-    component: SimulationsScreen,
-    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
-  },
-  {
     name: SCREEN_NAMES.COMMUNITY,
     component: CommunityScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY],
   },
 ];
+
+/**
+ * Returns the first visible tab name based on user permissions
+ * @param permissions - Array of user permissions
+ * @returns The name of the first visible tab or SEARCH as fallback
+ */
+export const getFirstVisibleTab = (permissions: string[]) => {
+  const visibleTabs = ALL_TABS.filter(
+    tab =>
+      tab?.requiredPermissions?.length === 0 ||
+      tab?.requiredPermissions?.some(permission =>
+        permissions.includes(permission),
+      ),
+  );
+  return visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
+};
 
 interface BottomTabsProps {
   hideTabBar?: boolean;
@@ -141,7 +157,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
         permissions.includes(permission),
       ),
   );
-  const initial = visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
+  const initial = getFirstVisibleTab(permissions);
 
   return (
     <View style={styles.container}>

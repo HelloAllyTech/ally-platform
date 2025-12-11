@@ -68,6 +68,9 @@ jest.mock('../components', () => {
 jest.mock('@/utils', () => ({
   __esModule: true,
   copyToClipboard: jest.fn(),
+  getTriggerWarningNames: jest.fn((triggerWarnings) => 
+    triggerWarnings?.map((tw: any) => tw.name) || []
+  ),
 }));
 
 describe('SimulationDetailsScreen', () => {
@@ -106,7 +109,7 @@ describe('SimulationDetailsScreen', () => {
     expect(getByText('Description')).toBeTruthy();
   });
 
-  it('calls startSimulation from hook when button is pressed', async () => {
+  it('calls startSimulation when button is pressed', async () => {
     const {getByTestId} = renderWithSafeArea(
       <SimulationDetailsScreen
         navigation={{} as any}
@@ -118,7 +121,7 @@ describe('SimulationDetailsScreen', () => {
     fireEvent.press(button);
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith(scenario);
+      expect(mockStartSimulation).toHaveBeenCalledWith(scenario.id);
     });
   });
 

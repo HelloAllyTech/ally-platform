@@ -61,6 +61,7 @@ import LogoutIcon from './logout.svg';
 import MagnifyEyeIcon from './magnifyEye.svg';
 import MicIcon from './mic.svg';
 import MicOffIcon from './micOff.svg';
+import MicOffWhiteIcon from './micOffWhite.svg';
 import MicOnIcon from './micOn.svg';
 import NetworkDisconnectedIcon from './networkDisconnected.svg';
 import NewsStandIcon from './newsStand.svg';
@@ -98,6 +99,7 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
@@ -164,6 +166,7 @@ export {
   LogoutIcon,
   MagnifyEyeIcon,
   MicIcon,
+  MicOffWhiteIcon,
   MicOffIcon,
   MicOnIcon,
   NetworkDisconnectedIcon,
@@ -203,6 +206,7 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
+  UserIcon,
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
