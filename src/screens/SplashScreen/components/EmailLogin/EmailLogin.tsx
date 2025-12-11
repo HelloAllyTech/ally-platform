@@ -43,7 +43,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
   // Handle success
   useEffect(() => {
     if (isSuccess && data) {
-      onOtpGenerationSuccess(email);
+      onOtpGenerationSuccess(email, data.expiresIn);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, data, email]);

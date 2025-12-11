@@ -89,6 +89,10 @@ jest.mock('@/services', () => {
       jest.fn().mockResolvedValue({data: {success: true}}),
     ],
     useLazyGetSimulationDetailsQuery,
+    useGetUpcomingScenarioQuery: jest.fn(() => ({
+      data: null,
+      fulfilledTimeStamp: 0,
+    })),
     useLazyGetUpcomingScenarioQuery,
   };
 });

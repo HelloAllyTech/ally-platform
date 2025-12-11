@@ -1,3 +1,4 @@
+import type {TriggerWarning} from '@/types';
 import {tryParseJson, uint8ToString} from '@/utils';
 
 export const decodeFeedbackPayloadToJson = (payload: unknown): unknown => {
@@ -12,4 +13,10 @@ export const decodeFeedbackPayloadToJson = (payload: unknown): unknown => {
     return null;
   }
   return null;
+};
+
+export const getTriggerWarningNames = (
+  triggerWarnings?: TriggerWarning[],
+): string[] => {
+  return triggerWarnings?.map(tw => tw.name) || [];
 };

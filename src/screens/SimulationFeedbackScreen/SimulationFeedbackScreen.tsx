@@ -13,7 +13,11 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ArrowDown, ChevronDown, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
-import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {
+  SCREEN_NAMES,
+  SimulationEventStatus,
+  USER_PERMISSIONS,
+} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
@@ -22,8 +26,8 @@ import {
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
+  useGetUpcomingScenarioQuery,
   useLazyGetSimulationDetailsQuery,
-  useLazyGetUpcomingScenarioQuery,
 } from '@/services';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
@@ -58,6 +62,8 @@ export const SimulationFeedbackScreen: React.FC<
   const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
+  const [pollingInterval, setPollingInterval] = useState<number>(3000);
+  const nextSimulationPollingAttemptsRef = useRef<number>(0);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -65,8 +71,31 @@ export const SimulationFeedbackScreen: React.FC<
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
   ] = useLazyGetSimulationDetailsQuery();
-  const [getUpcomingScenario, {data: upcomingData}] =
-    useLazyGetUpcomingScenarioQuery();
+  const {data: upcomingData, fulfilledTimeStamp} = useGetUpcomingScenarioQuery(
+    {scenarioSessionId: scenarioSessionId || ''},
+    {
+      skip: !scenarioSessionId || !pathId,
+      pollingInterval,
+    },
+  );
+
+  useEffect(() => {
+    if (
+      upcomingData?.currentSession?.eventStatus ===
+        SimulationEventStatus.COMPLETED ||
+      nextSimulationPollingAttemptsRef.current >= RETRY_COUNT_LIMIT
+    ) {
+      setPollingInterval(0);
+    } else {
+      nextSimulationPollingAttemptsRef.current += 1;
+    }
+  }, [upcomingData, fulfilledTimeStamp]);
+
+  useEffect(() => {
+    setPollingInterval(RETRY_DELAY);
+    nextSimulationPollingAttemptsRef.current = 0;
+  }, [scenarioSessionId]);
+
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
@@ -76,6 +105,8 @@ export const SimulationFeedbackScreen: React.FC<
   const canRetryCurrent =
     !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
   const isPathCompleted = !!currentSession?.isScenarioPathSessionCompleted;
+  const isEventCompleted =
+    currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
@@ -115,14 +146,6 @@ export const SimulationFeedbackScreen: React.FC<
       }
     }
   };
-
-  useEffect(() => {
-    if (scenarioSessionId) {
-      getUpcomingScenario({
-        scenarioSessionId: scenarioSessionId,
-      });
-    }
-  }, [scenarioSessionId, getUpcomingScenario]);
 
   const handleBack = () => {
     if (pathId) {
@@ -230,13 +253,7 @@ export const SimulationFeedbackScreen: React.FC<
     }
 
     startSimulation(
-      {
-        id: current.scenarioId,
-        title: current.title || '',
-        description: current.description || '',
-        coverImageUrl: current.coverImageUrl,
-        coverVideoUrl: current.coverVideoUrl,
-      },
+      current.scenarioId,
       current.scenarioPathSessionItemId,
       pathId,
     );
@@ -245,23 +262,16 @@ export const SimulationFeedbackScreen: React.FC<
   const handleNextSimulation = () => {
     const next = upcomingScenario;
     if (next && next.scenarioPathSessionItemId && next.id) {
-      startSimulation(
-        {
-          id: next.id,
-          title: next.title || '',
-          description: next.description || '',
-          coverImageUrl: next.coverImageUrl,
-          coverVideoUrl: next.coverVideoUrl,
-        },
-        next.scenarioPathSessionItemId,
-        pathId,
-      );
+      startSimulation(next.id, next.scenarioPathSessionItemId, pathId);
     }
   };
 
   const renderButtonContainer = () => {
     // Path simulations: show Finish / Retry / Next
     if (pathId) {
+      if (!isEventCompleted) {
+        return null;
+      }
       // Path completed: show a single Finish button
       if (isPathCompleted) {
         return (
@@ -396,37 +406,39 @@ export const SimulationFeedbackScreen: React.FC<
               {simulationDetails && (
                 <SimulationSummary data={simulationDetails} />
               )}
-              <>
-                {/* Transition message section */}
-                {(currentSession?.transitionMessageTitle ||
-                  currentSession?.transitionMessageContent) && (
-                  <View style={styles.transitionMessageContainer}>
-                    {currentSession?.transitionMessageTitle && (
+              {isEventCompleted && (
+                <>
+                  {/* Transition message section */}
+                  {(currentSession?.transitionMessageTitle ||
+                    currentSession?.transitionMessageContent) && (
+                    <View style={styles.transitionMessageContainer}>
+                      {currentSession?.transitionMessageTitle && (
+                        <Text style={styles.transitionMessageTitle}>
+                          {currentSession.transitionMessageTitle}
+                        </Text>
+                      )}
+                      {currentSession?.transitionMessageContent && (
+                        <Text style={styles.transitionMessageContent}>
+                          {currentSession.transitionMessageContent}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
+                    <>
                       <Text style={styles.transitionMessageTitle}>
-                        {currentSession.transitionMessageTitle}
+                        {t('SimulationFeedback.almostThereTitle')}
                       </Text>
-                    )}
-                    {currentSession?.transitionMessageContent && (
                       <Text style={styles.transitionMessageContent}>
-                        {currentSession.transitionMessageContent}
+                        {t('SimulationFeedback.almostThereDescription')}
                       </Text>
-                    )}
-                  </View>
-                )}
-                {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
-                  <>
-                    <Text style={styles.transitionMessageTitle}>
-                      {t('SimulationFeedback.almostThereTitle')}
-                    </Text>
-                    <Text style={styles.transitionMessageContent}>
-                      {t('SimulationFeedback.almostThereDescription')}
-                    </Text>
-                  </>
-                )}
-                {isCurrentSessionCompleted && !!upcomingScenario && (
-                  <UpNextSimulationCard upNext={upcomingScenario} />
-                )}
-              </>
+                    </>
+                  )}
+                  {isCurrentSessionCompleted && !!upcomingScenario && (
+                    <UpNextSimulationCard upNext={upcomingScenario} />
+                  )}
+                </>
+              )}
               {simulationDetails && renderButtonContainer()}
             </>
           )}

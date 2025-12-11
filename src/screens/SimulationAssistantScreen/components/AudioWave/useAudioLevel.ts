@@ -10,24 +10,6 @@ export const useAudioLevel = (trackRef: {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const participantRef = useRef<any>(null);
 
-  // Helper function to calculate realistic audio level variations
-  const calculateSimulatedAudioLevel = (): number => {
-    const now = Date.now();
-    const time1 = now / 800; // Slower wave for base level
-    const time2 = now / 300; // Faster wave for voice variations
-    const time3 = now / 150; // Even faster for speech patterns
-
-    const baseWave = Math.sin(time1) * 0.15;
-    const voiceWave = Math.sin(time2) * 0.25;
-    const speechWave = Math.sin(time3) * 0.1;
-    const randomVariation = (Math.random() - 0.5) * 0.2;
-
-    return Math.max(
-      0,
-      Math.min(1, 0.3 + baseWave + voiceWave + speechWave + randomVariation),
-    );
-  };
-
   // Helper function to get audio level from participant
   const getParticipantAudioLevel = (participant: any): number => {
     const participantAudioLevel = participant?.audioLevel || 0;
@@ -44,28 +26,23 @@ export const useAudioLevel = (trackRef: {
       if (realAudioLevel > 0) {
         setAudioLevel(realAudioLevel);
       } else {
-        setAudioLevel(calculateSimulatedAudioLevel());
+        // When speaking but no audio level detected (or very low), set a small non-zero value
+        // to indicate activity so the border can show up.
+        setAudioLevel(0.1);
       }
     };
 
-    intervalRef.current = setInterval(updateAudioLevel, 50);
+    intervalRef.current = setInterval(updateAudioLevel, 100);
     updateAudioLevel(); // Initial update
   }, []);
 
-  // Stop monitoring and gradually decrease audio level
+  // Stop monitoring and reset audio level
   const stopAudioMonitoring = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-
-    // Gradually decrease audio level when not speaking
-    const decreaseLevel = () => {
-      setAudioLevel(prev => (prev <= 0.05 ? 0 : prev - 0.05));
-    };
-
-    const decreaseInterval = setInterval(decreaseLevel, 50);
-    setTimeout(() => clearInterval(decreaseInterval), 1000);
+    setAudioLevel(0);
   }, []);
 
   useEffect(() => {
@@ -91,6 +68,8 @@ export const useAudioLevel = (trackRef: {
 
     // Check initial speaking state
     if (participant.isSpeaking) {
+      handleSpeakingChanged(true);
+    } else if (getParticipantAudioLevel(participant) > 0) {
       handleSpeakingChanged(true);
     }
 

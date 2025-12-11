@@ -145,10 +145,10 @@ const styles = ScaledSheet.create({
   sectionContainer: {
     width: '100%',
     alignItems: 'center',
-    borderRadius: '24@ms',
     paddingTop: '8@mvs',
-    paddingHorizontal: '21@s',
-    minHeight: '44@ms',
+    paddingBottom: '6@mvs',
+    paddingHorizontal: '16@ms',
+    backgroundColor: colors.ds.blackAlpha[200],
   },
   contentWrapper: {
     width: '100%',
@@ -174,7 +174,7 @@ const styles = ScaledSheet.create({
   buttonText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
-    color: colors.white,
+    color: colors.ds.neutral.white,
   },
   redSquareIcon: {
     width: '16@s',
@@ -191,6 +191,6 @@ const styles = ScaledSheet.create({
   },
   endSessionButton: {
     backgroundColor: colors.darkGray10,
-    marginBottom: '10@mvs',
+    marginBottom: '8@mvs',
   },
 });

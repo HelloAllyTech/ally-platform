@@ -1,12 +1,57 @@
+// Store mock
+jest.mock('@/store/store', () => ({ AppRootState: {} }));
+jest.mock('@/store/slices/summarySlice', () => ({
+  selectSummaryVisibleFields: (state: any) => state.summary.visibleFields,
+  setSummaryVisibleFields: jest.fn(),
+}));
+
+// Constants mock
+jest.mock('@/constants', () => ({
+  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
+  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
+  SCREEN_NAMES: { LISTENING: 'Listening' },
+  CHAT_TYPES: { 
+    EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
+    MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
+  },
+  USER_PERMISSIONS: {
+    VIEW_CALL_LOGS: 'view:call:logs',
+    VIEW_SCENARIO_SESSION: 'view:scenario-session',
+    START_MICROPHONE_CHAT: 'start:microphone-chat',
+    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
+  },
+}));
+
+// Navigation helpers
+jest.mock('@/navigation/TabNavigator', () => ({
+  getFirstVisibleTab: jest.fn(() => 'CallLog'),
+}));
+
+// Mock react-navigation hooks manually
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({ navigate: jest.fn() }),
+    useRoute: () => ({ name: 'CallLog' }),
+    useFocusEffect: () => {},
+  };
+});
+
+// Mock hooks
+jest.mock('@/hooks', () => ({
+  useAppNavigation: () => ({ navigate: jest.fn() }),
+  useCounselorChat: () => ({ checkCounselorChat: jest.fn().mockResolvedValue({}) }),
+  useHardwareBackPressHandler: () => {},
+  usePermissionAlert: () => ({ showMicrophoneSettingsAlert: jest.fn() }),
+  useTranslate: () => ({ t: (k: string) => k }),
+  useUser: () => ({ userData: undefined, checkAuth: jest.fn() }),
+}));
+
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
 import {CallLogScreen} from '../CallLogScreen';
-
-// Navigation focus effect - no-op to avoid async updates during render
-jest.mock('@react-navigation/native', () => ({
-  useFocusEffect: () => {},
-}));
 
 // Safe area
 jest.mock('react-native-safe-area-context', () => ({
@@ -34,24 +79,8 @@ jest.mock('@/components', () => {
 // Config
 jest.mock('@/config/env', () => ({ env: { ALLY_WEB_URL: 'https://example.com', THIRD_PARTY_CALL_NUMBER: '123' } }));
 
-// Constants
-jest.mock('@/constants', () => ({
-  CHAT_TYPES: { EXOTEL_CONFERENCE_CHAT: 'EXOTEL', MICROPHONE_CHAT: 'MIC' },
-  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
-  MICROPHONE_PERMISSION: 'mic',
-  SCREEN_NAMES: { CALL_SUMMARY: 'CallSummary', SIMULATION_FEEDBACK: 'SimulationFeedback' },
-  USER_PERMISSIONS: { VIEW_CALL_LOGS: 'CALLS', VIEW_SCENARIO_SESSION: 'SIM', VIEW_START_CALL_PAGE: 'START' },
-}));
-
-// Hooks
-jest.mock('@/hooks', () => ({
-  useAppNavigation: () => ({ navigate: jest.fn() }),
-  useCounselorChat: () => ({ checkCounselorChat: jest.fn().mockResolvedValue({}) }),
-  useHardwareBackPressHandler: () => {},
-  usePermissionAlert: () => ({ showMicrophoneSettingsAlert: jest.fn() }),
-  useTranslate: () => ({ t: (k: string) => k }),
-  useUser: () => ({ userData: undefined }),
-}));
+// Constants (duplicate block removed)
+// Hooks (duplicate block removed)
 
 // Store
 jest.mock('@/store/hooks', () => ({
@@ -80,12 +109,11 @@ jest.mock('@/services/settingsApi', () => ({
 jest.mock('@/utils/logger', () => ({ logger: { error: jest.fn() } }));
 
 // Child components
-jest.mock('@/screens/CallLog/components', () => ({
+jest.mock('../components', () => ({
   CallLogHeader: ({ search }: any) => <>{search}</>,
   CallLogItem: () => <></>,
   FeatureNotAvailable: ({ description }: any) => <>{description}</>,
   StartSessionModal: () => <></>,
-  TabView: () => <>TabView</>,
 }));
 
 // Permissions

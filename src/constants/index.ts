@@ -8,3 +8,4 @@ export * from './summary';
 export * from './navigation';
 export * from './feedback';
 export * from './permissions';
+export * from './terms';
