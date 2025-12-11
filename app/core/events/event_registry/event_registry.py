@@ -20,8 +20,7 @@ from app.core.queue import msg_event_queue
 from app.core.graph.utils import serialize_event
 from app.utils.logger import get_logger
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
-from app.utils.event_utils import evaluate_condition, evaluate_expression
-from app.core.constants import ExpressionType
+from app.utils.event_utils import evaluate_condition, evaluate_expression, extract_event_ids_from_expression
 from app.core.graph import agent_graph
 
 logger = get_logger(__name__)
@@ -85,6 +84,20 @@ class EventRegistry:
         self._live_score_lock = asyncio.Lock()
         self.setup_initial_state()
 
+    def _has_circular_dependency(self, event_id: str, expression: ExpressionNode) -> bool:
+        """
+        Check if a combination event has a circular dependency (references itself).
+        
+        Args:
+            event_id: The event ID to check
+            expression: The expression tree to check
+            
+        Returns:
+            True if the event references itself (circular dependency), False otherwise
+        """
+        referenced_event_ids = extract_event_ids_from_expression(expression)
+        return event_id in referenced_event_ids
+
     def setup_initial_state(self) -> None:
         """
         Initialize registry state (synchronous). Does NOT start timers.
@@ -93,19 +106,33 @@ class EventRegistry:
             "happened": false,  # Initial state based on event type
             "trigger_multiple": bool  # True for SENTENCE_SIMILARITY and SEMANTIC_SIMILARITY, False for TIME/SCORE/COMBINATION
         }
-        Build expression list for combination events
+        Build expression list for combination events, excluding those with circular dependencies.
         """
         # Initialize event states based on their detection type
         for event in self.events:
-            self.set_event_state(event.event_id, False, event.detection_type)
+            # For combination events, check for circular dependency first
             if event.detection_type == DetectionType.COMBINATION:
                 if isinstance(event.data, CombinationData):
+                    # Check for circular dependency - if found, completely ignore this event
+                    if self._has_circular_dependency(event.event_id, event.data.expression):
+                        logger.warning(
+                            f"Circular dependency detected: combination event '{event.event_id}' references itself "
+                            f"in its expression. This event will be completely ignored (not added to registry or expression list)."
+                        )
+                        # Skip this event entirely - don't add to event_registry or expression_list
+                        continue
+                    
+                    # No circular dependency - add to registry and expression list
+                    self.set_event_state(event.event_id, False, event.detection_type)
                     # Create expression list entry matching ExpressionListEntry structure
                     self.expression_list.append({
                         "event_id": event.event_id,
                         "type": DetectionType.COMBINATION,
                         "expression": event.data.expression,
                     })
+            else:
+                # Non-combination events: add to registry normally
+                self.set_event_state(event.event_id, False, event.detection_type)
 
     async def initialize(self) -> None:
         # Send initial score-based events to UI and Core (example: score < 5)
@@ -133,32 +160,6 @@ class EventRegistry:
             thread_id=self.thread_id
         )
 
-    def _extract_event_ids_from_expression(self, node: ExpressionNode) -> Set[str]:
-        """
-        Extract all event IDs referenced in an expression tree.
-        
-        Args:
-            node: The expression node to traverse
-            
-        Returns:
-            Set of all event IDs found in the expression
-        """
-        event_ids = set()
-        
-        if node.type == ExpressionType.IDENTIFIER:
-            if node.id:
-                event_ids.add(node.id)
-        elif node.type == ExpressionType.NOT:
-            if node.operand:
-                event_ids.update(self._extract_event_ids_from_expression(node.operand))
-        elif node.type in (ExpressionType.AND, ExpressionType.OR):
-            if node.left:
-                event_ids.update(self._extract_event_ids_from_expression(node.left))
-            if node.right:
-                event_ids.update(self._extract_event_ids_from_expression(node.right))
-        
-        return event_ids
-
     def update(self, detected_event_ids: Optional[Set[str]] = None) -> Dict[str, EventRegistryEntry]:
         if detected_event_ids:
             for event_id in detected_event_ids:
@@ -169,19 +170,7 @@ class EventRegistry:
                 event_id = expr_info["event_id"]
                 expression = expr_info["expression"]
                 
-                # Check for circular dependency: extract all event IDs from the expression
-                # and check if this event references itself (directly or indirectly)
-                referenced_event_ids = self._extract_event_ids_from_expression(expression)
-                if event_id in referenced_event_ids:
-                    logger.warning(
-                        f"Circular dependency detected: combination event '{event_id}' references itself "
-                        f"in its expression. Referenced events: {referenced_event_ids}. "
-                        f"Returning False to prevent infinite recursion."
-                    )
-                    self.set_event_state(event_id, False, DetectionType.COMBINATION)
-                    continue
-                
-                # Evaluate expression (no need to pass visited set since we check cycles upfront)
+                # Evaluate expression
                 result = evaluate_expression(expression, self.event_registry)
                 self.set_event_state(event_id, result, DetectionType.COMBINATION)
 
