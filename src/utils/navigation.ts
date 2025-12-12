@@ -3,10 +3,10 @@ import {CommonActions, NavigationProp} from '@react-navigation/native';
 import {SCREEN_NAMES} from '@/constants';
 
 const TAB_ROUTES = [
+  SCREEN_NAMES.LEARN,
   SCREEN_NAMES.CALL_LOG,
   SCREEN_NAMES.USER_ANALYTICS,
   SCREEN_NAMES.SEARCH,
-  SCREEN_NAMES.LEARN,
   SCREEN_NAMES.COMMUNITY,
 ] as const;
 

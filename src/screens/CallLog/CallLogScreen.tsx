@@ -1,5 +1,11 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {useFocusEffect} from '@react-navigation/native';
+import {
+  NavigationProp,
+  ParamListBase,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +38,7 @@ import {
   useTranslate,
   useUser,
 } from '@/hooks';
+import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
   useLazyGetSummaryFieldsQuery,
@@ -67,6 +74,7 @@ const ITEMS_PER_PAGE = 10;
  */
 export const CallLogScreen: React.FC = () => {
   const {permissions} = useAppSelector((state: AppRootState) => state.user);
+  const route = useRoute();
 
   const [search, setSearch] = useState('');
   const [expandedIdx, setExpandedIdx] = useState(-1);
@@ -86,7 +94,8 @@ export const CallLogScreen: React.FC = () => {
   const {userData, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
 
-  const navigation = useAppNavigation();
+  const stackNavigation = useAppNavigation();
+  const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const dispatch = useAppDispatch();
@@ -99,6 +108,12 @@ export const CallLogScreen: React.FC = () => {
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
+
+  // Check if this is the first visible tab
+  const isFirstTab = useMemo(() => {
+    const firstTab = getFirstVisibleTab(permissions);
+    return route.name === firstTab;
+  }, [permissions, route.name]);
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
   const showFeatureUnavailable = useMemo(() => {
@@ -179,7 +194,14 @@ export const CallLogScreen: React.FC = () => {
   }, [availableLogTypes, activeTab]);
 
   useHardwareBackPressHandler(() => {
-    BackHandler.exitApp();
+    if (isFirstTab) {
+      // Exit app if this is the first tab
+      BackHandler.exitApp();
+    } else {
+      // Navigate to first tab if this is not the first tab
+      const firstTab = getFirstVisibleTab(permissions);
+      tabNavigation.navigate(firstTab);
+    }
     return true;
   });
 
@@ -290,12 +312,12 @@ export const CallLogScreen: React.FC = () => {
 
   const handleItemPress = (item: LogItem) => {
     if (activeTab === LogType.REAL) {
-      navigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
+      stackNavigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
         callId: item?.details?.chatId,
         fromLogs: true,
       });
     } else {
-      navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+      stackNavigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         scenarioSessionId: item?.id?.toString(),
         fromLogs: true,
       });
@@ -403,7 +425,7 @@ export const CallLogScreen: React.FC = () => {
 
       if (finalStatus === RESULTS.GRANTED) {
         checkCounselorChat();
-        navigation.navigate('Listening', {isMicrophoneMode: true});
+        stackNavigation.navigate('Listening', {isMicrophoneMode: true});
         return;
       }
 
@@ -434,6 +456,7 @@ export const CallLogScreen: React.FC = () => {
           search={search}
           onSearchChange={setSearch}
           showTitle={false}
+          showHamburger={isFirstTab}
           isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         />
         <FeatureNotAvailable
@@ -452,6 +475,7 @@ export const CallLogScreen: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
+        showHamburger={isFirstTab}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (

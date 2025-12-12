@@ -1,9 +1,17 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {fireEvent, render, act} from '@testing-library/react-native';
 
 import {CustomDropdown} from '@/components/Dropdown';
 
 describe('CustomDropdown', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('renders placeholder and toggles open/close', () => {
     const setIsOpen = jest.fn();
     const {getByText} = render(
@@ -41,6 +49,11 @@ describe('CustomDropdown', () => {
 
     fireEvent.press(getByText('A'));
     expect(onSelect).toHaveBeenCalledWith('A');
+    
+    // Advance timers to clear animation
+    act(() => {
+      jest.runAllTimers();
+    });
 
     rerender(
       <CustomDropdown

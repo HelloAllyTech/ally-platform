@@ -41,23 +41,29 @@ export const styles = ScaledSheet.create({
     ...typography.body.small,
     color: colors.vividRed,
   },
-  resendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: '4@ms',
+  expiryContainer: {
+    marginTop: '8@ms',
   },
-  helperText: {
+  expiryText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
     color: colors.darkSlate,
+    lineHeight: '20@ms',
   },
-  resendButton: {
-    marginLeft: '4@ms',
+  expiryBoldText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+  },
+  resendInlineButton: {
+    alignSelf: 'flex-start',
+    marginTop: '2@ms',
   },
   resendButtonText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
-    color: colors.brightBlue,
+    color: colors.ds.theme.primary,
   },
   resendButtonDisabled: {
-    color: colors.mediumGray,
+    color: colors.ds.typography.lowEmphasis,
   },
 });

@@ -1,18 +1,19 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
   RoomContext,
+  useLocalParticipant,
+  useRemoteParticipants,
 } from '@livekit/react-native';
 import {
   activateKeepAwake,
   deactivateKeepAwake,
 } from '@sayem314/react-native-keep-awake';
-import {Room, RoomEvent} from 'livekit-client';
+import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {BackHandler, SafeAreaView, Text, View} from 'react-native';
+import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
 
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
@@ -24,21 +25,31 @@ import {
   SESSION_END_MODAL_MINUTES,
   SESSION_END_MODAL_SECONDS,
 } from '@/constants';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
-import {colors, fontFamily} from '@/theme';
+import {colors} from '@/theme';
 import {Feedback, LiveEventPayload} from '@/types';
-import {decodeFeedbackPayloadToJson, logger} from '@/utils';
+import {
+  decodeFeedbackPayloadToJson,
+  getTriggerWarningNames,
+  logger,
+  playNotificationSound,
+} from '@/utils';
 
 import {
-  AudioWave,
   ControlButtons,
   EndingSoonModal,
   LiveFeedback,
   SessionScoreMeter,
   SimulationTimer,
 } from './components';
+import {ParticipantTile} from './components/ParticipantTile/ParticipantTile';
+import {
+  ScenarioInfoOverlay,
+  ScenarioInfoOverlayRef,
+} from './components/ScenarioInfoOverlay';
+import {styles} from './styles';
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
@@ -59,6 +70,19 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
   const [room] = useState<Room>(() => new Room());
+  const remoteParticipants = useRemoteParticipants({room});
+  const remoteParticipant =
+    remoteParticipants.length > 0 ? remoteParticipants[0] : null;
+  const {localParticipant} = useLocalParticipant({room});
+  const {userData} = useUser();
+  const scenarioInfoRef = useRef<ScenarioInfoOverlayRef>(null);
+
+  const remoteAudioPub = remoteParticipant
+    ?.getTrackPublications()
+    .find(p => p.kind === Track.Kind.Audio);
+  const localAudioPub = localParticipant
+    .getTrackPublications()
+    .find(p => p.kind === Track.Kind.Audio);
 
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
@@ -89,20 +113,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
   }, []);
 
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        if (isSimulationInProgress) {
-          setShowBackPressConfirmation(true);
-          return true;
-        }
-        return false;
-      },
-    );
-
-    return () => backHandler.remove();
-  }, [isSimulationInProgress]);
+  useHardwareBackPressHandler(() => {
+    if (isSimulationInProgress) {
+      setShowBackPressConfirmation(true);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     // Show the ending-soon modal at 29 minutes 30 seconds from the start time
@@ -151,6 +168,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
+      playNotificationSound(require('../../assets/sounds/startSimulation.mp3'));
       setIsConnecting(false);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
@@ -225,6 +243,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             audioAttributesUsageType: 'voiceCommunication',
           },
         },
+        ios: {
+          defaultOutput: 'speaker',
+        },
       });
     } catch (error) {
       showErrorToast(error, 'Errors.audioSession');
@@ -246,6 +267,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     try {
       setIsDisconnecting(true);
       await room.disconnect();
+      playNotificationSound(require('../../assets/sounds/endSimulation.mp3'));
       await endScenarioSession({
         scenarioSessionId: sessionId,
       });
@@ -290,31 +312,68 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   };
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {paddingTop: insets.top, paddingBottom: insets.bottom},
-      ]}>
+    <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
       <RoomContext.Provider value={room}>
         <View style={styles.contentContainer}>
           {isSimulationInProgress && startTime && (
             <SimulationTimer startTime={startTime} />
           )}
-          <View style={styles.centralContainer}>
+          <>
             {!isSimulationInProgress ? (
               renderLoader()
             ) : (
               <>
-                <AudioWave avatarUrl={scenario?.coverImageUrl ?? undefined} />
-                {!!scenario?.title && (
-                  <Text style={styles.personaLabel}>{scenario.title}</Text>
-                )}
-                {!isFocusMode && (
+                <View style={styles.participantsContent}>
                   <View
                     style={[
-                      styles.liveFeedbackWrapper,
-                      isControlButtonMaximized && styles.bottom51,
+                      styles.participantsContainer,
+                      isFocusMode
+                        ? styles.participantsVertical
+                        : isControlButtonMaximized
+                          ? feedback
+                            ? styles.participantsHorizontal
+                            : styles.participantsVertical
+                          : styles.participantsVertical,
                     ]}>
+                    <View
+                      style={[
+                        styles.participantWrapper,
+                        styles.participantWrapperWithOverlay,
+                      ]}>
+                      <ParticipantTile
+                        participant={remoteParticipant}
+                        publication={remoteAudioPub}
+                        avatarUrl={scenario?.coverImageUrl ?? null}
+                        name={scenario?.metadata?.name || scenario?.title}
+                        {...(scenario?.title
+                          ? {
+                              topLeftOverlay: (
+                                <ScenarioInfoOverlay
+                                  ref={scenarioInfoRef}
+                                  title={scenario?.title}
+                                  triggerWarnings={getTriggerWarningNames(
+                                    scenario?.triggerWarnings,
+                                  )}
+                                />
+                              ),
+                              overlayRef:
+                                scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                            }
+                          : {})}
+                      />
+                    </View>
+                    <View style={styles.participantWrapper}>
+                      <ParticipantTile
+                        participant={localParticipant}
+                        publication={localAudioPub}
+                        name={userData?.name}
+                        isMicEnabled={isMicEnabled}
+                      />
+                    </View>
+                  </View>
+                </View>
+                {!isFocusMode && (
+                  <View style={styles.liveFeedbackWrapper}>
                     {feedback && (
                       <LiveFeedback
                         key={feedbackKey}
@@ -326,7 +385,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 )}
               </>
             )}
-          </View>
+          </>
 
           {isSimulationInProgress && (
             <View style={styles.scoreMeterContainer}>
@@ -355,82 +414,21 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             illustration={<EndSessionIcon />}
           />
         </View>
-        <ControlButtons
-          isMaximized={isControlButtonMaximized}
-          onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
-          isFocusMode={isFocusMode}
-          isFocusModeDisabled={!isSimulationInProgress}
-          onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
-          isSimulationEndDisabled={!isSimulationInProgress}
-          onSimulationEndPress={handleDisconnect}
-          isMicDisabled={!isSimulationInProgress}
-          onMicButtonPress={handleToggleMic}
-          isMuted={!isMicEnabled}
-        />
+        {isSimulationInProgress && (
+          <ControlButtons
+            isMaximized={isControlButtonMaximized}
+            onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
+            isFocusMode={isFocusMode}
+            isFocusModeDisabled={!isSimulationInProgress}
+            onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
+            isSimulationEndDisabled={!isSimulationInProgress}
+            onSimulationEndPress={handleDisconnect}
+            isMicDisabled={!isSimulationInProgress}
+            onMicButtonPress={handleToggleMic}
+            isMuted={!isMicEnabled}
+          />
+        )}
       </RoomContext.Provider>
     </SafeAreaView>
   );
 };
-
-const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkGray7,
-  },
-  contentContainer: {
-    flex: 1,
-    paddingHorizontal: '16@ms',
-  },
-  centralContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: '8@ms',
-    marginTop: '10@mvs',
-    marginBottom: '16@mvs',
-    paddingHorizontal: '16@ms',
-    backgroundColor: colors.darkGray3,
-  },
-  liveFeedbackWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: '81@mvs',
-  },
-  bottom51: {
-    bottom: '51@mvs',
-  },
-  loadingWrapper: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: '40@ms',
-  },
-  loadingTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: '4@mvs',
-  },
-  loadingItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-  },
-  loadingDescription: {
-    ...fontFamily.ROBOTO.REGULAR,
-    fontSize: '14@ms',
-    color: colors.lightGray3,
-    textAlign: 'center',
-  },
-  personaLabel: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '14@ms',
-    color: colors.white,
-    textAlign: 'left',
-    marginHorizontal: '20@ms',
-    marginBottom: '16@ms',
-    width: '100%',
-  },
-  scoreMeterContainer: {
-    marginBottom: '24@mvs',
-  },
-});

@@ -17,7 +17,7 @@ module.exports = {
       '<rootDir>/__mocks__/fileMock.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@react-native|react-native|react-native-.*|@react-navigation|@react-native-.*|@react-native-community|react-native-size-matters|@react-native/assets|@react-native/polyfills|react-native-svg|react-redux)/)',
+    'node_modules/(?!(@react-native|react-native|react-native-.*|@react-navigation|@react-native-.*|@react-native-community|react-native-size-matters|@react-native/assets|@react-native/polyfills|react-native-svg|react-redux|@sayem314/react-native-keep-awake|react-native-webview)/)',
   ],
   collectCoverage: true,
   coverageReporters: ['html'],
