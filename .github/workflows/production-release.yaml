@@ -29,8 +29,13 @@ on:
 env:
   ENABLE_DB_MIGRATION: "false"
   ENABLE_TESTS: "true"
-  S3_ENV_FILES: 'learn-core/.env'
+  S3_ENV_FILES: |
+    learn-core/.env
   BUILD_PLATFORM: linux/amd64
+  # GCP Workload Identity Federation configuration (set as GitHub secrets)
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+  GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
   BUILD_PATH: dockerfile
   SUBNETS: '["subnet-0803b15022d8454d1","subnet-0a9aebefcd504a6eb"]'
   SECURITY_GROUPS: '["sg-0802e74f0bf59122d"]'
@@ -217,6 +222,7 @@ jobs:
         if: ${{ env.TEST_RUNTIME == 'java' }}
         uses: actions/setup-java@v4
         with:
+          distribution: 'temurin'
           java-version: ${{ env.TEST_RUNTIME_VERSION }}
 
       - name: Setup Poetry
@@ -273,6 +279,9 @@ jobs:
           s3-env-files: ${{ env.S3_ENV_FILES }}
           build-platform: ${{ env.BUILD_PLATFORM }}
           build-path: ${{ env.BUILD_PATH }}
+          gcp-project-id: ${{ env.GCP_PROJECT_ID }}
+          gcp-wif-provider: ${{ env.GCP_WIF_PROVIDER }}
+          gcp-service-account: ${{ env.GCP_SERVICE_ACCOUNT }}
           
       - name: Tag additional version images
         run: |

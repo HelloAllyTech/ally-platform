@@ -1,6 +1,6 @@
 from typing import List, Literal, Mapping, Any, Optional, Dict
-
 from app.core.constants import VisibilityType, DetectionType
+from app.core.constants import VisibilityType, DetectionType, ConditionOperator, DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.event_types.similarity_based.similarity_event import SimilarityEvent
 from app.core.events.event_types.semantic_similarity.semantic_similarity_event import SemanticSimilarityEvent
@@ -24,6 +24,7 @@ def _create_event_by_detection_type(
     detection_type: DetectionType,
     logger=None,
     embedding_client: Optional[BaseEmbeddingClient] = None,
+    language_code: Optional[str] = None,
 ) -> Optional[BaseEvent]:
     """
     Robust factory helper that creates event instances per detection type.
@@ -68,6 +69,7 @@ def _create_event_by_detection_type(
                 detection_type=detection_type,
                 data=raw_data or {},
                 custom_sentences=sentences,
+                language_code=language_code or DEFAULT_LANGUAGE_CODE,
                 **common_fields,
             )
 
@@ -258,6 +260,28 @@ def _parse_expression(expr_dict: dict) -> ExpressionNode:
         raise ValueError(f"Unknown expression type: {node_type}")
 
 
+def _extract_language_code(source: Mapping[str, Any]) -> str:
+    """
+    Extract language_code from a dictionary, checking both direct fields and nested languageConfig.
+    
+    Args:
+        source: Dictionary to extract language_code from
+        
+    Returns:
+        Extracted language_code or DEFAULT_LANGUAGE_CODE if not found
+    """
+    # First check for languageCode directly (most common case)
+    language_code = source.get("languageCode") or source.get("language_code") or DEFAULT_LANGUAGE_CODE
+    
+    # Then check for nested languageConfig dict
+    if language_code == DEFAULT_LANGUAGE_CODE:
+        language_config = source.get("languageConfig") or source.get("language_config")
+        if isinstance(language_config, dict):
+            language_code = language_config.get("language_code") or language_config.get("languageCode") or DEFAULT_LANGUAGE_CODE
+    
+    return language_code
+
+
 def build_events_from_metadata(
         metadata: Mapping[str, Any],
         *,
@@ -283,10 +307,17 @@ def build_events_from_metadata(
     log = logger if logger is not None else logging.getLogger(__name__)
     log.debug("build_events_from_metadata called")
 
+    # Extract language_code from metadata
+    # If metadata has a "scenario" key, extract from that section; otherwise metadata is the scenario itself
+    scenario_section = metadata.get("scenario")
+    if isinstance(scenario_section, dict):
+        language_code = _extract_language_code(scenario_section)
+    else:
+        language_code = _extract_language_code(metadata)
+
     # normalize event list location: metadata may be {"scenario": {...}} or the raw scenario
     event_dicts = metadata.get("events") or []
     if not event_dicts:
-        scenario_section = metadata.get("scenario")
         if isinstance(scenario_section, dict):
             event_dicts = scenario_section.get("events") or []
 
@@ -341,6 +372,7 @@ def build_events_from_metadata(
                 detection_type=detection_type,
                 logger=log,
                 embedding_client=embedding_client,
+                language_code=language_code,
             )
             if instance is None:
                 reason = "factory returned None (validation/parsing failed inside _create_event_by_detection_type)"

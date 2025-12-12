@@ -10,6 +10,8 @@ services:
       - .env
     environment:
       AWS_ENDPOINT_URL: http://localstack:4566
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-ally-learn-core}  # Set in .env or use default
+      # GOOGLE_APPLICATION_CREDENTIALS not set - will use Application Default Credentials from mounted volume
     ports:
       - '8002:8000'
     volumes:

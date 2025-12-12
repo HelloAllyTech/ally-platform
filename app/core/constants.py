@@ -29,9 +29,12 @@ class TTSProvider(str, Enum):
 
 class STTProvider(str, Enum):
     DEEPGRAM = "deepgram"
+    GOOGLE = "google"
+    SARVAM = "sarvam"
 
 class LLMProvider(str, Enum):
     OPENAI = "openai"
+    GEMINI = "gemini"
 
 class VisibilityType(str, Enum):
     ACTIVE = "ACTIVE"
@@ -56,6 +59,19 @@ class ConditionOperator(str, Enum):
 class SimilarityEventConfig:
     match_threshold: Final[float] = 0.6
     min_match_tokens: Final[int] = 2
+
+class GoogleSTTConfig:
+    """Configuration constants for Google Cloud STT."""
+    DEFAULT_MODEL: Final[str] = "chirp"
+    DEFAULT_LOCATION: Final[str] = "global"
+    SPOKEN_PUNCTUATION: Final[bool] = False
+    
+    # Model name mappings for backward compatibility
+    MODEL_MAPPING: Final[Dict[str, str]] = {
+        "default": "chirp",
+        "command_and_search": "latest_short",
+        "phone_call": "latest_long",
+    }
 
 class ExpressionType(str, Enum):
     IDENTIFIER = "IDENTIFIER"

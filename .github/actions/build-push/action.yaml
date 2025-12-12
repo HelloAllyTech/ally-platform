@@ -28,6 +28,15 @@ inputs:
     required: false
     description: "BUILD PATH"
     default: ".dockerfile"
+  gcp-project-id:
+    required: false
+    description: "GCP Project ID for Workload Identity Federation"
+  gcp-wif-provider:
+    required: false
+    description: "GCP Workload Identity Federation Provider path"
+  gcp-service-account:
+    required: false
+    description: "GCP Service Account email for Workload Identity Federation"
 outputs:
   APP_IMAGE:
     description: "App image"
@@ -41,11 +50,24 @@ runs:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
 
+    - name: Authenticate to Google Cloud using Workload Identity Federation
+      if: inputs.gcp-project-id != '' && inputs.gcp-wif-provider != '' && inputs.gcp-service-account != ''
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.gcp-wif-provider }}
+        service_account: ${{ inputs.gcp-service-account }}
+
+    - name: Set up Google Cloud SDK
+      if: inputs.gcp-project-id != '' && inputs.gcp-wif-provider != '' && inputs.gcp-service-account != ''
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ inputs.gcp-project-id }}
+
     - name: Amazon ECR Login
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1.7.0
 
-    - name: Download environment files
+    - name: Download environment files from S3
       if: inputs.s3-env-files != ''
       shell: bash
       run: |
