@@ -218,8 +218,6 @@ class TestScenario:
         
         scenario = Scenario(
             scenarioName="Test Scenario",
-            learningObjective="Test objective",
-            prompt="Test prompt",
             events=events,
             metadata={"key": "value"},
             voice=voice,
@@ -227,8 +225,6 @@ class TestScenario:
         )
         
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "Test objective"
-        assert scenario.prompt == "Test prompt"
         assert scenario.events == events
         assert scenario.metadata == {"key": "value"}
         assert scenario.voice == voice
@@ -254,15 +250,11 @@ class TestScenario:
 
         scenario = Scenario(
             name="Direct Name",
-            learning_objective="Direct objective",
-            prompt="Direct prompt",
             voice=voice,
             prompt_data=prompt_data
         )
         
         assert scenario.name == "Direct Name"
-        assert scenario.learning_objective == "Direct objective"
-        assert scenario.prompt == "Direct prompt"
         assert scenario.events == []  # Default empty list
         assert scenario.metadata == {}  # Default empty dict
     
@@ -273,8 +265,6 @@ class TestScenario:
         
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
-        assert scenario.prompt == "Test prompt for the scenario"
         
         # Verify voice was created
         if hasattr(scenario, 'voice') and scenario.voice:
@@ -295,7 +285,6 @@ class TestScenario:
             "scenario": {
                 "title": "Nested Test",
                 "description": "Nested description",
-                "prompt": "Nested prompt",
                 "promptData": {
                     "name": "Nested Character",
                     "age": 28,
@@ -316,8 +305,6 @@ class TestScenario:
         scenario = Scenario.create(nested_payload)
         
         assert scenario.name == "Nested Test"
-        assert scenario.learning_objective == "Nested description"
-        assert scenario.prompt == "Nested prompt"
     
     @pytest.mark.unit
     def test_scenario_create_with_direct_scenario_payload(self):
@@ -325,7 +312,6 @@ class TestScenario:
         direct_payload = {
             "title": "Direct Test",
             "description": "Direct description",
-            "prompt": "Direct prompt",
             "promptData": {
                 "name": "Direct Character",
                 "age": 35,
@@ -345,8 +331,6 @@ class TestScenario:
         scenario = Scenario.create(direct_payload)
         
         assert scenario.name == "Direct Test"
-        assert scenario.learning_objective == "Direct description"
-        assert scenario.prompt == "Direct prompt"
     
     @pytest.mark.unit
     def test_scenario_extract_scenario_section(self):
@@ -370,7 +354,6 @@ class TestScenario:
         raw_payload = {
             "title": "Test Title",
             "description": "Test Description",
-            "prompt": "Test Prompt",
             "metadata": {"key": "value"}
         }
         
@@ -378,8 +361,6 @@ class TestScenario:
         
         expected = {
             "scenarioName": "Test Title",
-            "learningObjective": "Test Description",
-            "prompt": "Test Prompt",
             "metadata": {"key": "value"}
         }
         assert result == expected
@@ -393,8 +374,6 @@ class TestScenario:
         
         expected = {
             "scenarioName": "",
-            "learningObjective": "",
-            "prompt": "",
             "metadata": {}
         }
         assert result == expected
@@ -525,7 +504,6 @@ class TestScenario:
         payload = {
             "title": "Events Test",
             "description": "Test with events",
-            "prompt": "Events prompt",
             "promptData": {
                 "name": "Events Character",
                 "age": 30,
@@ -558,7 +536,6 @@ class TestScenario:
             "scenario": {
                 "title": "Integration Test",
                 "description": "Full integration test",
-                "prompt": "Integration prompt",
                 "metadata": {"test": "integration"},
                 "voice": {
                     "name": "integration_voice",
@@ -581,8 +558,6 @@ class TestScenario:
         
         # Verify all components were created correctly
         assert scenario.name == "Integration Test"
-        assert scenario.learning_objective == "Full integration test"
-        assert scenario.prompt == "Integration prompt"
         assert scenario.metadata == {"test": "integration"}
         
         # Verify voice integration
@@ -601,8 +576,6 @@ class TestScenario:
         # Test populate_by_name allows both alias and field name, and ensure nested models provided
         scenario_data = {
             "scenarioName": "Alias Test",  # Using alias
-            "learning_objective": "Field Test",  # Using field name
-            "prompt": "Config test",
             "voice": ScenarioVoice(
                 name="config_voice",
                 provider="openai",
@@ -622,8 +595,6 @@ class TestScenario:
         scenario = Scenario(**scenario_data)
 
         assert scenario.name == "Alias Test"
-        assert scenario.learning_objective == "Field Test"
-        assert scenario.prompt == "Config test"
 
 class TestScenarioIntegration:
     """Integration tests for Scenario with real dependencies."""
@@ -651,7 +622,6 @@ class TestScenarioIntegration:
         payload = {
             "title": "Real Events Test",
             "description": "Test with real event factory",
-            "prompt": "Real events prompt",
             "promptData": {
                 "name": "Real Events Character",
                 "age": 33,

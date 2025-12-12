@@ -29,7 +29,6 @@ class TestRoomMetadataEnvelope:
             "scenario": {
                 "title": "Minimal Test",
                 "description": "Minimal description",
-                "prompt": "Minimal prompt",
                 "promptData": {
                     "name": "Test Character",
                     "age": 25,
@@ -62,7 +61,6 @@ class TestRoomMetadataEnvelope:
             "scenario": {
                 "title": "Version Test",
                 "description": "Test with custom version",
-                "prompt": "Version test prompt",
                 "promptData": {
                     "name": "Version Character",
                     "age": 30,
@@ -97,7 +95,6 @@ class TestRoomMetadataEnvelope:
         scenario_payload = {
             "title": "Direct Scenario",
             "description": "Direct scenario test",
-            "prompt": "Direct prompt",
             "promptData": {
                 "name": "Direct Character",
                 "age": 28,
@@ -128,8 +125,6 @@ class TestRoomMetadataEnvelope:
         
         scenario = envelope.scenario
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
-        assert scenario.prompt == "Test prompt for the scenario"
         
         # Verify voice configuration is preserved
         if hasattr(scenario, 'voice') and scenario.voice:
@@ -143,8 +138,7 @@ class TestRoomMetadataEnvelope:
             "scenario": {
                 "scenario": {
                     "title": "Nested Test",
-                    "description": "Nested scenario test",
-                    "prompt": "Nested prompt",
+                    "description": "Nested scenario test",  
                     "promptData": {
                         "name": "Nested Character",
                         "age": 32,
@@ -227,7 +221,6 @@ class TestRoomMetadataEnvelope:
                   .with_scenario(
                       title="Builder Test",
                       description="Test with builder pattern",
-                      prompt="Builder prompt"
                   )
                   .with_voice("builder_voice", "elevenlabs", model="eleven_multilingual_v2")
                   .with_prompt_data(
@@ -322,7 +315,7 @@ class TestRoomMetadataEnvelope:
                 }
             ),
             "empty_payload": {},
-            "scenario_only": {"title": "Direct", "description": "Direct test", "prompt": "Direct"}
+            "scenario_only": {"title": "Direct", "description": "Direct test"}
         }
         
         payload = payloads[payload_type]
@@ -353,7 +346,6 @@ class TestRoomMetadataEnvelopeIntegration:
         scenario = envelope.scenario
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
         
         # Verify prompt data integration
         if hasattr(scenario, 'prompt_data') and scenario.prompt_data:
@@ -384,7 +376,6 @@ class TestRoomMetadataEnvelopeIntegration:
             "scenario": {
                 "title": "Events Test",
                 "description": "Test with events",
-                "prompt": "Events prompt",
                 "promptData": {
                     "name": "Events Character",
                     "age": 30,

@@ -60,8 +60,6 @@ class ScenarioFactory(factory.Factory):
         model = Scenario
     
     name = factory.Faker('sentence', nb_words=3)
-    learning_objective = factory.Faker('text', max_nb_chars=200)
-    prompt = factory.Faker('text', max_nb_chars=300)
     events = factory.LazyFunction(list)  # Empty list by default
     metadata = factory.LazyFunction(dict)  # Empty dict by default
     voice = factory.SubFactory(ScenarioVoiceFactory)
@@ -75,8 +73,6 @@ def create_mock_scenario(**overrides) -> Mock:
     # Default values
     defaults = {
         'name': 'Mock Scenario',
-        'learning_objective': 'Mock learning objective',
-        'prompt': 'Mock prompt for testing',
         'events': [],
         'metadata': {},
         'voice': None,
@@ -98,7 +94,6 @@ def create_scenario_payload(**overrides) -> Dict[str, Any]:
     base_payload = {
         "title": "Test Scenario",
         "description": "Test scenario description",
-        "prompt": "Test scenario prompt",
         "metadata": {},
         "voice": {
             "name": "test_voice",
@@ -163,7 +158,6 @@ def create_room_metadata_envelope_payload(**overrides) -> Dict[str, Any]:
 MINIMAL_SCENARIO_PAYLOAD = create_scenario_payload(
     title="Minimal Scenario",
     description="Minimal test scenario",
-    prompt="Minimal prompt",
     voice={
         "name": "minimal_voice",
         "provider": "deepgram",

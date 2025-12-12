@@ -7,7 +7,6 @@ SCENARIO_SAMPLE = {
             "reducing anxiety and building emotional safety. Guide Ahana toward constructive communication "
             "with parents and a more optimistic, self-compassionate view of herself and the future."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -168,7 +167,6 @@ SCENARIO_SAMPLE_HINDI = {
             "घबराहट को कम करें और भावनात्मक सुरक्षा का निर्माण करें। अहाना को माता-पिता के साथ रचनात्मक संचार और "
             "स्वयं और भविष्य के बारे में अधिक आशावादी, आत्म-करुणामय दृष्टिकोण की ओर मार्गदर्शन करें।"
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -239,7 +237,6 @@ SCENARIO_SAMPLE_GOOGLE = {
             "reducing anxiety and building emotional safety. Guide Ahana toward constructive communication "
             "with parents and a more optimistic, self-compassionate view of herself and the future."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -310,7 +307,6 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "घबराहट को कम करें और भावनात्मक सुरक्षा का निर्माण करें। अहाना को माता-पिता के साथ रचनात्मक संचार और "
             "स्वयं और भविष्य के बारे में अधिक आशावादी, आत्म-करुणामय दृष्टिकोण की ओर मार्गदर्शन करें।"
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -386,7 +382,6 @@ SCENARIO_SAMPLE_MALAYALAM = {
             "സ്വയത്തെയും ഭാവിയെയും കുറിച്ച് കൂടുതൽ ശുഭാപ്തിവിശ്വാസവും സ്വയം-കരുണയുമുള്ള "
             "വീക്ഷണത്തിലേക്ക് നയിക്കുക."
         ),
-        "prompt": "",
         "promptData": {
             "age": "15",
             "name": "Ahana",
@@ -459,7 +454,6 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "with parents and a more optimistic, self-compassionate view of herself and the future. "
             "IMPORTANT: Ahana knows only Malayalam and will speak only in Malayalam throughout the session."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",

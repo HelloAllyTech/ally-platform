@@ -82,7 +82,6 @@ def sample_room_metadata() -> Dict[str, Any]:
         "scenario": {
             "title": "Test Scenario",
             "description": "A test learning scenario",
-            "prompt": "Test prompt for the scenario",
             "metadata": {"key": "value"},
             "voice": {
                 "name": "test_voice",
@@ -128,7 +127,6 @@ def minimal_room_metadata() -> Dict[str, Any]:
         "scenario": {
             "title": "Minimal Scenario",
             "description": "Minimal test scenario",
-            "prompt": "Minimal prompt",
             "promptData": {
                 "name": "Minimal Character",
                 "age": 30,
@@ -235,7 +233,6 @@ def room_metadata_factory():
             "scenario": {
                 "title": "Factory Scenario",
                 "description": "Factory test scenario",
-                "prompt": "Factory prompt",
                 "promptData": {
                     "name": "Factory Character",
                     "age": 28,
@@ -270,7 +267,6 @@ def large_metadata():
         "scenario": {
             "title": "Large Scenario",
             "description": "A" * 1000,  # Large description
-            "prompt": "B" * 2000,  # Large prompt
             "promptData": {
                 "name": "Large Character",
                 "age": 35,
