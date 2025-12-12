@@ -48,7 +48,6 @@ class TestMetadataParsingIntegration:
         scenario = envelope.scenario
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Integration Test Scenario"
-        assert scenario.learning_objective == "Full integration test"
 
         # Verify voice integration
         assert isinstance(scenario.voice, ScenarioVoice)
@@ -137,7 +136,6 @@ class TestMetadataParsingIntegration:
         scenario = envelope.scenario
         assert "测试" in scenario.name
         assert "🎭" in scenario.name
-        assert "café" in scenario.learning_objective
         assert "角色" in scenario.prompt_data.name
         assert "🇧🇷" in scenario.prompt_data.current_location
 
@@ -187,7 +185,6 @@ class TestMetadataParsingIntegration:
             scenario={
                 "title": "Large Scenario",
                 "description": "C" * 500,  # Large description
-                "prompt": "D" * 1000,  # Large prompt
                 "promptData": large_prompt_data,
                 "metadata": {f"key_{i}": f"value_{i}" for i in range(100)}  # Large metadata
             }
@@ -200,8 +197,6 @@ class TestMetadataParsingIntegration:
 
         assert isinstance(envelope, RoomMetadataEnvelope)
         scenario = envelope.scenario
-        assert len(scenario.learning_objective) == 500
-        assert len(scenario.prompt) == 1000
         assert len(scenario.prompt_data.context) == 1000
         assert len(scenario.prompt_data.opening_statements) == 50
         assert len(scenario.metadata) == 100
@@ -215,7 +210,6 @@ class TestMetadataParsingIntegration:
                 "scenario": {
                     "title": "Nested Integration Test",
                     "description": "Testing nested extraction",
-                    "prompt": "Nested prompt",
                     "promptData": {
                         "name": "Nested Character",
                         "age": 28,

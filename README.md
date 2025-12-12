@@ -233,7 +233,6 @@ Scenarios define the client persona and are passed as LiveKit room metadata:
   "scenario": {
     "title": "Scenario Name",
     "description": "Learning objective",
-    "prompt": "System prompt",
     "promptData": {
       "name": "Client Name",
       "age": 25,

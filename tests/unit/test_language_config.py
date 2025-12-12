@@ -250,7 +250,6 @@ class TestScenarioWithLanguageConfig:
         payload = {
             "title": "Test Scenario",
             "description": "Test description",
-            "prompt": "Test prompt",
             "promptData": {
                 "name": "Test Character",
                 "age": 25,
@@ -275,7 +274,6 @@ class TestScenarioWithLanguageConfig:
         payload = {
             "title": "Test Scenario",
             "description": "Test description",
-            "prompt": "Test prompt",
             "languageCode": "hi-IN",
             "promptData": {
                 "name": "Test Character",
@@ -301,7 +299,6 @@ class TestScenarioWithLanguageConfig:
         payload = {
             "title": "Test Scenario",
             "description": "Test description",
-            "prompt": "Test prompt",
             "languageCode": "en-IN",
             "stt": {
                 "provider": "deepgram",
@@ -334,7 +331,6 @@ class TestScenarioWithLanguageConfig:
         payload = {
             "title": "Test Scenario",
             "description": "Test description",
-            "prompt": "Test prompt",
             "languageCode": "hi-IN",
             "llm": {
                 "provider": "openai",
@@ -371,7 +367,6 @@ class TestScenarioWithLanguageConfig:
             "scenario": {
                 "title": "Nested Test",
                 "description": "Nested description",
-                "prompt": "Nested prompt",
                 "languageCode": "es-ES",
                 "stt": {
                     "provider": "deepgram",
@@ -414,7 +409,6 @@ class TestScenarioWithLanguageConfig:
         payload = {
             "title": "Backward Compat Test",
             "description": "Test backward compatibility",
-            "prompt": "Test prompt",
             "promptData": {
                 "name": "Test Character",
                 "age": 25,

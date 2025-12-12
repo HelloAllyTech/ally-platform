@@ -91,8 +91,6 @@ def create_mock_scenario(name: str = "Test Scenario", **kwargs):
     """Create a mock scenario object."""
     mock_scenario = Mock()
     mock_scenario.name = name
-    mock_scenario.learning_objective = kwargs.get("learning_objective", "Test objective")
-    mock_scenario.prompt = kwargs.get("prompt", "Test prompt")
     mock_scenario.events = kwargs.get("events", [])
     mock_scenario.metadata = kwargs.get("metadata", {})
     mock_scenario.voice = kwargs.get("voice", None)
@@ -124,7 +122,7 @@ class AssertionHelpers:
     @staticmethod
     def assert_scenario_has_required_fields(scenario):
         """Assert scenario has all required fields."""
-        required_fields = ['name', 'learning_objective', 'prompt']
+        required_fields = ['name']
         for field in required_fields:
             assert hasattr(scenario, field)
     
@@ -177,7 +175,6 @@ class PerformanceTestHelpers:
             "scenario": {
                 "title": "Large Scenario" * size_multiplier,
                 "description": "A" * (1000 * size_multiplier),
-                "prompt": "B" * (2000 * size_multiplier),
                 "promptData": {
                     "name": "Large Character",
                     "age": 35,
