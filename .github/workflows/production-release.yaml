@@ -288,32 +288,41 @@ jobs:
           VERSION=${{ needs.validate-and-tag.outputs.VERSION }}
           MAJOR=${{ needs.validate-and-tag.outputs.MAJOR }}
           MINOR=${{ needs.validate-and-tag.outputs.MINOR }}
-          ECR_REPO=${{ needs.prepare-env.outputs.ECR_REPOSITORY }}
           
-          # Get the image that was just built
+          # Get the image that was just built (full path with registry)
           SOURCE_IMAGE="${{ steps.build_and_push.outputs.APP_IMAGE }}"
           
-          # Login to ECR
-          aws ecr get-login-password --region ${{ needs.prepare-env.outputs.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REPO
+          # Extract registry URL from the source image (e.g., 123456.dkr.ecr.region.amazonaws.com)
+          ECR_REGISTRY=$(echo $SOURCE_IMAGE | cut -d'/' -f1)
+          
+          # Extract repository name from source image
+          ECR_REPO=$(echo $SOURCE_IMAGE | cut -d'/' -f2 | cut -d':' -f1)
+          
+          echo "ECR Registry: $ECR_REGISTRY"
+          echo "ECR Repository: $ECR_REPO"
+          echo "Source Image: $SOURCE_IMAGE"
+          
+          # Login to ECR using the registry URL
+          aws ecr get-login-password --region ${{ needs.prepare-env.outputs.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY
           
           # Pull the versioned image
           docker pull $SOURCE_IMAGE
           
-          # Tag with additional versions
-          docker tag $SOURCE_IMAGE ${ECR_REPO}:${MAJOR}.${MINOR}
-          docker tag $SOURCE_IMAGE ${ECR_REPO}:${MAJOR}
-          docker tag $SOURCE_IMAGE ${ECR_REPO}:latest
+          # Tag with additional versions (using full registry path)
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:latest
           
           # Push additional tags
-          docker push ${ECR_REPO}:${MAJOR}.${MINOR}
-          docker push ${ECR_REPO}:${MAJOR}
-          docker push ${ECR_REPO}:latest
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:latest
           
           echo "## :package: Docker Images Created" >> $GITHUB_STEP_SUMMARY
           echo "- \`$SOURCE_IMAGE\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${ECR_REPO}:${MAJOR}.${MINOR}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${ECR_REPO}:${MAJOR}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${ECR_REPO}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:latest\`" >> $GITHUB_STEP_SUMMARY
 
   run-db-migration:
     name: Run DB Migration
@@ -417,19 +426,18 @@ jobs:
           
           echo "Generating changelog from $PREVIOUS_TAG to $TAG"
           
-          # Generate changelog
-          cat > CHANGELOG.md << 'EOF'
-          ## What's Changed
+          # Generate changelog with proper formatting
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
           
-          EOF
+          # Get commits since last tag (limit to 100 to avoid issues)
+          git log $PREVIOUS_TAG..master --pretty=format:"- %s (%h) @%an" --no-merges | head -100 >> CHANGELOG.md
           
-          # Get commits since last tag
-          git log $PREVIOUS_TAG..master --pretty=format:"- %s (%h) @%an" --no-merges >> CHANGELOG.md
-          
-          # Output for release notes
-          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          # Use a unique delimiter that won't appear in commit messages
+          DELIMITER="CHANGELOG_END_$(date +%s)"
+          echo "CHANGELOG<<${DELIMITER}" >> $GITHUB_OUTPUT
           cat CHANGELOG.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "${DELIMITER}" >> $GITHUB_OUTPUT
 
       - name: Create Release Draft
         uses: softprops/action-gh-release@v1
