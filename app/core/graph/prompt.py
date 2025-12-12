@@ -27,6 +27,30 @@ def _get_behavioral_guidelines(prompt_data: VoicePromptData) -> str:
     return ""
 
 
+def _format_custom_fields(custom_fields: list) -> str:
+    """
+    Formats custom fields into markdown sections for prompt injection.
+    
+    Args:
+        custom_fields: List of dicts with 'name' and 'value' keys
+        
+    Returns:
+        Formatted markdown string with custom field sections, or empty string if no fields
+    """
+    if not custom_fields:
+        return ""
+    
+    formatted_blocks = []
+    for field in custom_fields:
+        if isinstance(field, dict) and "name" in field and "value" in field:
+            field_name = field["name"]
+            field_value = field["value"]
+            if field_value:
+                formatted_blocks.append(f"**{field_name}:**\n{field_value}\n\n")
+    
+    return "".join(formatted_blocks)
+
+
 # --- Main Prompt Generator Function ---
 
 def generate_system_message(
@@ -92,6 +116,10 @@ def generate_system_message(
     emotional_needs_block = _get_optional_block("Your emotional needs from this counselling session",
                                                 prompt_data.emotional_needs)
     tone_block = _get_optional_block("Your talking stye/tone", prompt_data.tone)
+    
+    # Format custom fields dynamically
+    custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
+    
     # agent_goal is omitted as per user's new example structure
     # system_instruction from prompt_data is ignored and overridden below
 
@@ -148,6 +176,7 @@ def generate_system_message(
     {starting_state_block}
     {emotional_needs_block}
     {tone_block}
+    {custom_fields_block}
     
     """
 

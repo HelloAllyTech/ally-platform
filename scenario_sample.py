@@ -24,7 +24,7 @@ SCENARIO_SAMPLE = {
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
             "openingStatements": [
-              "Hi, I need some help."
+                "Hi, I need some help."
             ],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations."
@@ -40,6 +40,63 @@ SCENARIO_SAMPLE = {
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["Hi", "Hello"],
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "warm-greeting",
+                "name": "Offered warm greeting",
+                "description": "",
+                "score": 5,
+                "data": {
+                    "sentences": ["Welcome to the helpline"]
+                },
+                "emoji": "🔼",
+                "message": "Good greetings",
+                "detectionType": "SEMANTIC_SIMILARITY",
+                "branchInstruction": "start speaking",
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "score-lte-0",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": 0,
+                "data": {
+                    "score": 0,
+                    "condition": "LTE"
+                },
+                "emoji": "🔼",
+                "message": "Let's get started",
+                "detectionType": "SCORE",
+                "branchInstruction": "",
+                "feedbackStatus": "True"
+            },
+            {
+                "id": "comb-score-lte-0_and_open-ended-question",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": 0,
+                "data": {
+                    "expression": {
+                        "left": {
+                            "id": "score-lte-0",
+                            "type": "IDENTIFIER"
+                        },
+                        "type": "AND",
+                        "right": {
+                            "id": "open-ended-question",
+                            "type": "IDENTIFIER"
+                        }
+                    },
+                    "dependentEvents": [
+                        "score-lte-0",
+                        "open-ended-question"
+                    ]
+                },
+                "emoji": "🔼",
+                "detectionType": "COMBINATION",
+                "message": "Let's get started",
+                "branchInstruction": "",
                 "feedbackStatus": "True"
             },
             {
@@ -74,12 +131,14 @@ SCENARIO_SAMPLE = {
                 },
             },
         ],
+        "triggerEvents": ["open-ended-question", "superficial-hope", "comb-score-lte-0_and_open-ended-question",
+                          "warm-greeting", "score-lte-0"],
         "voice": {
             "name": "priya-adult-female",
             "provider": "sarvam",
             "config": {
-                "model":"bulbul:v2",
-                "speaker":"anushka",
+                "model": "bulbul:v2",
+                "speaker": "anushka",
             }
         },
         "languageCode": "en-IN",
@@ -126,7 +185,7 @@ SCENARIO_SAMPLE_HINDI = {
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
             "openingStatements": [
-              "नमस्ते, मुझे कुछ मदद चाहिए।"
+                "नमस्ते, मुझे कुछ मदद चाहिए।"
             ],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "अहाना को अपने डर और चिंताओं को खुलकर व्यक्त करना चाहिए। वह पहले संकोच कर सकती है लेकिन धीरे-धीरे खुल जाएगी। उसे शैक्षणिक दबाव और पारिवारिक अपेक्षाओं के बारे में कमजोरी दिखानी चाहिए।"

@@ -9,7 +9,7 @@ from app.core.events.factory import build_events_from_metadata
 from app.core.events.event_types.combination.constants import ExpressionNode, CombinationData
 from app.core.constants import DetectionType, ExpressionType
 from app.core.scenario.base import Scenario
-from app.utils.event_utils import evaluate_expression
+from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 
 
 @pytest.fixture
@@ -420,4 +420,215 @@ class TestEventRegistry:
         
         # All events should still be in registry
         assert len(registry.event_registry) == 3
+
+    def test_circular_dependency_direct_self_reference_ignored(self, mock_room, thread_id):
+        """Test that combination events with direct self-reference are completely ignored."""
+        metadata = {
+            "events": [
+                {"id": "event-1", "sentences": ["hello"]},
+                {
+                    "id": "circular-event",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "circular-event"  # References itself
+                        }
+                    }
+                }
+            ]
+        }
+        
+        scenario = create_test_scenario(metadata)
+        registry = EventRegistry(scenario, mock_room, thread_id)
+        
+        # Circular event should NOT be in event_registry
+        assert "circular-event" not in registry.event_registry
+        # Circular event should NOT be in expression_list
+        assert len(registry.expression_list) == 0
+        # Regular event should still be in registry
+        assert "event-1" in registry.event_registry
+        assert len(registry.event_registry) == 1
+
+    def test_circular_dependency_indirect_self_reference_ignored(self, mock_room, thread_id):
+        """Test that combination events with indirect self-reference are completely ignored."""
+        metadata = {
+            "events": [
+                {"id": "event-1", "sentences": ["hello"]},
+                {
+                    "id": "circular-event-a",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {
+                                "type": "IDENTIFIER",
+                                "id": "event-1"
+                            },
+                            "right": {
+                                "type": "IDENTIFIER",
+                                "id": "circular-event-a"  # References itself indirectly
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+        
+        scenario = create_test_scenario(metadata)
+        registry = EventRegistry(scenario, mock_room, thread_id)
+        
+        # Circular event should NOT be in event_registry
+        assert "circular-event-a" not in registry.event_registry
+        # Circular event should NOT be in expression_list
+        assert len(registry.expression_list) == 0
+        # Regular event should still be in registry
+        assert "event-1" in registry.event_registry
+
+    def test_circular_dependency_nested_self_reference_ignored(self, mock_room, thread_id):
+        """Test that combination events with nested self-reference are completely ignored."""
+        metadata = {
+            "events": [
+                {"id": "event-1", "sentences": ["hello"]},
+                {
+                    "id": "circular-event",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {
+                                "type": "IDENTIFIER",
+                                "id": "event-1"
+                            },
+                            "right": {
+                                "type": "NOT",
+                                "operand": {
+                                    "type": "IDENTIFIER",
+                                    "id": "circular-event"  # References itself in nested NOT
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+        
+        scenario = create_test_scenario(metadata)
+        registry = EventRegistry(scenario, mock_room, thread_id)
+        
+        # Circular event should NOT be in event_registry
+        assert "circular-event" not in registry.event_registry
+        # Circular event should NOT be in expression_list
+        assert len(registry.expression_list) == 0
+
+    def test_circular_dependency_warning_logged(self, mock_room, thread_id, caplog):
+        """Test that a warning is logged when circular dependency is detected."""
+        import logging
+        caplog.set_level(logging.WARNING)
+        
+        metadata = {
+            "events": [
+                {
+                    "id": "circular-event",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "circular-event"
+                        }
+                    }
+                }
+            ]
+        }
+        
+        scenario = create_test_scenario(metadata)
+        registry = EventRegistry(scenario, mock_room, thread_id)
+        
+        # Check that warning was logged
+        assert any("Circular dependency detected" in record.message for record in caplog.records)
+        assert any("circular-event" in record.message for record in caplog.records)
+
+    def test_non_circular_combination_events_are_added(self, mock_room, thread_id):
+        """Test that non-circular combination events are still added normally."""
+        metadata = {
+            "events": [
+                {"id": "event-1", "sentences": ["hello"]},
+                {"id": "event-2", "sentences": ["world"]},
+                {
+                    "id": "combo-1",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {
+                                "type": "IDENTIFIER",
+                                "id": "event-1"
+                            },
+                            "right": {
+                                "type": "IDENTIFIER",
+                                "id": "event-2"
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": "circular-combo",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "circular-combo"  # Circular
+                        }
+                    }
+                }
+            ]
+        }
+        
+        scenario = create_test_scenario(metadata)
+        registry = EventRegistry(scenario, mock_room, thread_id)
+        
+        # Non-circular combo should be in registry
+        assert "combo-1" in registry.event_registry
+        # Non-circular combo should be in expression_list
+        assert len(registry.expression_list) == 1
+        assert registry.expression_list[0]["event_id"] == "combo-1"
+        
+        # Circular combo should NOT be in registry
+        assert "circular-combo" not in registry.event_registry
+        # Circular combo should NOT be in expression_list
+        assert all(expr["event_id"] != "circular-combo" for expr in registry.expression_list)
+        
+        # Regular events should be in registry
+        assert "event-1" in registry.event_registry
+        assert "event-2" in registry.event_registry
+        assert len(registry.event_registry) == 3  # event-1, event-2, combo-1
+
+    def test_extract_event_ids_from_expression(self, mock_room, thread_id):
+        """Test the extract_event_ids_from_expression utility function."""
+        # Simple identifier
+        expr1 = ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-1")
+        assert extract_event_ids_from_expression(expr1) == {"event-1"}
+        
+        # AND expression
+        expr2 = ExpressionNode(
+            type=ExpressionType.AND,
+            left=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-1"),
+            right=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-2")
+        )
+        assert extract_event_ids_from_expression(expr2) == {"event-1", "event-2"}
+        
+        # Nested expression
+        expr3 = ExpressionNode(
+            type=ExpressionType.AND,
+            left=ExpressionNode(
+                type=ExpressionType.NOT,
+                operand=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-1")
+            ),
+            right=ExpressionNode(
+                type=ExpressionType.OR,
+                left=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-2"),
+                right=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-3")
+            )
+        )
+        assert extract_event_ids_from_expression(expr3) == {"event-1", "event-2", "event-3"}
 

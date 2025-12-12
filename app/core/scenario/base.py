@@ -33,6 +33,7 @@ class VoicePromptData(BaseModel):
     tone : Optional[str] = Field(default=None)
     opening_statements : List[str] = Field(...)
     agent_goal : Optional[str] = Field(default=None)
+    custom_fields : Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Dynamic custom fields")
 
 
 class VoiceConfig(BaseModel):
@@ -87,7 +88,11 @@ class Scenario(BaseModel):
     # Public constructor
     # ---------------------------
     @classmethod
-    def create(cls, payload: Mapping[str, Any], embedding_client: Optional[BaseEmbeddingClient] = None) -> "Scenario":
+    def create(
+        cls,
+        payload: Mapping[str, Any],
+        embedding_client: Optional[BaseEmbeddingClient] = None,
+    ) -> "Scenario":
         """
         Build a Scenario from:
           - a top-level BE payload: {"version": "...", "scenario": {...}}
@@ -103,7 +108,10 @@ class Scenario(BaseModel):
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
         # built_events = cls._build_events(raw)
-        built_events = build_events_from_metadata(raw, embedding_client=embedding_client)
+        built_events = build_events_from_metadata(
+            raw,
+            embedding_client=embedding_client,
+        )
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
         prompt_data = cls._build_prompt_data(raw)
@@ -202,6 +210,7 @@ class Scenario(BaseModel):
                 "tone": prompt_data_dict.get("tone",None),
                 "opening_statements": prompt_data_dict.get("openingStatements"),
                 "agent_goal": prompt_data_dict.get("agentGoal"),
+                "custom_fields": prompt_data_dict.get("customFields"),
             }
 
             prompt_data_obj = VoicePromptData(**mapped_data)

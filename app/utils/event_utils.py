@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Set
 from app.core.constants import ConditionOperator
 from app.core.events.schemas import EventRegistryEntry
 from app.core.events.event_types.combination.constants import ExpressionNode
@@ -101,6 +101,32 @@ def evaluate_expression(node: ExpressionNode, event_registry: Dict[str, EventReg
 
         else:
             return False
+
+def extract_event_ids_from_expression(node: ExpressionNode) -> Set[str]:
+    """
+    Extract all event IDs referenced in an expression tree.
+    
+    Args:
+        node: The expression node to traverse
+        
+    Returns:
+        Set of all event IDs found in the expression
+    """
+    event_ids = set()
+    
+    if node.type == ExpressionType.IDENTIFIER:
+        if node.id:
+            event_ids.add(node.id)
+    elif node.type == ExpressionType.NOT:
+        if node.operand:
+            event_ids.update(extract_event_ids_from_expression(node.operand))
+    elif node.type in (ExpressionType.AND, ExpressionType.OR):
+        if node.left:
+            event_ids.update(extract_event_ids_from_expression(node.left))
+        if node.right:
+            event_ids.update(extract_event_ids_from_expression(node.right))
+    
+    return event_ids
 
 # Get the current state for a specific thread_id
 def get_current_score_from_graph(thread_id: str) -> int:
