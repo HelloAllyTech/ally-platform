@@ -41,3 +41,4 @@ export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';
 export {SimulationCard} from './SimulationCard';
+export {Checkbox} from './Checkbox';

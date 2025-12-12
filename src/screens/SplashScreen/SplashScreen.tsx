@@ -74,6 +74,7 @@ export const SplashScreen: React.FC<
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('EMAIL');
   const [email, setEmail] = useState('');
+  const [otpExpiresIn, setOtpExpiresIn] = useState<number | undefined>();
 
   useHardwareBackPressHandler(() => {
     if (currentStep === 'OTP') {
@@ -131,8 +132,12 @@ export const SplashScreen: React.FC<
     permissions,
   ]);
 
-  const handleOtpGenerationSuccess = async (emailAddress: string) => {
+  const handleOtpGenerationSuccess = async (
+    emailAddress: string,
+    expiresIn?: number,
+  ) => {
     setEmail(emailAddress);
+    setOtpExpiresIn(expiresIn);
     setCurrentStep('OTP');
   };
 
@@ -155,6 +160,7 @@ export const SplashScreen: React.FC<
           <OtpVerification
             email={email}
             onOtpVerificationSuccess={handleOtpVerificationSuccess}
+            initialExpiresIn={otpExpiresIn}
           />
         );
       default:

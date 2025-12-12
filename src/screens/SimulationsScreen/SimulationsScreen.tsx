@@ -1,10 +1,25 @@
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
+import {
+  NavigationProp,
+  ParamListBase,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
 import {Trans, useTranslation} from 'react-i18next';
-import {FlatList, RefreshControl, Text, View} from 'react-native';
+import {
+  BackHandler,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
+import {useSelector} from 'react-redux';
 
-import {BoltIcon} from '@/assets';
+import {BoltIcon, DrawerMenuIcon} from '@/assets';
 import {
   CircularProgress,
   SimulationCard,
@@ -14,16 +29,25 @@ import {
 import {isIOS, SCREEN_NAMES, SimulationTabs} from '@/constants';
 import {
   useAppNavigation,
+  useDrawerNavigation,
+  useHardwareBackPressHandler,
   useSimulationCredits,
-  useTabBackToHomeHandler,
 } from '@/hooks';
+import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useGetScenariosQuery, useGetSimulationPathsQuery} from '@/services';
+import {AppRootState} from '@/store/store';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import type {Scenario, SimulationPath} from '@/types';
+import {getTriggerWarningNames} from '@/utils';
 
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
+  const drawerNavigation = useDrawerNavigation();
+  const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
+  const route = useRoute();
+  const isFocused = useIsFocused();
+  const permissions = useSelector((s: AppRootState) => s.user.permissions);
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<SimulationTabs>(
     SimulationTabs.SIMULATIONS,
@@ -45,7 +69,31 @@ export const SimulationsScreen: React.FC = () => {
 
   const keyExtractor = (item: Scenario | SimulationPath) => item.id?.toString();
 
-  useTabBackToHomeHandler();
+  // Check if this is the first visible tab
+  const isFirstTab = useMemo(() => {
+    const firstTab = getFirstVisibleTab(permissions);
+    return route.name === firstTab;
+  }, [permissions, route.name]);
+
+  // Handle back press: exit app if first tab, otherwise navigate to first tab
+  useHardwareBackPressHandler(
+    useCallback(() => {
+      if (isFocused) {
+        if (isFirstTab) {
+          BackHandler.exitApp();
+        } else {
+          const firstTab = getFirstVisibleTab(permissions);
+          tabNavigation.navigate(firstTab);
+        }
+        return true;
+      }
+      return false;
+    }, [isFocused, isFirstTab, permissions, tabNavigation]),
+  );
+
+  const handleOpenDrawer = useCallback(() => {
+    drawerNavigation.openDrawer();
+  }, [drawerNavigation]);
 
   const handleScenarioPress = (scenario: Scenario) => {
     navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario});
@@ -72,6 +120,7 @@ export const SimulationsScreen: React.FC = () => {
         description={item.description || ''}
         coverImageUrl={item.coverImageUrl}
         onPress={() => handleScenarioPress(item)}
+        triggerWarnings={getTriggerWarningNames(item.triggerWarnings)}
       />
     );
   };
@@ -128,12 +177,21 @@ export const SimulationsScreen: React.FC = () => {
     return (
       <>
         <View style={styles.brandHeader}>
-          <Text style={styles.brandTitle}>
-            {t('Simulations.header.title')}{' '}
-            <Text style={styles.brandTitleItalic}>
-              {t('Simulations.header.subtitle')}
+          <View style={styles.leftGroup}>
+            {isFirstTab && (
+              <TouchableOpacity
+                style={styles.hamburgerButton}
+                onPress={handleOpenDrawer}>
+                <DrawerMenuIcon />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.brandTitle}>
+              {t('Simulations.header.title')}{' '}
+              <Text style={styles.brandTitleItalic}>
+                {t('Simulations.header.subtitle')}
+              </Text>
             </Text>
-          </Text>
+          </View>
           {credits && getCreditsInfo && (
             <View style={styles.creditDisplay}>
               <BoltIcon width={14} height={14} />
@@ -163,7 +221,7 @@ export const SimulationsScreen: React.FC = () => {
         <Text style={styles.listTitle}>
           {t('Simulations.chooseYour')}{' '}
           <Text style={styles.pageTitleItalic}>
-            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'path'}`)}
+            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'track'}`)}
           </Text>
         </Text>
         {isSimulationsTab ? (
@@ -232,7 +290,7 @@ export const SimulationsScreen: React.FC = () => {
               },
               {
                 key: SimulationTabs.PATHS,
-                label: t('Simulations.pathWay'),
+                label: t('Simulations.trackWay'),
               },
             ]}
             activeTab={activeTab}
@@ -303,13 +361,21 @@ const styles = ScaledSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray5,
   },
+  leftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: '12@ms',
+  },
+  hamburgerButton: {
+    padding: '8@ms',
+  },
   brandTitle: {
     flex: 1,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     ...typography.display.small,
     fontWeight: fontWeights.light,
     color: colors.darkGray2,
-    marginBottom: '6@ms',
   },
   brandTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

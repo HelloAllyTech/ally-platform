@@ -50,3 +50,8 @@ export enum SimulationTabs {
   SIMULATIONS = 'SIMULATIONS',
   PATHS = 'PATHS',
 }
+
+export enum SimulationEventStatus {
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+}

@@ -19,6 +19,12 @@ jest.mock('@/services/api', () => ({
   },
 }));
 
+// Stub @livekit/react-native imports if needed by any sub-component
+jest.mock('@livekit/react-native', () => ({
+  AndroidAudioTypePresets: { media: {} },
+  AudioSession: { configureAudio: jest.fn() },
+}));
+
 // Guard: if any hook attempts to import live audio stream, stub it
 jest.mock('@/hooks/useLiveAudioStream', () => ({
   useLiveAudioStream: () => ({
