@@ -69,8 +69,6 @@ class Scenario(BaseModel):
     - `events` contains instantiated BaseEvent subclasses (from your registry).
     """
     name: str = Field(alias="scenarioName")
-    learning_objective: str = Field(alias="learningObjective")
-    prompt: str
     events: List[BaseEvent] = Field(default_factory=list)
     trigger_events: List[str] = Field(default_factory=list, description="List of event IDs that should be sent to UI/Core")
     termination_event: Optional[TerminationEvent] = Field(default=None, alias="terminationEvent", description="Configuration for auto-termination event")
@@ -123,8 +121,6 @@ class Scenario(BaseModel):
 
         return cls(
             scenarioName=normalized["scenarioName"],
-            learningObjective=normalized["learningObjective"],
-            prompt=normalized["prompt"],
             metadata=normalized.get("metadata", {}),
             events=built_events,
             trigger_events=trigger_events if isinstance(trigger_events, list) else [],
@@ -149,8 +145,6 @@ class Scenario(BaseModel):
         """
         return {
             "scenarioName": raw.get("title") or "",
-            "learningObjective": raw.get("description") or "",
-            "prompt": raw.get("prompt") or "",
             "metadata": raw.get("metadata", {})
         }
 
