@@ -26,11 +26,11 @@ from app.core.graph import agent_graph
 logger = get_logger(__name__)
 
 
-class EventRegistry:
+class EventOrchestrator:
     """
     Registry for tracking event states and managing combination expressions.
     
-    Event registry structure:
+    Event orchestrator structure:
         event_registry[event_id] = EventRegistryEntry with:
             - happened: bool  # Whether the event has occurred/is active
             - trigger_multiple: bool  # True for sentence/semantic similarity events (can trigger multiple times),

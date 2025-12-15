@@ -19,7 +19,7 @@ from app.core.events.event_types.score.score_event import ScoreEvent
 from app.core.events.event_types.score.constants import ScoreData
 from app.core.events.event_types.combination.combination_event import CombinationEvent
 from app.core.events.event_types.combination.constants import CombinationData, ExpressionNode
-from app.core.events.event_registry.event_registry import EventRegistry
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.constants import ConditionOperator, VisibilityType, DetectionType, ExpressionType
 from app.core.scenario.base import Scenario
 
@@ -100,28 +100,28 @@ class TestCombinationScoreBugFix:
         
         events = [s1, ss1, c1]
         scenario = create_test_scenario(events)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Step 1: Initially score = 5, S1 should be true
-        registry.live_score = 5
-        triggered = registry.get_newly_triggered_score_events(5)
+        orchestrator.live_score = 5
+        triggered = orchestrator.get_newly_triggered_score_events(5)
         assert "S1" in triggered
-        assert registry.get_event_state("S1") is True
+        assert orchestrator.get_event_state("S1") is True
         
         # Step 2: Score increases to 50, S1 should become false
-        registry.live_score = 50
-        triggered = registry.get_newly_triggered_score_events(50)
+        orchestrator.live_score = 50
+        triggered = orchestrator.get_newly_triggered_score_events(50)
         assert "S1" not in triggered  # Not newly triggered
-        assert registry.get_event_state("S1") is False  # Should be false now
+        assert orchestrator.get_event_state("S1") is False  # Should be false now
         
         # Step 3: SS1 becomes true
-        registry.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
+        orchestrator.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
         
         # Step 4: Update registry to evaluate combination expression
-        registry.update(detected_event_ids={"SS1"})
+        orchestrator.update(detected_event_ids={"SS1"})
         
         # Step 5: C1 should NOT be true because S1 is false
-        assert registry.get_event_state("C1") is False
+        assert orchestrator.get_event_state("C1") is False
         
     def test_combination_with_score_event_triggers_when_both_conditions_met(self, mock_room, thread_id):
         """
@@ -165,22 +165,22 @@ class TestCombinationScoreBugFix:
         
         events = [s1, ss1, c1]
         scenario = create_test_scenario(events)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Step 1: Score = 5, S1 should be true
-        registry.live_score = 5
-        triggered = registry.get_newly_triggered_score_events(5)
+        orchestrator.live_score = 5
+        triggered = orchestrator.get_newly_triggered_score_events(5)
         assert "S1" in triggered
-        assert registry.get_event_state("S1") is True
+        assert orchestrator.get_event_state("S1") is True
         
         # Step 2: SS1 becomes true
-        registry.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
+        orchestrator.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
         
-        # Step 3: Update registry to evaluate combination expression
-        registry.update(detected_event_ids={"SS1"})
+        # Step 3: Update orchestrator to evaluate combination expression
+        orchestrator.update(detected_event_ids={"SS1"})
         
         # Step 4: C1 SHOULD be true because both S1 and SS1 are true
-        assert registry.get_event_state("C1") is True
+        assert orchestrator.get_event_state("C1") is True
         
     def test_score_event_state_changes_with_score_fluctuations(self, mock_room, thread_id):
         """
@@ -201,23 +201,23 @@ class TestCombinationScoreBugFix:
         
         events = [s1]
         scenario = create_test_scenario(events)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Score = 5, S1 should be true
-        triggered = registry.get_newly_triggered_score_events(5)
+        triggered = orchestrator.get_newly_triggered_score_events(5)
         assert "S1" in triggered
-        assert registry.get_event_state("S1") is True
+        assert orchestrator.get_event_state("S1") is True
         
         # Score = 50, S1 should be false
-        triggered = registry.get_newly_triggered_score_events(50)
+        triggered = orchestrator.get_newly_triggered_score_events(50)
         assert "S1" not in triggered
-        assert registry.get_event_state("S1") is False
+        assert orchestrator.get_event_state("S1") is False
         
         # Score = 3, S1 should be true again (but not newly triggered since it was sent)
         # Note: In real scenario, if S1 was already sent, it won't be in newly triggered
         # But the state should still be updated to true
-        triggered = registry.get_newly_triggered_score_events(3)
-        assert registry.get_event_state("S1") is True
+        triggered = orchestrator.get_newly_triggered_score_events(3)
+        assert orchestrator.get_event_state("S1") is True
         
     def test_sent_score_event_state_updates_for_combination_events(self, mock_room, thread_id):
         """
@@ -267,29 +267,29 @@ class TestCombinationScoreBugFix:
         
         events = [s1, ss1, c1]
         scenario = create_test_scenario(events)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Step 1: Score = 5, S1 should trigger
-        registry.live_score = 5
-        triggered = registry.get_newly_triggered_score_events(5)
+        orchestrator.live_score = 5
+        triggered = orchestrator.get_newly_triggered_score_events(5)
         assert "S1" in triggered
-        assert registry.get_event_state("S1") is True
+        assert orchestrator.get_event_state("S1") is True
         
         # Step 2: Simulate S1 being sent (add to _sent_events)
-        registry._sent_events.add("S1")
+        orchestrator._sent_events.add("S1")
         
         # Step 3: Score increases to 50, S1 condition no longer met
         # Even though S1 is in _sent_events, its state should be updated to False
-        registry.live_score = 50
-        triggered = registry.get_newly_triggered_score_events(50)
+        orchestrator.live_score = 50
+        triggered = orchestrator.get_newly_triggered_score_events(50)
         assert "S1" not in triggered  # Not newly triggered (already sent)
-        assert registry.get_event_state("S1") is False  # CRITICAL: Should be False
+        assert orchestrator.get_event_state("S1") is False  # CRITICAL: Should be False
         
         # Step 4: SS1 becomes true
-        registry.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
+        orchestrator.set_event_state("SS1", True, DetectionType.SENTENCE_SIMILARITY)
         
-        # Step 5: Update registry to evaluate combination expression
-        registry.update(detected_event_ids={"SS1"})
+        # Step 5: Update orchestrator to evaluate combination expression
+        orchestrator.update(detected_event_ids={"SS1"})
         
         # Step 6: C1 should NOT be true because S1 is false
-        assert registry.get_event_state("C1") is False
+        assert orchestrator.get_event_state("C1") is False

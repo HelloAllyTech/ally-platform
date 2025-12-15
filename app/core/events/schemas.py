@@ -1,5 +1,5 @@
 """
-Centralized schemas for event registry and related structures.
+Centralized schemas for event orchestrator and related structures.
 """
 import time
 from livekit import rtc

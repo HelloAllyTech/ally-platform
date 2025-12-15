@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.events.base import ChatMessage
 from app.core.events.factory import build_events_from_metadata
-from app.core.events.event_registry.event_registry import EventRegistry
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 
 
 def create_mock_scenario(events, trigger_events=None, termination_event_id=None, termination_message=None):
@@ -73,14 +73,14 @@ class TestEventTerminationIntegration:
         mock_room = MagicMock()
         mock_room.name = "test-room-123"
         
-        # Initialize registry with termination callback
+        # Initialize orchestrator with termination callback
         scenario = create_mock_scenario(
             events,
             trigger_events=["end-session", "normal-event"],
             termination_event_id="end-session",
             termination_message="Session is ending now."
         )
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
         
         # Simulate conversation that should NOT trigger termination
         conversations = [
@@ -94,8 +94,8 @@ class TestEventTerminationIntegration:
         assert normal_detected is True
         assert term_detected is False
         
-        # Update registry - should not trigger termination
-        await registry.handle_events(
+        # Update orchestrator - should not trigger termination
+        await orchestrator.handle_events(
             detected_event_ids={"normal-event"},
             room=mock_room
         )
@@ -112,8 +112,8 @@ class TestEventTerminationIntegration:
         term_detected = await end_session_event.detect_event(conversations_with_termination)
         assert term_detected is True
         
-        # Update registry - should trigger termination
-        await registry.handle_events(
+        # Update orchestrator - should trigger termination
+        await orchestrator.handle_events(
             detected_event_ids={"end-session"},
             room=mock_room
         )
@@ -180,21 +180,21 @@ class TestEventTerminationIntegration:
             termination_event_id="max-score-reached",
             termination_message="Maximum score reached. Session ending."
         )
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=termination_callback)
 
-        registry.live_score = 10
+        orchestrator.live_score = 10
         # First update with greeting - should not terminate
-        await registry.handle_events(
+        await orchestrator.handle_events(
             detected_event_ids={"greeting"},
             room=mock_room,
         )
         
         termination_callback.assert_not_awaited()
 
-        registry.live_score = 50
+        orchestrator.live_score = 50
 
         # Update with high score - should trigger termination
-        await registry.handle_events(
+        await orchestrator.handle_events(
             detected_event_ids=None,
             room=mock_room,
         )
@@ -279,17 +279,17 @@ class TestEventTerminationIntegration:
             termination_event_id="final-event",
             termination_message="Final words spoken."
         )
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=mock_termination_callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=mock_termination_callback)
         
         # Patch the message queue to track when events are sent
-        with patch('app.core.events.event_registry.event_registry.msg_event_queue') as mock_queue:
+        with patch('app.core.events.event_orchestrator.event_orchestrator.msg_event_queue') as mock_queue:
             mock_queue.send_message = AsyncMock(side_effect=lambda **kwargs: call_order.append("send_to_core"))
             
-            with patch('app.core.events.event_registry.event_registry.send_event_to_ui') as mock_ui:
+            with patch('app.core.events.event_orchestrator.event_orchestrator.send_event_to_ui') as mock_ui:
                 mock_ui.side_effect = lambda *args: call_order.append("send_to_ui")
                 
                 # Trigger the termination event
-                await registry.handle_events(
+                await orchestrator.handle_events(
                     detected_event_ids={"final-event"},
                     room=mock_room
                 )
@@ -306,8 +306,8 @@ class TestEventTerminationIntegration:
         assert call_order[-1] == "termination"
         
         # Verify the termination event was deferred
-        assert registry.deferred_termination_event is not None
-        assert registry.deferred_termination_event.event_id == "final-event"
+        assert orchestrator.deferred_termination_event is not None
+        assert orchestrator.deferred_termination_event.event_id == "final-event"
 
     @pytest.mark.asyncio
     async def test_deferred_termination_event_sent_in_shutdown(self):
@@ -341,7 +341,7 @@ class TestEventTerminationIntegration:
             termination_event_id="session-end",
             termination_message="Goodbye! Session is ending."
         )
-        registry = EventRegistry(
+        orchestrator = EventOrchestrator(
             scenario,
             room=mock_room,
             thread_id="test-thread",
@@ -349,13 +349,13 @@ class TestEventTerminationIntegration:
         )
         
         # Initially, no deferred event
-        assert registry.deferred_termination_event is None
+        assert orchestrator.deferred_termination_event is None
         
         # Trigger the termination event
-        with patch('app.core.events.event_registry.event_registry.msg_event_queue') as mock_queue:
+        with patch('app.core.events.event_orchestrator.event_orchestrator.msg_event_queue') as mock_queue:
             mock_queue.send_message = AsyncMock()
             
-            await registry.handle_events(
+            await orchestrator.handle_events(
                 detected_event_ids={"session-end"},
                 room=mock_room
             )
@@ -364,8 +364,8 @@ class TestEventTerminationIntegration:
             mock_queue.send_message.assert_not_called()
         
         # Verify the event was deferred
-        assert registry.deferred_termination_event is not None
-        assert registry.deferred_termination_event.event_id == "session-end"
+        assert orchestrator.deferred_termination_event is not None
+        assert orchestrator.deferred_termination_event.event_id == "session-end"
         
         # Verify termination callback was still called
         termination_callback.assert_awaited_once()
@@ -374,14 +374,14 @@ class TestEventTerminationIntegration:
         from app.core.graph.utils import serialize_event
         from app.core.events.schemas import CoreEventMessageType
         
-        with patch('app.core.events.event_registry.event_registry.msg_event_queue') as mock_queue:
+        with patch('app.core.events.event_orchestrator.event_orchestrator.msg_event_queue') as mock_queue:
             mock_queue.send_message = AsyncMock()
             
             # This is what happens in the shutdown callback
             event_dict = serialize_event(
-                registry.deferred_termination_event,
-                termination_event_id=registry.termination_event_id,
-                termination_message=registry.termination_message
+                orchestrator.deferred_termination_event,
+                termination_event_id=orchestrator.termination_event_id,
+                termination_message=orchestrator.termination_message
             )
             core_event_message = CoreEventMessageType.create(
                 room_id=mock_room.name, event_data=event_dict
@@ -436,7 +436,7 @@ class TestEventTerminationIntegration:
             termination_event_id="visible-term",
             termination_message="Visible termination."
         )
-        registry = EventRegistry(
+        orchestrator = EventOrchestrator(
             scenario,
             room=mock_room,
             thread_id="test-thread",
@@ -444,7 +444,7 @@ class TestEventTerminationIntegration:
         )
         
         # Trigger hidden-term (should be filtered)
-        await registry.handle_events(
+        await orchestrator.handle_events(
             detected_event_ids={"hidden-term"},
             room=mock_room
         )
@@ -453,7 +453,7 @@ class TestEventTerminationIntegration:
         termination_callback.assert_not_awaited()
         
         # Trigger visible-term (should not be filtered)
-        await registry.handle_events(
+        await orchestrator.handle_events(
             detected_event_ids={"visible-term"},
             room=mock_room
         )
@@ -500,14 +500,14 @@ class TestEventTerminationIntegration:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        # Create registry with termination callback
+        # Create orchestrator with termination callback
         scenario = create_mock_scenario(
             events,
             trigger_events=["end-abruptly"],
             termination_event_id="end-abruptly",
             termination_message="I dont have time for this. I am leaving."
         )
-        registry = EventRegistry(
+        orchestrator = EventOrchestrator(
             scenario,
             room=mock_room,
             thread_id="test-thread",
@@ -515,7 +515,7 @@ class TestEventTerminationIntegration:
         )
         
         # Trigger the termination event
-        await registry.handle_events(
+        await orchestrator.handle_events(
             detected_event_ids={"end-abruptly"},
             room=mock_room
         )

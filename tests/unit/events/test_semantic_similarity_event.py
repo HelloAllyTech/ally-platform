@@ -489,7 +489,7 @@ class TestSemanticSimilarityEventIntegration:
     @pytest.mark.asyncio
     async def test_event_registry_trigger_multiple_for_semantic(self, mock_embedding_client):
         """Test that semantic similarity events have trigger_multiple=True in registry."""
-        from app.core.events.event_registry.event_registry import EventRegistry
+        from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
         from app.core.constants import DetectionType
         from unittest.mock import MagicMock
         
@@ -509,9 +509,9 @@ class TestSemanticSimilarityEventIntegration:
         mock_room = MagicMock()
         thread_id = "test_thread_123"
         
-        registry = EventRegistry(mock_scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(mock_scenario, mock_room, thread_id)
         
-        # Verify the event is in the registry with trigger_multiple=True
-        assert "semantic_reg_test" in registry.event_registry
-        assert registry.event_registry["semantic_reg_test"]["trigger_multiple"] is True
-        assert registry.event_registry["semantic_reg_test"]["happened"] is False
+        # Verify the event is in the orchestrator with trigger_multiple=True
+        assert "semantic_reg_test" in orchestrator.event_registry
+        assert orchestrator.event_registry["semantic_reg_test"]["trigger_multiple"] is True
+        assert orchestrator.event_registry["semantic_reg_test"]["happened"] is False

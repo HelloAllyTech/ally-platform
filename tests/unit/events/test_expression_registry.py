@@ -1,10 +1,10 @@
 """
-Tests for EventRegistry class.
+Tests for EventOrchestrator class.
 """
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.core.events.event_registry.event_registry import EventRegistry
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.factory import build_events_from_metadata
 from app.core.events.event_types.combination.constants import ExpressionNode, CombinationData
 from app.core.constants import DetectionType, ExpressionType
@@ -36,9 +36,9 @@ def create_test_scenario(metadata):
     return scenario
 
 
-class TestEventRegistry:
+class TestEventOrchestrator:
 
-    def test_initialize_creates_registry_for_all_events(self, mock_room, thread_id):
+    def test_initialize_creates_orchestrator_for_all_events(self, mock_room, thread_id):
         """Test that initialize creates entries for all events."""
         metadata = {
             "events": [
@@ -49,16 +49,16 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # All events should be in registry
-        assert len(registry.event_registry) == 3
+        assert len(orchestrator.event_registry) == 3
         # All events start as False in setup_initial_state()
         # TIME and SCORE events are only evaluated in async initialize()
-        assert registry.event_registry["event-1"]["happened"] is False
-        assert registry.event_registry["event-2"]["happened"] is False
-        assert registry.event_registry["event-3"]["happened"] is False
-        assert len(registry.expression_list) == 0  # No combination events
+        assert orchestrator.event_registry["event-1"]["happened"] is False
+        assert orchestrator.event_registry["event-2"]["happened"] is False
+        assert orchestrator.event_registry["event-3"]["happened"] is False
+        assert len(orchestrator.expression_list) == 0  # No combination events
 
 
     def test_initialize_adds_combination_events_to_expression_list(self, mock_room, thread_id):
@@ -80,12 +80,12 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
-        assert len(registry.expression_list) == 1
-        assert registry.expression_list[0]["event_id"] == "combo-1"
-        assert registry.expression_list[0]["type"] == DetectionType.COMBINATION
-        assert isinstance(registry.expression_list[0]["expression"], ExpressionNode)
+        assert len(orchestrator.expression_list) == 1
+        assert orchestrator.expression_list[0]["event_id"] == "combo-1"
+        assert orchestrator.expression_list[0]["type"] == DetectionType.COMBINATION
+        assert isinstance(orchestrator.expression_list[0]["expression"], ExpressionNode)
 
     def test_update_sets_detected_events_to_true(self, mock_room, thread_id):
         """Test that update() sets detected event states to True."""
@@ -97,17 +97,17 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Initially all False
-        assert registry.event_registry["event-1"]["happened"] is False
-        assert registry.event_registry["event-2"]["happened"] is False
+        assert orchestrator.event_registry["event-1"]["happened"] is False
+        assert orchestrator.event_registry["event-2"]["happened"] is False
         
         # Update with detected events
-        result = registry.update(detected_event_ids={"event-1"})
+        result = orchestrator.update(detected_event_ids={"event-1"})
         
-        assert registry.event_registry["event-1"]["happened"] is True
-        assert registry.event_registry["event-2"]["happened"] is False
+        assert orchestrator.event_registry["event-1"]["happened"] is True
+        assert orchestrator.event_registry["event-2"]["happened"] is False
         assert result["event-1"]["happened"] is True
         assert result["event-2"]["happened"] is False
 
@@ -120,26 +120,26 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Create an identifier expression
         expr = ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-1")
         
         # Initially False
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
         
         # After setting to True
-        registry.set_event_state("event-1", True)
-        assert evaluate_expression(expr, registry.event_registry) is True
+        orchestrator.set_event_state("event-1", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
 
     def test_evaluate_expression_identifier_unknown_event_returns_false(self, mock_room, thread_id):
         """Test that unknown event IDs return False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(type=ExpressionType.IDENTIFIER, id="unknown-event")
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_evaluate_expression_not_negates_operand(self, mock_room, thread_id):
         """Test evaluating a NOT expression."""
@@ -150,18 +150,18 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # NOT(False) = True
         expr = ExpressionNode(
             type=ExpressionType.NOT,
             operand=ExpressionNode(type=ExpressionType.IDENTIFIER, id="event-1")
         )
-        assert evaluate_expression(expr, registry.event_registry) is True
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
         
         # NOT(True) = False
-        registry.set_event_state("event-1", True)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        orchestrator.set_event_state("event-1", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_evaluate_expression_and_requires_both_true(self, mock_room, thread_id):
         """Test evaluating an AND expression."""
@@ -173,7 +173,7 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(
             type=ExpressionType.AND,
@@ -182,15 +182,15 @@ class TestEventRegistry:
         )
         
         # Both False -> False
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
         
         # One True -> False
-        registry.set_event_state("event-1", True)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        orchestrator.set_event_state("event-1", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
         
         # Both True -> True
-        registry.set_event_state("event-2", True)
-        assert evaluate_expression(expr, registry.event_registry) is True
+        orchestrator.set_event_state("event-2", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
 
     def test_evaluate_expression_or_requires_at_least_one_true(self, mock_room, thread_id):
         """Test evaluating an OR expression."""
@@ -202,7 +202,7 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(
             type=ExpressionType.OR,
@@ -211,15 +211,15 @@ class TestEventRegistry:
         )
         
         # Both False -> False
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
         
         # One True -> True
-        registry.set_event_state("event-1", True)
-        assert evaluate_expression(expr, registry.event_registry) is True
+        orchestrator.set_event_state("event-1", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
         
         # Both True -> True
-        registry.set_event_state("event-2", True)
-        assert evaluate_expression(expr, registry.event_registry) is True
+        orchestrator.set_event_state("event-2", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
 
     def test_evaluate_expression_nested_expression(self, mock_room, thread_id):
         """Test evaluating a nested expression: AND(NOT(A), OR(B, C))"""
@@ -232,7 +232,7 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # AND(NOT(event-a), OR(event-b, event-c))
         expr = ExpressionNode(
@@ -250,17 +250,17 @@ class TestEventRegistry:
         
         # event-a=False, event-b=False, event-c=False
         # NOT(False) AND OR(False, False) = True AND False = False
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
         
         # event-a=False, event-b=True, event-c=False
         # NOT(False) AND OR(True, False) = True AND True = True
-        registry.set_event_state("event-b", True)
-        assert evaluate_expression(expr, registry.event_registry) is True
+        orchestrator.set_event_state("event-b", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is True
         
         # event-a=True, event-b=True, event-c=False
         # NOT(True) AND OR(True, False) = False AND True = False
-        registry.set_event_state("event-a", True)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        orchestrator.set_event_state("event-a", True)
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_update_evaluates_combination_expressions(self, mock_room, thread_id):
         """Test that update() evaluates combination expressions and updates their states."""
@@ -289,20 +289,20 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Initially combo-1 should be False (both events False)
-        assert registry.get_event_state("combo-1") is False
+        assert orchestrator.get_event_state("combo-1") is False
         
         # Update with event-1 detected
-        registry.update(detected_event_ids={"event-1"})
+        orchestrator.update(detected_event_ids={"event-1"})
         # Still False because event-2 is False
-        assert registry.get_event_state("combo-1") is False
+        assert orchestrator.get_event_state("combo-1") is False
         
         # Update with both events detected
-        registry.update(detected_event_ids={"event-1", "event-2"})
+        orchestrator.update(detected_event_ids={"event-1", "event-2"})
         # Now True because both are True
-        assert registry.get_event_state("combo-1") is True
+        assert orchestrator.get_event_state("combo-1") is True
 
     def test_get_event_state_returns_current_state(self, mock_room, thread_id):
         """Test get_event_state() method."""
@@ -313,11 +313,11 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
-        assert registry.get_event_state("event-1") is False
-        registry.set_event_state("event-1", True)
-        assert registry.get_event_state("event-1") is True
+        assert orchestrator.get_event_state("event-1") is False
+        orchestrator.set_event_state("event-1", True)
+        assert orchestrator.get_event_state("event-1") is True
 
     def test_set_event_state_updates_state(self, mock_room, thread_id):
         """Test set_event_state() method."""
@@ -328,13 +328,13 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
-        registry.set_event_state("event-1", True)
-        assert registry.event_registry["event-1"]["happened"] is True
+        orchestrator.set_event_state("event-1", True)
+        assert orchestrator.event_registry["event-1"]["happened"] is True
         
-        registry.set_event_state("event-1", False)
-        assert registry.event_registry["event-1"]["happened"] is False
+        orchestrator.set_event_state("event-1", False)
+        assert orchestrator.event_registry["event-1"]["happened"] is False
 
 
 
@@ -342,37 +342,37 @@ class TestEventRegistry:
         """Test that invalid identifier (no name) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(type=ExpressionType.IDENTIFIER, id=None)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_evaluate_expression_invalid_not_returns_false(self, mock_room, thread_id):
         """Test that invalid NOT (no operand) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(type=ExpressionType.NOT, operand=None)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_evaluate_expression_invalid_and_returns_false(self, mock_room, thread_id):
         """Test that invalid AND (missing operands) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(type=ExpressionType.AND, left=None, right=None)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_evaluate_expression_invalid_or_returns_false(self, mock_room, thread_id):
         """Test that invalid OR (missing operands) returns False."""
         metadata = {"events": []}
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         expr = ExpressionNode(type=ExpressionType.OR, left=None, right=None)
-        assert evaluate_expression(expr, registry.event_registry) is False
+        assert evaluate_expression(expr, orchestrator.event_registry) is False
 
     def test_initialize_sets_trigger_multiple_correctly(self, mock_room, thread_id):
         """Test that trigger_multiple is set correctly for different event types."""
@@ -392,14 +392,14 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # SENTENCE_SIMILARITY should have trigger_multiple=True
-        assert registry.event_registry["similarity-1"]["trigger_multiple"] is True
+        assert orchestrator.event_registry["similarity-1"]["trigger_multiple"] is True
         # TIME, SCORE, COMBINATION should have trigger_multiple=False
-        assert registry.event_registry["time-1"]["trigger_multiple"] is False
-        assert registry.event_registry["score-1"]["trigger_multiple"] is False
-        assert registry.event_registry["combo-1"]["trigger_multiple"] is False
+        assert orchestrator.event_registry["time-1"]["trigger_multiple"] is False
+        assert orchestrator.event_registry["score-1"]["trigger_multiple"] is False
+        assert orchestrator.event_registry["combo-1"]["trigger_multiple"] is False
 
     def test_trigger_events_filtering(self, mock_room, thread_id):
         """Test that trigger_events list filters which events are sent."""
@@ -414,12 +414,12 @@ class TestEventRegistry:
         
         scenario = create_test_scenario(metadata)
         # Only event-1 and event-3 should be sent
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
-        assert registry.trigger_events == {"event-1", "event-3"}
+        assert orchestrator.trigger_events == {"event-1", "event-3"}
         
         # All events should still be in registry
-        assert len(registry.event_registry) == 3
+        assert len(orchestrator.event_registry) == 3
 
     def test_circular_dependency_direct_self_reference_ignored(self, mock_room, thread_id):
         """Test that combination events with direct self-reference are completely ignored."""
@@ -440,15 +440,15 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Circular event should NOT be in event_registry
-        assert "circular-event" not in registry.event_registry
+        assert "circular-event" not in orchestrator.event_registry
         # Circular event should NOT be in expression_list
-        assert len(registry.expression_list) == 0
+        assert len(orchestrator.expression_list) == 0
         # Regular event should still be in registry
-        assert "event-1" in registry.event_registry
-        assert len(registry.event_registry) == 1
+        assert "event-1" in orchestrator.event_registry
+        assert len(orchestrator.event_registry) == 1
 
     def test_circular_dependency_indirect_self_reference_ignored(self, mock_room, thread_id):
         """Test that combination events with indirect self-reference are completely ignored."""
@@ -476,14 +476,14 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Circular event should NOT be in event_registry
-        assert "circular-event-a" not in registry.event_registry
+        assert "circular-event-a" not in orchestrator.event_registry
         # Circular event should NOT be in expression_list
-        assert len(registry.expression_list) == 0
+        assert len(orchestrator.expression_list) == 0
         # Regular event should still be in registry
-        assert "event-1" in registry.event_registry
+        assert "event-1" in orchestrator.event_registry
 
     def test_circular_dependency_nested_self_reference_ignored(self, mock_room, thread_id):
         """Test that combination events with nested self-reference are completely ignored."""
@@ -514,12 +514,12 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Circular event should NOT be in event_registry
-        assert "circular-event" not in registry.event_registry
+        assert "circular-event" not in orchestrator.event_registry
         # Circular event should NOT be in expression_list
-        assert len(registry.expression_list) == 0
+        assert len(orchestrator.expression_list) == 0
 
     def test_circular_dependency_warning_logged(self, mock_room, thread_id, caplog):
         """Test that a warning is logged when circular dependency is detected."""
@@ -542,7 +542,7 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Check that warning was logged
         assert any("Circular dependency detected" in record.message for record in caplog.records)
@@ -585,23 +585,23 @@ class TestEventRegistry:
         }
         
         scenario = create_test_scenario(metadata)
-        registry = EventRegistry(scenario, mock_room, thread_id)
+        orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
         
         # Non-circular combo should be in registry
-        assert "combo-1" in registry.event_registry
+        assert "combo-1" in orchestrator.event_registry
         # Non-circular combo should be in expression_list
-        assert len(registry.expression_list) == 1
-        assert registry.expression_list[0]["event_id"] == "combo-1"
+        assert len(orchestrator.expression_list) == 1
+        assert orchestrator.expression_list[0]["event_id"] == "combo-1"
         
         # Circular combo should NOT be in registry
-        assert "circular-combo" not in registry.event_registry
+        assert "circular-combo" not in orchestrator.event_registry
         # Circular combo should NOT be in expression_list
-        assert all(expr["event_id"] != "circular-combo" for expr in registry.expression_list)
+        assert all(expr["event_id"] != "circular-combo" for expr in orchestrator.expression_list)
         
         # Regular events should be in registry
-        assert "event-1" in registry.event_registry
-        assert "event-2" in registry.event_registry
-        assert len(registry.event_registry) == 3  # event-1, event-2, combo-1
+        assert "event-1" in orchestrator.event_registry
+        assert "event-2" in orchestrator.event_registry
+        assert len(orchestrator.event_registry) == 3  # event-1, event-2, combo-1
 
     def test_extract_event_ids_from_expression(self, mock_room, thread_id):
         """Test the extract_event_ids_from_expression utility function."""

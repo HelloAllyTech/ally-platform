@@ -43,7 +43,7 @@ def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessa
     )
 
 
-async def send_final_score_to_core(room_id: str, thread_id: str, event_registry=None) -> None:
+async def send_final_score_to_core(room_id: str, thread_id: str, event_orchestrator=None) -> None:
     """
     Send final score to backend queue for session end or disconnect.
 
@@ -53,18 +53,18 @@ async def send_final_score_to_core(room_id: str, thread_id: str, event_registry=
     Args:
         room_id: LiveKit room identifier
         thread_id: LangGraph thread identifier (usually same as room_id)
-        event_registry: Optional EventRegistry instance to get live_score from.
+        event_orchestrator: Optional EventOrchestrator instance to get live_score from.
                        If provided, uses live_score. Otherwise falls back to graph state.
     """
     try:
-        # Get the final score from event_registry.live_score if available,
+        # Get the final score from event_orchestrator.live_score if available,
         # otherwise fall back to graph state
-        if event_registry is not None:
-            final_score = event_registry.live_score
-            logger.info(f"Using live_score from event_registry: {final_score}")
+        if event_orchestrator is not None:
+            final_score = event_orchestrator.live_score
+            logger.info(f"Using live_score from event_orchestrator: {final_score}")
         else:
             final_score = get_current_score_from_graph(thread_id)
-            logger.warning("event_registry not provided, falling back to graph state score")
+            logger.warning("event_orchestrator not provided, falling back to graph state score")
 
         # Create the session end message
         core_message = create_session_end_message(room_id, final_score)

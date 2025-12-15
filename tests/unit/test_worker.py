@@ -385,7 +385,7 @@ class TestWorker:
         assert fallback_used["used"] is not None
 
     @pytest.mark.asyncio
-    async def test_entrypoint_initializes_event_registry(self, monkeypatch):
+    async def test_entrypoint_initializes_event_orchestrator(self, monkeypatch):
         scenario = types.SimpleNamespace(
             voice=None,
             prompt_data=types.SimpleNamespace(gender="male", opening_statements=["hello"]),
@@ -409,7 +409,7 @@ class TestWorker:
 
         registry_init_called = {}
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             def __init__(self, scenario, termination_callback, room, thread_id):
                 registry_init_called["scenario"] = scenario
                 registry_init_called["room"] = room
@@ -423,7 +423,7 @@ class TestWorker:
             def is_termination_initiated(self):
                 return False
 
-        monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
+        monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)
@@ -531,7 +531,7 @@ class TestWorker:
 
         registry_instance = {}
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             def __init__(self, scenario, termination_callback, room, thread_id):
                 self.termination_callback = termination_callback
                 self.termination_message = "Goodbye"
@@ -543,7 +543,7 @@ class TestWorker:
             def is_termination_initiated(self):
                 return False
 
-        monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
+        monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 
         publish_called = {}
         async def mock_publish(message, session):
@@ -612,7 +612,7 @@ class TestWorker:
             return mock_client
         monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             def __init__(self, scenario, termination_callback, room, thread_id):
                 self.termination_callback = termination_callback
                 self.termination_message = None
@@ -625,7 +625,7 @@ class TestWorker:
             def is_termination_initiated(self):
                 return self._termination_initiated
 
-        monkeypatch.setattr(worker, "EventRegistry", MockEventRegistry)
+        monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(worker, "create_agent_session", lambda tts, vad, stt: dummy_session)

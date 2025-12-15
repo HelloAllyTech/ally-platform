@@ -15,7 +15,7 @@ from app.core.scenario.base import Scenario
 from app.utils.logger import logger
 
 if TYPE_CHECKING:
-    from app.core.events.event_registry.event_registry import EventRegistry
+    from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 
 
 async def process_events(
@@ -50,15 +50,15 @@ async def process_events(
     score_change = sum(event.score for event in new_events if event.score)
     new_current_score = state.current_score + score_change
 
-    # Update EventRegistry and send events (combination events are sent but not added to state)
+    # Update EventOrchestrator and send events (combination events are sent but not added to state)
     # Score-based events will also be checked and triggered if the score changed
     additional_score_from_triggered_events = 0
     branching_instruction=[]
     if config and "configurable" in config:
-        event_registry: Optional[EventRegistry] = config["configurable"].get("event_registry")
+        event_orchestrator: Optional[EventOrchestrator] = config["configurable"].get("event_orchestrator")
         room = config["configurable"].get("room")
 
-        if event_registry is not None:
+        if event_orchestrator is not None:
             # Get event IDs from detected events (currently only similarity-based events are detected)
             detected_event_ids = {event.event_id for event in new_events}
 
@@ -66,7 +66,7 @@ async def process_events(
             # This will send combination events and score-based events too, but we don't include them in state
             # Pass the new score so score-based events can be checked
             # Returns additional score from triggered score-based/time/combination events
-            _, additional_score_from_triggered_events,branching_instruction = await event_registry.handle_events(
+            _, additional_score_from_triggered_events,branching_instruction = await event_orchestrator.handle_events(
                 room=room,
                 detected_event_ids=detected_event_ids if detected_event_ids else None,
             )

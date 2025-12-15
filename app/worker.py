@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.constants import Environment, DEFAULT_LANGUAGE_CODE
 from app.core.graph import agent_graph
 from app.core.events.base import BaseEvent
-from app.core.events.event_registry.event_registry import EventRegistry
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.utils.logger import get_logger
 from app.tts import create_tts_client, Gender
@@ -162,14 +162,14 @@ async def entrypoint(ctx: agents.JobContext):
     vad = ctx.proc.userdata.get("vad")
     session = create_agent_session(tts_config, vad, stt_config)
 
-    # Initialize EventRegistry (termination callback will be set below)
-    event_registry = EventRegistry(
+    # Initialize EventOrchestrator (termination callback will be set below)
+    event_orchestrator = EventOrchestrator(
         scenario=scenario,
         termination_callback=None,  # Set after defining the callback
         room=ctx.room,
         thread_id=ctx.room.name
     )
-    logger.info(f"Initialized EventRegistry with {len(scenario.events)} events")
+    logger.info(f"Initialized EventOrchestrator with {len(scenario.events)} events")
 
     # Track if final score has been sent to prevent duplicates
     final_score_sent = False
@@ -192,7 +192,7 @@ async def entrypoint(ctx: agents.JobContext):
                     send_final_score_to_core(
                         room_id=ctx.room.name,
                         thread_id=ctx.room.name,
-                        event_registry=event_registry
+                        event_orchestrator=event_orchestrator
                     )
                 )
                 final_score_sent = True
@@ -206,7 +206,7 @@ async def entrypoint(ctx: agents.JobContext):
 
         try:
             # Publish termination audio message - use custom message from registry
-            termination_message = event_registry.termination_message or ""
+            termination_message = event_orchestrator.termination_message or ""
             logger.info(f"Using termination message: {termination_message}")
             await publish_termination_audio(termination_message, session)
 
@@ -226,7 +226,7 @@ async def entrypoint(ctx: agents.JobContext):
         return task
 
     # Set the termination callback
-    event_registry.termination_callback = handle_termination
+    event_orchestrator.termination_callback = handle_termination
 
     async def on_shutdown():
         """Cleanup callback when session is shutting down."""
@@ -237,14 +237,14 @@ async def entrypoint(ctx: agents.JobContext):
         # Termination events are sent here AFTER the agent has finished speaking the termination
         # message, ensuring the backend doesn't close the room prematurely when it receives
         # the event with autoTerminationStatus=true.
-        if event_registry.deferred_termination_event:
+        if event_orchestrator.deferred_termination_event:
             logger.info(
-                f"Sending deferred termination event {event_registry.deferred_termination_event.event_id} to Core")
+                f"Sending deferred termination event {event_orchestrator.deferred_termination_event.event_id} to Core")
             try:
                 event_dict = serialize_event(
-                    event_registry.deferred_termination_event,
-                    termination_event_id=event_registry.termination_event_id,
-                    termination_message=event_registry.termination_message
+                    event_orchestrator.deferred_termination_event,
+                    termination_event_id=event_orchestrator.termination_event_id,
+                    termination_message=event_orchestrator.termination_message
                 )
                 core_event_message = CoreEventMessageType.create(
                     room_id=ctx.room.name, event_data=event_dict
@@ -263,7 +263,7 @@ async def entrypoint(ctx: agents.JobContext):
                 await send_final_score_to_core(
                     room_id=ctx.room.name,
                     thread_id=ctx.room.name,
-                    event_registry=event_registry
+                    event_orchestrator=event_orchestrator
                 )
                 final_score_sent = True
                 logger.info("Final score sent successfully in on_shutdown")
@@ -285,7 +285,7 @@ async def entrypoint(ctx: agents.JobContext):
                 "room": ctx.room,
                 "scenario": scenario,
                 "agent_joined_at": joined_iso,
-                "event_registry": event_registry,
+                "event_orchestrator": event_orchestrator,
             }
         }
     )
@@ -310,10 +310,10 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
     # Initialise only after session is connected
-    await event_registry.initialize()
+    await event_orchestrator.initialize()
 
     # Only say opening statement if termination hasn't been initiated
-    if not event_registry.is_termination_initiated():
+    if not event_orchestrator.is_termination_initiated():
         await session.say(random.choice(scenario.prompt_data.opening_statements))
 
 

@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_registry.event_registry import EventRegistry
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.factory import build_events_from_metadata
 from app.core.constants import VisibilityType
 
@@ -35,8 +35,8 @@ def create_mock_scenario(events, trigger_events=None, termination_event_id=None,
 class TestEventTermination:
     """Test suite for event termination functionality."""
 
-    def test_event_registry_stores_termination_config(self):
-        """Test that EventRegistry stores termination configuration from scenario."""
+    def test_event_orchestrator_stores_termination_config(self):
+        """Test that EventOrchestrator stores termination configuration from scenario."""
         metadata = {
             "events": [
                 {"id": "event-1", "sentences": ["hello"], "score": 5, "feedbackStatus": True}
@@ -55,13 +55,13 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        registry = EventRegistry(mock_scenario, room=mock_room, thread_id="test-thread")
+        orchestrator = EventOrchestrator(mock_scenario, room=mock_room, thread_id="test-thread")
         
-        assert registry.termination_event_id == "event-1"
-        assert registry.termination_message == "Custom termination"
+        assert orchestrator.termination_event_id == "event-1"
+        assert orchestrator.termination_message == "Custom termination"
 
-    def test_event_registry_accepts_termination_callback(self):
-        """Test that EventRegistry accepts termination callback in __init__."""
+    def test_event_orchestrator_accepts_termination_callback(self):
+        """Test that EventOrchestrator accepts termination callback in __init__."""
         metadata = {
             "events": [
                 {"id": "event-1", "sentences": ["hello"]}
@@ -73,12 +73,12 @@ class TestEventTermination:
         callback = AsyncMock()
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
-        assert registry.termination_callback is callback
+        assert orchestrator.termination_callback is callback
 
-    def test_event_registry_works_without_termination_callback(self):
-        """Test that EventRegistry works fine without termination callback."""
+    def test_event_orchestrator_works_without_termination_callback(self):
+        """Test that EventOrchestrator works fine without termination callback."""
         metadata = {
             "events": [
                 {"id": "event-1", "sentences": ["hello"]}
@@ -89,8 +89,8 @@ class TestEventTermination:
         
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread")
-        assert registry.termination_callback is None
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread")
+        assert orchestrator.termination_callback is None
 
     @pytest.mark.asyncio
     async def test_termination_callback_called_for_termination_event(self):
@@ -117,11 +117,11 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        # Create registry with the termination callback
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        # Create orchestrator with the termination callback
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Update and send events (mark termination event as detected)
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"term-event"}
         )
@@ -151,11 +151,11 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        # Create registry with the termination callback
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        # Create orchestrator with the termination callback
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Update and send events
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"normal-event"}
         )
@@ -177,7 +177,7 @@ class TestEventTermination:
             visibility_type=VisibilityType.ACTIVE,
             score=0
         )
-        
+
         # Create callback mock - only term-1 is configured as termination
         callback = AsyncMock()
         scenario = create_mock_scenario(
@@ -191,11 +191,11 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        # Create registry
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        # Create orchestrator
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Update with both termination events
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"term-1", "term-2"}
         )
@@ -233,11 +233,11 @@ class TestEventTermination:
         mock_room = MagicMock()
         mock_room.name = "test-room"
         
-        # Create registry
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        # Create orchestrator
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Update with both events
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"normal", "terminator"}
         )
@@ -265,10 +265,10 @@ class TestEventTermination:
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Update without room (room=None)
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=None,
             detected_event_ids={"term-event"}
         )
@@ -288,7 +288,7 @@ class TestEventTermination:
         
         callback = AsyncMock()
         
-        # Create registry with trigger_events filter that includes the termination event
+        # Create orchestrator with trigger_events filter that includes the termination event
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["term-event"],
@@ -297,7 +297,7 @@ class TestEventTermination:
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(
+        orchestrator = EventOrchestrator(
             scenario,
             room=mock_room,
             thread_id="test-thread",
@@ -308,7 +308,7 @@ class TestEventTermination:
         mock_room.name = "test-room"
         
         # Update and send
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"term-event"}
         )
@@ -328,7 +328,7 @@ class TestEventTermination:
         
         callback = AsyncMock()
         
-        # Create registry with trigger_events filter that EXCLUDES the termination event
+        # Create orchestrator with trigger_events filter that EXCLUDES the termination event
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["other-event"],
@@ -337,7 +337,7 @@ class TestEventTermination:
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(
+        orchestrator = EventOrchestrator(
             scenario,
             room=mock_room,
             thread_id="test-thread",
@@ -348,7 +348,7 @@ class TestEventTermination:
         mock_room.name = "test-room"
         
         # Update and send
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"term-event"}
         )
@@ -394,10 +394,10 @@ class TestEventTermination:
         
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Trigger both base events so combination event becomes true
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"event-1", "event-2"}
         )
@@ -437,12 +437,12 @@ class TestEventTermination:
         
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
 
-        registry.live_score = 10
+        orchestrator.live_score = 10
 
         # Update with score that triggers the event
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids=None
         )
@@ -482,11 +482,11 @@ class TestEventTermination:
         
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        registry = EventRegistry(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
         
         # Manually trigger the time event by passing it in detected_event_ids
         # (Time events are normally triggered by schedulers, not in handle_events)
-        await registry.handle_events(
+        await orchestrator.handle_events(
             room=mock_room,
             detected_event_ids={"time-term"}
         )

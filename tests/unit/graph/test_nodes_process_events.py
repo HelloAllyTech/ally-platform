@@ -49,7 +49,7 @@ class TestProcessEvents:
         assert "branching_instructions" not in new_state
 
     @pytest.mark.asyncio
-    async def test_process_events_with_event_registry_integration(self):
+    async def test_process_events_with_event_orchestrator_integration(self):
         msgs = [HumanMessage(content="test message")]
         e1 = DetectingEvent(event_id="e1", match_text="test", score=5)
 
@@ -62,15 +62,15 @@ class TestProcessEvents:
             branching_instructions=[],
         )
 
-        # Mock EventRegistry
-        class MockEventRegistry:
+        # Mock EvenOrchestrator
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 7, [("probe deeper", 3)]
 
         mock_room = object()
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": mock_room,
             }
         }
@@ -97,13 +97,13 @@ class TestProcessEvents:
             branching_instructions=[("time instruction", 5)],
         )
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 0, [("event instruction", 3)]
 
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": object(),
             }
         }
@@ -200,13 +200,13 @@ class TestProcessEvents:
             branching_instructions=[],
         )
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 5, []  # Empty branching instructions
 
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": object(),
             }
         }
