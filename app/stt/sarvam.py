@@ -1,11 +1,78 @@
 """Sarvam STT provider implementation."""
 from typing import Optional, Dict, Any
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from livekit.plugins import sarvam
 from app.core.config import settings
 from app.stt.base import BaseSTTClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _patch_sarvam_stt_url_builder() -> None:
+    """
+    Monkey-patch _build_websocket_url to include sample_rate=16000 in the URL.
+    
+    This fixes a bug in the LiveKit Sarvam plugin where:
+    - SpeechStream has sample_rate=16000 (hardcoded)
+    - But _build_websocket_url doesn't receive or include it in the URL
+    - The Sarvam API requires sample_rate in the URL for proper initialization
+    
+    The patch is idempotent - it only applies once, even if called multiple times.
+    """
+    try:
+        import livekit.plugins.sarvam.stt as sarvam_stt_module
+        
+        # Only patch if not already patched
+        if hasattr(sarvam_stt_module, '_original_build_websocket_url'):
+            return  # Already patched
+        
+        # Store original function
+        original_func = sarvam_stt_module._build_websocket_url
+        sarvam_stt_module._original_build_websocket_url = original_func
+        
+        def _patched_build_websocket_url(
+            base_url: str, language: str, model: str, prompt: str | None = None
+        ) -> str:
+            """
+            Patched version that preserves existing query params and adds sample_rate=16000.
+            
+            The original function doesn't include sample_rate, which causes "Invalid Audio" errors.
+            SpeechStream uses sample_rate=16000 (hardcoded), so we add it to the URL here.
+            """
+            # Parse base_url to preserve existing query parameters
+            parsed = urlparse(base_url)
+            existing_params = parse_qs(parsed.query, keep_blank_values=True)
+            
+            # Add the standard parameters (these will override any existing values with same keys)
+            standard_params = {
+                "language-code": language,
+                "model": model,
+                "vad_signals": "true",
+            }
+            existing_params.update(standard_params)
+            
+            # Add sample_rate=16000 (must match audio data sample rate used by SpeechStream)
+            existing_params['sample_rate'] = ['16000']
+            
+            # Rebuild URL with all parameters
+            new_query = urlencode(existing_params, doseq=True)
+            return urlunparse((
+                parsed.scheme, parsed.netloc, parsed.path,
+                parsed.params, new_query, parsed.fragment
+            ))
+        
+        # Apply the patch
+        sarvam_stt_module._build_websocket_url = _patched_build_websocket_url
+        logger.debug("Patched _build_websocket_url to include sample_rate=16000")
+        
+    except Exception as e:
+        # Log but don't fail - the plugin might work without the patch in some cases
+        logger.warning(f"Failed to patch Sarvam STT _build_websocket_url: {e}")
+
+
+# Apply patch once at module import time
+#_patch_sarvam_stt_url_builder()
 
 class SarvamSTTClient(BaseSTTClient):
     """
@@ -53,9 +120,11 @@ class SarvamSTTClient(BaseSTTClient):
         logger.debug(f"Creating Sarvam STT with model: {model}, language: {self._language_code} (from {language_code})")
         
         # Create the underlying STT instance
+        # Note: LiveKit Sarvam STT uses 'language' parameter, not 'language_code'
+        # The monkey-patch for _build_websocket_url is applied at module import time
         self._stt_instance = sarvam.STT(
             model=self._model,
-            language_code=self._language_code,
+            language=self._language_code,
             api_key=self._api_key,
         )
     
