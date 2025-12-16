@@ -356,16 +356,19 @@ describe('SimulationAssistantScreen', () => {
       data: {score: 10, message: 'hello'},
     });
 
+    // Get the last registered handler (most recent)
+    const dataHandler = dataHandlers[dataHandlers.length - 1];
+
     // First event accepted
-    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(0))));
+    await act(async () => dataHandler(makeEvt(0)));
     expect(getByTestId('score').props.children).toBe('10');
 
     // Second event increments score immediately
-    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(1000))));
+    await act(async () => dataHandler(makeEvt(1000)));
     expect(getByTestId('score').props.children).toBe('20');
 
     // Another event increases the score further
-    await act(async () => dataHandlers.forEach(fn => fn(makeEvt(11_000))));
+    await act(async () => dataHandler(makeEvt(11_000)));
     expect(getByTestId('score').props.children).toBe('30');
 
     // No auto-hide assertion; screen keeps latest feedback visible
