@@ -1,37 +1,43 @@
-import random
 import asyncio
-
+import random
 from datetime import datetime, timezone
+
 from livekit import agents, rtc
-from livekit.agents import AgentSession, Agent, RoomInputOptions, JobProcess
+from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 
 from app.core.config import settings
-from app.core.constants import Environment, DEFAULT_LANGUAGE_CODE
-from app.core.graph import agent_graph
+from app.core.constants import DEFAULT_LANGUAGE_CODE, Environment
+from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.embeddings import OpenAIEmbeddingClient
-from app.utils.logger import get_logger
-from app.tts import create_tts_client, Gender
-from app.stt import create_stt_client
-from app.utils.metadata_parser import parse_room_metadata
-from app.utils.event_handler import create_conversation_handler
-from app.utils.queue_utils import send_final_score_to_core
-from app.core.graph.utils import serialize_event
 from app.core.events.schemas import CoreEventMessageType
+from app.core.graph import agent_graph
+from app.core.graph.utils import serialize_event
 from app.core.queue import msg_event_queue
+from app.stt import create_stt_client
+from app.tts import Gender, create_tts_client
+from app.utils.event_handler import create_conversation_handler
+from app.utils.logger import get_logger
+from app.utils.metadata_parser import parse_room_metadata
+from app.utils.queue_utils import send_final_score_to_core
 
 logger = get_logger(__name__)
-setup_logging(settings.LIVEKIT_LOG_LEVEL, devmode=settings.LIVEKIT_LOG_DEV_MODE, console=settings.LIVEKIT_LOG_CONSOLE)
+setup_logging(
+    settings.LIVEKIT_LOG_LEVEL,
+    devmode=settings.LIVEKIT_LOG_DEV_MODE,
+    console=settings.LIVEKIT_LOG_CONSOLE,
+)
 
 
 class Assistant(Agent):
     """Custom agent implementation."""
 
-    def __init__(self, instructions: str = "You're a simulation client", **kwargs) -> None:
+    def __init__(
+        self, instructions: str = "You're a simulation client", **kwargs
+    ) -> None:
         super().__init__(instructions=instructions, **kwargs)
 
 
@@ -85,16 +91,25 @@ async def publish_termination_audio(message: str, session: AgentSession) -> None
 async def entrypoint(ctx: agents.JobContext):
     """Main agent entrypoint handling room connection and conversation flow."""
 
-    # Create a single embedding client for all semantic similarity events in this agent call
-    embedding_client = OpenAIEmbeddingClient(model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY)
+    # Create a single embedding client for all semantic similarity events
+    # in this agent call
+    embedding_client = OpenAIEmbeddingClient(
+        model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
+    )
     logger.debug("Created shared embedding client for semantic similarity events")
 
-    # Initialize class-level embedding client for SemanticSimilarityEvent (once per session)
-    from app.core.events.event_types.semantic_similarity.semantic_similarity_event import SemanticSimilarityEvent
+    # Initialize class-level embedding client for SemanticSimilarityEvent
+    # (once per session)
+    from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
+        SemanticSimilarityEvent,
+    )
+
     SemanticSimilarityEvent._EMBEDDING_CLIENT = embedding_client
 
     # Parse metadata with error handling
-    rm_md_envelope = parse_room_metadata(ctx.job.metadata, embedding_client=embedding_client)
+    rm_md_envelope = parse_room_metadata(
+        ctx.job.metadata, embedding_client=embedding_client
+    )
     scenario = rm_md_envelope.scenario
     logger.debug(f"Events in scenario: {str(scenario.events)}")
 
@@ -108,8 +123,7 @@ async def entrypoint(ctx: agents.JobContext):
     # Configure STT
     try:
         stt_client = create_stt_client(
-            stt_config=stt_config_from_metadata,
-            language_code=language_code
+            stt_config=stt_config_from_metadata, language_code=language_code
         )
         stt_config = stt_client.stt_instance
     except Exception as e:
@@ -133,23 +147,29 @@ async def entrypoint(ctx: agents.JobContext):
                 "voice_cloning_key": scenario.voice.config.voice_cloning_key,
                 "instant_mode": scenario.voice.config.instant_mode,
                 "voice_provider": scenario.voice.config.voice_provider,
-            }
+            },
         }
 
     # Convert gender string to Gender enum
-    gender_enum = Gender(scenario.prompt_data.gender.lower()) if scenario.prompt_data.gender else None
+    gender_enum = (
+        Gender(scenario.prompt_data.gender.lower())
+        if scenario.prompt_data.gender
+        else None
+    )
 
     try:
         tts_client = create_tts_client(
             tts_config=tts_config_from_metadata,
             language_code=language_code,
-            gender=gender_enum
+            gender=gender_enum,
         )
         tts_config = tts_client.tts_instance
     except Exception as e:
         logger.warning(f"TTS config failed, using default: {e}")
         if gender_enum:
-            tts_client = create_tts_client(language_code=language_code, gender=gender_enum)
+            tts_client = create_tts_client(
+                language_code=language_code, gender=gender_enum
+            )
             tts_config = tts_client.tts_instance
         else:
             raise ValueError("Cannot create TTS: gender is required for fallback")
@@ -167,7 +187,7 @@ async def entrypoint(ctx: agents.JobContext):
         scenario=scenario,
         termination_callback=None,  # Set after defining the callback
         room=ctx.room,
-        thread_id=ctx.room.name
+        thread_id=ctx.room.name,
     )
     logger.info(f"Initialized EventOrchestrator with {len(scenario.events)} events")
 
@@ -183,26 +203,36 @@ async def entrypoint(ctx: agents.JobContext):
         # Send final score when connection state changes to DISCONNECTED
         if state == rtc.ConnectionState.CONN_DISCONNECTED:
             if final_score_sent:
-                logger.info("Final score already sent, skipping duplicate send on disconnect")
+                logger.info(
+                    "Final score already sent, skipping duplicate send on disconnect"
+                )
                 return
 
-            logger.info("Connection state is DISCONNECTED, sending final score to backend")
+            logger.info(
+                "Connection state is DISCONNECTED, sending final score to backend"
+            )
             try:
                 asyncio.create_task(
                     send_final_score_to_core(
                         room_id=ctx.room.name,
                         thread_id=ctx.room.name,
-                        event_orchestrator=event_orchestrator
+                        event_orchestrator=event_orchestrator,
                     )
                 )
                 final_score_sent = True
-                logger.info("Initiated queue push for connection state change to DISCONNECTED")
+                logger.info(
+                    "Initiated queue push for connection state change to DISCONNECTED"
+                )
             except Exception as e:
-                logger.error(f"Failed to initiate queue push on connection state change: {e}")
+                logger.error(
+                    f"Failed to initiate queue push on connection state change: {e}"
+                )
 
     async def handle_termination_task(event: BaseEvent):
         """Handle session termination when a termination event occurs."""
-        logger.info(f"Termination event '{event.event_id}' triggered. Initiating shutdown...")
+        logger.info(
+            f"Termination event '{event.event_id}' triggered. Initiating shutdown..."
+        )
 
         try:
             # Publish termination audio message - use custom message from registry
@@ -218,7 +248,8 @@ async def entrypoint(ctx: agents.JobContext):
             logger.info("Session shutdown completed")
 
     # This function creates a background task to handle session termination.
-    # This is done to handle the case where termination event coming from langgraph flow terminates without publishing audio.
+    # This is done to handle the case where termination event coming from
+    # langgraph flow terminates without publishing audio.
     async def handle_termination(event: BaseEvent):
         """Wrapper to execute termination as a background task."""
         task = asyncio.create_task(handle_termination_task(event))
@@ -234,17 +265,21 @@ async def entrypoint(ctx: agents.JobContext):
         logger.debug("Shutdown callback triggered")
 
         # Send deferred termination event to Core (if any).
-        # Termination events are sent here AFTER the agent has finished speaking the termination
-        # message, ensuring the backend doesn't close the room prematurely when it receives
-        # the event with autoTerminationStatus=true.
+        # Termination events are sent here AFTER the agent has finished
+        # speaking the termination message, ensuring the backend doesn't
+        # close the room prematurely when it receives the event with
+        # autoTerminationStatus=true.
         if event_orchestrator.deferred_termination_event:
             logger.info(
-                f"Sending deferred termination event {event_orchestrator.deferred_termination_event.event_id} to Core")
+                f"Sending deferred termination event "
+                f"{event_orchestrator.deferred_termination_event.event_id} "
+                f"to Core"
+            )
             try:
                 event_dict = serialize_event(
                     event_orchestrator.deferred_termination_event,
                     termination_event_id=event_orchestrator.termination_event_id,
-                    termination_message=event_orchestrator.termination_message
+                    termination_message=event_orchestrator.termination_message,
                 )
                 core_event_message = CoreEventMessageType.create(
                     room_id=ctx.room.name, event_data=event_dict
@@ -263,14 +298,16 @@ async def entrypoint(ctx: agents.JobContext):
                 await send_final_score_to_core(
                     room_id=ctx.room.name,
                     thread_id=ctx.room.name,
-                    event_orchestrator=event_orchestrator
+                    event_orchestrator=event_orchestrator,
                 )
                 final_score_sent = True
                 logger.info("Final score sent successfully in on_shutdown")
             except Exception as e:
                 logger.error(f"Failed to send final score in on_shutdown: {e}")
         else:
-            logger.info("Final score already sent, skipping duplicate send in on_shutdown")
+            logger.info(
+                "Final score already sent, skipping duplicate send in on_shutdown"
+            )
 
         logger.info("Shutdown initiated")
 
@@ -287,7 +324,7 @@ async def entrypoint(ctx: agents.JobContext):
                 "agent_joined_at": joined_iso,
                 "event_orchestrator": event_orchestrator,
             }
-        }
+        },
     )
 
     # Create agent

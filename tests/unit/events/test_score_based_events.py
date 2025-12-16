@@ -2,16 +2,18 @@
 Tests for score-based event triggering logic, including basic condition checks,
 cascading behaviors, and trigger_events filtering.
 """
-import pytest
+
 from unittest.mock import MagicMock
-from typing import Set
+
+import pytest
+
+from app.core.constants import ConditionOperator, DetectionType, VisibilityType
 
 # Adjust imports based on your actual project structure
 from app.core.events.base import BaseEvent
-from app.core.events.event_types.score.score_event import ScoreEvent
-from app.core.events.event_types.score.constants import ScoreData
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.constants import ConditionOperator, VisibilityType, DetectionType
+from app.core.events.event_types.score.constants import ScoreData
+from app.core.events.event_types.score.score_event import ScoreEvent
 from app.core.scenario.base import Scenario
 
 
@@ -49,7 +51,8 @@ def create_test_scenario(events, trigger_events_whitelist=None):
 
 class TestScoreCascadingLogic:
     """
-    Comprehensive tests for score logic, covering basic conditions and complex cascades/filters.
+    Comprehensive tests for score logic, covering basic conditions and
+    complex cascades/filters.
     """
 
     # --- Basic Condition Tests ---
@@ -59,7 +62,7 @@ class TestScoreCascadingLogic:
         score_event = ScoreEvent.create(
             event_id="score-lt-10",
             data=ScoreData(score=10, condition=ConditionOperator.LT),
-            visibility_type=VisibilityType.ACTIVE
+            visibility_type=VisibilityType.ACTIVE,
         )
         scenario = create_test_scenario([score_event])
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
@@ -72,17 +75,19 @@ class TestScoreCascadingLogic:
         triggered = orchestrator.get_newly_triggered_score_events(9)
         assert "score-lt-10" in triggered
 
-        # Test 11 (not < 10, already happened, but for LT, it might revert in a real scenario,
-        # here we check if it triggers *newly* from 9 to 11, which it should not)
+        # Test 11 (not < 10, already happened, but for LT, it might revert
+        # in a real scenario, here we check if it triggers *newly* from 9
+        # to 11, which it should not)
         triggered = orchestrator.get_newly_triggered_score_events(11)
         assert len(triggered) == 0
 
     def test_score_event_lte_condition(self, mock_room, thread_id):
-        """Test that LTE condition triggers when score is less than or equal to threshold."""
+        """Test that LTE condition triggers when score is less than or equal
+        to threshold."""
         score_event = ScoreEvent.create(
             event_id="score-lte-20",
             data=ScoreData(score=20, condition=ConditionOperator.LTE),
-            visibility_type=VisibilityType.PASSIVE
+            visibility_type=VisibilityType.PASSIVE,
         )
         scenario = create_test_scenario([score_event])
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
@@ -104,7 +109,7 @@ class TestScoreCascadingLogic:
         score_event = ScoreEvent.create(
             event_id="score-gt-10",
             data=ScoreData(score=10, condition=ConditionOperator.GT),
-            visibility_type=VisibilityType.ACTIVE
+            visibility_type=VisibilityType.ACTIVE,
         )
         scenario = create_test_scenario([score_event])
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
@@ -122,11 +127,12 @@ class TestScoreCascadingLogic:
         assert len(triggered) == 0
 
     def test_score_event_gte_condition(self, mock_room, thread_id):
-        """Test that GTE condition triggers when score is greater than or equal to threshold."""
+        """Test that GTE condition triggers when score is greater than or
+        equal to threshold."""
         score_event = ScoreEvent.create(
             event_id="score-gte-20",
             data=ScoreData(score=20, condition=ConditionOperator.GTE),
-            visibility_type=VisibilityType.PASSIVE
+            visibility_type=VisibilityType.PASSIVE,
         )
         scenario = create_test_scenario([score_event])
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
@@ -148,7 +154,7 @@ class TestScoreCascadingLogic:
         score_event = ScoreEvent.create(
             event_id="score-eq-5",
             data=ScoreData(score=5, condition=ConditionOperator.EQ),
-            visibility_type=VisibilityType.PASSIVE
+            visibility_type=VisibilityType.PASSIVE,
         )
         scenario = create_test_scenario([score_event])
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
@@ -174,7 +180,8 @@ class TestScoreCascadingLogic:
         2. Event B (Intermediate): Score event (triggers at >=10), adds 5 points.
         3. Event C (Final): Score event (triggers at >=15).
         """
-        # Event A: The user says something, detected via sentence similarity, adds 10 score
+        # Event A: The user says something, detected via sentence
+        # similarity, adds 10 score
         event_a = MagicMock(spec=BaseEvent)
         event_a.event_id = "event_a"
         event_a.score = 10
@@ -186,14 +193,14 @@ class TestScoreCascadingLogic:
             event_id="event_b",
             data=ScoreData(score=10, condition=ConditionOperator.GTE),
             visibility_type=VisibilityType.ACTIVE,
-            score=5
+            score=5,
         )
 
         # Event C: Triggers when score >= 15. Score remains 0 (None) by default.
         event_c = ScoreEvent.create(
             event_id="event_c",
             data=ScoreData(score=15, condition=ConditionOperator.GTE),
-            visibility_type=VisibilityType.ACTIVE
+            visibility_type=VisibilityType.ACTIVE,
         )
 
         return [event_a, event_b, event_c]
@@ -202,7 +209,8 @@ class TestScoreCascadingLogic:
         """Helper to set up and initialize the orchestrator."""
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
-        # Manually ensure the source event (Event A) state is correctly set in the registry
+        # Manually ensure the source event (Event A) state is correctly
+        # set in the registry
         for event in events:
             orchestrator.set_event_state(event.event_id, False, event.detection_type)
 
@@ -214,11 +222,17 @@ class TestScoreCascadingLogic:
         All events are in trigger_events. Expected added_score = 5 (from B).
         """
         events = self._create_chain_events()
-        scenario = create_test_scenario(events, trigger_events_whitelist=["event_a", "event_b", "event_c"])
-        orchestrator = self._setup_orchestrator_with_events(events, scenario, mock_room, thread_id)
+        scenario = create_test_scenario(
+            events, trigger_events_whitelist=["event_a", "event_b", "event_c"]
+        )
+        orchestrator = self._setup_orchestrator_with_events(
+            events, scenario, mock_room, thread_id
+        )
 
         detected_ids = {"event_a"}
-        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(detected_ids)
+        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(
+            detected_ids
+        )
 
         assert "event_a" in final_ids
         assert "event_b" in final_ids
@@ -228,14 +242,21 @@ class TestScoreCascadingLogic:
     def test_source_event_filtered(self, mock_room, thread_id):
         """
         CASE 2: Source Filtered
-        Event A is NOT in trigger_events. Expected: Score remains 0. B and C do NOT trigger.
+        Event A is NOT in trigger_events. Expected: Score remains 0. B
+        and C do NOT trigger.
         """
         events = self._create_chain_events()
-        scenario = create_test_scenario(events, trigger_events_whitelist=["event_b", "event_c"])
-        orchestrator = self._setup_orchestrator_with_events(events, scenario, mock_room, thread_id)
+        scenario = create_test_scenario(
+            events, trigger_events_whitelist=["event_b", "event_c"]
+        )
+        orchestrator = self._setup_orchestrator_with_events(
+            events, scenario, mock_room, thread_id
+        )
 
         detected_ids = {"event_a"}
-        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(detected_ids)
+        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(
+            detected_ids
+        )
 
         assert "event_a" in final_ids
         assert "event_b" not in final_ids
@@ -245,14 +266,21 @@ class TestScoreCascadingLogic:
     def test_intermediate_cascade_filtered(self, mock_room, thread_id):
         """
         CASE 3: Intermediate Event Filtered
-        Event B is NOT in trigger_events. Expected: B triggers (happened=True), but its score (+5) is ignored. C fails.
+        Event B is NOT in trigger_events. Expected: B triggers
+        (happened=True), but its score (+5) is ignored. C fails.
         """
         events = self._create_chain_events()
-        scenario = create_test_scenario(events, trigger_events_whitelist=["event_a", "event_c"])
-        orchestrator = self._setup_orchestrator_with_events(events, scenario, mock_room, thread_id)
+        scenario = create_test_scenario(
+            events, trigger_events_whitelist=["event_a", "event_c"]
+        )
+        orchestrator = self._setup_orchestrator_with_events(
+            events, scenario, mock_room, thread_id
+        )
 
         detected_ids = {"event_a"}
-        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(detected_ids)
+        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(
+            detected_ids
+        )
 
         assert "event_a" in final_ids
         assert "event_b" in final_ids  # B should register as "happened"
@@ -265,14 +293,21 @@ class TestScoreCascadingLogic:
         Tests that existing live_score respects the filter logic (B and C are allowed).
         """
         events = self._create_chain_events()
-        scenario = create_test_scenario(events, trigger_events_whitelist=["event_b", "event_c"])
-        orchestrator = self._setup_orchestrator_with_events(events, scenario, mock_room, thread_id)
+        scenario = create_test_scenario(
+            events, trigger_events_whitelist=["event_b", "event_c"]
+        )
+        orchestrator = self._setup_orchestrator_with_events(
+            events, scenario, mock_room, thread_id
+        )
 
-        # Manually set accumulated score to 10 (simulating previous events that were sent/scored)
+        # Manually set accumulated score to 10 (simulating previous events
+        # that were sent/scored)
         orchestrator.live_score = 10
 
         # Pass empty set to check purely score-based events
-        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(set())
+        final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(
+            set()
+        )
 
         # B triggers at 10, C triggers at 15 (since B adds +5)
         assert "event_b" in final_ids

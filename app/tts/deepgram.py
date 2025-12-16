@@ -1,10 +1,12 @@
 """Deepgram TTS provider implementation."""
-from typing import Optional, Dict, Any
-from livekit.plugins import deepgram
+
+from typing import Any, Dict, Optional
+
 from deepgram import DeepgramClient
 from deepgram.core import ApiError as DeepgramApiError
+from livekit.plugins import deepgram
+
 from app.core.config import settings
-from app.core.scenario.base import VoiceConfig
 from app.tts.base import BaseTTSClient
 from app.utils.logger import get_logger
 
@@ -14,50 +16,48 @@ logger = get_logger(__name__)
 class DeepgramTTSClient(BaseTTSClient):
     """
     Deepgram TTS client implementation.
+
+    Args:
+        model: Deepgram model name (e.g., "nova-2")
+        language_code: BCP 47 language code (not used by Deepgram, but
+            kept for consistency)
+        api_key: Optional API key (defaults to settings.DEEPGRAM_API_KEY)
     """
-    
+
     def __init__(
         self,
         model: str,
         language_code: str,
         api_key: Optional[str] = None,
     ):
-        """
-        Initialize Deepgram TTS client.
-        
-        Args:
-            model: Deepgram model name (e.g., "nova-2")
-            language_code: BCP 47 language code (not used by Deepgram, but kept for consistency)
-            api_key: Optional API key (defaults to settings.DEEPGRAM_API_KEY)
-        """
         if not model:
             raise ValueError("Deepgram TTS requires 'model'")
-        
+
         # Validate configuration
         if not self.validate_voice(model=model, api_key=api_key):
             raise ValueError(f"Invalid Deepgram model: {model}")
-        
+
         self._model = model
         self._language_code = language_code
         self._api_key = api_key or settings.DEEPGRAM_API_KEY
         self._tts_instance = None
-    
+
     @staticmethod
     def validate_voice(model: str, api_key: Optional[str] = None) -> bool:
         """
         Validate Deepgram TTS model using SDK by generating a short audio sample.
-        
+
         Args:
             model: Deepgram model name
             api_key: Optional API key (defaults to settings.DEEPGRAM_API_KEY)
-        
+
         Returns:
             True if validation succeeds, False otherwise
         """
         if not model:
             logger.error("Deepgram validation requires 'model' parameter")
             return False
-        
+
         logger.info(f"Validating Deepgram voice model='{model}'")
 
         try:
@@ -76,7 +76,10 @@ class DeepgramTTSClient(BaseTTSClient):
             audio_bytes = b"".join(chunk for chunk in audio_stream)
 
             if audio_bytes:
-                logger.info(f"Deepgram voice validation succeeded. Generated {len(audio_bytes)} bytes.")
+                logger.info(
+                    f"Deepgram voice validation succeeded. Generated "
+                    f"{len(audio_bytes)} bytes."
+                )
                 return True
 
             logger.warning("Deepgram voice validation failed: No audio data generated.")
@@ -88,7 +91,7 @@ class DeepgramTTSClient(BaseTTSClient):
         except Exception as e:
             logger.exception(f"Deepgram validation error: {e}")
             return False
-    
+
     @classmethod
     def from_config(
         cls,
@@ -97,25 +100,25 @@ class DeepgramTTSClient(BaseTTSClient):
     ) -> "DeepgramTTSClient":
         """
         Create Deepgram TTS client from config dictionary.
-        
+
         Args:
             config: Config dict from metadata. Expected structure:
                 {"model": "nova-2"}
             language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
-        
+
         Returns:
             DeepgramTTSClient instance
         """
         model = config.get("model")
         if not model:
             raise ValueError("Deepgram TTS requires 'model' in config")
-        
+
         return cls(
             model=model,
             language_code=language_code,
             api_key=settings.DEEPGRAM_API_KEY,
         )
-    
+
     @property
     def tts_instance(self) -> deepgram.TTS:
         """Get the underlying Deepgram TTS instance."""
@@ -127,4 +130,3 @@ class DeepgramTTSClient(BaseTTSClient):
                 api_key=self._api_key,
             )
         return self._tts_instance
-

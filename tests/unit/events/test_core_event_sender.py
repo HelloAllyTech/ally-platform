@@ -1,10 +1,10 @@
 import time
-import pytest
 from typing import List
 
-from app.core.events.base import ChatMessage, BaseEvent, VisibilityType
-from app.core.events.schemas import CoreEventType, CoreEventMessageType
-from app.utils import get_current_iso_timestamp
+import pytest
+
+from app.core.events.base import BaseEvent, ChatMessage, VisibilityType
+from app.core.events.schemas import CoreEventMessageType, CoreEventType
 
 
 class DummyEvent(BaseEvent):

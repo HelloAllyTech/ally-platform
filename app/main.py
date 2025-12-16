@@ -1,7 +1,9 @@
 """
 Main application module.
 """
+
 from fastapi import FastAPI
+
 from app.middleware import get_middlewares
 
 app = FastAPI(middleware=get_middlewares())

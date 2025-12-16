@@ -3,11 +3,11 @@ from typing import Optional
 
 import pytest
 
-from app.utils.event_handler import send_event_to_ui
 from app.core.events.schemas import (
     CustomUIEventMessageType,
     CustomUIEventMessageTypeData,
 )
+from app.utils.event_handler import send_event_to_ui
 
 
 class FakeParticipant:
@@ -19,11 +19,13 @@ class FakeParticipant:
         if self.raise_error:
             raise RuntimeError("publish failed")
         # store for assertions
-        self.published.append({
-            "data": data,
-            "topic": topic,
-            "reliable": reliable,
-        })
+        self.published.append(
+            {
+                "data": data,
+                "topic": topic,
+                "reliable": reliable,
+            }
+        )
 
 
 class FakeRoom:
@@ -36,18 +38,12 @@ class TestUIEventSender:
     def test_custom_ui_event_message_type_create_with_defaults(self):
         # Test standard creation with defaults (show_feedback=True)
         msg = CustomUIEventMessageType.create(
-            score=3,
-            emoji=":)",
-            message="ok",
-            timestamp="2020-01-01T00:00:00.000Z"
+            score=3, emoji=":)", message="ok", timestamp="2020-01-01T00:00:00.000Z"
         )
         assert msg.version == "1.0"
 
         assert msg.data == CustomUIEventMessageTypeData(
-            score=3,
-            emoji=":)",
-            message="ok",
-            show_feedback=True
+            score=3, emoji=":)", message="ok", show_feedback=True
         )
         assert msg.timestamp == "2020-01-01T00:00:00.000Z"
 
@@ -60,10 +56,7 @@ class TestUIEventSender:
     async def test_send_event_function_success(self):
         room = FakeRoom()
         evt = CustomUIEventMessageType.create(
-            score=1,
-            emoji=":)",
-            message="yay",
-            timestamp="2024-01-01T00:00:00.000Z"
+            score=1, emoji=":)", message="yay", timestamp="2024-01-01T00:00:00.000Z"
         )
 
         ok = await send_event_to_ui(evt, room)
@@ -80,15 +73,15 @@ class TestUIEventSender:
         assert payload["reliable"] is True
 
     @pytest.mark.asyncio
-    async def test_send_event_sets_emoji_and_message_null_when_show_feedback_false(self):
-        """Test that the standalone function sets emoji and message to null when show_feedback is False."""
+    async def test_send_event_sets_emoji_and_message_null_when_show_feedback_false(
+        self,
+    ):
+        """Test that the standalone function sets emoji and message to
+        null when show_feedback is False."""
         room = FakeRoom()
         # Create event with show_feedback=False
         evt = CustomUIEventMessageType.create(
-            score=1,
-            emoji=":)",
-            message="hidden",
-            show_feedback=False
+            score=1, emoji=":)", message="hidden", show_feedback=False
         )
 
         ok = await send_event_to_ui(evt, room)
@@ -123,10 +116,7 @@ class TestUIEventSender:
         """Test that event can be created with null emoji from the start."""
         room = FakeRoom()
         evt = CustomUIEventMessageType.create(
-            score=2,
-            emoji=None,
-            message="no emoji",
-            show_feedback=True
+            score=2, emoji=None, message="no emoji", show_feedback=True
         )
 
         ok = await send_event_to_ui(evt, room)
@@ -143,10 +133,7 @@ class TestUIEventSender:
         """Test that emoji is preserved when show_feedback is True."""
         room = FakeRoom()
         evt = CustomUIEventMessageType.create(
-            score=5,
-            emoji="🎉",
-            message="celebration",
-            show_feedback=True
+            score=5, emoji="🎉", message="celebration", show_feedback=True
         )
 
         ok = await send_event_to_ui(evt, room)

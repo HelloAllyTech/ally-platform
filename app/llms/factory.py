@@ -1,10 +1,11 @@
 """LLM provider factory for creating LLM clients based on configuration."""
-from typing import Optional, Dict, Any
-from app.core.constants import LLMProvider, DEFAULT_LANGUAGE_CODE, DEFAULT_LLM_CONFIG
-from app.core.config import settings
+
+from typing import Any, Dict, Optional
+
+from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_LLM_CONFIG, LLMProvider
 from app.llms.base import BaseLLMClient
-from app.llms.openai import OpenAILLMClient
 from app.llms.gemini import GeminiLLMClient
+from app.llms.openai import OpenAILLMClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,16 +17,18 @@ def create_llm_client(
 ) -> BaseLLMClient:
     """
     Create LLM client instance from configuration.
-    
+
     Args:
         llm_config: Optional LLM config from metadata. If None, uses defaults.
-            Expected structure: {"provider": "openai", "config": {"model": "gpt-4o-mini", "temperature": 0.7}}
-            Also supports backward compatibility with flat structure: {"provider": "openai", "model": "gpt-4o-mini"}
+            Expected structure: {"provider": "openai", "config":
+            {"model": "gpt-4o-mini", "temperature": 0.7}}
+            Also supports backward compatibility with flat structure:
+            {"provider": "openai", "model": "gpt-4o-mini"}
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
-    
+
     Returns:
         LLM client instance
-    
+
     Raises:
         ValueError: If provider is unsupported or required parameters are missing
     """
@@ -50,10 +53,10 @@ def create_llm_client(
             # Ensure model has a default if missing
             if "model" not in config_dict:
                 config_dict["model"] = DEFAULT_LLM_CONFIG["model"]
-    
+
     # Map provider to class and instantiate using from_config
     provider = provider.lower()
-    
+
     if provider == LLMProvider.OPENAI:
         return OpenAILLMClient.from_config(
             config=config_dict,
@@ -66,4 +69,3 @@ def create_llm_client(
         )
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
-

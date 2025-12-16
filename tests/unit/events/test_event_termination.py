@@ -1,34 +1,39 @@
 """
 Tests for event termination feature (terminate_on_occurrence flag).
 """
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
 
-from app.core.events.base import BaseEvent, ChatMessage
+import pytest
+
+from app.core.constants import VisibilityType
+from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.factory import build_events_from_metadata
-from app.core.constants import VisibilityType
 
 
 class DummyEvent(BaseEvent):
     """Test event that always detects."""
+
     async def detect_event(self, conversations):
         return True
 
 
-def create_mock_scenario(events, trigger_events=None, termination_event_id=None, termination_message=None):
+def create_mock_scenario(
+    events, trigger_events=None, termination_event_id=None, termination_message=None
+):
     """Helper to create a mock scenario for testing."""
     mock_scenario = MagicMock()
     mock_scenario.events = events
     mock_scenario.trigger_events = trigger_events
-    
+
     if termination_event_id:
         mock_scenario.termination_event = MagicMock()
         mock_scenario.termination_event.id = termination_event_id
         mock_scenario.termination_event.termination_message = termination_message or ""
     else:
         mock_scenario.termination_event = None
-    
+
     return mock_scenario
 
 
@@ -36,14 +41,20 @@ class TestEventTermination:
     """Test suite for event termination functionality."""
 
     def test_event_orchestrator_stores_termination_config(self):
-        """Test that EventOrchestrator stores termination configuration from scenario."""
+        """Test that EventOrchestrator stores termination configuration
+        from scenario."""
         metadata = {
             "events": [
-                {"id": "event-1", "sentences": ["hello"], "score": 5, "feedbackStatus": True}
+                {
+                    "id": "event-1",
+                    "sentences": ["hello"],
+                    "score": 5,
+                    "feedbackStatus": True,
+                }
             ]
         }
         events = build_events_from_metadata(metadata)
-        
+
         # Create mock scenario with termination event
         mock_scenario = MagicMock()
         mock_scenario.events = events
@@ -51,45 +62,46 @@ class TestEventTermination:
         mock_scenario.termination_event = MagicMock()
         mock_scenario.termination_event.id = "event-1"
         mock_scenario.termination_event.termination_message = "Custom termination"
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
-        orchestrator = EventOrchestrator(mock_scenario, room=mock_room, thread_id="test-thread")
-        
+
+        orchestrator = EventOrchestrator(
+            mock_scenario, room=mock_room, thread_id="test-thread"
+        )
+
         assert orchestrator.termination_event_id == "event-1"
         assert orchestrator.termination_message == "Custom termination"
 
     def test_event_orchestrator_accepts_termination_callback(self):
         """Test that EventOrchestrator accepts termination callback in __init__."""
-        metadata = {
-            "events": [
-                {"id": "event-1", "sentences": ["hello"]}
-            ]
-        }
+        metadata = {"events": [{"id": "event-1", "sentences": ["hello"]}]}
         events = build_events_from_metadata(metadata)
         scenario = create_mock_scenario(events, trigger_events=["event-1"])
-        
+
         callback = AsyncMock()
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         assert orchestrator.termination_callback is callback
 
     def test_event_orchestrator_works_without_termination_callback(self):
         """Test that EventOrchestrator works fine without termination callback."""
-        metadata = {
-            "events": [
-                {"id": "event-1", "sentences": ["hello"]}
-            ]
-        }
+        metadata = {"events": [{"id": "event-1", "sentences": ["hello"]}]}
         events = build_events_from_metadata(metadata)
         scenario = create_mock_scenario(events, trigger_events=["event-1"])
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread")
+        orchestrator = EventOrchestrator(
+            scenario, room=mock_room, thread_id="test-thread"
+        )
         assert orchestrator.termination_callback is None
 
     @pytest.mark.asyncio
@@ -101,31 +113,35 @@ class TestEventTermination:
             score=10,
             emoji="🛑",
             emoji_message="Terminating",
-            visibility_type=VisibilityType.ACTIVE
+            visibility_type=VisibilityType.ACTIVE,
         )
-        
+
         # Create callback mock
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [termination_event],
             trigger_events=["term-event"],
             termination_event_id="term-event",
-            termination_message="Custom termination message"
+            termination_message="Custom termination message",
         )
-        
+
         # Mock room
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Create orchestrator with the termination callback
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Update and send events (mark termination event as detected)
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"term-event"}
+            room=mock_room, detected_event_ids={"term-event"}
         )
-        
+
         # Verify callback was called with the termination event
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
@@ -140,26 +156,30 @@ class TestEventTermination:
             score=10,
             emoji="✅",
             emoji_message="Success",
-            visibility_type=VisibilityType.ACTIVE
+            visibility_type=VisibilityType.ACTIVE,
         )
-        
+
         # Create callback mock
         callback = AsyncMock()
         scenario = create_mock_scenario([normal_event], trigger_events=["normal-event"])
-        
+
         # Mock room
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Create orchestrator with the termination callback
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Update and send events
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"normal-event"}
+            room=mock_room, detected_event_ids={"normal-event"}
         )
-        
+
         # Verify callback was NOT called
         callback.assert_not_awaited()
 
@@ -168,14 +188,10 @@ class TestEventTermination:
         """Test that only one event can be configured as termination event."""
         # Create events
         term_event_1 = DummyEvent(
-            event_id="term-1",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=0
         )
         term_event_2 = DummyEvent(
-            event_id="term-2",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=0
         )
 
         # Create callback mock - only term-1 is configured as termination
@@ -184,22 +200,26 @@ class TestEventTermination:
             [term_event_1, term_event_2],
             trigger_events=["term-1", "term-2"],
             termination_event_id="term-1",
-            termination_message="Terminating"
+            termination_message="Terminating",
         )
-        
+
         # Mock room
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Create orchestrator
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Update with both termination events
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"term-1", "term-2"}
+            room=mock_room, detected_event_ids={"term-1", "term-2"}
         )
-        
+
         # Verify callback was called exactly once for term-1
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
@@ -210,38 +230,38 @@ class TestEventTermination:
         """Test termination with mix of normal and termination events."""
         # Create mixed events
         normal_event = DummyEvent(
-            event_id="normal",
-            visibility_type=VisibilityType.ACTIVE,
-            score=5
+            event_id="normal", visibility_type=VisibilityType.ACTIVE, score=5
         )
         term_event = DummyEvent(
-            event_id="terminator",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="terminator", visibility_type=VisibilityType.ACTIVE, score=0
         )
-        
+
         # Create callback mock
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [normal_event, term_event],
             trigger_events=["normal", "terminator"],
             termination_event_id="terminator",
-            termination_message="Terminating"
+            termination_message="Terminating",
         )
-        
+
         # Mock room
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Create orchestrator
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Update with both events
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"normal", "terminator"}
+            room=mock_room, detected_event_ids={"normal", "terminator"}
         )
-        
+
         # Verify callback was called with termination event only
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
@@ -251,28 +271,28 @@ class TestEventTermination:
     async def test_termination_callback_not_called_without_room(self):
         """Test that termination callback is not called when room is None."""
         term_event = DummyEvent(
-            event_id="term-event",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="term-event", visibility_type=VisibilityType.ACTIVE, score=0
         )
-        
+
         callback = AsyncMock()
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["term-event"],
             termination_event_id="term-event",
-            termination_message="Terminating"
+            termination_message="Terminating",
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
-        # Update without room (room=None)
-        await orchestrator.handle_events(
-            room=None,
-            detected_event_ids={"term-event"}
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
         )
-        
+
+        # Update without room (room=None)
+        await orchestrator.handle_events(room=None, detected_event_ids={"term-event"})
+
         # Callback is still called even without room (termination logic runs regardless)
         callback.assert_awaited_once()
 
@@ -281,19 +301,18 @@ class TestEventTermination:
         """Test that termination works with trigger_events filter."""
         # Create termination event
         term_event = DummyEvent(
-            event_id="term-event",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="term-event", visibility_type=VisibilityType.ACTIVE, score=0
         )
-        
+
         callback = AsyncMock()
-        
-        # Create orchestrator with trigger_events filter that includes the termination event
+
+        # Create orchestrator with trigger_events filter that includes
+        # the termination event
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["term-event"],
             termination_event_id="term-event",
-            termination_message="Terminating"
+            termination_message="Terminating",
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
@@ -301,39 +320,38 @@ class TestEventTermination:
             scenario,
             room=mock_room,
             thread_id="test-thread",
-            termination_callback=callback
+            termination_callback=callback,
         )
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Update and send
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"term-event"}
+            room=mock_room, detected_event_ids={"term-event"}
         )
-        
+
         # Callback should be called
         callback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_termination_event_filtered_by_trigger_events(self):
-        """Test that termination callback is NOT called if event is filtered by trigger_events."""
+        """Test that termination callback is NOT called if event is
+        filtered by trigger_events."""
         # Create termination event
         term_event = DummyEvent(
-            event_id="term-event",
-            visibility_type=VisibilityType.ACTIVE,
-            score=0
+            event_id="term-event", visibility_type=VisibilityType.ACTIVE, score=0
         )
-        
+
         callback = AsyncMock()
-        
-        # Create orchestrator with trigger_events filter that EXCLUDES the termination event
+
+        # Create orchestrator with trigger_events filter that EXCLUDES
+        # the termination event
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["other-event"],
             termination_event_id="term-event",
-            termination_message="Terminating"
+            termination_message="Terminating",
         )
         mock_room = MagicMock()
         mock_room.name = "test-room"
@@ -341,28 +359,38 @@ class TestEventTermination:
             scenario,
             room=mock_room,
             thread_id="test-thread",
-            termination_callback=callback
+            termination_callback=callback,
         )
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        
+
         # Update and send
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"term-event"}
+            room=mock_room, detected_event_ids={"term-event"}
         )
-        
+
         # Callback should NOT be called because event is filtered out
         callback.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_termination_with_combination_event(self):
-        """Test termination with a combination event that has terminate_on_occurrence=True."""
+        """Test termination with a combination event that has
+        terminate_on_occurrence=True."""
         metadata = {
             "events": [
-                {"id": "event-1", "sentences": ["hello"], "score": 5, "feedbackStatus": True},
-                {"id": "event-2", "sentences": ["world"], "score": 5, "feedbackStatus": True},
+                {
+                    "id": "event-1",
+                    "sentences": ["hello"],
+                    "score": 5,
+                    "feedbackStatus": True,
+                },
+                {
+                    "id": "event-2",
+                    "sentences": ["world"],
+                    "score": 5,
+                    "feedbackStatus": True,
+                },
                 {
                     "id": "combo-term",
                     "detectionType": "COMBINATION",
@@ -372,36 +400,40 @@ class TestEventTermination:
                         "expression": {
                             "type": "AND",
                             "left": {"type": "IDENTIFIER", "id": "event-1"},
-                            "right": {"type": "IDENTIFIER", "id": "event-2"}
+                            "right": {"type": "IDENTIFIER", "id": "event-2"},
                         }
-                    }
-                }
+                    },
+                },
             ],
             "autoTerminationEvent": {
                 "id": "combo-term",
-                "terminationMessage": "Combination event triggered termination."
-            }
+                "terminationMessage": "Combination event triggered termination.",
+            },
         }
-        
+
         events = build_events_from_metadata(metadata)
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
             trigger_events=["event-1", "event-2", "combo-term"],
             termination_event_id="combo-term",
-            termination_message="Combination event triggered termination."
+            termination_message="Combination event triggered termination.",
         )
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Trigger both base events so combination event becomes true
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"event-1", "event-2"}
+            room=mock_room, detected_event_ids={"event-1", "event-2"}
         )
-        
+
         # The combination event should trigger termination
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
@@ -409,7 +441,8 @@ class TestEventTermination:
 
     @pytest.mark.asyncio
     async def test_termination_with_score_event(self):
-        """Test termination with a score-based event that has terminate_on_occurrence=True."""
+        """Test termination with a score-based event that has
+        terminate_on_occurrence=True."""
         metadata = {
             "events": [
                 {
@@ -417,36 +450,38 @@ class TestEventTermination:
                     "detectionType": "SCORE",
                     "score": 0,
                     "feedbackStatus": True,
-                    "data": {"score": 10, "condition": "GTE"}
+                    "data": {"score": 10, "condition": "GTE"},
                 }
             ],
             "autoTerminationEvent": {
                 "id": "score-term",
-                "terminationMessage": "Score threshold reached."
-            }
+                "terminationMessage": "Score threshold reached.",
+            },
         }
-        
+
         events = build_events_from_metadata(metadata)
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
             trigger_events=["score-term"],
             termination_event_id="score-term",
-            termination_message="Score threshold reached."
+            termination_message="Score threshold reached.",
         )
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
 
         orchestrator.live_score = 10
 
         # Update with score that triggers the event
-        await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids=None
-        )
-        
+        await orchestrator.handle_events(room=mock_room, detected_event_ids=None)
+
         # Score event should trigger termination
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
@@ -454,7 +489,8 @@ class TestEventTermination:
 
     @pytest.mark.asyncio
     async def test_termination_with_time_event(self):
-        """Test termination with a time-based event that has terminate_on_occurrence=True."""
+        """Test termination with a time-based event that has
+        terminate_on_occurrence=True."""
         metadata = {
             "events": [
                 {
@@ -462,35 +498,39 @@ class TestEventTermination:
                     "detectionType": "TIME",
                     "score": 0,
                     "feedbackStatus": True,
-                    "data": {"time": 0, "condition": "GTE"}
+                    "data": {"time": 0, "condition": "GTE"},
                 }
             ],
             "autoTerminationEvent": {
                 "id": "time-term",
-                "terminationMessage": "Time limit reached."
-            }
+                "terminationMessage": "Time limit reached.",
+            },
         }
-        
+
         events = build_events_from_metadata(metadata)
         callback = AsyncMock()
         scenario = create_mock_scenario(
             events,
             trigger_events=["time-term"],
             termination_event_id="time-term",
-            termination_message="Time limit reached."
+            termination_message="Time limit reached.",
         )
-        
+
         mock_room = MagicMock()
         mock_room.name = "test-room"
-        orchestrator = EventOrchestrator(scenario, room=mock_room, thread_id="test-thread", termination_callback=callback)
-        
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
         # Manually trigger the time event by passing it in detected_event_ids
         # (Time events are normally triggered by schedulers, not in handle_events)
         await orchestrator.handle_events(
-            room=mock_room,
-            detected_event_ids={"time-term"}
+            room=mock_room, detected_event_ids={"time-term"}
         )
-        
+
         # Time event should trigger termination
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]

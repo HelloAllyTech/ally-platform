@@ -1,8 +1,7 @@
-import pytest
 import random
 
-from app.core.events.event_processor import EventProcessor
 from app.core.events.base import BaseEvent
+from app.core.events.event_processor import EventProcessor
 from app.core.events.schemas import CustomUIEventMessageType
 
 
@@ -12,7 +11,9 @@ class DummyEvent(BaseEvent):
 
 
 def make_event(event_id: str, score: int, emoji=":)", message="msg") -> DummyEvent:
-    return DummyEvent(event_id=event_id, score=score, emoji=emoji, emoji_message=message)
+    return DummyEvent(
+        event_id=event_id, score=score, emoji=emoji, emoji_message=message
+    )
 
 
 class TestEventProcessor:

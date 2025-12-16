@@ -1,17 +1,17 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional, cast, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, cast
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE
-from app.llms import create_llm_client
-from app.core.events.base import ChatMessage, BaseEvent
+from app.core.events.base import BaseEvent, ChatMessage
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import SimulationState
 from app.core.graph.utils import convert_messages_to_chat_messages
 from app.core.scenario.base import Scenario
+from app.llms import create_llm_client
 from app.utils.logger import logger
 
 if TYPE_CHECKING:
@@ -45,41 +45,59 @@ async def process_events(
     logger.debug(f"Detected Event number: {len(detected_events)}")
 
     new_events = [event for _, event in detected_events]
-    
-    # Calculate the score change from directly detected events only (not combination events)
+
+    # Calculate the score change from directly detected events only
+    # (not combination events)
     score_change = sum(event.score for event in new_events if event.score)
     new_current_score = state.current_score + score_change
 
-    # Update EventOrchestrator and send events (combination events are sent but not added to state)
-    # Score-based events will also be checked and triggered if the score changed
+    # Update EventOrchestrator and send events (combination events are sent
+    # but not added to state)
+    # Score-based events will also be checked and triggered if the score
+    # changed
     additional_score_from_triggered_events = 0
-    branching_instruction=[]
+    branching_instruction = []
     if config and "configurable" in config:
-        event_orchestrator: Optional[EventOrchestrator] = config["configurable"].get("event_orchestrator")
+        event_orchestrator: Optional[EventOrchestrator] = config["configurable"].get(
+            "event_orchestrator"
+        )
         room = config["configurable"].get("room")
 
         if event_orchestrator is not None:
-            # Get event IDs from detected events (currently only similarity-based events are detected)
+            # Get event IDs from detected events (currently only
+            # similarity-based events are detected)
             detected_event_ids = {event.event_id for event in new_events}
 
-            # Update registry, evaluate expressions, check score-based events, and send events
-            # This will send combination events and score-based events too, but we don't include them in state
+            # Update registry, evaluate expressions, check score-based
+            # events, and send events
+            # This will send combination events and score-based events too,
+            # but we don't include them in state
             # Pass the new score so score-based events can be checked
-            # Returns additional score from triggered score-based/time/combination events
-            _, additional_score_from_triggered_events,branching_instruction = await event_orchestrator.handle_events(
-                room=room,
-                detected_event_ids=detected_event_ids if detected_event_ids else None,
+            # Returns additional score from triggered score-based/time/
+            # combination events
+            _, additional_score_from_triggered_events, branching_instruction = (
+                await event_orchestrator.handle_events(
+                    room=room,
+                    detected_event_ids=(
+                        detected_event_ids if detected_event_ids else None
+                    ),
+                )
             )
 
-    # Add the additional score from triggered events (score-based, time-based, combination events)
-    # to the total score
+    # Add the additional score from triggered events (score-based,
+    # time-based, combination events) to the total score
     new_current_score += additional_score_from_triggered_events
     if additional_score_from_triggered_events > 0:
-        logger.info(f"Additional score from triggered events: {additional_score_from_triggered_events}. Total score: {new_current_score}")
+        logger.info(
+            f"Additional score from triggered events: "
+            f"{additional_score_from_triggered_events}. "
+            f"Total score: {new_current_score}"
+        )
 
     # Only include branching_instructions if we have new ones.
     # If we return [], the reducer clears the state.
-    # If we return state.branching_instructions + new, the reducer duplicates the state.
+    # If we return state.branching_instructions + new, the reducer
+    # duplicates the state.
     # By omitting the key when empty, we preserve the existing state.
     update_dict = {
         "messages": state.messages,
@@ -88,7 +106,7 @@ async def process_events(
         "new_events": new_events,
         "current_score": new_current_score,
     }
-    
+
     if branching_instruction:
         update_dict["branching_instructions"] = branching_instruction
 
@@ -116,7 +134,10 @@ async def generate_response(
             # Select instruction with maximum magnitude (highest absolute value)
             selected = max(valid_instructions, key=lambda x: abs(x[1]))
             next_instruction = selected[0]
-            logger.info(f"Selected instruction with score {selected[1]} (magnitude {abs(selected[1])}): '{next_instruction}'")
+            logger.info(
+                f"Selected instruction with score {selected[1]} "
+                f"(magnitude {abs(selected[1])}): '{next_instruction}'"
+            )
 
     # Build system message from scenario and prepend only for the LLM call
     scenario = (
@@ -145,8 +166,7 @@ async def generate_response(
     # Create response from LLM using config from metadata or defaults
     try:
         llm_client = create_llm_client(
-            llm_config=llm_config_from_metadata,
-            language_code=language_code
+            llm_config=llm_config_from_metadata, language_code=language_code
         )
         llm_instance = llm_client.llm_instance
     except Exception as e:

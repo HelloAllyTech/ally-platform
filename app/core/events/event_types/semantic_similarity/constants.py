@@ -1,8 +1,10 @@
 """Constants for semantic similarity event detection."""
-from pydantic import BaseModel
-from typing import List
-from app.core.config import settings
 
+from typing import List
+
+from pydantic import BaseModel
+
+from app.core.config import settings
 
 # OpenAI embedding model configuration
 OPENAI_EMBEDDING_MODEL = settings.OPENAI_EMBEDDING_MODEL
@@ -14,8 +16,9 @@ SEMANTIC_SIMILARITY_THRESHOLD = settings.SEMANTIC_SIMILARITY_THRESHOLD
 
 class SemanticSimilarityData(BaseModel):
     """Data model for semantic similarity event configuration."""
+
     sentences: List[str]
     threshold: float = SEMANTIC_SIMILARITY_THRESHOLD
-    
+
     class Config:
         frozen = True

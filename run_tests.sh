@@ -76,7 +76,7 @@ run_specific_test() {
         echo "Usage: $0 specific tests/unit/test_metadata_parser.py"
         exit 1
     fi
-    
+
     print_status "Running specific test: $1"
     poetry run pytest "$1" -v --tb=short
 }
@@ -101,7 +101,7 @@ run_marked_tests() {
         echo "Available markers: unit, integration, slow, external, livekit, auth, database"
         exit 1
     fi
-    
+
     print_status "Running tests with marker: $1"
     poetry run pytest -v --tb=short -m "$1"
 }
@@ -141,11 +141,11 @@ clean_test_artifacts() {
 show_test_stats() {
     print_status "Generating test statistics..."
     poetry run pytest --collect-only -q | grep -E "test session starts|collected"
-    
+
     echo ""
     print_status "Test file breakdown:"
     find tests/ -name "test_*.py" -exec basename {} \; | sort
-    
+
     echo ""
     print_status "Test markers usage:"
     poetry run pytest --markers | grep -E "^@pytest.mark"
@@ -162,17 +162,17 @@ run_smoke_tests() {
 # Function to set up test environment
 setup_test_env() {
     print_status "Setting up test environment..."
-    
+
     # Check if .env exists
     if [ ! -f .env ]; then
         print_warning ".env file not found, copying from env_sample"
         cp env_sample .env
         print_warning "Please update .env with appropriate test values"
     fi
-    
+
     # Install dependencies
     install_deps
-    
+
     print_success "Test environment setup completed"
 }
 
@@ -214,7 +214,7 @@ show_help() {
 main() {
     # Check if poetry is available
     check_poetry
-    
+
     # Parse command line arguments
     case "${1:-help}" in
         "unit")

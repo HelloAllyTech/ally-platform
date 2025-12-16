@@ -137,15 +137,15 @@ Contains shared fixtures and test configuration:
 ```python
 class TestClassName:
     """Test cases for ClassName."""
-    
+
     def test_method_name_with_valid_input(self):
         """Test method_name with valid input."""
         pass
-    
+
     def test_method_name_with_invalid_input(self):
         """Test method_name with invalid input."""
         pass
-    
+
     def test_method_name_edge_case(self):
         """Test method_name edge case scenario."""
         pass
@@ -218,7 +218,7 @@ from tests.fixtures.scenario_fixtures import ScenarioFactory, create_scenario_pa
 def test_with_factory():
     # Create a scenario with factory
     scenario = ScenarioFactory()
-    
+
     # Create custom payload
     payload = create_scenario_payload(
         title="Custom Test",
@@ -251,10 +251,10 @@ def test_complex_scenario():
    def test_function():
        # Arrange
        input_data = create_test_data()
-       
+
        # Act
        result = function_under_test(input_data)
-       
+
        # Assert
        assert result.expected_property == expected_value
    ```
@@ -264,7 +264,7 @@ def test_complex_scenario():
    def test_function_returns_correct_type():
        result = function_under_test()
        assert isinstance(result, ExpectedType)
-   
+
    def test_function_returns_correct_value():
        result = function_under_test()
        assert result.value == expected_value
@@ -288,11 +288,11 @@ def test_function_handles_exception_gracefully():
 ```python
 def test_function_performance():
     import time
-    
+
     start_time = time.time()
     result = function_under_test(large_input)
     end_time = time.time()
-    
+
     assert end_time - start_time < 1.0  # Should complete within 1 second
     assert result is not None
 ```
@@ -302,23 +302,23 @@ def test_function_performance():
 ```python
 def test_function_thread_safety():
     import threading
-    
+
     results = []
     errors = []
-    
+
     def worker():
         try:
             result = function_under_test()
             results.append(result)
         except Exception as e:
             errors.append(e)
-    
+
     threads = [threading.Thread(target=worker) for _ in range(10)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
-    
+
     assert len(errors) == 0
     assert len(results) == 10
 ```
@@ -363,7 +363,7 @@ from tests.utils.test_helpers import AssertionHelpers
 
 def test_with_helpers():
     envelope = create_envelope()
-    
+
     # Use helper assertions
     AssertionHelpers.assert_valid_room_metadata_envelope(envelope, "1.0")
     AssertionHelpers.assert_scenario_has_required_fields(envelope.scenario)

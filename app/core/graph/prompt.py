@@ -1,5 +1,7 @@
 from typing import Optional
+
 from langchain_core.messages import SystemMessage
+
 from app.core.scenario.base import VoicePromptData
 
 
@@ -23,23 +25,27 @@ def _get_gender_details(prompt_data: VoicePromptData) -> str:
 def _get_behavioral_guidelines(prompt_data: VoicePromptData) -> str:
     """Returns specific session guidelines if provided."""
     if prompt_data.session_behavior_guidelines:
-        return f"**How will you behave in this session:**\n{prompt_data.session_behavior_guidelines}\n\n"
+        return (
+            f"**How will you behave in this session:**\n"
+            f"{prompt_data.session_behavior_guidelines}\n\n"
+        )
     return ""
 
 
 def _format_custom_fields(custom_fields: list) -> str:
     """
     Formats custom fields into markdown sections for prompt injection.
-    
+
     Args:
         custom_fields: List of dicts with 'name' and 'value' keys
-        
+
     Returns:
-        Formatted markdown string with custom field sections, or empty string if no fields
+        Formatted markdown string with custom field sections,
+        or empty string if no fields
     """
     if not custom_fields:
         return ""
-    
+
     formatted_blocks = []
     for field in custom_fields:
         if isinstance(field, dict) and "name" in field and "value" in field:
@@ -47,15 +53,15 @@ def _format_custom_fields(custom_fields: list) -> str:
             field_value = field["value"]
             if field_value:
                 formatted_blocks.append(f"**{field_name}:**\n{field_value}\n\n")
-    
+
     return "".join(formatted_blocks)
 
 
 # --- Main Prompt Generator Function ---
 
+
 def generate_system_message(
-        prompt_data: VoicePromptData,
-        next_instruction: Optional[str] = None
+    prompt_data: VoicePromptData, next_instruction: Optional[str] = None
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -71,7 +77,8 @@ def generate_system_message(
 
     Args:
         prompt_data: An instance of VoicePromptData containing all client info.
-        next_instruction: Optional conversation-specific directive (branching instruction).
+        next_instruction: Optional conversation-specific directive
+            (branching instruction).
                          If provided, triggers minimal prompt mode.
 
     Returns:
@@ -84,101 +91,115 @@ def generate_system_message(
             You are roleplaying as {prompt_data.name} in a counseling session.
             You should only act as the client.
             </SYSTEM>
-            
+
             <CRITICAL_INSTRUCTION>
             {next_instruction}
-            
+
             This instruction takes ABSOLUTE PRIORITY over all other guidelines.
             You MUST follow this instruction exactly in your next response.
             </CRITICAL_INSTRUCTION>
-            
+
             <CONTEXT>
             - Name: {prompt_data.name}
             - Age: {prompt_data.age}
             - Gender: {prompt_data.gender}
             - Situation: {prompt_data.context}
             </CONTEXT>
-            
-            Respond as {prompt_data.name} while strictly following the critical instruction above."""
+
+            Respond as {prompt_data.name} while strictly following the critical
+            instruction above."""
         return SystemMessage(content=minimal_prompt.strip())
 
     # Otherwise, use the full detailed prompt (original behavior)
-    
+
     # Use helper functions to build optional sections
     gender_details_block = _get_gender_details(prompt_data)
     profession_block = _get_optional_block("Your profession", prompt_data.profession)
     guidelines_block = _get_behavioral_guidelines(prompt_data)
-    core_memories_block = _get_optional_block("Your core memories influencing your beliefs & actions",
-                                              prompt_data.core_memories)
+    core_memories_block = _get_optional_block(
+        "Your core memories influencing your beliefs & actions",
+        prompt_data.core_memories,
+    )
     personality_block = _get_optional_block("Your personality", prompt_data.personality)
-    starting_state_block = _get_optional_block("Your current thoughts",
-                                               prompt_data.starting_state)  # Mapped from starting_state
-    emotional_needs_block = _get_optional_block("Your emotional needs from this counselling session",
-                                                prompt_data.emotional_needs)
+    starting_state_block = _get_optional_block(
+        "Your current thoughts", prompt_data.starting_state
+    )  # Mapped from starting_state
+    emotional_needs_block = _get_optional_block(
+        "Your emotional needs from this counselling session",
+        prompt_data.emotional_needs,
+    )
     tone_block = _get_optional_block("Your talking stye/tone", prompt_data.tone)
-    
+
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
-    
+
     # agent_goal is omitted as per user's new example structure
     # system_instruction from prompt_data is ignored and overridden below
 
     # Hardcoded system instruction as requested
-    system_instruction = """"You are an AI roleplay assistant for counselor training. In this simulation, you must act ONLY as the **client** in a therapy session. Stay fully in character, provide realistic dialogue, and do not switch roles unless explicitly instructed.
+    system_instruction = """"
+    You are an AI roleplay assistant for counselor training.
+    In this simulation, you must act ONLY as the **client** in a therapy session.
+    Stay fully in character, provide realistic dialogue, and do not switch roles
+    unless explicitly instructed.
 
     **Important Instuctions:**
      - Prefer first-person phrasing (e.g., ""I feel…"", ""I've been struggling with…"").
     - Allow the counselor to guide the conversation.
-    - If the counselor is silent or open-ended, share one thought, feeling, or small story, then stop.
-    - Maintain consistency with your life history but allow natural variation in tone and detail.
+    - If the counselor is silent or open-ended, share one thought, feeling,
+      or small story, then stop.
+    - Maintain consistency with your life history but allow natural
+      variation in tone and detail.
     - Respond naturally, as a real client would (use first-person voice).
-    - Keep answers concise (2–6 sentences), unless a longer response is natural.
+    - Keep answers concise (2–6 sentences), unless a longer response is
+      natural.
     - Reveal information gradually, not all at once.
     - Start with few details and open up more as counsellor asks questions.
-    - Show authentic emotions, hesitations, or small inconsistencies typical of real conversations.
+    - Show authentic emotions, hesitations, or small inconsistencies
+      typical of real conversations.
     - Do not give therapy advice, diagnoses, or act as the counselor.
-    - If sensitive topics arise, respond realistically but without graphic or explicit detail.
+    - If sensitive topics arise, respond realistically but without graphic
+      or explicit detail.
     - Keep each reply under ~120 words to simulate session pacing."""
 
     # Assemble the full detailed prompt (when no branching instruction is present)
     system_prompt = f"""
     {system_instruction}
-    
+
     ## Your Client Persona Details
     This is the background information for your character.
-    
+
     **Your name:**
     {prompt_data.name}
-    
+
     **Your age:**
     {prompt_data.age}
-    
+
     **Your gender:**
     {prompt_data.gender}
-    
+
     {gender_details_block}
-    
+
     **Your current location:**
     {prompt_data.current_location}
-    
+
     {profession_block}
-    
+
     **Your current context:**
     {prompt_data.context}
-    
+
     {guidelines_block}
-    
+
     **Summary of your life's history:**
     {prompt_data.life_history_summary}
-    
+
     {core_memories_block}
     {personality_block}
     {starting_state_block}
     {emotional_needs_block}
     {tone_block}
     {custom_fields_block}
-    
+
     """
 
     return SystemMessage(content=system_prompt.strip())
-

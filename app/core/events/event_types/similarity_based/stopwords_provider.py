@@ -2,15 +2,17 @@
 Abstract interface for stopwords providers.
 Allows library-based, custom, or hybrid implementations for multilingual support.
 """
+
+import logging
 from abc import ABC, abstractmethod
 from typing import FrozenSet, Set
-import logging
 
 logger = logging.getLogger(__name__)
 
 # Try to import libraries
 try:
     from stopwordsiso import stopwords as stopwords_iso_stopwords
+
     STOPWORDS_ISO_AVAILABLE = True
 except ImportError:
     stopwords_iso_stopwords = None
@@ -19,6 +21,7 @@ except ImportError:
 
 try:
     import advertools as adv
+
     ADVERTOOLS_AVAILABLE = True
 except ImportError:
     ADVERTOOLS_AVAILABLE = False
@@ -35,53 +38,71 @@ LANGUAGE_MAPPING = {
     "te-IN": {"iso": None, "advertools": "telugu"},  # Only in advertools
     "ur-IN": {"iso": None, "advertools": "urdu"},  # Only in advertools
     "en-IN": {"iso": "en", "advertools": "english"},
-    "ml-IN": {"iso": None, "advertools": None},  # Malayalam - custom stopwords (empty for now)
-    "kn-IN": {"iso": None, "advertools": None},  # Kannada - custom stopwords (empty for now)
+    "ml-IN": {
+        "iso": None,
+        "advertools": None,
+    },  # Malayalam - custom stopwords (empty for now)
+    "kn-IN": {
+        "iso": None,
+        "advertools": None,
+    },  # Kannada - custom stopwords (empty for now)
     # Add more mappings as needed
 }
 
 # Custom domain-specific stopwords (counseling/mental health context)
 # Can be extended per language
 DOMAIN_SPECIFIC_STOPWORDS = {
-    "en-IN": set([
-        # Add counseling-specific words that libraries might miss
-        # or words that are too generic in your context
-    ]),
-    "hi-IN": set([
-        # Hindi counseling-specific (add as needed)
-    ]),
-    "ml-IN": set([
-        # Malayalam stopwords - empty for now, will fallback to English
-        # Can be populated later with comprehensive lists
-    ]),
-    "kn-IN": set([
-        # Kannada stopwords - empty for now, will fallback to English
-        # Can be populated later with comprehensive lists
-    ]),
+    "en-IN": set(
+        [
+            # Add counseling-specific words that libraries might miss
+            # or words that are too generic in your context
+        ]
+    ),
+    "hi-IN": set(
+        [
+            # Hindi counseling-specific (add as needed)
+        ]
+    ),
+    "ml-IN": set(
+        [
+            # Malayalam stopwords - empty for now, will fallback to English
+            # Can be populated later with comprehensive lists
+        ]
+    ),
+    "kn-IN": set(
+        [
+            # Kannada stopwords - empty for now, will fallback to English
+            # Can be populated later with comprehensive lists
+        ]
+    ),
     # Add more as needed
 }
 
 # Words to REMOVE from library stopwords (important in your domain)
 DOMAIN_IMPORTANT_WORDS = {
-    "en-IN": set([
-        # Keep these even if in library stopwords
-        "feel", "feeling", "emotion",  # Important for counseling
-    ]),
+    "en-IN": set(
+        [
+            # Keep these even if in library stopwords
+            "feel",
+            "feeling",
+            "emotion",  # Important for counseling
+        ]
+    ),
     # Add more as needed
 }
 
 
 class StopwordsProvider(ABC):
     """Abstract interface for stopwords providers."""
-    
+
     @abstractmethod
     def get_stopwords(self, language_code: str) -> FrozenSet[str]:
         """
         Get stopwords for a given language.
-        
+
         Args:
             language_code: Language code (e.g., "en-IN", "hi-IN")
-            
+
         Returns:
             FrozenSet of stopwords
         """
@@ -90,10 +111,13 @@ class StopwordsProvider(ABC):
 
 class DefaultStopwordsProvider(StopwordsProvider):
     """Default provider using hardcoded English stopwords (backward compatible)."""
-    
+
     def get_stopwords(self, language_code: str) -> FrozenSet[str]:
         """Return default English stopwords."""
-        from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS
+        from app.core.events.event_types.similarity_based.constants import (
+            DEFAULT_STOPWORDS,
+        )
+
         return DEFAULT_STOPWORDS
 
 
@@ -101,45 +125,47 @@ class MultilingualStopwordsProvider(StopwordsProvider):
     """
     Multilingual provider using libraries (stopwords-iso + advertools).
     Falls back to default English if language not found.
-    
+
     Uses hybrid approach:
     1. Get base stopwords from library (stopwords-iso or advertools)
     2. Add domain-specific custom stopwords
     3. Remove domain-important words (even if in library)
     """
-    
+
     def __init__(self):
         self._library_cache: dict[str, FrozenSet[str]] = {}
-    
+
     def get_stopwords(self, language_code: str) -> FrozenSet[str]:
         """
         Get stopwords for a given language using hybrid approach.
-        
+
         Args:
             language_code: Language code (e.g., "en-IN", "hi-IN")
-            
+
         Returns:
             FrozenSet of stopwords
         """
         if language_code in self._library_cache:
             return self._library_cache[language_code]
-        
+
         # Step 1: Get base from library
         base_stopwords = self._get_from_libraries(language_code)
-        
+
         # Step 2: Add domain-specific custom stopwords
         custom_stopwords = DOMAIN_SPECIFIC_STOPWORDS.get(language_code, set())
-        
+
         # Step 3: Remove domain-important words
         important_words = DOMAIN_IMPORTANT_WORDS.get(language_code, set())
-        
+
         # Combine: base + custom - important, then convert to frozenset
-        final_stopwords = frozenset((base_stopwords | custom_stopwords) - important_words)
-        
+        final_stopwords = frozenset(
+            (base_stopwords | custom_stopwords) - important_words
+        )
+
         # Cache and return
         self._library_cache[language_code] = final_stopwords
         return final_stopwords
-    
+
     def _get_from_libraries(self, language_code: str) -> Set[str]:
         """
         Get stopwords from libraries with fallback chain:
@@ -148,7 +174,7 @@ class MultilingualStopwordsProvider(StopwordsProvider):
         3. Default English stopwords (fallback)
         """
         mapping = LANGUAGE_MAPPING.get(language_code, {})
-        
+
         # Try stopwords-iso first (preferred for languages it supports)
         if STOPWORDS_ISO_AVAILABLE and stopwords_iso_stopwords and mapping.get("iso"):
             iso_code = mapping["iso"]
@@ -156,7 +182,7 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                 stopwords_list = stopwords_iso_stopwords[iso_code]
                 if stopwords_list:
                     return set(stopwords_list)
-        
+
         # Fallback to advertools
         if ADVERTOOLS_AVAILABLE and mapping.get("advertools"):
             adv_lang = mapping["advertools"]
@@ -164,15 +190,18 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                 stopwords_list = adv.stopwords[adv_lang]
                 if stopwords_list:
                     return set(stopwords_list)
-        
+
         # Final fallback: English stopwords (from constants)
-        from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS
+        from app.core.events.event_types.similarity_based.constants import (
+            DEFAULT_STOPWORDS,
+        )
+
         logger.warning(
             f"No stopwords found for {language_code}, using English defaults. "
             f"Consider adding custom stopwords for this language."
         )
         return set(DEFAULT_STOPWORDS)
-    
+
     def clear_cache(self):
         """Clear the stopwords cache (useful for testing)."""
         self._library_cache.clear()
@@ -181,11 +210,13 @@ class MultilingualStopwordsProvider(StopwordsProvider):
 def get_stopwords_provider(use_multilingual: bool = True) -> StopwordsProvider:
     """
     Factory function to get the appropriate stopwords provider.
-    
+
     Args:
-        use_multilingual: If True, use MultilingualStopwordsProvider (requires libraries).
-                         If False, use DefaultStopwordsProvider (backward compatible).
-    
+        use_multilingual: If True, use MultilingualStopwordsProvider
+                         (requires libraries).
+                         If False, use DefaultStopwordsProvider
+                         (backward compatible).
+
     Returns:
         StopwordsProvider instance
     """
@@ -193,4 +224,3 @@ def get_stopwords_provider(use_multilingual: bool = True) -> StopwordsProvider:
         return MultilingualStopwordsProvider()
     else:
         return DefaultStopwordsProvider()
-

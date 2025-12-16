@@ -1,26 +1,31 @@
 """
 Centralized schemas for event orchestrator and related structures.
 """
+
 import time
-from livekit import rtc
-from app.core.constants import DetectionType
-from app.core.events.event_types.combination.constants import ExpressionNode
+from typing import Literal, Optional, TypedDict
+
 from pydantic import BaseModel, Field
-from app.utils import get_logger, get_current_iso_timestamp
-from app.utils.datetime_utils import get_current_iso_timestamp as get_iso_timestamp
-from typing import Optional, Literal, TypedDict
+
+from app.core.constants import DetectionType
 from app.core.events.base import ChatMessage
+from app.core.events.event_types.combination.constants import ExpressionNode
+from app.utils import get_current_iso_timestamp
+from app.utils.datetime_utils import get_current_iso_timestamp as get_iso_timestamp
 
 
 class EventRegistryEntry(TypedDict):
     """
     Structure for an event registry entry.
-    
+
     Attributes:
         happened: Whether the event has occurred/is active
-        trigger_multiple: True for sentence similarity events (can trigger multiple times),
-                         False for time/score/combination events (trigger once)
+        trigger_multiple: True for sentence similarity events (can trigger
+                         multiple times),
+                         False for time/score/combination events
+                         (trigger once)
     """
+
     happened: bool
     trigger_multiple: bool
 
@@ -28,15 +33,17 @@ class EventRegistryEntry(TypedDict):
 class ExpressionListEntry(TypedDict):
     """
     Structure for an expression list entry (combination events).
-    
+
     Attributes:
         event_id: The event ID this expression belongs to
         type: The detection type (should be COMBINATION)
         expression: The expression node to evaluate
     """
+
     event_id: str
     type: DetectionType
     expression: ExpressionNode
+
 
 class CustomUIEventMessageTypeData(BaseModel):
     """Schema for custom event data payload."""
@@ -46,8 +53,10 @@ class CustomUIEventMessageTypeData(BaseModel):
     message: Optional[str] = Field(..., description="Event message")
     show_feedback: bool = Field(..., description="Show feedback button")
 
+
 class CoreEventType(BaseModel):
     """Core event data structure."""
+
     event_data: dict = None
     timestamp: Optional[str] = None  # store as ISO string for consistency
 
@@ -62,6 +71,7 @@ class CoreEventType(BaseModel):
 
 class CoreEventMessageTypeData(BaseModel):
     """Data payload for core event messages."""
+
     chat_message: Optional[ChatMessage] = Field(
         default=None, description="Message from user or agent"
     )
@@ -72,6 +82,7 @@ class CoreEventMessageTypeData(BaseModel):
 
 class CoreEventMessageType(BaseModel):
     """Schema for core event messages."""
+
     message_type: Literal["message", "event"]
     data: CoreEventMessageTypeData
     room_id: str
@@ -95,6 +106,7 @@ class CoreEventMessageType(BaseModel):
             timestamp=int(time.time()),
         )
 
+
 class CustomUIEventMessageType(BaseModel):
     """Schema for custom event sent to frontend."""
 
@@ -104,12 +116,12 @@ class CustomUIEventMessageType(BaseModel):
 
     @classmethod
     def create(
-            cls,
-            score: Optional[int],
-            emoji: Optional[str],
-            message: Optional[str],
-            timestamp: Optional[str] = None,
-            show_feedback: Optional[bool] = True,
+        cls,
+        score: Optional[int],
+        emoji: Optional[str],
+        message: Optional[str],
+        timestamp: Optional[str] = None,
+        show_feedback: Optional[bool] = True,
     ) -> "CustomUIEventMessageType":
         """Create a custom event with current timestamp."""
         if timestamp is None:
@@ -118,10 +130,7 @@ class CustomUIEventMessageType(BaseModel):
         return cls(
             version="1.0",
             data=CustomUIEventMessageTypeData(
-                score=score, 
-                emoji=emoji, 
-                message=message,
-                show_feedback=show_feedback
+                score=score, emoji=emoji, message=message, show_feedback=show_feedback
             ),
-            timestamp=timestamp
+            timestamp=timestamp,
         )

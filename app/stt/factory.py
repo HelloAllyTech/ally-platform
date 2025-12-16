@@ -1,7 +1,8 @@
 """STT provider factory for creating STT clients based on configuration."""
-from typing import Optional, Dict, Any
-from app.core.constants import STTProvider, DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG
-from app.core.config import settings
+
+from typing import Any, Dict, Optional
+
+from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG, STTProvider
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
 from app.stt.google import GoogleSTTClient
@@ -17,16 +18,18 @@ def create_stt_client(
 ) -> BaseSTTClient:
     """
     Create STT client instance from configuration.
-    
+
     Args:
         stt_config: Optional STT config from metadata. If None, uses defaults.
-            Expected structure: {"provider": "deepgram", "config": {"model": "nova-3"}}
-            Also supports backward compatibility with flat structure: {"provider": "deepgram", "model": "nova-3"}
+            Expected structure: {"provider": "deepgram", "config":
+            {"model": "nova-3"}}
+            Also supports backward compatibility with flat structure:
+            {"provider": "deepgram", "model": "nova-3"}
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
-    
+
     Returns:
         STT client instance
-    
+
     Raises:
         ValueError: If provider is unsupported or required parameters are missing
     """
@@ -50,10 +53,10 @@ def create_stt_client(
             # Ensure model has a default if missing
             if "model" not in config_dict:
                 config_dict["model"] = DEFAULT_STT_CONFIG["model"]
-    
+
     # Map provider to class and instantiate using from_config
     provider = provider.lower()
-    
+
     if provider == STTProvider.DEEPGRAM:
         return DeepgramSTTClient.from_config(
             config=config_dict,
@@ -71,4 +74,3 @@ def create_stt_client(
         )
     else:
         raise ValueError(f"Unsupported STT provider: {provider}")
-

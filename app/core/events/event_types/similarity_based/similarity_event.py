@@ -2,19 +2,25 @@
 Similarity event for runtime instantiation from YAML sentences.
 Refactored with abstractions for multilingual support.
 """
-from typing import List, Optional, Tuple, Dict, ClassVar, override
+
+from typing import ClassVar, Dict, List, Optional, Tuple, override
 
 from pydantic import PrivateAttr
 
-from app.core.constants import SimilarityEventConfig, DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE, SimilarityEventConfig
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.similarity_based.base import TargetPattern
-from app.core.events.event_types.similarity_based.constants import MATCH_THRESHOLD, MIN_MATCH_TOKENS
-from app.core.events.event_types.similarity_based.text_processor import TextProcessor
-from app.core.events.event_types.similarity_based.text_processor_factory import TextProcessorFactory
+from app.core.events.event_types.similarity_based.constants import (
+    MATCH_THRESHOLD,
+    MIN_MATCH_TOKENS,
+)
 from app.core.events.event_types.similarity_based.stopwords_provider import (
     StopwordsProvider,
     get_stopwords_provider,
+)
+from app.core.events.event_types.similarity_based.text_processor import TextProcessor
+from app.core.events.event_types.similarity_based.text_processor_factory import (
+    TextProcessorFactory,
 )
 from app.utils.logger import get_logger
 
@@ -24,15 +30,19 @@ logger = get_logger(__name__)
 class SimilarityEvent(BaseEvent):
     """
     Similarity-based event instantiated from YAML sentences.
-    
-    Uses shared pattern cache for performance across instances with identical configurations.
+
+    Uses shared pattern cache for performance across instances with
+    identical configurations.
     Now supports multilingual processing through abstractions.
     """
 
     # Regular fields that survive serialization
     sentences: List[str] = []
-    language_code: str = DEFAULT_LANGUAGE_CODE  # Store as regular field to survive LangGraph deserialization
-    
+    language_code: str = (
+        # Store as regular field to survive LangGraph deserialization
+        DEFAULT_LANGUAGE_CODE
+    )
+
     # Private attributes for transient/computed state
     _match_threshold: float = PrivateAttr(default=SimilarityEventConfig.match_threshold)
     _min_match_tokens: int = PrivateAttr(default=SimilarityEventConfig.min_match_tokens)
@@ -43,8 +53,12 @@ class SimilarityEvent(BaseEvent):
     _instance_patterns: List[TargetPattern] = PrivateAttr(default_factory=list)
     _instance_built: bool = PrivateAttr(default=False)
 
-    # Shared cache across instances: (sentences_hash, threshold, min_tokens, stopwords_hash, language_code) -> patterns
-    _PATTERN_CACHE: ClassVar[Dict[Tuple[int, float, int, int, str], List[TargetPattern]]] = {}
+    # Shared cache across instances:
+    # (sentences_hash, threshold, min_tokens, stopwords_hash, language_code)
+    # -> patterns
+    _PATTERN_CACHE: ClassVar[
+        Dict[Tuple[int, float, int, int, str], List[TargetPattern]]
+    ] = {}
 
     @classmethod
     def create(
@@ -59,7 +73,7 @@ class SimilarityEvent(BaseEvent):
     ) -> "SimilarityEvent":
         """
         Create a SimilarityEvent with Pydantic-safe construction.
-        
+
         Args:
             event_id: Unique event identifier
             custom_sentences: List of target sentences to match against
@@ -72,26 +86,45 @@ class SimilarityEvent(BaseEvent):
             event_id=event_id,
             sentences=list(custom_sentences or []),
             language_code=language_code or DEFAULT_LANGUAGE_CODE,
-            **kwargs
+            **kwargs,
         )
-        inst._match_threshold = match_threshold if match_threshold is not None else MATCH_THRESHOLD
-        inst._min_match_tokens = min_match_tokens if min_match_tokens is not None else MIN_MATCH_TOKENS
-        
+        inst._match_threshold = (
+            match_threshold if match_threshold is not None else MATCH_THRESHOLD
+        )
+        inst._min_match_tokens = (
+            min_match_tokens if min_match_tokens is not None else MIN_MATCH_TOKENS
+        )
+
         # Initialize abstractions - ensure _text_processor is never None
         try:
-            inst._text_processor = TextProcessorFactory.get_processor(inst.language_code)
+            inst._text_processor = TextProcessorFactory.get_processor(
+                inst.language_code
+            )
         except Exception as e:
-            logger.error(f"Failed to get text processor for language '{inst.language_code}': {e}, using default UnifiedTextProcessor")
-            from app.core.events.event_types.similarity_based.text_processor import UnifiedTextProcessor
-            inst._text_processor = UnifiedTextProcessor(language_code=inst.language_code)
-        
+            logger.error(
+                f"Failed to get text processor for language "
+                f"'{inst.language_code}': {e}, using default "
+                f"UnifiedTextProcessor"
+            )
+            from app.core.events.event_types.similarity_based.text_processor import (
+                UnifiedTextProcessor,
+            )
+
+            inst._text_processor = UnifiedTextProcessor(
+                language_code=inst.language_code
+            )
+
         # Final safety check - this should never happen, but fail fast if it does
         if inst._text_processor is None:
-            raise ValueError(f"Failed to initialize text processor for event '{event_id}' with language '{inst.language_code}'. This should never happen.")
-        
+            raise ValueError(
+                f"Failed to initialize text processor for event '{event_id}' "
+                f"with language '{inst.language_code}'. "
+                f"This should never happen."
+            )
+
         inst._stopwords_provider = get_stopwords_provider(use_multilingual=True)
         inst._stopwords = inst._stopwords_provider.get_stopwords(inst.language_code)
-        
+
         inst._instance_patterns = []
         inst._instance_built = False
         return inst
@@ -120,7 +153,8 @@ class SimilarityEvent(BaseEvent):
         return False
 
     def _match(self, sentence: str) -> bool:
-        self._ensure_patterns_built()  # This will lazily initialize _text_processor if needed
+        # This will lazily initialize _text_processor if needed
+        self._ensure_patterns_built()
 
         # Use abstracted text processor
         normalized_sentence: str = self._text_processor.normalize(sentence)
@@ -128,7 +162,9 @@ class SimilarityEvent(BaseEvent):
             return False
 
         # Use abstracted tokenizer
-        sentence_token_set: set[str] = set(self._text_processor.tokenize(normalized_sentence))
+        sentence_token_set: set[str] = set(
+            self._text_processor.tokenize(normalized_sentence)
+        )
         if not sentence_token_set:
             return False
 
@@ -146,7 +182,9 @@ class SimilarityEvent(BaseEvent):
             overlap_tokens = sentence_token_set & informative_target_tokens
 
             # Guard against trivial hits on longer targets
-            required_overlap = min(self._min_match_tokens, len(informative_target_tokens))
+            required_overlap = min(
+                self._min_match_tokens, len(informative_target_tokens)
+            )
             if len(overlap_tokens) < required_overlap:
                 continue
 
@@ -168,80 +206,100 @@ class SimilarityEvent(BaseEvent):
                 f"sentences is None for event '{self.event_id}'. "
                 f"This indicates a bug in event initialization."
             )
-        
+
         if not self.sentences:
             self._instance_patterns = []
             self._instance_built = True
             return
 
-        # Lazy initialization for deserialized events (LangGraph checkpointing loses PrivateAttr)
-        # Re-initialize _text_processor and _stopwords if they were lost during deserialization
-        # Use language_code field (regular field) which survives serialization
+        # Lazy initialization for deserialized events
+        # (LangGraph checkpointing loses PrivateAttr)
+        # Re-initialize _text_processor and _stopwords if they were lost
+        # during deserialization
+        # Use language_code field (regular field) which survives
+        # serialization
         if self._text_processor is None:
             lang_code = self.language_code or DEFAULT_LANGUAGE_CODE
             try:
                 self._text_processor = TextProcessorFactory.get_processor(lang_code)
             except Exception as e:
                 logger.error(
-                    f"Failed to get text processor for language '{lang_code}': {e}, "
-                    f"using default UnifiedTextProcessor as fallback"
+                    f"Failed to get text processor for language "
+                    f"'{lang_code}': {e}, using default "
+                    f"UnifiedTextProcessor as fallback"
                 )
                 try:
-                    from app.core.events.event_types.similarity_based.text_processor import UnifiedTextProcessor
+                    from app.core.events.event_types.similarity_based.text_processor import (  # noqa: E501
+                        UnifiedTextProcessor,
+                    )
+
                     self._text_processor = UnifiedTextProcessor(language_code=lang_code)
                 except Exception as fallback_error:
                     logger.error(
-                        f"Failed to create fallback UnifiedTextProcessor for language '{lang_code}': {fallback_error}. "
+                        f"Failed to create fallback UnifiedTextProcessor "
+                        f"for language '{lang_code}': {fallback_error}. "
                         f"Event '{self.event_id}' may not function correctly."
                     )
                     # Last resort: try with default language
                     if lang_code != DEFAULT_LANGUAGE_CODE:
                         try:
-                            self._text_processor = UnifiedTextProcessor(language_code=DEFAULT_LANGUAGE_CODE)
+                            self._text_processor = UnifiedTextProcessor(
+                                language_code=DEFAULT_LANGUAGE_CODE
+                            )
                             logger.warning(
-                                f"Using default language '{DEFAULT_LANGUAGE_CODE}' for event '{self.event_id}' "
-                                f"due to failure with '{lang_code}'"
+                                f"Using default language "
+                                f"'{DEFAULT_LANGUAGE_CODE}' for event "
+                                f"'{self.event_id}' due to failure with "
+                                f"'{lang_code}'"
                             )
                         except Exception:
                             raise ValueError(
-                                f"Failed to initialize text processor for event '{self.event_id}' "
-                                f"with language '{lang_code}' and fallback to '{DEFAULT_LANGUAGE_CODE}'. "
-                                f"This indicates a critical configuration issue."
+                                f"Failed to initialize text processor for "
+                                f"event '{self.event_id}' with language "
+                                f"'{lang_code}' and fallback to "
+                                f"'{DEFAULT_LANGUAGE_CODE}'. This indicates "
+                                f"a critical configuration issue."
                             )
-        
+
         # Final safety check - ensure _text_processor is never None
         if self._text_processor is None:
             raise ValueError(
-                f"Text processor is None for event '{self.event_id}' with language '{self.language_code}'. "
+                f"Text processor is None for event '{self.event_id}' "
+                f"with language '{self.language_code}'. "
                 f"This should never happen and indicates a bug."
             )
-        
+
         if self._stopwords is None or self._stopwords_provider is None:
             lang_code = self.language_code or DEFAULT_LANGUAGE_CODE
             try:
                 if self._stopwords_provider is None:
-                    self._stopwords_provider = get_stopwords_provider(use_multilingual=True)
+                    self._stopwords_provider = get_stopwords_provider(
+                        use_multilingual=True
+                    )
                 self._stopwords = self._stopwords_provider.get_stopwords(lang_code)
             except Exception as e:
                 logger.error(
                     f"Failed to get stopwords for language '{lang_code}': {e}, "
                     f"using default English stopwords as fallback"
                 )
-                from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS
+                from app.core.events.event_types.similarity_based.constants import (
+                    DEFAULT_STOPWORDS,
+                )
+
                 self._stopwords = DEFAULT_STOPWORDS
 
         # Deduplicate and strip surrounding quotes/whitespace
         deduped: List[str] = []
         seen: set[str] = set()
         for s in self.sentences:
-            cleaned = s.strip().strip('"\'')
+            cleaned = s.strip().strip("\"'")
             if cleaned and cleaned not in seen:
                 seen.add(cleaned)
                 deduped.append(cleaned)
 
         # Cache key from normalized phrases and tunables
         # Use abstracted text processor for normalization
-        
+
         normalized_phrases = [self._text_processor.normalize(p) for p in deduped]
         sentences_key = hash(tuple(normalized_phrases))
         stopwords_key = hash(tuple(sorted(self._stopwords)))

@@ -1,486 +1,473 @@
 """Comprehensive tests for new TTS directory structure."""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 
-from app.tts import (
-    create_tts_client,
-    get_default_tts_config,
-    Gender,
-)
+from unittest.mock import Mock, patch
+
+import pytest
+
+from app.tts import Gender, create_tts_client, get_default_tts_config
 from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
 from app.tts.sarvam import SarvamTTSClient
-from app.core.constants import TTSProvider
 
 
 class TestDeepgramProvider:
     """Test cases for Deepgram TTS provider."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
-    @patch('livekit.plugins.deepgram.TTS')
-    @patch('app.tts.deepgram.settings')
-    def test_create_deepgram_tts_success(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
+    @patch("livekit.plugins.deepgram.TTS")
+    @patch("app.tts.deepgram.settings")
+    def test_create_deepgram_tts_success(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test successful Deepgram TTS creation."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = DeepgramTTSClient(
-            model="nova-2",
-            language_code="en-IN",
-            api_key="test-api-key"
+            model="nova-2", language_code="en-IN", api_key="test-api-key"
         )
         result = client.tts_instance
-        
+
         mock_validate.assert_called_once_with(model="nova-2", api_key="test-api-key")
         mock_tts_class.assert_called_once_with(
             model="nova-2",
             encoding="linear16",
             sample_rate=24000,
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
-    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
+    @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
     def test_create_deepgram_tts_missing_model(self, mock_validate):
         """Test Deepgram TTS creation with missing model."""
         with pytest.raises(ValueError, match="Deepgram TTS requires 'model'"):
-            DeepgramTTSClient(
-                model="",
-                language_code="en-IN"
-            )
-    
+            DeepgramTTSClient(model="", language_code="en-IN")
+
     @pytest.mark.unit
-    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
+    @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
     def test_create_deepgram_tts_invalid_model(self, mock_validate):
         """Test Deepgram TTS creation with invalid model."""
         mock_validate.return_value = False
-        
+
         with pytest.raises(ValueError, match="Invalid Deepgram model"):
-            DeepgramTTSClient(
-                model="invalid-model",
-                language_code="en-IN"
-            )
-    
+            DeepgramTTSClient(model="invalid-model", language_code="en-IN")
+
     @pytest.mark.unit
-    @patch('app.tts.deepgram.DeepgramTTSClient.validate_voice')
-    @patch('livekit.plugins.deepgram.TTS')
-    @patch('app.tts.deepgram.settings')
-    def test_create_deepgram_tts_with_language_code(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
+    @patch("livekit.plugins.deepgram.TTS")
+    @patch("app.tts.deepgram.settings")
+    def test_create_deepgram_tts_with_language_code(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test Deepgram TTS creation with language_code (should be ignored)."""
         mock_settings.DEEPGRAM_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = DeepgramTTSClient(
-            model="nova-2",
-            language_code="hi-IN",
-            api_key="test-api-key"
+            model="nova-2", language_code="hi-IN", api_key="test-api-key"
         )
         result = client.tts_instance
-        
+
         # Language code should not affect Deepgram TTS creation
         mock_tts_class.assert_called_once_with(
             model="nova-2",
             encoding="linear16",
             sample_rate=24000,
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
 
 
 class TestElevenLabsProvider:
     """Test cases for ElevenLabs TTS provider."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice')
-    @patch('livekit.plugins.elevenlabs.TTS')
-    @patch('app.tts.elevenlabs.settings')
-    def test_create_elevenlabs_tts_success(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_create_elevenlabs_tts_success(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test successful ElevenLabs TTS creation."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = ElevenLabsTTSClient(
             model="eleven_multilingual_v2",
             voice_id="test-voice-id",
             language_code="en-IN",
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         result = client.tts_instance
-        
-        mock_validate.assert_called_once_with(voice_id="test-voice-id", api_key="test-api-key")
+
+        mock_validate.assert_called_once_with(
+            voice_id="test-voice-id", api_key="test-api-key"
+        )
         mock_tts_class.assert_called_once_with(
             voice_id="test-voice-id",
             model="eleven_multilingual_v2",
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
     def test_create_elevenlabs_tts_missing_voice_id(self):
         """Test ElevenLabs TTS creation with missing voice_id."""
         with pytest.raises(ValueError, match="ElevenLabs TTS requires 'voice_id'"):
             ElevenLabsTTSClient(
-                model="eleven_multilingual_v2",
-                voice_id="",
-                language_code="en-IN"
+                model="eleven_multilingual_v2", voice_id="", language_code="en-IN"
             )
-    
+
     @pytest.mark.unit
     def test_create_elevenlabs_tts_missing_model(self):
         """Test ElevenLabs TTS creation with missing model."""
         with pytest.raises(ValueError, match="ElevenLabs TTS requires 'model'"):
             ElevenLabsTTSClient(
-                model="",
-                voice_id="test-voice-id",
-                language_code="en-IN"
+                model="", voice_id="test-voice-id", language_code="en-IN"
             )
-    
+
     @pytest.mark.unit
-    @patch('app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice')
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
     def test_create_elevenlabs_tts_invalid_voice_id(self, mock_validate):
         """Test ElevenLabs TTS creation with invalid voice_id."""
         mock_validate.return_value = False
-        
+
         with pytest.raises(ValueError, match="Invalid ElevenLabs voice_id"):
             ElevenLabsTTSClient(
                 model="eleven_multilingual_v2",
                 voice_id="invalid-voice",
-                language_code="en-IN"
+                language_code="en-IN",
             )
 
 
 class TestSarvamProvider:
     """Test cases for Sarvam TTS provider."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
-    @patch('livekit.plugins.sarvam.TTS')
-    @patch('app.tts.sarvam.settings')
-    def test_create_sarvam_tts_success(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
+    @patch("livekit.plugins.sarvam.TTS")
+    @patch("app.tts.sarvam.settings")
+    def test_create_sarvam_tts_success(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test successful Sarvam TTS creation."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = SarvamTTSClient(
             model="bulbul:v2",
             speaker="anushka",
             language_code="en-IN",
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         result = client.tts_instance
-        
-        mock_validate.assert_called_once_with(model="bulbul:v2", speaker="anushka", api_key="test-api-key")
+
+        mock_validate.assert_called_once_with(
+            model="bulbul:v2", speaker="anushka", api_key="test-api-key"
+        )
         mock_tts_class.assert_called_once_with(
-            target_language_code="en-IN",
-            speaker="anushka",
-            api_key="test-api-key"
+            target_language_code="en-IN", speaker="anushka", api_key="test-api-key"
         )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
-    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
-    @patch('livekit.plugins.sarvam.TTS')
-    @patch('app.tts.sarvam.settings')
-    def test_create_sarvam_tts_with_hi_in(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
+    @patch("livekit.plugins.sarvam.TTS")
+    @patch("app.tts.sarvam.settings")
+    def test_create_sarvam_tts_with_hi_in(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test Sarvam TTS creation with Hindi language code."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = SarvamTTSClient(
             model="bulbul:v2",
             speaker="anushka",
             language_code="hi-IN",
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         result = client.tts_instance
-        
+
         mock_tts_class.assert_called_once_with(
-            target_language_code="hi-IN",
-            speaker="anushka",
-            api_key="test-api-key"
+            target_language_code="hi-IN", speaker="anushka", api_key="test-api-key"
         )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
-    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
-    @patch('livekit.plugins.sarvam.TTS')
-    @patch('app.tts.sarvam.settings')
-    def test_create_sarvam_tts_default_language(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
+    @patch("livekit.plugins.sarvam.TTS")
+    @patch("app.tts.sarvam.settings")
+    def test_create_sarvam_tts_default_language(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test Sarvam TTS creation with default language when not provided."""
         mock_settings.SARVAM_API_KEY = "test-api-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = SarvamTTSClient(
             model="bulbul:v2",
             speaker="anushka",
             language_code=None,  # Will default to "en-IN" in _convert_language_code
-            api_key="test-api-key"
+            api_key="test-api-key",
         )
         result = client.tts_instance
-        
+
         # Should default to "en-IN"
         mock_tts_class.assert_called_once_with(
-            target_language_code="en-IN",
-            speaker="anushka",
-            api_key="test-api-key"
+            target_language_code="en-IN", speaker="anushka", api_key="test-api-key"
         )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
     def test_create_sarvam_tts_missing_speaker(self):
         """Test Sarvam TTS creation with missing speaker."""
         with pytest.raises(ValueError, match="Sarvam TTS requires 'speaker'"):
-            SarvamTTSClient(
-                model="bulbul:v2",
-                speaker="",
-                language_code="en-IN"
-            )
-    
+            SarvamTTSClient(model="bulbul:v2", speaker="", language_code="en-IN")
+
     @pytest.mark.unit
     def test_create_sarvam_tts_missing_model(self):
         """Test Sarvam TTS creation with missing model."""
         with pytest.raises(ValueError, match="Sarvam TTS requires 'model'"):
-            SarvamTTSClient(
-                model="",
-                speaker="anushka",
-                language_code="en-IN"
-            )
-    
+            SarvamTTSClient(model="", speaker="anushka", language_code="en-IN")
+
     @pytest.mark.unit
-    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
+    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
     def test_create_sarvam_tts_invalid_config(self, mock_validate):
         """Test Sarvam TTS creation with invalid configuration."""
         mock_validate.return_value = False
-        
+
         with pytest.raises(ValueError, match="Invalid Sarvam configuration"):
             SarvamTTSClient(
-                model="bulbul:v2",
-                speaker="invalid-speaker",
-                language_code="en-IN"
+                model="bulbul:v2", speaker="invalid-speaker", language_code="en-IN"
             )
 
 
 class TestCreateTTSClientWithDefaults:
     """Test cases for create_tts_client function with defaults."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.settings')
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
     def test_create_tts_client_default_male(self, mock_settings, mock_deepgram_client):
         """Test creating TTS client with defaults for male gender."""
         mock_settings.DEFAULT_MALE_VOICE_MODEL = "nova-2-male"
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_client = Mock()
         mock_deepgram_client.return_value = mock_client
-        
+
         result = create_tts_client(language_code="en-IN", gender=Gender.MALE)
-        
+
         assert result == mock_client
         mock_deepgram_client.assert_called_once_with(
             model="nova-2-male",
             language_code="en-IN",
             api_key="test-key",
         )
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.settings')
-    def test_create_tts_client_default_female(self, mock_settings, mock_deepgram_client):
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_default_female(
+        self, mock_settings, mock_deepgram_client
+    ):
         """Test creating TTS client with defaults for female gender."""
         mock_settings.DEFAULT_FEMALE_VOICE_MODEL = "nova-2-female"
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_client = Mock()
         mock_deepgram_client.return_value = mock_client
-        
+
         result = create_tts_client(language_code="en-IN", gender=Gender.FEMALE)
-        
+
         assert result == mock_client
         mock_deepgram_client.assert_called_once_with(
             model="nova-2-female",
             language_code="en-IN",
             api_key="test-key",
         )
-    
+
     @pytest.mark.unit
     def test_create_tts_client_requires_gender_when_no_config(self):
         """Test that gender is required when tts_config is None."""
         with pytest.raises(ValueError, match="gender is required"):
             create_tts_client(language_code="en-IN")
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.settings')
+    @patch("app.tts.factory.settings")
     def test_create_tts_client_missing_setting(self, mock_settings):
         """Test handling missing settings attribute."""
         del mock_settings.DEFAULT_MALE_VOICE_MODEL
-        
+
         with pytest.raises((ValueError, AttributeError), match="Missing|default"):
             create_tts_client(language_code="en-IN", gender=Gender.MALE)
 
 
 class TestCreateTTSClientWithConfig:
     """Test cases for create_tts_client function with config."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.SarvamTTSClient')
-    @patch('app.tts.factory.settings')
-    def test_create_tts_client_with_sarvam_config(self, mock_settings, mock_sarvam_client):
+    @patch("app.tts.factory.SarvamTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_with_sarvam_config(
+        self, mock_settings, mock_sarvam_client
+    ):
         """Test creating TTS client with Sarvam config from metadata."""
         mock_settings.SARVAM_API_KEY = "test-key"
         mock_client = Mock()
         mock_sarvam_client.from_config.return_value = mock_client
-        
+
         tts_config = {
             "provider": "sarvam",
             "name": "test-voice",
-            "config": {
-                "model": "bulbul:v2",
-                "speaker": "anushka"
-            }
+            "config": {"model": "bulbul:v2", "speaker": "anushka"},
         }
-        
+
         result = create_tts_client(tts_config=tts_config, language_code="hi-IN")
-        
+
         mock_sarvam_client.from_config.assert_called_once_with(
             config={"model": "bulbul:v2", "speaker": "anushka"},
             language_code="hi-IN",
         )
         assert result == mock_client
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.settings')
-    def test_create_tts_client_with_deepgram_config(self, mock_settings, mock_deepgram_client):
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_with_deepgram_config(
+        self, mock_settings, mock_deepgram_client
+    ):
         """Test creating TTS client with Deepgram config."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_client = Mock()
         mock_deepgram_client.from_config.return_value = mock_client
-        
+
         tts_config = {
             "provider": "deepgram",
             "name": "test-voice",
-            "config": {
-                "model": "nova-2"
-            }
+            "config": {"model": "nova-2"},
         }
-        
+
         result = create_tts_client(tts_config=tts_config, language_code="en-IN")
-        
+
         mock_deepgram_client.from_config.assert_called_once_with(
             config={"model": "nova-2"},
             language_code="en-IN",
         )
         assert result == mock_client
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory._get_default_tts_client')
-    @patch('app.tts.factory.logger')
-    def test_create_tts_client_invalid_config_falls_back(self, mock_logger, mock_get_default):
+    @patch("app.tts.factory._get_default_tts_client")
+    @patch("app.tts.factory.logger")
+    def test_create_tts_client_invalid_config_falls_back(
+        self, mock_logger, mock_get_default
+    ):
         """Test fallback to default when config is invalid."""
         mock_client = Mock()
         mock_get_default.return_value = mock_client
-        
+
         tts_config = {
             "provider": "elevenlabs",
-            "config": {
-                "voice_id": "only"  # Missing model
-            }
+            "config": {"voice_id": "only"},  # Missing model
         }
-        
-        result = create_tts_client(tts_config=tts_config, language_code="en-IN", gender=Gender.FEMALE)
-        
+
+        result = create_tts_client(
+            tts_config=tts_config, language_code="en-IN", gender=Gender.FEMALE
+        )
+
         mock_get_default.assert_called_once_with(Gender.FEMALE, "en-IN")
         mock_logger.warning.assert_called_once()
         assert result == mock_client
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory._get_default_tts_client')
-    @patch('app.tts.factory.logger')
-    @patch('app.tts.factory.settings')
-    def test_create_tts_client_creation_failure_falls_back(self, mock_settings, mock_logger, mock_get_default, mock_deepgram_client):
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory._get_default_tts_client")
+    @patch("app.tts.factory.logger")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_creation_failure_falls_back(
+        self, mock_settings, mock_logger, mock_get_default, mock_deepgram_client
+    ):
         """Test fallback to default when TTS creation fails."""
         mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_deepgram_client.from_config.side_effect = RuntimeError("Creation failed")
         mock_client = Mock()
         mock_get_default.return_value = mock_client
-        
-        tts_config = {
-            "provider": "deepgram",
-            "config": {
-                "model": "test-model"
-            }
-        }
-        
-        result = create_tts_client(tts_config=tts_config, language_code="en-IN", gender=Gender.NON_BINARY)
-        
+
+        tts_config = {"provider": "deepgram", "config": {"model": "test-model"}}
+
+        result = create_tts_client(
+            tts_config=tts_config, language_code="en-IN", gender=Gender.NON_BINARY
+        )
+
         mock_get_default.assert_called_once_with(Gender.NON_BINARY, "en-IN")
         mock_logger.warning.assert_called_once()
         assert result == mock_client
-    
+
     @pytest.mark.unit
     def test_create_tts_client_missing_provider_falls_back(self):
         """Test that missing provider falls back to defaults."""
-        tts_config = {
-            "name": "test-voice",
-            "config": {}
-        }
-        
+        tts_config = {"name": "test-voice", "config": {}}
+
         with pytest.raises(ValueError, match="gender is required"):
             create_tts_client(tts_config=tts_config, language_code="en-IN")
 
 
 class TestGetDefaultTTSConfig:
     """Test cases for get_default_tts_config convenience function."""
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.create_tts_client')
+    @patch("app.tts.factory.create_tts_client")
     def test_get_default_tts_config_returns_instance(self, mock_create_tts):
         """Test that get_default_tts_config returns TTS instance directly."""
         mock_tts_instance = Mock()
         mock_client = Mock()
         mock_client.tts_instance = mock_tts_instance
         mock_create_tts.return_value = mock_client
-        
+
         result = get_default_tts_config(Gender.MALE, "en-IN")
-        
-        mock_create_tts.assert_called_once_with(language_code="en-IN", gender=Gender.MALE)
+
+        mock_create_tts.assert_called_once_with(
+            language_code="en-IN", gender=Gender.MALE
+        )
         assert result == mock_tts_instance
-    
+
     @pytest.mark.unit
-    @patch('app.tts.factory.create_tts_client')
+    @patch("app.tts.factory.create_tts_client")
     def test_get_default_tts_config_uses_default_language(self, mock_create_tts):
-        """Test that get_default_tts_config uses DEFAULT_LANGUAGE_CODE when not provided."""
+        """Test that get_default_tts_config uses DEFAULT_LANGUAGE_CODE
+        when not provided."""
         mock_tts_instance = Mock()
         mock_client = Mock()
         mock_client.tts_instance = mock_tts_instance
         mock_create_tts.return_value = mock_client
-        
+
         result = get_default_tts_config(Gender.FEMALE)
-        
-        mock_create_tts.assert_called_once_with(language_code="en-IN", gender=Gender.FEMALE)
+
+        mock_create_tts.assert_called_once_with(
+            language_code="en-IN", gender=Gender.FEMALE
+        )
         assert result == mock_tts_instance
 
 
 class TestTTSNewStructureIntegration:
     """Integration tests for new TTS structure."""
-    
+
     @pytest.mark.integration
-    @patch('app.tts.factory.DeepgramTTSClient')
-    @patch('app.tts.factory.settings')
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
     def test_full_tts_creation_flow(self, mock_settings, mock_deepgram_client):
         """Test complete TTS creation flow with new structure."""
         mock_settings.DEFAULT_MALE_VOICE_MODEL = "nova-2"
@@ -489,34 +476,33 @@ class TestTTSNewStructureIntegration:
         mock_client_instance = Mock()
         mock_client_instance.tts_instance = mock_tts_instance
         mock_deepgram_client.return_value = mock_client_instance
-        
+
         tts_client = create_tts_client(language_code="en-IN", gender=Gender.MALE)
         assert tts_client == mock_client_instance
         mock_deepgram_client.assert_called_once()
-    
+
     @pytest.mark.integration
-    @patch('app.tts.sarvam.SarvamTTSClient.validate_voice')
-    @patch('livekit.plugins.sarvam.TTS')
-    @patch('app.tts.sarvam.settings')
-    def test_sarvam_with_language_code_integration(self, mock_settings, mock_tts_class, mock_validate):
+    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
+    @patch("livekit.plugins.sarvam.TTS")
+    @patch("app.tts.sarvam.settings")
+    def test_sarvam_with_language_code_integration(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
         """Test Sarvam TTS with language code in integration scenario."""
         mock_settings.SARVAM_API_KEY = "test-key"
         mock_validate.return_value = True
         mock_tts_instance = Mock()
         mock_tts_class.return_value = mock_tts_instance
-        
+
         client = SarvamTTSClient(
             model="bulbul:v2",
             speaker="anushka",
             language_code="hi-IN",
-            api_key="test-key"
+            api_key="test-key",
         )
         result = client.tts_instance
-        
+
         mock_tts_class.assert_called_once_with(
-            target_language_code="hi-IN",
-            speaker="anushka",
-            api_key="test-key"
+            target_language_code="hi-IN", speaker="anushka", api_key="test-key"
         )
         assert result == mock_tts_instance
-
