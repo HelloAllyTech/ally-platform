@@ -15,6 +15,7 @@ import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
+import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
 import {
@@ -168,7 +169,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
-      playNotificationSound(require('../../assets/sounds/startSimulation.mp3'));
       setIsConnecting(false);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
@@ -181,6 +181,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
       if (!isDisconnecting) {
+        playNotificationSound(sounds.simulationAutoTermination);
         setIsDisconnecting(true);
         setIsMicEnabled(false);
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
@@ -230,6 +231,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
+  useEffect(() => {
+    playNotificationSound(sounds.startSimulation);
+  }, []);
+
   const configureAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
@@ -265,9 +270,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const handleDisconnect = async () => {
     try {
+      console.timeLog('handleDisconnect');
       setIsDisconnecting(true);
+      playNotificationSound(sounds.endSimulation);
       await room.disconnect();
-      playNotificationSound(require('../../assets/sounds/endSimulation.mp3'));
       await endScenarioSession({
         scenarioSessionId: sessionId,
       });
