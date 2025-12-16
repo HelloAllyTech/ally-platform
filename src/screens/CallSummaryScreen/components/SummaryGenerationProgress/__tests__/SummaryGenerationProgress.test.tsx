@@ -6,6 +6,9 @@ import {SummaryGenerationProgress} from '../SummaryGenerationProgress';
 jest.mock('lottie-react-native', () => 'LottieView');
 
 jest.mock('@/assets', () => ({
+  animations: {
+    summaryLoading: require('@/assets/animations/summaryLoading.json'),
+  },
   HexagonCloseIcon: () => null,
   ShieldWithTickIcon: () => null,
   summaryFailed: 1,

@@ -3,6 +3,7 @@ import {Animated as RNAnimated, StyleSheet, Text, View} from 'react-native';
 import {useSharedValue, withTiming} from 'react-native-reanimated';
 import SoundPlayer from 'react-native-sound-player';
 
+import {sounds} from '@/assets';
 import {SCREEN_WIDTH} from '@/constants/general';
 import {colors} from '@/theme';
 
@@ -103,7 +104,7 @@ export const BoxBreathingAnimation = ({
     const setup = async () => {
       // Enable mix with others so audio doesn't interfere with microphone
       SoundPlayer.setMixAudio(true);
-      SoundPlayer.playAsset(require('../../../../assets/sounds/breath.mp3'));
+      SoundPlayer.playAsset(sounds.breath);
       setIsPlayerReady(true);
     };
     setup();
