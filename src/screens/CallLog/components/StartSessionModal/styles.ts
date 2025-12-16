@@ -24,11 +24,6 @@ export const styles = ScaledSheet.create({
     padding: '6@ms',
     zIndex: 1,
   },
-  closeText: {
-    fontSize: '25@ms',
-    fontWeight: '400',
-    color: colors.darkSlate,
-  },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     fontSize: '20@ms',
@@ -54,36 +49,15 @@ export const styles = ScaledSheet.create({
     marginBottom: '16@mvs',
     marginHorizontal: '23@ms',
   },
-  sectionLabel: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    color: colors.darkGray2,
-    textAlign: 'center',
-  },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: '10@mvs',
-  },
-  radioOuter: {
-    width: '16@ms',
-    height: '16@ms',
-    borderRadius: '9@ms',
-    borderWidth: 1,
-    borderColor: colors.lightGray5,
-    alignItems: 'center',
+    paddingVertical: '16@mvs',
     justifyContent: 'center',
-    marginRight: '12@ms',
-    alignSelf: 'center',
-  },
-  radioInner: {
-    width: '10@ms',
-    height: '10@ms',
-    borderRadius: '5@ms',
-    backgroundColor: colors.blue,
   },
   optionTextBlock: {
     flex: 1,
+    alignItems: 'center',
   },
   optionTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -101,14 +75,6 @@ export const styles = ScaledSheet.create({
     width: '80%',
     alignSelf: 'center',
   },
-  ctaBtnDisabled: {
-    backgroundColor: colors.lightGray4,
-  },
-  ctaText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.white,
-    fontSize: '14@ms',
-  },
   consent: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '11@ms',
@@ -123,12 +89,5 @@ export const styles = ScaledSheet.create({
   },
   marginB16: {
     marginBottom: '16@mvs',
-  },
-  singleOptionRow: {
-    paddingVertical: '16@mvs',
-    justifyContent: 'center',
-  },
-  singleOptionTextBlock: {
-    alignItems: 'center',
   },
 });
