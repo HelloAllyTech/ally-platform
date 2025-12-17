@@ -133,11 +133,24 @@ def generate_system_message(
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
 
+    life_history = _get_optional_block(
+        "your life history is", prompt_data.life_history_summary
+    )
+    response_length = _get_optional_block(
+        "your response length should be", prompt_data.response_length
+    )
+    agent_dialogues = _get_optional_block(
+        "use these dialogues for reference", prompt_data.agent_dialogues
+    )
+
     # agent_goal is omitted as per user's new example structure
     # system_instruction from prompt_data is ignored and overridden below
 
     # Hardcoded system instruction as requested
-    system_instruction = """"
+    system_instruction = (
+        prompt_data.prompt
+        if prompt_data.prompt
+        else """"
     You are an AI roleplay assistant for counselor training.
     In this simulation, you must act ONLY as the **client** in a therapy session.
     Stay fully in character, provide realistic dialogue, and do not switch roles
@@ -151,8 +164,6 @@ def generate_system_message(
     - Maintain consistency with your life history but allow natural
       variation in tone and detail.
     - Respond naturally, as a real client would (use first-person voice).
-    - Keep answers concise (2–6 sentences), unless a longer response is
-      natural.
     - Reveal information gradually, not all at once.
     - Start with few details and open up more as counsellor asks questions.
     - Show authentic emotions, hesitations, or small inconsistencies
@@ -161,6 +172,7 @@ def generate_system_message(
     - If sensitive topics arise, respond realistically but without graphic
       or explicit detail.
     - Keep each reply under ~120 words to simulate session pacing."""
+    )
 
     # Assemble the full detailed prompt (when no branching instruction is present)
     system_prompt = f"""
@@ -191,7 +203,7 @@ def generate_system_message(
     {guidelines_block}
 
     **Summary of your life's history:**
-    {prompt_data.life_history_summary}
+    {life_history}
 
     {core_memories_block}
     {personality_block}
@@ -199,6 +211,9 @@ def generate_system_message(
     {emotional_needs_block}
     {tone_block}
     {custom_fields_block}
+
+    {response_length}
+    {agent_dialogues}
 
     """
 

@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, Field
@@ -22,6 +23,13 @@ class TerminationEvent(BaseModel):
     )
 
 
+class ScenarioResponseLength(str, Enum):
+    VERY_BRIEF = "VERY_BRIEF"
+    BRIEF = "BRIEF"
+    MEDIUM = "MEDIUM"
+    ELABORATE = "ELABORATE"
+
+
 class VoicePromptData(BaseModel):
     name: str = Field(...)
     age: str = Field(...)
@@ -43,6 +51,9 @@ class VoicePromptData(BaseModel):
     custom_fields: Optional[List[Dict[str, str]]] = Field(
         default_factory=list, description="Dynamic custom fields"
     )
+    prompt: Optional[str] = Field(default=None)
+    response_length: Optional[ScenarioResponseLength] = Field(default=None)
+    agent_dialogues: Optional[List[str]] = Field(default=None)
 
 
 class VoiceConfig(BaseModel):
@@ -231,6 +242,9 @@ class Scenario(BaseModel):
                 "opening_statements": prompt_data_dict.get("openingStatements"),
                 "agent_goal": prompt_data_dict.get("agentGoal"),
                 "custom_fields": prompt_data_dict.get("customFields"),
+                "prompt": prompt_data_dict.get("prompt"),
+                "response_length": prompt_data_dict.get("responseLength"),
+                "agent_dialogues": prompt_data_dict.get("agentDialogues"),
             }
 
             prompt_data_obj = VoicePromptData(**mapped_data)
