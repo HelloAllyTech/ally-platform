@@ -25,8 +25,8 @@ import {SocketEvent, SocketMessage} from '@/types';
 import {
   AudioWaveformContainer,
   CallEndConfirmationModal,
-  ControlButtonsSection,
   DismissableBanner,
+  ListeningControls,
   NudgeSection,
   Search,
   Timer,
@@ -290,7 +290,7 @@ export const ConferenceListeningScreen = () => {
         barStyle="light-content"
       />
       {isFocusMode ? renderFocusMode() : renderNonFocusMode()}
-      <ControlButtonsSection
+      <ListeningControls
         isMaximized={isControlSectionMaximized}
         onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
         onFocusModeButtonPress={toggleFocusModeCommon}

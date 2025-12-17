@@ -18,6 +18,7 @@ export const CollapsibleButtonGroup: React.FC<CollapsibleButtonGroupProps> = ({
   customButtonStyle,
   customButtonTextStyle,
   customToggleContainerStyle,
+  children,
   testID,
 }) => {
   const animatedOpacity = React.useRef(new Animated.Value(0)).current;
@@ -82,6 +83,7 @@ export const CollapsibleButtonGroup: React.FC<CollapsibleButtonGroupProps> = ({
             customButtonStyle={customButtonStyle}
             customButtonTextStyle={customButtonTextStyle}
           />
+          {children}
         </Animated.View>
       )}
     </View>

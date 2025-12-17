@@ -32,4 +32,5 @@ export interface CollapsibleButtonGroupProps extends ButtonGroupProps {
   onToggleMaximized: () => void;
   chevronColor?: string;
   customToggleContainerStyle?: StyleProp<ViewStyle>;
+  children?: React.ReactNode;
 }

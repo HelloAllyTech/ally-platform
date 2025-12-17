@@ -12,6 +12,7 @@ import {PrivacyTooltip} from '@/components';
 import {env} from '@/config/env';
 import {
   useDebounce,
+  useHardwareBackPressHandler,
   useListeningScreen,
   useLiveAudioStream,
   useNetworkConnectivity,
@@ -26,7 +27,7 @@ import {DisconnectedType, SocketEvent, SocketMessage} from '@/types';
 import {
   AudioWaveformContainer,
   CallEndConfirmationModal,
-  ControlButtonsSection,
+  ListeningControls,
   NetworkDisconnected,
   NudgeSection,
   Search,
@@ -89,6 +90,14 @@ export const MicrophoneListeningScreen = () => {
       isFocusMode: isFocusModeLocal,
       chatData,
     });
+
+  useHardwareBackPressHandler(() => {
+    if (!showCallEndConfirmation) {
+      setShowCallEndConfirmation(true);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     setIsFocusModeLocal(commonFocusMode);
@@ -395,7 +404,7 @@ export const MicrophoneListeningScreen = () => {
         barStyle="light-content"
       />
       {isFocusModeLocal ? renderFocusMode() : renderNonFocusMode()}
-      <ControlButtonsSection
+      <ListeningControls
         isMaximized={isControlSectionMaximized}
         onToggleMaximized={() => setIsControlSectionMaximized(prev => !prev)}
         onFocusModeButtonPress={toggleFocusModeCommon}

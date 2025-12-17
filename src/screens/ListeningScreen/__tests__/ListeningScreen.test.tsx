@@ -29,6 +29,10 @@ jest.mock('../components', () => {
       mockControlButtonsProps.push(props);
       return <Text testID="controls">controls</Text>;
     },
+    ListeningControls: (props: any) => {
+      mockControlButtonsProps.push(props);
+      return <Text testID="controls">controls</Text>;
+    },
     DismissableBanner: () => <Text testID="banner">banner</Text>,
     NetworkDisconnected: () => <View testID="network-disconnected" />,
     NudgeSection: () => <Text testID="nudge">nudge</Text>,

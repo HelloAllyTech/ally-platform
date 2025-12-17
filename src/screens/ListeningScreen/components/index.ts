@@ -4,6 +4,7 @@ export {CallEndConfirmationModal} from './CallEndConfirmationModal';
 export {ControlButtonsSection} from './ControlButtonsSection';
 export {CustomMarkdown} from './CustomMarkdown';
 export {ListeningAnimation} from './ListeningAnimation';
+export {ListeningControls} from './ListeningControls';
 export {NudgeSection} from './NudgeSection';
 export {Search} from './Search';
 export {SkeletonLoader} from './SkeletonLoader';
