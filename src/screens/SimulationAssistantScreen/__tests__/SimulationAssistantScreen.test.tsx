@@ -144,7 +144,7 @@ jest.mock('@/components', () => {
 // Mock local components barrel used by the screen (./components)
 jest.mock('../components', () => {
   const React = require('react');
-  const {View, Text} = require('react-native');
+  const {View, Text, TouchableOpacity} = require('react-native');
   return {
     __esModule: true,
     AudioWave: () => <View testID="audio-wave" />,
@@ -152,6 +152,35 @@ jest.mock('../components', () => {
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
     SimulationTimer: () => <Text testID="timer">timer</Text>,
+    SimulationControls: ({
+      isMicEnabled,
+      onMicToggle,
+      isFocusMode,
+      onFocusModeToggle,
+      onEndSession,
+      isSimulationInProgress,
+    }: any) => (
+      <View testID="simulation-control-buttons">
+        <TouchableOpacity
+          accessibilityLabel="mic"
+          disabled={!isSimulationInProgress}
+          onPress={onMicToggle}>
+          <Text>{isMicEnabled ? 'unmuted' : 'muted'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityLabel="focus"
+          disabled={!isSimulationInProgress}
+          onPress={onFocusModeToggle}>
+          <Text>{isFocusMode ? 'focused' : 'unfocused'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityLabel="end"
+          disabled={!isSimulationInProgress}
+          onPress={onEndSession}>
+          <Text>end</Text>
+        </TouchableOpacity>
+      </View>
+    ),
   };
 });
 

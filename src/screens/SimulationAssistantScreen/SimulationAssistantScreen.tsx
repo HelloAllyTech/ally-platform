@@ -16,13 +16,8 @@ import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {sounds} from '@/assets';
-import {EndSessionIcon, MicIcon, MicOffIcon, MicOnIcon} from '@/assets/icons';
-import {
-  CollapsibleButtonGroup,
-  IllustratedModal,
-  useErrorToast,
-} from '@/components';
-import type {ButtonOption} from '@/components/ButtonGroup';
+import {EndSessionIcon} from '@/assets/icons';
+import {IllustratedModal, useErrorToast} from '@/components';
 import {
   MINUTES_IN_MS,
   SCREEN_NAMES,
@@ -47,6 +42,7 @@ import {
   EndingSoonModal,
   LiveFeedback,
   SessionScoreMeter,
+  SimulationControls,
   SimulationTimer,
 } from './components';
 import {ParticipantTile} from './components/ParticipantTile/ParticipantTile';
@@ -302,43 +298,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicEnabled]);
 
-  const controlButtons: ButtonOption[] = useMemo(
-    () => [
-      {
-        id: 'mic',
-        icon: !isMicEnabled ? <MicOffIcon /> : <MicOnIcon />,
-        label: t(`SimulationAssistant.${!isMicEnabled ? 'unmute' : 'mute'}`),
-        onPress: handleToggleMic,
-        disabled: !isSimulationInProgress,
-        variant: !isMicEnabled ? 'active' : 'default',
-      },
-      {
-        id: 'focus',
-        icon: <MicIcon color={isFocusMode ? colors.black : colors.white} />,
-        label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
-        onPress: () => setIsFocusMode(prev => !prev),
-        disabled: !isSimulationInProgress,
-        variant: isFocusMode ? 'active' : 'default',
-      },
-      {
-        id: 'end',
-        icon: <View style={styles.endButtonIcon} />,
-        label: t('SimulationAssistant.endSession'),
-        onPress: handleDisconnect,
-        disabled: !isSimulationInProgress,
-        variant: 'destructive',
-      },
-    ],
-    [
-      isMicEnabled,
-      isFocusMode,
-      isSimulationInProgress,
-      t,
-      handleToggleMic,
-      handleDisconnect,
-    ],
-  );
-
   const renderLoader = () => {
     return (
       <View style={styles.loadingWrapper}>
@@ -420,15 +379,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                     </View>
                   </View>
                 </View>
-                {!isFocusMode && (
+                {!isFocusMode && feedback && (
                   <View style={styles.liveFeedbackWrapper}>
-                    {feedback && (
-                      <LiveFeedback
-                        key={feedbackKey}
-                        message={feedback.text}
-                        emoji={feedback.emoji}
-                      />
-                    )}
+                    <LiveFeedback
+                      key={feedbackKey}
+                      message={feedback.text}
+                      emoji={feedback.emoji}
+                    />
                   </View>
                 )}
               </>
@@ -463,11 +420,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           />
         </View>
         {isSimulationInProgress && (
-          <CollapsibleButtonGroup
-            buttons={controlButtons}
+          <SimulationControls
             isMaximized={isControlButtonMaximized}
             onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
-            testID="simulation-control-buttons"
+            isMicEnabled={isMicEnabled}
+            onMicToggle={handleToggleMic}
+            isFocusMode={isFocusMode}
+            onFocusModeToggle={() => setIsFocusMode(prev => !prev)}
+            onEndSession={handleDisconnect}
+            isSimulationInProgress={isSimulationInProgress}
           />
         )}
       </RoomContext.Provider>
