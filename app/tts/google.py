@@ -21,9 +21,15 @@ class GoogleTTSClient(BaseTTSClient):
     Based on LiveKit Google TTS plugin:
     https://docs.livekit.io/agents/models/tts/plugins/google/
 
+    Note: There is a known issue in older versions of livekit-plugins-google
+    that can cause "RuntimeError: aclose(): asynchronous generator is already
+    running" errors. This is handled by LiveKit's error logging and doesn't
+    crash the application. Updating to the latest version (>=1.3.6) may
+    resolve this issue.
+
     Args:
-        language_code: BCP 47 language code (e.g., "en-US", "hi-IN")
-            Defaults to "en-US" if not provided
+        language_code: BCP 47 language code (e.g., "en-US", "hi-IN").
+            Defaults to "en-US" if not provided.
         gender: Voice gender - "male", "female", or "neutral" (default: "neutral")
         voice_name: Optional specific voice name (e.g.,
             "en-US-Standard-H", "en-US-Neural2-A")
