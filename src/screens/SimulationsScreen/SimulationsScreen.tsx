@@ -290,7 +290,7 @@ export const SimulationsScreen: React.FC = () => {
               },
               {
                 key: SimulationTabs.PATHS,
-                label: t('Simulations.trackWay'),
+                label: t('Simulations.tracks'),
               },
             ]}
             activeTab={activeTab}
