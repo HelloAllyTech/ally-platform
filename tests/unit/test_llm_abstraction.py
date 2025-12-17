@@ -204,6 +204,44 @@ class TestLLMFactory:
         assert result == mock_client
 
     @pytest.mark.unit
+    @patch("app.llms.factory.GeminiLLMClient")
+    def test_create_llm_client_with_google_provider(self, mock_gemini_class):
+        """Test create_llm_client with 'google' provider."""
+        mock_client = Mock()
+        mock_gemini_class.from_config.return_value = mock_client
+
+        llm_config = {
+            "provider": "google",
+            "config": {"model": "gemini-pro", "temperature": 0.7},
+        }
+        result = create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        mock_gemini_class.from_config.assert_called_once_with(
+            config={"model": "gemini-pro", "temperature": 0.7},
+            language_code="en-IN",
+        )
+        assert result == mock_client
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.GeminiLLMClient")
+    def test_create_llm_client_with_gemini_provider(self, mock_gemini_class):
+        """Test create_llm_client with 'gemini' provider (backward compatibility)."""
+        mock_client = Mock()
+        mock_gemini_class.from_config.return_value = mock_client
+
+        llm_config = {
+            "provider": "gemini",
+            "config": {"model": "gemini-pro", "temperature": 0.7},
+        }
+        result = create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        mock_gemini_class.from_config.assert_called_once_with(
+            config={"model": "gemini-pro", "temperature": 0.7},
+            language_code="en-IN",
+        )
+        assert result == mock_client
+
+    @pytest.mark.unit
     @patch("app.llms.factory.OpenAILLMClient")
     def test_create_llm_client_unsupported_provider(self, mock_llm_class):
         """Test create_llm_client with unsupported provider."""

@@ -62,7 +62,8 @@ def create_llm_client(
             config=config_dict,
             language_code=language_code,
         )
-    elif provider == LLMProvider.GEMINI:
+    elif provider == LLMProvider.GEMINI or provider == "google":
+        # Support both "gemini" and "google" as provider names
         return GeminiLLMClient.from_config(
             config=config_dict,
             language_code=language_code,

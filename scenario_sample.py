@@ -457,7 +457,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
                 "location": "asia-southeast1",
             },
         },
-        "llm": {"provider": "gemini", "config": {"model": "gemini-2.0-flash-exp"}},
+        "llm": {"provider": "google", "config": {"model": "gemini-2.0-flash-exp"}},
         "metadata": {},
     },
 }
