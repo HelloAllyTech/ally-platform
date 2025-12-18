@@ -177,12 +177,18 @@ class MultilingualStopwordsProvider(StopwordsProvider):
         mapping = LANGUAGE_MAPPING.get(language_code, {})
 
         # Try stopwords-iso first (preferred for languages it supports)
+        # stopwords_iso_stopwords is a function, call it with language code
         if STOPWORDS_ISO_AVAILABLE and stopwords_iso_stopwords and mapping.get("iso"):
             iso_code = mapping["iso"]
-            if iso_code in stopwords_iso_stopwords:
-                stopwords_list = stopwords_iso_stopwords[iso_code]
+            try:
+                stopwords_list = stopwords_iso_stopwords(iso_code)
                 if stopwords_list:
                     return set(stopwords_list)
+            except Exception as e:
+                logger.debug(
+                    f"stopwords-iso failed for '{iso_code}': {e}. "
+                    f"Trying next fallback..."
+                )
 
         # Fallback to advertools
         if ADVERTOOLS_AVAILABLE and mapping.get("advertools"):
