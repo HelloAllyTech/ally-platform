@@ -147,20 +147,26 @@ class TestMultilingualStopwords:
         assert len(stopwords) > 0
 
     def test_malayalam_stopwords_fallback(self):
-        """Test that Malayalam falls back appropriately when no stopwords available."""
+        """Test that Malayalam returns empty set when no stopwords available."""
         provider = get_stopwords_provider(use_multilingual=True)
         stopwords = provider.get_stopwords("ml-IN")
 
-        # Should have stopwords (fallback to English if libraries don't have Malayalam)
-        assert len(stopwords) > 0
+        # Should return empty set (no stopword filtering) when not supported
+        # by libraries. This is correct behavior - English stopwords don't make
+        # sense for Malayalam
+        assert len(stopwords) == 0
+        assert isinstance(stopwords, frozenset)
 
     def test_kannada_stopwords_fallback(self):
-        """Test that Kannada falls back appropriately when no stopwords available."""
+        """Test that Kannada returns empty set when no stopwords available."""
         provider = get_stopwords_provider(use_multilingual=True)
         stopwords = provider.get_stopwords("kn-IN")
 
-        # Should have stopwords (fallback to English if libraries don't have Kannada)
-        assert len(stopwords) > 0
+        # Should return empty set (no stopword filtering) when not supported
+        # by libraries. This is correct behavior - English stopwords don't make
+        # sense for Kannada
+        assert len(stopwords) == 0
+        assert isinstance(stopwords, frozenset)
 
     def test_stopwords_are_frozen_set(self):
         """Test that stopwords are returned as FrozenSet."""

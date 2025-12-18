@@ -171,7 +171,8 @@ class MultilingualStopwordsProvider(StopwordsProvider):
         Get stopwords from libraries with fallback chain:
         1. stopwords-iso (if available)
         2. advertools (if available)
-        3. Default English stopwords (fallback)
+        3. Empty set (fallback - no stopword filtering for unsupported
+           languages)
         """
         mapping = LANGUAGE_MAPPING.get(language_code, {})
 
@@ -191,16 +192,33 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                 if stopwords_list:
                     return set(stopwords_list)
 
-        # Final fallback: English stopwords (from constants)
-        from app.core.events.event_types.similarity_based.constants import (
-            DEFAULT_STOPWORDS,
+        # Final fallback: Empty set (no stopword filtering)
+        # Using English stopwords for non-English languages doesn't make sense
+        # since they won't match anyway. Empty set means all tokens are
+        # considered informative, which is better than incorrect filtering.
+        is_known_unsupported = (
+            language_code in LANGUAGE_MAPPING
+            and mapping.get("iso") is None
+            and mapping.get("advertools") is None
         )
 
-        logger.warning(
-            f"No stopwords found for {language_code}, using English defaults. "
-            f"Consider adding custom stopwords for this language."
-        )
-        return set(DEFAULT_STOPWORDS)
+        if is_known_unsupported:
+            # Known unsupported languages (ml-IN, kn-IN) - log at debug level
+            logger.debug(
+                f"No stopwords available for {language_code} "
+                f"(not supported by libraries). "
+                f"Using empty stopwords set (all tokens will be considered "
+                f"informative). Consider adding custom stopwords in "
+                f"DOMAIN_SPECIFIC_STOPWORDS."
+            )
+        else:
+            # Unexpected language - log at warning level
+            logger.warning(
+                f"No stopwords found for {language_code}, using empty set. "
+                f"All tokens will be considered informative. "
+                f"Consider adding custom stopwords for this language."
+            )
+        return set()
 
     def clear_cache(self):
         """Clear the stopwords cache (useful for testing)."""
