@@ -8,6 +8,8 @@ import unicodedata
 from abc import ABC, abstractmethod
 from typing import List
 
+from app.core.constants import DEFAULT_LANGUAGE_CODE
+
 
 class TextProcessor(ABC):
     """Abstract interface for language-aware text processing."""
@@ -62,7 +64,7 @@ class UnifiedTextProcessor(TextProcessor):
 
     def __init__(
         self,
-        language_code: str = "en-IN",
+        language_code: str = DEFAULT_LANGUAGE_CODE,
         preserve_case: bool = False,
         remove_punctuation: bool = True,
     ):

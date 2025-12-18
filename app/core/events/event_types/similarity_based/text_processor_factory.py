@@ -4,6 +4,7 @@ Factory for creating language-specific text processors.
 
 from typing import Dict
 
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.event_types.similarity_based.text_processor import (
     TextProcessor,
     UnifiedTextProcessor,
@@ -17,7 +18,7 @@ class TextProcessorFactory:
     _instances: Dict[str, TextProcessor] = {}
 
     @classmethod
-    def get_processor(cls, language_code: str = "en-IN") -> TextProcessor:
+    def get_processor(cls, language_code: str = DEFAULT_LANGUAGE_CODE) -> TextProcessor:
         """
         Get or create a text processor for the given language.
 
@@ -45,11 +46,11 @@ class TextProcessorFactory:
             logger = logging.getLogger(__name__)
             logger.error(
                 f"Failed to create UnifiedTextProcessor for "
-                f"'{language_code}': {e}, using default 'en-IN'"
+                f"'{language_code}': {e}, using default '{DEFAULT_LANGUAGE_CODE}'"
             )
             # Fallback to English if language-specific processor fails
-            if language_code != "en-IN":
-                processor = UnifiedTextProcessor(language_code="en-IN")
+            if language_code != DEFAULT_LANGUAGE_CODE:
+                processor = UnifiedTextProcessor(language_code=DEFAULT_LANGUAGE_CODE)
             else:
                 # If even English fails, raise the exception
                 raise

@@ -192,6 +192,19 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                 if stopwords_list:
                     return set(stopwords_list)
 
+        # Special fallback for English: Always use DEFAULT_STOPWORDS if libraries fail
+        # This ensures English workflow is never broken
+        if language_code == "en-IN" or language_code.startswith("en-"):
+            from app.core.events.event_types.similarity_based.constants import (
+                DEFAULT_STOPWORDS,
+            )
+
+            logger.warning(
+                f"English stopwords not found in libraries for '{language_code}', "
+                f"using DEFAULT_STOPWORDS as fallback"
+            )
+            return set(DEFAULT_STOPWORDS)
+
         # Final fallback: Empty set (no stopword filtering)
         # Using English stopwords for non-English languages doesn't make sense
         # since they won't match anyway. Empty set means all tokens are
