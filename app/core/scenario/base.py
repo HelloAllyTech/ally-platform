@@ -40,7 +40,7 @@ class VoicePromptData(BaseModel):
     profession: Optional[str] = Field(default=None)
     context: str = Field(...)
     session_behavior_guidelines: Optional[str] = Field(default=None)
-    life_history_summary: str = Field(...)
+    life_history_summary: Optional[str] = Field(default=None)
     core_memories: Optional[str] = Field(default=None)
     personality: Optional[str] = Field(default=None)
     starting_state: Optional[str] = Field(default=None)
