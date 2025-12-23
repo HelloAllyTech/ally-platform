@@ -277,6 +277,72 @@ def _parse_binary_classifier_data(
         return None
 
 
+def _expand_combination_expression(
+    expression: ExpressionNode,
+    combination_events_map: Dict[str, ExpressionNode],
+    visited: Optional[set] = None,
+) -> ExpressionNode:
+    """
+    Recursively expand an expression by replacing IDENTIFIER nodes that reference
+    combination events with the referenced event's expression.
+
+    This ensures that combination event expressions only contain references to
+    simple (non-combination) events.
+
+    Args:
+        expression: The expression node to expand
+        combination_events_map: Map of combination event IDs to their expressions
+        visited: Set of event IDs already visited (for cycle detection)
+
+    Returns:
+        A new ExpressionNode with all combination event references expanded
+    """
+    if visited is None:
+        visited = set()
+
+    if expression.type == "IDENTIFIER":
+        event_id = expression.id
+        if event_id and event_id in combination_events_map:
+            # Check for circular reference
+            if event_id in visited:
+                # Return the identifier as-is to avoid infinite recursion
+                # The circular dependency check in EventOrchestrator will handle this
+                return expression
+            # Recursively expand the referenced combination event's expression
+            visited.add(event_id)
+            return _expand_combination_expression(
+                combination_events_map[event_id], combination_events_map, visited.copy()
+            )
+        # Not a combination event, return as-is
+        return expression
+
+    elif expression.type == "NOT":
+        if expression.operand:
+            expanded_operand = _expand_combination_expression(
+                expression.operand, combination_events_map, visited.copy()
+            )
+            return ExpressionNode(type="NOT", operand=expanded_operand)
+        return expression
+
+    elif expression.type in ("AND", "OR"):
+        expanded_left = None
+        expanded_right = None
+        if expression.left:
+            expanded_left = _expand_combination_expression(
+                expression.left, combination_events_map, visited.copy()
+            )
+        if expression.right:
+            expanded_right = _expand_combination_expression(
+                expression.right, combination_events_map, visited.copy()
+            )
+        return ExpressionNode(
+            type=expression.type, left=expanded_left, right=expanded_right
+        )
+
+    # Unknown type, return as-is
+    return expression
+
+
 def _parse_expression(expr_dict: dict) -> ExpressionNode:
     """Recursively parse an expression dictionary into an ExpressionNode."""
     if not expr_dict or "type" not in expr_dict:
@@ -480,6 +546,28 @@ def build_events_from_metadata(
                 log.debug("Skipped reason: %s -> %s", eid, r)
         elif on_unknown == "error":
             raise UnknownEventIdError(unknown_ids)
+
+    # Expand combination event expressions to only reference simple events
+    # Build a map of combination event IDs to their expressions
+    combination_events_map: Dict[str, ExpressionNode] = {}
+    for event in events:
+        if event.detection_type == DetectionType.COMBINATION:
+            if hasattr(event, "data") and hasattr(event.data, "expression"):
+                combination_events_map[event.event_id] = event.data.expression
+
+    # Expand each combination event's expression
+    if combination_events_map:
+        for event in events:
+            if event.detection_type == DetectionType.COMBINATION:
+                if hasattr(event, "data") and hasattr(event.data, "expression"):
+                    expanded_expression = _expand_combination_expression(
+                        event.data.expression, combination_events_map
+                    )
+                    event.data.expression = expanded_expression
+        log.debug(
+            "Expanded %d combination event expressions to reference only simple events",
+            len(combination_events_map),
+        )
 
     log.info(
         "build_events_from_metadata: built %d event objects, skipped %d",

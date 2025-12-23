@@ -397,3 +397,156 @@ class TestMixedEventTypes:
         assert events[1].detection_type == DetectionType.TIME
         assert events[2].detection_type == DetectionType.SCORE
         assert events[3].detection_type == DetectionType.COMBINATION
+
+
+class TestCombinationEventExpansion:
+    """Tests for expanding nested combination events to only reference simple events."""
+
+    def test_combination_referencing_combination_is_expanded(self):
+        """Test that a combination event referencing another combination event
+        gets expanded to only reference simple events."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {"id": "simple-2", "sentences": ["world"]},
+                {
+                    "id": "combo-1",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {"type": "IDENTIFIER", "id": "simple-1"},
+                            "right": {"type": "IDENTIFIER", "id": "simple-2"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-2",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "combo-1",  # References another combination event
+                        }
+                    },
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 4
+
+        # Find combo-2
+        combo_2 = next(e for e in events if e.event_id == "combo-2")
+
+        # combo-2's expression should now be expanded to AND(simple-1, simple-2)
+        # instead of just IDENTIFIER(combo-1)
+        expr = combo_2.data.expression
+        assert expr.type == "AND"
+        assert expr.left.type == "IDENTIFIER"
+        assert expr.left.id == "simple-1"
+        assert expr.right.type == "IDENTIFIER"
+        assert expr.right.id == "simple-2"
+
+    def test_deeply_nested_combination_expansion(self):
+        """Test expansion of deeply nested combination references."""
+        metadata = {
+            "events": [
+                {"id": "simple-a", "sentences": ["a"]},
+                {"id": "simple-b", "sentences": ["b"]},
+                {
+                    "id": "combo-level-1",
+                    "detectionType": "COMBINATION",
+                    "data": {"expression": {"type": "IDENTIFIER", "id": "simple-a"}},
+                },
+                {
+                    "id": "combo-level-2",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "OR",
+                            "left": {"type": "IDENTIFIER", "id": "combo-level-1"},
+                            "right": {"type": "IDENTIFIER", "id": "simple-b"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-level-3",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "NOT",
+                            "operand": {"type": "IDENTIFIER", "id": "combo-level-2"},
+                        }
+                    },
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 5
+
+        # Find combo-level-3
+        combo_3 = next(e for e in events if e.event_id == "combo-level-3")
+
+        # combo-level-3 should be expanded to NOT(OR(simple-a, simple-b))
+        expr = combo_3.data.expression
+        assert expr.type == "NOT"
+        assert expr.operand.type == "OR"
+        assert expr.operand.left.type == "IDENTIFIER"
+        assert expr.operand.left.id == "simple-a"
+        assert expr.operand.right.type == "IDENTIFIER"
+        assert expr.operand.right.id == "simple-b"
+
+    def test_combination_referencing_simple_event_unchanged(self):
+        """Test that combination events only referencing simple events are unchanged."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {
+                    "id": "combo-1",
+                    "detectionType": "COMBINATION",
+                    "data": {"expression": {"type": "IDENTIFIER", "id": "simple-1"}},
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        combo_1 = next(e for e in events if e.event_id == "combo-1")
+
+        # Expression should still be IDENTIFIER(simple-1)
+        assert combo_1.data.expression.type == "IDENTIFIER"
+        assert combo_1.data.expression.id == "simple-1"
+
+    def test_circular_combination_reference_handled(self):
+        """Test that circular references between combination events are handled."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {
+                    "id": "combo-a",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {"type": "IDENTIFIER", "id": "simple-1"},
+                            "right": {"type": "IDENTIFIER", "id": "combo-b"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-b",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "combo-a",  # Circular reference
+                        }
+                    },
+                },
+            ]
+        }
+
+        # Should not raise an exception due to circular reference
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 3
