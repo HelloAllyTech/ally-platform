@@ -110,14 +110,14 @@ jobs:
             exit 1
           fi
 
-      - name: Upload to Google Play Console
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
-          packageName: com.helloally.app
-          releaseFiles: ${{ steps.rename_aab.outputs.aab_path }}
-          track: internal
-          status: completed
+      # - name: Upload to Google Play Console
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
+      #     packageName: com.helloally.app
+      #     releaseFiles: ${{ steps.rename_aab.outputs.aab_path }}
+      #     track: internal
+      #     status: completed
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -133,28 +133,28 @@ jobs:
           path: android/app/build/outputs/bundle/prod/release/app-production-release-${{ github.run_number }}-*.aab
           retention-days: 30
 
-      - name: Send Slack notification (Production)
-        if: success()
-        uses: tokorom/action-slack-incoming-webhook@main
-        env:
-          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          text: 'Android Production Build #${{ github.run_number }} Successful!'
-          attachments: |
-            [
-              {
-                "color": "good",
-                "author_name": "${{ github.actor }}",
-                "author_icon": "${{ github.event.sender.avatar_url }}",
-                "fields": [
-                  {
-                    "title": "What's New",
-                    "value": "${{ github.event.head_commit.message }}"
-                  },
-                  {
-                    "title": "Download Production APK",
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
-                  }
-                ]
-              }
-            ]
+      # - name: Send Slack notification (Production)
+      #   if: success()
+      #   uses: tokorom/action-slack-incoming-webhook@main
+      #   env:
+      #     INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   with:
+      #     text: 'Android Production Build #${{ github.run_number }} Successful!'
+      #     attachments: |
+      #       [
+      #         {
+      #           "color": "good",
+      #           "author_name": "${{ github.actor }}",
+      #           "author_icon": "${{ github.event.sender.avatar_url }}",
+      #           "fields": [
+      #             {
+      #               "title": "What's New",
+      #               "value": "${{ github.event.head_commit.message }}"
+      #             },
+      #             {
+      #               "title": "Download Production APK",
+      #               "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
+      #             }
+      #           ]
+      #         }
+      #       ]
