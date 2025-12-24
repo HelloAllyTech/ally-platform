@@ -1,8 +1,10 @@
 import pytest
 
-from app.core.events.factory import build_events_from_metadata, UnknownEventIdError
-from app.core.events.event_types.similarity_based.similarity_event import SimilarityEvent
-from app.core.constants import VisibilityType, DetectionType
+from app.core.constants import DetectionType, VisibilityType
+from app.core.events.event_types.similarity_based.similarity_event import (
+    SimilarityEvent,
+)
+from app.core.events.factory import UnknownEventIdError, build_events_from_metadata
 
 
 class DummyLogger:
@@ -18,14 +20,14 @@ class DummyLogger:
 
     def error(self, msg, *args):
         self.errors.append(msg % args if args else msg)
-    
+
     def exception(self, msg, *args):
         self.exceptions.append(msg % args if args else msg)
         self.errors.append(msg % args if args else msg)
-    
+
     def debug(self, msg, *args):
         self.debugs.append(msg % args if args else msg)
-    
+
     def info(self, msg, *args):
         self.infos.append(msg % args if args else msg)
 
@@ -49,19 +51,23 @@ class TestEventsFactory:
                     "sentences": [],  # allowed
                     "score": -1,
                 },
-            ]
+            ],
         }
 
         evs = build_events_from_metadata(metadata)
         assert len(evs) == 2
         assert all(isinstance(e, SimilarityEvent) for e in evs)
-        assert evs[0].event_id == "E1" and evs[0].visibility_type == VisibilityType.ACTIVE
+        assert (
+            evs[0].event_id == "E1" and evs[0].visibility_type == VisibilityType.ACTIVE
+        )
         # Keep the expectation that the second event has an empty sentences list
         # (SimilarityEvent should expose the provided sentences/custom_sentences)
         assert evs[1].event_id == "E2"
         # attribute name may vary depending on SimilarityEvent implementation;
         # if it's stored as 'sentences' or 'custom_sentences', both are acceptable:
-        assert getattr(evs[1], "sentences", getattr(evs[1], "custom_sentences", [])) == []
+        assert (
+            getattr(evs[1], "sentences", getattr(evs[1], "custom_sentences", [])) == []
+        )
 
     def test_build_events_invalid_sentences_type_skips_and_warns(self):
         logger = DummyLogger()
@@ -75,7 +81,9 @@ class TestEventsFactory:
         evs = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         # Only B should be created
         assert len(evs) == 1 and evs[0].event_id == "B"
-        assert any("invalid" in w.lower() and "sentences" in w.lower() for w in logger.warnings)
+        assert any(
+            "invalid" in w.lower() and "sentences" in w.lower() for w in logger.warnings
+        )
 
     def test_build_events_missing_sentences_raises_when_error_mode(self):
         metadata = {
@@ -107,15 +115,13 @@ class TestEventsFactory:
                 {
                     "id": "E1",
                     "detectionType": "SENTENCE_SIMILARITY",
-                    "data": {
-                        "sentences": ["hello there", "slow down"]
-                    },
+                    "data": {"sentences": ["hello there", "slow down"]},
                     "score": 5,
-                    "visibilityType": "ACTIVE"
+                    "visibilityType": "ACTIVE",
                 }
             ]
         }
-        
+
         evs = build_events_from_metadata(metadata)
         assert len(evs) == 1
         assert isinstance(evs[0], SimilarityEvent)
@@ -126,14 +132,10 @@ class TestEventsFactory:
         """Test that old schema (sentences directly) still works."""
         metadata = {
             "events": [
-                {
-                    "id": "E1",
-                    "sentences": ["hello there"],  # Old format
-                    "score": 5
-                }
+                {"id": "E1", "sentences": ["hello there"], "score": 5}  # Old format
             ]
         }
-        
+
         evs = build_events_from_metadata(metadata)
         assert len(evs) == 1
         assert isinstance(evs[0], SimilarityEvent)

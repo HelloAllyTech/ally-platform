@@ -321,7 +321,7 @@ v1.2.3-rc1     # No pre-release suffixes
    ```bash
    # Check cluster exists
    aws ecs describe-clusters --clusters ally-prd-mb-ecs-cluster
-   
+
    # Check service exists
    aws ecs describe-services \
      --cluster ally-prd-mb-ecs-cluster \
@@ -458,4 +458,3 @@ For issues with the release pipeline:
 4. **Open Issue**
    - Create issue in repository
    - Include error logs and steps to reproduce
-

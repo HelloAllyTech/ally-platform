@@ -1,16 +1,22 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import VisibilityType, DetectionType
+from app.core.constants import DetectionType, VisibilityType
 
 
 class ChatMessage(BaseModel):
-    role: str = Field(..., description="The role of the sender (e.g., user, assistant, counselor)")
+    role: str = Field(
+        ..., description="The role of the sender (e.g., user, assistant, counselor)"
+    )
     content: str = Field(..., description="The content of the message")
-    start_time: Optional[float] = Field(None, description="Start time of the message in seconds (relative position)")
-    end_time: Optional[float] = Field(None, description="End time of the message in seconds (relative position)")
+    start_time: Optional[float] = Field(
+        None, description="Start time of the message in seconds (relative position)"
+    )
+    end_time: Optional[float] = Field(
+        None, description="End time of the message in seconds (relative position)"
+    )
 
     class Config:
         json_schema_extra = {
@@ -31,10 +37,10 @@ class BaseEvent(BaseModel, ABC):
 
     # Instance-level event identifier
     event_id: str
-    
+
     # Instance-level visibility type
     visibility_type: VisibilityType = VisibilityType.ACTIVE
-    
+
     # Detection type and data (optional for backward compatibility)
     # Default to SENTENCE_SIMILARITY with empty sentences list
     detection_type: DetectionType = DetectionType.SENTENCE_SIMILARITY

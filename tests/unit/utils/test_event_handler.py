@@ -1,6 +1,7 @@
 import asyncio
-import types
 import json
+import types
+
 import pytest
 
 from app.utils import event_handler as eh
@@ -71,20 +72,26 @@ class TestEventHandler:
 
         with caplog.at_level("ERROR"):
             await eh.send_event_to_queue("payload")
-        assert any("Failed to send event to queue" in rec.message for rec in caplog.records)
+        assert any(
+            "Failed to send event to queue" in rec.message for rec in caplog.records
+        )
 
     # -------------------- create_conversation_handler --------------------
     @pytest.mark.asyncio
-    async def test_create_conversation_handler_enqueues_correct_message(self, monkeypatch):
+    async def test_create_conversation_handler_enqueues_correct_message(
+        self, monkeypatch
+    ):
         # Capture create_task coroutine to run it deterministically
         created_tasks = []
 
         def fake_create_task(coro):
             created_tasks.append(coro)
+
             # return a dummy task-like object
             class _T:
                 def cancel(self):
                     pass
+
             return _T()
 
         # Fallback path should not be used if create_task works
@@ -106,9 +113,17 @@ class TestEventHandler:
                 "chat_message": chat_message,
                 "event_id": event_id,
             }
-            return DummyCoreEvent({"room_id": room_id, "role": chat_message.role, "content": chat_message.content})
+            return DummyCoreEvent(
+                {
+                    "room_id": room_id,
+                    "role": chat_message.role,
+                    "content": chat_message.content,
+                }
+            )
 
-        monkeypatch.setattr(eh, "CoreEventMessageType", types.SimpleNamespace(create=fake_core_create))
+        monkeypatch.setattr(
+            eh, "CoreEventMessageType", types.SimpleNamespace(create=fake_core_create)
+        )
 
         # Intercept queue send
         sent = {}
@@ -120,10 +135,14 @@ class TestEventHandler:
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
         # Build handler and trigger
-        handler = eh.create_conversation_handler(room_id="room-123", joined_iso="2024-01-01T00:00:00+00:00")
+        handler = eh.create_conversation_handler(
+            room_id="room-123", joined_iso="2024-01-01T00:00:00+00:00"
+        )
 
         # assistant -> CLIENT, others -> COUNSELOR
-        event = DummyEvent(DummyItem(role="assistant", content="hi there"), created_at=1704067205.0)
+        event = DummyEvent(
+            DummyItem(role="assistant", content="hi there"), created_at=1704067205.0
+        )
         handler(event)
 
         # Run the scheduled coroutine
@@ -157,9 +176,11 @@ class TestEventHandler:
         class DummyLoop:
             def create_task(self, coro):
                 loop_created["coro"] = coro
+
                 class _T:
                     def cancel(self):
                         pass
+
                 return _T()
 
         class DummyEventLoopPolicy:
@@ -174,7 +195,11 @@ class TestEventHandler:
             def model_dump_json(self):
                 return "{}"
 
-        monkeypatch.setattr(eh, "CoreEventMessageType", types.SimpleNamespace(create=lambda **_: DummyCoreEvent()))
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(create=lambda **_: DummyCoreEvent()),
+        )
 
         class DummyQueue:
             async def send_message(self, m):
@@ -183,7 +208,9 @@ class TestEventHandler:
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
         handler = eh.create_conversation_handler("room", "2024-01-01T00:00:00+00:00")
-        handler(DummyEvent(DummyItem(role="user", content="hey"), created_at=1704067205.0))
+        handler(
+            DummyEvent(DummyItem(role="user", content="hey"), created_at=1704067205.0)
+        )
 
         # ensure fallback scheduled something
         assert "coro" in loop_created

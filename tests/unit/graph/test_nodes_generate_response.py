@@ -1,9 +1,9 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.core.events.base import BaseEvent
 from app.core.graph.nodes import generate_response
 from app.core.graph.state import SimulationState
-from app.core.events.base import BaseEvent
 
 
 class FakeLLM:
@@ -17,9 +17,10 @@ class FakeLLM:
 
 class FakeLLMClient:
     """Mock LLM client that returns a FakeLLM instance."""
+
     def __init__(self, content: str = "OK"):
         self._llm_instance = FakeLLM(content)
-    
+
     @property
     def llm_instance(self):
         return self._llm_instance
@@ -27,19 +28,24 @@ class FakeLLMClient:
 
 class TestGenerateResponse:
     @pytest.mark.asyncio
-    async def test_generate_response_builds_system_message_and_returns_ai_only(self, monkeypatch):
+    async def test_generate_response_builds_system_message_and_returns_ai_only(
+        self, monkeypatch
+    ):
         # Monkeypatch create_llm_client to return FakeLLMClient
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="hello from llm")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
 
         # Minimal BaseEvent subclass for new_events validation
         class FakeEvent(BaseEvent):
             async def detect_event(self, conversations):
                 return False
 
-        # Build state with some prior messages and two events (one with branching_instruction)
+        # Build state with some prior messages and two events (one with
+        # branching_instruction)
         msgs = [HumanMessage(content="hi"), HumanMessage(content="tell me more")]
         ev1 = FakeEvent(event_id="e1", branching_instruction=None)
         ev2 = FakeEvent(event_id="e2", branching_instruction="probe on family")
@@ -54,37 +60,45 @@ class TestGenerateResponse:
         )
 
         # Provide scenario with prompt_data via config
-        prompt_data = type("PD", (), {
-            "name": "Alex",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Alex",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
 
         # Add language_config to scenario
-        language_config = type("LanguageConfig", (), {
-            "language_code": "en-IN",
-            "llm_config": None,
-            "stt_config": None
-        })()
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": language_config
-        })()
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-IN", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
@@ -100,11 +114,15 @@ class TestGenerateResponse:
         assert new_state.current_score == state.current_score
 
     @pytest.mark.asyncio
-    async def test_generate_response_selects_max_magnitude_branching_instruction(self, monkeypatch):
+    async def test_generate_response_selects_max_magnitude_branching_instruction(
+        self, monkeypatch
+    ):
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
 
         # Multiple branching instructions with different scores
         state = SimulationState(
@@ -120,36 +138,41 @@ class TestGenerateResponse:
             ],
         )
 
-        prompt_data = type("PD", (), {
-            "name": "Test",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+            },
+        )()
 
-        language_config = type("LanguageConfig", (), {
-            "language_code": "en-US",
-            "llm_config": None,
-            "stt_config": None
-        })()
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": language_config
-        })()
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
@@ -158,11 +181,15 @@ class TestGenerateResponse:
         assert new_state.branching_instructions == []
 
     @pytest.mark.asyncio
-    async def test_generate_response_filters_empty_branching_instructions(self, monkeypatch):
+    async def test_generate_response_filters_empty_branching_instructions(
+        self, monkeypatch
+    ):
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
 
         # Mix of valid and invalid instructions
         state = SimulationState(
@@ -178,36 +205,44 @@ class TestGenerateResponse:
             ],
         )
 
-        prompt_data = type("PD", (), {
-            "name": "Test",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
 
-        language_config = type("LanguageConfig", (), {
-            "language_code": "en-US",
-            "llm_config": None,
-            "stt_config": None
-        })()
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": language_config
-        })()
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
@@ -226,7 +261,9 @@ class TestGenerateResponse:
                 call_count["fallback"] += 1
                 return FakeLLMClient(content="fallback response")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
         monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
 
         state = SimulationState(
@@ -238,36 +275,48 @@ class TestGenerateResponse:
             branching_instructions=[],
         )
 
-        prompt_data = type("PD", (), {
-            "name": "Test",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
 
-        language_config = type("LanguageConfig", (), {
-            "language_code": "unsupported-lang",
-            "llm_config": None,
-            "stt_config": None
-        })()
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": language_config
-        })()
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {
+                "language_code": "unsupported-lang",
+                "llm_config": None,
+                "stt_config": None,
+            },
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
@@ -281,7 +330,9 @@ class TestGenerateResponse:
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response without scenario")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
 
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
@@ -305,7 +356,9 @@ class TestGenerateResponse:
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content=f"response in {language_code}")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
         monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
 
         state = SimulationState(
@@ -317,32 +370,38 @@ class TestGenerateResponse:
             branching_instructions=[],
         )
 
-        prompt_data = type("PD", (), {
-            "name": "Test",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
 
         # No language_config
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": None
-        })()
+        scenario = type(
+            "Scenario", (), {"prompt_data": prompt_data, "language_config": None}
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)
@@ -354,7 +413,9 @@ class TestGenerateResponse:
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
-        monkeypatch.setattr("app.core.graph.nodes.create_llm_client", fake_create_llm_client)
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
 
         class FakeEvent(BaseEvent):
             async def detect_event(self, conversations):
@@ -372,36 +433,44 @@ class TestGenerateResponse:
             branching_instructions=[],
         )
 
-        prompt_data = type("PD", (), {
-            "name": "Test",
-            "age": "30",
-            "gender": "Male",
-            "gender_identity": None,
-            "sexual_orientation": None,
-            "current_location": "NYC",
-            "profession": None,
-            "context": "Context",
-            "session_behavior_guidelines": None,
-            "life_history_summary": "History",
-            "core_memories": None,
-            "personality": None,
-            "starting_state": None,
-            "emotional_needs": None,
-            "tone": None,
-            "opening_statements": ["Hi"],
-            "agent_goal": None,
-            "custom_fields": None,
-        })()
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
 
-        language_config = type("LanguageConfig", (), {
-            "language_code": "en-US",
-            "llm_config": None,
-            "stt_config": None
-        })()
-        scenario = type("Scenario", (), {
-            "prompt_data": prompt_data,
-            "language_config": language_config
-        })()
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
         config = {"configurable": {"scenario": scenario}}
 
         new_state = await generate_response(state, config=config)

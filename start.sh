@@ -7,7 +7,7 @@ echo "Starting application services..."
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 UVICORN_PID=$!
 
-# Start worker in background  
+# Start worker in background
 poetry run python -m app.worker start &
 WORKER_PID=$!
 

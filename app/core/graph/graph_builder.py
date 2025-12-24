@@ -1,15 +1,14 @@
-from langgraph.constants import START, END
+from langgraph.constants import END, START
 from langgraph.graph import StateGraph
-from langgraph.graph.state import CompiledStateGraph
 
-from app.core.graph.nodes import process_events, generate_response
+from app.core.graph.nodes import generate_response, process_events
 from app.core.graph.state import SimulationState
 
 
 def build_graph() -> StateGraph[SimulationState]:
     """
     Build the LangGraph state graph.
-    
+
     Flow:
     1. process_events: Detects events, updates EventRegistry
     2. generate_response: Generates LLM response based on detected events

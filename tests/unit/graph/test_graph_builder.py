@@ -1,9 +1,8 @@
-from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph
 
-from app.core.graph.graph_builder import build_graph
-from app.core.graph.state import SimulationState
 from app.core.graph import agent_graph
+from app.core.graph.graph_builder import build_graph
 
 
 class TestGraphBuilder:

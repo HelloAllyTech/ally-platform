@@ -3,9 +3,9 @@ from typing import List
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.core.events.base import BaseEvent, ChatMessage
 from app.core.graph.nodes import process_events
 from app.core.graph.state import SimulationState
-from app.core.events.base import BaseEvent, ChatMessage
 
 
 class DetectingEvent(BaseEvent):
@@ -22,7 +22,10 @@ class DetectingEvent(BaseEvent):
 class TestProcessEvents:
     @pytest.mark.asyncio
     async def test_process_events_detects_and_updates_state(self):
-        msgs = [HumanMessage(content="Hello there"), AIMessage(content="I feel anxious")]
+        msgs = [
+            HumanMessage(content="Hello there"),
+            AIMessage(content="I feel anxious"),
+        ]
         e1 = DetectingEvent(event_id="e1", match_text="anxious", score=3)
         e2 = DetectingEvent(event_id="e2", match_text="nothing", score=5)
 
@@ -49,7 +52,7 @@ class TestProcessEvents:
         assert "branching_instructions" not in new_state
 
     @pytest.mark.asyncio
-    async def test_process_events_with_event_registry_integration(self):
+    async def test_process_events_with_event_orchestrator_integration(self):
         msgs = [HumanMessage(content="test message")]
         e1 = DetectingEvent(event_id="e1", match_text="test", score=5)
 
@@ -62,22 +65,23 @@ class TestProcessEvents:
             branching_instructions=[],
         )
 
-        # Mock EventRegistry
-        class MockEventRegistry:
+        # Mock EvenOrchestrator
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 7, [("probe deeper", 3)]
 
         mock_room = object()
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": mock_room,
             }
         }
 
         new_state = await process_events(state, config=config)
 
-        # Base score (10) + detected event score (5) + additional score from registry (7)
+        # Base score (10) + detected event score (5) + additional score
+        # from registry (7)
         assert new_state["current_score"] == 22
         assert new_state["branching_instructions"] == [("probe deeper", 3)]
         assert len(new_state["new_events"]) == 1
@@ -97,21 +101,23 @@ class TestProcessEvents:
             branching_instructions=[("time instruction", 5)],
         )
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 0, [("event instruction", 3)]
 
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": object(),
             }
         }
 
         new_state = await process_events(state, config=config)
 
-        # The node function only returns the NEW instructions from the event registry.
-        # The merging happens via the graph reducer, which isn't tested here (unit test of the node).
+        # The node function only returns the NEW instructions from the
+        # event registry.
+        # The merging happens via the graph reducer, which isn't tested
+        # here (unit test of the node).
         # So we expect only the new instruction in the return value.
         assert len(new_state["branching_instructions"]) == 1
         assert ("event instruction", 3) in new_state["branching_instructions"]
@@ -187,7 +193,8 @@ class TestProcessEvents:
 
     @pytest.mark.asyncio
     async def test_process_events_with_empty_branching_instructions_from_registry(self):
-        """Test that when registry returns empty branching instructions, the key is not included"""
+        """Test that when registry returns empty branching instructions,
+        the key is not included"""
         msgs = [HumanMessage(content="test")]
         e1 = DetectingEvent(event_id="e1", match_text="test", score=2)
 
@@ -200,13 +207,13 @@ class TestProcessEvents:
             branching_instructions=[],
         )
 
-        class MockEventRegistry:
+        class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
                 return [], 5, []  # Empty branching instructions
 
         config = {
             "configurable": {
-                "event_registry": MockEventRegistry(),
+                "event_orchestrator": MockEventOrchestrator(),
                 "room": object(),
             }
         }

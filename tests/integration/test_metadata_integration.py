@@ -1,16 +1,17 @@
 """Integration tests for metadata parsing and scenario creation."""
+
 import json
+
 import pytest
-from typing import Dict, Any
 from pydantic import ValidationError
 
-from app.utils.metadata_parser import parse_room_metadata
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
-from app.core.scenario.base import Scenario, VoicePromptData, ScenarioVoice
+from app.core.scenario.base import Scenario, ScenarioVoice, VoicePromptData
+from app.utils.metadata_parser import parse_room_metadata
 from tests.fixtures.scenario_fixtures import (
-    create_room_metadata_envelope_payload,
+    COMPLEX_SCENARIO_PAYLOAD,
     MINIMAL_SCENARIO_PAYLOAD,
-    COMPLEX_SCENARIO_PAYLOAD
+    create_room_metadata_envelope_payload,
 )
 
 
@@ -29,9 +30,9 @@ class TestMetadataParsingIntegration:
                 "voice": {
                     "name": "integration_voice",
                     "provider": "deepgram",
-                    "config": {"model": "nova-2", "voice_id": "test_id"}
-                }
-            }
+                    "config": {"model": "nova-2", "voice_id": "test_id"},
+                },
+            },
         )
 
         # Convert to JSON
@@ -78,10 +79,7 @@ class TestMetadataParsingIntegration:
     @pytest.mark.integration
     def test_complex_metadata_integration(self):
         """Test integration with complex metadata."""
-        payload = {
-            "version": "3.0",
-            "scenario": COMPLEX_SCENARIO_PAYLOAD
-        }
+        payload = {"version": "3.0", "scenario": COMPLEX_SCENARIO_PAYLOAD}
         json_metadata = json.dumps(payload)
 
         envelope = parse_room_metadata(json_metadata)
@@ -104,14 +102,15 @@ class TestMetadataParsingIntegration:
         """Test error recovery in the complete integration flow."""
         from app.core.config import settings
         from app.core.constants import Environment
-        
+
         # Ensure we're in PROD mode so ValueError is raised for invalid JSON
         monkeypatch.setattr(settings, "ENV", Environment.PROD)
-        
+
         # Test with invalid JSON
         invalid_json = '{"invalid": json}'
-        # With the updated parse_room_metadata behavior, invalid/missing metadata in non-LOCAL
-        # environments raises ValueError before model creation.
+        # With the updated parse_room_metadata behavior, invalid/missing
+        # metadata in non-LOCAL environments raises ValueError before
+        # model creation.
         with pytest.raises(ValueError):
             parse_room_metadata(invalid_json)
 
@@ -124,8 +123,8 @@ class TestMetadataParsingIntegration:
                 "description": "Testing unicode characters: café naïve résumé",
                 "promptData": {
                     "name": "Unicode Character 角色",
-                    "currentLocation": "São Paulo, Brasil 🇧🇷"
-                }
+                    "currentLocation": "São Paulo, Brasil 🇧🇷",
+                },
             }
         )
 
@@ -146,7 +145,7 @@ class TestMetadataParsingIntegration:
         voice_configs = {
             "deepgram": {"model": "nova-2"},
             "elevenlabs": {"model": "eleven_multilingual_v2", "voice_id": "test_id"},
-            "sarvam": {"model": "bulbul:v2", "voice_id": "karun"}
+            "sarvam": {"model": "bulbul:v2", "voice_id": "karun"},
         }
 
         payload = create_room_metadata_envelope_payload(
@@ -154,7 +153,7 @@ class TestMetadataParsingIntegration:
                 "voice": {
                     "name": f"{provider}_voice",
                     "provider": provider,
-                    "config": voice_configs[provider]
+                    "config": voice_configs[provider],
                 }
             }
         )
@@ -178,7 +177,9 @@ class TestMetadataParsingIntegration:
             "currentLocation": "Large City",
             "context": "A" * 1000,  # Large context
             "lifeHistory": "B" * 2000,  # Large history
-            "openingStatements": [f"Statement {i}" for i in range(50)]  # Many statements
+            "openingStatements": [
+                f"Statement {i}" for i in range(50)
+            ],  # Many statements
         }
 
         payload = create_room_metadata_envelope_payload(
@@ -186,7 +187,9 @@ class TestMetadataParsingIntegration:
                 "title": "Large Scenario",
                 "description": "C" * 500,  # Large description
                 "promptData": large_prompt_data,
-                "metadata": {f"key_{i}": f"value_{i}" for i in range(100)}  # Large metadata
+                "metadata": {
+                    f"key_{i}": f"value_{i}" for i in range(100)
+                },  # Large metadata
             }
         )
 
@@ -217,15 +220,15 @@ class TestMetadataParsingIntegration:
                         "currentLocation": "Nested City",
                         "context": "Nested context",
                         "lifeHistory": "Nested history",
-                        "openingStatements": ["Nested greeting!"]
+                        "openingStatements": ["Nested greeting!"],
                     },
                     "voice": {
                         "name": "Nested Voice",
                         "provider": "deepgram",
-                        "config": {"model": "aura-2-pandora-en"}
-                    }
+                        "config": {"model": "aura-2-pandora-en"},
+                    },
                 }
-            }
+            },
         }
 
         json_metadata = json.dumps(nested_payload)
@@ -238,7 +241,6 @@ class TestMetadataParsingIntegration:
     def test_concurrent_parsing_integration(self):
         """Test concurrent parsing of metadata (thread safety)."""
         import threading
-        import time
 
         payload = create_room_metadata_envelope_payload()
         json_metadata = json.dumps(payload)

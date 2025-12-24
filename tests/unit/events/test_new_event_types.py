@@ -1,13 +1,12 @@
 """
 Tests for new event types: TIME, SCORE, and COMBINATION.
 """
-import pytest
 
-from app.core.events.factory import build_events_from_metadata, UnknownEventIdError
-from app.core.events.event_types.time import TimeEvent, TimeData
-from app.core.events.event_types.score import ScoreEvent, ScoreData
-from app.core.events.event_types.combination import CombinationEvent, CombinationData, ExpressionNode
-from app.core.constants import DetectionType, ConditionOperator, VisibilityType
+from app.core.constants import ConditionOperator, DetectionType, VisibilityType
+from app.core.events.event_types.combination import CombinationEvent
+from app.core.events.event_types.score import ScoreEvent
+from app.core.events.event_types.time import TimeEvent
+from app.core.events.factory import build_events_from_metadata
 
 
 class DummyLogger:
@@ -23,14 +22,14 @@ class DummyLogger:
 
     def error(self, msg, *args):
         self.errors.append(msg % args if args else msg)
-    
+
     def exception(self, msg, *args):
         self.exceptions.append(msg % args if args else msg)
         self.errors.append(msg % args if args else msg)
-    
+
     def debug(self, msg, *args):
         self.debugs.append(msg % args if args else msg)
-    
+
     def info(self, msg, *args):
         self.infos.append(msg % args if args else msg)
 
@@ -42,14 +41,11 @@ class TestTimeEvent:
                 {
                     "id": "time-1",
                     "detectionType": "TIME",
-                    "data": {
-                        "time": 100.5,
-                        "condition": "LTE"
-                    },
+                    "data": {"time": 100.5, "condition": "LTE"},
                     "score": 5,
                     "emoji": "⏰",
                     "message": "Time check",
-                    "visibilityType": "ACTIVE"
+                    "visibilityType": "ACTIVE",
                 }
             ]
         }
@@ -73,10 +69,7 @@ class TestTimeEvent:
                     {
                         "id": f"time-{condition}",
                         "detectionType": "TIME",
-                        "data": {
-                            "time": 50.0,
-                            "condition": condition
-                        }
+                        "data": {"time": 50.0, "condition": condition},
                     }
                 ]
             }
@@ -90,7 +83,7 @@ class TestTimeEvent:
             "events": [
                 {
                     "id": "time-1",
-                    "detectionType": "TIME"
+                    "detectionType": "TIME",
                     # missing data
                 }
             ]
@@ -98,7 +91,9 @@ class TestTimeEvent:
 
         events = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         assert len(events) == 0
-        assert any("missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings)
+        assert any(
+            "missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings
+        )
 
     def test_build_time_event_invalid_data_warns(self):
         logger = DummyLogger()
@@ -107,9 +102,7 @@ class TestTimeEvent:
                 {
                     "id": "time-1",
                     "detectionType": "TIME",
-                    "data": {
-                        "time": "not-a-number"  # invalid
-                    }
+                    "data": {"time": "not-a-number"},  # invalid
                 }
             ]
         }
@@ -126,13 +119,10 @@ class TestScoreEvent:
                 {
                     "id": "score-1",
                     "detectionType": "SCORE",
-                    "data": {
-                        "score": 10,
-                        "condition": "GT"
-                    },
+                    "data": {"score": 10, "condition": "GT"},
                     "score": -5,
                     "emoji": "📊",
-                    "message": "Score check"
+                    "message": "Score check",
                 }
             ]
         }
@@ -154,10 +144,7 @@ class TestScoreEvent:
                     {
                         "id": f"score-{condition}",
                         "detectionType": "SCORE",
-                        "data": {
-                            "score": 5,
-                            "condition": condition
-                        }
+                        "data": {"score": 5, "condition": condition},
                     }
                 ]
             }
@@ -171,7 +158,7 @@ class TestScoreEvent:
             "events": [
                 {
                     "id": "score-1",
-                    "detectionType": "SCORE"
+                    "detectionType": "SCORE",
                     # missing data
                 }
             ]
@@ -179,7 +166,9 @@ class TestScoreEvent:
 
         events = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         assert len(events) == 0
-        assert any("missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings)
+        assert any(
+            "missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings
+        )
 
 
 class TestCombinationEvent:
@@ -191,11 +180,8 @@ class TestCombinationEvent:
                     "detectionType": "COMBINATION",
                     "data": {
                         "dependent_events": ["event-a"],
-                        "expression": {
-                            "type": "IDENTIFIER",
-                            "id": "event-a"
-                        }
-                    }
+                        "expression": {"type": "IDENTIFIER", "id": "event-a"},
+                    },
                 }
             ]
         }
@@ -218,16 +204,10 @@ class TestCombinationEvent:
                         "dependent_events": ["event-a", "event-b"],
                         "expression": {
                             "type": "AND",
-                            "left": {
-                                "type": "IDENTIFIER",
-                                "id": "event-a"
-                            },
-                            "right": {
-                                "type": "IDENTIFIER",
-                                "id": "event-b"
-                            }
-                        }
-                    }
+                            "left": {"type": "IDENTIFIER", "id": "event-a"},
+                            "right": {"type": "IDENTIFIER", "id": "event-b"},
+                        },
+                    },
                 }
             ]
         }
@@ -251,16 +231,10 @@ class TestCombinationEvent:
                         "dependent_events": ["event-a", "event-b"],
                         "expression": {
                             "type": "OR",
-                            "left": {
-                                "type": "IDENTIFIER",
-                                "id": "event-a"
-                            },
-                            "right": {
-                                "type": "IDENTIFIER",
-                                "id": "event-b"
-                            }
-                        }
-                    }
+                            "left": {"type": "IDENTIFIER", "id": "event-a"},
+                            "right": {"type": "IDENTIFIER", "id": "event-b"},
+                        },
+                    },
                 }
             ]
         }
@@ -280,12 +254,9 @@ class TestCombinationEvent:
                         "dependent_events": ["event-a"],
                         "expression": {
                             "type": "NOT",
-                            "operand": {
-                                "type": "IDENTIFIER",
-                                "id": "event-a"
-                            }
-                        }
-                    }
+                            "operand": {"type": "IDENTIFIER", "id": "event-a"},
+                        },
+                    },
                 }
             ]
         }
@@ -310,24 +281,15 @@ class TestCombinationEvent:
                             "type": "AND",
                             "left": {
                                 "type": "NOT",
-                                "operand": {
-                                    "type": "IDENTIFIER",
-                                    "id": "event-a"
-                                }
+                                "operand": {"type": "IDENTIFIER", "id": "event-a"},
                             },
                             "right": {
                                 "type": "OR",
-                                "left": {
-                                    "type": "IDENTIFIER",
-                                    "id": "event-b"
-                                },
-                                "right": {
-                                    "type": "IDENTIFIER",
-                                    "id": "event-c"
-                                }
-                            }
-                        }
-                    }
+                                "left": {"type": "IDENTIFIER", "id": "event-b"},
+                                "right": {"type": "IDENTIFIER", "id": "event-c"},
+                            },
+                        },
+                    },
                 }
             ]
         }
@@ -348,7 +310,7 @@ class TestCombinationEvent:
             "events": [
                 {
                     "id": "combo-1",
-                    "detectionType": "COMBINATION"
+                    "detectionType": "COMBINATION",
                     # missing data
                 }
             ]
@@ -356,7 +318,9 @@ class TestCombinationEvent:
 
         events = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         assert len(events) == 0
-        assert any("missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings)
+        assert any(
+            "missing" in w.lower() or "invalid" in w.lower() for w in logger.warnings
+        )
 
     def test_build_combination_event_invalid_expression_warns(self):
         logger = DummyLogger()
@@ -365,11 +329,7 @@ class TestCombinationEvent:
                 {
                     "id": "combo-1",
                     "detectionType": "COMBINATION",
-                    "data": {
-                        "expression": {
-                            "type": "INVALID_TYPE"  # invalid
-                        }
-                    }
+                    "data": {"expression": {"type": "INVALID_TYPE"}},  # invalid
                 }
             ]
         }
@@ -390,7 +350,7 @@ class TestCombinationEvent:
                             "type": "AND"
                             # missing left and right
                         }
-                    }
+                    },
                 }
             ]
         }
@@ -408,35 +368,26 @@ class TestMixedEventTypes:
                 {
                     "id": "similarity-1",
                     "sentences": ["hello"],
-                    "detectionType": "SENTENCE_SIMILARITY"
+                    "detectionType": "SENTENCE_SIMILARITY",
                 },
                 {
                     "id": "time-1",
                     "detectionType": "TIME",
-                    "data": {
-                        "time": 100.0,
-                        "condition": "LTE"
-                    }
+                    "data": {"time": 100.0, "condition": "LTE"},
                 },
                 {
                     "id": "score-1",
                     "detectionType": "SCORE",
-                    "data": {
-                        "score": 5,
-                        "condition": "GT"
-                    }
+                    "data": {"score": 5, "condition": "GT"},
                 },
                 {
                     "id": "combo-1",
                     "detectionType": "COMBINATION",
                     "data": {
                         "dependent_events": ["similarity-1"],
-                        "expression": {
-                            "type": "IDENTIFIER",
-                            "id": "similarity-1"
-                        }
-                    }
-                }
+                        "expression": {"type": "IDENTIFIER", "id": "similarity-1"},
+                    },
+                },
             ]
         }
 
@@ -447,3 +398,155 @@ class TestMixedEventTypes:
         assert events[2].detection_type == DetectionType.SCORE
         assert events[3].detection_type == DetectionType.COMBINATION
 
+
+class TestCombinationEventExpansion:
+    """Tests for expanding nested combination events to only reference simple events."""
+
+    def test_combination_referencing_combination_is_expanded(self):
+        """Test that a combination event referencing another combination event
+        gets expanded to only reference simple events."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {"id": "simple-2", "sentences": ["world"]},
+                {
+                    "id": "combo-1",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {"type": "IDENTIFIER", "id": "simple-1"},
+                            "right": {"type": "IDENTIFIER", "id": "simple-2"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-2",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "combo-1",  # References another combination event
+                        }
+                    },
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 4
+
+        # Find combo-2
+        combo_2 = next(e for e in events if e.event_id == "combo-2")
+
+        # combo-2's expression should now be expanded to AND(simple-1, simple-2)
+        # instead of just IDENTIFIER(combo-1)
+        expr = combo_2.data.expression
+        assert expr.type == "AND"
+        assert expr.left.type == "IDENTIFIER"
+        assert expr.left.id == "simple-1"
+        assert expr.right.type == "IDENTIFIER"
+        assert expr.right.id == "simple-2"
+
+    def test_deeply_nested_combination_expansion(self):
+        """Test expansion of deeply nested combination references."""
+        metadata = {
+            "events": [
+                {"id": "simple-a", "sentences": ["a"]},
+                {"id": "simple-b", "sentences": ["b"]},
+                {
+                    "id": "combo-level-1",
+                    "detectionType": "COMBINATION",
+                    "data": {"expression": {"type": "IDENTIFIER", "id": "simple-a"}},
+                },
+                {
+                    "id": "combo-level-2",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "OR",
+                            "left": {"type": "IDENTIFIER", "id": "combo-level-1"},
+                            "right": {"type": "IDENTIFIER", "id": "simple-b"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-level-3",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "NOT",
+                            "operand": {"type": "IDENTIFIER", "id": "combo-level-2"},
+                        }
+                    },
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 5
+
+        # Find combo-level-3
+        combo_3 = next(e for e in events if e.event_id == "combo-level-3")
+
+        # combo-level-3 should be expanded to NOT(OR(simple-a, simple-b))
+        expr = combo_3.data.expression
+        assert expr.type == "NOT"
+        assert expr.operand.type == "OR"
+        assert expr.operand.left.type == "IDENTIFIER"
+        assert expr.operand.left.id == "simple-a"
+        assert expr.operand.right.type == "IDENTIFIER"
+        assert expr.operand.right.id == "simple-b"
+
+    def test_combination_referencing_simple_event_unchanged(self):
+        """Test that combination events only referencing simple events are unchanged."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {
+                    "id": "combo-1",
+                    "detectionType": "COMBINATION",
+                    "data": {"expression": {"type": "IDENTIFIER", "id": "simple-1"}},
+                },
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+        combo_1 = next(e for e in events if e.event_id == "combo-1")
+
+        # Expression should still be IDENTIFIER(simple-1)
+        assert combo_1.data.expression.type == "IDENTIFIER"
+        assert combo_1.data.expression.id == "simple-1"
+
+    def test_circular_combination_reference_handled(self):
+        """Test that circular references between combination events are handled."""
+        metadata = {
+            "events": [
+                {"id": "simple-1", "sentences": ["hello"]},
+                {
+                    "id": "combo-a",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "AND",
+                            "left": {"type": "IDENTIFIER", "id": "simple-1"},
+                            "right": {"type": "IDENTIFIER", "id": "combo-b"},
+                        }
+                    },
+                },
+                {
+                    "id": "combo-b",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "expression": {
+                            "type": "IDENTIFIER",
+                            "id": "combo-a",  # Circular reference
+                        }
+                    },
+                },
+            ]
+        }
+
+        # Should not raise an exception due to circular reference
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 3

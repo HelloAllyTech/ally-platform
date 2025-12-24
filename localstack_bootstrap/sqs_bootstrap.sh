@@ -31,7 +31,7 @@ else
   # Create the SQS queue
   CREATE_OUTPUT=$(awslocal sqs create-queue --queue-name "${QUEUE_NAME}" 2>&1)
   CREATE_EXIT=$?
-  
+
   if [ $CREATE_EXIT -eq 0 ]; then
     echo "Successfully created queue: ${QUEUE_NAME}"
   else
@@ -41,4 +41,3 @@ else
 fi
 
 echo "Queue ${QUEUE_NAME} is ready"
-
