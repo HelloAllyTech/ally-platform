@@ -169,15 +169,23 @@ class MultilingualStopwordsProvider(StopwordsProvider):
     def _get_from_libraries(self, language_code: str) -> Set[str]:
         """
         Get stopwords from libraries with fallback chain:
-        1. stopwords-iso (if available)
-        2. advertools (if available)
-        3. Empty set (fallback - no stopword filtering for unsupported
-           languages)
+        For English: Use conservative DEFAULT_STOPWORDS (better for counseling domain)
+        For other languages: Use library stopwords (stopwords-iso or advertools)
         """
         mapping = LANGUAGE_MAPPING.get(language_code, {})
 
+        # For English: Use conservative DEFAULT_STOPWORDS instead of library stopwords
+        # Library stopwords are too aggressive for counseling domain (filter out
+        # semantically important words like "hard", "through", "get", "must", etc.)
+        if language_code == "en-IN" or language_code.startswith("en-"):
+            from app.core.events.event_types.similarity_based.constants import (
+                DEFAULT_STOPWORDS,
+            )
+
+            return set(DEFAULT_STOPWORDS)
+
+        # For non-English languages: Try library stopwords
         # Try stopwords-iso first (preferred for languages it supports)
-        # stopwords_iso_stopwords is a function, call it with language code
         if STOPWORDS_ISO_AVAILABLE and stopwords_iso_stopwords and mapping.get("iso"):
             iso_code = mapping["iso"]
             try:
@@ -197,19 +205,6 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                 stopwords_list = adv.stopwords[adv_lang]
                 if stopwords_list:
                     return set(stopwords_list)
-
-        # Special fallback for English: Always use DEFAULT_STOPWORDS if libraries fail
-        # This ensures English workflow is never broken
-        if language_code == "en-IN" or language_code.startswith("en-"):
-            from app.core.events.event_types.similarity_based.constants import (
-                DEFAULT_STOPWORDS,
-            )
-
-            logger.warning(
-                f"English stopwords not found in libraries for '{language_code}', "
-                f"using DEFAULT_STOPWORDS as fallback"
-            )
-            return set(DEFAULT_STOPWORDS)
 
         # Final fallback: Empty set (no stopword filtering)
         # Using English stopwords for non-English languages doesn't make sense

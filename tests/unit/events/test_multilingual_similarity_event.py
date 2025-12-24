@@ -175,6 +175,173 @@ class TestMultilingualStopwords:
 
         assert isinstance(stopwords, frozenset)
 
+    def test_english_uses_default_stopwords(self):
+        """Test that English uses DEFAULT_STOPWORDS exactly (not library stopwords)."""
+        from app.core.events.event_types.similarity_based.constants import (
+            DEFAULT_STOPWORDS,
+        )
+
+        provider = get_stopwords_provider(use_multilingual=True)
+        stopwords = provider.get_stopwords("en-IN")
+
+        # Should match DEFAULT_STOPWORDS exactly (after DOMAIN_IMPORTANT_WORDS removal)
+        # Default stopwords minus important words
+        expected_stopwords = DEFAULT_STOPWORDS - frozenset(
+            {"feel", "feeling", "emotion"}
+        )
+        assert stopwords == expected_stopwords
+
+    def test_important_words_not_filtered(self):
+        """Test that important counseling words are NOT filtered as stopwords."""
+        provider = get_stopwords_provider(use_multilingual=True)
+        stopwords = provider.get_stopwords("en-IN")
+
+        # These words should NOT be in stopwords (important for counseling context)
+        important_words = {
+            "hard",  # "that must be hard", "hard things"
+            "through",  # "get through", "go through"
+            "get",  # "get through", "get better"
+            "got",  # past tense
+            "gotten",  # past participle
+            "must",  # "that must be hard"
+            "things",  # "hard things", "these things"
+            "before",  # temporal context
+            "too",  # "too hard", "you too"
+        }
+
+        for word in important_words:
+            assert word not in stopwords, f"{word} should not be filtered as stopword"
+
+    def test_inspect_stopwords_for_all_languages(self):
+        """Inspect what stopwords are actually being used for each language.
+
+        This test helps identify if library stopwords are too aggressive
+        for the counseling domain in different languages.
+        """
+        provider = get_stopwords_provider(use_multilingual=True)
+
+        languages = [
+            "en-IN",
+            "hi-IN",
+            "bn-IN",
+            "ta-IN",
+            "te-IN",
+            "ur-IN",
+            "mr-IN",
+            "ml-IN",
+            "kn-IN",
+        ]
+
+        results = {}
+        for lang in languages:
+            stopwords = provider.get_stopwords(lang)
+            results[lang] = {
+                "count": len(stopwords),
+                "sample": list(stopwords)[:30] if stopwords else [],
+            }
+
+        # Print results for inspection
+        print("\n" + "=" * 80)
+        print("STOPWORD INSPECTION FOR ALL LANGUAGES")
+        print("=" * 80)
+        for lang, data in results.items():
+            print(f"\n{lang}:")
+            print(f"  Count: {data['count']} stopwords")
+            if data["sample"]:
+                print(f"  Sample (first 30): {', '.join(data['sample'][:30])}")
+            else:
+                print("  Status: Empty set (no stopword filtering)")
+        print("=" * 80 + "\n")
+
+        # Basic assertions
+        assert results["en-IN"]["count"] > 0, "English should have stopwords"
+        # Other languages may have stopwords or empty sets, both are valid
+
+    def test_stopword_coverage_comparison(self):
+        """Compare tokens remaining after stopword filtering for different languages.
+
+        This helps identify if stopwords are filtering too aggressively,
+        which could cause false positives in similarity matching.
+        """
+        from app.core.events.event_types.similarity_based.text_processor import (
+            UnifiedTextProcessor,
+        )
+
+        provider = get_stopwords_provider(use_multilingual=True)
+
+        # Test sentences in different languages (counseling-related)
+        test_cases = [
+            (
+                "en-IN",
+                (
+                    "You've gotten through hard things before, "
+                    "you'll get through this too."
+                ),
+            ),
+            ("hi-IN", "आप कैसा महसूस कर रहे हैं?"),  # "How are you feeling?"
+            ("bn-IN", "আপনি কেমন অনুভব করছেন?"),  # "How are you feeling?"
+            # Add more languages as needed
+        ]
+
+        print("\n" + "=" * 80)
+        print("STOPWORD FILTERING COVERAGE ANALYSIS")
+        print("=" * 80)
+
+        for lang_code, test_sentence in test_cases:
+            processor = UnifiedTextProcessor(language_code=lang_code)
+            stopwords = provider.get_stopwords(lang_code)
+
+            normalized = processor.normalize(test_sentence)
+            all_tokens = set(processor.tokenize(normalized))
+            informative_tokens = all_tokens - stopwords
+
+            if all_tokens:
+                filtered_percentage = (
+                    len(stopwords & all_tokens) / len(all_tokens) * 100
+                )
+            else:
+                filtered_percentage = 0
+
+            print(f"\n{lang_code}:")
+            print(f"  Sentence: {test_sentence}")
+            print(f"  Normalized: {normalized}")
+            print(f"  All tokens: {all_tokens} ({len(all_tokens)} tokens)")
+            stopwords_in_sentence = stopwords & all_tokens
+            print(
+                f"  Stopwords in sentence: {stopwords_in_sentence} "
+                f"({len(stopwords_in_sentence)} tokens)"
+            )
+            print(
+                f"  Informative tokens: {informative_tokens} "
+                f"({len(informative_tokens)} tokens)"
+            )
+            print(f"  Filtered: {filtered_percentage:.1f}%")
+
+            # Warning if too many tokens are filtered
+            if filtered_percentage > 70:
+                print(
+                    f"  ⚠️  WARNING: {filtered_percentage:.1f}% filtered - "
+                    "high risk of false positives!"
+                )
+            elif len(informative_tokens) < 2 and len(all_tokens) > 2:
+                print(
+                    f"  ⚠️  WARNING: Only {len(informative_tokens)} "
+                    "informative tokens - may cause false positives!"
+                )
+
+        print("=" * 80 + "\n")
+
+        # Basic assertions - at least verify the logic works
+        en_processor = UnifiedTextProcessor(language_code="en-IN")
+        en_stopwords = provider.get_stopwords("en-IN")
+        en_normalized = en_processor.normalize(test_cases[0][1])
+        en_tokens = set(en_processor.tokenize(en_normalized))
+        en_informative = en_tokens - en_stopwords
+
+        assert (
+            len(en_informative) >= 2
+        ), "English should have at least 2 informative tokens for this sentence"
+
 
 class TestMultilingualEventDetection:
     """Test actual event detection with real sentences in different languages."""
@@ -484,3 +651,42 @@ class TestMultilingualEdgeCases:
         assert event.language_code == "en-IN"
         assert event._text_processor is not None
         assert event._stopwords is not None
+
+    @pytest.mark.asyncio
+    async def test_no_false_positive_with_conservative_stopwords(self):
+        """Test that conservative stopwords prevent false positives.
+
+        This test verifies the fix for the issue where library stopwords
+        filtered out too many words, causing false matches like:
+        - Reference: "You've gotten through hard things before, "
+          "you'll get through this too."
+        - Input: "That must be hard for you"
+
+        With aggressive library stopwords, both sentences might only have "hard"
+        remaining, causing a false positive match. With DEFAULT_STOPWORDS,
+        more tokens remain, preventing the false positive.
+        """
+        # Create event with the reference sentence about getting through things
+        event = SimilarityEvent.create(
+            event_id="irrelevant-assurance",
+            custom_sentences=[
+                "You've gotten through hard things before, you'll get through this too."
+            ],
+            language_code="en-IN",
+            match_threshold=0.6,  # Default threshold
+        )
+
+        # This should NOT match (different sentiment/intent)
+        conversations = [
+            ChatMessage(
+                role="counselor",
+                content="That must be hard for you",
+            )
+        ]
+
+        # Should NOT match - they have different meanings
+        result = await event.detect_event(conversations)
+        assert result is False, (
+            "False positive detected! The input sentence should not match "
+            "the reference sentence about getting through hard things."
+        )
