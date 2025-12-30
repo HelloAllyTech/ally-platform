@@ -2,6 +2,11 @@ name: 'Build Android app - Production'
 
 on:
   workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release Notes (What is New)'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -94,6 +99,7 @@ jobs:
           fi
 
       - name: Rename AAB with build number, date, and env
+        id: rename_aab
         run: |
           DATETIME=$(date +'%Y%m%d-%H%M')
           # Expected AAB path for flavor 'prod' and buildType 'release'
@@ -102,11 +108,38 @@ jobs:
           if [ -f "$AAB_SRC" ]; then
             mkdir -p "$(dirname "$AAB_DST")"
             mv "$AAB_SRC" "$AAB_DST"
+            echo "aab_path=$AAB_DST" >> $GITHUB_OUTPUT
           else
             echo "AAB not found at $AAB_SRC"
             ls -R android/app/build/outputs/bundle || true
             exit 1
           fi
+
+      - name: Extract Version Information
+        id: version_info
+        run: |
+          VERSION_CODE=$(grep "versionCode" android/app/build.gradle | awk '{print $2}')
+          VERSION_NAME=$(grep "versionName" android/app/build.gradle | awk '{print $2}' | tr -d '"')
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release Notes
+        env:
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          mkdir -p distribution/whatsnew
+          echo "$RELEASE_NOTES" > distribution/whatsnew/whatsnew-en-US
+
+      - name: Upload to Google Play Console
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
+          packageName: com.helloally.app
+          releaseFiles: ${{ steps.rename_aab.outputs.aab_path }}
+          track: internal
+          status: completed
+          releaseName: '${{ steps.version_info.outputs.version_code }} (${{ steps.version_info.outputs.version_name }})'
+          whatsNewDirectory: distribution/whatsnew
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

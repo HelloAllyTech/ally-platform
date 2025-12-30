@@ -52,7 +52,6 @@ import {
 } from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
-import {Chat} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {
@@ -156,14 +155,11 @@ export const CallLogScreen: React.FC = () => {
     }
   }, [canStartCall, getVisibleChatTypes]);
 
-  const hasAnyCallType = useMemo(
+  const hasMicrophoneChatType = useMemo(
     () =>
       Boolean(
-        enabledChatTypes?.some?.((chatType: CHAT_TYPES) =>
-          [
-            CHAT_TYPES.EXOTEL_CONFERENCE_CHAT,
-            CHAT_TYPES.MICROPHONE_CHAT,
-          ].includes(chatType),
+        enabledChatTypes?.some?.(
+          (chatType: CHAT_TYPES) => chatType === CHAT_TYPES.MICROPHONE_CHAT,
         ),
       ),
     [enabledChatTypes],
@@ -388,28 +384,6 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
-  const handleThirdPartyCall = async () => {
-    checkCounselorChat().then(data => {
-      const url = `tel:${env.THIRD_PARTY_CALL_NUMBER}`;
-      if ((data as Chat)?.chatId) {
-        Alert.alert(
-          'Already in a call',
-          'You are already in a call. Please end the current call to make a new one.',
-          [{text: t('Common.ok')}],
-        );
-        return;
-      }
-      try {
-        Linking.openURL(url);
-      } catch (error) {
-        logger.error(`Error opening phone call URL: ${error}`);
-        Alert.alert('Error', "Can't handle phone call", [
-          {text: t('Common.ok')},
-        ]);
-      }
-    });
-  };
-
   const handleVoiceRecording = async () => {
     try {
       const micPermission = MICROPHONE_PERMISSION;
@@ -533,9 +507,9 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !hasAnyCallType && styles.bgAshGray,
+            !hasMicrophoneChatType && styles.bgAshGray,
           ]}
-          disabled={!hasAnyCallType}
+          disabled={!hasMicrophoneChatType}
           activeOpacity={0.9}
           onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
@@ -544,8 +518,6 @@ export const CallLogScreen: React.FC = () => {
       <StartSessionModal
         visible={showStartSession}
         onClose={() => setShowStartSession(false)}
-        enabledChatTypes={enabledChatTypes}
-        onJoinCall={handleThirdPartyCall}
         onListenLive={handleVoiceRecording}
       />
     </View>

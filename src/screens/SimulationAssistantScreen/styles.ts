@@ -90,4 +90,10 @@ export const styles = ScaledSheet.create({
     marginHorizontal: '14@ms',
     flexShrink: 0,
   },
+  endButtonIcon: {
+    width: '16@s',
+    height: '16@s',
+    backgroundColor: colors.coralRed,
+    borderRadius: '2@ms',
+  },
 });

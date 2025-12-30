@@ -77,7 +77,7 @@ jest.mock('@/components', () => {
 });
 
 // Config
-jest.mock('@/config/env', () => ({ env: { ALLY_WEB_URL: 'https://example.com', THIRD_PARTY_CALL_NUMBER: '123' } }));
+jest.mock('@/config/env', () => ({ env: { ALLY_WEB_URL: 'https://example.com' } }));
 
 // Constants (duplicate block removed)
 // Hooks (duplicate block removed)

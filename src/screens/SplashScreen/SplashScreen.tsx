@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets';
+import {animations, LeftArrowIcon} from '@/assets';
 import {ForceUpdateModal, PrimaryButton, SecurityCarousel} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS, WINDOW_HEIGHT} from '@/constants';
 import {
@@ -240,7 +240,7 @@ export const SplashScreen: React.FC<
       <Animated.View style={[styles.animationContainer, animationStyle]}>
         <LottieView
           ref={lottieRef}
-          source={require('@/assets/animations/splashAnimation.json')}
+          source={animations.splashAnimation}
           style={styles.animation}
           resizeMode="cover"
           autoPlay={!isAnimationEnded}

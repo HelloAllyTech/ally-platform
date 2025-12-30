@@ -73,7 +73,7 @@ describe('constants/general', () => {
     expect(API_ROUTES.AUTH.REFRESH).toBe('/auth/refresh');
     expect(API_ROUTES.AUTH.GENERATE_OTP).toBe('/auth/generate-otp');
     expect(API_ROUTES.AUTH.VERIFY_OTP).toBe('/auth/verify-otp');
-    expect(API_ROUTES.AUTH.PERMISSIONS).toBe('/auth/permissions');
+    expect(API_ROUTES.AUTH.PERMISSIONS).toBe('/authorization/permissions');
   });
 
   it('all API routes for users', () => {

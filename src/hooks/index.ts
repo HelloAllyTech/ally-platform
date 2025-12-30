@@ -13,6 +13,7 @@ export {useCallTranscriptDetails} from './useCallTranscriptDetails';
 export {useCounselorChat} from './useCounselorChat';
 export {useNavigationAwareCounselorChat} from './useNavigationAwareCounselorChat';
 export {useLiveAudioStream} from './useLiveAudioStream';
+export {useListeningScreen} from './useListeningScreen';
 export {useSocket} from './useSocket';
 export {useSocketConnection} from './useSocketConnection';
 export {useNetworkConnectivity} from './useNetworkConnectivity';
