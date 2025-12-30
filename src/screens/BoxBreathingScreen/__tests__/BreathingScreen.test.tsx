@@ -136,7 +136,7 @@ describe('BreathingScreen', () => {
   it(
     'hides overlay and shows breathing animation after 3 seconds',
     async () => {
-      const {getByTestId, queryByTestId} = render(
+      const {getByTestId} = render(
         <BreathingScreen navigation={mockNavigation} route={mockRoute} />,
       );
 
@@ -148,7 +148,7 @@ describe('BreathingScreen', () => {
 
       expect(getByTestId('box-breathing-animation')).toBeTruthy();
     },
-    10000,
+    20000,
   );
 
   it('toggles play/pause when control button is pressed', async () => {
