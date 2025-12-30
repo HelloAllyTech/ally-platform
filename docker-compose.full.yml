@@ -58,4 +58,3 @@ services:
 volumes:
   localstack_data:
     driver: local
-

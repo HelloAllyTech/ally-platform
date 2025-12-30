@@ -1,8 +1,9 @@
-import pytest
 from typing import List
 
-from app.core.events.event_types.similarity_based.base import SimilarityBaseEvent
+import pytest
+
 from app.core.events.base import ChatMessage
+from app.core.events.event_types.similarity_based.base import SimilarityBaseEvent
 
 
 @pytest.fixture
@@ -55,9 +56,10 @@ class TestSimilarityBaseEvent:
 
         # Token coverage: "slow down please" -> normalized "slow down please"
         # After stopword removal: informative_tokens = {"slow", "down", "please"}
-        # Test partial match with good coverage: "please slow" has 2/3 tokens = 66% >= 60% threshold
+        # Test partial match with good coverage: "please slow" has 2/3
+        # tokens = 66% >= 60% threshold
         assert ev._match("please slow a bit") is True
-        
+
         # Test that insufficient token coverage fails
         # "please" alone is only 1/3 = 33% < 60% threshold
         assert ev._match("please wait") is False

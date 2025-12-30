@@ -1,24 +1,27 @@
 """
 Combination event detection based on logical expressions of other events.
 """
-from typing import List, Optional, override
+
+from typing import List, override
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_types.combination.constants import CombinationData, ExpressionNode
+from app.core.events.event_types.combination.constants import (
+    CombinationData,
+    ExpressionNode,
+)
 
 
 class CombinationEvent(BaseEvent):
     """
     Event that triggers based on a logical combination of other events.
     """
-    
+
     detection_type: DetectionType = DetectionType.COMBINATION
     data: CombinationData = CombinationData(
-        dependent_events=[],
-        expression=ExpressionNode(type="IDENTIFIER", id="")
+        dependent_events=[], expression=ExpressionNode(type="IDENTIFIER", id="")
     )
-    
+
     @classmethod
     def create(
         cls,
@@ -31,7 +34,7 @@ class CombinationEvent(BaseEvent):
     ) -> "CombinationEvent":
         """
         Create a CombinationEvent with typed data.
-        
+
         Args:
             event_id: Event identifier
             data: CombinationData instance
@@ -44,14 +47,14 @@ class CombinationEvent(BaseEvent):
             visibility_type=visibility_type,
             detection_type=detection_type,
             data=data,
-            **kwargs
+            **kwargs,
         )
-    
+
     @override
     async def detect_event(self, conversations: List[ChatMessage]) -> bool:
         """
         Detect if the combination expression evaluates to true.
-        
+
         Note: This requires access to detected events from the current turn,
         which is not available in the current detect_event signature.
         For now, this is a placeholder that returns False.
@@ -61,4 +64,3 @@ class CombinationEvent(BaseEvent):
         # detected_event_ids = get_detected_event_ids()
         # return evaluate_expression(self.data.expression, detected_event_ids)
         return False
-

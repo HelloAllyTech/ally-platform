@@ -1,52 +1,52 @@
 """Comprehensive tests for scenario.base models."""
-import pytest
-from unittest.mock import Mock, patch
-from typing import Dict, Any, List
 
-from app.core.scenario.base import (
-    Scenario, VoicePromptData, VoiceConfig, ScenarioVoice
-)
-from tests.utils.test_helpers import DataBuilder, AssertionHelpers
+from typing import List
+from unittest.mock import patch
+
+import pytest
+
 from app.core.events.base import BaseEvent, ChatMessage
+from app.core.scenario.base import Scenario, ScenarioVoice, VoiceConfig, VoicePromptData
+from tests.utils.test_helpers import AssertionHelpers
 
 
 class DummyEvent(BaseEvent):
     """Minimal concrete event for tests."""
 
-    async def detect_event(self, conversations: List[ChatMessage]) -> bool:  # type: ignore[override]
+    async def detect_event(
+        self, conversations: List[ChatMessage]
+    ) -> bool:  # type: ignore[override]
         return False
 
 
 class TestVoiceConfig:
     """Test cases for VoiceConfig model."""
-    
+
     @pytest.mark.unit
     def test_voice_config_creation_with_all_fields(self):
         """Test creating VoiceConfig with all fields."""
         config = VoiceConfig(
-            model="nova-2",
-            voice_id="test_voice_id",
-            speaker="test_speaker"
+            model="nova-2", voice_id="test_voice_id", speaker="test_speaker"
         )
-        
+
         assert config.model == "nova-2"
         assert config.voice_id == "test_voice_id"
         assert config.speaker == "test_speaker"
-    
+
     @pytest.mark.unit
     def test_voice_config_creation_with_defaults(self):
         """Test creating VoiceConfig with default values."""
         config = VoiceConfig()
-        
+
         assert config.model is None
         assert config.voice_id is None
         assert config.speaker is None
-    
+
     @pytest.mark.unit
     def test_voice_config_partial_fields(self):
         """Test creating VoiceConfig with partial fields."""
         config = VoiceConfig(model="eleven_multilingual_v2")
-        
+
         assert config.model == "eleven_multilingual_v2"
         assert config.voice_id is None
         assert config.speaker is None
@@ -54,55 +54,47 @@ class TestVoiceConfig:
 
 class TestScenarioVoice:
     """Test cases for ScenarioVoice model."""
-    
+
     @pytest.mark.unit
     def test_scenario_voice_creation(self):
         """Test creating ScenarioVoice with all fields."""
         config = VoiceConfig(model="nova-2", voice_id="test_id")
-        voice = ScenarioVoice(
-            name="test_voice",
-            provider="deepgram",
-            config=config
-        )
-        
+        voice = ScenarioVoice(name="test_voice", provider="deepgram", config=config)
+
         assert voice.name == "test_voice"
         assert voice.provider == "deepgram"
         assert voice.config == config
-    
+
     @pytest.mark.unit
     def test_scenario_voice_with_aliases(self):
         """Test creating ScenarioVoice using field aliases."""
         config = VoiceConfig()
-        voice_data = {
-            "name": "alias_voice",
-            "provider": "elevenlabs",
-            "config": config
-        }
-        
+        voice_data = {"name": "alias_voice", "provider": "elevenlabs", "config": config}
+
         voice = ScenarioVoice(**voice_data)
-        
+
         assert voice.name == "alias_voice"
         assert voice.provider == "elevenlabs"
         assert voice.config == config
-    
+
     @pytest.mark.unit
     def test_scenario_voice_validation_errors(self):
         """Test ScenarioVoice validation with invalid data."""
         from pydantic import ValidationError
-        
+
         config = VoiceConfig()
-        
+
         # Missing required fields
         with pytest.raises(ValidationError):
             ScenarioVoice(config=config)  # Missing name and provider
-        
+
         with pytest.raises(ValidationError):
             ScenarioVoice(name="test", config=config)  # Missing provider
 
 
 class TestVoicePromptData:
     """Test cases for VoicePromptData model."""
-    
+
     @pytest.mark.unit
     def test_voice_prompt_data_creation_full(self):
         """Test creating VoicePromptData with all fields."""
@@ -123,9 +115,9 @@ class TestVoicePromptData:
             emotional_needs="Understanding",
             tone="Professional",
             opening_statements=["Hello!", "How are you?"],
-            agent_goal="Provide support"
+            agent_goal="Provide support",
         )
-        
+
         assert prompt_data.name == "Test Character"
         assert prompt_data.age == "25"
         assert prompt_data.gender == "non-binary"
@@ -134,7 +126,7 @@ class TestVoicePromptData:
         assert prompt_data.current_location == "San Francisco"
         assert prompt_data.profession == "Software Engineer"
         assert len(prompt_data.opening_statements) == 2
-    
+
     @pytest.mark.unit
     def test_voice_prompt_data_required_fields_only(self):
         """Test creating VoicePromptData with only required fields."""
@@ -145,34 +137,32 @@ class TestVoicePromptData:
             current_location="Test City",
             context="Minimal context",
             life_history_summary="Minimal history",
-            opening_statements=["Hi!"]
+            opening_statements=["Hi!"],
         )
-        
+
         assert prompt_data.name == "Minimal Character"
         assert prompt_data.age == "30"
         assert prompt_data.gender == "female"
         assert prompt_data.profession is None  # Optional field
         assert prompt_data.personality is None  # Optional field
-    
+
     @pytest.mark.unit
     def test_voice_prompt_data_validation_errors(self):
         """Test VoicePromptData validation with missing required fields."""
         from pydantic import ValidationError
-        
+
         # Missing required fields
         with pytest.raises(ValidationError):
             VoicePromptData()
-        
+
         with pytest.raises(ValidationError):
             VoicePromptData(name="Test")  # Missing other required fields
-    
+
     @pytest.mark.unit
-    @pytest.mark.parametrize("age_input,expected_age", [
-        (25, "25"),
-        ("30", "30"),
-        (35.5, "35.5"),
-        ("forty", "forty")  # String input
-    ])
+    @pytest.mark.parametrize(
+        "age_input,expected_age",
+        [(25, "25"), ("30", "30"), (35.5, "35.5"), ("forty", "forty")],  # String input
+    )
     def test_voice_prompt_data_age_conversion(self, age_input, expected_age):
         """Test age field conversion to string."""
         # Build via Scenario._build_prompt_data which handles age casting
@@ -184,7 +174,7 @@ class TestVoicePromptData:
                 "currentLocation": "Test City",
                 "context": "Age test",
                 "lifeHistory": "Age history",
-                "openingStatements": ["Hello!"]
+                "openingStatements": ["Hello!"],
             }
         }
 
@@ -196,15 +186,13 @@ class TestVoicePromptData:
 
 class TestScenario:
     """Test cases for Scenario model."""
-    
+
     @pytest.mark.unit
     def test_scenario_creation_with_aliases(self):
         """Test creating Scenario using field aliases."""
         events = [DummyEvent(event_id="e1"), DummyEvent(event_id="e2")]
         voice = ScenarioVoice(
-            name="test_voice",
-            provider="deepgram",
-            config=VoiceConfig()
+            name="test_voice", provider="deepgram", config=VoiceConfig()
         )
         prompt_data = VoicePromptData(
             name="Prompt User",
@@ -213,34 +201,28 @@ class TestScenario:
             current_location="City",
             context="Some context",
             life_history_summary="History",
-            opening_statements=["Hello!"]
+            opening_statements=["Hello!"],
         )
-        
+
         scenario = Scenario(
             scenarioName="Test Scenario",
-            learningObjective="Test objective",
-            prompt="Test prompt",
             events=events,
             metadata={"key": "value"},
             voice=voice,
-            prompt_data=prompt_data
+            prompt_data=prompt_data,
         )
-        
+
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "Test objective"
-        assert scenario.prompt == "Test prompt"
         assert scenario.events == events
         assert scenario.metadata == {"key": "value"}
         assert scenario.voice == voice
         assert scenario.prompt_data == prompt_data
-    
+
     @pytest.mark.unit
     def test_scenario_creation_with_field_names(self):
         """Test creating Scenario using actual field names."""
         voice = ScenarioVoice(
-            name="test_voice",
-            provider="deepgram",
-            config=VoiceConfig()
+            name="test_voice", provider="deepgram", config=VoiceConfig()
         )
         prompt_data = VoicePromptData(
             name="Prompt User",
@@ -249,44 +231,34 @@ class TestScenario:
             current_location="City",
             context="Some context",
             life_history_summary="History",
-            opening_statements=["Hello!"]
+            opening_statements=["Hello!"],
         )
 
-        scenario = Scenario(
-            name="Direct Name",
-            learning_objective="Direct objective",
-            prompt="Direct prompt",
-            voice=voice,
-            prompt_data=prompt_data
-        )
-        
+        scenario = Scenario(name="Direct Name", voice=voice, prompt_data=prompt_data)
+
         assert scenario.name == "Direct Name"
-        assert scenario.learning_objective == "Direct objective"
-        assert scenario.prompt == "Direct prompt"
         assert scenario.events == []  # Default empty list
         assert scenario.metadata == {}  # Default empty dict
-    
+
     @pytest.mark.unit
     def test_scenario_create_with_full_payload(self, sample_room_metadata):
         """Test Scenario.create with full payload."""
         scenario = Scenario.create(sample_room_metadata)
-        
+
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
-        assert scenario.prompt == "Test prompt for the scenario"
-        
+
         # Verify voice was created
-        if hasattr(scenario, 'voice') and scenario.voice:
+        if hasattr(scenario, "voice") and scenario.voice:
             assert isinstance(scenario.voice, ScenarioVoice)
             assert scenario.voice.name == "test_voice"
             assert scenario.voice.provider == "deepgram"
-        
+
         # Verify prompt data was created
-        if hasattr(scenario, 'prompt_data') and scenario.prompt_data:
+        if hasattr(scenario, "prompt_data") and scenario.prompt_data:
             assert isinstance(scenario.prompt_data, VoicePromptData)
             assert scenario.prompt_data.name == "Test Character"
-    
+
     @pytest.mark.unit
     def test_scenario_create_with_nested_scenario(self):
         """Test Scenario.create with nested scenario payload."""
@@ -295,7 +267,6 @@ class TestScenario:
             "scenario": {
                 "title": "Nested Test",
                 "description": "Nested description",
-                "prompt": "Nested prompt",
                 "promptData": {
                     "name": "Nested Character",
                     "age": 28,
@@ -303,29 +274,22 @@ class TestScenario:
                     "currentLocation": "Nested City",
                     "context": "Nested context",
                     "lifeHistory": "Nested history",
-                    "openingStatements": ["Nested greeting!"]
+                    "openingStatements": ["Nested greeting!"],
                 },
-                "voice": {
-                    "name": "test_voice",
-                    "provider": "deepgram",
-                    "config": {}
-                }
-            }
+                "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
+            },
         }
-        
+
         scenario = Scenario.create(nested_payload)
-        
+
         assert scenario.name == "Nested Test"
-        assert scenario.learning_objective == "Nested description"
-        assert scenario.prompt == "Nested prompt"
-    
+
     @pytest.mark.unit
     def test_scenario_create_with_direct_scenario_payload(self):
         """Test Scenario.create with direct scenario data (no wrapper)."""
         direct_payload = {
             "title": "Direct Test",
             "description": "Direct description",
-            "prompt": "Direct prompt",
             "promptData": {
                 "name": "Direct Character",
                 "age": 35,
@@ -333,72 +297,52 @@ class TestScenario:
                 "currentLocation": "Direct City",
                 "context": "Direct context",
                 "lifeHistory": "Direct history",
-                "openingStatements": ["Direct greeting!"]
+                "openingStatements": ["Direct greeting!"],
             },
-            "voice": {
-                "name": "test_voice",
-                "provider": "deepgram",
-                "config": {}
-            }
+            "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
         }
-        
+
         scenario = Scenario.create(direct_payload)
-        
+
         assert scenario.name == "Direct Test"
-        assert scenario.learning_objective == "Direct description"
-        assert scenario.prompt == "Direct prompt"
-    
+
     @pytest.mark.unit
     def test_scenario_extract_scenario_section(self):
         """Test _extract_scenario_section static method."""
         # Test with envelope payload
-        envelope_payload = {
-            "version": "1.0",
-            "scenario": {"title": "Envelope Test"}
-        }
+        envelope_payload = {"version": "1.0", "scenario": {"title": "Envelope Test"}}
         result = Scenario._extract_scenario_section(envelope_payload)
         assert result == {"title": "Envelope Test"}
-        
+
         # Test with direct payload
         direct_payload = {"title": "Direct Test"}
         result = Scenario._extract_scenario_section(direct_payload)
         assert result == {"title": "Direct Test"}
-    
+
     @pytest.mark.unit
     def test_scenario_normalize_top_level_fields(self):
         """Test _normalize_top_level_fields static method."""
         raw_payload = {
             "title": "Test Title",
             "description": "Test Description",
-            "prompt": "Test Prompt",
-            "metadata": {"key": "value"}
+            "metadata": {"key": "value"},
         }
-        
+
         result = Scenario._normalize_top_level_fields(raw_payload)
-        
-        expected = {
-            "scenarioName": "Test Title",
-            "learningObjective": "Test Description",
-            "prompt": "Test Prompt",
-            "metadata": {"key": "value"}
-        }
+
+        expected = {"scenarioName": "Test Title", "metadata": {"key": "value"}}
         assert result == expected
-    
+
     @pytest.mark.unit
     def test_scenario_normalize_with_missing_fields(self):
         """Test _normalize_top_level_fields with missing fields."""
         raw_payload = {}
-        
+
         result = Scenario._normalize_top_level_fields(raw_payload)
-        
-        expected = {
-            "scenarioName": "",
-            "learningObjective": "",
-            "prompt": "",
-            "metadata": {}
-        }
+
+        expected = {"scenarioName": "", "metadata": {}}
         assert result == expected
-    
+
     @pytest.mark.unit
     def test_scenario_build_voice_with_full_config(self):
         """Test _build_voice static method with full configuration."""
@@ -409,48 +353,43 @@ class TestScenario:
                 "config": {
                     "model": "nova-2",
                     "voice_id": "test_id",
-                    "speaker": "test_speaker"
-                }
+                    "speaker": "test_speaker",
+                },
             }
         }
-        
+
         result = Scenario._build_voice(raw_payload)
-        
+
         assert isinstance(result, ScenarioVoice)
         assert result.name == "test_voice"
         assert result.provider == "deepgram"  # Should be lowercase
         assert result.config.model == "nova-2"
         assert result.config.voice_id == "test_id"
         assert result.config.speaker == "test_speaker"
-    
+
     @pytest.mark.unit
     def test_scenario_build_voice_with_minimal_config(self):
         """Test _build_voice with minimal configuration."""
-        raw_payload = {
-            "voice": {
-                "name": "minimal_voice",
-                "provider": "elevenlabs"
-            }
-        }
-        
+        raw_payload = {"voice": {"name": "minimal_voice", "provider": "elevenlabs"}}
+
         result = Scenario._build_voice(raw_payload)
-        
+
         assert isinstance(result, ScenarioVoice)
         assert result.name == "minimal_voice"
         assert result.provider == "elevenlabs"
         assert result.config.model is None
         assert result.config.voice_id is None
         assert result.config.speaker is None
-    
+
     @pytest.mark.unit
     def test_scenario_build_voice_with_no_voice(self):
         """Test _build_voice with no voice configuration."""
         raw_payload = {}
-        
+
         result = Scenario._build_voice(raw_payload)
-        
+
         assert result is None
-    
+
     @pytest.mark.unit
     def test_scenario_build_prompt_data_success(self):
         """Test _build_prompt_data with valid data."""
@@ -472,12 +411,12 @@ class TestScenario:
                 "emotionalNeeds": "Support",
                 "tone": "Professional",
                 "openingStatements": ["Hello!", "How are you?"],
-                "agentGoal": "Help users"
+                "agentGoal": "Help users",
             }
         }
-        
+
         result = Scenario._build_prompt_data(raw_payload)
-        
+
         assert isinstance(result, VoicePromptData)
         assert result.name == "Test Character"
         assert result.age == "25"  # Converted to string
@@ -487,20 +426,20 @@ class TestScenario:
         assert result.current_location == "Test City"
         assert result.profession == "Teacher"
         assert len(result.opening_statements) == 2
-    
+
     @pytest.mark.unit
     def test_scenario_build_prompt_data_missing_key(self, mock_logger):
         """Test _build_prompt_data with missing promptData key."""
         raw_payload = {}
-        
-        with patch('app.core.scenario.base.logger', mock_logger):
+
+        with patch("app.core.scenario.base.logger", mock_logger):
             result = Scenario._build_prompt_data(raw_payload)
-            
+
             assert result is None
             mock_logger.error.assert_called_once()
             error_call = mock_logger.error.call_args[0][0]
             assert "'promptData' key not found" in error_call
-    
+
     @pytest.mark.unit
     def test_scenario_build_prompt_data_with_exception(self, mock_logger):
         """Test _build_prompt_data with exception during creation."""
@@ -510,22 +449,21 @@ class TestScenario:
                 # Missing required fields to trigger validation error
             }
         }
-        
-        with patch('app.core.scenario.base.logger', mock_logger):
+
+        with patch("app.core.scenario.base.logger", mock_logger):
             result = Scenario._build_prompt_data(raw_payload)
-            
+
             assert result is None
             mock_logger.error.assert_called_once()
             error_call = mock_logger.error.call_args[0][0]
             assert "Error instantiating VoicePromptData" in error_call
-    
+
     @pytest.mark.unit
     def test_scenario_create_with_events_mocked(self):
         """Test Scenario.create with mocked event building."""
         payload = {
             "title": "Events Test",
             "description": "Test with events",
-            "prompt": "Events prompt",
             "promptData": {
                 "name": "Events Character",
                 "age": 30,
@@ -533,23 +471,22 @@ class TestScenario:
                 "currentLocation": "Events City",
                 "context": "Events context",
                 "lifeHistory": "Events history",
-                "openingStatements": ["Events greeting!"]
+                "openingStatements": ["Events greeting!"],
             },
             "events": [{"id": "test_event", "type": "test"}],
-            "voice": {
-                "name": "test_voice",
-                "provider": "deepgram",
-                "config": {}
-            }
+            "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
         }
-        
+
         mock_events = [DummyEvent(event_id="e1"), DummyEvent(event_id="e2")]
-        
-        with patch('app.core.scenario.base.build_events_from_metadata', return_value=mock_events):
+
+        with patch(
+            "app.core.scenario.base.build_events_from_metadata",
+            return_value=mock_events,
+        ):
             scenario = Scenario.create(payload)
-            
+
             assert scenario.events == mock_events
-    
+
     @pytest.mark.unit
     def test_scenario_create_integration_flow(self):
         """Test the complete Scenario.create integration flow."""
@@ -558,12 +495,11 @@ class TestScenario:
             "scenario": {
                 "title": "Integration Test",
                 "description": "Full integration test",
-                "prompt": "Integration prompt",
                 "metadata": {"test": "integration"},
                 "voice": {
                     "name": "integration_voice",
                     "provider": "openai",
-                    "config": {"model": "tts-1"}
+                    "config": {"model": "tts-1"},
                 },
                 "promptData": {
                     "name": "Integration Character",
@@ -572,41 +508,38 @@ class TestScenario:
                     "currentLocation": "Integration City",
                     "context": "Integration context",
                     "lifeHistory": "Integration history",
-                    "openingStatements": ["Integration greeting!"]
-                }
-            }
+                    "openingStatements": ["Integration greeting!"],
+                },
+            },
         }
-        
+
         scenario = Scenario.create(payload)
-        
+
         # Verify all components were created correctly
         assert scenario.name == "Integration Test"
-        assert scenario.learning_objective == "Full integration test"
-        assert scenario.prompt == "Integration prompt"
         assert scenario.metadata == {"test": "integration"}
-        
+
         # Verify voice integration
         assert isinstance(scenario.voice, ScenarioVoice)
         assert scenario.voice.name == "integration_voice"
         assert scenario.voice.provider == "openai"
-        
+
         # Verify prompt data integration
         assert isinstance(scenario.prompt_data, VoicePromptData)
         assert scenario.prompt_data.name == "Integration Character"
         assert scenario.prompt_data.age == "40"
-    
+
     @pytest.mark.unit
     def test_scenario_model_config(self):
         """Test Scenario model configuration."""
-        # Test populate_by_name allows both alias and field name, and ensure nested models provided
+        # Test populate_by_name allows both alias and field name, and
+        # ensure nested models provided
         scenario_data = {
             "scenarioName": "Alias Test",  # Using alias
-            "learning_objective": "Field Test",  # Using field name
-            "prompt": "Config test",
             "voice": ScenarioVoice(
                 name="config_voice",
                 provider="openai",
-                config=VoiceConfig(model="tts-1")
+                config=VoiceConfig(model="tts-1"),
             ),
             "prompt_data": VoicePromptData(
                 name="Config Character",
@@ -615,43 +548,41 @@ class TestScenario:
                 current_location="Config City",
                 context="Config context",
                 life_history_summary="Config history",
-                opening_statements=["Hi"]
-            )
+                opening_statements=["Hi"],
+            ),
         }
 
         scenario = Scenario(**scenario_data)
 
         assert scenario.name == "Alias Test"
-        assert scenario.learning_objective == "Field Test"
-        assert scenario.prompt == "Config test"
+
 
 class TestScenarioIntegration:
     """Integration tests for Scenario with real dependencies."""
-    
+
     @pytest.mark.integration
     def test_scenario_full_creation_flow(self, sample_room_metadata):
         """Test complete scenario creation with real dependencies."""
         scenario = Scenario.create(sample_room_metadata)
-        
+
         # Verify scenario structure
         assert isinstance(scenario, Scenario)
         AssertionHelpers.assert_scenario_has_required_fields(scenario)
-        
+
         # Verify voice integration
         if scenario.voice:
             AssertionHelpers.assert_voice_config_valid(scenario.voice.config)
-        
+
         # Verify prompt data integration
         if scenario.prompt_data:
             AssertionHelpers.assert_prompt_data_valid(scenario.prompt_data)
-    
+
     @pytest.mark.integration
     def test_scenario_with_real_events_factory(self):
         """Test scenario creation with real events factory."""
         payload = {
             "title": "Real Events Test",
             "description": "Test with real event factory",
-            "prompt": "Real events prompt",
             "promptData": {
                 "name": "Real Events Character",
                 "age": 33,
@@ -659,18 +590,14 @@ class TestScenarioIntegration:
                 "currentLocation": "Real City",
                 "context": "Real context",
                 "lifeHistory": "Real history",
-                "openingStatements": ["Real greeting!"]
+                "openingStatements": ["Real greeting!"],
             },
             "events": [],  # Empty events for now
-            "voice": {
-                "name": "test_voice",
-                "provider": "deepgram",
-                "config": {}
-            }
+            "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
         }
-        
+
         scenario = Scenario.create(payload)
-        
+
         # Should handle real event factory (even with empty events)
         assert isinstance(scenario, Scenario)
         assert isinstance(scenario.events, list)

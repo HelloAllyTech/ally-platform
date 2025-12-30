@@ -1,13 +1,16 @@
 """Conversation event handlers for LiveKit sessions."""
+
 import asyncio
 import json
 from datetime import datetime
+
+from livekit import rtc
 from livekit.agents import ConversationItemAddedEvent
-from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
+
 from app.core.events.base import ChatMessage
+from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.queue import msg_event_queue
 from app.utils.logger import get_logger
-from livekit import rtc
 
 logger = get_logger(__name__)
 
@@ -26,7 +29,7 @@ def calculate_start_time(event_timestamp: float, joined_iso: str) -> float:
     if not event_timestamp:
         return None
 
-    joined_ts = datetime.fromisoformat(joined_iso.replace('Z', '+00:00')).timestamp()
+    joined_ts = datetime.fromisoformat(joined_iso.replace("Z", "+00:00")).timestamp()
     return event_timestamp - joined_ts
 
 
@@ -58,7 +61,7 @@ def create_conversation_handler(room_id: str, joined_iso: str):
             role=role,
             content=content,
             start_time=calculate_start_time(event.created_at, joined_iso),
-            end_time=None
+            end_time=None,
         )
 
         core_event = CoreEventMessageType.create(
@@ -79,7 +82,10 @@ def create_conversation_handler(room_id: str, joined_iso: str):
 
     return on_conversation_item_added
 
-async def send_event_to_ui(event_data: CustomUIEventMessageType, room: rtc.Room) -> bool:
+
+async def send_event_to_ui(
+    event_data: CustomUIEventMessageType, room: rtc.Room
+) -> bool:
     """
     Send a custom event to the frontend in the specified format.
 
@@ -96,11 +102,9 @@ async def send_event_to_ui(event_data: CustomUIEventMessageType, room: rtc.Room)
             event_data.data.emoji = None
             event_data.data.message = None
 
-        event_data_bytes = json.dumps(event_data.model_dump()).encode('utf-8')
+        event_data_bytes = json.dumps(event_data.model_dump()).encode("utf-8")
         await room.local_participant.publish_data(
-            event_data_bytes,
-            topic="events",
-            reliable=True
+            event_data_bytes, topic="events", reliable=True
         )
 
         logger.debug(f"Custom event sent to UI: {event_data.model_dump()}")

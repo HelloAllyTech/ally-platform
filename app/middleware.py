@@ -1,14 +1,16 @@
 """
 Middleware for the FastAPI application.
 """
+
 import uuid
 from typing import List
-from fastapi import Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from app.utils.logger import logger,trace_id_var
 
+from fastapi import Request
+from fastapi.middleware import Middleware
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.utils.logger import logger, trace_id_var
 
 
 class LogRequestMiddleware(BaseHTTPMiddleware):
@@ -18,16 +20,18 @@ class LogRequestMiddleware(BaseHTTPMiddleware):
         trace_id = str(uuid.uuid4())
         trace_id_var.set(trace_id)
 
-
         if request.url.path not in ["/api/health", "/api/v1/health"]:
-            logger.info(f"Incoming request {request.method} {request.url} (TraceID: {trace_id})")
+            logger.info(
+                f"Incoming request {request.method} {request.url} (TraceID: {trace_id})"
+            )
 
         response = await call_next(request)
         response.headers["X-Trace-ID"] = trace_id  # Include Trace ID in the response
 
         if request.url.path not in ["/api/health", "/api/v1/health"]:
             logger.info(
-                f"Completed request {request.method} {request.url} with status {response.status_code} (TraceID: {trace_id})"
+                f"Completed request {request.method} {request.url} "
+                f"with status {response.status_code} (TraceID: {trace_id})"
             )
 
         return response
@@ -45,6 +49,6 @@ def get_middlewares() -> List[Middleware]:
             allow_credentials=False,
             allow_methods=[],
             allow_headers=[],
-        )
+        ),
     ]
     return middlewares

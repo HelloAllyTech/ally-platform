@@ -1,11 +1,13 @@
-import boto3
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import boto3
 
 from app.core.config import settings
 from app.utils import get_logger
 
 logger = get_logger(__name__)
+
 
 class SQSQueue:
     def __init__(self, queue_url: str, region_name: str = "us-east-1"):
@@ -22,7 +24,9 @@ class SQSQueue:
             self.sqs = boto3.client("sqs", region_name=region_name)
 
         # If a queue name was provided instead of a full URL, resolve it.
-        if not self.queue_url.startswith("http://") and not self.queue_url.startswith("https://"):
+        if not self.queue_url.startswith("http://") and not self.queue_url.startswith(
+            "https://"
+        ):
             try:
                 resp = self.sqs.get_queue_url(QueueName=self.queue_url)
                 resolved_url = resp.get("QueueUrl")
@@ -33,14 +37,18 @@ class SQSQueue:
                     )
                     self.queue_url = resolved_url
             except Exception as e:
-                logger.error(f"Failed to resolve SQS queue URL for name '{self.queue_url}': {type(e).__name__}")
+                logger.error(
+                    f"Failed to resolve SQS queue URL for name "
+                    f"'{self.queue_url}': {type(e).__name__}"
+                )
 
     async def send_message(
-            self,
-            message_body: str,
-            message_attributes: Optional[Dict[str, Any]] = None,
+        self,
+        message_body: str,
+        message_attributes: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Send a message to the SQS queue asynchronously using boto3 inside a thread."""
+        """Send a message to the SQS queue asynchronously using boto3
+        inside a thread."""
         try:
             response = await asyncio.to_thread(
                 self.sqs.send_message,
@@ -51,7 +59,10 @@ class SQSQueue:
             if response.get("MessageId"):
                 logger.debug(
                     "SQS async send_message succeeded",
-                    extra={"message_id": response.get("MessageId"), "queue_url": self.queue_url},
+                    extra={
+                        "message_id": response.get("MessageId"),
+                        "queue_url": self.queue_url,
+                    },
                 )
             return response.get("MessageId") is not None
         except Exception as e:
@@ -59,9 +70,9 @@ class SQSQueue:
             return False
 
     def send_message_sync(
-            self,
-            message_body: str,
-            message_attributes: Optional[Dict[str, Any]] = None,
+        self,
+        message_body: str,
+        message_attributes: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Send a message to the SQS queue synchronously using boto3."""
         try:
@@ -73,7 +84,10 @@ class SQSQueue:
             if response.get("MessageId"):
                 logger.debug(
                     "SQS sync send_message succeeded",
-                    extra={"message_id": response.get("MessageId"), "queue_url": self.queue_url},
+                    extra={
+                        "message_id": response.get("MessageId"),
+                        "queue_url": self.queue_url,
+                    },
                 )
             return response.get("MessageId") is not None
         except Exception as e:

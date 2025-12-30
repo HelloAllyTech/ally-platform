@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from app.core.graph.prompt import generate_system_message
 from app.core.scenario.base import VoicePromptData
 
@@ -38,8 +36,14 @@ class TestPrompt:
         assert "Your age" in content and "28" in content
         assert "Your gender" in content and "Male" in content
         assert "Your current location" in content and "NYC" in content
-        assert "Your current context" in content and "Starting therapy for anxiety." in content
-        assert "Summary of your life's history" in content and "Grew up in a small town" in content
+        assert (
+            "Your current context" in content
+            and "Starting therapy for anxiety." in content
+        )
+        assert (
+            "Summary of your life's history" in content
+            and "Grew up in a small town" in content
+        )
 
     def test_generate_system_message_optional_blocks_and_next_instruction(self):
         pd = make_prompt_data(
@@ -53,7 +57,9 @@ class TestPrompt:
             gender_identity="Non-binary",
             sexual_orientation="Queer",
         )
-        msg = generate_system_message(prompt_data=pd, next_instruction="Focus on rapport.")
+        msg = generate_system_message(
+            prompt_data=pd, next_instruction="Focus on rapport."
+        )
         content = msg.content
 
         # When next_instruction is provided, minimal prompt is used

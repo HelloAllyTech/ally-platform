@@ -1,20 +1,18 @@
-import asyncio
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from datetime import timezone, datetime
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.core.graph.state import (
-    unique_by,
-    add_events_accumulator,
-    add_scores,
-    add_permitted_events,
-    add_new_events,
-    SimulationState,
-)
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.constants import VisibilityType
+from app.core.graph.state import (
+    SimulationState,
+    add_events_accumulator,
+    add_new_events,
+    add_permitted_events,
+    add_scores,
+    unique_by,
+)
 
 
 class FakeEvent(BaseEvent):

@@ -7,7 +7,6 @@ SCENARIO_SAMPLE = {
             "reducing anxiety and building emotional safety. Guide Ahana toward constructive communication "
             "with parents and a more optimistic, self-compassionate view of herself and the future."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -23,11 +22,9 @@ SCENARIO_SAMPLE = {
             "emotionalNeeds": "Validation of her feelings, reassurance that her worth isn't defined by grades, support in processing disappointment, and guidance on how to have a difficult conversation with parents",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "Hi, I need some help."
-            ],
+            "openingStatements": ["Hi, I need some help."],
             "sexualOrientation": "Heterosexual (straight)",
-            "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations."
+            "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
         },
         "events": [
             {
@@ -40,36 +37,31 @@ SCENARIO_SAMPLE = {
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["Hi", "Hello"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             },
             {
                 "id": "warm-greeting",
                 "name": "Offered warm greeting",
                 "description": "",
                 "score": 5,
-                "data": {
-                    "sentences": ["Welcome to the helpline"]
-                },
+                "data": {"sentences": ["Welcome to the helpline"]},
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
                 "branchInstruction": "start speaking",
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             },
             {
                 "id": "score-lte-0",
                 "name": "offered superficial hope",
                 "description": "",
                 "score": 0,
-                "data": {
-                    "score": 0,
-                    "condition": "LTE"
-                },
+                "data": {"score": 0, "condition": "LTE"},
                 "emoji": "🔼",
                 "message": "Let's get started",
                 "detectionType": "SCORE",
                 "branchInstruction": "",
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             },
             {
                 "id": "comb-score-lte-0_and_open-ended-question",
@@ -78,26 +70,17 @@ SCENARIO_SAMPLE = {
                 "score": 0,
                 "data": {
                     "expression": {
-                        "left": {
-                            "id": "score-lte-0",
-                            "type": "IDENTIFIER"
-                        },
+                        "left": {"id": "score-lte-0", "type": "IDENTIFIER"},
                         "type": "AND",
-                        "right": {
-                            "id": "open-ended-question",
-                            "type": "IDENTIFIER"
-                        }
+                        "right": {"id": "open-ended-question", "type": "IDENTIFIER"},
                     },
-                    "dependentEvents": [
-                        "score-lte-0",
-                        "open-ended-question"
-                    ]
+                    "dependentEvents": ["score-lte-0", "open-ended-question"],
                 },
                 "emoji": "🔼",
                 "detectionType": "COMBINATION",
                 "message": "Let's get started",
                 "branchInstruction": "",
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             },
             {
                 "id": "open-ended-question",
@@ -113,49 +96,36 @@ SCENARIO_SAMPLE = {
                 "data": {
                     "className": "Open-Ended Question",
                     "positiveExamples": [
-                        {
-                            "text": "How are you feeling today?"
-                        },
-                        {
-                            "text": "How are you doing?"
-                        }
+                        {"text": "How are you feeling today?"},
+                        {"text": "How are you doing?"},
                     ],
                     "negativeExamples": [
-                        {
-                            "text": "Are you okay?"
-                        },
-                        {
-                            "text": "Are you doing well?"
-                        }
-                    ]
+                        {"text": "Are you okay?"},
+                        {"text": "Are you doing well?"},
+                    ],
                 },
             },
         ],
-        "triggerEvents": ["open-ended-question", "superficial-hope", "comb-score-lte-0_and_open-ended-question",
-                          "warm-greeting", "score-lte-0"],
+        "triggerEvents": [
+            "open-ended-question",
+            "superficial-hope",
+            "comb-score-lte-0_and_open-ended-question",
+            "warm-greeting",
+            "score-lte-0",
+        ],
         "voice": {
             "name": "priya-adult-female",
             "provider": "sarvam",
             "config": {
                 "model": "bulbul:v2",
                 "speaker": "anushka",
-            }
+            },
         },
         "languageCode": "en-IN",
-        "stt": {
-            "provider": "deepgram",
-            "config": {
-                "model": "nova-3"
-            }
-        },
-        "llm": {
-            "provider": "openai",
-            "config": {
-                "model": "gpt-4o-mini"
-            }
-        },
-        "metadata": {}
-    }
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
+        "metadata": {},
+    },
 }
 
 # Hindi scenario for testing multilingual capabilities
@@ -168,7 +138,6 @@ SCENARIO_SAMPLE_HINDI = {
             "घबराहट को कम करें और भावनात्मक सुरक्षा का निर्माण करें। अहाना को माता-पिता के साथ रचनात्मक संचार और "
             "स्वयं और भविष्य के बारे में अधिक आशावादी, आत्म-करुणामय दृष्टिकोण की ओर मार्गदर्शन करें।"
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -184,11 +153,9 @@ SCENARIO_SAMPLE_HINDI = {
             "emotionalNeeds": "उसकी भावनाओं की मान्यता, आश्वासन कि उसकी कीमत ग्रेड से परिभाषित नहीं है, निराशा को संसाधित करने में सहायता, और माता-पिता के साथ कठिन बातचीत करने के तरीके पर मार्गदर्शन",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "नमस्ते, मुझे कुछ मदद चाहिए।"
-            ],
+            "openingStatements": ["नमस्ते, मुझे कुछ मदद चाहिए।"],
             "sexualOrientation": "Heterosexual (straight)",
-            "sessionBehaviorGuidelines": "अहाना को अपने डर और चिंताओं को खुलकर व्यक्त करना चाहिए। वह पहले संकोच कर सकती है लेकिन धीरे-धीरे खुल जाएगी। उसे शैक्षणिक दबाव और पारिवारिक अपेक्षाओं के बारे में कमजोरी दिखानी चाहिए।"
+            "sessionBehaviorGuidelines": "अहाना को अपने डर और चिंताओं को खुलकर व्यक्त करना चाहिए। वह पहले संकोच कर सकती है लेकिन धीरे-धीरे खुल जाएगी। उसे शैक्षणिक दबाव और पारिवारिक अपेक्षाओं के बारे में कमजोरी दिखानी चाहिए।",
         },
         "events": [
             {
@@ -201,32 +168,19 @@ SCENARIO_SAMPLE_HINDI = {
                 "branchInstruction": "मुझे यकीन नहीं है कि आप समझते हैं कि मैं क्या महसूस कर रही हूं।",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["नमस्ते", "हैलो"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             }
         ],
         "voice": {
             "name": "google-female-hindi-chirp3",
             "provider": "google",
-            "config": {
-                "voice_name": "hi-IN-Chirp3-HD-Aoede",
-                "gender": "female"
-            }
+            "config": {"voice_name": "hi-IN-Chirp3-HD-Aoede", "gender": "female"},
         },
         "languageCode": "hi-IN",
-        "stt": {
-            "provider": "deepgram",
-            "config": {
-                "model": "nova-3"
-            }
-        },
-        "llm": {
-            "provider": "openai",
-            "config": {
-                "model": "gpt-4o-mini"
-            }
-        },
-        "metadata": {}
-    }
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
+        "metadata": {},
+    },
 }
 
 # Google TTS scenario for testing Google Cloud TTS
@@ -239,7 +193,6 @@ SCENARIO_SAMPLE_GOOGLE = {
             "reducing anxiety and building emotional safety. Guide Ahana toward constructive communication "
             "with parents and a more optimistic, self-compassionate view of herself and the future."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -255,11 +208,9 @@ SCENARIO_SAMPLE_GOOGLE = {
             "emotionalNeeds": "Validation of her feelings, reassurance that her worth isn't defined by grades, support in processing disappointment, and guidance on how to have a difficult conversation with parents",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "Hi, I need some help."
-            ],
+            "openingStatements": ["Hi, I need some help."],
             "sexualOrientation": "Heterosexual (straight)",
-            "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations."
+            "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
         },
         "events": [
             {
@@ -272,32 +223,19 @@ SCENARIO_SAMPLE_GOOGLE = {
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["Hi", "Hello"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             }
         ],
         "voice": {
             "name": "google-female-chirp3",
             "provider": "google",
-            "config": {
-                "voice_name": "en-US-Chirp3-HD-Aoede",
-                "gender": "female"
-            }
+            "config": {"voice_name": "en-US-Chirp3-HD-Aoede", "gender": "female"},
         },
         "languageCode": "en-US",
-        "stt": {
-            "provider": "deepgram",
-            "config": {
-                "model": "nova-3"
-            }
-        },
-        "llm": {
-            "provider": "openai",
-            "config": {
-                "model": "gpt-4o-mini"
-            }
-        },
-        "metadata": {}
-    }
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
+        "metadata": {},
+    },
 }
 
 # Hume AI TTS scenario for testing Hume.ai TTS with Hindi
@@ -310,7 +248,6 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "घबराहट को कम करें और भावनात्मक सुरक्षा का निर्माण करें। अहाना को माता-पिता के साथ रचनात्मक संचार और "
             "स्वयं और भविष्य के बारे में अधिक आशावादी, आत्म-करुणामय दृष्टिकोण की ओर मार्गदर्शन करें।"
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -326,11 +263,9 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "emotionalNeeds": "उसकी भावनाओं की मान्यता, आश्वासन कि उसकी कीमत ग्रेड से परिभाषित नहीं है, निराशा को संसाधित करने में सहायता, और माता-पिता के साथ कठिन बातचीत करने के तरीके पर मार्गदर्शन",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "नमस्ते, मुझे कुछ मदद चाहिए।"
-            ],
+            "openingStatements": ["नमस्ते, मुझे कुछ मदद चाहिए।"],
             "sexualOrientation": "Heterosexual (straight)",
-            "sessionBehaviorGuidelines": "अहाना को अपने डर और चिंताओं को खुलकर व्यक्त करना चाहिए। वह पहले संकोच कर सकती है लेकिन धीरे-धीरे खुल जाएगी। उसे शैक्षणिक दबाव और पारिवारिक अपेक्षाओं के बारे में कमजोरी दिखानी चाहिए।"
+            "sessionBehaviorGuidelines": "अहाना को अपने डर और चिंताओं को खुलकर व्यक्त करना चाहिए। वह पहले संकोच कर सकती है लेकिन धीरे-धीरे खुल जाएगी। उसे शैक्षणिक दबाव और पारिवारिक अपेक्षाओं के बारे में कमजोरी दिखानी चाहिए।",
         },
         "events": [
             {
@@ -343,7 +278,7 @@ SCENARIO_SAMPLE_HUME_HINDI = {
                 "branchInstruction": "मुझे यकीन नहीं है कि आप समझते हैं कि मैं क्या महसूस कर रही हूं।",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["नमस्ते", "हैलो"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             }
         ],
         "voice": {
@@ -351,26 +286,16 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "provider": "hume",
             "config": {
                 "instant_mode": False,
-                "voice_provider": "HUME_AI"  # Use "HUME_AI" for pre-existing voices, "CUSTOM_VOICE" for custom voices
+                "voice_provider": "HUME_AI",  # Use "HUME_AI" for pre-existing voices, "CUSTOM_VOICE" for custom voices
                 # Note: The voice name must match an existing voice from Hume's Voice Library
                 # or a custom voice you've created. See: https://dev.hume.ai/docs/text-to-speech-tts/voices
-            }
+            },
         },
         "languageCode": "hi-IN",
-        "stt": {
-            "provider": "deepgram",
-            "config": {
-                "model": "nova-3"
-            }
-        },
-        "llm": {
-            "provider": "openai",
-            "config": {
-                "model": "gpt-4o-mini"
-            }
-        },
-        "metadata": {}
-    }
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
+        "metadata": {},
+    },
 }
 
 # Malayalam scenario for testing multilingual capabilities with Google STT and Sarvam TTS
@@ -386,7 +311,6 @@ SCENARIO_SAMPLE_MALAYALAM = {
             "സ്വയത്തെയും ഭാവിയെയും കുറിച്ച് കൂടുതൽ ശുഭാപ്തിവിശ്വാസവും സ്വയം-കരുണയുമുള്ള "
             "വീക്ഷണത്തിലേക്ക് നയിക്കുക."
         ),
-        "prompt": "",
         "promptData": {
             "age": "15",
             "name": "Ahana",
@@ -402,11 +326,9 @@ SCENARIO_SAMPLE_MALAYALAM = {
             "emotionalNeeds": "അവളുടെ വികാരങ്ങളുടെ മാന്യത, അവളുടെ മൂല്യം ഗ്രേഡുകളാൽ നിർവചിക്കപ്പെടുന്നില്ലെന്ന ഉറപ്പ്, നിരാശ പ്രോസസ് ചെയ്യുന്നതിൽ പിന്തുണ, മാതാപിതാക്കളുമായി ബുദ്ധിമുട്ടുള്ള സംഭാഷണം നടത്താനുള്ള വഴികാട്ടി",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "നമസ്കാരം, എനിക്ക് കുറച്ച് സഹായം വേണം."
-            ],
+            "openingStatements": ["നമസ്കാരം, എനിക്ക് കുറച്ച് സഹായം വേണം."],
             "sexualOrientation": "Heterosexual (straight)",
-            "sessionBehaviorGuidelines": "അഹാന അവളുടെ ഭയങ്ങളും ആശങ്കകളും തുറന്ന് പ്രകടിപ്പിക്കണം. അവൾ ആദ്യം സംശയിക്കാം, പക്ഷേ ക്രമേണ തുറന്നുപറയും. അവൾ അക്കാദമിക് സമ്മർദ്ദവും കുടുംബ പ്രതീക്ഷകളും സംബന്ധിച്ച് ദുർബലത കാണിക്കണം."
+            "sessionBehaviorGuidelines": "അഹാന അവളുടെ ഭയങ്ങളും ആശങ്കകളും തുറന്ന് പ്രകടിപ്പിക്കണം. അവൾ ആദ്യം സംശയിക്കാം, പക്ഷേ ക്രമേണ തുറന്നുപറയും. അവൾ അക്കാദമിക് സമ്മർദ്ദവും കുടുംബ പ്രതീക്ഷകളും സംബന്ധിച്ച് ദുർബലത കാണിക്കണം.",
         },
         "events": [
             {
@@ -419,16 +341,13 @@ SCENARIO_SAMPLE_MALAYALAM = {
                 "branchInstruction": "ഞാൻ ഇപ്പോൾ അനുഭവിച്ചതെന്താണെന്ന് നിങ്ങൾക്ക് മനസ്സിലായി എന്ന് തോന്നുന്നില്ല.",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["നമസ്കാരം", "ഹലോ"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             }
         ],
         "voice": {
             "name": "sarvam-female-malayalam",
             "provider": "sarvam",
-            "config": {
-                "model": "bulbul:v2",
-                "speaker": "anushka"
-            }
+            "config": {"model": "bulbul:v2", "speaker": "anushka"},
         },
         "languageCode": "ml-IN",
         "stt": {
@@ -436,16 +355,11 @@ SCENARIO_SAMPLE_MALAYALAM = {
             "config": {
                 "model": "chirp_2",
                 "location": "asia-southeast1",
-            }
+            },
         },
-        "llm": {
-            "provider": "gemini",
-            "config": {
-                "model": "gemini-2.0-flash-exp"
-            }
-        },
-        "metadata": {}
-    }
+        "llm": {"provider": "gemini", "config": {"model": "gemini-2.0-flash-exp"}},
+        "metadata": {},
+    },
 }
 
 # Malayalam scenario with English metadata (except opening statement) - Ahana speaks only Malayalam
@@ -459,7 +373,6 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "with parents and a more optimistic, self-compassionate view of herself and the future. "
             "IMPORTANT: Ahana knows only Malayalam and will speak only in Malayalam throughout the session."
         ),
-        "prompt": "",
         "promptData": {
             "age": "16",
             "name": "Ahana",
@@ -481,9 +394,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "emotionalNeeds": "Validation of her feelings, reassurance that her worth isn't defined by grades, support in processing disappointment, and guidance on how to have a difficult conversation with parents",
             "genderIdentity": "Female/Woman",
             "currentLocation": "Kolkata, India",
-            "openingStatements": [
-                "ഹലോ, എനിക്കൊരു സഹായം വേണം."
-            ],
+            "openingStatements": ["ഹലോ, എനിക്കൊരു സഹായം വേണം."],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": (
                 "Ahana should express her fears and anxieties openly in Malayalam. She may be hesitant at first but will gradually open up. "
@@ -498,7 +409,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
                 "- Use natural, conversational Malayalam as a 16-year-old would speak in 2024\n"
                 "- Mix Malayalam and English words naturally, as modern Malayalam speakers do in everyday conversation\n"
                 "- Keep the tone authentic to a teenager's speech patterns"
-            )
+            ),
         },
         "events": [
             {
@@ -511,7 +422,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["നമസ്കാരം", "ഹലോ"],
-                "feedbackStatus": "True"
+                "feedbackStatus": "True",
             },
             {
                 "id": "semantic-empathy-malayalam",
@@ -526,20 +437,17 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
                     "sentences": [
                         "എനിക്ക് നിങ്ങളുടെ വികാരങ്ങൾ മനസ്സിലാകുന്നു",
                         "നിങ്ങൾ എന്ത് അനുഭവിക്കുന്നുവെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു",
-                        "ഇത് നിങ്ങൾക്ക് എത്രയും ബുദ്ധിമുട്ടുള്ളതാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു"
+                        "ഇത് നിങ്ങൾക്ക് എത്രയും ബുദ്ധിമുട്ടുള്ളതാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു",
                     ],
-                    "threshold": 0.75
+                    "threshold": 0.75,
                 },
-                "feedbackStatus": "True"
-            }
+                "feedbackStatus": "True",
+            },
         ],
         "voice": {
             "name": "sarvam-female-malayalam",
             "provider": "sarvam",
-            "config": {
-                "model": "bulbul:v2",
-                "speaker": "anushka"
-            }
+            "config": {"model": "bulbul:v2", "speaker": "anushka"},
         },
         "languageCode": "ml-IN",
         "stt": {
@@ -547,14 +455,9 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "config": {
                 "model": "chirp_2",
                 "location": "asia-southeast1",
-            }
+            },
         },
-        "llm": {
-            "provider": "gemini",
-            "config": {
-                "model": "gemini-2.0-flash-exp"
-            }
-        },
-        "metadata": {}
-    }
+        "llm": {"provider": "google", "config": {"model": "gemini-2.0-flash-exp"}},
+        "metadata": {},
+    },
 }

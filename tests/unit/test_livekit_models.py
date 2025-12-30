@@ -1,27 +1,28 @@
 """Comprehensive tests for livekit_models module."""
-import pytest
+
 from unittest.mock import Mock, patch
-from typing import Dict, Any
+
+import pytest
 from pydantic import ValidationError
 
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.core.scenario.base import Scenario
-from tests.utils.test_helpers import DataBuilder, AssertionHelpers
+from tests.utils.test_helpers import AssertionHelpers, DataBuilder
 
 
 class TestRoomMetadataEnvelope:
     """Test cases for RoomMetadataEnvelope model."""
-    
+
     @pytest.mark.unit
     def test_create_with_full_payload(self, sample_room_metadata):
         """Test creating envelope with full payload."""
         envelope = RoomMetadataEnvelope.create(sample_room_metadata)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "1.0"
         assert isinstance(envelope.scenario, Scenario)
         AssertionHelpers.assert_valid_room_metadata_envelope(envelope, "1.0")
-    
+
     @pytest.mark.unit
     def test_create_with_minimal_payload(self):
         """Test creating envelope with minimal payload."""
@@ -29,7 +30,6 @@ class TestRoomMetadataEnvelope:
             "scenario": {
                 "title": "Minimal Test",
                 "description": "Minimal description",
-                "prompt": "Minimal prompt",
                 "promptData": {
                     "name": "Test Character",
                     "age": 25,
@@ -37,23 +37,19 @@ class TestRoomMetadataEnvelope:
                     "currentLocation": "Test City",
                     "context": "Test context",
                     "lifeHistory": "Test history",
-                    "openingStatements": ["Hello!"]
+                    "openingStatements": ["Hello!"],
                 },
                 # Include minimal voice config to satisfy Scenario.voice requirement
-                "voice": {
-                    "name": "test_voice",
-                    "provider": "deepgram",
-                    "config": {}
-                }
+                "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
             }
         }
-        
+
         envelope = RoomMetadataEnvelope.create(minimal_payload)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "1.0"  # Default version
         assert isinstance(envelope.scenario, Scenario)
-    
+
     @pytest.mark.unit
     def test_create_with_custom_version(self):
         """Test creating envelope with custom version."""
@@ -62,7 +58,6 @@ class TestRoomMetadataEnvelope:
             "scenario": {
                 "title": "Version Test",
                 "description": "Test with custom version",
-                "prompt": "Version test prompt",
                 "promptData": {
                     "name": "Version Character",
                     "age": 30,
@@ -70,34 +65,29 @@ class TestRoomMetadataEnvelope:
                     "currentLocation": "Version City",
                     "context": "Version context",
                     "lifeHistory": "Version history",
-                    "openingStatements": ["Version greeting!"]
+                    "openingStatements": ["Version greeting!"],
                 },
-                "voice": {
-                    "name": "test_voice",
-                    "provider": "deepgram",
-                    "config": {}
-                }
-            }
+                "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
+            },
         }
-        
+
         envelope = RoomMetadataEnvelope.create(payload)
-        
+
         assert envelope.version == "2.5"
         AssertionHelpers.assert_valid_room_metadata_envelope(envelope, "2.5")
-    
+
     @pytest.mark.unit
     def test_create_with_empty_payload(self):
         """Test creating envelope with empty payload."""
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope.create({})
-    
+
     @pytest.mark.unit
     def test_create_with_scenario_only_payload(self):
         """Test creating envelope from scenario-only payload."""
         scenario_payload = {
             "title": "Direct Scenario",
             "description": "Direct scenario test",
-            "prompt": "Direct prompt",
             "promptData": {
                 "name": "Direct Character",
                 "age": 28,
@@ -105,37 +95,31 @@ class TestRoomMetadataEnvelope:
                 "currentLocation": "Direct City",
                 "context": "Direct context",
                 "lifeHistory": "Direct history",
-                "openingStatements": ["Direct greeting!"]
+                "openingStatements": ["Direct greeting!"],
             },
             # Include minimal voice to satisfy validation
-            "voice": {
-                "name": "test_voice",
-                "provider": "deepgram",
-                "config": {}
-            }
+            "voice": {"name": "test_voice", "provider": "deepgram", "config": {}},
         }
-        
+
         envelope = RoomMetadataEnvelope.create(scenario_payload)
-        
+
         assert envelope.version == "1.0"  # Default version
         assert isinstance(envelope.scenario, Scenario)
         assert envelope.scenario.name == "Direct Scenario"
-    
+
     @pytest.mark.unit
     def test_create_preserves_scenario_data(self, sample_room_metadata):
         """Test that scenario data is preserved correctly."""
         envelope = RoomMetadataEnvelope.create(sample_room_metadata)
-        
+
         scenario = envelope.scenario
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
-        assert scenario.prompt == "Test prompt for the scenario"
-        
+
         # Verify voice configuration is preserved
-        if hasattr(scenario, 'voice') and scenario.voice:
+        if hasattr(scenario, "voice") and scenario.voice:
             assert scenario.voice.name == "test_voice"
             assert scenario.voice.provider == "deepgram"
-    
+
     def test_create_with_nested_scenario_payload(self):
         """Test creating envelope with nested scenario in payload."""
         nested_payload = {
@@ -144,7 +128,6 @@ class TestRoomMetadataEnvelope:
                 "scenario": {
                     "title": "Nested Test",
                     "description": "Nested scenario test",
-                    "prompt": "Nested prompt",
                     "promptData": {
                         "name": "Nested Character",
                         "age": 32,
@@ -152,181 +135,186 @@ class TestRoomMetadataEnvelope:
                         "currentLocation": "Nested City",
                         "context": "Nested context",
                         "lifeHistory": "Nested history",
-                        "openingStatements": ["Nested greeting!"]
+                        "openingStatements": ["Nested greeting!"],
                     },
                     "voice": {
                         "name": "test_voice",
                         "provider": "deepgram",
-                        "config": {}
-                    }
+                        "config": {},
+                    },
                 }
-            }
+            },
         }
         from pydantic import ValidationError
-        # Current implementation doesn't extract from non-standard nesting; expect failure
+
+        # Current implementation doesn't extract from non-standard
+        # nesting; expect failure
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope.create(nested_payload)
-    
+
     @pytest.mark.unit
     def test_create_with_mock_scenario(self):
         """Test creating envelope with mocked Scenario.create."""
         payload = {"test": "data"}
         mock_scenario = Mock(spec=Scenario)
-        
-        with patch('app.core.scenario.base.Scenario.create', return_value=mock_scenario) as mock_create:
+
+        with patch(
+            "app.core.scenario.base.Scenario.create", return_value=mock_scenario
+        ) as mock_create:
             envelope = RoomMetadataEnvelope.create(payload)
-            
+
             assert envelope.scenario == mock_scenario
             assert envelope.version == "1.0"  # Default
             mock_create.assert_called_once_with(payload, embedding_client=None)
-    
+
     @pytest.mark.unit
     def test_envelope_model_validation(self):
         """Test Pydantic model validation."""
         # Test with valid data
         scenario = Mock(spec=Scenario)
         envelope = RoomMetadataEnvelope(version="1.0", scenario=scenario)
-        
+
         assert envelope.version == "1.0"
         assert envelope.scenario == scenario
-    
+
     @pytest.mark.unit
     def test_envelope_model_validation_errors(self):
         """Test Pydantic model validation with invalid data."""
         from pydantic import ValidationError
-        
+
         # Test missing required fields
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope()
-        
+
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope(version="1.0")  # Missing scenario
-        
+
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope(scenario=Mock())  # Missing version
-    
+
     @pytest.mark.unit
     def test_envelope_serialization(self, sample_room_metadata):
         """Test envelope serialization to dict."""
         envelope = RoomMetadataEnvelope.create(sample_room_metadata)
-        
+
         # Test model_dump (Pydantic v2)
         envelope_dict = envelope.model_dump()
-        
+
         assert isinstance(envelope_dict, dict)
         assert "version" in envelope_dict
         assert "scenario" in envelope_dict
         assert envelope_dict["version"] == "1.0"
-    
+
     @pytest.mark.unit
     def test_create_with_builder_pattern(self):
         """Test creating envelope using DataBuilder."""
         builder = DataBuilder()
-        payload = (builder
-                  .with_version("3.0")
-                  .with_scenario(
-                      title="Builder Test",
-                      description="Test with builder pattern",
-                      prompt="Builder prompt"
-                  )
-                  .with_voice("builder_voice", "elevenlabs", model="eleven_multilingual_v2")
-                  .with_prompt_data(
-                      name="Builder Character",
-                      age=27,
-                      gender="female",
-                      currentLocation="Builder City",
-                      context="Builder context",
-                      lifeHistory="Builder history",
-                      openingStatements=["Builder greeting!"]
-                  )
-                  .build())
-        
+        payload = (
+            builder.with_version("3.0")
+            .with_scenario(
+                title="Builder Test",
+                description="Test with builder pattern",
+            )
+            .with_voice("builder_voice", "elevenlabs", model="eleven_multilingual_v2")
+            .with_prompt_data(
+                name="Builder Character",
+                age=27,
+                gender="female",
+                currentLocation="Builder City",
+                context="Builder context",
+                lifeHistory="Builder history",
+                openingStatements=["Builder greeting!"],
+            )
+            .build()
+        )
+
         envelope = RoomMetadataEnvelope.create(payload)
-        
+
         assert envelope.version == "3.0"
         assert isinstance(envelope.scenario, Scenario)
         AssertionHelpers.assert_valid_room_metadata_envelope(envelope, "3.0")
-    
+
     @pytest.mark.unit
     def test_create_performance_large_payload(self, large_metadata):
         """Test performance with large payload."""
         import time
-        
+
         start_time = time.time()
         envelope = RoomMetadataEnvelope.create(large_metadata)
         end_time = time.time()
-        
+
         # Should complete within reasonable time
         execution_time = end_time - start_time
         assert execution_time < 2.0  # 2 seconds max
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         AssertionHelpers.assert_valid_room_metadata_envelope(envelope)
-    
+
     @pytest.mark.unit
     def test_create_thread_safety(self, sample_room_metadata):
         """Test thread safety of create method."""
         import threading
-        
+
         results = []
         errors = []
-        
+
         def worker():
             try:
                 envelope = RoomMetadataEnvelope.create(sample_room_metadata)
                 results.append(envelope)
             except Exception as e:
                 errors.append(e)
-        
+
         # Run multiple threads
         threads = []
         for _ in range(5):
             thread = threading.Thread(target=worker)
             threads.append(thread)
             thread.start()
-        
+
         for thread in threads:
             thread.join()
-        
+
         # Verify no errors and all completed
         assert len(errors) == 0
         assert len(results) == 5
-        
+
         # Verify all results are valid
         for envelope in results:
             assert isinstance(envelope, RoomMetadataEnvelope)
             AssertionHelpers.assert_valid_room_metadata_envelope(envelope)
-    
+
     @pytest.mark.unit
-    @pytest.mark.parametrize("payload_type", [
-        "full_payload",
-        "minimal_payload", 
-        "empty_payload",
-        "scenario_only"
-    ])
-    def test_create_with_various_payload_types(self, payload_type, room_metadata_factory):
+    @pytest.mark.parametrize(
+        "payload_type",
+        ["full_payload", "minimal_payload", "empty_payload", "scenario_only"],
+    )
+    def test_create_with_various_payload_types(
+        self, payload_type, room_metadata_factory
+    ):
         """Test create method with various payload types."""
         payloads = {
             "full_payload": room_metadata_factory(
                 version="1.0",
                 scenario={
                     "title": "Full Test",
-                    "voice": {"name": "test", "provider": "deepgram", "config": {}}
-                }
+                    "voice": {"name": "test", "provider": "deepgram", "config": {}},
+                },
             ),
             # Include minimal voice config to satisfy Scenario.voice requirement
             "minimal_payload": room_metadata_factory(
                 scenario={
                     "title": "Minimal",
-                    "voice": {"name": "test", "provider": "deepgram", "config": {}}
+                    "voice": {"name": "test", "provider": "deepgram", "config": {}},
                 }
             ),
             "empty_payload": {},
-            "scenario_only": {"title": "Direct", "description": "Direct test", "prompt": "Direct"}
+            "scenario_only": {"title": "Direct", "description": "Direct test"},
         }
-        
+
         payload = payloads[payload_type]
         from pydantic import ValidationError
+
         if payload_type in ["empty_payload", "scenario_only"]:
             with pytest.raises(ValidationError):
                 RoomMetadataEnvelope.create(payload)
@@ -339,43 +327,42 @@ class TestRoomMetadataEnvelope:
 
 class TestRoomMetadataEnvelopeIntegration:
     """Integration tests for RoomMetadataEnvelope."""
-    
+
     @pytest.mark.integration
     def test_full_integration_with_real_scenario(self, sample_room_metadata):
         """Test full integration with real Scenario creation."""
         envelope = RoomMetadataEnvelope.create(sample_room_metadata)
-        
+
         # Verify envelope structure
         assert isinstance(envelope, RoomMetadataEnvelope)
         assert envelope.version == "1.0"
-        
+
         # Verify scenario integration
         scenario = envelope.scenario
         assert isinstance(scenario, Scenario)
         assert scenario.name == "Test Scenario"
-        assert scenario.learning_objective == "A test learning scenario"
-        
+
         # Verify prompt data integration
-        if hasattr(scenario, 'prompt_data') and scenario.prompt_data:
+        if hasattr(scenario, "prompt_data") and scenario.prompt_data:
             assert scenario.prompt_data.name == "Test Character"
             assert scenario.prompt_data.age == "25"
             assert scenario.prompt_data.gender == "non-binary"
-    
+
     @pytest.mark.integration
     def test_envelope_scenario_voice_integration(self, sample_room_metadata):
         """Test integration between envelope and scenario voice configuration."""
         envelope = RoomMetadataEnvelope.create(sample_room_metadata)
-        
+
         scenario = envelope.scenario
-        if hasattr(scenario, 'voice') and scenario.voice:
+        if hasattr(scenario, "voice") and scenario.voice:
             voice = scenario.voice
             assert voice.name == "test_voice"
             assert voice.provider == "deepgram"
-            
-            if hasattr(voice, 'config') and voice.config:
+
+            if hasattr(voice, "config") and voice.config:
                 config = voice.config
                 AssertionHelpers.assert_voice_config_valid(config)
-    
+
     @pytest.mark.integration
     def test_envelope_with_events_integration(self):
         """Test envelope integration with scenario events."""
@@ -384,7 +371,6 @@ class TestRoomMetadataEnvelopeIntegration:
             "scenario": {
                 "title": "Events Test",
                 "description": "Test with events",
-                "prompt": "Events prompt",
                 "promptData": {
                     "name": "Events Character",
                     "age": 30,
@@ -392,25 +378,25 @@ class TestRoomMetadataEnvelopeIntegration:
                     "currentLocation": "Events City",
                     "context": "Events context",
                     "lifeHistory": "Events history",
-                    "openingStatements": ["Events greeting!"]
+                    "openingStatements": ["Events greeting!"],
                 },
                 "events": [
                     {"id": "test_event_1", "type": "test", "data": {}},
-                    {"id": "test_event_2", "type": "test", "data": {}}
+                    {"id": "test_event_2", "type": "test", "data": {}},
                 ],
                 "voice": {
                     "name": "test_voice",
                     "provider": "deepgram",
-                    "config": {"model": "test-voice"}
-                }
-            }
+                    "config": {"model": "test-voice"},
+                },
+            },
         }
-        
+
         envelope = RoomMetadataEnvelope.create(payload)
-        
+
         assert isinstance(envelope, RoomMetadataEnvelope)
         scenario = envelope.scenario
-        
+
         # Events should be processed by scenario
-        assert hasattr(scenario, 'events')
+        assert hasattr(scenario, "events")
         # Note: Actual event processing depends on event factory implementation

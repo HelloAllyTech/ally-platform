@@ -1,39 +1,59 @@
-from typing import Optional, List, Any, Dict, Mapping
+from enum import Enum
+from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, Field
 
-from app.core.events.base import BaseEvent
-from app.core.events.factory import build_events_from_metadata
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import BaseEmbeddingClient
+from app.core.events.base import BaseEvent
+from app.core.events.factory import build_events_from_metadata
 from app.utils import get_logger
 
 logger = get_logger(__name__)
 
+
 class TerminationEvent(BaseModel):
     """Configuration for auto-termination event."""
+
     id: str = Field(..., description="Event ID that triggers termination")
-    termination_message: str = Field(..., alias="terminationMessage", description="Custom message to speak on termination")
+    termination_message: str = Field(
+        ...,
+        alias="terminationMessage",
+        description="Custom message to speak on termination",
+    )
+
+
+class ScenarioResponseLength(str, Enum):
+    VERY_BRIEF = "VERY_BRIEF"
+    BRIEF = "BRIEF"
+    MEDIUM = "MEDIUM"
+    ELABORATE = "ELABORATE"
+
 
 class VoicePromptData(BaseModel):
-    name : str = Field(...)
-    age : str = Field(...)
-    gender : str = Field(...)
-    gender_identity : Optional[str] = Field(default=None)
-    sexual_orientation : Optional[str] = Field(default=None)
-    current_location : str = Field(...)
-    profession : Optional[str] = Field(default=None)
-    context : str = Field(...)
-    session_behavior_guidelines : Optional[str] = Field(default=None)
-    life_history_summary : str = Field(...)
-    core_memories : Optional[str] = Field(default=None)
-    personality : Optional[str] = Field(default=None)
-    starting_state : Optional[str] = Field(default=None)
-    emotional_needs : Optional[str] = Field(default=None)
-    tone : Optional[str] = Field(default=None)
-    opening_statements : List[str] = Field(...)
-    agent_goal : Optional[str] = Field(default=None)
-    custom_fields : Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Dynamic custom fields")
+    name: str = Field(...)
+    age: str = Field(...)
+    gender: str = Field(...)
+    gender_identity: Optional[str] = Field(default=None)
+    sexual_orientation: Optional[str] = Field(default=None)
+    current_location: str = Field(...)
+    profession: Optional[str] = Field(default=None)
+    context: str = Field(...)
+    session_behavior_guidelines: Optional[str] = Field(default=None)
+    life_history_summary: Optional[str] = Field(default=None)
+    core_memories: Optional[str] = Field(default=None)
+    personality: Optional[str] = Field(default=None)
+    starting_state: Optional[str] = Field(default=None)
+    emotional_needs: Optional[str] = Field(default=None)
+    tone: Optional[str] = Field(default=None)
+    opening_statements: List[str] = Field(...)
+    agent_goal: Optional[str] = Field(default=None)
+    custom_fields: Optional[List[Dict[str, str]]] = Field(
+        default_factory=list, description="Dynamic custom fields"
+    )
+    prompt: Optional[str] = Field(default=None)
+    response_length: Optional[ScenarioResponseLength] = Field(default=None)
+    agent_dialogues: Optional[List[str]] = Field(default=None)
 
 
 class VoiceConfig(BaseModel):
@@ -41,25 +61,30 @@ class VoiceConfig(BaseModel):
     voice_id: Optional[str] = Field(default=None)
     speaker: Optional[str] = Field(default=None)
     voice_name: Optional[str] = Field(default=None)  # For Google TTS
-    gender: Optional[str] = Field(default=None)  # For Google TTS ("male", "female", "neutral")
-    voice_cloning_key: Optional[str] = Field(default=None)  # For Google TTS custom voices
+    gender: Optional[str] = Field(
+        default=None
+    )  # For Google TTS ("male", "female", "neutral")
+    voice_cloning_key: Optional[str] = Field(
+        default=None
+    )  # For Google TTS custom voices
     instant_mode: Optional[bool] = Field(default=None)  # For Hume TTS
-    voice_provider: Optional[str] = Field(default=None)  # For Hume TTS: "HUME_AI" (pre-existing) or "CUSTOM_VOICE" (custom)
-
+    voice_provider: Optional[str] = Field(
+        default=None
+    )  # For Hume TTS: "HUME_AI" (pre-existing) or "CUSTOM_VOICE" (custom)
 
 
 class ScenarioVoice(BaseModel):
     name: str = Field(alias="name")
-    provider : str = Field(alias="provider")
-    config : VoiceConfig = Field(alias="config")
+    provider: str = Field(alias="provider")
+    config: VoiceConfig = Field(alias="config")
 
 
 class LanguageConfig(BaseModel):
     """Language-specific configuration for STT and LLM providers."""
+
     language_code: str = Field(default=DEFAULT_LANGUAGE_CODE)
     stt_config: Optional[Dict[str, Any]] = Field(default=None)
     llm_config: Optional[Dict[str, Any]] = Field(default=None)
-
 
 
 class Scenario(BaseModel):
@@ -68,19 +93,25 @@ class Scenario(BaseModel):
     - Accepts BE keys via aliases (e.g., `scenarioName`, `lifeHistory`).
     - `events` contains instantiated BaseEvent subclasses (from your registry).
     """
+
     name: str = Field(alias="scenarioName")
-    learning_objective: str = Field(alias="learningObjective")
-    prompt: str
     events: List[BaseEvent] = Field(default_factory=list)
-    trigger_events: List[str] = Field(default_factory=list, description="List of event IDs that should be sent to UI/Core")
-    termination_event: Optional[TerminationEvent] = Field(default=None, alias="terminationEvent", description="Configuration for auto-termination event")
+    trigger_events: List[str] = Field(
+        default_factory=list,
+        description="List of event IDs that should be sent to UI/Core",
+    )
+    termination_event: Optional[TerminationEvent] = Field(
+        default=None,
+        alias="terminationEvent",
+        description="Configuration for auto-termination event",
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict)
     voice: Optional[ScenarioVoice] = Field(default=None)
-    prompt_data : VoicePromptData = Field(default_factory=VoicePromptData)
+    prompt_data: VoicePromptData = Field(default_factory=VoicePromptData)
     language_config: Optional[LanguageConfig] = Field(default=None)
 
     model_config = {
-        "populate_by_name": True,     # allow both alias and field name on input
+        "populate_by_name": True,  # allow both alias and field name on input
         "arbitrary_types_allowed": True,
     }
 
@@ -103,7 +134,8 @@ class Scenario(BaseModel):
 
         Args:
             payload: Scenario metadata
-            embedding_client: Optional shared embedding client for semantic similarity events
+            embedding_client: Optional shared embedding client for
+                semantic similarity events
         """
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
@@ -116,22 +148,20 @@ class Scenario(BaseModel):
         voice_obj = cls._build_voice(raw)
         prompt_data = cls._build_prompt_data(raw)
         language_config = cls._build_language_config(raw)
-        # Extract trigger_events (list of event IDs that should be sent)
+        # Extract trigger_events (list of event IDs that should be sent).
         trigger_events = raw.get("triggerEvents") or []
         # Extract termination event configuration
         termination_event = cls._build_termination_event(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
-            learningObjective=normalized["learningObjective"],
-            prompt=normalized["prompt"],
             metadata=normalized.get("metadata", {}),
             events=built_events,
             trigger_events=trigger_events if isinstance(trigger_events, list) else [],
             terminationEvent=termination_event,
             voice=voice_obj,
             prompt_data=prompt_data,
-            language_config=language_config
+            language_config=language_config,
         )
 
     # ---------------------------
@@ -149,9 +179,7 @@ class Scenario(BaseModel):
         """
         return {
             "scenarioName": raw.get("title") or "",
-            "learningObjective": raw.get("description") or "",
-            "prompt": raw.get("prompt") or "",
-            "metadata": raw.get("metadata", {})
+            "metadata": raw.get("metadata", {}),
         }
 
     @staticmethod
@@ -183,7 +211,8 @@ class Scenario(BaseModel):
     @staticmethod
     def _build_prompt_data(raw: Mapping[str, Any]) -> VoicePromptData:
         """
-        Parses the raw input dictionary, maps keys, and creates a VoicePromptData object.
+        Parses the raw input dictionary, maps keys, and creates a
+        VoicePromptData object.
         """
         prompt_data_dict = raw.get("promptData")
 
@@ -196,21 +225,26 @@ class Scenario(BaseModel):
                 "name": prompt_data_dict.get("name"),
                 "age": str(prompt_data_dict.get("age")),
                 "gender": prompt_data_dict.get("gender"),
-                "gender_identity": prompt_data_dict.get("genderIdentity",None),
-                "sexual_orientation": prompt_data_dict.get("sexualOrientation",None),
+                "gender_identity": prompt_data_dict.get("genderIdentity", None),
+                "sexual_orientation": prompt_data_dict.get("sexualOrientation", None),
                 "current_location": prompt_data_dict.get("currentLocation"),
-                "profession": prompt_data_dict.get("profession",None),
+                "profession": prompt_data_dict.get("profession", None),
                 "context": prompt_data_dict.get("context"),
-                "session_behavior_guidelines": prompt_data_dict.get("sessionBehaviorGuidelines",None),
+                "session_behavior_guidelines": prompt_data_dict.get(
+                    "sessionBehaviorGuidelines", None
+                ),
                 "life_history_summary": prompt_data_dict.get("lifeHistory"),
-                "core_memories": prompt_data_dict.get("coreMemories",None),
-                "personality": prompt_data_dict.get("personality",None),
-                "starting_state": prompt_data_dict.get("startingState",None),
-                "emotional_needs": prompt_data_dict.get("emotionalNeeds",None),
-                "tone": prompt_data_dict.get("tone",None),
+                "core_memories": prompt_data_dict.get("coreMemories", None),
+                "personality": prompt_data_dict.get("personality", None),
+                "starting_state": prompt_data_dict.get("startingState", None),
+                "emotional_needs": prompt_data_dict.get("emotionalNeeds", None),
+                "tone": prompt_data_dict.get("tone", None),
                 "opening_statements": prompt_data_dict.get("openingStatements"),
                 "agent_goal": prompt_data_dict.get("agentGoal"),
                 "custom_fields": prompt_data_dict.get("customFields"),
+                "prompt": prompt_data_dict.get("prompt"),
+                "response_length": prompt_data_dict.get("responseLength"),
+                "agent_dialogues": prompt_data_dict.get("agentDialogues"),
             }
 
             prompt_data_obj = VoicePromptData(**mapped_data)
@@ -221,7 +255,8 @@ class Scenario(BaseModel):
 
     @staticmethod
     def _build_termination_event(raw: Mapping[str, Any]) -> Optional[TerminationEvent]:
-        """Extract termination event configuration from scenario-level `autoTerminationEvent` key."""
+        """Extract termination event configuration from scenario-level
+        `autoTerminationEvent` key."""
         termination_event_data = raw.get("autoTerminationEvent")
         if not termination_event_data:
             return None
@@ -239,8 +274,10 @@ class Scenario(BaseModel):
 
         Parses:
         - languageCode: BCP 47 language code (defaults to "en-IN")
-        - stt: Optional STT provider configuration (currently unused - uses language registry)
-        - llm: Optional LLM provider configuration (currently unused - uses language registry)
+        - stt: Optional STT provider configuration (currently unused -
+          uses language registry)
+        - llm: Optional LLM provider configuration (currently unused -
+          uses language registry)
 
         Args:
             raw: Raw scenario dictionary from metadata
@@ -253,10 +290,5 @@ class Scenario(BaseModel):
         llm_config = raw.get("llm")
 
         return LanguageConfig(
-            language_code=language_code,
-            stt_config=stt_config,
-            llm_config=llm_config
+            language_code=language_code, stt_config=stt_config, llm_config=llm_config
         )
-
-
-

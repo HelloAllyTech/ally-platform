@@ -1,15 +1,28 @@
-from typing import List, Literal, Mapping, Any, Optional, Dict
-from app.core.constants import VisibilityType, DetectionType
-from app.core.constants import VisibilityType, DetectionType, ConditionOperator, DEFAULT_LANGUAGE_CODE
-from app.core.events.base import BaseEvent
-from app.core.events.event_types.similarity_based.similarity_event import SimilarityEvent
-from app.core.events.event_types.semantic_similarity.semantic_similarity_event import SemanticSimilarityEvent
-from app.core.events.event_types.time.time_event import TimeEvent, TimeData
-from app.core.events.event_types.score.score_event import ScoreEvent, ScoreData
-from app.core.events.event_types.combination.combination_event import CombinationEvent, CombinationData, ExpressionNode
-from app.core.events.event_types.binary_classifier.binary_classifier_event import BinaryClassifierEvent
-from app.core.events.event_types.binary_classifier.schemas import BinaryClassifierData, Example
+from typing import Any, Dict, List, Literal, Mapping, Optional
+
+from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
+from app.core.events.base import BaseEvent
+from app.core.events.event_types.binary_classifier.binary_classifier_event import (
+    BinaryClassifierEvent,
+)
+from app.core.events.event_types.binary_classifier.schemas import (
+    BinaryClassifierData,
+    Example,
+)
+from app.core.events.event_types.combination.combination_event import (
+    CombinationData,
+    CombinationEvent,
+    ExpressionNode,
+)
+from app.core.events.event_types.score.score_event import ScoreData, ScoreEvent
+from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (
+    SemanticSimilarityEvent,
+)
+from app.core.events.event_types.similarity_based.similarity_event import (
+    SimilarityEvent,
+)
+from app.core.events.event_types.time.time_event import TimeData, TimeEvent
 from app.utils import get_logger
 
 
@@ -49,7 +62,9 @@ def _create_event_by_detection_type(
         "emoji": ev.get("emoji"),
         "emoji_message": ev.get("message"),
         "branching_instruction": ev.get("branchInstruction"),
-        "show_feedback": ev.get("feedbackStatus", True),  # Default to True if not provided
+        "show_feedback": ev.get(
+            "feedbackStatus", True
+        ),  # Default to True if not provided
     }
 
     try:
@@ -60,7 +75,11 @@ def _create_event_by_detection_type(
             elif "sentences" in ev:
                 sentences = ev.get("sentences", [])
             if not isinstance(sentences, list):
-                log.warning("Event '%s' (SENTENCE_SIMILARITY) invalid 'sentences' field: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (SENTENCE_SIMILARITY) invalid 'sentences' field: %r",
+                    event_id,
+                    raw_data,
+                )
                 return None
 
             return SimilarityEvent.create(
@@ -75,7 +94,9 @@ def _create_event_by_detection_type(
 
         elif detection_type == DetectionType.TIME:
             if not raw_data or not isinstance(raw_data, dict):
-                log.warning("Event '%s' (TIME) missing/invalid data: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (TIME) missing/invalid data: %r", event_id, raw_data
+                )
                 return None
 
             try:
@@ -94,7 +115,9 @@ def _create_event_by_detection_type(
 
         elif detection_type == DetectionType.SCORE:
             if not raw_data or not isinstance(raw_data, dict):
-                log.warning("Event '%s' (SCORE) missing/invalid data: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (SCORE) missing/invalid data: %r", event_id, raw_data
+                )
                 return None
             try:
                 score_data = ScoreData(**raw_data)
@@ -119,7 +142,11 @@ def _create_event_by_detection_type(
                 sentences = ev.get("sentences", [])
 
             if not isinstance(sentences, list):
-                log.warning("Event '%s' (SEMANTIC_SIMILARITY) invalid 'sentences' field: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (SEMANTIC_SIMILARITY) invalid 'sentences' field: %r",
+                    event_id,
+                    raw_data,
+                )
                 return None
 
             return SemanticSimilarityEvent.create(
@@ -135,16 +162,22 @@ def _create_event_by_detection_type(
 
         elif detection_type == DetectionType.COMBINATION:
             if not raw_data or not isinstance(raw_data, dict):
-                log.warning("Event '%s' (COMBINATION) missing/invalid data: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (COMBINATION) missing/invalid data: %r",
+                    event_id,
+                    raw_data,
+                )
                 return None
             try:
                 expression = _parse_expression(raw_data.get("expression", {}))
                 combination_data = CombinationData(
                     dependent_events=raw_data.get("dependent_events", []),
-                    expression=expression
+                    expression=expression,
                 )
             except Exception as e:
-                log.warning("Event '%s' (COMBINATION) invalid expression/data: %s", event_id, e)
+                log.warning(
+                    "Event '%s' (COMBINATION) invalid expression/data: %s", event_id, e
+                )
                 return None
 
             return CombinationEvent.create(
@@ -157,13 +190,17 @@ def _create_event_by_detection_type(
 
         elif detection_type == DetectionType.BINARY_CLASSIFIER:
             if not raw_data or not isinstance(raw_data, dict):
-                log.warning("Event '%s' (BINARY_CLASSIFIER) missing/invalid data: %r", event_id, raw_data)
+                log.warning(
+                    "Event '%s' (BINARY_CLASSIFIER) missing/invalid data: %r",
+                    event_id,
+                    raw_data,
+                )
                 return None
-            
+
             classifier_data = _parse_binary_classifier_data(raw_data, event_id, log)
             if not classifier_data:
                 return None
-            
+
             return BinaryClassifierEvent.create(
                 event_id=event_id,
                 visibility_type=visibility_type,
@@ -173,58 +210,137 @@ def _create_event_by_detection_type(
             )
 
         else:
-            log.warning("Event '%s' unknown detection type: %s", event_id, detection_type)
+            log.warning(
+                "Event '%s' unknown detection type: %s", event_id, detection_type
+            )
             return None
 
     except Exception as e:
-        log.exception("Unhandled exception while creating event '%s' (type=%s): %s", event_id, detection_type, e)
+        log.exception(
+            "Unhandled exception while creating event '%s' (type=%s): %s",
+            event_id,
+            detection_type,
+            e,
+        )
         return None
 
 
-def _parse_binary_classifier_data(raw_data: dict, event_id: str, log) -> Optional[BinaryClassifierData]:
+def _parse_binary_classifier_data(
+    raw_data: dict, event_id: str, log
+) -> Optional[BinaryClassifierData]:
     """
     Parse raw binary classifier data from metadata into BinaryClassifierData.
     Handles camelCase keys from backend.
-    
+
     Args:
         raw_data: Raw data dictionary from metadata
         event_id: Event ID for logging
         log: Logger instance
-    
+
     Returns:
         BinaryClassifierData instance or None if parsing fails
     """
     class_name = raw_data.get("className")
     if not class_name:
-        log.warning("Event '%s' (BINARY_CLASSIFIER) missing 'className' field: %r", event_id, raw_data)
+        log.warning(
+            "Event '%s' (BINARY_CLASSIFIER) missing 'className' field: %r",
+            event_id,
+            raw_data,
+        )
         return None
-    
+
     positive_examples = None
     negative_examples = None
-    
+
     pos_examples_raw = raw_data.get("positiveExamples")
     if pos_examples_raw and isinstance(pos_examples_raw, list):
         positive_examples = [
             Example(text=ex["text"]) if isinstance(ex, dict) else Example(text=str(ex))
             for ex in pos_examples_raw
         ]
-    
+
     neg_examples_raw = raw_data.get("negativeExamples")
     if neg_examples_raw and isinstance(neg_examples_raw, list):
         negative_examples = [
             Example(text=ex["text"]) if isinstance(ex, dict) else Example(text=str(ex))
             for ex in neg_examples_raw
         ]
-    
+
     try:
         return BinaryClassifierData(
             class_name=class_name,
             positive_examples=positive_examples,
-            negative_examples=negative_examples
+            negative_examples=negative_examples,
         )
     except Exception as e:
         log.warning("Event '%s' (BINARY_CLASSIFIER) invalid data: %s", event_id, e)
         return None
+
+
+def _expand_combination_expression(
+    expression: ExpressionNode,
+    combination_events_map: Dict[str, ExpressionNode],
+    visited: Optional[set] = None,
+) -> ExpressionNode:
+    """
+    Recursively expand an expression by replacing IDENTIFIER nodes that reference
+    combination events with the referenced event's expression.
+
+    This ensures that combination event expressions only contain references to
+    simple (non-combination) events.
+
+    Args:
+        expression: The expression node to expand
+        combination_events_map: Map of combination event IDs to their expressions
+        visited: Set of event IDs already visited (for cycle detection)
+
+    Returns:
+        A new ExpressionNode with all combination event references expanded
+    """
+    if visited is None:
+        visited = set()
+
+    if expression.type == "IDENTIFIER":
+        event_id = expression.id
+        if event_id and event_id in combination_events_map:
+            # Check for circular reference
+            if event_id in visited:
+                # Return the identifier as-is to avoid infinite recursion
+                # The circular dependency check in EventOrchestrator will handle this
+                return expression
+            # Recursively expand the referenced combination event's expression
+            visited.add(event_id)
+            return _expand_combination_expression(
+                combination_events_map[event_id], combination_events_map, visited.copy()
+            )
+        # Not a combination event, return as-is
+        return expression
+
+    elif expression.type == "NOT":
+        if expression.operand:
+            expanded_operand = _expand_combination_expression(
+                expression.operand, combination_events_map, visited.copy()
+            )
+            return ExpressionNode(type="NOT", operand=expanded_operand)
+        return expression
+
+    elif expression.type in ("AND", "OR"):
+        expanded_left = None
+        expanded_right = None
+        if expression.left:
+            expanded_left = _expand_combination_expression(
+                expression.left, combination_events_map, visited.copy()
+            )
+        if expression.right:
+            expanded_right = _expand_combination_expression(
+                expression.right, combination_events_map, visited.copy()
+            )
+        return ExpressionNode(
+            type=expression.type, left=expanded_left, right=expanded_right
+        )
+
+    # Unknown type, return as-is
+    return expression
 
 
 def _parse_expression(expr_dict: dict) -> ExpressionNode:
@@ -243,17 +359,18 @@ def _parse_expression(expr_dict: dict) -> ExpressionNode:
         if "operand" not in expr_dict:
             raise ValueError("NOT expression must have 'operand' field")
         return ExpressionNode(
-            type="NOT",
-            operand=_parse_expression(expr_dict["operand"])
+            type="NOT", operand=_parse_expression(expr_dict["operand"])
         )
 
     elif node_type in ("AND", "OR"):
         if "left" not in expr_dict or "right" not in expr_dict:
-            raise ValueError(f"{node_type} expression must have 'left' and 'right' fields")
+            raise ValueError(
+                f"{node_type} expression must have 'left' and 'right' fields"
+            )
         return ExpressionNode(
             type=node_type,
             left=_parse_expression(expr_dict["left"]),
-            right=_parse_expression(expr_dict["right"])
+            right=_parse_expression(expr_dict["right"]),
         )
 
     else:
@@ -262,32 +379,41 @@ def _parse_expression(expr_dict: dict) -> ExpressionNode:
 
 def _extract_language_code(source: Mapping[str, Any]) -> str:
     """
-    Extract language_code from a dictionary, checking both direct fields and nested languageConfig.
-    
+    Extract language_code from a dictionary, checking both direct fields
+    and nested languageConfig.
+
     Args:
         source: Dictionary to extract language_code from
-        
+
     Returns:
         Extracted language_code or DEFAULT_LANGUAGE_CODE if not found
     """
     # First check for languageCode directly (most common case)
-    language_code = source.get("languageCode") or source.get("language_code") or DEFAULT_LANGUAGE_CODE
-    
+    language_code = (
+        source.get("languageCode")
+        or source.get("language_code")
+        or DEFAULT_LANGUAGE_CODE
+    )
+
     # Then check for nested languageConfig dict
     if language_code == DEFAULT_LANGUAGE_CODE:
         language_config = source.get("languageConfig") or source.get("language_config")
         if isinstance(language_config, dict):
-            language_code = language_config.get("language_code") or language_config.get("languageCode") or DEFAULT_LANGUAGE_CODE
-    
+            language_code = (
+                language_config.get("language_code")
+                or language_config.get("languageCode")
+                or DEFAULT_LANGUAGE_CODE
+            )
+
     return language_code
 
 
 def build_events_from_metadata(
-        metadata: Mapping[str, Any],
-        *,
-        on_unknown: Literal["ignore", "warn", "error"] = "ignore",
-        logger=None,
-        embedding_client: Optional[BaseEmbeddingClient] = None,
+    metadata: Mapping[str, Any],
+    *,
+    on_unknown: Literal["ignore", "warn", "error"] = "ignore",
+    logger=None,
+    embedding_client: Optional[BaseEmbeddingClient] = None,
 ) -> List[BaseEvent]:
     """
     Convert a scenario dict to a list of BaseEvent instances.
@@ -299,6 +425,7 @@ def build_events_from_metadata(
         embedding_client: Optional embedding client for semantic similarity events
     """
     import logging
+
     events: List[BaseEvent] = []
     unknown_ids: list[str] = []
     reasons: Dict[str, str] = {}
@@ -308,14 +435,16 @@ def build_events_from_metadata(
     log.debug("build_events_from_metadata called")
 
     # Extract language_code from metadata
-    # If metadata has a "scenario" key, extract from that section; otherwise metadata is the scenario itself
+    # If metadata has a "scenario" key, extract from that section;
+    # otherwise metadata is the scenario itself
     scenario_section = metadata.get("scenario")
     if isinstance(scenario_section, dict):
         language_code = _extract_language_code(scenario_section)
     else:
         language_code = _extract_language_code(metadata)
 
-    # normalize event list location: metadata may be {"scenario": {...}} or the raw scenario
+    # normalize event list location: metadata may be {"scenario": {...}} or
+    # the raw scenario
     event_dicts = metadata.get("events") or []
     if not event_dicts:
         if isinstance(scenario_section, dict):
@@ -338,7 +467,11 @@ def build_events_from_metadata(
             reasons["<missing-id>"] = reason
             continue
 
-        log.debug("Processing event id=%s raw_detectionType=%s", event_id, ev.get("detectionType"))
+        log.debug(
+            "Processing event id=%s raw_detectionType=%s",
+            event_id,
+            ev.get("detectionType"),
+        )
 
         # determine detection type (strict name lookup first)
         detection_type_str = ev.get("detectionType")
@@ -347,7 +480,11 @@ def build_events_from_metadata(
             # backward compatibility: old format with 'sentences' => SENTENCE_SIMILARITY
             if "sentences" in ev:
                 detection_type = DetectionType.SENTENCE_SIMILARITY
-                log.debug("Event %s: inferred detection type SENTENCE_SIMILARITY from legacy 'sentences' field", event_id)
+                log.debug(
+                    "Event %s: inferred detection type SENTENCE_SIMILARITY "
+                    "from legacy 'sentences' field",
+                    event_id,
+                )
             else:
                 reason = "missing detectionType and no legacy 'sentences' field"
                 log.warning("Skipping event '%s': %s", event_id, reason)
@@ -375,14 +512,22 @@ def build_events_from_metadata(
                 language_code=language_code,
             )
             if instance is None:
-                reason = "factory returned None (validation/parsing failed inside _create_event_by_detection_type)"
+                reason = (
+                    "factory returned None (validation/parsing failed "
+                    "inside _create_event_by_detection_type)"
+                )
                 log.warning("Event '%s' skipped: %s", event_id, reason)
                 unknown_ids.append(event_id)
                 reasons[event_id] = reason
                 continue
 
             events.append(instance)
-            log.info("Created event object: id=%s type=%s class=%s", event_id, detection_type.name, instance.__class__.__name__)
+            log.info(
+                "Created event object: id=%s type=%s class=%s",
+                event_id,
+                detection_type.name,
+                instance.__class__.__name__,
+            )
 
         except Exception as e:
             log.exception("Failed to create event '%s': %s", event_id, e)
@@ -394,11 +539,39 @@ def build_events_from_metadata(
     # Summarize skipped events if requested
     if unknown_ids:
         if on_unknown == "warn":
-            log.warning("Some events were skipped (%d): %s", len(unknown_ids), unknown_ids)
+            log.warning(
+                "Some events were skipped (%d): %s", len(unknown_ids), unknown_ids
+            )
             for eid, r in reasons.items():
                 log.debug("Skipped reason: %s -> %s", eid, r)
         elif on_unknown == "error":
             raise UnknownEventIdError(unknown_ids)
 
-    log.info("build_events_from_metadata: built %d event objects, skipped %d", len(events), len(unknown_ids))
+    # Expand combination event expressions to only reference simple events
+    # Build a map of combination event IDs to their expressions
+    combination_events_map: Dict[str, ExpressionNode] = {}
+    for event in events:
+        if event.detection_type == DetectionType.COMBINATION:
+            if hasattr(event, "data") and hasattr(event.data, "expression"):
+                combination_events_map[event.event_id] = event.data.expression
+
+    # Expand each combination event's expression
+    if combination_events_map:
+        for event in events:
+            if event.detection_type == DetectionType.COMBINATION:
+                if hasattr(event, "data") and hasattr(event.data, "expression"):
+                    expanded_expression = _expand_combination_expression(
+                        event.data.expression, combination_events_map
+                    )
+                    event.data.expression = expanded_expression
+        log.debug(
+            "Expanded %d combination event expressions to reference only simple events",
+            len(combination_events_map),
+        )
+
+    log.info(
+        "build_events_from_metadata: built %d event objects, skipped %d",
+        len(events),
+        len(unknown_ids),
+    )
     return events
