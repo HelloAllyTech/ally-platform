@@ -4,6 +4,7 @@ import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {
+  animations,
   HexagonCloseIcon,
   ShieldWithTickIcon,
   summaryFailed,
@@ -117,7 +118,7 @@ export const SummaryGenerationProgress = ({
       ) : (
         <View style={styles.videoContainer}>
           <LottieView
-            source={require('@/assets/animations/summaryLoading.json')}
+            source={animations.summaryLoading}
             style={styles.video}
             autoPlay
             loop

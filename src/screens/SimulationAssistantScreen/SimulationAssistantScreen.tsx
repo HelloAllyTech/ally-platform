@@ -15,6 +15,7 @@ import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
+import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
 import {
@@ -38,10 +39,10 @@ import {
 } from '@/utils';
 
 import {
-  ControlButtons,
   EndingSoonModal,
   LiveFeedback,
   SessionScoreMeter,
+  SimulationControls,
   SimulationTimer,
 } from './components';
 import {ParticipantTile} from './components/ParticipantTile/ParticipantTile';
@@ -168,7 +169,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
-      playNotificationSound(require('../../assets/sounds/startSimulation.mp3'));
       setIsConnecting(false);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
@@ -181,6 +181,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
       if (!isDisconnecting) {
+        playNotificationSound(sounds.simulationAutoTermination);
         setIsDisconnecting(true);
         setIsMicEnabled(false);
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
@@ -230,6 +231,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
+  useEffect(() => {
+    playNotificationSound(sounds.startSimulation);
+  }, []);
+
   const configureAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
@@ -263,11 +268,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, liveKitServerUrl]);
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = useCallback(async () => {
     try {
       setIsDisconnecting(true);
+      playNotificationSound(sounds.endSimulation);
       await room.disconnect();
-      playNotificationSound(require('../../assets/sounds/endSimulation.mp3'));
       await endScenarioSession({
         scenarioSessionId: sessionId,
       });
@@ -279,9 +284,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       setIsMicEnabled(false);
       setIsDisconnecting(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, pathId]);
 
-  const handleToggleMic = async () => {
+  const handleToggleMic = useCallback(async () => {
     try {
       const next = !isMicEnabled;
       await room.localParticipant.setMicrophoneEnabled(next);
@@ -289,7 +295,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     } catch (error) {
       showErrorToast(error, 'Errors.toggleMic');
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMicEnabled]);
 
   const renderLoader = () => {
     return (
@@ -372,15 +379,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                     </View>
                   </View>
                 </View>
-                {!isFocusMode && (
+                {!isFocusMode && feedback && (
                   <View style={styles.liveFeedbackWrapper}>
-                    {feedback && (
-                      <LiveFeedback
-                        key={feedbackKey}
-                        message={feedback.text}
-                        emoji={feedback.emoji}
-                      />
-                    )}
+                    <LiveFeedback
+                      key={feedbackKey}
+                      message={feedback.text}
+                      emoji={feedback.emoji}
+                    />
                   </View>
                 )}
               </>
@@ -415,17 +420,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           />
         </View>
         {isSimulationInProgress && (
-          <ControlButtons
+          <SimulationControls
             isMaximized={isControlButtonMaximized}
             onToggleMaximized={() => setIsControlButtonMaximized(prev => !prev)}
+            isMicEnabled={isMicEnabled}
+            onMicToggle={handleToggleMic}
             isFocusMode={isFocusMode}
-            isFocusModeDisabled={!isSimulationInProgress}
-            onFocusModeButtonPress={() => setIsFocusMode(prev => !prev)}
-            isSimulationEndDisabled={!isSimulationInProgress}
-            onSimulationEndPress={handleDisconnect}
-            isMicDisabled={!isSimulationInProgress}
-            onMicButtonPress={handleToggleMic}
-            isMuted={!isMicEnabled}
+            onFocusModeToggle={() => setIsFocusMode(prev => !prev)}
+            onEndSession={handleDisconnect}
+            isSimulationInProgress={isSimulationInProgress}
           />
         )}
       </RoomContext.Provider>

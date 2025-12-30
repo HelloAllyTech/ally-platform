@@ -16,7 +16,7 @@ react {
     autolinkLibrariesWithApp()
 }
 
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
@@ -31,8 +31,8 @@ android {
         applicationId "com.helloally.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 23
-        versionName "1.7.0"
+        versionCode 25
+        versionName "1.8.0"
     }
 
     flavorDimensions "version"

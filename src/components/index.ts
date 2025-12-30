@@ -31,6 +31,14 @@ export {ShinyText} from './ShinyText';
 export {ForceUpdateModal} from './ForceUpdateModal';
 export {StarRating, type StarRatingProps} from './StarRating';
 export {ChipGroup, type ChipGroupProps, type ChipOption} from './ChipGroup';
+export {
+  ButtonGroup,
+  ButtonItem,
+  CollapsibleButtonGroup,
+  type ButtonOption,
+  type ButtonGroupProps,
+  type CollapsibleButtonGroupProps,
+} from './ButtonGroup';
 export {EmptyTranscript} from './EmptyTranscript';
 export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';

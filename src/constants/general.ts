@@ -76,7 +76,7 @@ export const API_ROUTES = {
     REFRESH: '/auth/refresh',
     GENERATE_OTP: '/auth/generate-otp',
     VERIFY_OTP: '/auth/verify-otp',
-    PERMISSIONS: '/auth/permissions',
+    PERMISSIONS: '/authorization/permissions',
   },
   USERS: {
     ME: '/users/me',

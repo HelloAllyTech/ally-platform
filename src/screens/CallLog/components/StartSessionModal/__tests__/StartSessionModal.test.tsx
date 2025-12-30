@@ -19,33 +19,27 @@ jest.mock('@/components', () => {
   };
 });
 
-jest.mock('@/constants', () => ({
-  CHAT_TYPES: { EXOTEL_CONFERENCE_CHAT: 'EXOTEL', MICROPHONE_CHAT: 'MIC' },
-}));
-
 describe('StartSessionModal', () => {
   it('returns null when not visible', () => {
     const {toJSON} = render(
-      <StartSessionModal visible={false} onClose={jest.fn()} onJoinCall={jest.fn()} onListenLive={jest.fn()} />,
+      <StartSessionModal visible={false} onClose={jest.fn()} onListenLive={jest.fn()} />,
     );
     expect(toJSON()).toBeNull();
   });
 
-  it('enables single option preselect and fires onJoinCall', () => {
+  it('fires onListenLive when start button is pressed', () => {
     const onClose = jest.fn();
-    const onJoinCall = jest.fn();
+    const onListenLive = jest.fn();
     const {getByText} = render(
       <StartSessionModal
         visible
         onClose={onClose}
-        enabledChatTypes={['EXOTEL'] as any}
-        onJoinCall={onJoinCall}
-        onListenLive={jest.fn()}
+        onListenLive={onListenLive}
       />,
     );
 
     fireEvent.press(getByText('CallLogs.startSessionNow'));
-    expect(onJoinCall).toHaveBeenCalled();
+    expect(onListenLive).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 });

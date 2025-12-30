@@ -374,7 +374,7 @@ describe('SimulationPathDetailsScreen', () => {
     expect(hasCredits).toBeTruthy();
   });
 
-  it('should render header with "Track way" title', () => {
+  it('should render header with path title', () => {
     useGetSimulationPathDetailsQuery.mockReturnValue({
       data: mockPathData,
       isLoading: false,
@@ -392,7 +392,7 @@ describe('SimulationPathDetailsScreen', () => {
       />,
     );
 
-    expect(getByText('Track way')).toBeTruthy();
+    expect(getByText('Test Path')).toBeTruthy();
   });
 
   it('should disable button when no next simulation is available', () => {
