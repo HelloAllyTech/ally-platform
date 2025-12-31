@@ -41,8 +41,7 @@ class TestPrompt:
             and "Starting therapy for anxiety." in content
         )
         assert (
-            "Summary of your life's history" in content
-            and "Grew up in a small town" in content
+            "your life history is" in content and "Grew up in a small town" in content
         )
 
     def test_generate_system_message_optional_blocks_and_next_instruction(self):
@@ -66,8 +65,8 @@ class TestPrompt:
         # It should contain the critical instruction and essential details only
         assert "<CRITICAL_INSTRUCTION>" in content
         assert "Focus on rapport." in content
-        assert "<CONTEXT>" in content
+        assert "<SYSTEM>" in content
         assert pd.name in content
-        assert str(pd.age) in content
-        assert pd.gender in content
-        assert pd.context in content
+        # Minimal prompt intentionally excludes detailed fields like age,
+        # gender, context
+        # to keep the prompt focused on the critical instruction

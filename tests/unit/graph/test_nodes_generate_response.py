@@ -160,6 +160,7 @@ class TestGenerateResponse:
                 "opening_statements": ["Hi"],
                 "agent_goal": None,
                 "custom_fields": None,
+                "prompt": None,
             },
         )()
 

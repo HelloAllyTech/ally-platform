@@ -1,8 +1,35 @@
+from textwrap import dedent
 from typing import Optional
 
 from langchain_core.messages import SystemMessage
 
 from app.core.scenario.base import VoicePromptData
+
+# --- Constants ---
+
+DEFAULT_PROMPT = """
+You are an AI roleplay assistant for counselor training.
+In this simulation, you must act ONLY as the **client** in a therapy session.
+Stay fully in character, provide realistic dialogue, and do not switch roles
+unless explicitly instructed.
+
+**Important Instructions:**
+- Prefer first-person phrasing (e.g., "I feel…", "I've been struggling with…").
+- Allow the counselor to guide the conversation.
+- If the counselor is silent or open-ended, share one thought, feeling,
+  or small story, then stop.
+- Maintain consistency with your life history but allow natural
+  variation in tone and detail.
+- Respond naturally, as a real client would (use first-person voice).
+- Reveal information gradually, not all at once.
+- Start with few details and open up more as counsellor asks questions.
+- Show authentic emotions, hesitations, or small inconsistencies
+  typical of real conversations.
+- Do not give therapy advice, diagnoses, or act as the counselor.
+- If sensitive topics arise, respond realistically but without graphic
+  or explicit detail.
+- Keep each reply under ~120 words to simulate session pacing.
+"""
 
 
 def _get_optional_block(label: str, value: Optional[str]) -> str:
@@ -85,11 +112,17 @@ def generate_system_message(
         A SystemMessage object with the complete, formatted prompt.
     """
 
+    # 1. Determine the base instruction (Custom vs Default)
+    # This prevents code duplication and keeps the fallback logic in one place.
+    base_system_prompt = prompt_data.prompt if prompt_data.prompt else DEFAULT_PROMPT
+
     # If we have a branching instruction, use simplified minimal prompt
     if next_instruction:
-        minimal_prompt = f"""<SYSTEM>
-            You are roleplaying as {prompt_data.name} in a counseling session.
-            You should only act as the client.
+        # 2. Construct the final prompt using dedent to handle indentation cleanly
+        minimal_prompt = dedent(
+            f"""
+            <SYSTEM>
+            {base_system_prompt.strip()}
             </SYSTEM>
 
             <CRITICAL_INSTRUCTION>
@@ -99,16 +132,12 @@ def generate_system_message(
             You MUST follow this instruction exactly in your next response.
             </CRITICAL_INSTRUCTION>
 
-            <CONTEXT>
-            - Name: {prompt_data.name}
-            - Age: {prompt_data.age}
-            - Gender: {prompt_data.gender}
-            - Situation: {prompt_data.context}
-            </CONTEXT>
-
             Respond as {prompt_data.name} while strictly following the critical
-            instruction above."""
-        return SystemMessage(content=minimal_prompt.strip())
+            instruction above.
+        """
+        ).strip()
+
+        return SystemMessage(content=minimal_prompt)
 
     # Otherwise, use the full detailed prompt (original behavior)
 
@@ -128,7 +157,7 @@ def generate_system_message(
         "Your emotional needs from this counselling session",
         prompt_data.emotional_needs,
     )
-    tone_block = _get_optional_block("Your talking stye/tone", prompt_data.tone)
+    tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
 
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
@@ -143,40 +172,10 @@ def generate_system_message(
         "use these dialogues for reference", prompt_data.agent_dialogues
     )
 
-    # agent_goal is omitted as per user's new example structure
-    # system_instruction from prompt_data is ignored and overridden below
-
-    # Hardcoded system instruction as requested
-    system_instruction = (
-        prompt_data.prompt
-        if prompt_data.prompt
-        else """"
-    You are an AI roleplay assistant for counselor training.
-    In this simulation, you must act ONLY as the **client** in a therapy session.
-    Stay fully in character, provide realistic dialogue, and do not switch roles
-    unless explicitly instructed.
-
-    **Important Instuctions:**
-     - Prefer first-person phrasing (e.g., ""I feel…"", ""I've been struggling with…"").
-    - Allow the counselor to guide the conversation.
-    - If the counselor is silent or open-ended, share one thought, feeling,
-      or small story, then stop.
-    - Maintain consistency with your life history but allow natural
-      variation in tone and detail.
-    - Respond naturally, as a real client would (use first-person voice).
-    - Reveal information gradually, not all at once.
-    - Start with few details and open up more as counsellor asks questions.
-    - Show authentic emotions, hesitations, or small inconsistencies
-      typical of real conversations.
-    - Do not give therapy advice, diagnoses, or act as the counselor.
-    - If sensitive topics arise, respond realistically but without graphic
-      or explicit detail.
-    - Keep each reply under ~120 words to simulate session pacing."""
-    )
-
     # Assemble the full detailed prompt (when no branching instruction is present)
-    system_prompt = f"""
-    {system_instruction}
+    system_prompt = dedent(
+        f"""
+    {base_system_prompt.strip()}
 
     ## Your Client Persona Details
     This is the background information for your character.
@@ -202,7 +201,6 @@ def generate_system_message(
 
     {guidelines_block}
 
-    **Summary of your life's history:**
     {life_history}
 
     {core_memories_block}
@@ -216,5 +214,6 @@ def generate_system_message(
     {agent_dialogues}
 
     """
+    )
 
     return SystemMessage(content=system_prompt.strip())
