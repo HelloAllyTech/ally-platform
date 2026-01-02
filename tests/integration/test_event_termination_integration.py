@@ -292,15 +292,17 @@ class TestEventTerminationIntegration:
         )
 
         # Patch the message queue to track when events are sent
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock(
                 side_effect=lambda **kwargs: call_order.append("send_to_core")
             )
 
+            # NOTE: Updated patch path to point to event_sender module
             with patch(
-                "app.core.events.event_orchestrator.event_orchestrator.send_event_to_ui"
+                "app.core.events.event_orchestrator.event_sender.send_event_to_ui"
             ) as mock_ui:
                 mock_ui.side_effect = lambda *args: call_order.append("send_to_ui")
 
@@ -368,8 +370,9 @@ class TestEventTerminationIntegration:
         assert orchestrator.deferred_termination_event is None
 
         # Trigger the termination event
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock()
 
@@ -391,8 +394,9 @@ class TestEventTerminationIntegration:
         from app.core.events.schemas import CoreEventMessageType
         from app.core.graph.utils import serialize_event
 
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock()
 
