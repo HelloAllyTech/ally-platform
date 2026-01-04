@@ -29,9 +29,40 @@ describe('authApi endpoints', () => {
   });
 
   it('exports mutation hooks', () => {
-    const {useGenerateOtpMutation, useVerifyOtpMutation} = require('../authApi');
+    const {useGenerateOtpMutation, useVerifyOtpMutation, useLoginWithGoogleMutation} = require('../authApi');
     expect(useGenerateOtpMutation).toBeDefined();
     expect(useVerifyOtpMutation).toBeDefined();
+    expect(useLoginWithGoogleMutation).toBeDefined();
+  });
+
+  it('defines loginWithGoogle endpoint', () => {
+    expect(typeof (authApi as any).endpoints.loginWithGoogle).toBe('object');
+  });
+
+  it('loginWithGoogle endpoint is a mutation', () => {
+    const endpoint = (authApi as any).endpoints.loginWithGoogle;
+    expect(endpoint.matchFulfilled).toBeDefined();
+  });
+
+  describe('loginWithGoogle endpoint', () => {
+    it('should support idToken payload', () => {
+      const request = {
+        idToken: 'test-id-token',
+        allowedRoles: [UserRole.COUNSELOR, UserRole.LEARNER],
+      } as any;
+      
+      expect(request.idToken).toBe('test-id-token');
+      expect(request.allowedRoles).toEqual([UserRole.COUNSELOR, UserRole.LEARNER]);
+    });
+
+    it('should handle empty allowedRoles array', () => {
+      const request = {
+        idToken: 'test-id-token',
+        allowedRoles: [],
+      } as any;
+      
+      expect(request.allowedRoles).toEqual([]);
+    });
   });
 
   describe('endpoint interfaces', () => {

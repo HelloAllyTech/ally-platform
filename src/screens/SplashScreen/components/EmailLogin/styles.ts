@@ -46,6 +46,22 @@ export const styles = ScaledSheet.create({
   inputFocused: {
     borderColor: colors.brightBlue,
   },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: '48@vs',
+    marginBottom: '22@vs',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.ds.stroke.primary,
+  },
+  dividerText: {
+    ...typography.body.small,
+    color: colors.mediumGray,
+    marginHorizontal: '10@s',
+  },
   bottomContainer: {
     width: '100%',
   },

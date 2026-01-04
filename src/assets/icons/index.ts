@@ -42,6 +42,7 @@ import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
 import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
 import GoldenShieldIcon from './goldenShield.svg';
+import GoogleIcon from './google.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
@@ -148,6 +149,7 @@ export {
   FilterIcon,
   FlowIcon,
   GoldenShieldIcon,
+  GoogleIcon,
   HandShareIcon,
   HeadphoneIcon,
   HeadsetMicIcon,

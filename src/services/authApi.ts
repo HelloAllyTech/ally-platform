@@ -22,6 +22,10 @@ export interface VerifyOtpRequest {
   otp: string;
 }
 
+export interface GoogleLoginRequest {
+  idToken: string;
+}
+
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<GenerateOtpResponse, GenerateOtpRequest>({
@@ -36,6 +40,13 @@ export const authApi = api.injectEndpoints({
         url: API_ROUTES.AUTH.VERIFY_OTP,
         method: API_METHODS.POST,
         body: {email, otp, allowedRoles: ALLOWED_ROLES},
+      }),
+    }),
+    loginWithGoogle: builder.mutation<AuthResponse, GoogleLoginRequest>({
+      query: ({idToken}) => ({
+        url: API_ROUTES.AUTH.GOOGLE_LOGIN,
+        method: API_METHODS.POST,
+        body: {idToken, allowedRoles: ALLOWED_ROLES},
       }),
     }),
     getUser: builder.query<User, void>({
@@ -70,6 +81,7 @@ export const authApi = api.injectEndpoints({
 export const {
   useGenerateOtpMutation,
   useVerifyOtpMutation,
+  useLoginWithGoogleMutation,
   useLazyGetUserQuery,
   useLazyGetPermissionsQuery,
   useLazyCheckTermsAndAgreementQuery,

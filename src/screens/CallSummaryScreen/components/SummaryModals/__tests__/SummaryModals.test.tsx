@@ -1,6 +1,20 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
+// Mock Google Sign-In to avoid native module requirement
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(),
+    signIn: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+}));
+
 // Mock RTK Query api to avoid circular import issues in tests
 jest.mock('@/services/api', () => ({
   api: {
