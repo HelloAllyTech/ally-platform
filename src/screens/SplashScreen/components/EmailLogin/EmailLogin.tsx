@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {SerializedError} from '@reduxjs/toolkit';
 import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
 import {Alert, Linking, Text, TextInput, View} from 'react-native';
@@ -12,10 +12,13 @@ import {
   TERMS_AND_CONDITIONS_URL,
 } from '@/constants/general';
 import {useGoogleLogin, useTranslate} from '@/hooks';
-import {useGenerateOtpMutation} from '@/services/authApi';
+import {AuthResponse, useGenerateOtpMutation} from '@/services/authApi';
+import {useAppDispatch} from '@/store/hooks';
+import {storeTokens} from '@/store/slices/userSlice';
 import {colors} from '@/theme';
 import {getErrorDetails, isValidEmail} from '@/utils';
 
+import {TermsAndAgreementModal} from '../TermsAndAgreementModal';
 import {styles} from './styles';
 import type {EmailLoginProps} from './types';
 
@@ -25,6 +28,8 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const tempTokensRef = useRef<AuthResponse | null>(null);
   const [
     generateOtp,
     {
@@ -35,11 +40,27 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
       data: otpData,
     },
   ] = useGenerateOtpMutation();
+  const dispatch = useAppDispatch();
+
+  const handleGoogleLoginSuccess = useCallback((tokens: AuthResponse) => {
+    tempTokensRef.current = tokens;
+    setShowTermsModal(true);
+  }, []);
 
   const {signIn: handleGoogleSignIn, isLoading: isGoogleLoading} =
     useGoogleLogin({
-      onLoginSuccess,
+      onLoginSuccess: handleGoogleLoginSuccess,
     });
+
+  const handleAcceptTerms = useCallback(async () => {
+    const tokens = tempTokensRef.current;
+    if (!tokens) return;
+
+    setShowTermsModal(false);
+    await dispatch(storeTokens(tokens)).unwrap();
+    tempTokensRef.current = null;
+    onLoginSuccess();
+  }, [dispatch, onLoginSuccess]);
 
   const {t} = useTranslate();
 
@@ -158,6 +179,11 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
           isLoading={isOtpLoading}
         />
       </View>
+
+      <TermsAndAgreementModal
+        visible={showTermsModal}
+        onAgree={handleAcceptTerms}
+      />
     </View>
   );
 };

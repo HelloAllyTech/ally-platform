@@ -6,18 +6,15 @@ import {
 import Config from 'react-native-config';
 
 import {showToast} from '@/components/Toast/ToastProvider';
-import {useLoginWithGoogleMutation} from '@/services/authApi';
-import {useAppDispatch} from '@/store/hooks';
-import {storeTokens} from '@/store/slices/userSlice';
+import {AuthResponse, useLoginWithGoogleMutation} from '@/services/authApi';
 import {logger} from '@/utils/logger';
 
 interface UseGoogleLoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (tokens: AuthResponse) => void;
 }
 
 export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
   const [loginWithGoogle, {isLoading}] = useLoginWithGoogleMutation();
-  const dispatch = useAppDispatch();
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -59,13 +56,7 @@ export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
         const response = await loginWithGoogle({idToken}).unwrap();
 
         if (response.accessToken && response.refreshToken) {
-          await dispatch(
-            storeTokens({
-              accessToken: response.accessToken,
-              refreshToken: response.refreshToken,
-            }),
-          ).unwrap();
-          onLoginSuccess();
+          onLoginSuccess(response);
         } else {
           throw new Error('Invalid response from server');
         }
@@ -75,7 +66,7 @@ export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
     } catch (error) {
       handleGoogleLoginError(error);
     }
-  }, [dispatch, handleGoogleLoginError, loginWithGoogle, onLoginSuccess]);
+  }, [handleGoogleLoginError, loginWithGoogle, onLoginSuccess]);
 
   return {
     signIn,
