@@ -21,13 +21,11 @@ import {styles} from './styles';
 interface TermsAndAgreementModalProps {
   visible: boolean;
   onAgree: () => void;
-  isLoading?: boolean;
 }
 
 export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
   visible,
   onAgree,
-  isLoading,
 }) => {
   const [isAgreed, setIsAgreed] = useState(false);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
@@ -153,7 +151,6 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
                     label={t('TermsAndAgreement.agree')}
                     onPress={onAgree}
                     isDisabled={!isAgreed}
-                    isLoading={isLoading}
                     customContainerStyle={styles.agreeButton}
                   />
                 </>

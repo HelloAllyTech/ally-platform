@@ -5,8 +5,6 @@ import {GoogleSignin, statusCodes} from '@react-native-google-signin/google-sign
 import {useGoogleLogin} from '../useGoogleLogin';
 import {showToast} from '@/components/Toast/ToastProvider';
 import {useLoginWithGoogleMutation} from '@/services/authApi';
-import {useAppDispatch} from '@/store/hooks';
-import {storeTokens} from '@/store/slices/userSlice';
 import {logger} from '@/utils/logger';
 
 // Create mock functions that can be accessed in tests
@@ -46,23 +44,12 @@ jest.mock('@/components/Toast/ToastProvider', () => ({
 jest.mock('@/services/authApi', () => ({
   useLoginWithGoogleMutation: jest.fn(),
 }));
-jest.mock('@/store/hooks', () => ({
-  useAppDispatch: jest.fn(),
-}));
-jest.mock('@/store/slices/userSlice', () => ({
-  storeTokens: jest.fn((payload) => ({
-    type: 'storeTokens',
-    payload,
-    unwrap: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
 jest.mock('@/utils/logger', () => ({
   logger: {
     error: jest.fn(),
   },
 }));
 
-const mockDispatch = jest.fn();
 const mockLoginWithGoogle = jest.fn();
 
 describe('useGoogleLogin', () => {
@@ -70,7 +57,6 @@ describe('useGoogleLogin', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAppDispatch as unknown as jest.Mock).mockReturnValue(mockDispatch);
     (useLoginWithGoogleMutation as jest.Mock).mockReturnValue([
       mockLoginWithGoogle,
       {isLoading: false},
@@ -100,7 +86,7 @@ describe('useGoogleLogin', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it('handles successful Google Sign-In', async () => {
+  it('handles successful Google Sign-In and calls onLoginSuccess with tokens', async () => {
     const mockIdToken = 'test-id-token';
     const mockUserInfo = {
       data: {
@@ -116,9 +102,6 @@ describe('useGoogleLogin', () => {
     mockLoginWithGoogle.mockReturnValue({
       unwrap: jest.fn().mockResolvedValue(mockResponse),
     });
-    mockDispatch.mockReturnValue({
-      unwrap: jest.fn().mockResolvedValue(undefined),
-    });
 
     const {result} = renderHook(() =>
       useGoogleLogin({onLoginSuccess: mockOnLoginSuccess}),
@@ -131,14 +114,10 @@ describe('useGoogleLogin', () => {
     expect(GoogleSignin.hasPlayServices).toHaveBeenCalled();
     expect(GoogleSignin.signIn).toHaveBeenCalled();
     expect(mockLoginWithGoogle).toHaveBeenCalledWith({idToken: mockIdToken});
-    expect(mockDispatch).toHaveBeenCalled();
-    const dispatchCall = mockDispatch.mock.calls[0][0];
-    expect(dispatchCall.type).toBe('storeTokens');
-    expect(dispatchCall.payload).toEqual({
+    expect(mockOnLoginSuccess).toHaveBeenCalledWith({
       accessToken: mockResponse.accessToken,
       refreshToken: mockResponse.refreshToken,
     });
-    expect(mockOnLoginSuccess).toHaveBeenCalled();
   });
 
   it('handles sign-in cancellation gracefully', async () => {

@@ -81,7 +81,6 @@ export const API_ROUTES = {
   },
   USERS: {
     ME: '/users/me',
-    TERMS_AND_AGREEMENT: '/users/terms-and-agreement-status',
   },
   CHATS: {
     ROOT: '/chats',
