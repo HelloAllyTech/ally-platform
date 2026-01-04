@@ -16,6 +16,7 @@
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
       "openSettings": "Open Settings"
     },
+    "or": "OR",
     "offline": {
       "socketTitle": "Something went wrong",
       "socketDescription": "The call ended due to an error. Please try again.",

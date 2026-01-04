@@ -5,12 +5,13 @@ import {Alert, Linking, Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton} from '@/components';
+import {GoogleLoginButton} from '@/components/Button/GoogleLoginButton';
 import {
   isIOS,
   PRIVACY_POLICY_URL,
   TERMS_AND_CONDITIONS_URL,
 } from '@/constants/general';
-import {useTranslate} from '@/hooks';
+import {useGoogleLogin, useTranslate} from '@/hooks';
 import {useGenerateOtpMutation} from '@/services/authApi';
 import {colors} from '@/theme';
 import {getErrorDetails, isValidEmail} from '@/utils';
@@ -20,11 +21,26 @@ import type {EmailLoginProps} from './types';
 
 export const EmailLogin: React.FC<EmailLoginProps> = ({
   onOtpGenerationSuccess,
+  onLoginSuccess,
 }) => {
   const [email, setEmail] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [generateOtp, {isLoading, isSuccess, isError, error, data}] =
-    useGenerateOtpMutation();
+  const [
+    generateOtp,
+    {
+      isLoading: isOtpLoading,
+      isSuccess: isOtpSuccess,
+      isError: isOtpError,
+      error: otpError,
+      data: otpData,
+    },
+  ] = useGenerateOtpMutation();
+
+  const {signIn: handleGoogleSignIn, isLoading: isGoogleLoading} =
+    useGoogleLogin({
+      onLoginSuccess,
+    });
+
   const {t} = useTranslate();
 
   const handleOtpError = useCallback(
@@ -34,26 +50,26 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
         'Failed to Send OTP',
         message === 'Network Error'
           ? 'Please check your internet connection and try again.'
-          : message,
+          : message || 'Unknown error',
       );
     },
     [],
   );
 
-  // Handle success
+  // Handle OTP success
   useEffect(() => {
-    if (isSuccess && data) {
-      onOtpGenerationSuccess(email, data.expiresIn);
+    if (isOtpSuccess && otpData) {
+      onOtpGenerationSuccess(email, otpData.expiresIn);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess, data, email]);
+  }, [isOtpSuccess, otpData, email]);
 
-  // Handle error
+  // Handle OTP error
   useEffect(() => {
-    if (isError && error) {
-      handleOtpError(error);
+    if (isOtpError && otpError) {
+      handleOtpError(otpError);
     }
-  }, [isError, error, handleOtpError]);
+  }, [isOtpError, otpError, handleOtpError]);
 
   const handleEmailChange = useCallback((text: string) => {
     setEmail(text.trim().toLowerCase());
@@ -64,6 +80,8 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
       await generateOtp({email});
     }
   }, [email, generateOtp]);
+
+  const isLoading = isOtpLoading || isGoogleLoading;
 
   return (
     <View style={styles.container}>
@@ -100,6 +118,18 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               placeholderTextColor={colors.mediumGray}
             />
           </View>
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('Common.or')}</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <GoogleLoginButton
+            onPress={handleGoogleSignIn}
+            isLoading={isGoogleLoading}
+            isDisabled={isLoading}
+          />
         </View>
       </KeyboardAwareScrollView>
       <View style={styles.bottomContainer}>
@@ -125,7 +155,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
           label={t('Common.next')}
           onPress={handleSubmit}
           isDisabled={!isValidEmail(email)}
-          isLoading={isLoading}
+          isLoading={isOtpLoading}
         />
       </View>
     </View>
