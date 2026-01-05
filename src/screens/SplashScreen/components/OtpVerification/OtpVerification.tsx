@@ -6,7 +6,6 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {PrimaryButton, useToast} from '@/components';
 import {
   DEFAULT_OTP_EXPIRY_MINUTES,
-  ErrorCode,
   isIOS,
   MINUTES_IN_SECONDS,
   RESEND_COUNTDOWN_SECONDS,
@@ -20,7 +19,7 @@ import {
 } from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, isSuspendedUserError} from '@/utils';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
 import {TermsAndAgreementModal} from '../TermsAndAgreementModal';
@@ -94,18 +93,13 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
 
   useEffect(() => {
     if (isError && apiError) {
-      const errorDetails = getErrorDetails(apiError);
-
       // Check if user is suspended
-      if (
-        errorDetails.status === 403 &&
-        (errorDetails.error === ErrorCode.USER_SUSPENDED ||
-          errorDetails.message === 'User suspended')
-      ) {
+      if (isSuspendedUserError(apiError)) {
         navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
         return;
       }
 
+      const errorDetails = getErrorDetails(apiError);
       setError(errorDetails.message);
     }
   }, [isError, apiError, navigation]);

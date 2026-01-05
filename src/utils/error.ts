@@ -1,5 +1,7 @@
 import {t} from 'i18next';
 
+import {ErrorCode} from '@/constants/general';
+
 interface ApiError {
   status?: number;
   data?: {
@@ -21,4 +23,22 @@ export const getErrorDetails = (
     data?.message || data?.error || t('Common.somethingWentWrong');
 
   return {message, status, error: data?.error};
+};
+
+export const isBackendApiError = (error: unknown): boolean => {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as {status?: unknown}).status !== 'undefined'
+  );
+};
+
+export const isSuspendedUserError = (error: unknown): boolean => {
+  const errorDetails = getErrorDetails(error);
+  return (
+    errorDetails.status === 403 &&
+    (errorDetails.error === ErrorCode.USER_SUSPENDED ||
+      errorDetails.message === 'User suspended')
+  );
 };
