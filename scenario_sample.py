@@ -48,7 +48,7 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "start speaking",
+                "branchInstruction": "start speaking about oranges",
                 "feedbackStatus": "True",
             },
             {
@@ -111,7 +111,6 @@ SCENARIO_SAMPLE = {
             "superficial-hope",
             "comb-score-lte-0_and_open-ended-question",
             "warm-greeting",
-            "score-gte-5",
         ],
         "autoTerminationEvent": {
             "id": "superficial-hope",

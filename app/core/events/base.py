@@ -29,6 +29,19 @@ class ChatMessage(BaseModel):
         }
 
 
+class DetectionConfiguration(BaseModel):
+    """
+    Configuration settings for when and how the event should be detected.
+    """
+
+    start_time: Optional[float] = Field(
+        None, description="The start time window (in seconds) for detection."
+    )
+    end_time: Optional[float] = Field(
+        None, description="The end time window (in seconds) for detection."
+    )
+
+
 class BaseEvent(BaseModel, ABC):
     """
     Runtime event instance populated from scenario metadata.
@@ -52,6 +65,10 @@ class BaseEvent(BaseModel, ABC):
     emoji_message: Optional[str] = None
     branching_instruction: Optional[str] = None
     show_feedback: Optional[bool] = True
+
+    detection_configuration: Optional[DetectionConfiguration] = Field(
+        default_factory=DetectionConfiguration
+    )
 
     model_config = {"arbitrary_types_allowed": True}
 

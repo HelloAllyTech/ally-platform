@@ -29,18 +29,74 @@ async def process_events(
         return None
 
     chat_messages = convert_messages_to_chat_messages(state.messages)
-    tasks = [
-        asyncio.create_task(detect_single_event(e, chat_messages))
-        for e in state.permitted_events
-    ]
+
+    current_elapsed_seconds = 0.0
+
+    if config and "configurable" in config:
+        # Retrieve the ISO string passed from your worker
+        joined_at_raw = config["configurable"].get("agent_joined_at")
+        if joined_at_raw:
+            now_utc = datetime.now(timezone.utc)
+            joined_time = None
+
+            try:
+                # Parse the ISO string (e.g., "2023-10-27T10:00:00+00:00")
+                if isinstance(joined_at_raw, str):
+                    joined_time = datetime.fromisoformat(joined_at_raw)
+                elif isinstance(joined_at_raw, datetime):
+                    joined_time = joined_at_raw
+
+                if joined_time:
+                    # Ensure timezone awareness to match now_utc
+                    if joined_time.tzinfo is None:
+                        joined_time = joined_time.replace(tzinfo=timezone.utc)
+
+                    # Calculate elapsed time in seconds
+                    current_elapsed_seconds = (now_utc - joined_time).total_seconds()
+
+            except ValueError as e:
+                logger.error(
+                    f"Error parsing agent_joined_at: {e}. Defaulting elapsed time to 0."
+                )
+
+    logger.debug(f"Current session elapsed time: {current_elapsed_seconds:.2f} seconds")
+
+    tasks = []
+    skipped_count = 0
+
+    for e in state.permitted_events:
+        # Treat None as open boundaries
+        # start_time=None -> Starts at 0
+        # end_time=None -> Runs forever (Infinity)
+        det_config = e.detection_configuration
+
+        # Get raw values (handling if config or values are None)
+        raw_start = det_config.start_time if det_config else None
+        raw_end = det_config.end_time if det_config else None
+
+        # Apply defaults: None -> 0 (start) or Infinity (end)
+        event_start = raw_start if raw_start is not None else 0
+        event_end = raw_end if raw_end is not None else float("inf")
+
+        # Strict filtering: Only create LLM task if within the window
+        if event_start <= current_elapsed_seconds <= event_end:
+            tasks.append(asyncio.create_task(detect_single_event(e, chat_messages)))
+        else:
+            skipped_count += 1
+
+    if skipped_count > 0:
+        logger.debug(
+            f"Event optimization: Skipped {skipped_count} events outside time window."
+        )
 
     # Preserve completion order (like as_completed in threads)
     detected_events = []
-    for t in asyncio.as_completed(tasks):
-        result = await t
-        if result is not None:
-            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            detected_events.append((timestamp, result))
+    if tasks:
+        for t in asyncio.as_completed(tasks):
+            result = await t
+            if result is not None:
+                timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                detected_events.append((timestamp, result))
 
     logger.debug(f"Detected Event number: {len(detected_events)}")
 

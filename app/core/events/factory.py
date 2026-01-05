@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Literal, Mapping, Optional
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
-from app.core.events.base import BaseEvent
+from app.core.events.base import BaseEvent, DetectionConfiguration
 from app.core.events.event_types.binary_classifier.binary_classifier_event import (
     BinaryClassifierEvent,
 )
@@ -56,6 +56,19 @@ def _create_event_by_detection_type(
     event_id = ev.get("id") or ev.get("event_id") or "<no-id>"
     visibility_type = ev.get("visibilityType") or VisibilityType.ACTIVE
     raw_data = ev.get("data")
+    raw_config = (
+        ev.get("detectionConfiguration") or ev.get("detection_configuration") or {}
+    )
+
+    # 2. Extract times from the *nested* dictionary
+    start_time_val = raw_config.get("startTime") or raw_config.get("start_time")
+    end_time_val = raw_config.get("endTime") or raw_config.get("end_time")
+
+    # 3. Create the Pydantic model instance
+    detection_config = DetectionConfiguration(
+        start_time=float(start_time_val) if start_time_val is not None else None,
+        end_time=float(end_time_val) if end_time_val is not None else None,
+    )
 
     common_fields = {
         "score": ev.get("score"),
@@ -65,6 +78,7 @@ def _create_event_by_detection_type(
         "show_feedback": ev.get(
             "feedbackStatus", True
         ),  # Default to True if not provided
+        "detection_configuration": detection_config,
     }
 
     try:
