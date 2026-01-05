@@ -39,6 +39,7 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: '16@s',
     paddingVertical: '10@vs',
     marginRight: '2@s',
+    marginBottom: '8@vs',
   },
   inputEnabled: {
     opacity: 1,
@@ -49,7 +50,7 @@ export const styles = ScaledSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: '48@vs',
+    marginTop: '40@vs',
     marginBottom: '22@vs',
   },
   dividerLine: {

@@ -4,8 +4,10 @@ import {GoogleSignin, statusCodes} from '@react-native-google-signin/google-sign
 
 import {useGoogleLogin} from '../useGoogleLogin';
 import {showToast} from '@/components/Toast/ToastProvider';
+import {ErrorCode} from '@/constants/general';
+import {SCREEN_NAMES} from '@/constants/navigation';
+import {useAppNavigation} from '@/hooks';
 import {useLoginWithGoogleMutation} from '@/services/authApi';
-import {logger} from '@/utils/logger';
 
 // Create mock functions that can be accessed in tests
 const mockConfigure = jest.fn();
@@ -23,6 +25,7 @@ jest.mock('@react-native-google-signin/google-signin', () => {
     GoogleSignin: {
       configure: jest.fn(),
       hasPlayServices: jest.fn(),
+      signOut: jest.fn(),
       signIn: jest.fn(),
     },
     statusCodes: {
@@ -44,19 +47,67 @@ jest.mock('@/components/Toast/ToastProvider', () => ({
 jest.mock('@/services/authApi', () => ({
   useLoginWithGoogleMutation: jest.fn(),
 }));
-jest.mock('@/utils/logger', () => ({
-  logger: {
-    error: jest.fn(),
-  },
+jest.mock('@/hooks', () => ({
+  useAppNavigation: jest.fn(),
 }));
 
+jest.mock('@/utils', () => {
+  const mockLogger = {
+    error: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    getErrorDetails: jest.fn((error: any) => {
+      if (error?.status && error?.data) {
+        return {
+          status: error.status,
+          message: error.data.message || error.data.error,
+          error: error.data.error,
+        };
+      }
+      return {message: 'Unknown error'};
+    }),
+    isBackendApiError: jest.fn((error: any) => {
+      return (
+        typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        typeof error.status !== 'undefined'
+      );
+    }),
+    isSuspendedUserError: jest.fn((error: any) => {
+      if (error?.status === 403 && error?.data) {
+        return (
+          error.data.error === 'USER_SUSPENDED' ||
+          error.data.message === 'User suspended'
+        );
+      }
+      return false;
+    }),
+    logger: mockLogger,
+  };
+});
+jest.mock('@/utils/logger', () => {
+  const mockLogger = {
+    error: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    logger: mockLogger,
+  };
+});
+
 const mockLoginWithGoogle = jest.fn();
+const mockNavigation = {
+  replace: jest.fn(),
+};
 
 describe('useGoogleLogin', () => {
   const mockOnLoginSuccess = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (useAppNavigation as jest.Mock).mockReturnValue(mockNavigation);
     (useLoginWithGoogleMutation as jest.Mock).mockReturnValue([
       mockLoginWithGoogle,
       {isLoading: false},
@@ -200,7 +251,9 @@ describe('useGoogleLogin', () => {
       'Something went wrong',
       'error',
     );
-    expect(logger.error).toHaveBeenCalled();
+    // Logger is mocked, verify it was called
+    const {logger: mockLogger} = require('@/utils');
+    expect(mockLogger.error).toHaveBeenCalled();
   });
 
   it('handles missing idToken error', async () => {
@@ -220,14 +273,14 @@ describe('useGoogleLogin', () => {
       await result.current.signIn();
     });
 
-    expect(showToast).toHaveBeenCalledWith(
-      'Failed to sign in with Google',
-      'error',
-    );
+    // Missing idToken error is logged but no toast is shown (falls through to unexpected error handler)
+    expect(showToast).not.toHaveBeenCalled();
     expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    const {logger: mockLogger} = require('@/utils');
+    expect(mockLogger.error).toHaveBeenCalled();
   });
 
-  it('handles invalid server response', async () => {
+  it('handles invalid server response silently', async () => {
     const mockIdToken = 'test-id-token';
     const mockUserInfo = {
       data: {
@@ -252,10 +305,79 @@ describe('useGoogleLogin', () => {
       await result.current.signIn();
     });
 
-    expect(showToast).toHaveBeenCalledWith(
-      'Failed to sign in with Google',
-      'error',
+    // Backend errors should be silently ignored (no error toast)
+    expect(showToast).not.toHaveBeenCalled();
+    expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+  });
+
+  it('silently handles backend API errors (user not found, etc.)', async () => {
+    const mockIdToken = 'test-id-token';
+    const mockUserInfo = {
+      data: {
+        idToken: mockIdToken,
+      },
+    };
+    const backendError = {
+      status: 404,
+      data: {message: 'User not found'},
+    };
+
+    (GoogleSignin.signIn as jest.Mock).mockResolvedValue(mockUserInfo);
+    mockLoginWithGoogle.mockReturnValue({
+      unwrap: jest.fn().mockRejectedValue(backendError),
+    });
+
+    const {result} = renderHook(() =>
+      useGoogleLogin({onLoginSuccess: mockOnLoginSuccess}),
     );
+
+    await act(async () => {
+      await result.current.signIn();
+    });
+
+    // Backend errors should be silently ignored (no error toast for security)
+    expect(showToast).not.toHaveBeenCalled();
+    expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    // Logger is mocked, verify it was called
+    const {logger: mockLogger} = require('@/utils');
+    expect(mockLogger.error).toHaveBeenCalled();
+  });
+
+  it('navigates to SuspendedAccount screen when user is suspended', async () => {
+    const mockIdToken = 'test-id-token';
+    const mockUserInfo = {
+      data: {
+        idToken: mockIdToken,
+      },
+    };
+    const suspendedError = {
+      status: 403,
+      data: {
+        statusCode: 403,
+        message: 'User suspended',
+        error: ErrorCode.USER_SUSPENDED,
+      },
+    };
+
+    (GoogleSignin.signIn as jest.Mock).mockResolvedValue(mockUserInfo);
+    mockLoginWithGoogle.mockReturnValue({
+      unwrap: jest.fn().mockRejectedValue(suspendedError),
+    });
+
+    const {result} = renderHook(() =>
+      useGoogleLogin({onLoginSuccess: mockOnLoginSuccess}),
+    );
+
+    await act(async () => {
+      await result.current.signIn();
+    });
+
+    // Should navigate to SuspendedAccount screen
+    expect(mockNavigation.replace).toHaveBeenCalledWith(
+      SCREEN_NAMES.SUSPENDED_ACCOUNT,
+    );
+    // Should not show error toast
+    expect(showToast).not.toHaveBeenCalled();
     expect(mockOnLoginSuccess).not.toHaveBeenCalled();
   });
 });

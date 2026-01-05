@@ -6,8 +6,10 @@ import {
 import Config from 'react-native-config';
 
 import {showToast} from '@/components/Toast/ToastProvider';
+import {SCREEN_NAMES} from '@/constants/navigation';
+import {useAppNavigation} from '@/hooks';
 import {AuthResponse, useLoginWithGoogleMutation} from '@/services/authApi';
-import {logger} from '@/utils/logger';
+import {isBackendApiError, isSuspendedUserError, logger} from '@/utils';
 
 interface UseGoogleLoginProps {
   onLoginSuccess: (tokens: AuthResponse) => void;
@@ -15,6 +17,7 @@ interface UseGoogleLoginProps {
 
 export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
   const [loginWithGoogle, {isLoading}] = useLoginWithGoogleMutation();
+  const navigation = useAppNavigation();
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -24,44 +27,75 @@ export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
     });
   }, []);
 
-  const handleGoogleLoginError = useCallback((error: unknown) => {
-    logger.error(`Google Sign-In Error: ${error}`);
-    let message = 'Failed to sign in with Google';
-
-    if (typeof error === 'object' && error !== null && 'code' in error) {
-      const err = error as {code: string; message?: string};
-      switch (err.code) {
-        case statusCodes.SIGN_IN_CANCELLED:
-          return; // Ignore cancellation
-        case statusCodes.IN_PROGRESS:
-          return; // Ignore in-progress
-        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-          message = 'Google Play Services not available or outdated';
-          break;
-        default:
-          message = err.message || message;
+  const handleGoogleLoginError = useCallback(
+    (error: unknown) => {
+      // Check if error is from backend API (has status property)
+      if (isBackendApiError(error)) {
+        // Check if user is suspended
+        if (isSuspendedUserError(error)) {
+          navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
+          return;
+        }
+        // Other backend API errors - silently fail for security reasons
+        logger.error(`Google Sign-In Backend Error: ${error}`);
+        return;
       }
-    }
 
-    showToast(message, 'error');
-  }, []);
+      // Handle Google Sign-In SDK errors
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const err = error as {code: string; message?: string};
+        switch (err.code) {
+          case statusCodes.SIGN_IN_CANCELLED:
+            // User cancelled - silently ignore
+            return;
+          case statusCodes.IN_PROGRESS:
+            // Sign-in already in progress - silently ignore
+            return;
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            // Google Play Services issue - show error toast
+            showToast(
+              'Google Play Services not available or outdated',
+              'error',
+            );
+            logger.error(`Google Sign-In Error: ${error}`);
+            return;
+          default:
+            // Other Google-side errors - show error toast
+            const message = err.message || 'Failed to sign in with Google';
+            showToast(message, 'error');
+            logger.error(`Google Sign-In Error: ${error}`);
+            return;
+        }
+      }
+
+      logger.error(`Google Sign-In Unexpected Error: ${error}`);
+    },
+    [navigation],
+  );
 
   const signIn = useCallback(async () => {
     try {
       await GoogleSignin.hasPlayServices();
+
+      try {
+        await GoogleSignin.signOut();
+      } catch (signOutError) {
+        logger.info(`Google Sign-Out (optional): ${signOutError}`);
+      }
+
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken;
 
-      if (idToken) {
-        const response = await loginWithGoogle({idToken}).unwrap();
-
-        if (response.accessToken && response.refreshToken) {
-          onLoginSuccess(response);
-        } else {
-          throw new Error('Invalid response from server');
-        }
-      } else {
+      if (!idToken) {
         throw new Error('No ID token returned from Google');
+      }
+
+      const response = await loginWithGoogle({idToken}).unwrap();
+
+      if (response.accessToken && response.refreshToken) {
+        onLoginSuccess(response);
+      } else {
+        logger.error('Invalid response from server: missing tokens');
       }
     } catch (error) {
       handleGoogleLoginError(error);

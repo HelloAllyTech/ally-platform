@@ -1,31 +1,69 @@
-export const TermsAndAgreementData = [
+export interface TermsSection {
+  headingKey: string;
+  bullets: Array<{
+    textKey: string;
+    boldTextKey?: string;
+    suffixTextKey?: string;
+    link?: {
+      textKey: string;
+      href: string;
+    };
+  }>;
+}
+
+export const TermsAndAgreementData: TermsSection[] = [
   {
-    heading: 'Data Usage',
-    content:
-      'We collect and process your data to enhance user experience and improve AI accuracy. Your data is never sold to third parties.',
+    headingKey: 'TermsAndAgreement.sections.generalTerms.heading',
+    bullets: [
+      {
+        textKey:
+          'TermsAndAgreement.sections.generalTerms.bullets.ageRequirement',
+      },
+      {
+        textKey: 'TermsAndAgreement.sections.generalTerms.bullets.accessMethod',
+      },
+      {
+        textKey:
+          'TermsAndAgreement.sections.generalTerms.bullets.platformUsage',
+      },
+      {
+        textKey:
+          'TermsAndAgreement.sections.generalTerms.bullets.notForEmergencies',
+        link: {
+          textKey: 'TermsAndAgreement.sections.generalTerms.bullets.crisisLink',
+          href: 'https://findahelpline.com/',
+        },
+      },
+    ],
   },
   {
-    heading: 'Privacy Protection',
-    content:
-      'Your personal information remains encrypted and accessible only for service-related functions as defined in our ',
-    link: {
-      text: 'Privacy Policy',
-      href: 'https://www.helloally.ai/policy',
-    },
+    headingKey: 'TermsAndAgreement.sections.skillsLab.heading',
+    bullets: [
+      {
+        textKey:
+          'TermsAndAgreement.sections.skillsLab.bullets.fictionalScenarios',
+      },
+      {
+        textKey: 'TermsAndAgreement.sections.skillsLab.bullets.noCertification',
+      },
+      {
+        textKey: 'TermsAndAgreement.sections.skillsLab.bullets.consentStorage',
+      },
+    ],
   },
   {
-    heading: 'User Responsibility',
-    content:
-      'Users must ensure that shared content complies with ethical and legal boundaries. Misuse may result in suspension.',
-  },
-  {
-    heading: 'Consent for Processing',
-    content:
-      'By continuing, you consent to Ally’s use of cookies, analytics, and AI models for improving your personalized experience.',
-  },
-  {
-    heading: 'Data Security',
-    content:
-      'We use industry-standard security measures to protect your data against unauthorized access, alteration, disclosure, or destruction. While we strive to safeguard your information, we cannot guarantee absolute security due to the nature of the internet.',
+    headingKey: 'TermsAndAgreement.sections.assist.heading',
+    bullets: [
+      {
+        textKey: 'TermsAndAgreement.sections.assist.bullets.authorizedSessions',
+      },
+      {
+        textKey: 'TermsAndAgreement.sections.assist.bullets.audioNotStored',
+        boldTextKey:
+          'TermsAndAgreement.sections.assist.bullets.audioNotStoredBold',
+        suffixTextKey:
+          'TermsAndAgreement.sections.assist.bullets.audioNotStoredSuffix',
+      },
+    ],
   },
 ];

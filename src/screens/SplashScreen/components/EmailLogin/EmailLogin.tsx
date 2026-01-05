@@ -138,6 +138,12 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               editable={!isLoading}
               placeholderTextColor={colors.mediumGray}
             />
+            <PrimaryButton
+              label={t('Common.next')}
+              onPress={handleSubmit}
+              isDisabled={!isValidEmail(email)}
+              isLoading={isOtpLoading}
+            />
           </View>
 
           <View style={styles.dividerContainer}>
@@ -171,13 +177,6 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
             .
           </Text>
         </View>
-
-        <PrimaryButton
-          label={t('Common.next')}
-          onPress={handleSubmit}
-          isDisabled={!isValidEmail(email)}
-          isLoading={isOtpLoading}
-        />
       </View>
 
       <TermsAndAgreementModal
