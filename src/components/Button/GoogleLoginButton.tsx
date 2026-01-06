@@ -54,6 +54,7 @@ const styles = ScaledSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.ds.stroke.primary,
+    marginBottom: '10@vs',
   },
   buttonDisabled: {
     opacity: 0.6,

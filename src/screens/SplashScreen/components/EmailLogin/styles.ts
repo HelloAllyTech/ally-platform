@@ -68,7 +68,6 @@ export const styles = ScaledSheet.create({
   },
   termsContainer: {
     paddingHorizontal: '16@ms',
-    marginBottom: '24@ms',
   },
   termsText: {
     ...typography.body.small,
