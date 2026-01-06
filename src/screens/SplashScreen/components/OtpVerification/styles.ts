@@ -5,11 +5,12 @@ import {colors, fontFamily, globalStyles, typography} from '@/theme';
 export const styles = ScaledSheet.create({
   contentContainer: {
     flex: 1,
-    paddingTop: '40@ms',
+    paddingTop: '30@ms',
   },
   container: {
     flex: 1,
     justifyContent: 'space-between',
+    paddingBottom: '54@vs',
   },
   containerWrapper: {
     flex: 1,
