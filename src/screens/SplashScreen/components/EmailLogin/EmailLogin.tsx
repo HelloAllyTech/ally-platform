@@ -158,26 +158,26 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
             isDisabled={isLoading}
           />
         </View>
-      </KeyboardAwareScrollView>
-      <View style={styles.bottomContainer}>
-        <View style={styles.termsContainer}>
-          <Text style={styles.termsText}>
-            {t('SplashScreen.byTappingNext')}{' '}
-            <Text
-              style={styles.termsLink}
-              onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
-              {t('SplashScreen.termsAndConditions')}
-            </Text>{' '}
-            {t('SplashScreen.andAcknowledge')}{' '}
-            <Text
-              style={styles.termsLink}
-              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-              {t('SplashScreen.privacyPolicy')}
+        <View style={styles.bottomContainer}>
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              {t('SplashScreen.byTappingNext')}{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
+                {t('SplashScreen.termsAndConditions')}
+              </Text>{' '}
+              {t('SplashScreen.andAcknowledge')}{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                {t('SplashScreen.privacyPolicy')}
+              </Text>
+              .
             </Text>
-            .
-          </Text>
+          </View>
         </View>
-      </View>
+      </KeyboardAwareScrollView>
 
       <TermsAndAgreementModal
         visible={showTermsModal}
