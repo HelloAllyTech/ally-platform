@@ -16,6 +16,7 @@ from app.core.events.event_types.combination.constants import (
 from app.core.events.schedulers import TimeEventScheduler
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.core.graph import agent_graph
+from app.core.graph.state import BranchingAndFeedbackData
 from app.core.scenario.base import Scenario
 from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 from app.utils.logger import get_logger
@@ -163,21 +164,31 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 self.set_event_state(event.event_id, False, event.detection_type)
 
     async def initialize(self) -> None:
-        # Send initial score-based events to UI and Core (example: score < 5)
-        _, additional_score, branching_instructions = await self.handle_events(
-            room=self.room, detected_event_ids=None
-        )
+        """
+        Initialize the event orchestrator and send initial events.
 
-        # Update graph state with initial branching instructions if any were
-        # triggered
-        if agent_graph and self.thread_id and branching_instructions:
+        This method:
+        1. Sends initial score-based events to Core (example: score < 5)
+        2. Updates graph state with initial branching_and_feedback_data
+        3. Starts timers for all TIME events
+        """
+        # Send initial score-based events to Core (example: score < 5)
+        (
+            _,
+            additional_score,
+            branching_and_feedback_data,
+        ) = await self.handle_events(room=self.room, detected_event_ids=None)
+
+        # Update graph state with initial branching_and_feedback_data
+        # if any were triggered
+        if agent_graph and self.thread_id and branching_and_feedback_data:
             logger.info(
-                f"Updating graph state with {len(branching_instructions)} "
-                f"initial branching instructions"
+                f"Updating graph state with {len(branching_and_feedback_data)} "
+                f"initial branching and feedback data entries"
             )
             agent_graph.update_state(
                 {"configurable": {"thread_id": self.thread_id}},
-                values={"branching_instructions": branching_instructions},
+                values={"branching_and_feedback_data": branching_and_feedback_data},
             )
 
         # Start timers for all TIME events
@@ -226,7 +237,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
     def _update_registry_and_collect_event_data(
         self, detected_event_ids: Optional[Set[str]] = None
-    ) -> Tuple[List[BaseEvent], List[BaseEvent], int, List[Tuple[str, int]]]:
+    ) -> Tuple[
+        List[BaseEvent],
+        List[BaseEvent],
+        int,
+        List["BranchingAndFeedbackData"],
+    ]:
         """
         Update the event registry and collect all output data.
 
@@ -237,7 +253,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         2. Updating the registry and evaluating combination expressions
         3. Getting successful events from the registry
         4. Filtering events to send based on trigger_multiple flag
-        5. Collecting branching instructions from triggered events
+        5. Collecting unified branching and feedback data for state
 
         Args:
             detected_event_ids: Optional set of event IDs that have been detected.
@@ -245,14 +261,14 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         Returns:
             Tuple of (successful_events, events_to_send, additional_score,
-                      branching_instructions)
+                      branching_and_feedback_data)
             - successful_events: All events where happened=True in registry
             - events_to_send: Filtered events that should be sent
               (respecting trigger_multiple)
             - additional_score: Additional score from score-based/combination/
               time events
-            - branching_instructions: List of (instruction, score) tuples from
-              triggered events
+            - branching_and_feedback_data: List of BranchingAndFeedbackData objects
+              (unified branching + feedback)
         """
         # Combine detected event IDs with score-based event IDs
         all_detected_event_ids = (
@@ -349,29 +365,38 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                     f"trigger_multiple=False)"
                 )
 
-        # Collect branching instructions from triggered events
-        branching_instructions = self._collect_branching_instructions(events_to_send)
+        # Collect unified branching and feedback data for state
+        branching_and_feedback_data = self._collect_branching_and_feedback_data(
+            events_to_send
+        )
 
         return (
             successful_events,
             events_to_send,
             additional_score_from_triggered_events,
-            branching_instructions,
+            branching_and_feedback_data,
         )
 
     async def handle_events(
-        self, room: rtc.Room, detected_event_ids: Optional[Set[str]] = None
-    ) -> Tuple[List[BaseEvent], int, List[Tuple[str, int]]]:
+        self,
+        room: rtc.Room,
+        detected_event_ids: Optional[Set[str]] = None,
+    ) -> Tuple[List[BaseEvent], int, List[BranchingAndFeedbackData]]:
         """
         Orchestrates the complete event processing workflow.
 
         This function coordinates the complete event workflow by:
         1. Calling `_update_registry_and_collect_event_data` to update
            registry and gather event data
-        2. Calling `_send_events_to_ui_and_core` to send events to external
-           systems
-        3. Updating live_score with scores from events sent to core
-        4. Returning the collected data for use by the caller
+        2. Sending events to Core immediately (backend needs real-time updates)
+        3. Collecting event data (branching + feedback) to be stored in state
+        4. Updating live_score with scores from events sent to core
+        5. Returning the collected data for use by the caller
+
+        Note: UI events are no longer sent here. Instead,
+        branching_and_feedback_data is returned and stored in state,
+        then processed in generate_response to determine which feedback
+        message to send to UI.
 
         Args:
             room: LiveKit room instance for sending events
@@ -379,27 +404,35 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         Returns:
             Tuple of (successful_events, additional_score_from_triggered_events,
-                      branching_instructions)
+                      branching_and_feedback_data)
             - successful_events: All events where happened=True in registry
             - additional_score_from_triggered_events: Additional score from
               triggered events
-            - branching_instructions: List of (instruction, score) tuples
-              from triggered events
+            - branching_and_feedback_data: List of BranchingAndFeedbackData objects
+              (unified branching + feedback)
         """
         # Update registry and collect all data
-        successful_events, events_to_send, additional_score, branching_instructions = (
-            self._update_registry_and_collect_event_data(
-                detected_event_ids=detected_event_ids
-            )
+        (
+            successful_events,
+            events_to_send,
+            additional_score,
+            branching_and_feedback_data,
+        ) = self._update_registry_and_collect_event_data(
+            detected_event_ids=detected_event_ids
         )
 
-        # Send events to UI and Core
-        await self._send_events_to_ui_and_core(events_to_send, room)
+        # Send events to Core immediately (backend needs real-time updates)
+        # UI events are handled via branching_and_feedback_data in generate_response
+        await self._send_events_to_core(events_to_send, room)
 
         # Update live_score with scores from events sent to core
         await self._update_live_score(events_to_send)
 
-        return successful_events, additional_score, branching_instructions
+        return (
+            successful_events,
+            additional_score,
+            branching_and_feedback_data,
+        )
 
     def get_event_state(self, event_id: str) -> bool:
         """

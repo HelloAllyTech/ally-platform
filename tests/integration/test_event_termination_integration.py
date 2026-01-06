@@ -300,19 +300,14 @@ class TestEventTerminationIntegration:
                 side_effect=lambda **kwargs: call_order.append("send_to_core")
             )
 
-            # NOTE: Updated patch path to point to event_sender module
-            with patch(
-                "app.core.events.event_orchestrator.event_sender.send_event_to_ui"
-            ) as mock_ui:
-                mock_ui.side_effect = lambda *args: call_order.append("send_to_ui")
+            # Trigger the termination event
+            # Note: UI events are no longer sent from handle_events -
+            # they're sent from generate_response after STT/TTS completes
+            await orchestrator.handle_events(
+                detected_event_ids={"final-event"}, room=mock_room
+            )
 
-                # Trigger the termination event
-                await orchestrator.handle_events(
-                    detected_event_ids={"final-event"}, room=mock_room
-                )
-
-        # Verify UI event was sent and termination callback was called
-        assert "send_to_ui" in call_order
+        # Verify termination callback was called
         assert "termination" in call_order
 
         # Termination event should NOT be sent to Core immediately (it's deferred)

@@ -3,18 +3,16 @@ Event sending logic for external communication.
 Handles sending events to UI and Core messaging systems.
 """
 
-import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional
 
 from livekit import rtc
 
 from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
-from app.core.events.event_processor import EventProcessor
 from app.core.events.schemas import CoreEventMessageType
+from app.core.graph.state import BranchingAndFeedbackData, EventFeedback
 from app.core.graph.utils import serialize_event
 from app.core.queue import msg_event_queue
-from app.utils.event_handler import send_event_to_ui
 from app.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -52,37 +50,68 @@ class EventSender:
         """Initialize event sender state."""
         self.deferred_termination_event = None
 
-    def _collect_branching_instructions(
+    def _collect_branching_and_feedback_data(
         self, events_to_send: List[BaseEvent]
-    ) -> List[Tuple[str, int]]:
+    ) -> List[BranchingAndFeedbackData]:
         """
-        Collect branching instructions from triggered events.
+        Collect unified branching and feedback data from triggered events.
+
+        This method creates BranchingAndFeedbackData objects that combine:
+        - Branching instructions (for LLM guidance)
+        - Feedback messages (for UI display)
+        - Event scores (for priority selection)
+
+        The collected data will be stored in state and processed in generate_response
+        to determine which branching instruction to use and which feedback to display.
 
         Args:
             events_to_send: List of events that will be sent
 
         Returns:
-            List of (instruction, score) tuples from triggered events
+            List of BranchingAndFeedbackData objects containing branching
+            instructions and feedback
         """
-        branching_instructions: List[Tuple[str, int]] = []
+        data_list: List[BranchingAndFeedbackData] = []
 
         for event in events_to_send:
-            if event.branching_instruction:
-                # Create tuple: (instruction, score)
-                # Use event.score if available, otherwise 0
-                score = event.score if event.score is not None else 0
-                branching_instructions.append((event.branching_instruction, score))
-                logger.debug(
-                    f"Collected branching instruction from {event.event_id}: "
-                    f"'{event.branching_instruction}' (score={score})"
+            # Only collect data for ACTIVE events (they have UI feedback)
+            # PASSIVE events don't need feedback, but may have branching instructions
+            if event.visibility_type == VisibilityType.ACTIVE:
+                # Create feedback object for UI display
+                # Note: Score is NOT stored in EventFeedback -
+                # it's in BranchingAndFeedbackData
+                feedback = EventFeedback(
+                    emoji=event.emoji,
+                    message=event.emoji_message,
+                    show_feedback=(
+                        event.show_feedback if event.show_feedback is not None else True
+                    ),
                 )
+            else:
+                # PASSIVE events don't have UI feedback
+                feedback = None
 
-        if branching_instructions:
-            logger.info(
-                f"Collected {len(branching_instructions)} branching instructions"
+            # Create BranchingAndFeedbackData object
+            data = BranchingAndFeedbackData(
+                branching_instruction=event.branching_instruction,
+                feedback=feedback,
+                score=event.score if event.score is not None else 0,
             )
 
-        return branching_instructions
+            data_list.append(data)
+
+            logger.debug(
+                f"Collected branching and feedback data from {event.event_id}: "
+                f"branching={bool(event.branching_instruction)}, "
+                f"feedback={feedback is not None}, score={data.score}"
+            )
+
+        if data_list:
+            logger.info(
+                f"Collected {len(data_list)} branching and feedback data entries"
+            )
+
+        return data_list
 
     async def _handle_termination_events(self, events_to_send: List[BaseEvent]) -> None:
         """
@@ -122,16 +151,20 @@ class EventSender:
                     f"{termination_events[0].event_id}"
                 )
 
-    async def _send_events_to_ui_and_core(
+    async def _send_events_to_core(
         self, events_to_send: List[BaseEvent], room: rtc.Room
     ) -> None:
         """
-        Send events to UI and Core messaging systems.
+        Send events to Core messaging system only (backend).
 
-        This method focuses solely on sending events to external systems:
-        1. Sends ACTIVE events to UI
-        2. Sends all events to Core
-        3. Handles termination callback for termination events
+        This method sends all events (both ACTIVE and PASSIVE) to the backend
+        immediately. UI events are handled separately via branching_and_feedback_data
+        in state, which is processed in generate_response to determine which feedback
+        message to send to UI.
+
+        Note: Termination events are still deferred and sent in shutdown callback
+        to ensure the agent completes speaking the termination message before
+        the backend receives autoTerminationStatus=true and closes the room.
 
         Args:
             events_to_send: List of events that should be sent
@@ -140,25 +173,8 @@ class EventSender:
         if not events_to_send:
             return
 
-        # Send to UI and Core only if room is provided
+        # Send to Core only if room is provided
         if room:
-            # Send to UI: Only ACTIVE events
-            active_events = [
-                event
-                for event in events_to_send
-                if event.visibility_type == VisibilityType.ACTIVE
-            ]
-
-            if active_events:
-                logger.info(f"Sending {len(active_events)} active events to UI")
-                if logger.isEnabledFor(logging.DEBUG):
-                    event_summary = EventProcessor.get_events_summary(active_events)
-                    logger.debug(f"Active events summary: {event_summary}")
-
-                ui_message_type = EventProcessor.process_events_for_ui(active_events)
-                if ui_message_type is not None:
-                    await send_event_to_ui(ui_message_type, room)
-
             # Send to Core: All events to send (both ACTIVE and PASSIVE)
             # EXCEPT termination events - they are deferred and sent in
             # shutdown callback.
@@ -180,7 +196,11 @@ class EventSender:
                     continue
                 events_to_send_to_core.append(event)
 
-            logger.info(f"Sending {len(events_to_send_to_core)} events to core")
+            # Send Core events immediately
+            logger.info(
+                f"Sending {len(events_to_send_to_core)} events to "
+                f"Core messaging system"
+            )
             for event in events_to_send_to_core:
                 logger.debug(
                     f"Sending event to core: {event.event_id} "

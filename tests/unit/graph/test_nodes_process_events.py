@@ -5,7 +5,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.graph.nodes import process_events
-from app.core.graph.state import SimulationState
+from app.core.graph.state import (
+    BranchingAndFeedbackData,
+    EventFeedback,
+    SimulationState,
+)
 
 
 class DetectingEvent(BaseEvent):
@@ -35,7 +39,7 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=10,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -48,8 +52,8 @@ class TestProcessEvents:
         assert ev.event_id == "e1"
         # timestamp is ISO-like string ending with 'Z'
         assert ts.endswith("Z")
-        # branching_instructions key should not be present when empty
-        assert "branching_instructions" not in new_state
+        # branching_and_feedback_data key should not be present when empty
+        assert "branching_and_feedback_data" not in new_state
 
     @pytest.mark.asyncio
     async def test_process_events_with_event_orchestrator_integration(self):
@@ -62,13 +66,27 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=10,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
-        # Mock EvenOrchestrator
+        # Mock EventOrchestrator
         class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
-                return [], 7, [("probe deeper", 3)]
+                # Returns: (successful_events, additional_score,
+                # branching_and_feedback_data)
+                return (
+                    [],
+                    7,
+                    [
+                        BranchingAndFeedbackData(
+                            branching_instruction="probe deeper",
+                            feedback=EventFeedback(
+                                emoji=":)", message="Probe", show_feedback=True
+                            ),
+                            score=3,
+                        )
+                    ],
+                )
 
         mock_room = object()
         config = {
@@ -83,27 +101,54 @@ class TestProcessEvents:
         # Base score (10) + detected event score (5) + additional score
         # from registry (7)
         assert new_state["current_score"] == 22
-        assert new_state["branching_instructions"] == [("probe deeper", 3)]
+        assert len(new_state["branching_and_feedback_data"]) == 1
+        assert (
+            new_state["branching_and_feedback_data"][0].branching_instruction
+            == "probe deeper"
+        )
+        assert new_state["branching_and_feedback_data"][0].score == 3
         assert len(new_state["new_events"]) == 1
 
     @pytest.mark.asyncio
-    async def test_process_events_merges_time_based_branching_instructions(self):
+    async def test_process_events_merges_time_based_branching_and_feedback_data(self):
         msgs = [HumanMessage(content="test")]
         e1 = DetectingEvent(event_id="e1", match_text="test", score=2)
 
-        # State has existing time-based branching instructions
+        # State has existing time-based branching and feedback data
         state = SimulationState(
             messages=msgs,
             permitted_events=[e1],
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[("time instruction", 5)],
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction="time instruction",
+                    feedback=EventFeedback(
+                        emoji=":)", message="Time", show_feedback=True
+                    ),
+                    score=5,
+                )
+            ],
         )
 
         class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
-                return [], 0, [("event instruction", 3)]
+                # Returns: (successful_events, additional_score,
+                # branching_and_feedback_data)
+                return (
+                    [],
+                    0,
+                    [
+                        BranchingAndFeedbackData(
+                            branching_instruction="event instruction",
+                            feedback=EventFeedback(
+                                emoji=":D", message="Event", show_feedback=True
+                            ),
+                            score=3,
+                        )
+                    ],
+                )
 
         config = {
             "configurable": {
@@ -114,13 +159,17 @@ class TestProcessEvents:
 
         new_state = await process_events(state, config=config)
 
-        # The node function only returns the NEW instructions from the
+        # The node function only returns the NEW data from the
         # event registry.
         # The merging happens via the graph reducer, which isn't tested
         # here (unit test of the node).
-        # So we expect only the new instruction in the return value.
-        assert len(new_state["branching_instructions"]) == 1
-        assert ("event instruction", 3) in new_state["branching_instructions"]
+        # So we expect only the new data in the return value.
+        assert len(new_state["branching_and_feedback_data"]) == 1
+        assert (
+            new_state["branching_and_feedback_data"][0].branching_instruction
+            == "event instruction"
+        )
+        assert new_state["branching_and_feedback_data"][0].score == 3
         # The existing "time instruction" is NOT in the return value of the node,
         # but would be preserved in the state by the reducer because we returned a dict.
 
@@ -135,7 +184,7 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=10,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -143,8 +192,8 @@ class TestProcessEvents:
         assert new_state["new_events"] == []
         assert new_state["current_score"] == 10  # No change
         assert len(new_state["events_accumulator"]) == 0
-        # branching_instructions key should not be present when empty
-        assert "branching_instructions" not in new_state
+        # branching_and_feedback_data key should not be present when empty
+        assert "branching_and_feedback_data" not in new_state
 
     @pytest.mark.asyncio
     async def test_process_events_handles_events_with_no_score(self):
@@ -157,15 +206,15 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=10,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
 
         assert len(new_state["new_events"]) == 1
         assert new_state["current_score"] == 10  # No score change
-        # branching_instructions key should not be present when empty
-        assert "branching_instructions" not in new_state
+        # branching_and_feedback_data key should not be present when empty
+        assert "branching_and_feedback_data" not in new_state
 
     @pytest.mark.asyncio
     async def test_process_events_multiple_detected_events(self):
@@ -179,7 +228,7 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -188,8 +237,8 @@ class TestProcessEvents:
         event_ids = {e.event_id for e in new_state["new_events"]}
         assert event_ids == {"e1", "e2"}
         assert new_state["current_score"] == 8  # 3 + 5
-        # branching_instructions key should not be present when empty
-        assert "branching_instructions" not in new_state
+        # branching_and_feedback_data key should not be present when empty
+        assert "branching_and_feedback_data" not in new_state
 
     @pytest.mark.asyncio
     async def test_process_events_with_empty_branching_instructions_from_registry(self):
@@ -204,12 +253,14 @@ class TestProcessEvents:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         class MockEventOrchestrator:
             async def handle_events(self, room, detected_event_ids):
-                return [], 5, []  # Empty branching instructions
+                # Returns: (successful_events, additional_score,
+                # branching_and_feedback_data)
+                return [], 5, []  # Empty branching and feedback data
 
         config = {
             "configurable": {
@@ -221,5 +272,5 @@ class TestProcessEvents:
         new_state = await process_events(state, config=config)
 
         assert new_state["current_score"] == 7  # 0 + 2 + 5
-        # branching_instructions key should not be present when empty
-        assert "branching_instructions" not in new_state
+        # branching_and_feedback_data key should not be present when empty
+        assert "branching_and_feedback_data" not in new_state

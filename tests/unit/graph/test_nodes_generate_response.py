@@ -3,7 +3,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.events.base import BaseEvent
 from app.core.graph.nodes import generate_response
-from app.core.graph.state import SimulationState
+from app.core.graph.state import (
+    BranchingAndFeedbackData,
+    EventFeedback,
+    SimulationState,
+)
 
 
 class FakeLLM:
@@ -56,7 +60,7 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[ev1, ev2],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         # Provide scenario with prompt_data via config
@@ -131,10 +135,28 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[
-                ("low positive", 2),
-                ("high negative", -10),  # Highest magnitude
-                ("medium positive", 5),
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction="low positive",
+                    feedback=EventFeedback(
+                        emoji=":)", message="Low", show_feedback=True
+                    ),
+                    score=2,
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction="high negative",  # Highest magnitude
+                    feedback=EventFeedback(
+                        emoji=":(", message="High", show_feedback=True
+                    ),
+                    score=-10,
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction="medium positive",
+                    feedback=EventFeedback(
+                        emoji=":D", message="Medium", show_feedback=True
+                    ),
+                    score=5,
+                ),
             ],
         )
 
@@ -178,13 +200,11 @@ class TestGenerateResponse:
 
         new_state = await generate_response(state, config=config)
 
-        # Branching instructions should be cleared after use
-        assert new_state.branching_instructions == []
+        # Branching and feedback data should be cleared after use
+        assert new_state.branching_and_feedback_data == []
 
     @pytest.mark.asyncio
-    async def test_generate_response_filters_empty_branching_instructions(
-        self, monkeypatch
-    ):
+    async def test_generate_response_with_no_branching_instructions(self, monkeypatch):
         def fake_create_llm_client(llm_config=None, language_code=None):
             return FakeLLMClient(content="response")
 
@@ -192,17 +212,28 @@ class TestGenerateResponse:
             "app.core.graph.nodes.create_llm_client", fake_create_llm_client
         )
 
-        # Mix of valid and invalid instructions
+        # Events without branching instructions
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
             permitted_events=[],
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[
-                ("", 5),  # Empty string
-                ("  ", 3),  # Whitespace only
-                ("valid instruction", 2),
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":)", message="Good", show_feedback=True
+                    ),
+                    score=5,
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":D", message="Great", show_feedback=True
+                    ),
+                    score=3,
+                ),
             ],
         )
 
@@ -248,7 +279,8 @@ class TestGenerateResponse:
 
         new_state = await generate_response(state, config=config)
 
-        assert new_state.branching_instructions == []
+        # Branching and feedback data should be cleared after use
+        assert new_state.branching_and_feedback_data == []
 
     @pytest.mark.asyncio
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):
@@ -273,7 +305,7 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         prompt_data = type(
@@ -341,7 +373,7 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         # No scenario in config
@@ -368,7 +400,7 @@ class TestGenerateResponse:
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         prompt_data = type(
@@ -431,7 +463,7 @@ class TestGenerateResponse:
             events_accumulator=accumulated,
             new_events=[],
             current_score=42,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         prompt_data = type(
@@ -480,3 +512,248 @@ class TestGenerateResponse:
         assert new_state.permitted_events == [e1]
         assert new_state.events_accumulator == accumulated
         assert new_state.current_score == 42
+
+    @pytest.mark.asyncio
+    async def test_generate_response_selects_feedback_from_branching_event(
+        self, monkeypatch
+    ):
+        """Test that feedback is selected from branching event when available"""
+
+        def fake_create_llm_client(llm_config=None, language_code=None):
+            return FakeLLMClient(content="response")
+
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction="probe deeper",
+                    feedback=EventFeedback(
+                        emoji=":)", message="Great job!", show_feedback=True
+                    ),
+                    score=10,
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":D", message="Excellent", show_feedback=True
+                    ),
+                    score=15,  # Higher score but no branching instruction
+                ),
+            ],
+        )
+
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
+
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        # Branching and feedback data should be cleared
+        assert new_state.branching_and_feedback_data == []
+
+    @pytest.mark.asyncio
+    async def test_generate_response_selects_highest_score_feedback_when_no_branching(
+        self, monkeypatch
+    ):
+        """Test that highest score event's feedback is selected
+        when no branching events"""
+
+        def fake_create_llm_client(llm_config=None, language_code=None):
+            return FakeLLMClient(content="response")
+
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":)", message="Good", show_feedback=True
+                    ),
+                    score=5,
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":D", message="Excellent", show_feedback=True
+                    ),
+                    score=15,  # Highest score
+                ),
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=":(", message="Bad", show_feedback=True
+                    ),
+                    score=-10,  # Highest magnitude (negative)
+                ),
+            ],
+        )
+
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
+
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        # Branching and feedback data should be cleared
+        assert new_state.branching_and_feedback_data == []
+
+    @pytest.mark.asyncio
+    async def test_generate_response_handles_empty_feedback_message(self, monkeypatch):
+        """Test that empty string is sent when feedback message is None"""
+
+        def fake_create_llm_client(llm_config=None, language_code=None):
+            return FakeLLMClient(content="response")
+
+        monkeypatch.setattr(
+            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="hi")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(
+                        emoji=None, message=None, show_feedback=True
+                    ),
+                    score=10,  # Score exists but no message
+                ),
+            ],
+        )
+
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Test",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+            },
+        )()
+
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-US", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {"prompt_data": prompt_data, "language_config": language_config},
+        )()
+        config = {"configurable": {"scenario": scenario}}
+
+        new_state = await generate_response(state, config=config)
+
+        # Branching and feedback data should be cleared
+        assert new_state.branching_and_feedback_data == []

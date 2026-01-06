@@ -73,7 +73,7 @@ class TestSimulationStateModel:
             events_accumulator=acc,
             new_events=new,
             current_score=10,
-            branching_instructions=[],
+            branching_and_feedback_data=[],
         )
 
         # Sanity checks on fields
@@ -82,4 +82,4 @@ class TestSimulationStateModel:
         assert len(state.permitted_events) == 2
         assert len(state.events_accumulator) == 1
         assert len(state.new_events) == 1
-        assert len(state.branching_instructions) == 0
+        assert len(state.branching_and_feedback_data) == 0

@@ -39,7 +39,7 @@ def base_state():
         events_accumulator=[],
         current_score=0,
         new_events=[],
-        branching_instructions=[],
+        branching_and_feedback_data=[],
     )
 
 
