@@ -193,7 +193,7 @@ class Scenario(BaseModel):
 
         voice_config = VoiceConfig(
             model=config_meta.get("model"),
-            voice_id=config_meta.get("voice_id"),
+            voice_id=config_meta.get("voice_id") or config_meta.get("voiceId"),
             speaker=config_meta.get("speaker"),
             voice_name=config_meta.get("voice_name"),
             gender=config_meta.get("gender"),
