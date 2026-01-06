@@ -13,3 +13,5 @@ export {SimulationDetailsScreen} from './SimulationDetailsScreen';
 export {SimulationPathDetailsScreen} from './SimulationPathDetailsScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
 export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
+export {LeaderboardScreen} from './LeaderboardScreen';
+export {AchievementsScreen} from './AchievementsScreen';

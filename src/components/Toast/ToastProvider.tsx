@@ -9,6 +9,7 @@ import React, {
 
 import {useTranslate} from '@/hooks';
 import {TranslationType} from '@/localization/locales/type';
+import {getErrorDetails} from '@/utils/error';
 
 import {Toast} from './Toast';
 
@@ -132,10 +133,31 @@ export const useErrorToast = () => {
 
   const showErrorToast = useCallback(
     (error: unknown, fallbackKey: string) => {
-      const message =
-        error instanceof Error && error.message?.trim()
-          ? error.message
-          : t(fallbackKey as TranslationType);
+      const errorDetails = getErrorDetails(error);
+      const fallbackMessage = t(fallbackKey as TranslationType);
+
+      const apiError = error as {data?: {message?: string; error?: string}};
+      const hasApiError = apiError?.data?.message || apiError?.data?.error;
+
+      const defaultFallback = t('Common.somethingWentWrong');
+      const hasSpecificError =
+        hasApiError ||
+        (errorDetails.message &&
+          errorDetails.message !== defaultFallback &&
+          errorDetails.message.trim() !== '');
+
+      let message: string;
+      if (hasSpecificError) {
+        // Format as "Failed to start simulation: {reason}"
+        message = `${fallbackMessage}: ${errorDetails.message}`;
+      } else if (error instanceof Error && error.message?.trim()) {
+        // Handle standard Error instances
+        message = error.message;
+      } else {
+        // Use fallback translation
+        message = fallbackMessage;
+      }
+
       showToast(message, 'error');
     },
     [t],
