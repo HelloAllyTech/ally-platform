@@ -16,6 +16,7 @@ import {
   useUser,
 } from '@/hooks';
 import {
+  AchievementsScreen,
   BreathingScreen,
   CallSummaryScreen,
   ListeningScreen,
@@ -239,6 +240,10 @@ const NavigationContent = ({
             name={SCREEN_NAMES.SIMULATION_FEEDBACK}
             component={SimulationFeedbackScreen}
             options={{gestureEnabled: false}}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.ACHIEVEMENTS}
+            component={AchievementsScreen}
           />
         </>
       ) : (

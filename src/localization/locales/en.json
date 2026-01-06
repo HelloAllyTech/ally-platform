@@ -420,5 +420,47 @@
     "suggestionPlaceholder": "Anything else that you'd like to share about the summary?",
     "instructionText": "Please rate the quality, let us know what worked well, and share areas for improvement.",
     "submitButton": "Submit"
+  },
+  "Leaderboard": {
+    "title": "Leaderboard",
+    "badges": "Badges",
+    "tableHeaders": {
+      "rank": "Rank",
+      "user": "User",
+      "totalDuration": "Total duration",
+      "badges": "Badges"
+    },
+    "period": {
+      "last": "Last",
+      "week": "week",
+      "month": "month",
+      "year": "year",
+      "allTime": "All time"
+    }
+  },
+  "Achievements": {
+    "title": "Achievements",
+    "unlocked": "Unlocked",
+    "locked": "Locked",
+    "firstSteps": {
+      "title": "First Steps",
+      "description": "Practice for at least 15 minutes at account level"
+    },
+    "consistentStart": {
+      "title": "Consistent Start",
+      "description": "Maintain a 3-day practice streak (minimum 10 mins/day)"
+    },
+    "milestoneHunter": {
+      "title": "Milestone Hunter",
+      "description": "Successfully complete 10 simulation sessions"
+    },
+    "365Champion": {
+      "title": "365 Champion",
+      "description": "Maintain a 365-day practice streak"
+    },
+    "weekWarrior": {
+      "title": "Week Warrior",
+      "description": "Practice daily for 7 consecutive days (minimum 10 mins/day)"
+    }
   }
 }

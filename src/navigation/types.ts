@@ -24,6 +24,7 @@ export type RootStackParamList = {
     fromLogs?: boolean;
     pathId?: string;
   };
+  Achievements: undefined;
 };
 
 export type DrawerParamList = {
@@ -38,6 +39,7 @@ export type TabParamList = {
   UserAnalytics: undefined;
   Search: undefined;
   Learn: undefined;
+  Leaderboard: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

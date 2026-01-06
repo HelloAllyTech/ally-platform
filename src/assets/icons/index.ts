@@ -1,3 +1,4 @@
+import AchievementLockedIcon from './achievementLocked.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
@@ -52,6 +53,8 @@ import InfoIcon from './info.svg';
 import InfoBlackCircleIcon from './infoBlackCircle.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
+import LeaderboardInactiveIcon from './leaderboard.svg';
+import LeaderboardActiveIcon from './leaderboardActive.svg';
 import LearnInactiveIcon from './learn.svg';
 import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
@@ -106,6 +109,7 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  AchievementLockedIcon,
   AllyLogoIcon,
   AnalyticsActiveIcon,
   AnalyticsInactiveIcon,
@@ -161,6 +165,8 @@ export {
   KeyEventsIcon,
   LearnActiveIcon,
   LearnInactiveIcon,
+  LeaderboardActiveIcon,
+  LeaderboardInactiveIcon,
   LeftArrow,
   LeftArrowIcon,
   LightBulbIcon,
