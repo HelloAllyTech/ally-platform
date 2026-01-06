@@ -50,3 +50,5 @@ export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';
 export {SimulationCard} from './SimulationCard';
 export {Checkbox} from './Checkbox';
+export {BottomSheet} from './BottomSheet';
+export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
