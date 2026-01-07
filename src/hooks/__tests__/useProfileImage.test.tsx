@@ -173,7 +173,7 @@ describe('useProfileImage', () => {
       });
     });
 
-    it('should delete old image before uploading new one', async () => {
+    it('should delete old image after successful upload and state update', async () => {
       const mockAsset = {
         uri: 'file://image.jpg',
         fileName: 'image.jpg',
@@ -216,6 +216,26 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
+      // Verify upload happens first
+      await waitFor(() => {
+        expect(mockGetPresignedUrl).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(uploadImageToS3).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(mockUpdateProfileImage).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(result.current.profileImageUri).toBe(
+          'https://s3.amazonaws.com/profile-image.jpg',
+        );
+      });
+
+      // Then verify old image is deleted after successful upload
       await waitFor(() => {
         expect(mockDeleteProfileImage).toHaveBeenCalledWith({
           profileImageUrl: 'https://example.com/old-image.jpg',
@@ -223,7 +243,7 @@ describe('useProfileImage', () => {
       });
     });
 
-    it('should continue upload even if deleting old image fails', async () => {
+    it('should continue successfully even if deleting old image fails after upload', async () => {
       const mockAsset = {
         uri: 'file://image.jpg',
         fileName: 'image.jpg',
@@ -256,9 +276,11 @@ describe('useProfileImage', () => {
 
       (uploadImageToS3 as jest.Mock).mockResolvedValue(true);
 
+      const mockOnUploadSuccess = jest.fn();
       const {result} = renderHook(() =>
         useProfileImage({
           currentProfileImageUrl: 'https://example.com/old-image.jpg',
+          onUploadSuccess: mockOnUploadSuccess,
         }),
       );
 
@@ -266,14 +288,30 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
+      // Verify upload completes successfully
       await waitFor(() => {
-        expect(logger.warn).toHaveBeenCalledWith(
-          expect.stringContaining('Failed to delete old profile image'),
+        expect(mockGetPresignedUrl).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(result.current.profileImageUri).toBe(
+          'https://s3.amazonaws.com/profile-image.jpg',
         );
       });
 
       await waitFor(() => {
-        expect(mockGetPresignedUrl).toHaveBeenCalled();
+        expect(mockOnUploadSuccess).toHaveBeenCalled();
+      });
+
+      // Then verify delete is attempted and failure is logged but doesn't fail the upload
+      await waitFor(() => {
+        expect(mockDeleteProfileImage).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to delete old profile image'),
+        );
       });
     });
 
