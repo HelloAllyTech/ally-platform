@@ -6,6 +6,7 @@ export * from './credits';
 export * from './date';
 export * from './error';
 export * from './fileOperations';
+export * from './imageUpload';
 export * from './navigation';
 export * from './validation';
 export * from './version';
