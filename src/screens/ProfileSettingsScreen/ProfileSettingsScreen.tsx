@@ -1,5 +1,12 @@
 import React, {useState} from 'react';
-import {Image, Platform, Text, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
@@ -10,7 +17,7 @@ import {
   useTranslate,
   useUser,
 } from '@/hooks';
-import {colors, fontFamily, fontWeights} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ProfileImageBottomSheet} from './components/ProfileImageBottomSheet';
 
@@ -25,10 +32,11 @@ export const ProfileSettingsScreen: React.FC = () => {
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
 
-  const {profileImageUri, handleImagePicker, handleRemoveImage} =
+  const {profileImageUri, isUploading, handleImagePicker, handleRemoveImage} =
     useProfileImage({
       currentProfileImageUrl: profileImageUrl,
     });
+  console.log('🚀 ~ ProfileSettingsScreen ~ isUploading:', isUploading);
 
   // Get the first letter of the user's name for the placeholder
   const getInitial = () => {
@@ -88,6 +96,11 @@ export const ProfileSettingsScreen: React.FC = () => {
                 <Text style={styles.avatarInitial}>{getInitial()}</Text>
               </View>
             )}
+            {isUploading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={colors.azureBlue} />
+              </View>
+            )}
           </View>
           {profileImageUri ? (
             <TouchableOpacity
@@ -101,7 +114,7 @@ export const ProfileSettingsScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.uploadButton}
               onPress={handleUploadImage}>
-              <Text style={styles.uploadButtonText}>
+              <Text style={styles.editButtonText}>
                 {t('ProfileSettings.uploadImage')}
               </Text>
             </TouchableOpacity>
@@ -147,7 +160,7 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '21@ms',
     paddingVertical: '16@ms',
     borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
+    borderBottomColor: colors.ds.stroke.primary,
   },
   backButton: {
     marginRight: '16@ms',
@@ -201,27 +214,28 @@ const styles = ScaledSheet.create({
     lineHeight: ms(41.6),
     color: '#757575',
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: '58@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   uploadButton: {
     marginTop: '8@mvs',
-  },
-  uploadButtonText: {
-    fontFamily: 'Roboto',
-    fontSize: ms(14),
-    lineHeight: ms(20),
-    letterSpacing: ms(0.1),
-    fontWeight: '500',
-    color: colors.azureBlue,
   },
   editButton: {
     marginTop: '8@mvs',
   },
   editButtonText: {
-    fontFamily: 'Roboto',
-    fontSize: ms(14),
-    lineHeight: ms(20),
-    letterSpacing: ms(0.1),
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.medium,
     fontWeight: '500',
-    color: colors.azureBlue,
+    color: colors.ds.theme.primary,
   },
   fieldsSection: {
     gap: '24@mvs',
@@ -231,10 +245,8 @@ const styles = ScaledSheet.create({
   },
   fieldLabel: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: ms(14),
-    lineHeight: ms(20),
-    letterSpacing: ms(0.25),
-    color: '#1A1A1A',
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
   fieldValue: {
     paddingVertical: '8@mvs',
@@ -246,9 +258,7 @@ const styles = ScaledSheet.create({
   },
   fieldValueText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: ms(14),
-    lineHeight: ms(20),
-    letterSpacing: ms(0.25),
-    color: 'rgba(0, 0, 0, 0.38)',
+    ...typography.body.medium,
+    color: colors.ds.typography.lowEmphasis,
   },
 });

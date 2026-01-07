@@ -1,11 +1,11 @@
 import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
-import {ms, ScaledSheet} from 'react-native-size-matters';
+import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChangeImageIcon, RemoveImageIcon} from '@/assets/icons';
 import {BottomSheet} from '@/components';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface ProfileImageOptionProps {
   icon: React.ReactNode;
@@ -18,7 +18,6 @@ const ProfileImageOption: React.FC<ProfileImageOptionProps> = ({
   icon,
   text,
   onPress,
-  textColor = '#000000',
 }) => {
   return (
     <TouchableOpacity
@@ -26,7 +25,7 @@ const ProfileImageOption: React.FC<ProfileImageOptionProps> = ({
       onPress={onPress}
       activeOpacity={0.7}>
       <View style={styles.optionIcon}>{icon}</View>
-      <Text style={[styles.optionText, {color: textColor}]}>{text}</Text>
+      <Text style={styles.optionText}>{text}</Text>
     </TouchableOpacity>
   );
 };
@@ -62,7 +61,6 @@ export const ProfileImageBottomSheet: React.FC<
                 : t('ProfileSettings.uploadImage')
             }
             onPress={onChangeImage}
-            textColor="#000000"
           />
 
           {hasExistingImage && (
@@ -70,7 +68,6 @@ export const ProfileImageBottomSheet: React.FC<
               icon={<RemoveImageIcon width={24} height={24} />}
               text={t('ProfileSettings.removeImage')}
               onPress={onRemoveImage}
-              textColor="rgba(0, 0, 0, 0.87)"
             />
           )}
         </View>
@@ -87,10 +84,9 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: ms(18),
-    lineHeight: ms(32),
+    ...typography.display.small,
     textAlign: 'center',
-    color: '#222222',
+    color: colors.ds.typography.highEmphasis,
     marginBottom: '16@mvs',
   },
   optionsContainer: {
@@ -109,8 +105,7 @@ const styles = ScaledSheet.create({
   },
   optionText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: ms(14),
-    lineHeight: ms(18.2),
-    letterSpacing: ms(0.15),
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
 });

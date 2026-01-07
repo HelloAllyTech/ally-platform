@@ -46,6 +46,11 @@ export interface DeleteProfileImageRequest {
   profileImageUrl: string;
 }
 
+export interface LogoUrlResponse {
+  name: string;
+  logoUrl: string;
+}
+
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<GenerateOtpResponse, GenerateOtpRequest>({
@@ -132,6 +137,9 @@ export const authApi = api.injectEndpoints({
         }
       },
     }),
+    getLogoUrl: builder.query<LogoUrlResponse, void>({
+      query: () => API_ROUTES.USERS.LOGO_URL,
+    }),
   }),
 });
 
@@ -144,4 +152,5 @@ export const {
   useGetProfileImagePresignedUrlMutation,
   useUpdateProfileImageMutation,
   useDeleteProfileImageMutation,
+  useGetLogoUrlQuery,
 } = authApi;

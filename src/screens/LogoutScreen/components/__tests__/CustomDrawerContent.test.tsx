@@ -31,6 +31,11 @@ jest.mock('@/config/env', () => ({
   env: { ENVIRONMENT: 'development' },
 }));
 
+jest.mock('@/services/authApi', () => ({
+  __esModule: true,
+  useGetLogoUrlQuery: () => ({ data: null }),
+}));
+
 // Mock child components to avoid rendering complexity
 jest.mock('@/components', () => {
   const React = require('react');
@@ -63,8 +68,64 @@ jest.mock('@/assets', () => {
     ProfileIcon: () => <View testID="profile-icon" />,
     ProfileSettingsIcon: () => <View testID="profile-settings-icon" />,
     BoltIcon: () => <View testID="bolt-icon" />,
+    AllyLogoIcon: () => <View testID="ally-logo-icon" />,
   };
 });
+
+jest.mock('@/theme', () => ({
+  __esModule: true,
+  colors: {
+    white: '#FFFFFF',
+    black: '#000000',
+    lightGray2: '#E5E5E5',
+    lightGray5: '#F5F5F5',
+    softCoralRed: '#FF6B6B',
+    azureBlue: '#4A90E2',
+    ds: {
+      typography: {
+        highEmphasis: '#000000',
+        mediumEmphasis: '#666666',
+      },
+    },
+  },
+  fontFamily: {
+    REPLAY_PRO: {
+      HEADLINE: {fontFamily: 'ReplayPro-Headline'},
+    },
+    IBM_PLEX_SERIF: {
+      MEDIUM: {fontFamily: 'IBMPlexSerif-Medium'},
+      REGULAR: {fontFamily: 'IBMPlexSerif-Regular'},
+    },
+  },
+  typography: {
+    body: {
+      large: {
+        fontSize: 16,
+        lineHeight: 24,
+        letterSpacing: 0.5,
+      },
+      small: {
+        fontSize: 12,
+        lineHeight: 16,
+        letterSpacing: 0.2,
+      },
+    },
+    label: {
+      large: {
+        fontSize: 14,
+        lineHeight: 22,
+        letterSpacing: 0.2,
+      },
+    },
+    headline: {
+      tiny: {
+        fontSize: 18,
+        lineHeight: 24,
+        letterSpacing: 0,
+      },
+    },
+  },
+}));
 
 describe('CustomDrawerContent', () => {
   const mockDrawerProps: DrawerContentComponentProps = {

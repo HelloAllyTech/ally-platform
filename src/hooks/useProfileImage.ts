@@ -99,26 +99,12 @@ export const useProfileImage = ({
 
           setIsUploading(true);
           try {
-            // Step 0: Delete old image if exists
-            if (currentProfileImageUrl) {
-              try {
-                await deleteProfileImage({
-                  profileImageUrl: currentProfileImageUrl,
-                }).unwrap();
-              } catch (error) {
-                // Log error but continue with upload
-                logger.warn(`Failed to delete old profile image: ${error}`);
-              }
-            }
-
-            // Step 1: Get presigned URL
             const presignedResponse = await getPresignedUrl({
               fileName,
               fileSize,
               contentType: type,
             }).unwrap();
 
-            // Step 2: Upload to S3 using presigned URL
             const uploadSuccess = await uploadImageToS3(
               uri,
               presignedResponse.presignedUrl,
@@ -129,17 +115,24 @@ export const useProfileImage = ({
               throw new Error('Failed to upload image to S3');
             }
 
-            // Step 3: Use the profileImageUrl from API response (clean S3 URL)
             const s3Url = presignedResponse.profileImageUrl;
 
-            // Step 4: Update profile image URL in backend
             await updateProfileImage({
               profileImageUrl: s3Url,
             }).unwrap();
 
-            // Step 5: Update local state
             setProfileImageUri(s3Url);
             onUploadSuccess?.(s3Url);
+
+            if (currentProfileImageUrl) {
+              try {
+                await deleteProfileImage({
+                  profileImageUrl: currentProfileImageUrl,
+                }).unwrap();
+              } catch (error) {
+                logger.warn(`Failed to delete old profile image: ${error}`);
+              }
+            }
           } catch (error) {
             const errorObj =
               error instanceof Error ? error : new Error(String(error));

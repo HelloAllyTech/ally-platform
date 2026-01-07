@@ -1,8 +1,14 @@
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
-import {Text, View} from 'react-native';
+import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {BoltIcon, LogoutIcon, ProfileIcon, ProfileSettingsIcon} from '@/assets';
+import {
+  AllyLogoIcon,
+  BoltIcon,
+  LogoutIcon,
+  ProfileIcon,
+  ProfileSettingsIcon,
+} from '@/assets';
 import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
 import {
@@ -11,6 +17,7 @@ import {
   useTranslate,
   useUser,
 } from '@/hooks';
+import {useGetLogoUrlQuery} from '@/services/authApi';
 import {colors, fontFamily, typography} from '@/theme';
 import {getAppVersion} from '@/utils';
 
@@ -29,6 +36,7 @@ export const DrawerContent = ({
   const navigation = useAppNavigation();
   const {credits, getCreditsInfo} = useSimulationCredits();
   const {name, email} = userData ?? {};
+  const {data: tenantData} = useGetLogoUrlQuery();
 
   const handleProfileSettingsPress = () => {
     drawerNavigation.closeDrawer();
@@ -114,6 +122,17 @@ export const DrawerContent = ({
           {t('Common.version')}: {getAppVersion()}{' '}
           {env.ENVIRONMENT === 'development' && t('Drawer.dev')}
         </Text>
+      </View>
+
+      <View style={styles.logoContainer}>
+        {tenantData?.logoUrl && (
+          <Image
+            source={{uri: tenantData.logoUrl}}
+            style={styles.orgLogo}
+            resizeMode="contain"
+          />
+        )}
+        <AllyLogoIcon />
       </View>
     </View>
   );
@@ -217,5 +236,17 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '2@ms',
+    marginBottom: '20@ms',
+    marginTop: '8@mvs',
+  },
+  orgLogo: {
+    height: '40@ms',
+    width: '60@ms',
   },
 });

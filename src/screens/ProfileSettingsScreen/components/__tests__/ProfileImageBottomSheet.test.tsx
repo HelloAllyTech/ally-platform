@@ -44,11 +44,33 @@ jest.mock('react-native-size-matters', () => ({
 jest.mock('@/theme', () => ({
   colors: {
     white: '#FFFFFF',
+    ds: {
+      typography: {
+        highEmphasis: '#000000',
+        mediumEmphasis: '#666666',
+      },
+    },
   },
   fontFamily: {
     IBM_PLEX_SERIF: {
       MEDIUM: {fontFamily: 'IBMPlexSerif-Medium'},
       REGULAR: {fontFamily: 'IBMPlexSerif-Regular'},
+    },
+  },
+  typography: {
+    display: {
+      small: {
+        fontSize: 18,
+        lineHeight: 24,
+        letterSpacing: 0.18,
+      },
+    },
+    body: {
+      medium: {
+        fontSize: 14,
+        lineHeight: 22,
+        letterSpacing: 0.2,
+      },
     },
   },
 }));
