@@ -88,7 +88,7 @@ async def process_events(
                 _,
                 additional_score_from_triggered_events,
                 branching_and_feedback_data,
-            ) = await event_orchestrator.handle_events(
+            ) = await event_orchestrator.orchestrate_events(
                 room=room,
                 detected_event_ids=(detected_event_ids if detected_event_ids else None),
             )

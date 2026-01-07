@@ -181,7 +181,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             _,
             additional_score,
             branching_and_feedback_data,
-        ) = await self.handle_events(room=self.room, detected_event_ids=None)
+        ) = await self.orchestrate_events(room=self.room, detected_event_ids=None)
 
         # Update graph state with initial branching_and_feedback_data
         # if any were triggered
@@ -199,7 +199,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         await self._scheduler.start_time_event_schedulers(
             events=self.events,
             event_registry=self.event_registry,
-            event_notifier=self.handle_events,
+            event_notifier=self.orchestrate_events,
             room=self.room,
             default_seconds=60.0,
             agent_graph=agent_graph,
@@ -383,7 +383,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             branching_and_feedback_data,
         )
 
-    async def handle_events(
+    async def orchestrate_events(
         self,
         room: rtc.Room,
         detected_event_ids: Optional[Set[str]] = None,

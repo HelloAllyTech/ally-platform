@@ -166,7 +166,7 @@ class TestEventTermination:
         )
 
         # Update and send events (mark termination event as detected)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-event"}
         )
 
@@ -204,7 +204,7 @@ class TestEventTermination:
         )
 
         # Update and send events
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"normal-event"}
         )
 
@@ -244,7 +244,7 @@ class TestEventTermination:
         )
 
         # Update with both termination events
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-1", "term-2"}
         )
 
@@ -286,7 +286,7 @@ class TestEventTermination:
         )
 
         # Update with both events
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"normal", "terminator"}
         )
 
@@ -319,7 +319,9 @@ class TestEventTermination:
         )
 
         # Update without room (room=None)
-        await orchestrator.handle_events(room=None, detected_event_ids={"term-event"})
+        await orchestrator.orchestrate_events(
+            room=None, detected_event_ids={"term-event"}
+        )
 
         # Callback is still called even without room (termination logic runs regardless)
         callback.assert_awaited_once()
@@ -355,7 +357,7 @@ class TestEventTermination:
         mock_room.name = "test-room"
 
         # Update and send
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-event"}
         )
 
@@ -394,7 +396,7 @@ class TestEventTermination:
         )
 
         # Update and send
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-event"}
         )
 
@@ -459,7 +461,7 @@ class TestEventTermination:
         )
 
         # Trigger both base events so combination event becomes true
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"event-1", "event-2"}
         )
 
@@ -509,7 +511,7 @@ class TestEventTermination:
         orchestrator.live_score = 10
 
         # Update with score that triggers the event
-        await orchestrator.handle_events(room=mock_room, detected_event_ids=None)
+        await orchestrator.orchestrate_events(room=mock_room, detected_event_ids=None)
 
         # Score event should trigger termination
         callback.assert_awaited_once()
@@ -556,7 +558,7 @@ class TestEventTermination:
 
         # Manually trigger the time event by passing it in detected_event_ids
         # (Time events are normally triggered by schedulers, not in handle_events)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"time-term"}
         )
 
@@ -629,7 +631,7 @@ class TestMultipleTerminationEvents:
         )
 
         # Trigger both termination events
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-1", "term-2"}
         )
 
@@ -669,7 +671,7 @@ class TestMultipleTerminationEvents:
         )
 
         # Trigger both termination events
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             room=mock_room, detected_event_ids={"term-1", "term-2"}
         )
 

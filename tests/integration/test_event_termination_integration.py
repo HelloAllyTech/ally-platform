@@ -108,7 +108,7 @@ class TestEventTerminationIntegration:
         assert term_detected is False
 
         # Update orchestrator - should not trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"normal-event"}, room=mock_room
         )
 
@@ -127,7 +127,7 @@ class TestEventTerminationIntegration:
         assert term_detected is True
 
         # Update orchestrator - should trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"end-session"}, room=mock_room
         )
 
@@ -197,7 +197,7 @@ class TestEventTerminationIntegration:
 
         orchestrator.live_score = 10
         # First update with greeting - should not terminate
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"greeting"},
             room=mock_room,
         )
@@ -207,7 +207,7 @@ class TestEventTerminationIntegration:
         orchestrator.live_score = 50
 
         # Update with high score - should trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids=None,
             room=mock_room,
         )
@@ -308,7 +308,7 @@ class TestEventTerminationIntegration:
             # Trigger the termination event
             # Note: UI events are no longer sent from handle_events -
             # they're sent from generate_response after STT/TTS completes
-            await orchestrator.handle_events(
+            await orchestrator.orchestrate_events(
                 detected_event_ids={"final-event"}, room=mock_room
             )
 
@@ -376,7 +376,7 @@ class TestEventTerminationIntegration:
         ) as mock_queue:
             mock_queue.send_message = AsyncMock()
 
-            await orchestrator.handle_events(
+            await orchestrator.orchestrate_events(
                 detected_event_ids={"session-end"}, room=mock_room
             )
 
@@ -480,7 +480,7 @@ class TestEventTerminationIntegration:
         )
 
         # Trigger hidden-term (should be filtered)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"hidden-term"}, room=mock_room
         )
 
@@ -488,7 +488,7 @@ class TestEventTerminationIntegration:
         termination_callback.assert_not_awaited()
 
         # Trigger visible-term (should not be filtered)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"visible-term"}, room=mock_room
         )
 
@@ -550,7 +550,7 @@ class TestEventTerminationIntegration:
         )
 
         # Trigger the termination event
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"end-abruptly"}, room=mock_room
         )
 

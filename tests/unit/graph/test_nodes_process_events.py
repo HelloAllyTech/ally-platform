@@ -71,7 +71,7 @@ class TestProcessEvents:
 
         # Mock EventOrchestrator
         class MockEventOrchestrator:
-            async def handle_events(self, room, detected_event_ids):
+            async def orchestrate_events(self, room, detected_event_ids):
                 # Returns: (successful_events, additional_score,
                 # branching_and_feedback_data)
                 return (
@@ -133,7 +133,7 @@ class TestProcessEvents:
         )
 
         class MockEventOrchestrator:
-            async def handle_events(self, room, detected_event_ids):
+            async def orchestrate_events(self, room, detected_event_ids):
                 # Returns: (successful_events, additional_score,
                 # branching_and_feedback_data)
                 return (
@@ -257,7 +257,7 @@ class TestProcessEvents:
         )
 
         class MockEventOrchestrator:
-            async def handle_events(self, room, detected_event_ids):
+            async def orchestrate_events(self, room, detected_event_ids):
                 # Returns: (successful_events, additional_score,
                 # branching_and_feedback_data)
                 return [], 5, []  # Empty branching and feedback data

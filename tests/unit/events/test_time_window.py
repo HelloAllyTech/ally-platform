@@ -63,7 +63,7 @@ async def test_process_events_time_filtering(base_state):
     ]
 
     mock_orchestrator = MagicMock(spec=EventOrchestrator)
-    mock_orchestrator.handle_events = AsyncMock(return_value=(None, 0, []))
+    mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
 
     mock_orchestrator.live_score = 0
 
@@ -110,7 +110,7 @@ async def test_process_events_score_filtering(base_state):
     base_state.permitted_events = [evt_high_req, evt_low_req, evt_mid_range]
 
     mock_orchestrator = MagicMock()
-    mock_orchestrator.handle_events = AsyncMock(return_value=(None, 0, []))
+    mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
     # CRITICAL: This prevents 'int <= MagicMock' error
     mock_orchestrator.live_score = 50
 
@@ -135,7 +135,7 @@ async def test_process_events_invalid_time_format(base_state):
 
     # --- FIX 3: Configure Orchestrator ---
     mock_orchestrator = MagicMock()
-    mock_orchestrator.handle_events = AsyncMock(return_value=(None, 0, []))
+    mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
     mock_orchestrator.live_score = 0  # Default score
 
     config = {
