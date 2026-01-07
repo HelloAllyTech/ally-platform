@@ -63,8 +63,6 @@ class ElevenLabsTTSClient(BaseTTSClient):
             logger.error("ElevenLabs validation requires 'voice_id' parameter")
             return False
 
-        logger.info(f"Validating ElevenLabs voice voice_id='{voice_id}'")
-
         try:
             key = api_key or settings.ELEVEN_API_KEY
             client = ElevenLabs(api_key=key)
