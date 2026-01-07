@@ -58,7 +58,7 @@ def create_test_scenario(events, trigger_events_whitelist=None):
     else:
         scenario.trigger_events = [e.event_id for e in events]
 
-    scenario.termination_event = None
+    scenario.termination_events = []
     return scenario
 
 

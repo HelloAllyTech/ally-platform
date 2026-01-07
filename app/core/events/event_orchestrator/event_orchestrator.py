@@ -17,7 +17,7 @@ from app.core.events.schedulers import TimeEventScheduler
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.core.graph import agent_graph
 from app.core.graph.state import BranchingAndFeedbackData
-from app.core.scenario.base import Scenario
+from app.core.scenario.base import Scenario, TerminationEvent
 from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 from app.utils.logger import get_logger
 
@@ -69,15 +69,20 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         )
         self.initial_time = 0.0
         self.termination_callback = termination_callback
-        # Store termination event configuration from scenario
-        self.termination_event_id: Optional[str] = None
-        self.termination_message: Optional[str] = None
-        if scenario.termination_event:
-            self.termination_event_id = scenario.termination_event.id
-            self.termination_message = scenario.termination_event.termination_message
+        # Store termination event configurations from scenario (list of events)
+        self.termination_events: List[TerminationEvent] = (
+            scenario.termination_events or []
+        )
+        # Build set of termination event IDs for O(1) lookup
+        self.termination_event_ids: Set[str] = {te.id for te in self.termination_events}
+        if self.termination_events:
             logger.debug(
-                f"Termination configured for event: {self.termination_event_id}"
+                f"Termination configured for events: "
+                f"{[te.id for te in self.termination_events]}"
             )
+        # Flag to track if termination flow has started.
+        # Once started, additional termination events will be ignored.
+        self._termination_flow_started: bool = False
         # Store session reference for termination
         self._session = None
         # Track if termination has been initiated (session-level flag)
@@ -310,12 +315,15 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         )
 
         # Filter events to send based on trigger_multiple flag and trigger_events list
-        events_to_send = []
+        events_to_process = []
         for event in successful_events:
             # First check if event is in trigger_events (if trigger_events is specified)
+            # Exception: Termination events are ALWAYS processed,
+            # even if not in trigger_events
             if (
                 self.trigger_events is not None
                 and event.event_id not in self.trigger_events
+                and event.event_id not in self.termination_event_ids
             ):
                 logger.debug(
                     f"Event {event.event_id} skipped (not in trigger_events list)"
@@ -333,8 +341,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             # even if trigger_multiple=True
             # This prevents duplicate termination callbacks
             if (
-                self.termination_event_id
-                and event.event_id == self.termination_event_id
+                event.event_id in self.termination_event_ids
                 and event.event_id in self._sent_events
             ):
                 logger.debug(
@@ -345,7 +352,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             # If trigger_multiple is True, always send
             # If trigger_multiple is False, only send if not sent before
             if trigger_multiple and event.event_id in all_detected_event_ids:
-                events_to_send.append(event)
+                events_to_process.append(event)
                 self._sent_events.add(
                     event.event_id
                 )  # Track sent events even for trigger_multiple=True
@@ -353,7 +360,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                     f"Event {event.event_id} will be sent (trigger_multiple=True)"
                 )
             elif event.event_id not in self._sent_events:
-                events_to_send.append(event)
+                events_to_process.append(event)
                 self._sent_events.add(event.event_id)
                 logger.debug(
                     f"Event {event.event_id} will be sent (first time, "
@@ -367,12 +374,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         # Collect unified branching and feedback data for state
         branching_and_feedback_data = self._collect_branching_and_feedback_data(
-            events_to_send
+            events_to_process
         )
 
         return (
             successful_events,
-            events_to_send,
+            events_to_process,
             additional_score_from_triggered_events,
             branching_and_feedback_data,
         )
@@ -414,7 +421,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # Update registry and collect all data
         (
             successful_events,
-            events_to_send,
+            events_to_process,
             additional_score,
             branching_and_feedback_data,
         ) = self._update_registry_and_collect_event_data(
@@ -423,10 +430,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         # Send events to Core immediately (backend needs real-time updates)
         # UI events are handled via branching_and_feedback_data in generate_response
-        await self._send_events_to_core(events_to_send, room)
+        await self._send_events_to_core(events_to_process, room)
 
         # Update live_score with scores from events sent to core
-        await self._update_live_score(events_to_send)
+        await self._update_live_score(events_to_process)
+
+        # Handle termination events after sending events (even if room is None)
+        await self._handle_termination_events(events_to_process)
 
         return (
             successful_events,

@@ -112,10 +112,12 @@ SCENARIO_SAMPLE = {
             "comb-score-lte-0_and_open-ended-question",
             "warm-greeting",
         ],
-        "autoTerminationEvent": {
-            "id": "superficial-hope",
-            "terminationMessage": "Termination message",
-        },
+        "autoTerminationEvents": [
+            {
+                "id": "superficial-hope",
+                "terminationMessage": "Termination message is being played",
+            }
+        ],
         "voice": {
             "name": "priya-adult-female",
             "provider": "sarvam",

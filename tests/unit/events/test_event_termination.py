@@ -20,19 +20,47 @@ class DummyEvent(BaseEvent):
 
 
 def create_mock_scenario(
-    events, trigger_events=None, termination_event_id=None, termination_message=None
+    events,
+    trigger_events=None,
+    termination_event_id=None,
+    termination_message=None,
+    termination_events=None,
 ):
-    """Helper to create a mock scenario for testing."""
+    """
+    Helper to create a mock scenario for testing.
+
+    Args:
+        events: List of events
+        trigger_events: List of event IDs to trigger
+        termination_event_id: Single termination event ID (for convenience in tests)
+        termination_message: Termination message for single event
+        termination_events: List of termination event configs
+            (each with id, termination_message, and optional score)
+    """
     mock_scenario = MagicMock()
     mock_scenario.events = events
     mock_scenario.trigger_events = trigger_events
 
-    if termination_event_id:
-        mock_scenario.termination_event = MagicMock()
-        mock_scenario.termination_event.id = termination_event_id
-        mock_scenario.termination_event.termination_message = termination_message or ""
+    # Handle termination_events list
+    if termination_events:
+        mock_termination_events = []
+        for te in termination_events:
+            mock_te = MagicMock()
+            mock_te.id = te["id"]
+            mock_te.termination_message = te.get("termination_message", "")
+            mock_te.score = te.get("score")
+            mock_termination_events.append(mock_te)
+        mock_scenario.termination_events = mock_termination_events
+    elif termination_event_id:
+        # Create termination_events from single termination event
+        # (convenience for tests)
+        mock_te = MagicMock()
+        mock_te.id = termination_event_id
+        mock_te.termination_message = termination_message or ""
+        mock_te.score = None
+        mock_scenario.termination_events = [mock_te]
     else:
-        mock_scenario.termination_event = None
+        mock_scenario.termination_events = []
 
     return mock_scenario
 
@@ -56,22 +84,22 @@ class TestEventTermination:
         events = build_events_from_metadata(metadata)
 
         # Create mock scenario with termination event
-        mock_scenario = MagicMock()
-        mock_scenario.events = events
-        mock_scenario.trigger_events = []
-        mock_scenario.termination_event = MagicMock()
-        mock_scenario.termination_event.id = "event-1"
-        mock_scenario.termination_event.termination_message = "Custom termination"
+        scenario = create_mock_scenario(
+            events,
+            trigger_events=[],
+            termination_event_id="event-1",
+            termination_message="Custom termination",
+        )
 
         mock_room = MagicMock()
         mock_room.name = "test-room"
 
         orchestrator = EventOrchestrator(
-            mock_scenario, room=mock_room, thread_id="test-thread"
+            scenario, room=mock_room, thread_id="test-thread"
         )
 
-        assert orchestrator.termination_event_id == "event-1"
-        assert orchestrator.termination_message == "Custom termination"
+        assert len(orchestrator.termination_events) == 1
+        assert "event-1" in orchestrator.termination_event_ids
 
     def test_event_orchestrator_accepts_termination_callback(self):
         """Test that EventOrchestrator accepts termination callback in __init__."""
@@ -335,9 +363,12 @@ class TestEventTermination:
         callback.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_termination_event_filtered_by_trigger_events(self):
-        """Test that termination callback is NOT called if event is
-        filtered by trigger_events."""
+    async def test_termination_event_works_without_trigger_events(self):
+        """Test that termination events work even if NOT in trigger_events list.
+
+        Termination events should always be processed, regardless of trigger_events.
+        This allows BE to configure termination without adding to trigger_events.
+        """
         # Create termination event
         term_event = DummyEvent(
             event_id="term-event", visibility_type=VisibilityType.ACTIVE, score=0
@@ -345,8 +376,8 @@ class TestEventTermination:
 
         callback = AsyncMock()
 
-        # Create orchestrator with trigger_events filter that EXCLUDES
-        # the termination event
+        # Create orchestrator with trigger_events that EXCLUDES the termination event
+        # But termination should still work
         scenario = create_mock_scenario(
             [term_event],
             trigger_events=["other-event"],
@@ -362,16 +393,14 @@ class TestEventTermination:
             termination_callback=callback,
         )
 
-        mock_room = MagicMock()
-        mock_room.name = "test-room"
-
         # Update and send
         await orchestrator.handle_events(
             room=mock_room, detected_event_ids={"term-event"}
         )
 
-        # Callback should NOT be called because event is filtered out
-        callback.assert_not_awaited()
+        # Callback SHOULD be called even though term-event not in trigger_events
+        # Termination events are always processed
+        callback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_termination_with_combination_event(self):
@@ -535,3 +564,224 @@ class TestEventTermination:
         callback.assert_awaited_once()
         called_event = callback.call_args[0][0]
         assert called_event.event_id == "time-term"
+
+
+class TestMultipleTerminationEvents:
+    """Test suite for multiple auto-termination events functionality."""
+
+    def test_event_orchestrator_stores_multiple_termination_events(self):
+        """Test that EventOrchestrator stores multiple termination events."""
+        term_event_1 = DummyEvent(
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=5
+        )
+        term_event_2 = DummyEvent(
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=10
+        )
+
+        scenario = create_mock_scenario(
+            [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
+            termination_events=[
+                {"id": "term-1", "termination_message": "Message 1", "score": 5},
+                {"id": "term-2", "termination_message": "Message 2", "score": 10},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario, room=mock_room, thread_id="test-thread"
+        )
+
+        assert len(orchestrator.termination_events) == 2
+        assert orchestrator.termination_event_ids == {"term-1", "term-2"}
+
+    @pytest.mark.asyncio
+    async def test_multiple_termination_events_selects_highest_magnitude_score(self):
+        """Test that when multiple termination events trigger, the one with
+        highest magnitude score is selected."""
+        term_event_1 = DummyEvent(
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=5
+        )
+        term_event_2 = DummyEvent(
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=10
+        )
+
+        callback = AsyncMock()
+        scenario = create_mock_scenario(
+            [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
+            termination_events=[
+                {"id": "term-1", "termination_message": "Message 1", "score": 5},
+                {"id": "term-2", "termination_message": "Message 2", "score": 10},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
+        # Trigger both termination events
+        await orchestrator.handle_events(
+            room=mock_room, detected_event_ids={"term-1", "term-2"}
+        )
+
+        # Should select term-2 (score=10 > score=5)
+        callback.assert_awaited_once()
+        called_event = callback.call_args[0][0]
+        assert called_event.event_id == "term-2"
+
+    @pytest.mark.asyncio
+    async def test_multiple_termination_events_negative_score_magnitude(self):
+        """Test that negative scores are compared by magnitude (absolute value)."""
+        term_event_1 = DummyEvent(
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=-15
+        )
+        term_event_2 = DummyEvent(
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=10
+        )
+
+        callback = AsyncMock()
+        scenario = create_mock_scenario(
+            [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
+            termination_events=[
+                {"id": "term-1", "termination_message": "Message 1", "score": -15},
+                {"id": "term-2", "termination_message": "Message 2", "score": 10},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
+        # Trigger both termination events
+        await orchestrator.handle_events(
+            room=mock_room, detected_event_ids={"term-1", "term-2"}
+        )
+
+        # Should select term-1 (abs(-15)=15 > abs(10)=10)
+        callback.assert_awaited_once()
+        called_event = callback.call_args[0][0]
+        assert called_event.event_id == "term-1"
+
+    @pytest.mark.asyncio
+    async def test_termination_flow_ignores_subsequent_events(self):
+        """Test that once termination flow starts, subsequent termination events
+        are ignored."""
+        term_event_1 = DummyEvent(
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=5
+        )
+        term_event_2 = DummyEvent(
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=10
+        )
+
+        callback = AsyncMock()
+        scenario = create_mock_scenario(
+            [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
+            termination_events=[
+                {"id": "term-1", "termination_message": "Message 1", "score": 5},
+                {"id": "term-2", "termination_message": "Message 2", "score": 10},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
+        # Manually set termination flow started
+        orchestrator._termination_flow_started = True
+
+        # Try to trigger another termination event
+        # This should be ignored since termination flow already started
+        await orchestrator._handle_termination_events([term_event_2])
+
+        # Callback should NOT be called because termination flow already started
+        callback.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_termination_flow_prevents_duplicate_callbacks(self):
+        """Test that termination callback is only called once even if
+        termination flow flag is bypassed."""
+        term_event_1 = DummyEvent(
+            event_id="term-1", visibility_type=VisibilityType.ACTIVE, score=5
+        )
+        term_event_2 = DummyEvent(
+            event_id="term-2", visibility_type=VisibilityType.ACTIVE, score=10
+        )
+
+        callback = AsyncMock()
+        scenario = create_mock_scenario(
+            [term_event_1, term_event_2],
+            trigger_events=["term-1", "term-2"],
+            termination_events=[
+                {"id": "term-1", "termination_message": "Message 1", "score": 5},
+                {"id": "term-2", "termination_message": "Message 2", "score": 10},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=callback,
+        )
+
+        # First termination event
+        await orchestrator._handle_termination_events([term_event_1])
+        callback.assert_awaited_once()
+
+        # Try to trigger another termination event
+        # Callback should NOT be called again due to _termination_initiated flag
+        await orchestrator._handle_termination_events([term_event_2])
+
+        # Still only called once
+        callback.assert_awaited_once()
+
+    def test_single_termination_event_convenience(self):
+        """Test that single termination event ID creates termination_events list."""
+        term_event = DummyEvent(
+            event_id="term-event", visibility_type=VisibilityType.ACTIVE, score=5
+        )
+
+        # Use single termination event (convenience in tests)
+        scenario = create_mock_scenario(
+            [term_event],
+            trigger_events=["term-event"],
+            termination_event_id="term-event",
+            termination_message="Single termination",
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario, room=mock_room, thread_id="test-thread"
+        )
+
+        # Should have termination_events list populated
+        assert len(orchestrator.termination_events) == 1
+        assert "term-event" in orchestrator.termination_event_ids

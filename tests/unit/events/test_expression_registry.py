@@ -34,7 +34,7 @@ def create_test_scenario(metadata):
     scenario = MagicMock(spec=Scenario)
     scenario.events = events
     scenario.trigger_events = metadata.get("trigger_events", [])
-    scenario.termination_event = None
+    scenario.termination_events = []
     return scenario
 
 

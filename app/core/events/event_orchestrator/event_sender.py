@@ -3,7 +3,7 @@ Event sending logic for external communication.
 Handles sending events to UI and Core messaging systems.
 """
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from livekit import rtc
 
@@ -13,6 +13,7 @@ from app.core.events.schemas import CoreEventMessageType
 from app.core.graph.state import BranchingAndFeedbackData, EventFeedback
 from app.core.graph.utils import serialize_event
 from app.core.queue import msg_event_queue
+from app.core.scenario.base import TerminationEvent
 from app.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -30,20 +31,23 @@ class EventSender:
     - Sending events to Core (all events except deferred termination)
     - Collecting branching instructions from triggered events
     - Handling deferred termination events
+    - Managing multiple auto-termination events with flow isolation
 
     Requires the following attributes on the host class:
-    - termination_event_id: Optional[str]
-    - termination_message: Optional[str]
+    - termination_events: List[TerminationEvent]
+    - termination_event_ids: Set[str]
     - termination_callback: Optional[callable]
     - _termination_initiated: bool
+    - _termination_flow_started: bool
     - deferred_termination_event: Optional[BaseEvent]
     """
 
     # Type hints for attributes expected from the host class
-    termination_event_id: Optional[str]
-    termination_message: Optional[str]
+    termination_events: List[TerminationEvent]
+    termination_event_ids: Set[str]
     termination_callback: Optional[callable]
     _termination_initiated: bool
+    _termination_flow_started: bool
     deferred_termination_event: Optional[BaseEvent]
 
     def _init_event_sender(self) -> None:
@@ -113,43 +117,134 @@ class EventSender:
 
         return data_list
 
+    def get_termination_config(self, event_id: str) -> Optional[TerminationEvent]:
+        """
+        Get the termination configuration for a given event ID.
+
+        Args:
+            event_id: The event ID to look up
+
+        Returns:
+            TerminationEvent config if found, None otherwise
+        """
+        for te in self.termination_events:
+            if te.id == event_id:
+                return te
+        return None
+
+    def _select_highest_magnitude_termination_event(
+        self, termination_events: List[BaseEvent]
+    ) -> Optional[BaseEvent]:
+        """
+        Select the termination event with the highest magnitude score.
+
+        When multiple termination events are triggered in the same flow,
+        prefer the one with the highest absolute score value.
+
+        Args:
+            termination_events: List of triggered termination events
+
+        Returns:
+            The termination event with highest magnitude score, or first if no scores
+        """
+        if not termination_events:
+            return None
+
+        if len(termination_events) == 1:
+            return termination_events[0]
+
+        # Find event with highest magnitude score
+        best_event = termination_events[0]
+        best_magnitude = 0.0
+
+        for event in termination_events:
+            # Get score from termination config or event itself
+            config = self.get_termination_config(event.event_id)
+            score = config.score if config and config.score is not None else 0.0
+            # Also check event's own score if config score is not set
+            if score == 0.0 and event.score is not None:
+                score = event.score
+
+            magnitude = abs(score)
+            if magnitude > best_magnitude:
+                best_magnitude = magnitude
+                best_event = event
+
+        logger.info(
+            f"Selected termination event {best_event.event_id} with highest "
+            f"magnitude score from {len(termination_events)} candidates"
+        )
+        return best_event
+
     async def _handle_termination_events(self, events_to_send: List[BaseEvent]) -> None:
         """
         Handle termination callback for events that should terminate the session.
 
-        This method checks for termination events and calls the termination callback
-        if one is registered and termination hasn't already been initiated.
+        This method:
+        1. Checks if termination flow has already started
+        2. If multiple termination events are present, selects the one with highest
+           magnitude score
+        3. Calls the termination callback if registered and not already initiated
 
         Args:
             events_to_send: List of events that were sent
         """
-        # Check for termination events using registry's termination_event_id
-        if not self.termination_event_id:
+        # Check for termination events using the list of termination event IDs
+        if not self.termination_event_ids:
             return
 
-        termination_events = [
+        # Filter events that are termination events
+        triggered_termination_events = [
             event
             for event in events_to_send
-            if event.event_id == self.termination_event_id
+            if event.event_id in self.termination_event_ids
         ]
 
-        if termination_events:
-            logger.info(f"Termination event detected: {termination_events[0].event_id}")
+        if not triggered_termination_events:
+            return
 
-            # Only call termination callback once per session
-            if self.termination_callback and not self._termination_initiated:
-                self._termination_initiated = True
-                logger.info(
-                    f"Initiating termination for event: "
-                    f"{termination_events[0].event_id} with message: "
-                    f"{self.termination_message}"
-                )
-                await self.termination_callback(termination_events[0])
-            elif self._termination_initiated:
-                logger.debug(
-                    f"Termination already initiated, skipping callback for: "
-                    f"{termination_events[0].event_id}"
-                )
+        logger.info(
+            f"Termination events detected: "
+            f"{[e.event_id for e in triggered_termination_events]}"
+        )
+
+        # Check if termination flow has already started
+        if self._termination_flow_started:
+            logger.info(
+                "Ignoring termination events - termination flow already started"
+            )
+            return
+
+        # Mark that termination flow has started
+        self._termination_flow_started = True
+        logger.info("Termination flow started")
+
+        # Select the termination event with highest magnitude score
+        selected_event = self._select_highest_magnitude_termination_event(
+            triggered_termination_events
+        )
+
+        if not selected_event:
+            return
+
+        # Get termination message from config
+        config = self.get_termination_config(selected_event.event_id)
+        termination_message = config.termination_message if config else None
+
+        # Only call termination callback once per session
+        if self.termination_callback and not self._termination_initiated:
+            self._termination_initiated = True
+            logger.info(
+                f"Initiating termination for event: "
+                f"{selected_event.event_id} with message: "
+                f"{termination_message}"
+            )
+            await self.termination_callback(selected_event)
+        elif self._termination_initiated:
+            logger.debug(
+                f"Termination already initiated, skipping callback for: "
+                f"{selected_event.event_id}"
+            )
 
     async def _send_events_to_core(
         self, events_to_send: List[BaseEvent], room: rtc.Room
@@ -183,11 +278,8 @@ class EventSender:
             # and closes the room.
             events_to_send_to_core = []
             for event in events_to_send:
-                # Check if this is a termination event
-                if (
-                    self.termination_event_id
-                    and event.event_id == self.termination_event_id
-                ):
+                # Check if this is a termination event (using set for O(1) lookup)
+                if event.event_id in self.termination_event_ids:
                     logger.info(
                         f"Deferring termination event {event.event_id} - "
                         f"will be sent after shutdown"
@@ -206,10 +298,20 @@ class EventSender:
                     f"Sending event to core: {event.event_id} "
                     f"(visibility: {event.visibility_type})"
                 )
+                # Get termination info for this specific event
+                # if it's a termination event
+                term_event_id = None
+                term_message = None
+                if event.event_id in self.termination_event_ids:
+                    config = self.get_termination_config(event.event_id)
+                    if config:
+                        term_event_id = config.id
+                        term_message = config.termination_message
+
                 event_dict = serialize_event(
                     event,
-                    termination_event_id=self.termination_event_id,
-                    termination_message=self.termination_message,
+                    termination_event_id=term_event_id,
+                    termination_message=term_message,
                 )
                 core_event_message = CoreEventMessageType.create(
                     room_id=room.name, event_data=event_dict
@@ -217,6 +319,3 @@ class EventSender:
                 await msg_event_queue.send_message(
                     message_body=core_event_message.model_dump_json()
                 )
-
-        # Handle termination events after sending events (even if room is None)
-        await self._handle_termination_events(events_to_send)

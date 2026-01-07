@@ -115,7 +115,7 @@ class TestWorker:
             language_config=None,  # Can be None, will default to DEFAULT_LANGUAGE_CODE
             events=[mock_event],
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
 
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
@@ -227,7 +227,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -368,7 +368,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -529,7 +529,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -599,7 +599,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -638,6 +638,9 @@ class TestWorker:
 
             def is_termination_initiated(self):
                 return False
+
+            def get_termination_config(self, event_id):
+                return types.SimpleNamespace(termination_message="Goodbye")
 
         monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 

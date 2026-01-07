@@ -10,6 +10,7 @@ import pytest
 from app.core.events.base import ChatMessage
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.factory import build_events_from_metadata
+from app.core.scenario.base import TerminationEvent
 
 
 def create_mock_scenario(
@@ -21,11 +22,15 @@ def create_mock_scenario(
     mock_scenario.trigger_events = trigger_events
 
     if termination_event_id:
-        mock_scenario.termination_event = MagicMock()
-        mock_scenario.termination_event.id = termination_event_id
-        mock_scenario.termination_event.termination_message = termination_message or ""
+        # Create a list of TerminationEvent objects (new structure)
+        mock_scenario.termination_events = [
+            TerminationEvent(
+                id=termination_event_id,
+                termination_message=termination_message or "",
+            )
+        ]
     else:
-        mock_scenario.termination_event = None
+        mock_scenario.termination_events = []
 
     return mock_scenario
 
@@ -396,10 +401,19 @@ class TestEventTerminationIntegration:
             mock_queue.send_message = AsyncMock()
 
             # This is what happens in the shutdown callback
+            deferred_event = orchestrator.deferred_termination_event
+            termination_config = orchestrator.get_termination_config(
+                deferred_event.event_id
+            )
+            termination_event_id = termination_config.id if termination_config else None
+            termination_message = (
+                termination_config.termination_message if termination_config else None
+            )
+
             event_dict = serialize_event(
-                orchestrator.deferred_termination_event,
-                termination_event_id=orchestrator.termination_event_id,
-                termination_message=orchestrator.termination_message,
+                deferred_event,
+                termination_event_id=termination_event_id,
+                termination_message=termination_message,
             )
             core_event_message = CoreEventMessageType.create(
                 room_id=mock_room.name, event_data=event_dict

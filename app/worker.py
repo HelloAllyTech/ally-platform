@@ -235,8 +235,13 @@ async def entrypoint(ctx: agents.JobContext):
         )
 
         try:
-            # Publish termination audio message - use custom message from registry
-            termination_message = event_orchestrator.termination_message or ""
+            # Publish termination audio message - get from termination event config
+            termination_config = event_orchestrator.get_termination_config(
+                event.event_id
+            )
+            termination_message = (
+                termination_config.termination_message if termination_config else ""
+            )
             logger.info(f"Using termination message: {termination_message}")
             await publish_termination_audio(termination_message, session)
 
@@ -276,10 +281,24 @@ async def entrypoint(ctx: agents.JobContext):
                 f"to Core"
             )
             try:
+                # Get termination info from the deferred event's config
+                deferred_event = event_orchestrator.deferred_termination_event
+                termination_config = event_orchestrator.get_termination_config(
+                    deferred_event.event_id
+                )
+                termination_event_id = (
+                    termination_config.id if termination_config else None
+                )
+                termination_message = (
+                    termination_config.termination_message
+                    if termination_config
+                    else None
+                )
+
                 event_dict = serialize_event(
-                    event_orchestrator.deferred_termination_event,
-                    termination_event_id=event_orchestrator.termination_event_id,
-                    termination_message=event_orchestrator.termination_message,
+                    deferred_event,
+                    termination_event_id=termination_event_id,
+                    termination_message=termination_message,
                 )
                 core_event_message = CoreEventMessageType.create(
                     room_id=ctx.room.name, event_data=event_dict

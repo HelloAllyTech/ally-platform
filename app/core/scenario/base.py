@@ -18,8 +18,11 @@ class TerminationEvent(BaseModel):
     id: str = Field(..., description="Event ID that triggers termination")
     termination_message: str = Field(
         ...,
-        alias="terminationMessage",
         description="Custom message to speak on termination",
+    )
+    score: Optional[float] = Field(
+        default=None,
+        description="Score magnitude for prioritizing termination events",
     )
 
 
@@ -100,10 +103,9 @@ class Scenario(BaseModel):
         default_factory=list,
         description="List of event IDs that should be sent to UI/Core",
     )
-    termination_event: Optional[TerminationEvent] = Field(
-        default=None,
-        alias="terminationEvent",
-        description="Configuration for auto-termination event",
+    termination_events: List[TerminationEvent] = Field(
+        default_factory=list,
+        description="List of auto-termination event configurations",
     )
     metadata: Dict[str, Any] = Field(default_factory=dict)
     voice: Optional[ScenarioVoice] = Field(default=None)
@@ -150,15 +152,15 @@ class Scenario(BaseModel):
         language_config = cls._build_language_config(raw)
         # Extract trigger_events (list of event IDs that should be sent).
         trigger_events = raw.get("triggerEvents") or []
-        # Extract termination event configuration
-        termination_event = cls._build_termination_event(raw)
+        # Extract termination event configuration (supports both old and new keys)
+        termination_events = cls._build_termination_events(raw)
 
         return cls(
             scenarioName=normalized["scenarioName"],
             metadata=normalized.get("metadata", {}),
             events=built_events,
-            trigger_events=trigger_events if isinstance(trigger_events, list) else [],
-            terminationEvent=termination_event,
+            trigger_events=trigger_events,
+            termination_events=termination_events,
             voice=voice_obj,
             prompt_data=prompt_data,
             language_config=language_config,
@@ -254,18 +256,68 @@ class Scenario(BaseModel):
             return None
 
     @staticmethod
-    def _build_termination_event(raw: Mapping[str, Any]) -> Optional[TerminationEvent]:
-        """Extract termination event configuration from scenario-level
-        `autoTerminationEvent` key."""
-        termination_event_data = raw.get("autoTerminationEvent")
-        if not termination_event_data:
-            return None
+    def _normalize_termination_event_data(event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize termination event data from BE camelCase to Python snake_case.
 
-        try:
-            return TerminationEvent(**termination_event_data)
-        except Exception as e:
-            logger.error(f"Error instantiating TerminationEvent from data: {e}")
-            return None
+        Args:
+            event_data: Raw termination event data from metadata
+
+        Returns:
+            Normalized dict with snake_case keys
+        """
+        return {
+            "id": event_data.get("id"),
+            "termination_message": event_data.get("terminationMessage"),
+            "score": event_data.get("score"),
+        }
+
+    @staticmethod
+    def _build_termination_events(raw: Mapping[str, Any]) -> List[TerminationEvent]:
+        """
+        Extract termination event configurations from scenario metadata.
+
+        Supports both BE metadata keys for backward compatibility:
+        - `autoTerminationEvent` (deprecated, single event)
+        - `autoTerminationEvents` (new, list of events)
+
+        Returns:
+            List of TerminationEvent objects combined from both keys
+        """
+        termination_events: List[TerminationEvent] = []
+
+        # Handle deprecated autoTerminationEvent (single event from BE)
+        termination_event_data = raw.get("autoTerminationEvent")
+        if termination_event_data:
+            try:
+                normalized_data = Scenario._normalize_termination_event_data(
+                    termination_event_data
+                )
+                event = TerminationEvent(**normalized_data)
+                termination_events.append(event)
+            except Exception as e:
+                logger.error(
+                    f"Error instantiating TerminationEvent from "
+                    f"autoTerminationEvent: {e}"
+                )
+
+        # Handle new autoTerminationEvents (list of events)
+        termination_events_data = raw.get("autoTerminationEvents", [])
+        if termination_events_data and isinstance(termination_events_data, list):
+            for event_data in termination_events_data:
+                try:
+                    normalized_data = Scenario._normalize_termination_event_data(
+                        event_data
+                    )
+                    event = TerminationEvent(**normalized_data)
+                    termination_events.append(event)
+                except Exception as e:
+                    logger.error(
+                        f"Error instantiating TerminationEvent from "
+                        f"autoTerminationEvents: {e}"
+                    )
+
+        return termination_events
 
     @staticmethod
     def _build_language_config(raw: Mapping[str, Any]) -> LanguageConfig:
