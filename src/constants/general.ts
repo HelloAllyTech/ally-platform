@@ -81,6 +81,8 @@ export const API_ROUTES = {
   },
   USERS: {
     ME: '/users/me',
+    PROFILE_IMAGE_URL: '/users/profile-image-url',
+    PROFILE_IMAGE: '/users/profile-image',
   },
   CHATS: {
     ROOT: '/chats',

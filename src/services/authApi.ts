@@ -1,4 +1,5 @@
 import {ALLOWED_ROLES, API_METHODS, API_ROUTES} from '@/constants';
+import {setUser} from '@/store/slices/userSlice';
 import {User} from '@/types';
 
 import {api} from './api';
@@ -26,6 +27,25 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export interface GetPresignedUrlRequest {
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+
+export interface GetPresignedUrlResponse {
+  presignedUrl: string;
+  profileImageUrl: string;
+}
+
+export interface UpdateProfileImageRequest {
+  profileImageUrl: string;
+}
+
+export interface DeleteProfileImageRequest {
+  profileImageUrl: string;
+}
+
 export const authApi = api.injectEndpoints({
   endpoints: builder => ({
     generateOtp: builder.mutation<GenerateOtpResponse, GenerateOtpRequest>({
@@ -51,9 +71,66 @@ export const authApi = api.injectEndpoints({
     }),
     getUser: builder.query<User, void>({
       query: () => API_ROUTES.USERS.ME,
+      providesTags: ['User'],
     }),
     getPermissions: builder.query<string[], void>({
       query: () => API_ROUTES.AUTH.PERMISSIONS,
+    }),
+    getProfileImagePresignedUrl: builder.mutation<
+      GetPresignedUrlResponse,
+      GetPresignedUrlRequest
+    >({
+      query: body => ({
+        url: API_ROUTES.USERS.PROFILE_IMAGE_URL,
+        method: API_METHODS.POST,
+        body,
+      }),
+    }),
+    updateProfileImage: builder.mutation<void, UpdateProfileImageRequest>({
+      query: body => ({
+        url: API_ROUTES.USERS.PROFILE_IMAGE,
+        method: API_METHODS.PATCH,
+        body,
+      }),
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        // Invalidate and refetch user data after updating profile image
+        try {
+          await queryFulfilled;
+          dispatch(authApi.util.invalidateTags(['User']));
+          const result = await dispatch(
+            authApi.endpoints.getUser.initiate(undefined, {forceRefetch: true}),
+          );
+          // Update Redux store with the refetched user data
+          if ('data' in result && result.data) {
+            dispatch(setUser(result.data));
+          }
+        } catch {
+          // Error handling is done by RTK Query
+        }
+      },
+    }),
+    deleteProfileImage: builder.mutation<void, DeleteProfileImageRequest>({
+      query: body => ({
+        url: API_ROUTES.USERS.PROFILE_IMAGE,
+        method: API_METHODS.DELETE,
+        body,
+      }),
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        // Invalidate and refetch user data after deleting profile image
+        try {
+          await queryFulfilled;
+          dispatch(authApi.util.invalidateTags(['User']));
+          const result = await dispatch(
+            authApi.endpoints.getUser.initiate(undefined, {forceRefetch: true}),
+          );
+          // Update Redux store with the refetched user data
+          if ('data' in result && result.data) {
+            dispatch(setUser(result.data));
+          }
+        } catch {
+          // Error handling is done by RTK Query
+        }
+      },
     }),
   }),
 });
@@ -64,4 +141,7 @@ export const {
   useLoginWithGoogleMutation,
   useLazyGetUserQuery,
   useLazyGetPermissionsQuery,
+  useGetProfileImagePresignedUrlMutation,
+  useUpdateProfileImageMutation,
+  useDeleteProfileImageMutation,
 } = authApi;

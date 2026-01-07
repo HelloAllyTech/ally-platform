@@ -20,6 +20,7 @@ import {
   BreathingScreen,
   CallSummaryScreen,
   ListeningScreen,
+  ProfileSettingsScreen,
   SimulationAssistantScreen,
   SimulationDetailsScreen,
   SimulationFeedbackScreen,
@@ -244,6 +245,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.ACHIEVEMENTS}
             component={AchievementsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.PROFILE_SETTINGS}
+            component={ProfileSettingsScreen}
           />
         </>
       ) : (

@@ -1,5 +1,6 @@
 import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
+import {DrawerContentComponentProps} from '@react-navigation/drawer';
 
 import {DrawerContent} from '../CustomDrawerContent';
 
@@ -9,6 +10,10 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({ t: (k: string) => k }),
   useUser: () => ({ userData: { name: 'John Doe', email: 'john.very.long.email.address@example.com' } }),
   useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
+  useAppNavigation: () => ({
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+  }),
 }));
 
 jest.mock('@/store/hooks', () => ({
@@ -26,14 +31,25 @@ jest.mock('@/config/env', () => ({
   env: { ENVIRONMENT: 'development' },
 }));
 
-// Mock child components and icons to avoid rendering complexity
+// Mock child components to avoid rendering complexity
 jest.mock('@/components', () => {
   const React = require('react');
   const {View, Text} = require('react-native');
   return {
     __esModule: true,
-    SecurityCarousel: ({variant}: any) => (
-      <View testID="security-carousel"><Text>{variant}</Text></View>
+  };
+});
+
+jest.mock('../MenuOption', () => {
+  const React = require('react');
+  const {TouchableOpacity, View, Text} = require('react-native');
+  return {
+    __esModule: true,
+    MenuOption: ({icon, text, onPress}: any) => (
+      <TouchableOpacity onPress={onPress} testID={`menu-option-${text}`}>
+        {icon}
+        <Text>{text}</Text>
+      </TouchableOpacity>
     ),
   };
 });
@@ -45,14 +61,46 @@ jest.mock('@/assets', () => {
     __esModule: true,
     LogoutIcon: () => <View testID="logout-icon" />,
     ProfileIcon: () => <View testID="profile-icon" />,
+    ProfileSettingsIcon: () => <View testID="profile-settings-icon" />,
+    BoltIcon: () => <View testID="bolt-icon" />,
   };
 });
 
 describe('CustomDrawerContent', () => {
+  const mockDrawerProps: DrawerContentComponentProps = {
+    state: {
+      index: 0,
+      routes: [],
+      history: [],
+      type: 'drawer' as const,
+      key: 'drawer',
+      stale: false,
+      routeNames: [],
+    } as any,
+    navigation: {
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      closeDrawer: jest.fn(),
+      openDrawer: jest.fn(),
+      toggleDrawer: jest.fn(),
+      dispatch: jest.fn(),
+      reset: jest.fn(),
+      isFocused: jest.fn(() => true),
+      canGoBack: jest.fn(() => false),
+      getId: jest.fn(),
+      getParent: jest.fn(),
+      getState: jest.fn(),
+      setParams: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+    } as any,
+    descriptors: {} as any,
+  };
+
   it('renders user info, logout button, carousel and version in dev', () => {
     const openLogoutModal = jest.fn();
     const {getByText, getByTestId} = render(
-      <DrawerContent openLogoutModal={openLogoutModal} />,
+      <DrawerContent {...mockDrawerProps} openLogoutModal={openLogoutModal} />,
     );
 
     expect(getByTestId('profile-icon')).toBeTruthy();
@@ -64,16 +112,21 @@ describe('CustomDrawerContent', () => {
     expect(getByTestId('logout-icon')).toBeTruthy();
     expect(getByText('Logout.logout')).toBeTruthy();
 
-    // carousel and version
-    expect(getByTestId('security-carousel')).toBeTruthy();
+    // profile settings menu item
+    expect(getByTestId('profile-settings-icon')).toBeTruthy();
+    expect(getByText('Drawer.profileSettings')).toBeTruthy();
+
+    // version
     expect(getByText(/Common.version/)).toBeTruthy();
     expect(getByText(/1.2.3/)).toBeTruthy();
-    expect(getByText(/\(Dev\)/)).toBeTruthy();
+    expect(getByText(/Drawer.dev/)).toBeTruthy();
   });
 
   it('invokes openLogoutModal when logout is pressed', () => {
     const openLogoutModal = jest.fn();
-    const {getByText} = render(<DrawerContent openLogoutModal={openLogoutModal} />);
+    const {getByText} = render(
+      <DrawerContent {...mockDrawerProps} openLogoutModal={openLogoutModal} />,
+    );
 
     fireEvent.press(getByText('Logout.logout'));
     expect(openLogoutModal).toHaveBeenCalled();

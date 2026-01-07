@@ -83,6 +83,21 @@
     "logoutConfirmation": "Are you sure you want to log out? You will need to enter secure OTP to login again.",
     "logoutActionButton": "Logout & lock my Ally account"
   },
+  "Drawer": {
+    "profileSettings": "Profile settings",
+    "dev": "(Dev)"
+  },
+  "ProfileSettings": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "edit": "Edit",
+    "uploadImage": "Upload image",
+    "name": "Name",
+    "email": "Email",
+    "profileImage": "Profile image",
+    "changeImage": "Change image",
+    "removeImage": "Remove image"
+  },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
     "isThisHelpful": "Is this helpful",
@@ -393,7 +408,9 @@
     "attachListeners": "Failed to attach room listeners",
     "connect": "Failed to connect to the room",
     "toggleMic": "Failed to toggle microphone",
-    "submitFeedback": "Failed to submit feedback"
+    "submitFeedback": "Failed to submit feedback",
+    "uploadProfileImage": "Failed to upload profile image",
+    "removeProfileImage": "Failed to remove profile image"
   },
   "Success": {
     "submitFeedback": "Feedback submitted successfully"
