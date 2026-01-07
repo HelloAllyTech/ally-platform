@@ -16,6 +16,7 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import ChangeImageIcon from './changeImage.svg';
 import CheckIcon from './check.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -79,6 +80,8 @@ import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
+import ProfileSettingsIcon from './profileSettings.svg';
+import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
@@ -127,6 +130,7 @@ export {
   CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  ChangeImageIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,
@@ -189,6 +193,8 @@ export {
   PlayWhiteIcon,
   PrescriptionsIcon,
   ProfileIcon,
+  ProfileSettingsIcon,
+  RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
   RightArrow,
