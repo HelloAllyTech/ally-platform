@@ -787,3 +787,162 @@ class TestMultipleTerminationEvents:
         # Should have termination_events list populated
         assert len(orchestrator.termination_events) == 1
         assert "term-event" in orchestrator.termination_event_ids
+
+    @pytest.mark.asyncio
+    async def test_score_calculation_only_from_trigger_events_not_termination(self):
+        """
+        Test that _calculate_total_score_from_events only includes scores from
+        events in trigger_events list and excludes termination events.
+
+        Test scenarios:
+        1. Event in trigger_events only -> score included
+        2. Event in termination_events only -> score excluded
+        3. Event in both trigger_events and termination_events -> score included
+        4. Event in neither list -> score excluded
+        """
+        # Create test events with different scores
+        event_trigger_only = DummyEvent(
+            event_id="trigger-only",
+            score=10,
+            emoji="✅",
+            emoji_message="Trigger only",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        event_termination_only = DummyEvent(
+            event_id="termination-only",
+            score=20,
+            emoji="🛑",
+            emoji_message="Termination only",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        event_both = DummyEvent(
+            event_id="both-lists",
+            score=30,
+            emoji="⚡",
+            emoji_message="In both lists",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        event_neither = DummyEvent(
+            event_id="neither-list",
+            score=40,
+            emoji="❌",
+            emoji_message="In neither list",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        # Create scenario with specific trigger_events and termination_events
+        scenario = create_mock_scenario(
+            events=[
+                event_trigger_only,
+                event_termination_only,
+                event_both,
+                event_neither,
+            ],
+            trigger_events=["trigger-only", "both-lists"],
+            termination_events=[
+                {"id": "termination-only", "termination_message": "Term only"},
+                {"id": "both-lists", "termination_message": "In both"},
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario, room=mock_room, thread_id="test-thread"
+        )
+
+        # Test _calculate_total_score_from_events with all events
+        all_events = [
+            event_trigger_only,
+            event_termination_only,
+            event_both,
+            event_neither,
+        ]
+
+        calculated_score = orchestrator._calculate_total_score_from_events(all_events)
+
+        # Expected score:
+        # - trigger-only: 10 (in trigger_events) ✓
+        # - termination-only: 20 (NOT in trigger_events) ✗
+        # - both-lists: 30 (in trigger_events) ✓
+        # - neither-list: 40 (NOT in trigger_events) ✗
+        # Total: 10 + 30 = 40
+        assert calculated_score == 40, (
+            f"Expected score 40 (10+30), but got {calculated_score}. "
+            "Only events in trigger_events should be counted."
+        )
+
+        # Additional verification: Test with only termination events
+        termination_only_score = orchestrator._calculate_total_score_from_events(
+            [event_termination_only]
+        )
+        assert (
+            termination_only_score == 0
+        ), "Termination-only event should not contribute to score"
+
+        # Test with event that's in both lists
+        both_lists_score = orchestrator._calculate_total_score_from_events([event_both])
+        assert (
+            both_lists_score == 30
+        ), "Event in both trigger_events and termination_events should be counted"
+
+        # Test with trigger-only event
+        trigger_only_score = orchestrator._calculate_total_score_from_events(
+            [event_trigger_only]
+        )
+        assert trigger_only_score == 10, "Trigger-only event should be counted"
+
+    @pytest.mark.asyncio
+    async def test_live_score_update_respects_trigger_events_filter(self):
+        """
+        Test that _update_live_score only updates live_score with scores from
+        events in trigger_events, not from termination_events.
+        """
+        # Create events
+        trigger_event = DummyEvent(
+            event_id="trigger-event",
+            score=15,
+            emoji="✅",
+            emoji_message="Trigger",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        termination_event = DummyEvent(
+            event_id="term-event",
+            score=25,
+            emoji="🛑",
+            emoji_message="Termination",
+            visibility_type=VisibilityType.ACTIVE,
+        )
+
+        scenario = create_mock_scenario(
+            events=[trigger_event, termination_event],
+            trigger_events=["trigger-event"],
+            termination_events=[
+                {"id": "term-event", "termination_message": "Session ended"}
+            ],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        orchestrator = EventOrchestrator(
+            scenario, room=mock_room, thread_id="test-thread"
+        )
+
+        # Initial live_score should be 0
+        assert orchestrator.live_score == 0
+
+        # Update live_score with both events
+        await orchestrator._update_live_score([trigger_event, termination_event])
+
+        # Only trigger_event's score should be added (15)
+        # termination_event's score (25) should be excluded
+        assert orchestrator.live_score == 15, (
+            f"Expected live_score to be 15, but got {orchestrator.live_score}. "
+            "Only trigger_event score should be added."
+        )

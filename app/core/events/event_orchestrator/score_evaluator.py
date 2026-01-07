@@ -50,6 +50,24 @@ class ScoreEvaluatorMixin:
         self.live_score = 0
         self._live_score_lock = asyncio.Lock()
 
+    def _calculate_total_score_from_events(self, events: List[BaseEvent]) -> int:
+        """
+        Calculate the total score from a list of events.
+        Only includes events that are in the trigger_events list.
+
+        Args:
+            events: List of events to calculate score from
+
+        Returns:
+            Total score sum from all events with non-None scores that are in
+            trigger_events
+        """
+        return sum(
+            event.score
+            for event in events
+            if event.score is not None and event.event_id in self.trigger_events
+        )
+
     def _calculate_score_from_event_ids(self, event_ids: Set[str]) -> int:
         """
         Calculate the total score from a set of event IDs.
@@ -229,13 +247,12 @@ class ScoreEvaluatorMixin:
         Args:
             events_to_send: List of events that were sent to core
         """
+        score_delta = self._calculate_total_score_from_events(events_to_send)
+
         async with self._live_score_lock:
-            for event in events_to_send:
-                if event.score is not None:
-                    self.live_score += event.score
-                    logger.debug(
-                        f"Live score updated: +{event.score} = {self.live_score}"
-                    )
+            if score_delta != 0:
+                self.live_score += score_delta
+                logger.debug(f"Live score updated: +{score_delta} = {self.live_score}")
 
         if events_to_send:
             logger.info(f"Current live score: {self.live_score}")
