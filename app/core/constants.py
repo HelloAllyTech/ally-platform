@@ -50,6 +50,7 @@ class DetectionType(str, Enum):
     TIME = "TIME"
     SCORE = "SCORE"
     COMBINATION = "COMBINATION"
+    UTTERANCE_LENGTH = "UTTERANCE_LENGTH"
 
 
 class ConditionOperator(str, Enum):

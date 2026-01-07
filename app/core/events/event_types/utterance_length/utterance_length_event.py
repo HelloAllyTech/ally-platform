@@ -1,0 +1,98 @@
+"""
+Utterance length-based event detection.
+Tracks the length of counselor/helper utterances.
+"""
+
+from typing import List, override
+
+from app.core.constants import DetectionType
+from app.core.events.base import BaseEvent, ChatMessage
+from app.core.events.event_types.utterance_length.constants import UtteranceLengthData
+
+
+class UtteranceLengthEvent(BaseEvent):
+    """
+    Event that triggers based on the character length of counselor utterances.
+
+    This event detects when the counselor's (helper's) message length falls
+    within a specified range. It checks the most recent counselor message.
+    """
+
+    detection_type: DetectionType = DetectionType.UTTERANCE_LENGTH
+    data: UtteranceLengthData = UtteranceLengthData(min_length=0)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        event_id: str,
+        data: UtteranceLengthData,
+        visibility_type=None,
+        detection_type: DetectionType = DetectionType.UTTERANCE_LENGTH,
+        **kwargs,
+    ) -> "UtteranceLengthEvent":
+        """
+        Create an UtteranceLengthEvent with typed data.
+
+        Args:
+            event_id: Event identifier
+            data: UtteranceLengthData instance with min_length and/or max_length
+            visibility_type: Visibility type (optional)
+            detection_type: Detection type (defaults to UTTERANCE_LENGTH)
+            **kwargs: Other BaseEvent fields (score, emoji, show_feedback, etc.)
+        """
+        return cls.model_construct(
+            event_id=event_id,
+            visibility_type=visibility_type,
+            detection_type=detection_type,
+            data=data,
+            **kwargs,
+        )
+
+    @override
+    async def detect_event(self, conversations: List[ChatMessage]) -> bool:
+        """
+        Detect if the most recent counselor message length matches the criteria.
+
+        Checks the last message in the conversation. If it's from the counselor,
+        checks if its character length falls within the specified range.
+
+        Args:
+            conversations: List of chat messages
+
+        Returns:
+            True if the most recent counselor message length matches, False otherwise
+        """
+        if not conversations:
+            return False
+
+        # Get the most recent message
+        last_message = conversations[-1]
+
+        # Only check counselor messages
+        # Note: role can be "counselor" (from convert_messages_to_chat_messages)
+        # or "COUNSELOR" (from event_handler), so we check case-insensitively
+        if last_message.role.lower() != "counselor":
+            return False
+
+        # Get the character length of the message
+        message_length = len(last_message.content) if last_message.content else 0
+
+        # Check if length matches the criteria
+        min_length = self.data.min_length
+        max_length = self.data.max_length
+
+        # If only min_length is provided, check if length >= min_length
+        if min_length is not None and max_length is None:
+            return message_length >= min_length
+
+        # If only max_length is provided, check if length <= max_length
+        if min_length is None and max_length is not None:
+            return message_length <= max_length
+
+        # If both are provided, check if length is in range [min_length, max_length]
+        if min_length is not None and max_length is not None:
+            return min_length <= message_length <= max_length
+
+        # Should not reach here due to validation, but return False as fallback
+        return False

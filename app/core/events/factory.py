@@ -23,6 +23,10 @@ from app.core.events.event_types.similarity_based.similarity_event import (
     SimilarityEvent,
 )
 from app.core.events.event_types.time.time_event import TimeData, TimeEvent
+from app.core.events.event_types.utterance_length.utterance_length_event import (
+    UtteranceLengthData,
+    UtteranceLengthEvent,
+)
 from app.utils import get_logger
 
 
@@ -224,6 +228,31 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=classifier_data,
+                **common_fields,
+            )
+
+        elif detection_type == DetectionType.UTTERANCE_LENGTH:
+            if not raw_data or not isinstance(raw_data, dict):
+                log.warning(
+                    "Event '%s' (UTTERANCE_LENGTH) missing/invalid data: %r",
+                    event_id,
+                    raw_data,
+                )
+                return None
+
+            try:
+                utterance_length_data = UtteranceLengthData(**raw_data)
+            except Exception as e:
+                log.warning(
+                    "Event '%s' (UTTERANCE_LENGTH) invalid data: %s", event_id, e
+                )
+                return None
+
+            return UtteranceLengthEvent.create(
+                event_id=event_id,
+                visibility_type=visibility_type,
+                detection_type=detection_type,
+                data=utterance_length_data,
                 **common_fields,
             )
 
