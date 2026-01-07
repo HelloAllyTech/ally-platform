@@ -15,60 +15,53 @@ import {logger} from '@/utils/logger';
 
 interface UseProfileImageOptions {
   currentProfileImageUrl?: string | null;
-  onUploadSuccess?: (imageUrl: string) => void;
-  onRemoveSuccess?: () => void;
+  onSaveSuccess?: () => void;
   onError?: (error: Error) => void;
 }
 
 interface UseProfileImageReturn {
-  profileImageUri: string | null;
-  isUploading: boolean;
+  previewImageUri: string | null;
+  isSaving: boolean;
+  hasUnsavedChanges: boolean;
   handleImagePicker: () => void;
-  handleRemoveImage: () => Promise<void>;
-  setProfileImageUri: (uri: string | null) => void;
+  handleRemoveImage: () => void;
+  handleSave: () => Promise<void>;
+  resetToSavedState: () => void;
 }
 
-/**
- * Custom hook for managing profile image upload and removal
- * Handles the complete flow: image picker → presigned URL → S3 upload → backend update
- *
- * @param options - Configuration options
- * @param options.currentProfileImageUrl - Current profile image URL from user data
- * @param options.onUploadSuccess - Callback when upload succeeds
- * @param options.onRemoveSuccess - Callback when removal succeeds
- * @param options.onError - Callback when an error occurs
- * @returns Object containing state and handlers for profile image management
- *
- * @example
- * ```tsx
- * const { profileImageUri, isUploading, handleImagePicker, handleRemoveImage } = useProfileImage({
- *   currentProfileImageUrl: userData?.profileImageUrl,
- *   onUploadSuccess: (url) => console.log('Uploaded:', url),
- * });
- * ```
- */
 export const useProfileImage = ({
   currentProfileImageUrl,
-  onUploadSuccess,
-  onRemoveSuccess,
+  onSaveSuccess,
   onError,
 }: UseProfileImageOptions): UseProfileImageReturn => {
   const {showErrorToast} = useErrorToast();
-  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedImageAsset, setSelectedImageAsset] =
+    useState<ImagePickerResponse['assets']>(undefined);
 
   const [getPresignedUrl] = useGetProfileImagePresignedUrlMutation();
   const [updateProfileImage] = useUpdateProfileImageMutation();
   const [deleteProfileImage] = useDeleteProfileImageMutation();
 
-  // Initialize profile image from userData
+  const normalizeProfileImageUrl = useCallback(
+    (url: string | null | undefined): string | null => {
+      if (!url || url.trim() === '') {
+        return null;
+      }
+      return url;
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (currentProfileImageUrl) {
-      setProfileImageUri(currentProfileImageUrl);
-    } else {
-      setProfileImageUri(null);
-    }
-  }, [currentProfileImageUrl]);
+    setPreviewImageUri(normalizeProfileImageUrl(currentProfileImageUrl));
+  }, [currentProfileImageUrl, normalizeProfileImageUrl]);
+
+  const hasUnsavedChanges = useCallback(() => {
+    const normalizedSavedUrl = normalizeProfileImageUrl(currentProfileImageUrl);
+    return previewImageUri !== normalizedSavedUrl;
+  }, [previewImageUri, currentProfileImageUrl, normalizeProfileImageUrl]);
 
   const handleImagePicker = useCallback(() => {
     launchImageLibrary(
@@ -78,117 +71,126 @@ export const useProfileImage = ({
         maxWidth: 800,
         maxHeight: 800,
       },
-      async (response: ImagePickerResponse) => {
+      (response: ImagePickerResponse) => {
         if (response.didCancel || response.errorCode) {
           return;
         }
         if (response.assets && response.assets[0]) {
           const asset = response.assets[0];
-          const uri = asset.uri;
-          const fileName = asset.fileName || `profile-${Date.now()}.jpg`;
-          const fileSize = asset.fileSize || 0;
-          const type = asset.type || 'image/jpeg';
-
-          if (!uri) {
-            showErrorToast(
-              new Error('Invalid image URI'),
-              'Errors.uploadProfileImage',
-            );
-            return;
-          }
-
-          setIsUploading(true);
-          try {
-            const presignedResponse = await getPresignedUrl({
-              fileName,
-              fileSize,
-              contentType: type,
-            }).unwrap();
-
-            const uploadSuccess = await uploadImageToS3(
-              uri,
-              presignedResponse.presignedUrl,
-              type,
-            );
-
-            if (!uploadSuccess) {
-              throw new Error('Failed to upload image to S3');
-            }
-
-            const s3Url = presignedResponse.profileImageUrl;
-
-            await updateProfileImage({
-              profileImageUrl: s3Url,
-            }).unwrap();
-
-            setProfileImageUri(s3Url);
-            onUploadSuccess?.(s3Url);
-
-            if (currentProfileImageUrl) {
-              try {
-                await deleteProfileImage({
-                  profileImageUrl: currentProfileImageUrl,
-                }).unwrap();
-              } catch (error) {
-                logger.warn(`Failed to delete old profile image: ${error}`);
-              }
-            }
-          } catch (error) {
-            const errorObj =
-              error instanceof Error ? error : new Error(String(error));
-            logger.error(`Error uploading profile image: ${errorObj}`);
-            showErrorToast(errorObj, 'Errors.uploadProfileImage');
-            onError?.(errorObj);
-          } finally {
-            setIsUploading(false);
+          if (asset.uri) {
+            setPreviewImageUri(asset.uri);
+            setSelectedImageAsset(response.assets);
           }
         }
       },
     );
-  }, [
-    currentProfileImageUrl,
-    deleteProfileImage,
-    getPresignedUrl,
-    onError,
-    onUploadSuccess,
-    showErrorToast,
-    updateProfileImage,
-  ]);
+  }, []);
 
-  const handleRemoveImage = useCallback(async () => {
-    setIsUploading(true);
+  const handleRemoveImage = useCallback(() => {
+    setPreviewImageUri(null);
+    setSelectedImageAsset(undefined);
+  }, []);
+
+  const handleSave = async () => {
+    if (!hasUnsavedChanges()) {
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      // Delete profile image using DELETE endpoint
-      if (currentProfileImageUrl) {
-        await deleteProfileImage({
-          profileImageUrl: currentProfileImageUrl,
-        }).unwrap();
-      }
+      const normalizedSavedUrl = normalizeProfileImageUrl(
+        currentProfileImageUrl,
+      );
 
-      setProfileImageUri(null);
-      onRemoveSuccess?.();
+      const isRemoveAction =
+        previewImageUri === null && normalizedSavedUrl !== null;
+      const isUploadAction =
+        previewImageUri !== null &&
+        previewImageUri !== normalizedSavedUrl &&
+        selectedImageAsset?.[0];
+
+      if (isRemoveAction) {
+        if (normalizedSavedUrl) {
+          await deleteProfileImage({
+            profileImageUrl: normalizedSavedUrl,
+          }).unwrap();
+        }
+        await updateProfileImage({
+          profileImageUrl: '',
+        }).unwrap();
+        setPreviewImageUri(null);
+        setSelectedImageAsset(undefined);
+        onSaveSuccess?.();
+      } else if (isUploadAction && selectedImageAsset?.[0]) {
+        const asset = selectedImageAsset[0];
+        const uri = asset.uri;
+        const fileName = asset.fileName || `profile-${Date.now()}.jpg`;
+        const fileSize = asset.fileSize || 0;
+        const type = asset.type || 'image/jpeg';
+
+        if (!uri) {
+          throw new Error('Invalid image URI');
+        }
+
+        const presignedResponse = await getPresignedUrl({
+          fileName,
+          fileSize,
+          contentType: type,
+        }).unwrap();
+
+        const uploadSuccess = await uploadImageToS3(
+          uri,
+          presignedResponse.presignedUrl,
+          type,
+        );
+
+        if (!uploadSuccess) {
+          throw new Error('Failed to upload image to S3');
+        }
+
+        const s3Url = presignedResponse.profileImageUrl;
+
+        await updateProfileImage({
+          profileImageUrl: s3Url,
+        }).unwrap();
+
+        if (normalizedSavedUrl) {
+          try {
+            await deleteProfileImage({
+              profileImageUrl: normalizedSavedUrl,
+            }).unwrap();
+          } catch (error) {
+            logger.warn(`Failed to delete old profile image: ${error}`);
+          }
+        }
+
+        setPreviewImageUri(s3Url);
+        setSelectedImageAsset(undefined);
+        onSaveSuccess?.();
+      }
     } catch (error) {
       const errorObj =
         error instanceof Error ? error : new Error(String(error));
-      logger.error(`Error removing profile image: ${errorObj}`);
-      showErrorToast(errorObj, 'Errors.removeProfileImage');
+      logger.error(`Error saving profile image: ${errorObj}`);
+      showErrorToast(errorObj, 'Errors.uploadProfileImage');
       onError?.(errorObj);
     } finally {
-      setIsUploading(false);
+      setIsSaving(false);
     }
-  }, [
-    currentProfileImageUrl,
-    deleteProfileImage,
-    onError,
-    onRemoveSuccess,
-    showErrorToast,
-  ]);
+  };
+
+  const resetToSavedState = useCallback(() => {
+    setPreviewImageUri(normalizeProfileImageUrl(currentProfileImageUrl));
+    setSelectedImageAsset(undefined);
+  }, [currentProfileImageUrl, normalizeProfileImageUrl]);
 
   return {
-    profileImageUri,
-    isUploading,
+    previewImageUri,
+    isSaving,
+    hasUnsavedChanges: hasUnsavedChanges(),
     handleImagePicker,
     handleRemoveImage,
-    setProfileImageUri,
+    handleSave,
+    resetToSavedState,
   };
 };

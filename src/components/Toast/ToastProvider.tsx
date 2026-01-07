@@ -127,7 +127,6 @@ export const hideToast = () => {
   externalHideRef?.();
 };
 
-// Hook for error toasts that automatically handles translation
 export const useErrorToast = () => {
   const {t} = useTranslate();
 

@@ -17,6 +17,9 @@
       "openSettings": "Open Settings"
     },
     "or": "OR",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesDescription": "You have unsaved changes. Are you sure you want to discard them?",
+    "discard": "Discard",
     "offline": {
       "socketTitle": "Something went wrong",
       "socketDescription": "The call ended due to an error. Please try again.",

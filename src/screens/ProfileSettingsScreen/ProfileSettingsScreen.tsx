@@ -11,6 +11,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
+import {CustomModal, PrimaryButton} from '@/components';
 import {
   useAppNavigation,
   useProfileImage,
@@ -31,12 +32,19 @@ export const ProfileSettingsScreen: React.FC = () => {
   const {name, email, profileImageUrl} = userData ?? {};
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const {profileImageUri, isUploading, handleImagePicker, handleRemoveImage} =
-    useProfileImage({
-      currentProfileImageUrl: profileImageUrl,
-    });
-  console.log('🚀 ~ ProfileSettingsScreen ~ isUploading:', isUploading);
+  const {
+    previewImageUri,
+    isSaving,
+    hasUnsavedChanges,
+    handleImagePicker,
+    handleRemoveImage,
+    handleSave,
+    resetToSavedState,
+  } = useProfileImage({
+    currentProfileImageUrl: profileImageUrl,
+  });
 
   // Get the first letter of the user's name for the placeholder
   const getInitial = () => {
@@ -57,9 +65,27 @@ export const ProfileSettingsScreen: React.FC = () => {
     handleImagePicker();
   };
 
-  const onRemoveImage = async () => {
+  const onRemoveImage = () => {
     setIsBottomSheetVisible(false);
-    await handleRemoveImage();
+    handleRemoveImage();
+  };
+
+  const handleBackPress = () => {
+    if (hasUnsavedChanges) {
+      setShowConfirmDialog(true);
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowConfirmDialog(false);
+    resetToSavedState();
+    navigation.goBack();
+  };
+
+  const handleCancelDiscard = () => {
+    setShowConfirmDialog(false);
   };
 
   return (
@@ -69,9 +95,7 @@ export const ProfileSettingsScreen: React.FC = () => {
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <LeftArrowIcon color={colors.black} />
         </TouchableOpacity>
         <Text style={styles.title}>
@@ -85,9 +109,9 @@ export const ProfileSettingsScreen: React.FC = () => {
       <View style={styles.content}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            {profileImageUri ? (
+            {previewImageUri ? (
               <Image
-                source={{uri: profileImageUri}}
+                source={{uri: previewImageUri}}
                 style={styles.avatarImage}
                 resizeMode="cover"
               />
@@ -96,16 +120,17 @@ export const ProfileSettingsScreen: React.FC = () => {
                 <Text style={styles.avatarInitial}>{getInitial()}</Text>
               </View>
             )}
-            {isUploading && (
+            {isSaving && (
               <View style={styles.loadingOverlay}>
                 <ActivityIndicator size="large" color={colors.azureBlue} />
               </View>
             )}
           </View>
-          {profileImageUri ? (
+          {previewImageUri ? (
             <TouchableOpacity
               style={styles.editButton}
-              onPress={handleChangeImage}>
+              onPress={handleChangeImage}
+              disabled={isSaving}>
               <Text style={styles.editButtonText}>
                 {t('ProfileSettings.edit')}
               </Text>
@@ -113,7 +138,8 @@ export const ProfileSettingsScreen: React.FC = () => {
           ) : (
             <TouchableOpacity
               style={styles.uploadButton}
-              onPress={handleUploadImage}>
+              onPress={handleUploadImage}
+              disabled={isSaving}>
               <Text style={styles.editButtonText}>
                 {t('ProfileSettings.uploadImage')}
               </Text>
@@ -138,12 +164,35 @@ export const ProfileSettingsScreen: React.FC = () => {
         </View>
       </View>
 
+      {hasUnsavedChanges && (
+        <View style={styles.saveButtonContainer}>
+          <PrimaryButton
+            label={t('save')}
+            onPress={handleSave}
+            isLoading={isSaving}
+            customContainerStyle={styles.saveButton}
+          />
+        </View>
+      )}
+
       <ProfileImageBottomSheet
         visible={isBottomSheetVisible}
         onClose={() => setIsBottomSheetVisible(false)}
         onChangeImage={onImagePicker}
         onRemoveImage={onRemoveImage}
-        hasExistingImage={!!profileImageUri}
+        hasExistingImage={!!previewImageUri}
+      />
+
+      <CustomModal
+        visible={showConfirmDialog}
+        onClose={handleCancelDiscard}
+        title={t('Common.unsavedChanges')}
+        description={t('Common.unsavedChangesDescription')}
+        primaryButtonText={t('Common.discard')}
+        secondaryButtonText={t('Common.cancel')}
+        onPrimaryPress={handleConfirmDiscard}
+        onSecondaryPress={handleCancelDiscard}
+        primaryTextColor={colors.brightRed}
       />
     </View>
   );
@@ -157,7 +206,7 @@ const styles = ScaledSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: '21@ms',
+    paddingHorizontal: '16@ms',
     paddingVertical: '16@ms',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.ds.stroke.primary,
@@ -167,11 +216,10 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: ms(18),
-    lineHeight: ms(32),
+    ...typography.display.small,
     fontWeight: fontWeights.light,
     textAlign: 'left',
-    color: '#222222',
+    color: colors.ds.typography.highEmphasis,
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -260,5 +308,13 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.lowEmphasis,
+  },
+  saveButtonContainer: {
+    paddingHorizontal: '24@ms',
+    paddingBottom: '24@mvs',
+    paddingTop: '16@mvs',
+  },
+  saveButton: {
+    width: '100%',
   },
 });
