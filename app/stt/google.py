@@ -147,7 +147,7 @@ class GoogleSTTClient(BaseSTTClient):
 
         # Prioritize language_code from config if available, otherwise use parameter
         # This allows per-scenario language code overrides
-        final_language_code = config_dict.get("language_code") or language_code
+        final_language_code = config.get("languageCode") or language_code
 
         return cls(
             model=model,
