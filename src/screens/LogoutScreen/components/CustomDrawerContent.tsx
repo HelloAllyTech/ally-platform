@@ -1,23 +1,39 @@
-import {Text, TouchableOpacity, View} from 'react-native';
+import {DrawerContentComponentProps} from '@react-navigation/drawer';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {BoltIcon, LogoutIcon, ProfileIcon} from '@/assets';
-import {SecurityCarousel} from '@/components';
+import {BoltIcon, LogoutIcon, ProfileIcon, ProfileSettingsIcon} from '@/assets';
 import {env} from '@/config/env';
-import {CarouselVariant} from '@/constants';
-import {useSimulationCredits, useTranslate, useUser} from '@/hooks';
+import {SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useSimulationCredits,
+  useTranslate,
+  useUser,
+} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 import {getAppVersion} from '@/utils';
 
-interface DrawerContentProps {
+import {MenuOption} from './MenuOption';
+
+interface DrawerContentProps extends DrawerContentComponentProps {
   openLogoutModal: () => void;
 }
 
-export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
+export const DrawerContent = ({
+  openLogoutModal,
+  navigation: drawerNavigation,
+}: DrawerContentProps) => {
   const {userData} = useUser();
   const {t} = useTranslate();
+  const navigation = useAppNavigation();
   const {credits, getCreditsInfo} = useSimulationCredits();
   const {name, email} = userData ?? {};
+
+  const handleProfileSettingsPress = () => {
+    drawerNavigation.closeDrawer();
+    navigation.navigate(SCREEN_NAMES.PROFILE_SETTINGS);
+  };
 
   return (
     <View style={styles.container}>
@@ -78,21 +94,25 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         </>
       )}
 
-      <TouchableOpacity
-        style={styles.logoutContainer}
-        onPress={openLogoutModal}>
-        <View style={styles.logoutIconContainer}>
-          <LogoutIcon />
-        </View>
-        <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
-      </TouchableOpacity>
-      <View style={styles.carouselWrapper}>
-        <SecurityCarousel variant={CarouselVariant.DRAWER} />
+      <View style={styles.menuItemsWrapper}>
+        <MenuOption
+          icon={<ProfileSettingsIcon width={24} height={24} />}
+          text={t('Drawer.profileSettings')}
+          onPress={handleProfileSettingsPress}
+          gap={8}
+        />
+        <MenuOption
+          icon={<LogoutIcon />}
+          text={t('Logout.logout')}
+          onPress={openLogoutModal}
+          gap={8}
+        />
       </View>
+
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>
           {t('Common.version')}: {getAppVersion()}{' '}
-          {env.ENVIRONMENT === 'development' && '(Dev)'}
+          {env.ENVIRONMENT === 'development' && t('Drawer.dev')}
         </Text>
       </View>
     </View>
@@ -185,32 +205,13 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.lightGray5,
     marginTop: '20@mvs',
   },
-  logoutContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '8@ms',
-    marginTop: '16@ms',
-  },
-  logoutIconContainer: {
-    width: '24@ms',
-    height: '24@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.label.large,
-    color: colors.ds.typography.highEmphasis,
-  },
-  carouselWrapper: {
+  menuItemsWrapper: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: '4@ms',
   },
   versionContainer: {
     alignItems: 'center',
     paddingBottom: '16@ms',
+    marginTop: 'auto',
   },
   versionText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

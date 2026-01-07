@@ -25,6 +25,7 @@ export type RootStackParamList = {
     pathId?: string;
   };
   Achievements: undefined;
+  ProfileSettings: undefined;
 };
 
 export type DrawerParamList = {
