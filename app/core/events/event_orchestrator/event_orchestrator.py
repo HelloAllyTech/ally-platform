@@ -9,6 +9,8 @@ from livekit import rtc
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
+from app.core.events.event_orchestrator.event_sender import EventSender
+from app.core.events.event_orchestrator.score_evaluator import ScoreEvaluatorMixin
 from app.core.events.event_types.combination.constants import (
     CombinationData,
     ExpressionNode,
@@ -20,9 +22,6 @@ from app.core.graph.state import BranchingAndFeedbackData
 from app.core.scenario.base import Scenario, TerminationEvent
 from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 from app.utils.logger import get_logger
-
-from .event_sender import EventSender
-from .score_evaluator import ScoreEvaluatorMixin
 
 logger = get_logger(__name__)
 

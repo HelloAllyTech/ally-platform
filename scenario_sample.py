@@ -38,6 +38,7 @@ SCENARIO_SAMPLE = {
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["Hi", "Hello"],
                 "feedbackStatus": "True",
+                "detectionConfig": {"minScore": 5, "maxScore": 10},
             },
             {
                 "id": "warm-greeting",

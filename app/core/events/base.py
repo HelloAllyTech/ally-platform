@@ -29,7 +29,7 @@ class ChatMessage(BaseModel):
         }
 
 
-class DetectionConfiguration(BaseModel):
+class DetectionConfig(BaseModel):
     """
     Configuration settings for when and how the event should be detected.
     """
@@ -39,6 +39,12 @@ class DetectionConfiguration(BaseModel):
     )
     end_time: Optional[float] = Field(
         None, description="The end time window (in seconds) for detection."
+    )
+    min_score: Optional[int] = Field(
+        None, description="Minimum score required to trigger."
+    )
+    max_score: Optional[int] = Field(
+        None, description="Maximum score allowed to trigger."
     )
 
 
@@ -66,9 +72,7 @@ class BaseEvent(BaseModel, ABC):
     branching_instruction: Optional[str] = None
     show_feedback: Optional[bool] = True
 
-    detection_configuration: Optional[DetectionConfiguration] = Field(
-        default_factory=DetectionConfiguration
-    )
+    detection_config: Optional[DetectionConfig] = Field(default_factory=DetectionConfig)
 
     model_config = {"arbitrary_types_allowed": True}
 

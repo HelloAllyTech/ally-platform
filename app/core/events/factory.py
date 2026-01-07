@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Literal, Mapping, Optional
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
-from app.core.events.base import BaseEvent, DetectionConfiguration
+from app.core.events.base import BaseEvent, DetectionConfig
 from app.core.events.event_types.binary_classifier.binary_classifier_event import (
     BinaryClassifierEvent,
 )
@@ -56,18 +56,22 @@ def _create_event_by_detection_type(
     event_id = ev.get("id") or ev.get("event_id") or "<no-id>"
     visibility_type = ev.get("visibilityType") or VisibilityType.ACTIVE
     raw_data = ev.get("data")
-    raw_config = (
-        ev.get("detectionConfiguration") or ev.get("detection_configuration") or {}
-    )
+    raw_config = ev.get("detectionConfig") or ev.get("detection_config") or {}
 
-    # 2. Extract times from the *nested* dictionary
+    #  Extract times from the *nested* dictionary
     start_time_val = raw_config.get("startTime") or raw_config.get("start_time")
     end_time_val = raw_config.get("endTime") or raw_config.get("end_time")
 
-    # 3. Create the Pydantic model instance
-    detection_config = DetectionConfiguration(
+    #   Extract SCORE (New)
+    min_score_val = raw_config.get("minScore") or raw_config.get("min_score")
+    max_score_val = raw_config.get("maxScore") or raw_config.get("max_score")
+
+    #  Create the Pydantic model instance
+    detection_config = DetectionConfig(
         start_time=float(start_time_val) if start_time_val is not None else None,
         end_time=float(end_time_val) if end_time_val is not None else None,
+        min_score=int(min_score_val) if min_score_val is not None else None,
+        max_score=int(max_score_val) if max_score_val is not None else None,
     )
 
     common_fields = {
@@ -78,7 +82,7 @@ def _create_event_by_detection_type(
         "show_feedback": ev.get(
             "feedbackStatus", True
         ),  # Default to True if not provided
-        "detection_configuration": detection_config,
+        "detection_config": detection_config,
     }
 
     try:

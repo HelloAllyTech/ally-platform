@@ -1,122 +1,67 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List, Optional, cast
+from typing import Optional, cast
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE
-from app.core.events.base import BaseEvent, ChatMessage
+from app.core.events.base import BaseEvent
 from app.core.events.schemas import CustomUIEventMessageType
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import SimulationState
-from app.core.graph.utils import convert_messages_to_chat_messages
+from app.core.graph.utils import (
+    calculate_elapsed_time,
+    convert_messages_to_chat_messages,
+    get_live_score,
+    is_event_in_window,
+)
 from app.core.scenario.base import Scenario
 from app.llms import create_llm_client
 from app.utils.event_handler import send_event_to_ui
 from app.utils.logger import logger
-
-if TYPE_CHECKING:
-    from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 
 
 async def process_events(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
     """
-    Process events in the state and collect event data for later processing.
-
-    This function:
-    1. Detects events from conversation messages
-    2. Updates the event registry and evaluates combination expressions
-    3. Sends events to Core (backend) immediately for real-time tracking
-    4. Collects branching_and_feedback_data (branching instructions +
-       feedback) to be stored in state
-    5. Returns branching_and_feedback_data which will be processed in
-       generate_response
-
-    Branching and Feedback Data Flow:
-    - Events are detected and sent to Core immediately (backend needs real-time updates)
-    - Branching and feedback data is collected and stored in
-      state.branching_and_feedback_data
-    - This branching_and_feedback_data will be processed in
-      generate_response to:
-      * Determine which branching instruction to use for LLM guidance
-      * Determine which feedback message to send to UI
-
-    Returns:
-        Dictionary with updated state including branching_and_feedback_data field
+    Process events, optimizing detection based on Time and Score windows.
+    Collects branching_and_feedback_data for later processing.
     """
 
-    async def detect_single_event(event: BaseEvent, chat_messages: List[ChatMessage]):
-        if await event.detect_event(chat_messages):  # async call
+    # Prepare Context (Time & Score) ---
+    chat_messages = convert_messages_to_chat_messages(state.messages)
+    elapsed_time = calculate_elapsed_time(config)
+    live_score = get_live_score(config)
+
+    logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
+
+    async def detect_single_event(event: BaseEvent):
+        if await event.detect_event(chat_messages):
             return event
         return None
 
-    chat_messages = convert_messages_to_chat_messages(state.messages)
-
-    current_elapsed_seconds = 0.0
-
-    if config and "configurable" in config:
-        # Retrieve the ISO string passed from your worker
-        joined_at_raw = config["configurable"].get("agent_joined_at")
-        if joined_at_raw:
-            now_utc = datetime.now(timezone.utc)
-            joined_time = None
-
-            try:
-                # Parse the ISO string (e.g., "2023-10-27T10:00:00+00:00")
-                if isinstance(joined_at_raw, str):
-                    joined_time = datetime.fromisoformat(joined_at_raw)
-                elif isinstance(joined_at_raw, datetime):
-                    joined_time = joined_at_raw
-
-                if joined_time:
-                    # Ensure timezone awareness to match now_utc
-                    if joined_time.tzinfo is None:
-                        joined_time = joined_time.replace(tzinfo=timezone.utc)
-
-                    # Calculate elapsed time in seconds
-                    current_elapsed_seconds = (now_utc - joined_time).total_seconds()
-
-            except ValueError as e:
-                logger.error(
-                    f"Error parsing agent_joined_at: {e}. Defaulting elapsed time to 0."
-                )
-
-    logger.debug(f"Current session elapsed time: {current_elapsed_seconds:.2f} seconds")
-
+    # Filter Events (Time & Score Windows) & Create Tasks ---
     tasks = []
     skipped_count = 0
 
-    for e in state.permitted_events:
-        # Treat None as open boundaries
-        # start_time=None -> Starts at 0
-        # end_time=None -> Runs forever (Infinity)
-        det_config = e.detection_configuration
-
-        # Get raw values (handling if config or values are None)
-        raw_start = det_config.start_time if det_config else None
-        raw_end = det_config.end_time if det_config else None
-
-        # Apply defaults: None -> 0 (start) or Infinity (end)
-        event_start = raw_start if raw_start is not None else 0
-        event_end = raw_end if raw_end is not None else float("inf")
-
-        # Strict filtering: Only create LLM task if within the window
-        if event_start <= current_elapsed_seconds <= event_end:
-            tasks.append(asyncio.create_task(detect_single_event(e, chat_messages)))
+    for event in state.permitted_events:
+        # Use helper to check BOTH time and score windows
+        if is_event_in_window(event, elapsed_time, live_score):
+            tasks.append(asyncio.create_task(detect_single_event(event)))
         else:
             skipped_count += 1
 
     if skipped_count > 0:
         logger.debug(
-            f"Event optimization: Skipped {skipped_count} events outside time window."
+            f"Event optimization: Skipped {skipped_count} events (outside windows)."
         )
 
-    # Preserve completion order (like as_completed in threads)
+    # Process Detection Results ---
     detected_events = []
     if tasks:
+        # Preserve completion order
         for t in asyncio.as_completed(tasks):
             result = await t
             if result is not None:
@@ -127,44 +72,18 @@ async def process_events(
 
     new_events = [event for _, event in detected_events]
 
-    # Calculate the score change from directly detected events only
-    # (not combination events)
-    score_change = sum(event.score for event in new_events if event.score)
-    new_current_score = state.current_score + score_change
-
-    if score_change != 0:
-        logger.info(
-            f"Score change: {state.current_score} → {new_current_score} "
-            f"(change: {score_change:+d})"
-        )
-
-    # Update EventOrchestrator and process events
-    # Events are sent to Core immediately, but branching_and_feedback_data
-    # is collected for state
-    # Score-based events will also be checked and triggered if the score
-    # changed
+    # Orchestration (Backend Sync & Logic) ---
     additional_score_from_triggered_events = 0
     branching_and_feedback_data = []
+
     if config and "configurable" in config:
-        event_orchestrator: Optional[EventOrchestrator] = config["configurable"].get(
-            "event_orchestrator"
-        )
+        event_orchestrator = config["configurable"].get("event_orchestrator")
         room = config["configurable"].get("room")
 
         if event_orchestrator is not None:
-            # Get event IDs from detected events (currently only
-            # similarity-based events are detected)
             detected_event_ids = {event.event_id for event in new_events}
 
-            # Update registry, evaluate expressions, check score-based events,
-            # and send events to Core immediately
-            # This will send combination events and score-based events too,
-            # but we don't include them in state
-            # Returns:
-            # - additional_score: Additional score from triggered
-            #   score-based/time/combination events
-            # - branching_and_feedback_data: Unified data (branching + feedback)
-            #   to be stored in state
+            # Updates registry, evaluates expressions, sends to Core
             (
                 _,
                 additional_score_from_triggered_events,
@@ -174,6 +93,7 @@ async def process_events(
                 detected_event_ids=(detected_event_ids if detected_event_ids else None),
             )
 
+            # Log results
             if branching_and_feedback_data:
                 logger.info("Branching and Feedback Data Collected:")
                 for idx, data in enumerate(branching_and_feedback_data, 1):
@@ -187,26 +107,27 @@ async def process_events(
                         f"Branching: {data.branching_instruction or 'None'} | "
                         f"Feedback: {feedback_msg}"
                     )
+
             if additional_score_from_triggered_events != 0:
                 logger.info(
-                    f"Additional score from triggered events: "
-                    f"{additional_score_from_triggered_events:+d}"
+                    f"Additional score from triggered "
+                    f"events: {additional_score_from_triggered_events:+d}"
                 )
 
-    # Add the additional score from triggered events (score-based,
-    # time-based, combination events) to the total score
-    new_current_score += additional_score_from_triggered_events
-    if additional_score_from_triggered_events > 0:
+    # Calculate score delta for THIS turn to update LangChain state
+    # (Orchestrator maintains the 'true' total, but we update state history here)
+    direct_score_change = sum(event.score for event in new_events if event.score)
+    total_turn_score_delta = (
+        direct_score_change + additional_score_from_triggered_events
+    )
+    new_current_score = state.current_score + total_turn_score_delta
+
+    if total_turn_score_delta != 0:
         logger.info(
-            f"Additional score from triggered events: "
-            f"{additional_score_from_triggered_events}. "
-            f"Total score: {new_current_score}"
+            f"Total Score Update: {state.current_score} → {new_current_score} "
+            f"(Delta: {total_turn_score_delta:+d})"
         )
 
-    # Build update dictionary for state
-    # Only include branching_and_feedback_data if we have new ones.
-    # If we return [], the reducer clears the state.
-    # By omitting the key when empty, we preserve the existing state.
     update_dict = {
         "messages": state.messages,
         "permitted_events": state.permitted_events,
@@ -215,15 +136,11 @@ async def process_events(
         "current_score": new_current_score,
     }
 
-    # Include branching_and_feedback_data if we have new ones
-    # This will be processed in generate_response to determine:
-    # 1. Which branching instruction to use for LLM
-    # 2. Which feedback message to send to UI
     if branching_and_feedback_data:
         update_dict["branching_and_feedback_data"] = branching_and_feedback_data
         logger.info(
-            f"Stored {len(branching_and_feedback_data)} "
-            f"branching_and_feedback_data entries in state"
+            f"Stored {len(branching_and_feedback_data)} branching_and_feedback_data"
+            f" entries in state"
         )
 
     return update_dict
