@@ -373,6 +373,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       <ParticipantTile
                         participant={localParticipant}
                         publication={localAudioPub}
+                        avatarUrl={userData?.profileImageUrl ?? null}
                         name={userData?.name}
                         isMicEnabled={isMicEnabled}
                       />
