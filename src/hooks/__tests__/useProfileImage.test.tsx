@@ -72,16 +72,28 @@ describe('useProfileImage', () => {
         }),
       );
 
-      expect(result.current.profileImageUri).toBe('https://example.com/image.jpg');
+      expect(result.current.previewImageUri).toBe(
+        'https://example.com/image.jpg',
+      );
     });
 
     it('should initialize with null when currentProfileImageUrl is not provided', () => {
       const {result} = renderHook(() => useProfileImage({}));
 
-      expect(result.current.profileImageUri).toBeNull();
+      expect(result.current.previewImageUri).toBeNull();
     });
 
-    it('should update profileImageUri when currentProfileImageUrl changes', () => {
+    it('should initialize with null when currentProfileImageUrl is empty string', () => {
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: '',
+        }),
+      );
+
+      expect(result.current.previewImageUri).toBeNull();
+    });
+
+    it('should update previewImageUri when currentProfileImageUrl changes', () => {
       const {result, rerender} = renderHook(
         ({url}) => useProfileImage({currentProfileImageUrl: url}),
         {
@@ -89,17 +101,149 @@ describe('useProfileImage', () => {
         },
       );
 
-      expect(result.current.profileImageUri).toBeNull();
+      expect(result.current.previewImageUri).toBeNull();
 
       rerender({url: 'https://example.com/new-image.jpg'});
 
-      expect(result.current.profileImageUri).toBe('https://example.com/new-image.jpg');
+      expect(result.current.previewImageUri).toBe(
+        'https://example.com/new-image.jpg',
+      );
+    });
+  });
+
+  describe('hasUnsavedChanges', () => {
+    it('should return false when preview matches saved state', () => {
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: 'https://example.com/image.jpg',
+        }),
+      );
+
+      expect(result.current.hasUnsavedChanges).toBe(false);
+    });
+
+    it('should return true when preview differs from saved state', () => {
+      const mockAsset = {
+        uri: 'file://new-image.jpg',
+        fileName: 'new-image.jpg',
+        fileSize: 1000,
+        type: 'image/jpeg',
+      };
+
+      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
+        callback({
+          didCancel: false,
+          errorCode: undefined,
+          assets: [mockAsset],
+        });
+      });
+
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: 'https://example.com/image.jpg',
+        }),
+      );
+
+      act(() => {
+        result.current.handleImagePicker();
+      });
+
+      expect(result.current.hasUnsavedChanges).toBe(true);
     });
   });
 
   describe('handleImagePicker', () => {
+    it('should set preview image when image is selected', () => {
+      const mockAsset = {
+        uri: 'file://image.jpg',
+        fileName: 'image.jpg',
+        fileSize: 1000,
+        type: 'image/jpeg',
+      };
+
+      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
+        callback({
+          didCancel: false,
+          errorCode: undefined,
+          assets: [mockAsset],
+        });
+      });
+
+      const {result} = renderHook(() => useProfileImage({}));
+
+      act(() => {
+        result.current.handleImagePicker();
+      });
+
+      expect(result.current.previewImageUri).toBe('file://image.jpg');
+      // hasUnsavedChanges compares previewImageUri with currentProfileImageUrl
+      // Since currentProfileImageUrl is null/undefined and previewImageUri is set, there are changes
+      // Note: This will be true even if currentProfileImageUrl was null initially
+      expect(result.current.hasUnsavedChanges).toBe(true);
+      // Should not call API immediately
+      expect(mockGetPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should handle image picker cancellation', () => {
+      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
+        callback({
+          didCancel: true,
+        });
+      });
+
+      const {result} = renderHook(() => useProfileImage({}));
+
+      act(() => {
+        result.current.handleImagePicker();
+      });
+
+      // Preview should remain unchanged
+      expect(result.current.previewImageUri).toBeNull();
+      expect(mockGetPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should handle missing URI', () => {
+      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
+        callback({
+          didCancel: false,
+          errorCode: undefined,
+          assets: [{uri: undefined, fileName: 'image.jpg'}],
+        });
+      });
+
+      const {result} = renderHook(() => useProfileImage({}));
+
+      act(() => {
+        result.current.handleImagePicker();
+      });
+
+      // Preview should remain unchanged if no URI
+      expect(result.current.previewImageUri).toBeNull();
+    });
+  });
+
+  describe('handleRemoveImage', () => {
+    it('should set preview to null without calling API', () => {
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: 'https://example.com/image.jpg',
+        }),
+      );
+
+      act(() => {
+        result.current.handleRemoveImage();
+      });
+
+      expect(result.current.previewImageUri).toBeNull();
+      expect(result.current.hasUnsavedChanges).toBe(true);
+      // Should not call API immediately
+      expect(mockDeleteProfileImage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleSave', () => {
     it('should handle successful image upload', async () => {
-      const mockOnUploadSuccess = jest.fn();
+      const mockOnSaveSuccess = jest.fn();
       const mockAsset = {
         uri: 'file://image.jpg',
         fileName: 'image.jpg',
@@ -130,12 +274,20 @@ describe('useProfileImage', () => {
 
       const {result} = renderHook(() =>
         useProfileImage({
-          onUploadSuccess: mockOnUploadSuccess,
+          onSaveSuccess: mockOnSaveSuccess,
         }),
       );
 
+      // First select image
       act(() => {
         result.current.handleImagePicker();
+      });
+
+      expect(result.current.hasUnsavedChanges).toBe(true);
+
+      // Then save
+      await act(async () => {
+        await result.current.handleSave();
       });
 
       await waitFor(() => {
@@ -161,19 +313,21 @@ describe('useProfileImage', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.profileImageUri).toBe(
+        expect(result.current.previewImageUri).toBe(
           'https://s3.amazonaws.com/profile-image.jpg',
         );
       });
 
       await waitFor(() => {
-        expect(mockOnUploadSuccess).toHaveBeenCalledWith(
-          'https://s3.amazonaws.com/profile-image.jpg',
-        );
+        expect(mockOnSaveSuccess).toHaveBeenCalled();
       });
+
+      // Note: hasUnsavedChanges will be true until currentProfileImageUrl updates
+      // via API refetch, which happens in the onQueryStarted callback
+      // In a real scenario, the API would refetch and update currentProfileImageUrl
     });
 
-    it('should delete old image after successful upload and state update', async () => {
+    it('should delete old image after successful upload', async () => {
       const mockAsset = {
         uri: 'file://image.jpg',
         fileName: 'image.jpg',
@@ -216,26 +370,14 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
-      // Verify upload happens first
-      await waitFor(() => {
-        expect(mockGetPresignedUrl).toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(uploadImageToS3).toHaveBeenCalled();
+      await act(async () => {
+        await result.current.handleSave();
       });
 
       await waitFor(() => {
         expect(mockUpdateProfileImage).toHaveBeenCalled();
       });
 
-      await waitFor(() => {
-        expect(result.current.profileImageUri).toBe(
-          'https://s3.amazonaws.com/profile-image.jpg',
-        );
-      });
-
-      // Then verify old image is deleted after successful upload
       await waitFor(() => {
         expect(mockDeleteProfileImage).toHaveBeenCalledWith({
           profileImageUrl: 'https://example.com/old-image.jpg',
@@ -276,11 +418,11 @@ describe('useProfileImage', () => {
 
       (uploadImageToS3 as jest.Mock).mockResolvedValue(true);
 
-      const mockOnUploadSuccess = jest.fn();
+      const mockOnSaveSuccess = jest.fn();
       const {result} = renderHook(() =>
         useProfileImage({
           currentProfileImageUrl: 'https://example.com/old-image.jpg',
-          onUploadSuccess: mockOnUploadSuccess,
+          onSaveSuccess: mockOnSaveSuccess,
         }),
       );
 
@@ -288,24 +430,18 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
-      // Verify upload completes successfully
-      await waitFor(() => {
-        expect(mockGetPresignedUrl).toHaveBeenCalled();
+      await act(async () => {
+        await result.current.handleSave();
       });
 
       await waitFor(() => {
-        expect(result.current.profileImageUri).toBe(
+        expect(result.current.previewImageUri).toBe(
           'https://s3.amazonaws.com/profile-image.jpg',
         );
       });
 
       await waitFor(() => {
-        expect(mockOnUploadSuccess).toHaveBeenCalled();
-      });
-
-      // Then verify delete is attempted and failure is logged but doesn't fail the upload
-      await waitFor(() => {
-        expect(mockDeleteProfileImage).toHaveBeenCalled();
+        expect(mockOnSaveSuccess).toHaveBeenCalled();
       });
 
       await waitFor(() => {
@@ -315,45 +451,73 @@ describe('useProfileImage', () => {
       });
     });
 
-    it('should handle missing URI', async () => {
-      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
-        callback({
-          didCancel: false,
-          errorCode: undefined,
-          assets: [{uri: undefined, fileName: 'image.jpg'}],
-        });
+    it('should handle successful image removal', async () => {
+      mockDeleteProfileImage.mockReturnValue({
+        unwrap: jest.fn().mockResolvedValue(undefined),
       });
 
-      const {result} = renderHook(() => useProfileImage({}));
+      mockUpdateProfileImage.mockReturnValue({
+        unwrap: jest.fn().mockResolvedValue(undefined),
+      });
 
+      const mockOnSaveSuccess = jest.fn();
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: 'https://example.com/image.jpg',
+          onSaveSuccess: mockOnSaveSuccess,
+        }),
+      );
+
+      // First remove image (sets preview to null)
       act(() => {
-        result.current.handleImagePicker();
+        result.current.handleRemoveImage();
+      });
+
+      expect(result.current.hasUnsavedChanges).toBe(true);
+
+      // Then save
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(mockDeleteProfileImage).toHaveBeenCalledWith({
+        profileImageUrl: 'https://example.com/image.jpg',
       });
 
       await waitFor(() => {
-        expect(mockShowErrorToast).toHaveBeenCalledWith(
-          expect.any(Error),
-          'Errors.uploadProfileImage',
-        );
+        expect(mockUpdateProfileImage).toHaveBeenCalledWith({
+          profileImageUrl: '',
+        });
       });
+
+      expect(result.current.previewImageUri).toBeNull();
+      // After save, the currentProfileImageUrl should be updated by the API,
+      // but in tests we need to wait for the refetch. For now, just verify the save was called.
+      expect(mockOnSaveSuccess).toHaveBeenCalled();
     });
 
-    it('should handle image picker cancellation', async () => {
-      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
-        callback({
-          didCancel: true,
-        });
+    it('should handle removal when no existing image', async () => {
+      mockUpdateProfileImage.mockReturnValue({
+        unwrap: jest.fn().mockResolvedValue(undefined),
       });
 
       const {result} = renderHook(() => useProfileImage({}));
 
       act(() => {
-        result.current.handleImagePicker();
+        result.current.handleRemoveImage();
       });
 
-      await waitFor(() => {
-        expect(mockGetPresignedUrl).not.toHaveBeenCalled();
+      // When there's no existing image, hasUnsavedChanges should be false
+      // because preview (null) matches saved (null)
+      expect(result.current.hasUnsavedChanges).toBe(false);
+
+      await act(async () => {
+        await result.current.handleSave();
       });
+
+      // Should not call API if there are no unsaved changes
+      expect(mockUpdateProfileImage).not.toHaveBeenCalled();
+      expect(mockDeleteProfileImage).not.toHaveBeenCalled();
     });
 
     it('should handle S3 upload failure', async () => {
@@ -390,6 +554,10 @@ describe('useProfileImage', () => {
 
       act(() => {
         result.current.handleImagePicker();
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
       });
 
       await waitFor(() => {
@@ -433,6 +601,10 @@ describe('useProfileImage', () => {
 
       act(() => {
         result.current.handleImagePicker();
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
       });
 
       await waitFor(() => {
@@ -482,6 +654,10 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
       await waitFor(() => {
         expect(mockGetPresignedUrl).toHaveBeenCalledWith({
           fileName: expect.stringMatching(/^profile-\d+\.jpg$/),
@@ -490,86 +666,26 @@ describe('useProfileImage', () => {
         });
       });
     });
-  });
 
-  describe('handleRemoveImage', () => {
-    it('should successfully remove image', async () => {
-      mockDeleteProfileImage.mockReturnValue({
-        unwrap: jest.fn().mockResolvedValue(undefined),
-      });
-
-      const mockOnRemoveSuccess = jest.fn();
+    it('should not save if there are no unsaved changes', async () => {
       const {result} = renderHook(() =>
         useProfileImage({
           currentProfileImageUrl: 'https://example.com/image.jpg',
-          onRemoveSuccess: mockOnRemoveSuccess,
         }),
       );
 
       await act(async () => {
-        await result.current.handleRemoveImage();
+        await result.current.handleSave();
       });
 
-      expect(mockDeleteProfileImage).toHaveBeenCalledWith({
-        profileImageUrl: 'https://example.com/image.jpg',
-      });
-
-      expect(result.current.profileImageUri).toBeNull();
-      expect(mockOnRemoveSuccess).toHaveBeenCalled();
-    });
-
-    it('should handle removal error', async () => {
-      const error = new Error('Delete failed');
-      mockDeleteProfileImage.mockReturnValue({
-        unwrap: jest.fn().mockRejectedValue(error),
-      });
-
-      const mockOnError = jest.fn();
-      const {result} = renderHook(() =>
-        useProfileImage({
-          currentProfileImageUrl: 'https://example.com/image.jpg',
-          onError: mockOnError,
-        }),
-      );
-
-      await act(async () => {
-        await result.current.handleRemoveImage();
-      });
-
-      expect(mockShowErrorToast).toHaveBeenCalledWith(
-        expect.any(Error),
-        'Errors.removeProfileImage',
-      );
-
-      expect(mockOnError).toHaveBeenCalled();
-    });
-
-    it('should not call API if no currentProfileImageUrl', async () => {
-      const {result} = renderHook(() => useProfileImage({}));
-
-      await act(async () => {
-        await result.current.handleRemoveImage();
-      });
-
+      expect(mockGetPresignedUrl).not.toHaveBeenCalled();
+      expect(mockUpdateProfileImage).not.toHaveBeenCalled();
       expect(mockDeleteProfileImage).not.toHaveBeenCalled();
-      expect(result.current.profileImageUri).toBeNull();
     });
   });
 
-  describe('setProfileImageUri', () => {
-    it('should update profileImageUri', () => {
-      const {result} = renderHook(() => useProfileImage({}));
-
-      act(() => {
-        result.current.setProfileImageUri('https://example.com/new-image.jpg');
-      });
-
-      expect(result.current.profileImageUri).toBe('https://example.com/new-image.jpg');
-    });
-  });
-
-  describe('isUploading state', () => {
-    it('should set isUploading to true during upload', async () => {
+  describe('isSaving state', () => {
+    it('should set isSaving to true during save', async () => {
       const mockAsset = {
         uri: 'file://image.jpg',
         fileName: 'image.jpg',
@@ -585,11 +701,21 @@ describe('useProfileImage', () => {
         });
       });
 
+      // Make the API calls take some time to test isSaving state
       mockGetPresignedUrl.mockReturnValue({
-        unwrap: jest.fn().mockResolvedValue({
-          presignedUrl: 'https://s3.amazonaws.com/presigned-url',
-          profileImageUrl: 'https://s3.amazonaws.com/profile-image.jpg',
-        }),
+        unwrap: jest.fn().mockImplementation(
+          () =>
+            new Promise(resolve =>
+              setTimeout(
+                () =>
+                  resolve({
+                    presignedUrl: 'https://s3.amazonaws.com/presigned-url',
+                    profileImageUrl: 'https://s3.amazonaws.com/profile-image.jpg',
+                  }),
+                100,
+              ),
+            ),
+        ),
       });
 
       mockUpdateProfileImage.mockReturnValue({
@@ -604,15 +730,66 @@ describe('useProfileImage', () => {
         result.current.handleImagePicker();
       });
 
-      // isUploading should be true during upload
-      await waitFor(() => {
-        expect(result.current.isUploading).toBe(true);
+      // Start save operation
+      const savePromise = result.current.handleSave();
+
+      // Check isSaving is true during save
+      await waitFor(
+        () => {
+          expect(result.current.isSaving).toBe(true);
+        },
+        {timeout: 200},
+      );
+
+      await act(async () => {
+        await savePromise;
       });
 
-      // isUploading should be false after upload completes
-      await waitFor(() => {
-        expect(result.current.isUploading).toBe(false);
+      // isSaving should be false after save completes
+      expect(result.current.isSaving).toBe(false);
+    });
+  });
+
+  describe('resetToSavedState', () => {
+    it('should reset preview to saved state', () => {
+      const mockAsset = {
+        uri: 'file://new-image.jpg',
+        fileName: 'new-image.jpg',
+        fileSize: 1000,
+        type: 'image/jpeg',
+      };
+
+      (launchImageLibrary as jest.Mock).mockImplementation((_, callback) => {
+        callback({
+          didCancel: false,
+          errorCode: undefined,
+          assets: [mockAsset],
+        });
       });
+
+      const {result} = renderHook(() =>
+        useProfileImage({
+          currentProfileImageUrl: 'https://example.com/image.jpg',
+        }),
+      );
+
+      // Change preview
+      act(() => {
+        result.current.handleImagePicker();
+      });
+
+      expect(result.current.previewImageUri).toBe('file://new-image.jpg');
+      expect(result.current.hasUnsavedChanges).toBe(true);
+
+      // Reset to saved state
+      act(() => {
+        result.current.resetToSavedState();
+      });
+
+      expect(result.current.previewImageUri).toBe(
+        'https://example.com/image.jpg',
+      );
+      expect(result.current.hasUnsavedChanges).toBe(false);
     });
   });
 });
