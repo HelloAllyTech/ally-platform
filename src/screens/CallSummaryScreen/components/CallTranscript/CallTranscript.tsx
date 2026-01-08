@@ -3,16 +3,9 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscript} from '@/components';
 import {useCallTranscriptDetails, useTranslate} from '@/hooks';
+import {CallTranscriptMessage} from '@/types';
 
 import {CallTranscriptItem} from '../CallTranscriptItem';
-
-type Message = {
-  id: number;
-  message: string;
-  time: string;
-  counselor: boolean;
-  client: boolean;
-};
 
 export const CallTranscript = ({chatId}: {chatId: number}) => {
   const {formattedMessages, isLoading, listRef, handleEndReached} =
@@ -20,7 +13,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
 
   const {t} = useTranslate();
 
-  const renderItem = ({item}: {item: Message}) => {
+  const renderItem = ({item}: {item: CallTranscriptMessage}) => {
     const {time, counselor, message} = item;
     return (
       <CallTranscriptItem
@@ -39,7 +32,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       ref={listRef}
-      data={formattedMessages as Message[]}
+      data={formattedMessages}
       keyExtractor={item => item.id.toString()}
       renderItem={renderItem}
       ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
