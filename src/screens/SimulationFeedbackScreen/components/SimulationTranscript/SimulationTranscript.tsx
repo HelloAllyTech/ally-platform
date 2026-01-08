@@ -6,16 +6,9 @@ import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
 import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDetails';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
+import {SimulationTranscriptMessage} from '@/types';
 
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
-
-type TranscriptItem = {
-  id: number;
-  time: string;
-  message: string;
-  learner: boolean;
-  startSeconds: number;
-};
 
 export const SimulationTranscript: React.FC<{
   sessionId: string;
@@ -31,7 +24,7 @@ export const SimulationTranscript: React.FC<{
   const [activeIndex, setActiveIndex] = useState(-1);
   const isUserScrolling = useRef(false);
 
-  const messagesToRender = formattedMessages as TranscriptItem[];
+  const messagesToRender = formattedMessages;
 
   useEffect(() => {
     if (currentTime === undefined || !messagesToRender.length) {
@@ -69,7 +62,13 @@ export const SimulationTranscript: React.FC<{
     }
   }, [currentTime, messagesToRender, activeIndex, listRef]);
 
-  const renderItem = ({item, index}: {item: TranscriptItem; index: number}) => {
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    item: SimulationTranscriptMessage;
+    index: number;
+  }) => {
     const {time, message, learner, startSeconds} = item;
     const speaker = learner
       ? t('CallTranscript.you')
