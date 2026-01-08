@@ -36,6 +36,7 @@ class EventSender:
     Requires the following attributes on the host class:
     - termination_events: List[TerminationEvent]
     - termination_event_ids: Set[str]
+    - trigger_events: Set[str]
     - termination_callback: Optional[callable]
     - _termination_initiated: bool
     - _termination_flow_started: bool
@@ -45,6 +46,7 @@ class EventSender:
     # Type hints for attributes expected from the host class
     termination_events: List[TerminationEvent]
     termination_event_ids: Set[str]
+    trigger_events: Set[str]
     termination_callback: Optional[callable]
     _termination_initiated: bool
     _termination_flow_started: bool
@@ -280,11 +282,21 @@ class EventSender:
             for event in events_to_send:
                 # Check if this is a termination event (using set for O(1) lookup)
                 if event.event_id in self.termination_event_ids:
+                    # Always defer termination events for shutdown handler
                     logger.info(
                         f"Deferring termination event {event.event_id} - "
                         f"will be sent after shutdown"
                     )
                     self.deferred_termination_event = event
+
+                    # If event is ALSO in trigger_events, send it immediately
+                    # WITHOUT termination info (termination info only in deferred event)
+                    if event.event_id in self.trigger_events:
+                        logger.info(
+                            f"Event {event.event_id} is in trigger_events - "
+                            f"sending immediately without termination info"
+                        )
+                        events_to_send_to_core.append(event)
                     continue
                 events_to_send_to_core.append(event)
 
@@ -298,21 +310,9 @@ class EventSender:
                     f"Sending event to core: {event.event_id} "
                     f"(visibility: {event.visibility_type})"
                 )
-                # Get termination info for this specific event
-                # if it's a termination event
-                term_event_id = None
-                term_message = None
-                if event.event_id in self.termination_event_ids:
-                    config = self.get_termination_config(event.event_id)
-                    if config:
-                        term_event_id = config.id
-                        term_message = config.termination_message
-
-                event_dict = serialize_event(
-                    event,
-                    termination_event_id=term_event_id,
-                    termination_message=term_message,
-                )
+                # Events sent immediately should NOT include termination info
+                # Termination info is only added to deferred events sent during shutdown
+                event_dict = serialize_event(event)
                 core_event_message = CoreEventMessageType.create(
                     room_id=room.name, event_data=event_dict
                 )
