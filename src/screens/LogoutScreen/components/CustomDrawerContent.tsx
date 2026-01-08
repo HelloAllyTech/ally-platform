@@ -35,7 +35,7 @@ export const DrawerContent = ({
   const {t} = useTranslate();
   const navigation = useAppNavigation();
   const {credits, getCreditsInfo} = useSimulationCredits();
-  const {name, email} = userData ?? {};
+  const {name, email, profileImageUrl} = userData ?? {};
   const {data: tenantData} = useGetLogoUrlQuery();
 
   const handleProfileSettingsPress = () => {
@@ -47,7 +47,15 @@ export const DrawerContent = ({
     <View style={styles.container}>
       <View style={styles.profileContainer}>
         <View style={styles.profileIconContainer}>
-          <ProfileIcon />
+          {profileImageUrl ? (
+            <Image
+              source={{uri: profileImageUrl}}
+              style={styles.profileImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <ProfileIcon />
+          )}
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
@@ -157,6 +165,12 @@ const styles = ScaledSheet.create({
     height: '40@ms',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: '20@ms',
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
   },
   textContainer: {
     flex: 1,

@@ -5,6 +5,7 @@ import {
 } from 'react-native-image-picker';
 
 import {useErrorToast} from '@/components';
+import {MAX_PROFILE_IMAGE_SIZE} from '@/constants';
 import {
   useDeleteProfileImageMutation,
   useGetProfileImagePresignedUrlMutation,
@@ -67,24 +68,50 @@ export const useProfileImage = ({
     launchImageLibrary(
       {
         mediaType: 'photo',
+        restrictMimeTypes: ['image/jpeg', 'image/png'],
         quality: 0.8,
         maxWidth: 800,
         maxHeight: 800,
       },
-      (response: ImagePickerResponse) => {
+      async (response: ImagePickerResponse) => {
         if (response.didCancel || response.errorCode) {
           return;
         }
         if (response.assets && response.assets[0]) {
           const asset = response.assets[0];
-          if (asset.uri) {
-            setPreviewImageUri(asset.uri);
-            setSelectedImageAsset(response.assets);
+          if (!asset.uri) {
+            return;
           }
+
+          const MAX_FILE_SIZE = MAX_PROFILE_IMAGE_SIZE;
+          const fileSize = asset.fileSize || 0;
+          if (fileSize > MAX_FILE_SIZE) {
+            const error = new Error(
+              'Image size must be less than 2MB. Please select a smaller image.',
+            );
+            showErrorToast(error, 'Errors.uploadProfileImage');
+            onError?.(error);
+            return;
+          }
+
+          let width = asset.width || 0;
+          let height = asset.height || 0;
+
+          if (width > 0 && height > 0 && width !== height) {
+            const error = new Error(
+              'Image must be square (1:1 aspect ratio). Please select a square image.',
+            );
+            showErrorToast(error, 'Errors.uploadProfileImage');
+            onError?.(error);
+            return;
+          }
+
+          setPreviewImageUri(asset.uri);
+          setSelectedImageAsset(response.assets);
         }
       },
     );
-  }, []);
+  }, [showErrorToast, onError]);
 
   const handleRemoveImage = useCallback(() => {
     setPreviewImageUri(null);

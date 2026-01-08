@@ -126,6 +126,9 @@ export const ProfileSettingsScreen: React.FC = () => {
               </View>
             )}
           </View>
+          <Text style={styles.imageRequirementsText}>
+            {t('ProfileSettings.imageRequirements')}
+          </Text>
           {previewImageUri ? (
             <TouchableOpacity
               style={styles.editButton}
@@ -137,7 +140,7 @@ export const ProfileSettingsScreen: React.FC = () => {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={styles.uploadButton}
+              style={styles.editButton}
               onPress={handleUploadImage}
               disabled={isSaving}>
               <Text style={styles.editButtonText}>
@@ -273,11 +276,16 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  uploadButton: {
+  imageRequirementsText: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
     marginTop: '8@mvs',
+    marginBottom: '4@mvs',
+    textAlign: 'center',
   },
   editButton: {
-    marginTop: '8@mvs',
+    marginTop: '4@mvs',
   },
   editButtonText: {
     ...fontFamily.ROBOTO.REGULAR,
