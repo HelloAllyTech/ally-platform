@@ -50,7 +50,7 @@ export const LeaderboardScreen: React.FC = () => {
   }, [navigation]);
 
   const renderRankBadge = (rank: number) => {
-    let badgeColor: string = colors.lightGray2;
+    let badgeColor;
     if (rank === 1) badgeColor = '#FFD700'; // Gold
     if (rank === 2) badgeColor = colors.lightGray3; // Silver/Gray
     if (rank === 3) badgeColor = '#CD7F32'; // Bronze
@@ -75,7 +75,13 @@ export const LeaderboardScreen: React.FC = () => {
     return (
       <View
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
-        <View style={styles.rankColumn}>{renderRankBadge(item.rank)}</View>
+        <View
+          style={[
+            styles.rankColumn,
+            isHighlighted && styles.highlightedRankColumn,
+          ]}>
+          {renderRankBadge(item.rank)}
+        </View>
         <View style={styles.userColumn}>
           <View style={styles.avatarContainer}>
             {item.avatarUrl ? (
@@ -256,22 +262,22 @@ const styles = ScaledSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: '21@ms',
   },
   tabContainer: {
+    paddingHorizontal: '21@ms',
     marginBottom: '16@ms',
   },
   tableHeader: {
     flexDirection: 'row',
     paddingVertical: '12@ms',
-    paddingLeft: 0,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray2,
     marginBottom: '8@ms',
+    paddingHorizontal: '21@ms',
   },
   headerText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.label.small,
+    ...typography.label.tiny,
     color: colors.ds.typography.mediumEmphasis,
   },
   listContent: {
@@ -281,8 +287,6 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: '12@ms',
-    paddingLeft: 0,
-    paddingRight: '4@ms',
     borderRadius: '8@ms',
     marginBottom: '4@ms',
   },
@@ -290,11 +294,15 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.blue[50],
     borderWidth: '0.5@ms',
     borderColor: colors.ds.theme.primary,
+    marginHorizontal: '12@ms',
   },
   rankColumn: {
     width: '45@ms',
     alignItems: 'flex-start',
-    paddingLeft: 0,
+    marginLeft: '21@ms',
+  },
+  highlightedRankColumn: {
+    marginLeft: '9@ms',
   },
   rankColumnHeader: {
     width: '45@ms',
@@ -369,7 +377,7 @@ const styles = ScaledSheet.create({
   },
   userName: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
+    ...typography.body.small,
     color: colors.ds.typography.highEmphasis,
     flex: 1,
     fontWeight: '600',
@@ -385,7 +393,7 @@ const styles = ScaledSheet.create({
   },
   durationText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
+    ...typography.body.tiny,
     color: colors.ds.typography.highEmphasis,
   },
   badgesColumn: {
@@ -396,7 +404,7 @@ const styles = ScaledSheet.create({
   },
   badgesText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
+    ...typography.body.tiny,
     color: colors.ds.typography.highEmphasis,
   },
   highlightedText: {
