@@ -52,3 +52,5 @@ export {SimulationCard} from './SimulationCard';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {SelectableTextArea} from './SelectableTextArea';
+export type {SelectableTextAreaProps} from './SelectableTextArea';
