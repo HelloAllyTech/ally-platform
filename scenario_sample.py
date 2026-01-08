@@ -49,8 +49,9 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "start speaking about oranges",
+                "branchInstruction": "start speaking about your academics",
                 "feedbackStatus": "True",
+                "detectionConfig": {"minGapTime": 20},
             },
             {
                 "id": "score-gte-5",

@@ -70,12 +70,16 @@ def _create_event_by_detection_type(
     min_score_val = raw_config.get("minScore") or raw_config.get("min_score")
     max_score_val = raw_config.get("maxScore") or raw_config.get("max_score")
 
+    # Extract minGapTime (handle camelCase)
+    min_gap_val = raw_config.get("minGapTime") or raw_config.get("min_gap_time")
+
     #  Create the Pydantic model instance
     detection_config = DetectionConfig(
         start_time=float(start_time_val) if start_time_val is not None else None,
         end_time=float(end_time_val) if end_time_val is not None else None,
         min_score=int(min_score_val) if min_score_val is not None else None,
         max_score=int(max_score_val) if max_score_val is not None else None,
+        min_gap_time=float(min_gap_val) if min_gap_val is not None else None,
     )
 
     common_fields = {

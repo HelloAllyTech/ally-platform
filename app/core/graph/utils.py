@@ -1,3 +1,4 @@
+import datetime
 import datetime as dt
 from typing import List, Optional
 
@@ -111,8 +112,11 @@ def get_live_score(config: Optional[RunnableConfig]) -> int:
     return 0
 
 
-def is_event_in_window(
-    event: "BaseEvent", elapsed_time: float, current_score: int
+def is_event_eligible(
+    event: "BaseEvent",
+    elapsed_time: float,
+    current_score: int,
+    last_occurred_at: Optional[datetime] = None,
 ) -> bool:
     """Checks if the event is valid within the current time and score windows."""
     config = event.detection_config
@@ -134,5 +138,15 @@ def is_event_in_window(
 
     if not (min_s <= current_score <= max_s):
         return False
+
+    # 3. Check Min Gap Time (Cooldown)
+    if config.min_gap_time is not None and last_occurred_at is not None:
+        # Calculate seconds since last occurrence
+        now_utc = dt.datetime.now(dt.timezone.utc)
+        time_since_last = (now_utc - last_occurred_at).total_seconds()
+
+        if time_since_last < config.min_gap_time:
+            # Cooldown hasn't finished yet
+            return False
 
     return True

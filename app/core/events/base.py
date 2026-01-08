@@ -46,6 +46,11 @@ class DetectionConfig(BaseModel):
     max_score: Optional[int] = Field(
         None, description="Maximum score allowed to trigger."
     )
+    min_gap_time: Optional[float] = Field(
+        None,
+        description="Minimum time (seconds) that must pass"
+        " since this event's last occurrence.",
+    )
 
 
 class BaseEvent(BaseModel, ABC):

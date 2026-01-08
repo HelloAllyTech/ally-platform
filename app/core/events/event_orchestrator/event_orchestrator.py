@@ -3,6 +3,7 @@ Expression registry for tracking event states and evaluating combination express
 Includes built-in scheduling for time-based events (no external registry needed).
 """
 
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple
 
 from livekit import rtc
@@ -468,8 +469,15 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             event_id: The event ID to update
             state: The new "happened" value (True/False)
         """
+        timestamp = None
+        if state:
+            timestamp = datetime.now(timezone.utc)
+
         if event_id in self.event_registry:
             self.event_registry[event_id]["happened"] = state
+            # Only run if state is false
+            if state:
+                self.event_registry[event_id]["occurred_at"] = timestamp
         else:
             # If event not in registry, create entry with trigger_multiple
             # based on event type
@@ -483,6 +491,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             self.event_registry[event_id] = {
                 "happened": state,
                 "trigger_multiple": trigger_multiple,
+                "occurred_at": timestamp,
             }
 
     def is_termination_initiated(self) -> bool:
@@ -493,3 +502,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             True if termination has been initiated, False otherwise
         """
         return self._termination_initiated
+
+    def get_last_occurred_at(self, event_id: str) -> Optional[datetime]:
+        """Returns the timestamp of when the event last occurred, or None."""
+        event_data = self.event_registry.get(event_id)
+        if event_data:
+            return event_data.get("occurred_at")
+        return None

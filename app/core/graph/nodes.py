@@ -14,7 +14,7 @@ from app.core.graph.utils import (
     calculate_elapsed_time,
     convert_messages_to_chat_messages,
     get_live_score,
-    is_event_in_window,
+    is_event_eligible,
 )
 from app.core.scenario.base import Scenario
 from app.llms import create_llm_client
@@ -26,14 +26,21 @@ async def process_events(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
     """
-    Process events, optimizing detection based on Time and Score windows.
+    Process events, optimizing detection based on Time, Score, and Cooldown windows.
     Collects branching_and_feedback_data for later processing.
     """
 
-    # Prepare Context (Time & Score) ---
+    # 1. Prepare Context ---
     chat_messages = convert_messages_to_chat_messages(state.messages)
     elapsed_time = calculate_elapsed_time(config)
     live_score = get_live_score(config)
+
+    # Retrieve orchestrator once to use throughout the function
+    orchestrator = None
+    room = None
+    if config and "configurable" in config:
+        orchestrator = config["configurable"].get("event_orchestrator")
+        room = config["configurable"].get("room")
 
     logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
 
@@ -42,13 +49,19 @@ async def process_events(
             return event
         return None
 
-    # Filter Events (Time & Score Windows) & Create Tasks ---
+    # 2. Filter Events & Create Tasks ---
     tasks = []
     skipped_count = 0
 
     for event in state.permitted_events:
-        # Use helper to check BOTH time and score windows
-        if is_event_in_window(event, elapsed_time, live_score):
+        # Fetch last occurrence time safely (if orchestrator exists)
+        last_occurred_at = None
+        if orchestrator:
+            last_occurred_at = orchestrator.get_last_occurred_at(event.event_id)
+
+        # Check ALL windows (Time, Score, Cooldown)
+        # FIX: Ensure this is NOT indented inside 'if orchestrator:'
+        if is_event_eligible(event, elapsed_time, live_score, last_occurred_at):
             tasks.append(asyncio.create_task(detect_single_event(event)))
         else:
             skipped_count += 1
@@ -58,7 +71,7 @@ async def process_events(
             f"Event optimization: Skipped {skipped_count} events (outside windows)."
         )
 
-    # Process Detection Results ---
+    # 3. Process Detection Results ---
     detected_events = []
     if tasks:
         # Preserve completion order
@@ -72,50 +85,46 @@ async def process_events(
 
     new_events = [event for _, event in detected_events]
 
-    # Orchestration (Backend Sync & Logic) ---
+    # 4. Orchestration (Backend Sync & Logic) ---
     additional_score_from_triggered_events = 0
     branching_and_feedback_data = []
 
-    if config and "configurable" in config:
-        event_orchestrator = config["configurable"].get("event_orchestrator")
-        room = config["configurable"].get("room")
+    if orchestrator is not None:
+        detected_event_ids = {event.event_id for event in new_events}
 
-        if event_orchestrator is not None:
-            detected_event_ids = {event.event_id for event in new_events}
+        # Updates registry, evaluates expressions, sends to Core
+        (
+            _,
+            additional_score_from_triggered_events,
+            branching_and_feedback_data,
+        ) = await orchestrator.orchestrate_events(
+            room=room,
+            detected_event_ids=(detected_event_ids if detected_event_ids else None),
+        )
 
-            # Updates registry, evaluates expressions, sends to Core
-            (
-                _,
-                additional_score_from_triggered_events,
-                branching_and_feedback_data,
-            ) = await event_orchestrator.orchestrate_events(
-                room=room,
-                detected_event_ids=(detected_event_ids if detected_event_ids else None),
-            )
-
-            # Log results
-            if branching_and_feedback_data:
-                logger.info("Branching and Feedback Data Collected:")
-                for idx, data in enumerate(branching_and_feedback_data, 1):
-                    feedback_msg = (
-                        data.feedback.message
-                        if data.feedback and data.feedback.message
-                        else "None"
-                    )
-                    logger.info(
-                        f"    [{idx}] Event Score: {data.score} | "
-                        f"Branching: {data.branching_instruction or 'None'} | "
-                        f"Feedback: {feedback_msg}"
-                    )
-
-            if additional_score_from_triggered_events != 0:
+        # Log results
+        if branching_and_feedback_data:
+            logger.info("Branching and Feedback Data Collected:")
+            for idx, data in enumerate(branching_and_feedback_data, 1):
+                feedback_msg = (
+                    data.feedback.message
+                    if data.feedback and data.feedback.message
+                    else "None"
+                )
                 logger.info(
-                    f"Additional score from triggered "
-                    f"events: {additional_score_from_triggered_events:+d}"
+                    f"    [{idx}] Event Score: {data.score} | "
+                    f"Branching: {data.branching_instruction or 'None'} | "
+                    f"Feedback: {feedback_msg}"
                 )
 
+        if additional_score_from_triggered_events != 0:
+            logger.info(
+                f"Additional score from triggered "
+                f"events: {additional_score_from_triggered_events:+d}"
+            )
+
+    # 5. State Updates ---
     # Calculate score delta for THIS turn to update LangChain state
-    # (Orchestrator maintains the 'true' total, but we update state history here)
     direct_score_change = sum(event.score for event in new_events if event.score)
     total_turn_score_delta = (
         direct_score_change + additional_score_from_triggered_events
@@ -190,6 +199,7 @@ async def generate_response(
                 branching_events, key=lambda e: abs(e.score)
             )
             next_instruction = selected_branching_event_data.branching_instruction
+            print(f"\n\n\nUsing Branching instruction:{next_instruction}")
 
     # Step 2: Determine feedback message for UI
     # Priority 1: If branching event was selected, use its feedback
