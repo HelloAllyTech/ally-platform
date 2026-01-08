@@ -1,8 +1,10 @@
 import {ActivityIndicator, FlatList} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {EmptyTranscript, TranscriptItem} from '@/components';
+import {EmptyTranscript} from '@/components';
 import {useCallTranscriptDetails, useTranslate} from '@/hooks';
+
+import {CallTranscriptItem} from '../CallTranscriptItem';
 
 type Message = {
   id: number;
@@ -21,7 +23,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
   const renderItem = ({item}: {item: Message}) => {
     const {time, counselor, message} = item;
     return (
-      <TranscriptItem
+      <CallTranscriptItem
         time={time}
         message={message}
         speakerLabel={

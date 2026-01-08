@@ -1,37 +1,87 @@
-import React from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, FlatList} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
-import {TranscriptItem} from '@/components/TranscriptItem/TranscriptItem';
 import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDetails';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
+
+import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
 
 type TranscriptItem = {
   id: number;
   time: string;
   message: string;
-  counselor: boolean;
+  learner: boolean;
+  startSeconds: number;
 };
 
 export const SimulationTranscript: React.FC<{
   sessionId: string;
   startedAt?: string;
-}> = ({sessionId, startedAt}) => {
+  currentTime?: number;
+  onSeek?: (time: number) => void;
+  agentName?: string;
+}> = ({sessionId, startedAt, currentTime, onSeek, agentName}) => {
   const {t} = useTranslate();
   const {formattedMessages, isLoading, listRef, handleEndReached} =
     useSimulationTranscriptDetails(sessionId, startedAt);
 
-  const renderItem = ({item}: {item: TranscriptItem}) => {
-    const {time, message, counselor} = item;
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const isUserScrolling = useRef(false);
+
+  const messagesToRender = formattedMessages as TranscriptItem[];
+
+  useEffect(() => {
+    if (currentTime === undefined || !messagesToRender.length) {
+      return;
+    }
+
+    // Find the currently active message based on timestamp
+    const index = messagesToRender.findIndex((item, i, arr) => {
+      const nextItem = arr[i + 1];
+      return (
+        item.startSeconds <= currentTime &&
+        (!nextItem || nextItem.startSeconds > currentTime)
+      );
+    });
+
+    if (index !== -1 && index !== activeIndex) {
+      setActiveIndex(index);
+
+      // Only auto-scroll if the user isn't manually interacting
+      if (
+        !isUserScrolling.current &&
+        listRef.current &&
+        index < messagesToRender.length
+      ) {
+        try {
+          listRef.current.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.3, // Scroll to top-third of screen for better reading context
+          });
+        } catch (e) {
+          // Ignore scroll errors (e.g. layout not ready)
+        }
+      }
+    }
+  }, [currentTime, messagesToRender, activeIndex, listRef]);
+
+  const renderItem = ({item, index}: {item: TranscriptItem; index: number}) => {
+    const {time, message, learner, startSeconds} = item;
+    const speaker = learner
+      ? t('CallTranscript.you')
+      : `${agentName} (${t('CallTranscript.aiClient')})`;
+
     return (
-      <TranscriptItem
+      <SimulationTranscriptItem
         time={time}
         message={message}
-        speakerLabel={
-          counselor ? t('CallTranscript.you') : t('CallTranscript.client')
-        }
+        speakerLabel={speaker}
+        isActive={index === activeIndex}
+        onPress={onSeek ? () => onSeek(startSeconds) : undefined}
       />
     );
   };
@@ -43,13 +93,29 @@ export const SimulationTranscript: React.FC<{
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       ref={listRef}
-      data={formattedMessages as TranscriptItem[]}
+      data={messagesToRender || []}
       keyExtractor={item => String(item.id)}
       renderItem={renderItem}
       ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.1}
       ListEmptyComponent={renderEmptyComponent}
+      onScrollBeginDrag={() => (isUserScrolling.current = true)}
+      onMomentumScrollEnd={() => (isUserScrolling.current = false)}
+      onScrollToIndexFailed={info => {
+        // Fallback or retry logic if needed
+        setTimeout(() => {
+          if (listRef.current) {
+            try {
+              listRef.current.scrollToIndex({
+                index: info.index,
+                animated: true,
+                viewPosition: 0.3,
+              });
+            } catch (e) {}
+          }
+        }, 100);
+      }}
     />
   );
 };
@@ -57,7 +123,7 @@ export const SimulationTranscript: React.FC<{
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: '25@ms',
+    paddingHorizontal: '16@ms',
     paddingBottom: '40@vs',
   },
   placeholder: {
@@ -66,6 +132,6 @@ const styles = ScaledSheet.create({
     fontSize: '15@ms',
   },
   contentContainer: {
-    paddingBottom: '48@mvs',
+    paddingBottom: '100@mvs',
   },
 });

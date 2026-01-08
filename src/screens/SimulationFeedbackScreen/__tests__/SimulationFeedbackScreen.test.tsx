@@ -104,6 +104,9 @@ jest.mock('../components', () => {
     SimulationSummarySkeleton: () => <View testID="summary-skeleton" />,
     SimulationSummary: () => <View testID="summary-comp" />,
     SimulationTranscript: () => <View testID="transcript-comp" />,
+    SimulationAudioPlayer: () => <View testID="audio-player" />,
+    PrivacyToggle: () => <View testID="privacy-toggle" />,
+    UpNextSimulationCard: () => <View testID="up-next-card" />,
     FeedbackDropdown: ({visible, setShowSummary}: any) => {
       if (!visible) return null;
       return (

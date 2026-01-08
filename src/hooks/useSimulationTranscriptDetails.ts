@@ -83,6 +83,8 @@ export const useSimulationTranscriptDetails = (
     return messages.map(message => ({
       id: message.id,
       message: message.content,
+      startSeconds:
+        typeof message.startSeconds === 'number' ? message.startSeconds : 0,
       time: formatTimeToMMSS(
         typeof message.startSeconds === 'number' && message.startSeconds >= 0
           ? Math.round(message.startSeconds * 1000)
@@ -91,7 +93,7 @@ export const useSimulationTranscriptDetails = (
               new Date(sessionStartedAt).getTime()
             : 0,
       ),
-      counselor: message.senderId !== -1,
+      learner: message.senderId !== -1,
     }));
   }, [messages, sessionStartedAt]);
 

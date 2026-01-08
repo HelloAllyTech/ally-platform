@@ -40,7 +40,6 @@ export {
   type CollapsibleButtonGroupProps,
 } from './ButtonGroup';
 export {EmptyTranscript} from './EmptyTranscript';
-export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';
 export {EmptyState} from './EmptyState';
 export {FeedbackPopup} from './FeedbackPopup';
