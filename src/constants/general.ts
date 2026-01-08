@@ -25,6 +25,8 @@ export const SCREEN_WIDTH = Dimensions.get('window').width;
 export const WINDOW_HEIGHT = Dimensions.get('window').height;
 export const DEFAULT_OTP_EXPIRY_MINUTES = 10;
 export const RESEND_COUNTDOWN_SECONDS = 1 * MINUTES_IN_SECONDS;
+export const MB_IN_BYTES = 1024 * 1024;
+export const MAX_PROFILE_IMAGE_SIZE = 2 * MB_IN_BYTES;
 
 export const isIOS = Platform.OS === 'ios';
 

@@ -99,7 +99,8 @@
     "email": "Email",
     "profileImage": "Profile image",
     "changeImage": "Change image",
-    "removeImage": "Remove image"
+    "removeImage": "Remove image",
+    "imageRequirements": "1:1 ratio (max 2MB)"
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
