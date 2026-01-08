@@ -265,7 +265,8 @@
   "CallTranscript": {
     "empty": "No transcript available",
     "you": "You",
-    "client": "Client"
+    "client": "Client",
+    "aiClient": "AI Client"
   },
   "BreathingScreen": {
     "header": {
@@ -404,7 +405,9 @@
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
     "almostThereTitle": "Almost there",
-    "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready."
+    "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready.",
+    "keepItPrivate": "Keep it private",
+    "shareForReview": "Share for review"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
