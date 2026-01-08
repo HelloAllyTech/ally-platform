@@ -43,6 +43,7 @@ import FileIcon from './file.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
 import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
+import Forward10Icon from './forward10.svg';
 import GoldenShieldIcon from './goldenShield.svg';
 import GoogleIcon from './google.svg';
 import HandShareIcon from './handShare.svg';
@@ -75,6 +76,7 @@ import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
+import PausePlayerIcon from './pausePlayer.svg';
 import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
@@ -83,6 +85,7 @@ import ProfileIcon from './profileIcon.svg';
 import ProfileSettingsIcon from './profileSettings.svg';
 import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
+import Replay10Icon from './replay10.svg';
 import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
 import RunningSimulationIcon from './runningSimulation.svg';
@@ -112,6 +115,9 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  Forward10Icon,
+  Replay10Icon,
+  PausePlayerIcon,
   AchievementLockedIcon,
   AllyLogoIcon,
   AnalyticsActiveIcon,
