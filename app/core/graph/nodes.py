@@ -54,14 +54,19 @@ async def process_events(
     skipped_count = 0
 
     for event in state.permitted_events:
-        # Fetch last occurrence time safely (if orchestrator exists)
-        last_occurred_at = None
+        # Fetch last occurrence time and
+        # occurrence count safely (if orchestrator exists)
+        last_occurred_at, occurrence_count = None, None
+
         if orchestrator:
             last_occurred_at = orchestrator.get_last_occurred_at(event.event_id)
+            occurrence_count = orchestrator.get_occurrence_count(event.event_id)
 
         # Check ALL windows (Time, Score, Cooldown)
         # FIX: Ensure this is NOT indented inside 'if orchestrator:'
-        if is_event_eligible(event, elapsed_time, live_score, last_occurred_at):
+        if is_event_eligible(
+            event, elapsed_time, live_score, last_occurred_at, occurrence_count
+        ):
             tasks.append(asyncio.create_task(detect_single_event(event)))
         else:
             skipped_count += 1
@@ -199,7 +204,6 @@ async def generate_response(
                 branching_events, key=lambda e: abs(e.score)
             )
             next_instruction = selected_branching_event_data.branching_instruction
-            print(f"\n\n\nUsing Branching instruction:{next_instruction}")
 
     # Step 2: Determine feedback message for UI
     # Priority 1: If branching event was selected, use its feedback

@@ -91,6 +91,9 @@ class TestProcessEvents:
             def get_last_occurred_at(self, event_id: str):
                 return None
 
+            def get_occurrence_count(self, event_id: str) -> int:
+                return None
+
         mock_room = object()
         config = {
             "configurable": {
@@ -154,6 +157,9 @@ class TestProcessEvents:
                 )
 
             def get_last_occurred_at(self, event_id: str):
+                return None
+
+            def get_occurrence_count(self, event_id: str) -> int:
                 return None
 
         config = {
@@ -269,6 +275,9 @@ class TestProcessEvents:
                 return [], 5, []  # Empty branching and feedback data
 
             def get_last_occurred_at(self, event_id: str):
+                return None
+
+            def get_occurrence_count(self, event_id: str) -> int:
                 return None
 
         config = {

@@ -50,6 +50,7 @@ def mock_event():
     config.min_score = None
     config.max_score = None
     config.min_gap_time = 10.0
+    config.max_occurrences = None
 
     event.detection_config = config
     return event

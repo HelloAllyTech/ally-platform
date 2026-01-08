@@ -477,6 +477,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             self.event_registry[event_id]["happened"] = state
             # Only run if state is false
             if state:
+                # Get current count (default to 0 just in case) and increment
+                current_count = self.event_registry[event_id].get("occurrence_count", 0)
+                self.event_registry[event_id]["occurrence_count"] = current_count + 1
+
                 self.event_registry[event_id]["occurred_at"] = timestamp
         else:
             # If event not in registry, create entry with trigger_multiple
@@ -488,10 +492,15 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 DetectionType.SEMANTIC_SIMILARITY,
                 DetectionType.BINARY_CLASSIFIER,
             )
+            # If we are setting it to True immediately, count is 1.
+            # If False, count is 0.
+            initial_count = 1 if state else 0
+
             self.event_registry[event_id] = {
                 "happened": state,
                 "trigger_multiple": trigger_multiple,
                 "occurred_at": timestamp,
+                "occurrence_count": initial_count,
             }
 
     def is_termination_initiated(self) -> bool:
@@ -509,3 +518,9 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         if event_data:
             return event_data.get("occurred_at")
         return None
+
+    def get_occurrence_count(self, event_id: str) -> int:
+        entry = self.event_registry.get(event_id)
+        if entry:
+            return entry.get("occurrence_count", 0)
+        return 0

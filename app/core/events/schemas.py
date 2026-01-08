@@ -30,6 +30,7 @@ class EventRegistryEntry(TypedDict):
     happened: bool
     trigger_multiple: bool
     occurred_at: Optional[datetime]
+    occurrence_count: int
 
 
 class ExpressionListEntry(TypedDict):

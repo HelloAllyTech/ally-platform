@@ -117,6 +117,7 @@ def is_event_eligible(
     elapsed_time: float,
     current_score: int,
     last_occurred_at: Optional[datetime] = None,
+    occurrence_count: int = 0,
 ) -> bool:
     """Checks if the event is valid within the current time and score windows."""
     config = event.detection_config
@@ -147,6 +148,10 @@ def is_event_eligible(
 
         if time_since_last < config.min_gap_time:
             # Cooldown hasn't finished yet
+            return False
+
+    if config.max_occurrences is not None:
+        if occurrence_count >= config.max_occurrences:
             return False
 
     return True

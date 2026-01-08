@@ -51,6 +51,9 @@ class DetectionConfig(BaseModel):
         description="Minimum time (seconds) that must pass"
         " since this event's last occurrence.",
     )
+    max_occurrences: Optional[int] = Field(
+        None, description="Maximum number of times this event can trigger."
+    )
 
 
 class BaseEvent(BaseModel, ABC):
