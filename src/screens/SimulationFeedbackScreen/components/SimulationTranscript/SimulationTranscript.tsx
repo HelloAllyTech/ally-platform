@@ -26,15 +26,13 @@ export const SimulationTranscript: React.FC<{
   const [activeIndex, setActiveIndex] = useState(-1);
   const isUserScrolling = useRef(false);
 
-  const messagesToRender = formattedMessages;
-
   useEffect(() => {
-    if (currentTime === undefined || !messagesToRender.length) {
+    if (currentTime === undefined || !formattedMessages.length) {
       return;
     }
 
     // Find the currently active message based on timestamp
-    const index = messagesToRender.findIndex((item, i, arr) => {
+    const index = formattedMessages.findIndex((item, i, arr) => {
       const nextItem = arr[i + 1];
       return (
         item.startSeconds <= currentTime &&
@@ -49,7 +47,7 @@ export const SimulationTranscript: React.FC<{
       if (
         !isUserScrolling.current &&
         listRef.current &&
-        index < messagesToRender.length
+        index < formattedMessages.length
       ) {
         try {
           listRef.current.scrollToIndex({
@@ -62,7 +60,7 @@ export const SimulationTranscript: React.FC<{
         }
       }
     }
-  }, [currentTime, messagesToRender, activeIndex, listRef]);
+  }, [currentTime, formattedMessages, activeIndex, listRef]);
 
   const renderItem = ({
     item,
@@ -88,17 +86,32 @@ export const SimulationTranscript: React.FC<{
     );
   };
 
-  const renderEmptyComponent = () => <EmptyTranscript />;
+  const renderEmptyComponent = () => {
+    if (isLoading) {
+      return (
+        <ActivityIndicator
+          size="large"
+          color={colors.ds.theme.primary}
+          style={styles.loadingIndicator}
+        />
+      );
+    }
+    return <EmptyTranscript />;
+  };
 
   return (
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       ref={listRef}
-      data={messagesToRender || []}
+      data={formattedMessages || []}
       keyExtractor={item => String(item.id)}
       renderItem={renderItem}
-      ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
+      ListFooterComponent={
+        isLoading && formattedMessages?.length > 0 ? (
+          <ActivityIndicator color={colors.ds.theme.primary} />
+        ) : null
+      }
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.1}
       ListEmptyComponent={renderEmptyComponent}
@@ -135,5 +148,8 @@ const styles = ScaledSheet.create({
   },
   contentContainer: {
     paddingBottom: '100@mvs',
+  },
+  loadingIndicator: {
+    marginTop: '40@vs',
   },
 });
