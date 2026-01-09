@@ -1,4 +1,5 @@
 import AchievementLockedIcon from './achievementLocked.svg';
+import AddReactionIcon from './addReaction.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
@@ -119,6 +120,7 @@ export {
   Replay10Icon,
   PausePlayerIcon,
   AchievementLockedIcon,
+  AddReactionIcon,
   AllyLogoIcon,
   AnalyticsActiveIcon,
   AnalyticsInactiveIcon,
