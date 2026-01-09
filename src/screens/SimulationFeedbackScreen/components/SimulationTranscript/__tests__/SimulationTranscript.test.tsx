@@ -8,6 +8,18 @@ jest.mock('@/components/EmptyTranscript/EmptyTranscript', () => ({
   EmptyTranscript: () => null,
 }));
 
+jest.mock('@/store/hooks', () => ({
+  useAppSelector: jest.fn().mockImplementation(selector =>
+    selector({
+      user: {
+        user: {
+          name: 'Test User',
+        },
+      },
+    }),
+  ),
+}));
+
 jest.mock('@/hooks/useSimulationTranscriptDetails', () => ({
   useSimulationTranscriptDetails: () => ({
     formattedMessages: [
