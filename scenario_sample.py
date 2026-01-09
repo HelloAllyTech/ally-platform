@@ -292,6 +292,7 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "name": "Priya",
             "provider": "hume",
             "config": {
+                "voice_name": "Priya",  # Voice name from Hume's Voice Library or custom voice
                 "instant_mode": False,
                 "voice_provider": "HUME_AI",  # Use "HUME_AI" for pre-existing voices, "CUSTOM_VOICE" for custom voices
                 # Note: The voice name must match an existing voice from Hume's Voice Library
