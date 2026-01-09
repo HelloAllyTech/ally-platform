@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TextStyle, TouchableOpacity, View, ViewStyle} from 'react-native';
+import {Pressable, Text, TextStyle, View, ViewStyle} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
@@ -14,6 +14,7 @@ export type SimulationTranscriptItemProps = {
   messageStyle?: TextStyle;
   isActive?: boolean;
   onPress?: () => void;
+  isLearner?: boolean;
 };
 
 export const SimulationTranscriptItem: React.FC<
@@ -28,13 +29,13 @@ export const SimulationTranscriptItem: React.FC<
   messageStyle,
   isActive = false,
   onPress,
+  isLearner = false,
 }) => {
   return (
-    <TouchableOpacity
+    <Pressable
       style={[styles.messageContainer, containerStyle]}
       onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.7}>
+      disabled={!onPress}>
       <View style={styles.leftContainer}>
         <View
           style={[
@@ -55,12 +56,16 @@ export const SimulationTranscriptItem: React.FC<
         style={[styles.messageContent, isActive && styles.activeMessageText]}>
         <Text style={[styles.messageText, messageTextStyle]}>
           {!!speakerLabel && (
-            <Text style={styles.speakerLabel}>{`${speakerLabel}: `}</Text>
+            <Text
+              style={[
+                styles.speakerLabel,
+                isLearner && styles.learnerLabel,
+              ]}>{`${speakerLabel}: `}</Text>
           )}
           <Text style={[styles.message, messageStyle]}>{message}</Text>
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -99,6 +104,9 @@ const styles = ScaledSheet.create({
   speakerLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.black,
+  },
+  learnerLabel: {
+    color: colors.ds.theme.primary,
   },
   message: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
