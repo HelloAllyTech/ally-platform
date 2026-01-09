@@ -62,18 +62,12 @@ def _create_event_by_detection_type(
     raw_data = ev.get("data")
     raw_config = ev.get("detectionConfig") or ev.get("detection_config") or {}
 
-    #  Extract times from the *nested* dictionary
-    start_time_val = raw_config.get("startTime") or raw_config.get("start_time")
-    end_time_val = raw_config.get("endTime") or raw_config.get("end_time")
-
-    #   Extract SCORE (New)
-    min_score_val = raw_config.get("minScore") or raw_config.get("min_score")
-    max_score_val = raw_config.get("maxScore") or raw_config.get("max_score")
-
-    # Extract minGapTime (handle camelCase)
-    min_gap_val = raw_config.get("minGapTime") or raw_config.get("min_gap_time")
-
-    max_occ_val = raw_config.get("maxOccurrences") or raw_config.get("max_occurrences")
+    start_time_val = raw_config.get("startTime")
+    end_time_val = raw_config.get("endTime")
+    min_score_val = raw_config.get("minScore")
+    max_score_val = raw_config.get("maxScore")
+    min_gap_val = raw_config.get("minGapTime")
+    max_occ_val = raw_config.get("maxOccurrences")
 
     #  Create the Pydantic model instance
     detection_config = DetectionConfig(
@@ -90,9 +84,7 @@ def _create_event_by_detection_type(
         "emoji": ev.get("emoji"),
         "emoji_message": ev.get("message"),
         "branching_instruction": ev.get("branchInstruction"),
-        "show_feedback": ev.get(
-            "feedbackStatus", True
-        ),  # Default to True if not provided
+        "show_feedback": ev.get("feedbackStatus", True),
         "detection_config": detection_config,
     }
 

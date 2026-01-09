@@ -56,7 +56,8 @@ async def process_events(
     for event in state.permitted_events:
         # Fetch last occurrence time and
         # occurrence count safely (if orchestrator exists)
-        last_occurred_at, occurrence_count = None, None
+        last_occurred_at = None
+        occurrence_count = 0
 
         if orchestrator:
             last_occurred_at = orchestrator.get_last_occurred_at(event.event_id)

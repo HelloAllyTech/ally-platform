@@ -122,7 +122,7 @@ def is_event_eligible(
     """Checks if the event is valid within the current time and score windows."""
     config = event.detection_config
     if not config:
-        return True  # No restrictions
+        return True
 
     # 1. Check Time Window
     # Default: Start=0, End=Infinity
@@ -150,6 +150,7 @@ def is_event_eligible(
             # Cooldown hasn't finished yet
             return False
 
+    # 4. Check Max Occurrences
     if config.max_occurrences is not None:
         if occurrence_count >= config.max_occurrences:
             return False

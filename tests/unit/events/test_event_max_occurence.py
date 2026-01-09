@@ -163,3 +163,15 @@ def test_integration_limit_flow(orchestrator, limited_event):
     # 1. Check if eligible (Current count 2) -> SHOULD FAIL
     count = orchestrator.get_occurrence_count(event_id)  # 2
     assert is_event_eligible(limited_event, 30, 0, None, count) is False
+
+
+def test_is_event_eligible_respects_zero_max_occurrences(limited_event):
+    """Test that max_occurrences=0 effectively disables the event."""
+    # Set limit to 0
+    limited_event.detection_config.max_occurrences = 0
+
+    # Case 1: Count is 0 (Blocked - Limit Reached immediately)
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=0) is False
+
+    # Case 2: Count is 1 (Blocked - Limit Exceeded)
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=1) is False
