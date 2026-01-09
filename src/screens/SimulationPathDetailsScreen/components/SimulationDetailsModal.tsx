@@ -14,39 +14,39 @@ import {PrimaryButton, VideoPreview} from '@/components';
 import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
-import type {PathScenario} from '@/types';
+import type {TriggerWarning} from '@/types';
 import {getTriggerWarningNames} from '@/utils';
 
 export interface SimulationDetailsModalProps {
   visible: boolean;
-  simulation: PathScenario | null;
   onClose: () => void;
-  onStartSimulation: () => void;
-  isCreatingRoom: boolean;
+  title?: string;
+  description?: string;
+  coverImageUrl?: string | null;
+  coverVideoUrl?: string | null;
+  order?: number;
+  triggerWarnings?: TriggerWarning[];
+  headerTitle?: string;
+  onStartSimulation?: () => void;
+  isCreatingRoom?: boolean;
 }
 
 export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   visible,
-  simulation,
   onClose,
+  title,
+  description,
+  coverImageUrl,
+  coverVideoUrl,
+  order,
+  triggerWarnings,
+  headerTitle,
   onStartSimulation,
-  isCreatingRoom,
+  isCreatingRoom = false,
 }) => {
   const {t} = useTranslate();
 
-  if (!simulation) {
-    return null;
-  }
-  const {
-    coverImageUrl,
-    coverVideoUrl,
-    title,
-    description,
-    order,
-    triggerWarnings,
-  } = simulation;
   const triggerWarningNames = getTriggerWarningNames(triggerWarnings);
-
   return (
     <Modal
       visible={visible}
@@ -57,10 +57,16 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
         <View style={styles.modalContainer}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>
-              {t('Simulations.start')}{' '}
-              <Text style={styles.headerTitleItalic}>
-                {t('Simulations.simulation')}
-              </Text>
+              {headerTitle ? (
+                headerTitle
+              ) : (
+                <>
+                  {t('Simulations.start')}{' '}
+                  <Text style={styles.headerTitleItalic}>
+                    {t('Simulations.simulation')}
+                  </Text>
+                </>
+              )}
             </Text>
             <TouchableOpacity
               onPress={onClose}
@@ -96,20 +102,23 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               bounces={false}>
-              <Text style={styles.orderLabel}>
-                {t('Simulations.simulation')} {order}
-              </Text>
-              <Text style={styles.title}>{title}</Text>
+              {order !== undefined && (
+                <Text style={styles.orderLabel}>
+                  {t('Simulations.simulation')} {order}
+                </Text>
+              )}
+              {title && <Text style={styles.title}>{title}</Text>}
 
-              {/* Label */}
-              <Text style={styles.scenarioLabel}>
-                {t('Simulations.scenarioLabel')}
-              </Text>
+              {description && (
+                <>
+                  <Text style={styles.scenarioLabel}>
+                    {t('Simulations.scenarioLabel')}
+                  </Text>
 
-              {/* Description */}
-              <Text style={styles.description}>{description}</Text>
+                  <Text style={styles.description}>{description}</Text>
+                </>
+              )}
 
-              {/* Trigger Warnings */}
               {triggerWarningNames.length > 0 && (
                 <>
                   <Text style={styles.triggerWarningLabel}>
@@ -127,17 +136,18 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
             </ScrollView>
           </View>
 
-          {/* Fixed Button Container at Bottom - Clips content above */}
-          <View style={styles.buttonContainer}>
-            <View style={styles.ctaWrapper}>
-              <PrimaryButton
-                label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
-                onPress={onStartSimulation}
-                isLoading={isCreatingRoom}
-                isDisabled={isCreatingRoom}
-              />
+          {onStartSimulation && (
+            <View style={styles.buttonContainer}>
+              <View style={styles.ctaWrapper}>
+                <PrimaryButton
+                  label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
+                  onPress={onStartSimulation}
+                  isLoading={isCreatingRoom}
+                  isDisabled={isCreatingRoom}
+                />
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </View>
     </Modal>

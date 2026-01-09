@@ -51,3 +51,5 @@ export {SimulationCard} from './SimulationCard';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {EmojiPicker} from './EmojiPicker';
+export type {EmojiPickerProps} from './EmojiPicker';
