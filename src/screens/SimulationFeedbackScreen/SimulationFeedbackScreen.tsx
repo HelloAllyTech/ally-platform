@@ -459,8 +459,8 @@ export const SimulationFeedbackScreen: React.FC<
           <SimulationTranscript
             sessionId={scenarioSessionId}
             startedAt={simulationDetails?.startedAt}
-            currentTime={currentPlaybackTime}
-            onSeek={setSeekTime}
+            // currentTime={currentPlaybackTime}
+            // onSeek={setSeekTime}
             agentName={simulationDetails?.scenario?.metadata?.name}
           />
           {/* <View style={styles.privacyToggleContainer}>

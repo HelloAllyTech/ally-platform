@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
 import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDetails';
 import {useTranslate} from '@/hooks/useTranslate';
+import {useAppSelector} from '@/store/hooks';
 import {colors, fontFamily} from '@/theme';
 import {SimulationTranscriptMessage} from '@/types';
 
@@ -18,6 +19,7 @@ export const SimulationTranscript: React.FC<{
   agentName?: string;
 }> = ({sessionId, startedAt, currentTime, onSeek, agentName}) => {
   const {t} = useTranslate();
+  const userName = useAppSelector(state => state.user.user?.name);
   const {formattedMessages, isLoading, listRef, handleEndReached} =
     useSimulationTranscriptDetails(sessionId, startedAt);
 
@@ -71,7 +73,7 @@ export const SimulationTranscript: React.FC<{
   }) => {
     const {time, message, learner, startSeconds} = item;
     const speaker = learner
-      ? t('CallTranscript.you')
+      ? userName || t('CallTranscript.you')
       : `${agentName} (${t('CallTranscript.aiClient')})`;
 
     return (
@@ -81,6 +83,7 @@ export const SimulationTranscript: React.FC<{
         speakerLabel={speaker}
         isActive={index === activeIndex}
         onPress={onSeek ? () => onSeek(startSeconds) : undefined}
+        isLearner={learner}
       />
     );
   };
