@@ -38,19 +38,18 @@ describe('SimulationTranscriptItem', () => {
 
   it('handles onPress when provided', () => {
     const onPressMock = jest.fn();
-    const {getByText, UNSAFE_getByType} = render(
+    const {UNSAFE_getByType} = render(
       <SimulationTranscriptItem {...defaultProps} onPress={onPressMock} />,
     );
-    const {TouchableOpacity} = require('react-native');
-    const touchable = UNSAFE_getByType(TouchableOpacity);
-    fireEvent.press(touchable);
+    const {Pressable} = require('react-native');
+    const pressable = UNSAFE_getByType(Pressable);
+    fireEvent.press(pressable);
     expect(onPressMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not call onPress when not provided', () => {
-    const onPressMock = jest.fn();
     const {getByText} = render(<SimulationTranscriptItem {...defaultProps} />);
-    // Component should render but TouchableOpacity should be disabled
+    // Component should render but Pressable should be disabled
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
