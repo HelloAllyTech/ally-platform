@@ -148,6 +148,11 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
   },
+  REVIEWS: {
+    REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
+    REACTIONS_COUNT: (reviewId: string | number) =>
+      `/reviews/${reviewId}/reactions/count`,
+  },
 } as const;
 
 export const API_METHODS = {

@@ -78,6 +78,47 @@ export interface BottomSheetProps {
    * Default: 300
    */
   animationDuration?: number;
+
+  /**
+   * Skip wrapping children in BottomSheetView
+   * Useful when using BottomSheetFlatList or BottomSheetScrollView directly
+   * Default: false
+   */
+  skipBottomSheetView?: boolean;
+
+  /**
+   * Enable content panning gesture (scrolling within the sheet)
+   * When false, only the handle can be used to drag the sheet
+   * Default: true
+   */
+  enableContentPanningGesture?: boolean;
+
+  /**
+   * Enable dynamic sizing of the bottom sheet
+   * When false, sheet size is fixed to snap points
+   * Default: true
+   */
+  enableDynamicSizing?: boolean;
+
+  /**
+   * Enable over-drag beyond snap points
+   * Default: true
+   */
+  enableOverDrag?: boolean;
+
+  /**
+   * Resistance factor when over-dragging (0-1)
+   * Lower values = more resistance
+   * Default: 0.5
+   */
+  overDragResistanceFactor?: number;
+
+  /**
+   * Enable handle panning gesture
+   * When true, users can drag the handle to move the sheet
+   * Default: true
+   */
+  enableHandlePanningGesture?: boolean;
 }
 
 export interface BottomSheetRef extends BottomSheetModalMethods {}

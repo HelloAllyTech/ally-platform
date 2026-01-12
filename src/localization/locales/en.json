@@ -462,6 +462,11 @@
       "allTime": "All time"
     }
   },
+  "ReactionsBottomSheet": {
+    "title": "Reactions",
+    "allFilter": "All",
+    "noReactionsYet": "No reactions yet"
+  },
   "Achievements": {
     "title": "Achievements",
     "unlocked": "Unlocked",
