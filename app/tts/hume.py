@@ -102,22 +102,22 @@ class HumeTTSClient(BaseTTSClient):
         cls,
         config: Dict[str, Any],
         language_code: str,
-        voice_name: Optional[str] = None,
     ) -> "HumeTTSClient":
         """
         Create Hume TTS client from config dictionary.
 
         Args:
             config: Config dict from metadata. Expected structure:
-                {"instant_mode": False, "voice_provider": "HUME_AI"}
+                {"voice_name": "Priya", "instant_mode": False,
+                 "voice_provider": "HUME_AI"}
             language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
-            voice_name: Voice name from metadata (from "name" field, not config)
 
         Returns:
             HumeTTSClient instance
         """
+        voice_name = config.get("voice_name")
         if not voice_name:
-            raise ValueError("Hume TTS requires 'voice_name' parameter")
+            raise ValueError("Hume TTS requires 'voice_name' in config")
 
         return cls(
             voice_name=voice_name,

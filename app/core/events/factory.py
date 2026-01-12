@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Literal, Mapping, Optional
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
-from app.core.events.base import BaseEvent
+from app.core.events.base import BaseEvent, DetectionConfig
 from app.core.events.event_types.binary_classifier.binary_classifier_event import (
     BinaryClassifierEvent,
 )
@@ -23,6 +23,10 @@ from app.core.events.event_types.similarity_based.similarity_event import (
     SimilarityEvent,
 )
 from app.core.events.event_types.time.time_event import TimeData, TimeEvent
+from app.core.events.event_types.utterance_length.utterance_length_event import (
+    UtteranceLengthData,
+    UtteranceLengthEvent,
+)
 from app.utils import get_logger
 
 
@@ -56,15 +60,32 @@ def _create_event_by_detection_type(
     event_id = ev.get("id") or ev.get("event_id") or "<no-id>"
     visibility_type = ev.get("visibilityType") or VisibilityType.ACTIVE
     raw_data = ev.get("data")
+    raw_config = ev.get("detectionConfig") or ev.get("detection_config") or {}
+
+    start_time_val = raw_config.get("startTime")
+    end_time_val = raw_config.get("endTime")
+    min_score_val = raw_config.get("minScore")
+    max_score_val = raw_config.get("maxScore")
+    min_gap_val = raw_config.get("minGapTime")
+    max_occ_val = raw_config.get("maxOccurrences")
+
+    #  Create the Pydantic model instance
+    detection_config = DetectionConfig(
+        start_time=float(start_time_val) if start_time_val is not None else None,
+        end_time=float(end_time_val) if end_time_val is not None else None,
+        min_score=int(min_score_val) if min_score_val is not None else None,
+        max_score=int(max_score_val) if max_score_val is not None else None,
+        min_gap_time=float(min_gap_val) if min_gap_val is not None else None,
+        max_occurrences=int(max_occ_val) if max_occ_val is not None else None,
+    )
 
     common_fields = {
         "score": ev.get("score"),
         "emoji": ev.get("emoji"),
         "emoji_message": ev.get("message"),
         "branching_instruction": ev.get("branchInstruction"),
-        "show_feedback": ev.get(
-            "feedbackStatus", True
-        ),  # Default to True if not provided
+        "show_feedback": ev.get("feedbackStatus", True),
+        "detection_config": detection_config,
     }
 
     try:
@@ -206,6 +227,31 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=classifier_data,
+                **common_fields,
+            )
+
+        elif detection_type == DetectionType.UTTERANCE_LENGTH:
+            if not raw_data or not isinstance(raw_data, dict):
+                log.warning(
+                    "Event '%s' (UTTERANCE_LENGTH) missing/invalid data: %r",
+                    event_id,
+                    raw_data,
+                )
+                return None
+
+            try:
+                utterance_length_data = UtteranceLengthData(**raw_data)
+            except Exception as e:
+                log.warning(
+                    "Event '%s' (UTTERANCE_LENGTH) invalid data: %s", event_id, e
+                )
+                return None
+
+            return UtteranceLengthEvent.create(
+                event_id=event_id,
+                visibility_type=visibility_type,
+                detection_type=detection_type,
+                data=utterance_length_data,
                 **common_fields,
             )
 

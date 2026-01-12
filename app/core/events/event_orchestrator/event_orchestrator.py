@@ -3,41 +3,32 @@ Expression registry for tracking event states and evaluating combination express
 Includes built-in scheduling for time-based events (no external registry needed).
 """
 
-import asyncio
-import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple
 
 from livekit import rtc
 
-from app.core.constants import DetectionType, VisibilityType
+from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
-from app.core.events.event_processor import EventProcessor
+from app.core.events.event_orchestrator.event_sender import EventSender
+from app.core.events.event_orchestrator.score_evaluator import ScoreEvaluatorMixin
 from app.core.events.event_types.combination.constants import (
     CombinationData,
     ExpressionNode,
 )
 from app.core.events.schedulers import TimeEventScheduler
-from app.core.events.schemas import (
-    CoreEventMessageType,
-    EventRegistryEntry,
-    ExpressionListEntry,
-)
+from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.core.graph import agent_graph
-from app.core.graph.utils import serialize_event
-from app.core.queue import msg_event_queue
-from app.core.scenario.base import Scenario
-from app.utils.event_handler import send_event_to_ui
-from app.utils.event_utils import (
-    evaluate_condition,
-    evaluate_expression,
-    extract_event_ids_from_expression,
-)
+from app.core.graph.state import BranchingAndFeedbackData
+from app.core.graph.utils import is_event_eligible
+from app.core.scenario.base import Scenario, TerminationEvent
+from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class EventOrchestrator:
+class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
     """
     Registry for tracking event states and managing combination expressions.
 
@@ -65,8 +56,10 @@ class EventOrchestrator:
         room: rtc.Room,
         thread_id: str,
         termination_callback: Optional[callable] = None,
+        agent_joined_at: Optional[datetime] = None,
     ):
         self.events = scenario.events
+        self._event_map = {e.event_id: e for e in self.events}
         self.event_registry: Dict[str, EventRegistryEntry] = {}
         self.expression_list: List[ExpressionListEntry] = []
         # Time event scheduler for managing asyncio timers
@@ -79,15 +72,20 @@ class EventOrchestrator:
         )
         self.initial_time = 0.0
         self.termination_callback = termination_callback
-        # Store termination event configuration from scenario
-        self.termination_event_id: Optional[str] = None
-        self.termination_message: Optional[str] = None
-        if scenario.termination_event:
-            self.termination_event_id = scenario.termination_event.id
-            self.termination_message = scenario.termination_event.termination_message
+        # Store termination event configurations from scenario (list of events)
+        self.termination_events: List[TerminationEvent] = (
+            scenario.termination_events or []
+        )
+        # Build set of termination event IDs for O(1) lookup
+        self.termination_event_ids: Set[str] = {te.id for te in self.termination_events}
+        if self.termination_events:
             logger.debug(
-                f"Termination configured for event: {self.termination_event_id}"
+                f"Termination configured for events: "
+                f"{[te.id for te in self.termination_events]}"
             )
+        # Flag to track if termination flow has started.
+        # Once started, additional termination events will be ignored.
+        self._termination_flow_started: bool = False
         # Store session reference for termination
         self._session = None
         # Track if termination has been initiated (session-level flag)
@@ -99,15 +97,14 @@ class EventOrchestrator:
             for event in self.events
             if event.detection_type == DetectionType.SCORE
         ]
+        self.agent_joined_at = datetime.now(timezone.utc)
         # Track deferred termination events that should be sent only after
         # shutdown. This prevents the backend from closing the room before
         # the agent finishes speaking the termination message. The event will
         # be sent in the shutdown callback after audio playback.
-        self.deferred_termination_event: Optional[BaseEvent] = None
+        self._init_event_sender()
         # Track cumulative score of events sent to core
-        self.live_score = 0
-        # Lock for thread-safe live_score updates
-        self._live_score_lock = asyncio.Lock()
+        self._init_score_evaluator()
         self.setup_initial_state()
 
     def _has_circular_dependency(
@@ -176,28 +173,38 @@ class EventOrchestrator:
                 self.set_event_state(event.event_id, False, event.detection_type)
 
     async def initialize(self) -> None:
-        # Send initial score-based events to UI and Core (example: score < 5)
-        _, additional_score, branching_instructions = await self.handle_events(
-            room=self.room, detected_event_ids=None
-        )
+        """
+        Initialize the event orchestrator and send initial events.
 
-        # Update graph state with initial branching instructions if any were
-        # triggered
-        if agent_graph and self.thread_id and branching_instructions:
+        This method:
+        1. Sends initial score-based events to Core (example: score < 5)
+        2. Updates graph state with initial branching_and_feedback_data
+        3. Starts timers for all TIME events
+        """
+        # Send initial score-based events to Core (example: score < 5)
+        (
+            _,
+            additional_score,
+            branching_and_feedback_data,
+        ) = await self.orchestrate_events(room=self.room, detected_event_ids=None)
+
+        # Update graph state with initial branching_and_feedback_data
+        # if any were triggered
+        if agent_graph and self.thread_id and branching_and_feedback_data:
             logger.info(
-                f"Updating graph state with {len(branching_instructions)} "
-                f"initial branching instructions"
+                f"Updating graph state with {len(branching_and_feedback_data)} "
+                f"initial branching and feedback data entries"
             )
             agent_graph.update_state(
                 {"configurable": {"thread_id": self.thread_id}},
-                values={"branching_instructions": branching_instructions},
+                values={"branching_and_feedback_data": branching_and_feedback_data},
             )
 
         # Start timers for all TIME events
         await self._scheduler.start_time_event_schedulers(
             events=self.events,
             event_registry=self.event_registry,
-            event_notifier=self.handle_events,
+            event_notifier=self.orchestrate_events,
             room=self.room,
             default_seconds=60.0,
             agent_graph=agent_graph,
@@ -205,8 +212,14 @@ class EventOrchestrator:
         )
 
     def update(
-        self, detected_event_ids: Optional[Set[str]] = None
+        self, detected_event_ids: Optional[Set[str]] = None, current_score: int = 0
     ) -> Dict[str, EventRegistryEntry]:
+
+        # Calculate real elapsed time
+        elapsed_time = self._get_elapsed_time()
+        # Use internal score from Mixin
+        current_score = current_score
+
         if detected_event_ids:
             for event_id in detected_event_ids:
                 self.set_event_state(event_id, True)
@@ -216,10 +229,29 @@ class EventOrchestrator:
                 event_id = expr_info["event_id"]
                 expression = expr_info["expression"]
 
-                # Evaluate expression
-                result = evaluate_expression(expression, self.event_registry)
-                self.set_event_state(event_id, result, DetectionType.COMBINATION)
+                # 1. Evaluate Logic
+                logic_result = evaluate_expression(expression, self.event_registry)
+                final_result = logic_result
 
+                # 2. If Logic is True, Check Eligibility Constraints
+                if logic_result:
+                    event = self._event_map.get(event_id)
+
+                    if event:
+                        last_at = self.get_last_occurred_at(event_id)
+                        count = self.get_occurrence_count(event_id)
+
+                        # Check Max Occurrences, Time Window, Score Window, Cooldown
+                        if not is_event_eligible(
+                            event=event,
+                            elapsed_time=elapsed_time,
+                            current_score=current_score,
+                            last_occurred_at=last_at,
+                            occurrence_count=count,
+                        ):
+                            final_result = False
+
+                self.set_event_state(event_id, final_result, DetectionType.COMBINATION)
         return self.event_registry.copy()
 
     def get_happened_events(self) -> List[BaseEvent]:
@@ -237,150 +269,14 @@ class EventOrchestrator:
         ]
         return happened_events
 
-    def _calculate_score_from_event_ids(self, event_ids: Set[str]) -> int:
-        """
-        Calculate the total score from a set of event IDs.
-        Only includes events that are in the trigger_events list.
-
-        Args:
-            event_ids: Set of event IDs to calculate score for
-
-        Returns:
-            Total score from all events in the set that are also in trigger_events
-        """
-        event_map = {event.event_id: event for event in self.events}
-        total_score = 0
-
-        for event_id in event_ids:
-
-            # Skip if event is not in trigger_events
-            if event_id not in self.trigger_events:
-                continue
-
-            event = event_map[event_id]
-            if event.score is not None:
-                total_score += event.score
-
-        return total_score
-
-    def _evaluate_and_handle_cascade_score_events(
-        self, detected_event_ids: Set[str]
-    ) -> Tuple[Set[str], int]:
-        """
-        Evaluate score-based events and track cascading score changes.
-
-        This method handles the cascading effect where score-based events
-        can have their own scores which may trigger other score-based events.
-
-        The method ensures score-based events trigger in the same cycle as
-        the events that bring the score to the threshold by:
-        1. Starting with live_score + score from current cycle's detected events
-        2. Evaluating score-based events against this working score
-        3. Cascading through any score-based events that trigger other
-           score-based events
-
-        Args:
-            detected_event_ids: Set of already detected event IDs
-                (will be modified in place).
-
-        Returns:
-            Tuple of (all_detected_event_ids, additional_score_from_triggered_events)
-            - all_detected_event_ids: Updated set including
-              score-triggered events
-            - additional_score_from_triggered_events: Additional score from
-              score-based events that were triggered
-        """
-        additional_score_from_triggered_events = 0
-
-        # Calculate the score contribution from currently detected events
-        # (similarity, time, combination, etc.)
-        # This excludes score-based events which will be evaluated in the
-        # cascade loop
-        current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
-
-        # Start with live_score + current cycle's event scores
-        # This ensures score-based events can trigger on the same cycle as
-        # the events that bring the score to threshold
-        working_score = self.live_score + current_cycle_score
-
-        if current_cycle_score != 0:
-            logger.info(
-                f"Current cycle adding {current_cycle_score} to live_score "
-                f"{self.live_score}. Working score: {working_score}"
-            )
-
-        # Evaluate score-based events against the working score
-        newly_triggered_score_event_ids = self.get_newly_triggered_score_events(
-            working_score
-        )
-
-        # Keep checking for newly triggered score-based events until no more
-        # are triggered
-        # This handles cascading: score-based events triggering other
-        # score-based events
-        while newly_triggered_score_event_ids:
-            logger.info(
-                f"Score-based events triggered at score {working_score}: "
-                f"{newly_triggered_score_event_ids}"
-            )
-            detected_event_ids.update(newly_triggered_score_event_ids)
-
-            # Calculate additional score from newly triggered score-based events
-            additional_score = self._calculate_score_from_event_ids(
-                newly_triggered_score_event_ids
-            )
-
-            if additional_score != 0:
-                additional_score_from_triggered_events += additional_score
-                working_score += additional_score
-                logger.info(
-                    f"Score changed by {additional_score} from triggered "
-                    f"score-based events. New working score: {working_score}"
-                )
-
-            # Check again with the new score to handle cascading
-            # Loop will exit naturally when no more events trigger
-            newly_triggered_score_event_ids = self.get_newly_triggered_score_events(
-                working_score
-            )
-
-        return detected_event_ids, additional_score_from_triggered_events
-
-    def _collect_branching_instructions(
-        self, events_to_send: List[BaseEvent]
-    ) -> List[Tuple[str, int]]:
-        """
-        Collect branching instructions from triggered events.
-
-        Args:
-            events_to_send: List of events that will be sent
-
-        Returns:
-            List of (instruction, score) tuples from triggered events
-        """
-        branching_instructions: List[Tuple[str, int]] = []
-
-        for event in events_to_send:
-            if event.branching_instruction:
-                # Create tuple: (instruction, score)
-                # Use event.score if available, otherwise 0
-                score = event.score if event.score is not None else 0
-                branching_instructions.append((event.branching_instruction, score))
-                logger.debug(
-                    f"Collected branching instruction from {event.event_id}: "
-                    f"'{event.branching_instruction}' (score={score})"
-                )
-
-        if branching_instructions:
-            logger.info(
-                f"Collected {len(branching_instructions)} branching instructions"
-            )
-
-        return branching_instructions
-
     def _update_registry_and_collect_event_data(
         self, detected_event_ids: Optional[Set[str]] = None
-    ) -> Tuple[List[BaseEvent], List[BaseEvent], int, List[Tuple[str, int]]]:
+    ) -> Tuple[
+        List[BaseEvent],
+        List[BaseEvent],
+        int,
+        List["BranchingAndFeedbackData"],
+    ]:
         """
         Update the event registry and collect all output data.
 
@@ -391,7 +287,7 @@ class EventOrchestrator:
         2. Updating the registry and evaluating combination expressions
         3. Getting successful events from the registry
         4. Filtering events to send based on trigger_multiple flag
-        5. Collecting branching instructions from triggered events
+        5. Collecting unified branching and feedback data for state
 
         Args:
             detected_event_ids: Optional set of event IDs that have been detected.
@@ -399,19 +295,27 @@ class EventOrchestrator:
 
         Returns:
             Tuple of (successful_events, events_to_send, additional_score,
-                      branching_instructions)
+                      branching_and_feedback_data)
             - successful_events: All events where happened=True in registry
             - events_to_send: Filtered events that should be sent
               (respecting trigger_multiple)
             - additional_score: Additional score from score-based/combination/
               time events
-            - branching_instructions: List of (instruction, score) tuples from
-              triggered events
+            - branching_and_feedback_data: List of BranchingAndFeedbackData objects
+              (unified branching + feedback)
         """
         # Combine detected event IDs with score-based event IDs
         all_detected_event_ids = (
             set(detected_event_ids) if detected_event_ids else set()
         )
+
+        # We sum these points to let combination events "see" the new score immediately.
+        score_from_new_events = 0
+        if detected_event_ids:
+            for eid in detected_event_ids:
+                # Use the map for O(1) lookup
+                if event := self._event_map.get(eid):
+                    score_from_new_events += event.score or 0
 
         # Process score-based events and get additional score
         all_detected_event_ids, additional_score_from_triggered_events = (
@@ -420,16 +324,27 @@ class EventOrchestrator:
             )
         )
 
+        # Current History + New Event Points + Cascade Bonus Points
+        projected_score = (
+            self.live_score
+            + score_from_new_events
+            + additional_score_from_triggered_events
+        )
+
         # Update the registry (and evaluate combination expressions)
         if all_detected_event_ids:
-            updated_states = self.update(detected_event_ids=all_detected_event_ids)
+            updated_states = self.update(
+                detected_event_ids=all_detected_event_ids, current_score=projected_score
+            )
             logger.info(
                 f"Expression registry updated with detected events: "
                 f"{all_detected_event_ids}"
             )
             logger.info(f"Expression registry state: {updated_states}")
         else:
-            updated_states = self.update(detected_event_ids=None)
+            updated_states = self.update(
+                detected_event_ids=None, current_score=projected_score
+            )
             logger.debug(
                 f"Expression registry updated (no new events detected). "
                 f"Registry state: {updated_states}"
@@ -448,12 +363,15 @@ class EventOrchestrator:
         )
 
         # Filter events to send based on trigger_multiple flag and trigger_events list
-        events_to_send = []
+        events_to_process = []
         for event in successful_events:
             # First check if event is in trigger_events (if trigger_events is specified)
+            # Exception: Termination events are ALWAYS processed,
+            # even if not in trigger_events
             if (
                 self.trigger_events is not None
                 and event.event_id not in self.trigger_events
+                and event.event_id not in self.termination_event_ids
             ):
                 logger.debug(
                     f"Event {event.event_id} skipped (not in trigger_events list)"
@@ -471,8 +389,7 @@ class EventOrchestrator:
             # even if trigger_multiple=True
             # This prevents duplicate termination callbacks
             if (
-                self.termination_event_id
-                and event.event_id == self.termination_event_id
+                event.event_id in self.termination_event_ids
                 and event.event_id in self._sent_events
             ):
                 logger.debug(
@@ -483,7 +400,7 @@ class EventOrchestrator:
             # If trigger_multiple is True, always send
             # If trigger_multiple is False, only send if not sent before
             if trigger_multiple and event.event_id in all_detected_event_ids:
-                events_to_send.append(event)
+                events_to_process.append(event)
                 self._sent_events.add(
                     event.event_id
                 )  # Track sent events even for trigger_multiple=True
@@ -491,7 +408,7 @@ class EventOrchestrator:
                     f"Event {event.event_id} will be sent (trigger_multiple=True)"
                 )
             elif event.event_id not in self._sent_events:
-                events_to_send.append(event)
+                events_to_process.append(event)
                 self._sent_events.add(event.event_id)
                 logger.debug(
                     f"Event {event.event_id} will be sent (first time, "
@@ -503,167 +420,38 @@ class EventOrchestrator:
                     f"trigger_multiple=False)"
                 )
 
-        # Collect branching instructions from triggered events
-        branching_instructions = self._collect_branching_instructions(events_to_send)
+        # Collect unified branching and feedback data for state
+        branching_and_feedback_data = self._collect_branching_and_feedback_data(
+            events_to_process
+        )
 
         return (
             successful_events,
-            events_to_send,
+            events_to_process,
             additional_score_from_triggered_events,
-            branching_instructions,
+            branching_and_feedback_data,
         )
 
-    async def _handle_termination_events(self, events_to_send: List[BaseEvent]) -> None:
-        """
-        Handle termination callback for events that should terminate the session.
-
-        This method checks for termination events and calls the termination callback
-        if one is registered and termination hasn't already been initiated.
-
-        Args:
-            events_to_send: List of events that were sent
-        """
-        # Check for termination events using registry's termination_event_id
-        if not self.termination_event_id:
-            return
-
-        termination_events = [
-            event
-            for event in events_to_send
-            if event.event_id == self.termination_event_id
-        ]
-
-        if termination_events:
-            logger.info(f"Termination event detected: {termination_events[0].event_id}")
-
-            # Only call termination callback once per session
-            if self.termination_callback and not self._termination_initiated:
-                self._termination_initiated = True
-                logger.info(
-                    f"Initiating termination for event: "
-                    f"{termination_events[0].event_id} with message: "
-                    f"{self.termination_message}"
-                )
-                await self.termination_callback(termination_events[0])
-            elif self._termination_initiated:
-                logger.debug(
-                    f"Termination already initiated, skipping callback for: "
-                    f"{termination_events[0].event_id}"
-                )
-
-    async def _send_events_to_ui_and_core(
-        self, events_to_send: List[BaseEvent], room: rtc.Room
-    ) -> None:
-        """
-        Send events to UI and Core messaging systems.
-
-        This method focuses solely on sending events to external systems:
-        1. Sends ACTIVE events to UI
-        2. Sends all events to Core
-        3. Handles termination callback for termination events
-
-        Args:
-            events_to_send: List of events that should be sent
-            room: LiveKit room instance for sending events
-        """
-        if not events_to_send:
-            return
-
-        # Send to UI and Core only if room is provided
-        if room:
-            # Send to UI: Only ACTIVE events
-            active_events = [
-                event
-                for event in events_to_send
-                if event.visibility_type == VisibilityType.ACTIVE
-            ]
-
-            if active_events:
-                logger.info(f"Sending {len(active_events)} active events to UI")
-                if logger.isEnabledFor(logging.DEBUG):
-                    event_summary = EventProcessor.get_events_summary(active_events)
-                    logger.debug(f"Active events summary: {event_summary}")
-
-                ui_message_type = EventProcessor.process_events_for_ui(active_events)
-                if ui_message_type is not None:
-                    await send_event_to_ui(ui_message_type, room)
-
-            # Send to Core: All events to send (both ACTIVE and PASSIVE)
-            # EXCEPT termination events - they are deferred and sent in
-            # shutdown callback.
-            # This ensures the agent completes speaking the termination
-            # message before the backend receives autoTerminationStatus=true
-            # and closes the room.
-            events_to_send_to_core = []
-            for event in events_to_send:
-                # Check if this is a termination event
-                if (
-                    self.termination_event_id
-                    and event.event_id == self.termination_event_id
-                ):
-                    logger.info(
-                        f"Deferring termination event {event.event_id} - "
-                        f"will be sent after shutdown"
-                    )
-                    self.deferred_termination_event = event
-                    continue
-                events_to_send_to_core.append(event)
-
-            logger.info(f"Sending {len(events_to_send_to_core)} events to core")
-            for event in events_to_send_to_core:
-                logger.debug(
-                    f"Sending event to core: {event.event_id} "
-                    f"(visibility: {event.visibility_type})"
-                )
-                event_dict = serialize_event(
-                    event,
-                    termination_event_id=self.termination_event_id,
-                    termination_message=self.termination_message,
-                )
-                core_event_message = CoreEventMessageType.create(
-                    room_id=room.name, event_data=event_dict
-                )
-                await msg_event_queue.send_message(
-                    message_body=core_event_message.model_dump_json()
-                )
-
-        # Handle termination events after sending events (even if room is None)
-        await self._handle_termination_events(events_to_send)
-
-    async def _update_live_score(self, events_to_send: List[BaseEvent]) -> None:
-        """
-        Update live_score with scores from events that were sent to core.
-
-        This method should be called after events have been successfully sent to core.
-        Uses asyncio.Lock to prevent race conditions during concurrent event processing.
-
-        Args:
-            events_to_send: List of events that were sent to core
-        """
-        async with self._live_score_lock:
-            for event in events_to_send:
-                if event.score is not None:
-                    self.live_score += event.score
-                    logger.debug(
-                        f"Live score updated: +{event.score} = {self.live_score}"
-                    )
-
-        if events_to_send:
-            logger.info(f"Current live score: {self.live_score}")
-
-    async def handle_events(
-        self, room: rtc.Room, detected_event_ids: Optional[Set[str]] = None
-    ) -> Tuple[List[BaseEvent], int, List[Tuple[str, int]]]:
+    async def orchestrate_events(
+        self,
+        room: rtc.Room,
+        detected_event_ids: Optional[Set[str]] = None,
+    ) -> Tuple[List[BaseEvent], int, List[BranchingAndFeedbackData]]:
         """
         Orchestrates the complete event processing workflow.
 
         This function coordinates the complete event workflow by:
         1. Calling `_update_registry_and_collect_event_data` to update
            registry and gather event data
-        2. Calling `_send_events_to_ui_and_core` to send events to external
-           systems
-        3. Updating live_score with scores from events sent to core
-        4. Returning the collected data for use by the caller
+        2. Sending events to Core immediately (backend needs real-time updates)
+        3. Collecting event data (branching + feedback) to be stored in state
+        4. Updating live_score with scores from events sent to core
+        5. Returning the collected data for use by the caller
+
+        Note: UI events are no longer sent here. Instead,
+        branching_and_feedback_data is returned and stored in state,
+        then processed in generate_response to determine which feedback
+        message to send to UI.
 
         Args:
             room: LiveKit room instance for sending events
@@ -671,27 +459,38 @@ class EventOrchestrator:
 
         Returns:
             Tuple of (successful_events, additional_score_from_triggered_events,
-                      branching_instructions)
+                      branching_and_feedback_data)
             - successful_events: All events where happened=True in registry
             - additional_score_from_triggered_events: Additional score from
               triggered events
-            - branching_instructions: List of (instruction, score) tuples
-              from triggered events
+            - branching_and_feedback_data: List of BranchingAndFeedbackData objects
+              (unified branching + feedback)
         """
         # Update registry and collect all data
-        successful_events, events_to_send, additional_score, branching_instructions = (
-            self._update_registry_and_collect_event_data(
-                detected_event_ids=detected_event_ids
-            )
+        (
+            successful_events,
+            events_to_process,
+            additional_score,
+            branching_and_feedback_data,
+        ) = self._update_registry_and_collect_event_data(
+            detected_event_ids=detected_event_ids
         )
 
-        # Send events to UI and Core
-        await self._send_events_to_ui_and_core(events_to_send, room)
+        # Send events to Core immediately (backend needs real-time updates)
+        # UI events are handled via branching_and_feedback_data in generate_response
+        await self._send_events_to_core(events_to_process, room)
 
         # Update live_score with scores from events sent to core
-        await self._update_live_score(events_to_send)
+        await self._update_live_score(events_to_process)
 
-        return successful_events, additional_score, branching_instructions
+        # Handle termination events after sending events (even if room is None)
+        await self._handle_termination_events(events_to_process)
+
+        return (
+            successful_events,
+            additional_score,
+            branching_and_feedback_data,
+        )
 
     def get_event_state(self, event_id: str) -> bool:
         """
@@ -718,8 +517,19 @@ class EventOrchestrator:
             event_id: The event ID to update
             state: The new "happened" value (True/False)
         """
+        timestamp = None
+        if state:
+            timestamp = datetime.now(timezone.utc)
+
         if event_id in self.event_registry:
             self.event_registry[event_id]["happened"] = state
+            # Only run if state is false
+            if state:
+                # Get current count (default to 0 just in case) and increment
+                current_count = self.event_registry[event_id].get("occurrence_count", 0)
+                self.event_registry[event_id]["occurrence_count"] = current_count + 1
+
+                self.event_registry[event_id]["occurred_at"] = timestamp
         else:
             # If event not in registry, create entry with trigger_multiple
             # based on event type
@@ -730,9 +540,15 @@ class EventOrchestrator:
                 DetectionType.SEMANTIC_SIMILARITY,
                 DetectionType.BINARY_CLASSIFIER,
             )
+            # If we are setting it to True immediately, count is 1.
+            # If False, count is 0.
+            initial_count = 1 if state else 0
+
             self.event_registry[event_id] = {
                 "happened": state,
                 "trigger_multiple": trigger_multiple,
+                "occurred_at": timestamp,
+                "occurrence_count": initial_count,
             }
 
     def is_termination_initiated(self) -> bool:
@@ -744,62 +560,20 @@ class EventOrchestrator:
         """
         return self._termination_initiated
 
-    def get_newly_triggered_score_events(self, current_score: int) -> Set[str]:
-        """
-        Get the set of event IDs for score-based events that are newly triggered.
-        1. Iterates through all score-based events
-        2. Evaluates their conditions against the current score
-        3. Updates their "happened" state based on whether the condition is met
-        4. Returns the set of event IDs that newly became True (weren't True before)
-        5. Events that are already in the _sent_events set are skipped
+    def get_last_occurred_at(self, event_id: str) -> Optional[datetime]:
+        """Returns the timestamp of when the event last occurred, or None."""
+        event_data = self.event_registry.get(event_id)
+        if event_data:
+            return event_data.get("occurred_at")
+        return None
 
-        Args:
-            current_score: The current cumulative score to check against
+    def get_occurrence_count(self, event_id: str) -> int:
+        entry = self.event_registry.get(event_id)
+        if entry:
+            return entry.get("occurrence_count", 0)
+        return 0
 
-        Returns:
-            Set of event IDs for score-based events that are newly triggered
-        """
-        newly_triggered_event_ids: Set[str] = set()
-
-        for event in self.score_based_events:
-            # Check if event was already happened (prevents infinite loop)
-            event_data = self.event_registry.get(event.event_id)
-            was_happened = event_data.get("happened", False) if event_data else False
-
-            condition_met = evaluate_condition(
-                value=current_score,
-                condition=event.data.condition,
-                threshold=event.data.score,
-            )
-
-            if condition_met:
-                # Only add to newly triggered if not already sent
-                if event.event_id not in self._sent_events:
-                    # Only add if condition is met AND it wasn't already True
-                    # (newly triggered)
-                    if not was_happened:
-                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
-                        newly_triggered_event_ids.add(event.event_id)
-                    else:
-                        # Condition is met but was already True - update state
-                        # but don't add to newly triggered
-                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
-                else:
-                    # Event was already sent, but still update state to True
-                    # if condition is met
-                    self.set_event_state(event.event_id, True, DetectionType.SCORE)
-            else:
-                # Condition is NOT met - set happened to False
-                # This ensures combination events that depend on this score
-                # event are properly re-evaluated
-                # This must happen even for sent events, so combination events
-                # can re-evaluate correctly
-                if was_happened:
-                    logger.debug(
-                        f"Score event {event.event_id} condition no longer "
-                        f"met at score {current_score}. Setting "
-                        f"happened=False"
-                    )
-                self.set_event_state(event.event_id, False, DetectionType.SCORE)
-
-        return newly_triggered_event_ids
+    def _get_elapsed_time(self) -> float:
+        """Calculates seconds since agent joined."""
+        now = datetime.now(timezone.utc)
+        return (now - self.agent_joined_at).total_seconds()

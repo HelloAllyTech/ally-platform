@@ -1,4 +1,5 @@
-from typing import Annotated, Callable, Iterable, List, Tuple, TypeVar
+from dataclasses import dataclass
+from typing import Annotated, Callable, Iterable, List, Optional, Tuple, TypeVar
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
@@ -53,26 +54,81 @@ def add_new_events(left: List[BaseEvent], right: List[BaseEvent]) -> List[BaseEv
     return right
 
 
-def add_branching_instructions(
-    left: List[Tuple[str, int]], right: List[Tuple[str, int]]
-) -> List[Tuple[str, int]]:
-    """Reducer to accumulate or clear branching instructions.
+@dataclass
+class EventFeedback:
+    """
+    Represents feedback message data to be sent to the UI.
 
-    When multiple events (especially time-based events during initialization)
-    update the state with branching instructions, we need to accumulate them
-    all rather than replacing. However, when the generate_response node clears
-    them by passing an empty list, we should replace (clear) them.
+    This contains all the information needed to display feedback to the user,
+    including emoji, message text, and visibility settings.
 
-    Logic:
-    - If right is empty: replace (clear) the instructions
-    - If right has items: accumulate with left
+    Note: Score is NOT stored here - it's stored in BranchingAndFeedbackData
+    and used for priority selection and cumulative score calculation.
+    """
+
+    emoji: Optional[str]  # Emoji to display (from event.emoji)
+    message: Optional[str]  # Feedback message text (from event.emoji_message)
+    show_feedback: bool = (
+        True  # Whether to show feedback button (from event.show_feedback)
+    )
+
+
+@dataclass
+class BranchingAndFeedbackData:
+    """
+    Unified event data structure that combines branching instructions and feedback.
+
+    This structure allows us to:
+    1. Store branching instructions for LLM guidance (conversation direction)
+    2. Store feedback messages for UI display (user feedback)
+    3. Maintain event scores for priority selection
+
+    Priority logic:
+    - If an event has a branching_instruction, it takes priority for both
+      LLM guidance and UI feedback (highest score among branching events)
+    - If no branching events exist, the highest score event's feedback is used
+    """
+
+    branching_instruction: Optional[str]  # For LLM guidance (conversation direction)
+    feedback: Optional[EventFeedback]  # For UI display (user feedback)
+    score: int  # Event score for priority selection
+
+
+def add_branching_and_feedback_data(
+    left: List[BranchingAndFeedbackData], right: List[BranchingAndFeedbackData]
+) -> List[BranchingAndFeedbackData]:
+    """
+    Reducer to accumulate or clear branching and feedback data.
+
+    When data is provided (right has items), accumulate with existing data.
+    When an empty list is provided (right is empty), clear all data.
+
+    This allows the generate_response node to clear branching_and_feedback_data
+    after processing by returning an empty list.
+
+    Args:
+        left: Existing branching and feedback data in state
+        right: New data to add (or empty list to clear)
+
+    Returns:
+        Accumulated data, or empty list if right was empty
     """
     if not right:
         return right  # Clear: replace with empty list
-    return left + right  # Accumulate: add new instructions to existing ones
+    return left + right  # Accumulate: add new data to existing ones
 
 
 class SimulationState(BaseModel):
+    """
+    State model for the LangGraph simulation workflow.
+
+    This state tracks:
+    - Conversation messages
+    - Events (permitted, detected, accumulated)
+    - Score tracking
+    - Branching and feedback data (unified structure for branching + feedback)
+    """
+
     messages: Annotated[List[AnyMessage], add_messages]
     permitted_events: Annotated[List[BaseEvent], add_permitted_events]
     events_accumulator: Annotated[
@@ -80,6 +136,6 @@ class SimulationState(BaseModel):
     ]  # Tuple -> (timestamp, BaseEvent)
     new_events: Annotated[List[BaseEvent], add_new_events]
     current_score: Annotated[int, add_scores]
-    branching_instructions: Annotated[
-        List[Tuple[str, int]], add_branching_instructions
-    ]  # Tuple -> (instruction, score)
+    branching_and_feedback_data: Annotated[
+        List[BranchingAndFeedbackData], add_branching_and_feedback_data
+    ]  # Unified data: branching instructions + feedback messages

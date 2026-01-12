@@ -3,6 +3,7 @@ Centralized schemas for event orchestrator and related structures.
 """
 
 import time
+from datetime import datetime
 from typing import Literal, Optional, TypedDict
 
 from pydantic import BaseModel, Field
@@ -28,6 +29,8 @@ class EventRegistryEntry(TypedDict):
 
     happened: bool
     trigger_multiple: bool
+    occurred_at: Optional[datetime]
+    occurrence_count: int
 
 
 class ExpressionListEntry(TypedDict):

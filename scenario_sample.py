@@ -38,6 +38,7 @@ SCENARIO_SAMPLE = {
                 "detectionType": "SENTENCE_SIMILARITY",
                 "sentences": ["Hi", "Hello"],
                 "feedbackStatus": "True",
+                "detectionConfig": {"minScore": 5, "maxScore": 10},
             },
             {
                 "id": "warm-greeting",
@@ -48,15 +49,16 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "start speaking",
+                "branchInstruction": "start speaking about your academics",
                 "feedbackStatus": "True",
+                "detectionConfig": {"minGapTime": 20},
             },
             {
-                "id": "score-lte-0",
+                "id": "score-gte-5",
                 "name": "offered superficial hope",
                 "description": "",
-                "score": 0,
-                "data": {"score": 0, "condition": "LTE"},
+                "score": 5,
+                "data": {"score": 5, "condition": "GTE"},
                 "emoji": "🔼",
                 "message": "Let's get started",
                 "detectionType": "SCORE",
@@ -67,26 +69,27 @@ SCENARIO_SAMPLE = {
                 "id": "comb-score-lte-0_and_open-ended-question",
                 "name": "offered superficial hope",
                 "description": "",
-                "score": 0,
+                "score": 10,
                 "data": {
                     "expression": {
-                        "left": {"id": "score-lte-0", "type": "IDENTIFIER"},
+                        "left": {"id": "score-gte-5", "type": "IDENTIFIER"},
                         "type": "AND",
                         "right": {"id": "open-ended-question", "type": "IDENTIFIER"},
                     },
-                    "dependentEvents": ["score-lte-0", "open-ended-question"],
+                    "dependentEvents": ["score-gte-5", "open-ended-question"],
                 },
                 "emoji": "🔼",
                 "detectionType": "COMBINATION",
                 "message": "Let's get started",
                 "branchInstruction": "",
                 "feedbackStatus": "True",
+                "detectionConfig": {"maxOccurrences": 1},
             },
             {
                 "id": "open-ended-question",
                 "name": "Open Ended Question",
                 "description": "Triggers when open ended question is detected",
-                "score": 8,
+                "score": 5,
                 "emoji": "🎯",
                 "message": "Open ended question detected",
                 "branchInstruction": "Open up more",
@@ -111,7 +114,12 @@ SCENARIO_SAMPLE = {
             "superficial-hope",
             "comb-score-lte-0_and_open-ended-question",
             "warm-greeting",
-            "score-lte-0",
+        ],
+        "autoTerminationEvents": [
+            {
+                "id": "superficial-hope",
+                "terminationMessage": "Termination message is being played",
+            }
         ],
         "voice": {
             "name": "priya-adult-female",
@@ -285,6 +293,7 @@ SCENARIO_SAMPLE_HUME_HINDI = {
             "name": "Priya",
             "provider": "hume",
             "config": {
+                "voice_name": "Priya",  # Voice name from Hume's Voice Library or custom voice
                 "instant_mode": False,
                 "voice_provider": "HUME_AI",  # Use "HUME_AI" for pre-existing voices, "CUSTOM_VOICE" for custom voices
                 # Note: The voice name must match an existing voice from Hume's Voice Library

@@ -3,6 +3,7 @@ Integration tests for event termination feature.
 Tests the full workflow from event detection to session termination.
 """
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from app.core.events.base import ChatMessage
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.factory import build_events_from_metadata
+from app.core.scenario.base import TerminationEvent
 
 
 def create_mock_scenario(
@@ -21,11 +23,15 @@ def create_mock_scenario(
     mock_scenario.trigger_events = trigger_events
 
     if termination_event_id:
-        mock_scenario.termination_event = MagicMock()
-        mock_scenario.termination_event.id = termination_event_id
-        mock_scenario.termination_event.termination_message = termination_message or ""
+        # Create a list of TerminationEvent objects (new structure)
+        mock_scenario.termination_events = [
+            TerminationEvent(
+                id=termination_event_id,
+                termination_message=termination_message or "",
+            )
+        ]
     else:
-        mock_scenario.termination_event = None
+        mock_scenario.termination_events = []
 
     return mock_scenario
 
@@ -103,7 +109,7 @@ class TestEventTerminationIntegration:
         assert term_detected is False
 
         # Update orchestrator - should not trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"normal-event"}, room=mock_room
         )
 
@@ -122,7 +128,7 @@ class TestEventTerminationIntegration:
         assert term_detected is True
 
         # Update orchestrator - should trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"end-session"}, room=mock_room
         )
 
@@ -192,7 +198,7 @@ class TestEventTerminationIntegration:
 
         orchestrator.live_score = 10
         # First update with greeting - should not terminate
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"greeting"},
             room=mock_room,
         )
@@ -202,7 +208,7 @@ class TestEventTerminationIntegration:
         orchestrator.live_score = 50
 
         # Update with high score - should trigger termination
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids=None,
             room=mock_room,
         )
@@ -247,8 +253,8 @@ class TestEventTerminationIntegration:
 
     @pytest.mark.asyncio
     async def test_termination_does_not_prevent_event_sending(self):
-        """Test that termination events are deferred and UI events are
-        sent before termination callback."""
+        """Test that termination events in trigger_events are sent to Core
+        immediately (without termination info) and also deferred for shutdown."""
         metadata = {
             "events": [
                 {
@@ -292,33 +298,31 @@ class TestEventTerminationIntegration:
         )
 
         # Patch the message queue to track when events are sent
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock(
                 side_effect=lambda **kwargs: call_order.append("send_to_core")
             )
 
-            with patch(
-                "app.core.events.event_orchestrator.event_orchestrator.send_event_to_ui"
-            ) as mock_ui:
-                mock_ui.side_effect = lambda *args: call_order.append("send_to_ui")
+            # Trigger the termination event
+            # Note: UI events are no longer sent from handle_events -
+            # they're sent from generate_response after STT/TTS completes
+            await orchestrator.orchestrate_events(
+                detected_event_ids={"final-event"}, room=mock_room
+            )
 
-                # Trigger the termination event
-                await orchestrator.handle_events(
-                    detected_event_ids={"final-event"}, room=mock_room
-                )
-
-        # Verify UI event was sent and termination callback was called
-        assert "send_to_ui" in call_order
+        # Verify termination callback was called
         assert "termination" in call_order
 
-        # Termination event should NOT be sent to Core immediately (it's deferred)
-        # It will be sent later in the shutdown callback
-        assert "send_to_core" not in call_order
+        # NEW BEHAVIOR: Since "final-event" is in BOTH trigger_events and
+        # termination_event_ids, it should be sent to Core immediately
+        # (without termination info)
+        assert "send_to_core" in call_order
 
-        # Termination should be last
-        assert call_order[-1] == "termination"
+        # Verify order: send_to_core happens first, then termination callback
+        assert call_order == ["send_to_core", "termination"]
 
         # Verify the termination event was deferred
         assert orchestrator.deferred_termination_event is not None
@@ -326,8 +330,9 @@ class TestEventTerminationIntegration:
 
     @pytest.mark.asyncio
     async def test_deferred_termination_event_sent_in_shutdown(self):
-        """Test that termination events are deferred and can be sent in
-        shutdown callback."""
+        """Test that termination events in trigger_events are sent immediately
+        without termination info, and also deferred for shutdown with termination info.
+        """
         metadata = {
             "events": [
                 {
@@ -368,17 +373,30 @@ class TestEventTerminationIntegration:
         assert orchestrator.deferred_termination_event is None
 
         # Trigger the termination event
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock()
 
-            await orchestrator.handle_events(
+            await orchestrator.orchestrate_events(
                 detected_event_ids={"session-end"}, room=mock_room
             )
 
-            # Verify termination event was NOT sent to Core immediately
-            mock_queue.send_message.assert_not_called()
+            # NEW BEHAVIOR: Since "session-end" is in BOTH trigger_events and
+            # termination_event_ids, it SHOULD be sent to Core immediately
+            # (without termination info)
+            mock_queue.send_message.assert_awaited_once()
+
+            # Verify the immediate message does NOT include termination info
+            sent_message = mock_queue.send_message.call_args[1]["message_body"]
+            sent_data = json.loads(sent_message)
+            auto_term_status = sent_data["data"]["event"]["event_data"][
+                "autoTerminationStatus"
+            ]
+            assert (
+                not auto_term_status
+            ), "Immediate send should not have termination info"
 
         # Verify the event was deferred
         assert orchestrator.deferred_termination_event is not None
@@ -391,16 +409,26 @@ class TestEventTerminationIntegration:
         from app.core.events.schemas import CoreEventMessageType
         from app.core.graph.utils import serialize_event
 
+        # NOTE: Updated patch path to point to event_sender module
         with patch(
-            "app.core.events.event_orchestrator.event_orchestrator.msg_event_queue"
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
         ) as mock_queue:
             mock_queue.send_message = AsyncMock()
 
             # This is what happens in the shutdown callback
+            deferred_event = orchestrator.deferred_termination_event
+            termination_config = orchestrator.get_termination_config(
+                deferred_event.event_id
+            )
+            termination_event_id = termination_config.id if termination_config else None
+            termination_message = (
+                termination_config.termination_message if termination_config else None
+            )
+
             event_dict = serialize_event(
-                orchestrator.deferred_termination_event,
-                termination_event_id=orchestrator.termination_event_id,
-                termination_message=orchestrator.termination_message,
+                deferred_event,
+                termination_event_id=termination_event_id,
+                termination_message=termination_message,
             )
             core_event_message = CoreEventMessageType.create(
                 room_id=mock_room.name, event_data=event_dict
@@ -412,8 +440,6 @@ class TestEventTerminationIntegration:
             # Verify the event was sent with autoTerminationStatus=true
             mock_queue.send_message.assert_awaited_once()
             sent_message = mock_queue.send_message.call_args[1]["message_body"]
-            import json
-
             sent_data = json.loads(sent_message)
             # The structure is: data -> event -> event_data
             assert (
@@ -467,7 +493,7 @@ class TestEventTerminationIntegration:
         )
 
         # Trigger hidden-term (should be filtered)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"hidden-term"}, room=mock_room
         )
 
@@ -475,7 +501,7 @@ class TestEventTerminationIntegration:
         termination_callback.assert_not_awaited()
 
         # Trigger visible-term (should not be filtered)
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"visible-term"}, room=mock_room
         )
 
@@ -537,7 +563,7 @@ class TestEventTerminationIntegration:
         )
 
         # Trigger the termination event
-        await orchestrator.handle_events(
+        await orchestrator.orchestrate_events(
             detected_event_ids={"end-abruptly"}, room=mock_room
         )
 
@@ -545,3 +571,84 @@ class TestEventTerminationIntegration:
         termination_callback.assert_awaited_once()
         called_event = termination_callback.call_args[0][0]
         assert called_event.event_id == "end-abruptly"
+
+    @pytest.mark.asyncio
+    async def test_event_in_both_trigger_and_termination_sent_to_core_immediately(self):
+        """Test that events in both trigger_events and termination_event_ids are
+        sent to Core immediately without termination info, while still being
+        deferred for shutdown with termination info."""
+        # Define scenario metadata with an event that's in both lists
+        metadata = {
+            "events": [
+                {
+                    "id": "dual-event",
+                    "sentences": ["I want to end this"],
+                    "score": 10,
+                    "feedbackStatus": True,
+                    "emoji": "🛑",
+                    "emojiMessage": "Ending session",
+                }
+            ]
+        }
+
+        events = build_events_from_metadata(metadata)
+
+        # Create scenario where "dual-event" is in BOTH trigger_events AND termination
+        scenario = create_mock_scenario(
+            events,
+            trigger_events=["dual-event"],  # In trigger_events
+            termination_event_id="dual-event",  # Also a termination event
+            termination_message="Session terminated by user",
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test-room"
+
+        termination_callback = AsyncMock()
+        orchestrator = EventOrchestrator(
+            scenario,
+            room=mock_room,
+            thread_id="test-thread",
+            termination_callback=termination_callback,
+        )
+
+        # Patch the message queue to track Core messages
+        with patch(
+            "app.core.events.event_orchestrator.event_sender.msg_event_queue"
+        ) as mock_queue:
+            mock_queue.send_message = AsyncMock()
+
+            # Trigger the event
+            await orchestrator.orchestrate_events(
+                detected_event_ids={"dual-event"}, room=mock_room
+            )
+
+            # Verify the event WAS sent to Core immediately
+            # (because it's in trigger_events)
+            mock_queue.send_message.assert_awaited_once()
+
+            # Verify the immediate message does NOT include termination info
+            sent_message = mock_queue.send_message.call_args[1]["message_body"]
+            sent_data = json.loads(sent_message)
+
+            # The event data should be present (nested under data.event.event_data)
+            assert sent_data["data"]["event"]["event_data"]["id"] == "dual-event"
+
+            # But autoTerminationStatus should be falsy (False or None, no termination)
+            # Note: Pydantic may serialize False as None in some cases
+            auto_term_status = sent_data["data"]["event"]["event_data"][
+                "autoTerminationStatus"
+            ]
+            assert (
+                not auto_term_status
+            ), f"Expected falsy autoTerminationStatus, got {auto_term_status}"
+            assert (
+                sent_data["data"]["event"]["event_data"]["terminationMessage"] is None
+            )
+
+        # Verify the event was also deferred for shutdown
+        assert orchestrator.deferred_termination_event is not None
+        assert orchestrator.deferred_termination_event.event_id == "dual-event"
+
+        # Verify termination callback was called
+        termination_callback.assert_awaited_once()

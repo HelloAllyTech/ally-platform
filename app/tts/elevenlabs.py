@@ -63,8 +63,6 @@ class ElevenLabsTTSClient(BaseTTSClient):
             logger.error("ElevenLabs validation requires 'voice_id' parameter")
             return False
 
-        logger.info(f"Validating ElevenLabs voice voice_id='{voice_id}'")
-
         try:
             key = api_key or settings.ELEVEN_API_KEY
             client = ElevenLabs(api_key=key)
@@ -104,12 +102,14 @@ class ElevenLabsTTSClient(BaseTTSClient):
             ElevenLabsTTSClient instance
         """
         model = config.get("model")
-        voice_id = config.get("voice_id")
+        voice_id = config.get("voice_id") or config.get("voiceId")
 
         if not model:
             raise ValueError("ElevenLabs TTS requires 'model' in config")
         if not voice_id:
-            raise ValueError("ElevenLabs TTS requires 'voice_id' in config")
+            raise ValueError(
+                "ElevenLabs TTS requires 'voice_id' or 'voiceId' in config"
+            )
 
         return cls(
             model=model,

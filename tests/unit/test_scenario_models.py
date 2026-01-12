@@ -382,6 +382,28 @@ class TestScenario:
         assert result.config.speaker is None
 
     @pytest.mark.unit
+    def test_scenario_build_voice_with_camelcase_voice_id(self):
+        """Test _build_voice with camelCase voiceId (backward compatibility)."""
+        raw_payload = {
+            "voice": {
+                "name": "test_voice",
+                "provider": "elevenlabs",
+                "config": {
+                    "model": "eleven_multilingual_v2",
+                    "voiceId": "test-voice-id-camel",  # camelCase
+                },
+            }
+        }
+
+        result = Scenario._build_voice(raw_payload)
+
+        assert isinstance(result, ScenarioVoice)
+        assert result.name == "test_voice"
+        assert result.provider == "elevenlabs"
+        assert result.config.model == "eleven_multilingual_v2"
+        assert result.config.voice_id == "test-voice-id-camel"  # Should parse camelCase
+
+    @pytest.mark.unit
     def test_scenario_build_voice_with_no_voice(self):
         """Test _build_voice with no voice configuration."""
         raw_payload = {}

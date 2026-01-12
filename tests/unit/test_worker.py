@@ -115,7 +115,7 @@ class TestWorker:
             language_config=None,  # Can be None, will default to DEFAULT_LANGUAGE_CODE
             events=[mock_event],
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
 
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
@@ -227,7 +227,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -368,7 +368,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -471,8 +471,16 @@ class TestWorker:
 
         registry_init_called = {}
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 registry_init_called["scenario"] = scenario
                 registry_init_called["room"] = room
                 registry_init_called["thread_id"] = thread_id
@@ -529,7 +537,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -599,7 +607,7 @@ class TestWorker:
             events=[],
             language_config=None,
             trigger_events=None,
-            termination_event=None,
+            termination_events=[],
         )
         rm_md_envelope = types.SimpleNamespace(scenario=scenario)
         monkeypatch.setattr(
@@ -627,8 +635,16 @@ class TestWorker:
 
         registry_instance = {}
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 self.termination_callback = termination_callback
                 self.termination_message = "Goodbye"
                 registry_instance["instance"] = self
@@ -638,6 +654,9 @@ class TestWorker:
 
             def is_termination_initiated(self):
                 return False
+
+            def get_termination_config(self, event_id):
+                return types.SimpleNamespace(termination_message="Goodbye")
 
         monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 
@@ -730,8 +749,16 @@ class TestWorker:
 
         monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 self.termination_callback = termination_callback
                 self.termination_message = None
                 self._termination_initiated = False

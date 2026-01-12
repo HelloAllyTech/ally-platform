@@ -148,20 +148,22 @@ class TimeEventScheduler:
                     # Notify and capture branching instructions and additional score
                     try:
 
-                        _, additional_score, branching_instructions = (
-                            await event_notifier(room, detected_event_ids={event_id})
-                        )
+                        (
+                            _,
+                            additional_score,
+                            branching_and_feedback_data,
+                        ) = await event_notifier(room, detected_event_ids={event_id})
                         # Update graph state if graph and thread_id are provided
                         if agent_graph and thread_id:
                             state_updates = {}
-                            if branching_instructions:
-                                state_updates["branching_instructions"] = (
-                                    branching_instructions
+                            if branching_and_feedback_data:
+                                state_updates["branching_and_feedback_data"] = (
+                                    branching_and_feedback_data
                                 )
                                 logger.info(
                                     f"Updating graph state with "
-                                    f"{len(branching_instructions)} branching "
-                                    f"instructions from LT/LTE time event "
+                                    f"{len(branching_and_feedback_data)} branching "
+                                    f"and feedback data entries from LT/LTE time event "
                                     f"{event_id}"
                                 )
                             if state_updates:
@@ -278,18 +280,22 @@ class TimeEventScheduler:
                             f"event {event_id}, using 0"
                         )
 
-                _, additional_score, branching_instructions = await event_notifier(
-                    room, detected_event_ids={event_id}
-                )
+                (
+                    _,
+                    additional_score,
+                    branching_and_feedback_data,
+                ) = await event_notifier(room, detected_event_ids={event_id})
                 # Update graph state if graph and thread_id are provided
                 if agent_graph and thread_id:
                     state_updates = {}
-                    if branching_instructions:
-                        state_updates["branching_instructions"] = branching_instructions
+                    if branching_and_feedback_data:
+                        state_updates["branching_and_feedback_data"] = (
+                            branching_and_feedback_data
+                        )
                         logger.info(
                             f"Updating graph state with "
-                            f"{len(branching_instructions)} branching "
-                            f"instructions from time event {event_id}"
+                            f"{len(branching_and_feedback_data)} branching "
+                            f"and feedback data entries from time event {event_id}"
                         )
                     if additional_score > 0:
                         state_updates["additional_score"] = additional_score

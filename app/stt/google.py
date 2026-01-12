@@ -116,10 +116,13 @@ class GoogleSTTClient(BaseSTTClient):
                 Valid models: "chirp" (default, recommended), "chirp_2",
                 "chirp_3", "latest_long", "latest_short", "long", "short"
                 Can optionally include: {"location": "asia-northeast1",
-                "credentials_file": "...", "credentials_info": {...}}
+                "credentials_file": "...", "credentials_info": {...},
+                "language_code": "pa-Guru-IN"}  # language_code in config
+                takes priority over parameter
                 Note: Some models like "chirp_2" may only be available in
                 specific regions (e.g., "asia-southeast1")
             language_code: BCP 47 language code (e.g., "en-IN", "ml-IN", "hi-IN")
+                Used as fallback if not specified in config
 
         Returns:
             GoogleSTTClient instance
@@ -142,9 +145,13 @@ class GoogleSTTClient(BaseSTTClient):
         credentials_file = config_dict.get("credentials_file")
         location = config_dict.get("location")
 
+        # Prioritize language_code from config if available, otherwise use parameter
+        # This allows per-scenario language code overrides
+        final_language_code = config.get("languageCode") or language_code
+
         return cls(
             model=model,
-            language_code=language_code,
+            language_code=final_language_code,
             credentials_info=credentials_info,
             credentials_file=credentials_file,
             location=location,

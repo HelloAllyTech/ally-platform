@@ -31,6 +31,7 @@ env:
   ENABLE_TESTS: "true"
   S3_ENV_FILES: |
     learn-core/.env
+    learn-core/google-credentials.json
   BUILD_PLATFORM: linux/amd64
   # GCP Workload Identity Federation configuration (set as GitHub secrets)
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -437,6 +438,7 @@ jobs:
           DELIMITER="CHANGELOG_END_$(date +%s)"
           echo "CHANGELOG<<${DELIMITER}" >> $GITHUB_OUTPUT
           cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
           echo "${DELIMITER}" >> $GITHUB_OUTPUT
 
       - name: Create Release Draft
@@ -467,6 +469,5 @@ jobs:
             ---
 
             **Note**: This is a draft release. Please review and publish when ready.
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

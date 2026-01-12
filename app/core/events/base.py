@@ -29,6 +29,33 @@ class ChatMessage(BaseModel):
         }
 
 
+class DetectionConfig(BaseModel):
+    """
+    Configuration settings for when and how the event should be detected.
+    """
+
+    start_time: Optional[float] = Field(
+        None, description="The start time window (in seconds) for detection."
+    )
+    end_time: Optional[float] = Field(
+        None, description="The end time window (in seconds) for detection."
+    )
+    min_score: Optional[int] = Field(
+        None, description="Minimum score required to trigger."
+    )
+    max_score: Optional[int] = Field(
+        None, description="Maximum score allowed to trigger."
+    )
+    min_gap_time: Optional[float] = Field(
+        None,
+        description="Minimum time (seconds) that must pass"
+        " since this event's last occurrence.",
+    )
+    max_occurrences: Optional[int] = Field(
+        None, description="Maximum number of times this event can trigger."
+    )
+
+
 class BaseEvent(BaseModel, ABC):
     """
     Runtime event instance populated from scenario metadata.
@@ -52,6 +79,8 @@ class BaseEvent(BaseModel, ABC):
     emoji_message: Optional[str] = None
     branching_instruction: Optional[str] = None
     show_feedback: Optional[bool] = True
+
+    detection_config: Optional[DetectionConfig] = Field(default_factory=DetectionConfig)
 
     model_config = {"arbitrary_types_allowed": True}
 

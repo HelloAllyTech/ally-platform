@@ -126,7 +126,6 @@ def create_tts_client(
         return _get_default_tts_client(gender, language_code)
 
     config_dict = tts_config.get("config", {}) or {}
-    voice_name = tts_config.get("name")
 
     try:
         # Instantiate TTS client based on provider using from_config
@@ -158,7 +157,6 @@ def create_tts_client(
             return HumeTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
-                voice_name=voice_name,
             )
 
         else:

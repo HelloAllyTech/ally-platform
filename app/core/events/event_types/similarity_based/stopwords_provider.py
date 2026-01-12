@@ -210,28 +210,6 @@ class MultilingualStopwordsProvider(StopwordsProvider):
         # Using English stopwords for non-English languages doesn't make sense
         # since they won't match anyway. Empty set means all tokens are
         # considered informative, which is better than incorrect filtering.
-        is_known_unsupported = (
-            language_code in LANGUAGE_MAPPING
-            and mapping.get("iso") is None
-            and mapping.get("advertools") is None
-        )
-
-        if is_known_unsupported:
-            # Known unsupported languages (ml-IN, kn-IN) - log at debug level
-            logger.debug(
-                f"No stopwords available for {language_code} "
-                f"(not supported by libraries). "
-                f"Using empty stopwords set (all tokens will be considered "
-                f"informative). Consider adding custom stopwords in "
-                f"DOMAIN_SPECIFIC_STOPWORDS."
-            )
-        else:
-            # Unexpected language - log at warning level
-            logger.warning(
-                f"No stopwords found for {language_code}, using empty set. "
-                f"All tokens will be considered informative. "
-                f"Consider adding custom stopwords for this language."
-            )
         return set()
 
     def clear_cache(self):

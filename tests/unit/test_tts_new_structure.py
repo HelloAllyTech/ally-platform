@@ -147,6 +147,58 @@ class TestElevenLabsProvider:
                 language_code="en-IN",
             )
 
+    @pytest.mark.unit
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_elevenlabs_from_config_with_camelcase_voice_id(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
+        """Test ElevenLabs from_config with camelCase voiceId (backward compat)."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        mock_tts_instance = Mock()
+        mock_tts_class.return_value = mock_tts_instance
+
+        config = {
+            "model": "eleven_multilingual_v2",
+            "voiceId": "test-voice-id-camel",  # camelCase
+        }
+
+        client = ElevenLabsTTSClient.from_config(config=config, language_code="en-IN")
+
+        assert client._model == "eleven_multilingual_v2"
+        assert client._voice_id == "test-voice-id-camel"
+        mock_validate.assert_called_once_with(
+            voice_id="test-voice-id-camel", api_key="test-api-key"
+        )
+
+    @pytest.mark.unit
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_elevenlabs_from_config_with_snake_case_voice_id(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
+        """Test ElevenLabs from_config with snake_case voice_id (preferred format)."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        mock_tts_instance = Mock()
+        mock_tts_class.return_value = mock_tts_instance
+
+        config = {
+            "model": "eleven_multilingual_v2",
+            "voice_id": "test-voice-id-snake",  # snake_case
+        }
+
+        client = ElevenLabsTTSClient.from_config(config=config, language_code="en-IN")
+
+        assert client._model == "eleven_multilingual_v2"
+        assert client._voice_id == "test-voice-id-snake"
+        mock_validate.assert_called_once_with(
+            voice_id="test-voice-id-snake", api_key="test-api-key"
+        )
+
 
 class TestSarvamProvider:
     """Test cases for Sarvam TTS provider."""

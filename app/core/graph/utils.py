@@ -1,8 +1,12 @@
-from typing import List
+import datetime
+import datetime as dt
+from typing import List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 from app.core.events.base import BaseEvent, ChatMessage
+from app.utils.logger import logger
 
 
 def convert_messages_to_chat_messages(messages) -> List[ChatMessage]:
@@ -56,3 +60,99 @@ def serialize_event(
         "autoTerminationStatus": is_termination_event,
         "terminationMessage": termination_message if is_termination_event else None,
     }
+
+
+def calculate_elapsed_time(config: Optional[RunnableConfig]) -> float:
+    """Calculates seconds since the agent joined,
+    handling timezone and format safety."""
+    if not config or "configurable" not in config:
+        return 0.0
+
+    joined_at_raw = config["configurable"].get("agent_joined_at")
+    if not joined_at_raw:
+        return 0.0
+
+    try:
+        # FIX: Use dt.datetime and dt.timezone explicitly
+        now_utc = dt.datetime.now(dt.timezone.utc)
+
+        # Parse based on type
+        joined_time = None
+        if isinstance(joined_at_raw, str):
+            joined_time = dt.datetime.fromisoformat(joined_at_raw)
+        elif isinstance(joined_at_raw, dt.datetime):
+            joined_time = joined_at_raw
+
+        if joined_time is None:
+            return 0.0
+
+        # Ensure UTC consistency
+        if joined_time.tzinfo is None:
+            joined_time = joined_time.replace(tzinfo=dt.timezone.utc)
+
+        return max(0.0, (now_utc - joined_time).total_seconds())
+
+    except ValueError:
+        logger.warning(f"Failed to parse agent_joined_at: {joined_at_raw}")
+        return 0.0
+
+
+def get_live_score(config: Optional[RunnableConfig]) -> int:
+    """
+    Retrieves the authoritative score.
+    Prioritizes the Orchestrator's live_score; falls back to 0 (or requires state).
+    """
+    # 1. Try Orchestrator (Single Source of Truth)
+    if config and "configurable" in config:
+        orchestrator = config["configurable"].get("event_orchestrator")
+        if orchestrator and hasattr(orchestrator, "live_score"):
+            return orchestrator.live_score
+
+    # FIX: Added return statement to satisfy '-> int' signature
+    return 0
+
+
+def is_event_eligible(
+    event: "BaseEvent",
+    elapsed_time: float,
+    current_score: int,
+    last_occurred_at: Optional[datetime] = None,
+    occurrence_count: int = 0,
+) -> bool:
+    """Checks if the event is valid within the current time and score windows."""
+    config = event.detection_config
+    if not config:
+        return True
+
+    # 1. Check Time Window
+    # Default: Start=0, End=Infinity
+    start = config.start_time if config.start_time is not None else 0
+    end = config.end_time if config.end_time is not None else float("inf")
+
+    if not (start <= elapsed_time <= end):
+        return False
+
+    # 2. Check Score Window
+    # Default: Min=-Inf, Max=+Inf
+    min_s = config.min_score if config.min_score is not None else float("-inf")
+    max_s = config.max_score if config.max_score is not None else float("inf")
+
+    if not (min_s <= current_score <= max_s):
+        return False
+
+    # 3. Check Min Gap Time (Cooldown)
+    if config.min_gap_time is not None and last_occurred_at is not None:
+        # Calculate seconds since last occurrence
+        now_utc = dt.datetime.now(dt.timezone.utc)
+        time_since_last = (now_utc - last_occurred_at).total_seconds()
+
+        if time_since_last < config.min_gap_time:
+            # Cooldown hasn't finished yet
+            return False
+
+    # 4. Check Max Occurrences
+    if config.max_occurrences is not None:
+        if occurrence_count >= config.max_occurrences:
+            return False
+
+    return True
