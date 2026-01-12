@@ -270,6 +270,12 @@ async def entrypoint(ctx: agents.JobContext):
         nonlocal final_score_sent
         logger.debug("Shutdown callback triggered")
 
+        # Clean up conversation handler state (deduplication set)
+        try:
+            cleanup_conversation_handler()
+        except Exception as e:
+            logger.debug(f"Error cleaning up conversation handler: {e}")
+
         # Send deferred termination event to Core (if any).
         # Termination events are sent here AFTER the agent has finished
         # speaking the termination message, ensuring the backend doesn't
@@ -350,10 +356,11 @@ async def entrypoint(ctx: agents.JobContext):
     # Create agent
     agent = Assistant(llm=agent_adapter)
 
-    # Register conversation handler
-    session.on("conversation_item_added")(
-        create_conversation_handler(ctx.room.name, joined_iso)
+    # Register conversation handler with deduplication
+    conversation_handler, cleanup_conversation_handler = create_conversation_handler(
+        ctx.room.name, joined_iso
     )
+    session.on("conversation_item_added")(conversation_handler)
 
     # Start session
     await session.start(

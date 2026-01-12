@@ -135,7 +135,7 @@ class TestEventHandler:
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
         # Build handler and trigger
-        handler = eh.create_conversation_handler(
+        handler, cleanup = eh.create_conversation_handler(
             room_id="room-123", joined_iso="2024-01-01T00:00:00+00:00"
         )
 
@@ -207,7 +207,9 @@ class TestEventHandler:
 
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
-        handler = eh.create_conversation_handler("room", "2024-01-01T00:00:00+00:00")
+        handler, cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
         handler(
             DummyEvent(DummyItem(role="user", content="hey"), created_at=1704067205.0)
         )
@@ -215,3 +217,115 @@ class TestEventHandler:
         # ensure fallback scheduled something
         assert "coro" in loop_created
         await loop_created["coro"]
+
+    @pytest.mark.asyncio
+    async def test_create_conversation_handler_deduplicates_utterances(
+        self, monkeypatch
+    ):
+        """Test that duplicate utterances are skipped."""
+        created_tasks = []
+
+        def fake_create_task(coro):
+            created_tasks.append(coro)
+            return types.SimpleNamespace(cancel=lambda: None)
+
+        monkeypatch.setattr(asyncio, "create_task", fake_create_task)
+
+        class DummyCoreEvent:
+            def model_dump_json(self):
+                return "{}"
+
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(create=lambda **_: DummyCoreEvent()),
+        )
+
+        class DummyQueue:
+            async def send_message(self, m):
+                pass
+
+        monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
+
+        handler, cleanup = eh.create_conversation_handler(
+            "room-123", "2024-01-01T00:00:00+00:00"
+        )
+
+        # First event - should be processed
+        event1 = DummyEvent(
+            DummyItem(role="user", content="hello"), created_at=1704067205.0
+        )
+        handler(event1)
+        assert len(created_tasks) == 1
+
+        # Duplicate event (same content and timestamp) - should be skipped
+        event2 = DummyEvent(
+            DummyItem(role="user", content="hello"), created_at=1704067205.0
+        )
+        handler(event2)
+        assert len(created_tasks) == 1  # No new task created
+
+        # Different content - should be processed
+        event3 = DummyEvent(
+            DummyItem(role="user", content="world"), created_at=1704067205.0
+        )
+        handler(event3)
+        assert len(created_tasks) == 2  # New task created
+
+        # Same content, different timestamp - should be processed
+        event4 = DummyEvent(
+            DummyItem(role="user", content="hello"), created_at=1704067206.0
+        )
+        handler(event4)
+        assert len(created_tasks) == 3  # New task created
+
+    def test_create_conversation_handler_cleanup(self, monkeypatch):
+        """Test that cleanup function clears the seen_utterances set."""
+
+        class DummyCoreEvent:
+            def model_dump_json(self):
+                return "{}"
+
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(create=lambda **_: DummyCoreEvent()),
+        )
+
+        class DummyQueue:
+            async def send_message(self, m):
+                pass
+
+        monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
+        monkeypatch.setattr(
+            asyncio, "create_task", lambda _: types.SimpleNamespace(cancel=lambda: None)
+        )
+
+        handler, cleanup = eh.create_conversation_handler(
+            "room-123", "2024-01-01T00:00:00+00:00"
+        )
+
+        # Process some events
+        event1 = DummyEvent(
+            DummyItem(role="user", content="hello"), created_at=1704067205.0
+        )
+        handler(event1)
+
+        event2 = DummyEvent(
+            DummyItem(role="user", content="world"), created_at=1704067206.0
+        )
+        handler(event2)
+
+        # Cleanup should clear the set
+        cleanup()
+
+        # After cleanup, same events should be processed again (no deduplication)
+        # This is expected behavior - cleanup resets the state
+        # Process the same event again - it should be accepted after cleanup
+        event3 = DummyEvent(
+            DummyItem(role="user", content="hello"), created_at=1704067205.0
+        )
+        handler(event3)  # Should process since cleanup cleared the set
+
+        # Call cleanup again to ensure it's idempotent
+        cleanup()

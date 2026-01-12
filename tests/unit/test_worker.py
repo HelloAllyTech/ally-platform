@@ -176,7 +176,10 @@ class TestWorker:
             def _h(evt):
                 called_handler["called"] = True
 
-            return _h
+            def _cleanup():
+                pass
+
+            return _h, _cleanup
 
         monkeypatch.setattr(worker, "create_conversation_handler", fake_handler_factory)
 
@@ -275,7 +278,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
@@ -411,7 +416,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
@@ -503,7 +510,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
@@ -571,7 +580,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
@@ -675,7 +686,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
@@ -780,7 +793,9 @@ class TestWorker:
         monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
         monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker, "create_conversation_handler", lambda *a, **k: (lambda e: None)
+            worker,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
