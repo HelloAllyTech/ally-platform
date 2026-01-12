@@ -20,6 +20,7 @@ from app.core.events.schedulers import TimeEventScheduler
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
 from app.core.graph import agent_graph
 from app.core.graph.state import BranchingAndFeedbackData
+from app.core.graph.utils import is_event_eligible
 from app.core.scenario.base import Scenario, TerminationEvent
 from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 from app.utils.logger import get_logger
@@ -55,8 +56,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         room: rtc.Room,
         thread_id: str,
         termination_callback: Optional[callable] = None,
+        agent_joined_at: Optional[datetime] = None,
     ):
         self.events = scenario.events
+        self._event_map = {e.event_id: e for e in self.events}
         self.event_registry: Dict[str, EventRegistryEntry] = {}
         self.expression_list: List[ExpressionListEntry] = []
         # Time event scheduler for managing asyncio timers
@@ -94,6 +97,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             for event in self.events
             if event.detection_type == DetectionType.SCORE
         ]
+        self.agent_joined_at = datetime.now(timezone.utc)
         # Track deferred termination events that should be sent only after
         # shutdown. This prevents the backend from closing the room before
         # the agent finishes speaking the termination message. The event will
@@ -208,8 +212,14 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         )
 
     def update(
-        self, detected_event_ids: Optional[Set[str]] = None
+        self, detected_event_ids: Optional[Set[str]] = None, current_score: int = 0
     ) -> Dict[str, EventRegistryEntry]:
+
+        # Calculate real elapsed time
+        elapsed_time = self._get_elapsed_time()
+        # Use internal score from Mixin
+        current_score = current_score
+
         if detected_event_ids:
             for event_id in detected_event_ids:
                 self.set_event_state(event_id, True)
@@ -219,10 +229,29 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 event_id = expr_info["event_id"]
                 expression = expr_info["expression"]
 
-                # Evaluate expression
-                result = evaluate_expression(expression, self.event_registry)
-                self.set_event_state(event_id, result, DetectionType.COMBINATION)
+                # 1. Evaluate Logic
+                logic_result = evaluate_expression(expression, self.event_registry)
+                final_result = logic_result
 
+                # 2. If Logic is True, Check Eligibility Constraints
+                if logic_result:
+                    event = self._event_map.get(event_id)
+
+                    if event:
+                        last_at = self.get_last_occurred_at(event_id)
+                        count = self.get_occurrence_count(event_id)
+
+                        # Check Max Occurrences, Time Window, Score Window, Cooldown
+                        if not is_event_eligible(
+                            event=event,
+                            elapsed_time=elapsed_time,
+                            current_score=current_score,
+                            last_occurred_at=last_at,
+                            occurrence_count=count,
+                        ):
+                            final_result = False
+
+                self.set_event_state(event_id, final_result, DetectionType.COMBINATION)
         return self.event_registry.copy()
 
     def get_happened_events(self) -> List[BaseEvent]:
@@ -280,6 +309,14 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             set(detected_event_ids) if detected_event_ids else set()
         )
 
+        # We sum these points to let combination events "see" the new score immediately.
+        score_from_new_events = 0
+        if detected_event_ids:
+            for eid in detected_event_ids:
+                # Use the map for O(1) lookup
+                if event := self._event_map.get(eid):
+                    score_from_new_events += event.score or 0
+
         # Process score-based events and get additional score
         all_detected_event_ids, additional_score_from_triggered_events = (
             self._evaluate_and_handle_cascade_score_events(
@@ -287,16 +324,27 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             )
         )
 
+        # Current History + New Event Points + Cascade Bonus Points
+        projected_score = (
+            self.live_score
+            + score_from_new_events
+            + additional_score_from_triggered_events
+        )
+
         # Update the registry (and evaluate combination expressions)
         if all_detected_event_ids:
-            updated_states = self.update(detected_event_ids=all_detected_event_ids)
+            updated_states = self.update(
+                detected_event_ids=all_detected_event_ids, current_score=projected_score
+            )
             logger.info(
                 f"Expression registry updated with detected events: "
                 f"{all_detected_event_ids}"
             )
             logger.info(f"Expression registry state: {updated_states}")
         else:
-            updated_states = self.update(detected_event_ids=None)
+            updated_states = self.update(
+                detected_event_ids=None, current_score=projected_score
+            )
             logger.debug(
                 f"Expression registry updated (no new events detected). "
                 f"Registry state: {updated_states}"
@@ -524,3 +572,8 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         if entry:
             return entry.get("occurrence_count", 0)
         return 0
+
+    def _get_elapsed_time(self) -> float:
+        """Calculates seconds since agent joined."""
+        now = datetime.now(timezone.utc)
+        return (now - self.agent_joined_at).total_seconds()

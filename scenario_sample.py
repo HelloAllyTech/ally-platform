@@ -83,6 +83,7 @@ SCENARIO_SAMPLE = {
                 "message": "Let's get started",
                 "branchInstruction": "",
                 "feedbackStatus": "True",
+                "detectionConfig": {"maxOccurrences": 1},
             },
             {
                 "id": "open-ended-question",

@@ -64,7 +64,6 @@ async def process_events(
             occurrence_count = orchestrator.get_occurrence_count(event.event_id)
 
         # Check ALL windows (Time, Score, Cooldown)
-        # FIX: Ensure this is NOT indented inside 'if orchestrator:'
         if is_event_eligible(
             event, elapsed_time, live_score, last_occurred_at, occurrence_count
         ):

@@ -471,8 +471,16 @@ class TestWorker:
 
         registry_init_called = {}
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 registry_init_called["scenario"] = scenario
                 registry_init_called["room"] = room
                 registry_init_called["thread_id"] = thread_id
@@ -627,8 +635,16 @@ class TestWorker:
 
         registry_instance = {}
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 self.termination_callback = termination_callback
                 self.termination_message = "Goodbye"
                 registry_instance["instance"] = self
@@ -733,8 +749,16 @@ class TestWorker:
 
         monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
 
+        # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
-            def __init__(self, scenario, termination_callback, room, thread_id):
+            def __init__(
+                self,
+                scenario,
+                termination_callback,
+                room,
+                thread_id,
+                agent_joined_at=None,
+            ):
                 self.termination_callback = termination_callback
                 self.termination_message = None
                 self._termination_initiated = False

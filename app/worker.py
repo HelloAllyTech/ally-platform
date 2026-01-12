@@ -188,6 +188,7 @@ async def entrypoint(ctx: agents.JobContext):
         termination_callback=None,  # Set after defining the callback
         room=ctx.room,
         thread_id=ctx.room.name,
+        agent_joined_at=joined_iso,
     )
     logger.info(f"Initialized EventOrchestrator with {len(scenario.events)} events")
 
