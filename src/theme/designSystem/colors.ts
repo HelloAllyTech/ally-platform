@@ -328,6 +328,13 @@ export const theme = {
 } as const;
 
 /**
+ * Brand colors - App identity
+ */
+export const brand = {
+  logo: '#264D8E',
+} as const;
+
+/**
  * Surface colors - Backgrounds and surfaces
  */
 export const surface = {
@@ -444,6 +451,7 @@ export const dsColors = {
 
   // Semantic tokens
   theme,
+  brand,
   surface,
   feedback,
   system,
