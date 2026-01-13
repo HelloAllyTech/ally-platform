@@ -8,10 +8,19 @@ export interface GenericTabMeta<T extends string = string> {
   label: string;
 }
 
+export type TabWidthMode = 'equal' | 'content';
+
 export interface TabViewProps<T extends string = string> {
   tabs: GenericTabMeta<T>[];
   activeTab: T;
   onTabChange: (tabKey: T) => void;
+  /**
+   * Controls how tabs distribute width:
+   * - 'equal': Each tab takes equal width (default)
+   * - 'content': Tabs fit their content size but can grow to fill container
+   * @default 'equal'
+   */
+  tabWidthMode?: TabWidthMode;
 }
 
 /**
@@ -23,13 +32,20 @@ export const TabView = <T extends string = string>({
   tabs,
   activeTab,
   onTabChange,
+  tabWidthMode = 'equal',
 }: TabViewProps<T>) => {
+  const isContentBased = tabWidthMode === 'content';
+
   return (
     <View style={styles.container}>
       {tabs.map(tab => (
         <TouchableOpacity
           key={tab.key}
-          style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+          style={[
+            styles.tab,
+            isContentBased ? styles.tabContentBased : styles.tabEqual,
+            activeTab === tab.key && styles.activeTab,
+          ]}
           onPress={() => onTabChange(tab.key)}
           activeOpacity={0.7}>
           <Text
@@ -54,13 +70,19 @@ const styles = ScaledSheet.create({
     borderColor: colors.lightGray4,
   },
   tab: {
-    flex: 1,
     paddingVertical: '12@ms',
     paddingLeft: '4@ms',
     paddingRight: '2@ms',
     borderRadius: '7@ms',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabEqual: {
+    flex: 1,
+  },
+  tabContentBased: {
+    flexGrow: 1,
+    flexShrink: 0,
   },
   activeTab: {
     backgroundColor: colors.white,

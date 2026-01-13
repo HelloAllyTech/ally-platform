@@ -23,6 +23,7 @@ export const SCREEN_NAMES = {
   SEARCH: 'Search',
   LEARN: 'Learn',
   LEADERBOARD: 'Leaderboard',
+  REVIEW: 'Review',
 
   // Drawer Screens
   BOTTOM_TABS: 'BottomTabs',
