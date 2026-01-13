@@ -149,6 +149,7 @@ export const API_ROUTES = {
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
   },
   REVIEWS: {
+    REVIEWS: '/reviews',
     REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
       `/reviews/${reviewId}/reactions/count`,

@@ -6,7 +6,7 @@ import {SvgProps} from 'react-native-svg';
 import {colors, fontFamily} from '@/theme';
 
 interface EmptyStateProps {
-  icon: React.ComponentType<SvgProps>;
+  icon?: React.ComponentType<SvgProps>;
   title: string;
   description?: string;
   iconProps?: SvgProps;
@@ -22,7 +22,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      <Icon style={styles.icon} {...iconProps} />
+      {Icon && <Icon style={styles.icon} {...iconProps} />}
       <Text style={styles.title}>{title}</Text>
       {!!description && <Text style={styles.description}>{description}</Text>}
     </View>

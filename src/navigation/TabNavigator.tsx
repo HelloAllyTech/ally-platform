@@ -19,6 +19,8 @@ import {
   LeaderboardInactiveIcon,
   LearnActiveIcon,
   LearnInactiveIcon,
+  ReviewActiveIcon,
+  ReviewInactiveIcon,
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
@@ -26,6 +28,7 @@ import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
+  ReviewScreen,
   // LeaderboardScreen,
   SearchScreen,
   SimulationsScreen,
@@ -48,6 +51,7 @@ const ALL_TABS = [
     // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
     requiredPermissions: [],
   },
+  {name: SCREEN_NAMES.REVIEW, component: ReviewScreen, requiredPermissions: []},
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
@@ -107,6 +111,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
         <SearchActiveIcon width={20} height={20} color={colors.blue} />
       ),
       [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.REVIEW]: <ReviewActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
@@ -122,6 +127,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
       ),
       [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
       [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.REVIEW]: <ReviewInactiveIcon width={20} height={20} />,
     };
 
     return focused
