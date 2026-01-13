@@ -31,20 +31,48 @@ export const styles = ScaledSheet.create({
   termItem: {
     marginTop: '16@ms',
   },
-  termHeader: {
-    flexDirection: 'row',
-    marginBottom: '4@ms',
-  },
-  termIndex: {
-    marginRight: '4@ms',
-  },
   termHeading: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     fontWeight: '600',
     color: colors.ds.typography.highEmphasis,
+    marginBottom: '4@ms',
+  },
+  termDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    marginBottom: '8@ms',
+    fontStyle: 'italic',
+  },
+  bulletContainer: {
+    flexDirection: 'row',
+    marginTop: '8@ms',
+    marginLeft: '8@ms',
+  },
+  bulletPoint: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    marginRight: '8@ms',
   },
   termContent: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    flex: 1,
+  },
+  boldText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: '700',
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  completeDetailsContainer: {
+    marginTop: '24@ms',
+    marginBottom: '8@ms',
+  },
+  completeDetailsText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.mediumEmphasis,

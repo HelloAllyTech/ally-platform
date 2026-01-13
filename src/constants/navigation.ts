@@ -13,6 +13,8 @@ export const SCREEN_NAMES = {
   SIMULATION_PATH_DETAILS: 'SimulationPathDetails',
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
+  ACHIEVEMENTS: 'Achievements',
+  PROFILE_SETTINGS: 'ProfileSettings',
 
   // Tab Screens
   HOME_TAB: 'HomeTab',
@@ -20,6 +22,7 @@ export const SCREEN_NAMES = {
   USER_ANALYTICS: 'UserAnalytics',
   SEARCH: 'Search',
   LEARN: 'Learn',
+  LEADERBOARD: 'Leaderboard',
 
   // Drawer Screens
   BOTTOM_TABS: 'BottomTabs',

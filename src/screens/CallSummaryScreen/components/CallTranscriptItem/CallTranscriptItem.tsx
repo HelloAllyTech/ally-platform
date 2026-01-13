@@ -4,17 +4,17 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
 
-export type TranscriptItemProps = {
+export type CallTranscriptItemProps = {
   time: string;
   message: string;
-  speakerLabel?: string; // e.g., "You" / "Client"
+  speakerLabel?: string;
   containerStyle?: ViewStyle;
   timeStyle?: TextStyle;
   messageTextStyle?: TextStyle;
   messageStyle?: TextStyle;
 };
 
-export const TranscriptItem: React.FC<TranscriptItemProps> = ({
+export const CallTranscriptItem: React.FC<CallTranscriptItemProps> = ({
   time,
   message,
   speakerLabel,

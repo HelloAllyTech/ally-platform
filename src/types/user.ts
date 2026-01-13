@@ -5,6 +5,7 @@ export interface User {
   phone: string;
   role: UserRole;
   userId: number;
+  profileImageUrl?: string | null;
 }
 
 export enum UserRole {

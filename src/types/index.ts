@@ -30,6 +30,10 @@ export type {User} from './user';
 // Simulations types
 export * from './simulations';
 
+// Transcript types
+export type {CallTranscriptMessage} from './callTranscript';
+export type {SimulationTranscriptMessage} from './simulationTranscript';
+
 // Credits types
 export * from './credits';
 

@@ -16,6 +16,10 @@
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
       "openSettings": "Open Settings"
     },
+    "or": "OR",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesDescription": "You have unsaved changes. Are you sure you want to discard them?",
+    "discard": "Discard",
     "offline": {
       "socketTitle": "Something went wrong",
       "socketDescription": "The call ended due to an error. Please try again.",
@@ -82,6 +86,22 @@
     "logoutConfirmation": "Are you sure you want to log out? You will need to enter secure OTP to login again.",
     "logoutActionButton": "Logout & lock my Ally account"
   },
+  "Drawer": {
+    "profileSettings": "Profile settings",
+    "dev": "(Dev)"
+  },
+  "ProfileSettings": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "edit": "Edit",
+    "uploadImage": "Upload image",
+    "name": "Name",
+    "email": "Email",
+    "profileImage": "Profile image",
+    "changeImage": "Change image",
+    "removeImage": "Remove image",
+    "imageRequirements": "1:1 ratio (max 2MB)"
+  },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
     "isThisHelpful": "Is this helpful",
@@ -139,8 +159,39 @@
   "TermsAndAgreement": {
     "title": "Terms and agreement",
     "scrollToBottom": "Scroll to bottom",
-    "iHaveReadAndAgree": "I have read and agree to these terms",
-    "agree": "Agree"
+    "iHaveReadAndAgree": "I have read and agreed to these Terms & Conditions, and consent.",
+    "agree": "Agree",
+    "completeDetails": "For complete details, please review our",
+    "privacyPolicyAndUserLicenseAgreement": "Privacy Policy and User License Agreement",
+    "sections": {
+      "generalTerms": {
+        "heading": "General Terms (All Users)",
+        "bullets": {
+          "ageRequirement": "You are 18+ and legally able to enter contracts",
+          "accessMethod": "You are accessing Ally through a partner organization formally engaged with Ally or through direct invitation by Ally for demonstration, testing or research purposes.",
+          "platformUsage": "You are using Ally's platform in accordance with your affiliated organization's rules, ethics and requirements.",
+          "notForEmergencies": "You understand that Ally is NOT for real emergencies. Contact crisis services, if needed. More information: ",
+          "crisisLink": "https://findahelpline.com/"
+        }
+      },
+      "skillsLab": {
+        "heading": "For Ally Skills Lab (Training Simulations)",
+        "bullets": {
+          "fictionalScenarios": "You understand that all the scenarios are fictional, and for training purposes only.",
+          "noCertification": "You understand that this doesn't replace human-supervised training, provide certification, or qualify you for independent practice.",
+          "consentStorage": "You consent to audio and transcripts of role-play sessions being stored for quality improvement and being shared with your training organization / supervisor."
+        }
+      },
+      "assist": {
+        "heading": "For Ally Assist (Session Notes)",
+        "bullets": {
+          "authorizedSessions": "You will use this only for authorized sessions per your organization's rules",
+          "audioNotStored": "For this product, ",
+          "audioNotStoredBold": "audio recordings are NOT stored by Ally",
+          "audioNotStoredSuffix": ". Transcripts of sessions are stored and deleted based on the user organization's decision."
+        }
+      }
+    }
   },
   "Carousel": {
     "slide1": "We do not save audio recordings",
@@ -214,7 +265,8 @@
   "CallTranscript": {
     "empty": "No transcript available",
     "you": "You",
-    "client": "Client"
+    "client": "Client",
+    "aiClient": "AI Client"
   },
   "BreathingScreen": {
     "header": {
@@ -353,7 +405,9 @@
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
     "almostThereTitle": "Almost there",
-    "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready."
+    "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready.",
+    "keepItPrivate": "Keep it private",
+    "shareForReview": "Share for review"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
@@ -361,7 +415,9 @@
     "attachListeners": "Failed to attach room listeners",
     "connect": "Failed to connect to the room",
     "toggleMic": "Failed to toggle microphone",
-    "submitFeedback": "Failed to submit feedback"
+    "submitFeedback": "Failed to submit feedback",
+    "uploadProfileImage": "Failed to upload profile image",
+    "removeProfileImage": "Failed to remove profile image"
   },
   "Success": {
     "submitFeedback": "Feedback submitted successfully"
@@ -388,5 +444,52 @@
     "suggestionPlaceholder": "Anything else that you'd like to share about the summary?",
     "instructionText": "Please rate the quality, let us know what worked well, and share areas for improvement.",
     "submitButton": "Submit"
+  },
+  "Leaderboard": {
+    "title": "Leaderboard",
+    "badges": "Badges",
+    "tableHeaders": {
+      "rank": "Rank",
+      "user": "User",
+      "totalDuration": "Total duration",
+      "badges": "Badges"
+    },
+    "period": {
+      "last": "Last",
+      "week": "week",
+      "month": "month",
+      "year": "year",
+      "allTime": "All time"
+    }
+  },
+  "ReactionsBottomSheet": {
+    "title": "Reactions",
+    "allFilter": "All",
+    "noReactionsYet": "No reactions yet"
+  },
+  "Achievements": {
+    "title": "Achievements",
+    "unlocked": "Unlocked",
+    "locked": "Locked",
+    "firstSteps": {
+      "title": "First Steps",
+      "description": "Practice for at least 15 minutes at account level"
+    },
+    "consistentStart": {
+      "title": "Consistent Start",
+      "description": "Maintain a 3-day practice streak (minimum 10 mins/day)"
+    },
+    "milestoneHunter": {
+      "title": "Milestone Hunter",
+      "description": "Successfully complete 10 simulation sessions"
+    },
+    "365Champion": {
+      "title": "365 Champion",
+      "description": "Maintain a 365-day practice streak"
+    },
+    "weekWarrior": {
+      "title": "Week Warrior",
+      "description": "Practice daily for 7 consecutive days (minimum 10 mins/day)"
+    }
   }
 }

@@ -57,8 +57,8 @@ describe('TermsAndAgreementModal', () => {
       <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
     );
 
-    TermsAndAgreementData.forEach((item) => {
-      expect(getByText(item.heading)).toBeTruthy();
+    TermsAndAgreementData.forEach((section) => {
+      expect(getByText(section.headingKey)).toBeTruthy();
     });
   });
 
@@ -70,6 +70,8 @@ describe('TermsAndAgreementModal', () => {
     fireEvent.press(getByTestId('scroll-to-bottom-button'));
 
     expect(queryByText('TermsAndAgreement.scrollToBottom')).toBeNull();
+    // completeDetails text is always rendered in ScrollView, check if it contains the key
+    expect(getByText(/TermsAndAgreement\.completeDetails/)).toBeTruthy();
     expect(getByText('TermsAndAgreement.iHaveReadAndAgree')).toBeTruthy();
     expect(getByTestId('mock-primary-button')).toBeTruthy();
   });
@@ -119,11 +121,17 @@ describe('TermsAndAgreementModal', () => {
       <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
     );
 
-    const linkItem = TermsAndAgreementData.find(item => item.link);
-    if (linkItem && linkItem.link) {
-        const linkText = getByText(linkItem.link.text + '.'); // The component adds a dot
+    // Find a section with a bullet that has a link
+    const sectionWithLink = TermsAndAgreementData.find(section =>
+      section.bullets.some(bullet => bullet.link),
+    );
+    if (sectionWithLink) {
+      const bulletWithLink = sectionWithLink.bullets.find(bullet => bullet.link);
+      if (bulletWithLink && bulletWithLink.link) {
+        const linkText = getByText(bulletWithLink.link.textKey);
         fireEvent.press(linkText);
-        expect(Linking.openURL).toHaveBeenCalledWith(linkItem.link.href);
+        expect(Linking.openURL).toHaveBeenCalledWith(bulletWithLink.link.href);
+      }
     }
   });
 
@@ -143,6 +151,8 @@ describe('TermsAndAgreementModal', () => {
         },
       });
 
-      expect(getByText('TermsAndAgreement.iHaveReadAndAgree')).toBeTruthy();
+      expect(
+        getByText('TermsAndAgreement.iHaveReadAndAgree'),
+      ).toBeTruthy();
   });
 });

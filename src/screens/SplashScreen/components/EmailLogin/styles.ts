@@ -5,10 +5,11 @@ import {colors, fontFamily, typography} from '@/theme';
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingTop: '20@ms',
+    paddingTop: '15@ms',
+    paddingBottom: '20@vs',
   },
   contentContainer: {
-    flex: 1,
+    flexGrow: 1,
   },
   headerText: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
@@ -39,6 +40,7 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: '16@s',
     paddingVertical: '10@vs',
     marginRight: '2@s',
+    marginBottom: '8@vs',
   },
   inputEnabled: {
     opacity: 1,
@@ -46,12 +48,27 @@ export const styles = ScaledSheet.create({
   inputFocused: {
     borderColor: colors.brightBlue,
   },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: '30@vs',
+    marginBottom: '22@vs',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.ds.stroke.primary,
+  },
+  dividerText: {
+    ...typography.body.small,
+    color: colors.mediumGray,
+    marginHorizontal: '10@s',
+  },
   bottomContainer: {
     width: '100%',
   },
   termsContainer: {
-    paddingHorizontal: '16@ms',
-    marginBottom: '24@ms',
+    paddingHorizontal: '12@ms',
   },
   termsText: {
     ...typography.body.small,

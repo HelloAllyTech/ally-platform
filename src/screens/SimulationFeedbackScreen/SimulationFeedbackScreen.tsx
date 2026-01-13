@@ -65,6 +65,10 @@ export const SimulationFeedbackScreen: React.FC<
   const [pollingInterval, setPollingInterval] = useState<number>(3000);
   const nextSimulationPollingAttemptsRef = useRef<number>(0);
 
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
+  const [seekTime, setSeekTime] = useState<number | null>(null);
+  const [isPrivate, setIsPrivate] = useState(true);
+
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
   const [
@@ -445,10 +449,24 @@ export const SimulationFeedbackScreen: React.FC<
         </KeyboardAwareScrollView>
       )}
       {showTranscript && scenarioSessionId && (
-        <SimulationTranscript
-          sessionId={scenarioSessionId}
-          startedAt={simulationDetails?.startedAt}
-        />
+        <>
+          {/* TODO: Replace with actual audio url */}
+          {/* <SimulationAudioPlayer
+            audioUrl="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+            onProgress={setCurrentPlaybackTime}
+            externalSeekTime={seekTime}
+          /> */}
+          <SimulationTranscript
+            sessionId={scenarioSessionId}
+            startedAt={simulationDetails?.startedAt}
+            // currentTime={currentPlaybackTime}
+            // onSeek={setSeekTime}
+            agentName={simulationDetails?.scenario?.metadata?.name}
+          />
+          {/* <View style={styles.privacyToggleContainer}>
+            <PrivacyToggle isPrivate={isPrivate} onToggle={setIsPrivate} />
+          </View> */}
+        </>
       )}
       <FeedbackDropdown
         visible={isDropdownVisible}
