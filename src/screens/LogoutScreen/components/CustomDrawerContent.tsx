@@ -46,15 +46,17 @@ export const DrawerContent = ({
   return (
     <View style={styles.container}>
       {tenantData?.logoUrl && (
-        <View style={styles.orgLogoContainer}>
-          <Image
-            source={{uri: tenantData.logoUrl}}
-            style={styles.orgLogo}
-            resizeMode="contain"
-          />
-        </View>
+        <>
+          <View style={styles.orgLogoContainer}>
+            <Image
+              source={{uri: tenantData.logoUrl}}
+              style={styles.orgLogo}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.separator} />
+        </>
       )}
-      <View style={styles.separator} />
       <View style={styles.profileContainer}>
         <View style={styles.profileIconContainer}>
           {profileImageUrl ? (
