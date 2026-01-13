@@ -120,10 +120,9 @@ export const DrawerContent = ({
               />
             </View>
           </View>
+          <View style={styles.separator} />
         </>
       )}
-
-      <View style={styles.separator} />
 
       <View style={styles.menuItemsWrapper}>
         <MenuOption
