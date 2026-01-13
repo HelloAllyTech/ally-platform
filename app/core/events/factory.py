@@ -15,6 +15,10 @@ from app.core.events.event_types.combination.combination_event import (
     CombinationEvent,
     ExpressionNode,
 )
+from app.core.events.event_types.interruption.interruption_event import (
+    InterruptionData,
+    InterruptionEvent,
+)
 from app.core.events.event_types.score.score_event import ScoreData, ScoreEvent
 from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (
     SemanticSimilarityEvent,
@@ -230,10 +234,10 @@ def _create_event_by_detection_type(
                 **common_fields,
             )
 
-        elif detection_type == DetectionType.UTTERANCE_LENGTH:
+        elif detection_type == DetectionType.HELPER_UTTERANCE_LENGTH:
             if not raw_data or not isinstance(raw_data, dict):
                 log.warning(
-                    "Event '%s' (UTTERANCE_LENGTH) missing/invalid data: %r",
+                    "Event '%s' (HELPER_UTTERANCE_LENGTH) missing/invalid data: %r",
                     event_id,
                     raw_data,
                 )
@@ -243,7 +247,7 @@ def _create_event_by_detection_type(
                 utterance_length_data = UtteranceLengthData(**raw_data)
             except Exception as e:
                 log.warning(
-                    "Event '%s' (UTTERANCE_LENGTH) invalid data: %s", event_id, e
+                    "Event '%s' (HELPER_UTTERANCE_LENGTH) invalid data: %s", event_id, e
                 )
                 return None
 
@@ -252,6 +256,27 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=utterance_length_data,
+                **common_fields,
+            )
+
+        elif detection_type == DetectionType.HELPER_INTERRUPTED:
+            # Interruption events don't require data, but we accept it if provided
+            try:
+                interruption_data = InterruptionData()
+                if raw_data and isinstance(raw_data, dict):
+                    # Allow empty dict or no data for interruption events
+                    interruption_data = InterruptionData(**raw_data)
+            except Exception as e:
+                log.warning(
+                    "Event '%s' (HELPER_INTERRUPTED) invalid data: %s", event_id, e
+                )
+                return None
+
+            return InterruptionEvent.create(
+                event_id=event_id,
+                visibility_type=visibility_type,
+                detection_type=detection_type,
+                data=interruption_data,
                 **common_fields,
             )
 

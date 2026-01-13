@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class UtteranceLengthData(BaseModel):
-    """Data structure for UTTERANCE_LENGTH detection type."""
+    """Data structure for HELPER_UTTERANCE_LENGTH detection type."""
 
     min_length: Optional[int] = Field(
         None, description="Minimum character count (inclusive)"

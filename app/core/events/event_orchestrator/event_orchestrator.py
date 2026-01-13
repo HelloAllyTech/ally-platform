@@ -341,6 +341,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 f"{all_detected_event_ids}"
             )
             logger.info(f"Expression registry state: {updated_states}")
+
         else:
             updated_states = self.update(
                 detected_event_ids=None, current_score=projected_score
@@ -384,6 +385,16 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
             # Get trigger_multiple from event_data, or derive from event type if missing
             trigger_multiple = event_data.get("trigger_multiple")
+
+            # Fall back to event type-based logic if trigger_multiple is None
+            # This ensures HELPER_INTERRUPTED and other event types default to True
+            if trigger_multiple is None:
+                trigger_multiple = event.detection_type in (
+                    DetectionType.SENTENCE_SIMILARITY,
+                    DetectionType.SEMANTIC_SIMILARITY,
+                    DetectionType.BINARY_CLASSIFIER,
+                    DetectionType.HELPER_INTERRUPTED,
+                )
 
             # Special case: termination events should only be sent once,
             # even if trigger_multiple=True
@@ -533,12 +544,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         else:
             # If event not in registry, create entry with trigger_multiple
             # based on event type
-            # SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, and BINARY_CLASSIFIER
-            # events can trigger multiple times
+            # SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, and
+            # HELPER_INTERRUPTED events can trigger multiple times
             trigger_multiple = event_type in (
                 DetectionType.SENTENCE_SIMILARITY,
                 DetectionType.SEMANTIC_SIMILARITY,
                 DetectionType.BINARY_CLASSIFIER,
+                DetectionType.HELPER_INTERRUPTED,
             )
             # If we are setting it to True immediately, count is 1.
             # If False, count is 0.

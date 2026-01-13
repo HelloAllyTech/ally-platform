@@ -1,5 +1,5 @@
 """
-Tests for UTTERANCE_LENGTH event type.
+Tests for HELPER_UTTERANCE_LENGTH event type.
 """
 
 import pytest
@@ -323,7 +323,7 @@ class TestUtteranceLengthEventFactory:
                 {
                     "id": "utterance-length-1-25",
                     "name": "Short Utterance",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"min_length": 1, "max_length": 25},
                     "score": 2,
                     "emoji": "💬",
@@ -338,7 +338,7 @@ class TestUtteranceLengthEventFactory:
         assert len(events) == 1
         assert isinstance(events[0], UtteranceLengthEvent)
         assert events[0].event_id == "utterance-length-1-25"
-        assert events[0].detection_type == DetectionType.UTTERANCE_LENGTH
+        assert events[0].detection_type == DetectionType.HELPER_UTTERANCE_LENGTH
         assert events[0].data.min_length == 1
         assert events[0].data.max_length == 25
         assert events[0].score == 2
@@ -353,7 +353,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-gt-200",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"min_length": 201},
                     "score": 7,
                 }
@@ -371,7 +371,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-lt-50",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"max_length": 50},
                     "score": 3,
                 }
@@ -390,7 +390,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-1",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     # missing data
                 }
             ]
@@ -409,7 +409,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-1",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"min_length": "not-a-number"},  # invalid
                 }
             ]
@@ -426,7 +426,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-1",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"min_length": 100, "max_length": 50},  # invalid
                 }
             ]
@@ -443,7 +443,7 @@ class TestUtteranceLengthEventFactory:
             "events": [
                 {
                     "id": "utterance-length-1",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {},  # no limits
                 }
             ]
@@ -464,7 +464,7 @@ class TestUtteranceLengthEventFactory:
                 },
                 {
                     "id": "utterance-length-1",
-                    "detectionType": "UTTERANCE_LENGTH",
+                    "detectionType": "HELPER_UTTERANCE_LENGTH",
                     "data": {"min_length": 1, "max_length": 25},
                 },
                 {
@@ -478,5 +478,5 @@ class TestUtteranceLengthEventFactory:
         events = build_events_from_metadata(metadata)
         assert len(events) == 3
         assert events[0].detection_type == DetectionType.SENTENCE_SIMILARITY
-        assert events[1].detection_type == DetectionType.UTTERANCE_LENGTH
+        assert events[1].detection_type == DetectionType.HELPER_UTTERANCE_LENGTH
         assert events[2].detection_type == DetectionType.TIME

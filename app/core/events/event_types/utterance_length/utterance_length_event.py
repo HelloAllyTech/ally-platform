@@ -18,7 +18,7 @@ class UtteranceLengthEvent(BaseEvent):
     within a specified range. It checks the most recent counselor message.
     """
 
-    detection_type: DetectionType = DetectionType.UTTERANCE_LENGTH
+    detection_type: DetectionType = DetectionType.HELPER_UTTERANCE_LENGTH
     data: UtteranceLengthData = UtteranceLengthData(min_length=0)
 
     @classmethod
@@ -28,7 +28,7 @@ class UtteranceLengthEvent(BaseEvent):
         event_id: str,
         data: UtteranceLengthData,
         visibility_type=None,
-        detection_type: DetectionType = DetectionType.UTTERANCE_LENGTH,
+        detection_type: DetectionType = DetectionType.HELPER_UTTERANCE_LENGTH,
         **kwargs,
     ) -> "UtteranceLengthEvent":
         """
@@ -38,7 +38,7 @@ class UtteranceLengthEvent(BaseEvent):
             event_id: Event identifier
             data: UtteranceLengthData instance with min_length and/or max_length
             visibility_type: Visibility type (optional)
-            detection_type: Detection type (defaults to UTTERANCE_LENGTH)
+            detection_type: Detection type (defaults to HELPER_UTTERANCE_LENGTH)
             **kwargs: Other BaseEvent fields (score, emoji, show_feedback, etc.)
         """
         return cls.model_construct(

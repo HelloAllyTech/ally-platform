@@ -366,6 +366,48 @@ async def entrypoint(ctx: agents.JobContext):
 
     await ctx.connect()
 
+    # Listen to LiveKit's playback_finished event to detect interruptions
+    try:
+        from livekit.agents.voice.io import PlaybackFinishedEvent
+
+        from app.core.events.event_types.interruption.interruption_event import (
+            set_interruption_detected,
+        )
+
+        @session.output.audio.on("playback_finished")
+        def on_playback_finished(event: PlaybackFinishedEvent):
+            logger.info(
+                f"LiveKit playback_finished event received: "
+                f"interrupted={event.interrupted}"
+            )
+            if event.interrupted:
+                logger.info(
+                    "LiveKit detected interruption: " "Agent's speech was interrupted"
+                )
+                # Set the interruption flag for the interruption event to detect
+                set_interruption_detected(True)
+                logger.info(
+                    "Interruption flag set to True - "
+                    "InterruptionEvent will detect this in next process_events cycle"
+                )
+            else:
+                # Reset flag when playback finishes normally
+                logger.debug(
+                    "Playback finished normally " "(not interrupted) - resetting flag"
+                )
+                set_interruption_detected(False)
+
+    except ImportError:
+        logger.warning(
+            "Could not import PlaybackFinishedEvent. "
+            "Interruption detection will not work."
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to set up interruption detection listener: {e}. "
+            "Interruption detection will not work."
+        )
+
     # Initialise only after session is connected
     await event_orchestrator.initialize()
 
