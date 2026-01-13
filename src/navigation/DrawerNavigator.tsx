@@ -1,5 +1,8 @@
 import {useState} from 'react';
-import {createDrawerNavigator} from '@react-navigation/drawer';
+import {
+  createDrawerNavigator,
+  DrawerContentComponentProps,
+} from '@react-navigation/drawer';
 import {StyleSheet} from 'react-native';
 
 import {SCREEN_NAMES} from '@/constants';
@@ -16,8 +19,8 @@ export const DrawerNavigator = () => {
 
   const openLogoutModal = () => setIsLogoutModalVisible(true);
 
-  const renderDrawerContent = () => (
-    <DrawerContent openLogoutModal={openLogoutModal} />
+  const renderDrawerContent = (props: DrawerContentComponentProps) => (
+    <DrawerContent {...props} openLogoutModal={openLogoutModal} />
   );
 
   return (

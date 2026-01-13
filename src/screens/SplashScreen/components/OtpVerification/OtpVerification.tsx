@@ -4,10 +4,8 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {PrimaryButton, useToast} from '@/components';
-import {env} from '@/config/env';
 import {
   DEFAULT_OTP_EXPIRY_MINUTES,
-  ErrorCode,
   isIOS,
   MINUTES_IN_SECONDS,
   RESEND_COUNTDOWN_SECONDS,
@@ -15,14 +13,13 @@ import {
 } from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {
-  useAcceptTermsAndAgreementMutation,
+  AuthResponse,
   useGenerateOtpMutation,
-  useLazyCheckTermsAndAgreementQuery,
   useVerifyOtpMutation,
 } from '@/services';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
-import {getErrorDetails} from '@/utils';
+import {getErrorDetails, isSuspendedUserError} from '@/utils';
 
 import {OtpInput, OtpInputRef} from '../OtpInput/OtpInput';
 import {TermsAndAgreementModal} from '../TermsAndAgreementModal';
@@ -47,10 +44,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     return DEFAULT_OTP_EXPIRY_MINUTES;
   });
 
-  const tempTokensRef = useRef<{
-    accessToken: string;
-    refreshToken: string;
-  } | null>(null);
+  const tempTokensRef = useRef<AuthResponse | null>(null);
 
   const [showTermsModal, setShowTermsModal] = useState(false);
   const otpInputRef = useRef<OtpInputRef>(null);
@@ -63,12 +57,6 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     {isLoading: isVerifying, isSuccess, isError, error: apiError, data},
   ] = useVerifyOtpMutation();
   const [generateOtp, {isLoading: isResending}] = useGenerateOtpMutation();
-
-  const [checkTermsAndAgreement, {isFetching: isCheckingTerms}] =
-    useLazyCheckTermsAndAgreementQuery();
-
-  const [acceptTermsAndAgreement, {isLoading: isAcceptingTerms}] =
-    useAcceptTermsAndAgreementMutation();
 
   const {t} = useTranslate();
 
@@ -85,32 +73,11 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
   }, [countdown]);
 
   const completeVerification = useCallback(
-    (tokens: {accessToken: string; refreshToken: string}) => {
-      dispatch(
-        storeTokens({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-        }),
-      );
+    (tokens: AuthResponse) => {
+      dispatch(storeTokens(tokens));
       onOtpVerificationSuccess(otp);
     },
     [dispatch, onOtpVerificationSuccess, otp],
-  );
-
-  const checkTerms = useCallback(
-    async (tokens: {accessToken: string; refreshToken: string}) => {
-      try {
-        const response = await checkTermsAndAgreement(tokens.accessToken);
-        if (response.data?.success) {
-          completeVerification(tokens);
-        } else {
-          setShowTermsModal(true);
-        }
-      } catch (err) {
-        showToast('Failed to check terms acceptance', 'error');
-      }
-    },
-    [checkTermsAndAgreement, completeVerification, showToast],
   );
 
   useEffect(() => {
@@ -119,31 +86,20 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       };
-      // Store tokens in ref to be used later if needed (e.g., in handleAgreeTerms)
       tempTokensRef.current = newTokens;
-      if (env.TERMS_AND_CONDITION_FLAG) {
-        checkTerms(newTokens);
-      } else {
-        completeVerification(newTokens);
-      }
+      setShowTermsModal(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, data]);
 
   useEffect(() => {
     if (isError && apiError) {
-      const errorDetails = getErrorDetails(apiError);
-
       // Check if user is suspended
-      if (
-        errorDetails.status === 403 &&
-        (errorDetails.error === ErrorCode.USER_SUSPENDED ||
-          errorDetails.message === 'User suspended')
-      ) {
+      if (isSuspendedUserError(apiError)) {
         navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
         return;
       }
 
+      const errorDetails = getErrorDetails(apiError);
       setError(errorDetails.message);
     }
   }, [isError, apiError, navigation]);
@@ -178,22 +134,13 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
     }
   }, [email, generateOtp, resetOtpState, showToast]);
 
-  const handleAcceptTerms = async () => {
+  const handleAcceptTerms = useCallback(() => {
     const tokens = tempTokensRef.current;
     if (!tokens) return;
 
-    try {
-      const response = await acceptTermsAndAgreement(tokens.accessToken);
-      if (response.data?.success) {
-        setShowTermsModal(false);
-        completeVerification(tokens);
-      } else {
-        showToast('Failed to accept terms', 'error');
-      }
-    } catch (err) {
-      showToast('Failed to accept terms', 'error');
-    }
-  };
+    setShowTermsModal(false);
+    completeVerification(tokens);
+  }, [completeVerification]);
 
   return (
     <View style={styles.container}>
@@ -257,13 +204,12 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         label={t('SplashScreen.verifyOtp')}
         onPress={handleSubmit}
         isDisabled={!isOtpComplete || showTermsModal}
-        isLoading={isVerifying || isCheckingTerms}
+        isLoading={isVerifying}
       />
 
       <TermsAndAgreementModal
         visible={showTermsModal}
         onAgree={handleAcceptTerms}
-        isLoading={isAcceptingTerms}
       />
     </View>
   );

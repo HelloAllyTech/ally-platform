@@ -1,3 +1,5 @@
+import AchievementLockedIcon from './achievementLocked.svg';
+import AddReactionIcon from './addReaction.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
@@ -15,6 +17,7 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import ChangeImageIcon from './changeImage.svg';
 import CheckIcon from './check.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -41,7 +44,9 @@ import FileIcon from './file.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
 import ForceUpdateAlertIcon from './forceUpdateAlert.svg';
+import Forward10Icon from './forward10.svg';
 import GoldenShieldIcon from './goldenShield.svg';
+import GoogleIcon from './google.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
@@ -51,6 +56,8 @@ import InfoIcon from './info.svg';
 import InfoBlackCircleIcon from './infoBlackCircle.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
+import LeaderboardInactiveIcon from './leaderboard.svg';
+import LeaderboardActiveIcon from './leaderboardActive.svg';
 import LearnInactiveIcon from './learn.svg';
 import LearnActiveIcon from './learnActive.svg';
 import LeftArrow from './leftArrow.svg';
@@ -70,12 +77,16 @@ import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
+import PausePlayerIcon from './pausePlayer.svg';
 import PauseWhiteIcon from './pauseWhite.svg';
 import PlayIcon from './play.svg';
 import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
+import ProfileSettingsIcon from './profileSettings.svg';
+import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
+import Replay10Icon from './replay10.svg';
 import ResumeIcon from './resume.svg';
 import RightArrow from './rightArrow.svg';
 import RunningSimulationIcon from './runningSimulation.svg';
@@ -105,6 +116,11 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  Forward10Icon,
+  Replay10Icon,
+  PausePlayerIcon,
+  AchievementLockedIcon,
+  AddReactionIcon,
   AllyLogoIcon,
   AnalyticsActiveIcon,
   AnalyticsInactiveIcon,
@@ -122,6 +138,7 @@ export {
   CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  ChangeImageIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,
@@ -148,6 +165,7 @@ export {
   FilterIcon,
   FlowIcon,
   GoldenShieldIcon,
+  GoogleIcon,
   HandShareIcon,
   HeadphoneIcon,
   HeadsetMicIcon,
@@ -159,6 +177,8 @@ export {
   KeyEventsIcon,
   LearnActiveIcon,
   LearnInactiveIcon,
+  LeaderboardActiveIcon,
+  LeaderboardInactiveIcon,
   LeftArrow,
   LeftArrowIcon,
   LightBulbIcon,
@@ -181,6 +201,8 @@ export {
   PlayWhiteIcon,
   PrescriptionsIcon,
   ProfileIcon,
+  ProfileSettingsIcon,
+  RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
   RightArrow,

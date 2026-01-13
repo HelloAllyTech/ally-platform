@@ -3,3 +3,5 @@ export {SimulationSummary} from './SimulationSummary';
 export {SimulationTranscript} from './SimulationTranscript/SimulationTranscript';
 export {FeedbackDropdown} from './FeedbackDropdown';
 export {UpNextSimulationCard} from './UpNextSimulationCard';
+export {SimulationAudioPlayer} from './SimulationAudioPlayer/SimulationAudioPlayer';
+export {PrivacyToggle} from './PrivacyToggle/PrivacyToggle';

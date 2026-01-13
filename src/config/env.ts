@@ -7,7 +7,8 @@ export interface Env {
   ALLY_WEB_URL: string;
   MICROPHONE_SOCKET_PATH: string;
   CLOUD_TELEPHONY_PATH: string;
-  TERMS_AND_CONDITION_FLAG: boolean;
+  GOOGLE_WEB_CLIENT_ID: string;
+  GOOGLE_IOS_CLIENT_ID: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -33,9 +34,12 @@ export const env: Env = {
     Config.CLOUD_TELEPHONY_PATH,
     'CLOUD_TELEPHONY_PATH',
   ),
-  TERMS_AND_CONDITION_FLAG:
-    assertEnvVar(
-      Config.TERMS_AND_CONDITION_FLAG,
-      'TERMS_AND_CONDITION_FLAG',
-    ) === 'true',
+  GOOGLE_WEB_CLIENT_ID: assertEnvVar(
+    Config.GOOGLE_WEB_CLIENT_ID,
+    'GOOGLE_WEB_CLIENT_ID',
+  ),
+  GOOGLE_IOS_CLIENT_ID: assertEnvVar(
+    Config.GOOGLE_IOS_CLIENT_ID,
+    'GOOGLE_IOS_CLIENT_ID',
+  ),
 };

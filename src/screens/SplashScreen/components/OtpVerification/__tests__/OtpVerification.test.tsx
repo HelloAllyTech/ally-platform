@@ -4,14 +4,6 @@ import {fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {OtpVerification} from '../OtpVerification';
 import * as services from '@/services';
-import {env} from '@/config/env';
-
-// Mock env
-jest.mock('@/config/env', () => ({
-  env: {
-    TERMS_AND_CONDITION_FLAG: true,
-  },
-}));
 
 // Mock Components
 jest.mock('@/components', () => {
@@ -46,19 +38,13 @@ jest.mock('../../TermsAndAgreementModal', () => {
 // Mock Services
 const mockVerify = jest.fn();
 const mockGen = jest.fn();
-const mockCheckTerms = jest.fn();
-const mockAcceptTerms = jest.fn();
 
 const mockUseVerifyOtpMutation = jest.fn();
 const mockUseGenerateOtpMutation = jest.fn();
-const mockUseLazyCheckTermsAndAgreementQuery = jest.fn();
-const mockUseAcceptTermsAndAgreementMutation = jest.fn();
 
 jest.mock('@/services', () => ({
   useVerifyOtpMutation: () => mockUseVerifyOtpMutation(),
   useGenerateOtpMutation: () => mockUseGenerateOtpMutation(),
-  useLazyCheckTermsAndAgreementQuery: () => mockUseLazyCheckTermsAndAgreementQuery(),
-  useAcceptTermsAndAgreementMutation: () => mockUseAcceptTermsAndAgreementMutation(),
 }));
 
 const mockDispatch = jest.fn();
@@ -84,11 +70,6 @@ describe('OtpVerification', () => {
         {isLoading: false, isSuccess: false, isError: false, data: undefined},
     ]);
     mockUseGenerateOtpMutation.mockReturnValue([mockGen, {isLoading: false}]);
-    mockUseLazyCheckTermsAndAgreementQuery.mockReturnValue([mockCheckTerms, {isFetching: false}]);
-    mockUseAcceptTermsAndAgreementMutation.mockReturnValue([mockAcceptTerms, {isLoading: false}]);
-    
-    // Default flag to true
-    (env as any).TERMS_AND_CONDITION_FLAG = true;
   });
 
   afterEach(() => {
@@ -122,155 +103,102 @@ describe('OtpVerification', () => {
     });
   });
 
-  describe('When TERMS_AND_CONDITION_FLAG is true', () => {
-      beforeEach(() => {
-        (env as any).TERMS_AND_CONDITION_FLAG = true;
-      });
+  it('shows terms modal after successful OTP verification', async () => {
+    // Initial state: not success
+    mockUseVerifyOtpMutation.mockReturnValue([
+        mockVerify,
+        {isLoading: false, isSuccess: false, data: undefined},
+    ]);
 
-      it('checks terms after successful verification and completes if already accepted', async () => {
-        // Initial state: not success
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {isLoading: false, isSuccess: false, data: undefined},
-        ]);
-        mockCheckTerms.mockResolvedValue({data: {success: true}});
+    const {getByTestId, UNSAFE_getAllByType, rerender} = render(
+      <OtpVerification
+        email="user@example.com"
+        onOtpVerificationSuccess={mockOnSuccess}
+      />,
+    );
 
-        const {UNSAFE_getAllByType, rerender} = render(
-          <OtpVerification
-            email="user@example.com"
-            onOtpVerificationSuccess={mockOnSuccess}
-          />,
-        );
+    // Pre-fill OTP
+    const inputs = UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], '1');
+    fireEvent.changeText(inputs[1], '2');
+    fireEvent.changeText(inputs[2], '3');
+    fireEvent.changeText(inputs[3], '4');
 
-        // Pre-fill OTP
-        const inputs = UNSAFE_getAllByType(TextInput);
-        fireEvent.changeText(inputs[0], '1');
-        fireEvent.changeText(inputs[1], '2');
-        fireEvent.changeText(inputs[2], '3');
-        fireEvent.changeText(inputs[3], '4');
+    // Simulate success
+    mockUseVerifyOtpMutation.mockReturnValue([
+        mockVerify,
+        {
+            isLoading: false,
+            isSuccess: true,
+            isError: false,
+            data: {accessToken: 'access', refreshToken: 'refresh'},
+        },
+    ]);
 
-        // Simulate success
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {
-                isLoading: false,
-                isSuccess: true,
-                isError: false,
-                data: {accessToken: 'access', refreshToken: 'refresh'},
-            },
-        ]);
-
-        rerender(
-          <OtpVerification
-            email="user@example.com"
-            onOtpVerificationSuccess={mockOnSuccess}
-          />
-        );
-        
-        await waitFor(() => {
-            expect(mockCheckTerms).toHaveBeenCalledWith('access');
-        });
-
-        expect(mockDispatch).toHaveBeenCalled();
-        expect(mockOnSuccess).toHaveBeenCalledWith('1234');
-      });
-
-      it('shows terms modal if terms not accepted', async () => {
-        // Initial state
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {isLoading: false, isSuccess: false, data: undefined},
-        ]);
-        mockCheckTerms.mockResolvedValue({data: {success: false}});
-
-        const {getByTestId, UNSAFE_getAllByType, rerender} = render(
-          <OtpVerification
-            email="user@example.com"
-            onOtpVerificationSuccess={mockOnSuccess}
-          />,
-        );
-        
-        const inputs = UNSAFE_getAllByType(TextInput);
-        fireEvent.changeText(inputs[0], '1');
-        fireEvent.changeText(inputs[1], '2');
-        fireEvent.changeText(inputs[2], '3');
-        fireEvent.changeText(inputs[3], '4');
-
-        // Simulate success
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {
-                isLoading: false,
-                isSuccess: true,
-                isError: false,
-                data: {accessToken: 'access', refreshToken: 'refresh'},
-            },
-        ]);
-
-        rerender(
-          <OtpVerification
-            email="user@example.com"
-            onOtpVerificationSuccess={mockOnSuccess}
-          />
-        );
-
-        await waitFor(() => {
-            expect(mockCheckTerms).toHaveBeenCalledWith('access');
-        });
-
+    rerender(
+      <OtpVerification
+        email="user@example.com"
+        onOtpVerificationSuccess={mockOnSuccess}
+      />
+    );
+    
+    await waitFor(() => {
         expect(getByTestId('terms-modal-agree')).toBeTruthy();
-        expect(mockOnSuccess).not.toHaveBeenCalled();
-      });
-  });
-
-  describe('When TERMS_AND_CONDITION_FLAG is false', () => {
-    beforeEach(() => {
-        (env as any).TERMS_AND_CONDITION_FLAG = false;
     });
 
-    it('skips terms check and completes verification immediately', async () => {
-        // Initial state
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {isLoading: false, isSuccess: false, data: undefined},
-        ]);
+    expect(mockOnSuccess).not.toHaveBeenCalled();
+  });
 
-        const {UNSAFE_getAllByType, rerender} = render(
-            <OtpVerification
-                email="user@example.com"
-                onOtpVerificationSuccess={mockOnSuccess}
-            />,
-        );
+  it('completes verification after accepting terms', async () => {
+    mockDispatch.mockResolvedValue({unwrap: jest.fn()});
+    
+    // Initial state: not success
+    mockUseVerifyOtpMutation.mockReturnValue([
+        mockVerify,
+        {isLoading: false, isSuccess: false, data: undefined},
+    ]);
 
-        const inputs = UNSAFE_getAllByType(TextInput);
-        fireEvent.changeText(inputs[0], '1');
-        fireEvent.changeText(inputs[1], '2');
-        fireEvent.changeText(inputs[2], '3');
-        fireEvent.changeText(inputs[3], '4');
+    const {getByTestId, UNSAFE_getAllByType, rerender} = render(
+      <OtpVerification
+        email="user@example.com"
+        onOtpVerificationSuccess={mockOnSuccess}
+      />,
+    );
 
-        // Simulate success
-        mockUseVerifyOtpMutation.mockReturnValue([
-            mockVerify,
-            {
-                isLoading: false,
-                isSuccess: true,
-                isError: false,
-                data: {accessToken: 'access', refreshToken: 'refresh'},
-            },
-        ]);
+    // Pre-fill OTP
+    const inputs = UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], '1');
+    fireEvent.changeText(inputs[1], '2');
+    fireEvent.changeText(inputs[2], '3');
+    fireEvent.changeText(inputs[3], '4');
 
-        rerender(
-            <OtpVerification
-                email="user@example.com"
-                onOtpVerificationSuccess={mockOnSuccess}
-            />
-        );
+    // Simulate success
+    mockUseVerifyOtpMutation.mockReturnValue([
+        mockVerify,
+        {
+            isLoading: false,
+            isSuccess: true,
+            isError: false,
+            data: {accessToken: 'access', refreshToken: 'refresh'},
+        },
+    ]);
 
-        await waitFor(() => {
-            expect(mockDispatch).toHaveBeenCalled();
-        });
-        
-        expect(mockCheckTerms).not.toHaveBeenCalled();
+    rerender(
+      <OtpVerification
+        email="user@example.com"
+        onOtpVerificationSuccess={mockOnSuccess}
+      />
+    );
+    
+    await waitFor(() => {
+        expect(getByTestId('terms-modal-agree')).toBeTruthy();
+    });
+
+    // Accept terms
+    fireEvent.press(getByTestId('terms-modal-agree'));
+
+    await waitFor(() => {
+        expect(mockDispatch).toHaveBeenCalled();
         expect(mockOnSuccess).toHaveBeenCalledWith('1234');
     });
   });

@@ -153,7 +153,10 @@ export const SplashScreen: React.FC<
     switch (currentStep) {
       case 'EMAIL':
         return (
-          <EmailLogin onOtpGenerationSuccess={handleOtpGenerationSuccess} />
+          <EmailLogin
+            onOtpGenerationSuccess={handleOtpGenerationSuccess}
+            onLoginSuccess={handleOtpVerificationSuccess}
+          />
         );
       case 'OTP':
         return (

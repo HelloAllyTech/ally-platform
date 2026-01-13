@@ -6,6 +6,20 @@ import {SimulationsScreen} from '../SimulationsScreen';
 import {ScenarioStatus, SCREEN_NAMES} from '../../../constants';
 import type {Scenario} from '../../../types';
 
+// Mock Google Sign-In to avoid native module requirement
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(),
+    signIn: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+}));
+
 // Mock Store hooks directly to avoid store.ts loading which causes issues
 jest.mock('@/store/hooks', () => ({
   useAppSelector: (fn: any) => fn({ user: { permissions: [] } }),

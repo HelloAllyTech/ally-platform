@@ -13,21 +13,20 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {Checkbox, PrimaryButton} from '@/components';
-import {TermsAndAgreementData} from '@/constants';
+import {TERMS_AND_CONDITIONS_URL, TermsAndAgreementData} from '@/constants';
 import {useTranslate} from '@/hooks';
+import {TranslationType} from '@/localization/locales/type';
 
 import {styles} from './styles';
 
 interface TermsAndAgreementModalProps {
   visible: boolean;
   onAgree: () => void;
-  isLoading?: boolean;
 }
 
 export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
   visible,
   onAgree,
-  isLoading,
 }) => {
   const [isAgreed, setIsAgreed] = useState(false);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
@@ -97,26 +96,51 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
               onContentSizeChange={handleContentSizeChange}
               onLayout={handleLayout}
               testID="terms-scroll-view">
-              {TermsAndAgreementData.map((item, index) => (
-                <View key={index} style={styles.termItem}>
-                  <View style={styles.termHeader}>
-                    <Text style={[styles.termHeading, styles.termIndex]}>
-                      {index + 1}.
-                    </Text>
-                    <Text style={styles.termHeading}>{item.heading}</Text>
-                  </View>
-                  <Text style={styles.termContent}>
-                    {item.content}
-                    {item.link && (
-                      <Text
-                        style={styles.linkText}
-                        onPress={() => handleLinkPress(item.link.href)}>
-                        {item.link.text}.
-                      </Text>
-                    )}
+              {TermsAndAgreementData.map((section, sectionIndex) => (
+                <View key={sectionIndex} style={styles.termItem}>
+                  <Text style={styles.termHeading}>
+                    {t(section.headingKey as TranslationType)}
                   </Text>
+                  {section.bullets.map((bullet, bulletIndex) => (
+                    <View key={bulletIndex} style={styles.bulletContainer}>
+                      <Text style={styles.bulletPoint}>•</Text>
+                      <Text style={styles.termContent}>
+                        {t(bullet.textKey as TranslationType)}
+                        {bullet.boldTextKey && (
+                          <Text style={styles.boldText}>
+                            {t(bullet.boldTextKey as TranslationType)}
+                          </Text>
+                        )}
+                        {bullet.suffixTextKey && (
+                          <Text>
+                            {t(bullet.suffixTextKey as TranslationType)}
+                          </Text>
+                        )}
+                        {bullet.link && (
+                          <Text
+                            style={styles.linkText}
+                            onPress={() => handleLinkPress(bullet.link!.href)}>
+                            {t(bullet.link.textKey as TranslationType)}
+                          </Text>
+                        )}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               ))}
+              <View style={styles.completeDetailsContainer}>
+                <Text style={styles.completeDetailsText}>
+                  {t('TermsAndAgreement.completeDetails')}{' '}
+                  <Text
+                    style={styles.linkText}
+                    onPress={() => handleLinkPress(TERMS_AND_CONDITIONS_URL)}>
+                    {t(
+                      'TermsAndAgreement.privacyPolicyAndUserLicenseAgreement',
+                    )}
+                  </Text>
+                  .
+                </Text>
+              </View>
             </ScrollView>
 
             <View style={styles.footer}>
@@ -153,7 +177,6 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
                     label={t('TermsAndAgreement.agree')}
                     onPress={onAgree}
                     isDisabled={!isAgreed}
-                    isLoading={isLoading}
                     customContainerStyle={styles.agreeButton}
                   />
                 </>

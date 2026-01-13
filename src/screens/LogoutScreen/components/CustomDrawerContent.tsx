@@ -1,29 +1,73 @@
-import {Text, TouchableOpacity, View} from 'react-native';
+import {DrawerContentComponentProps} from '@react-navigation/drawer';
+import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {BoltIcon, LogoutIcon, ProfileIcon} from '@/assets';
-import {SecurityCarousel} from '@/components';
+import {
+  AllyLogoIcon,
+  BoltIcon,
+  LogoutIcon,
+  ProfileIcon,
+  ProfileSettingsIcon,
+} from '@/assets';
 import {env} from '@/config/env';
-import {CarouselVariant} from '@/constants';
-import {useSimulationCredits, useTranslate, useUser} from '@/hooks';
-import {colors, fontFamily, typography} from '@/theme';
+import {SCREEN_NAMES} from '@/constants';
+import {
+  useAppNavigation,
+  useSimulationCredits,
+  useTranslate,
+  useUser,
+} from '@/hooks';
+import {useGetLogoUrlQuery} from '@/services/authApi';
+import {colors, fontFamily, radius, typography} from '@/theme';
 import {getAppVersion} from '@/utils';
 
-interface DrawerContentProps {
+import {MenuOption} from './MenuOption';
+
+interface DrawerContentProps extends DrawerContentComponentProps {
   openLogoutModal: () => void;
 }
 
-export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
+export const DrawerContent = ({
+  openLogoutModal,
+  navigation: drawerNavigation,
+}: DrawerContentProps) => {
   const {userData} = useUser();
   const {t} = useTranslate();
+  const navigation = useAppNavigation();
   const {credits, getCreditsInfo} = useSimulationCredits();
-  const {name, email} = userData ?? {};
+  const {name, email, profileImageUrl} = userData ?? {};
+  const {data: tenantData} = useGetLogoUrlQuery();
+
+  const handleProfileSettingsPress = () => {
+    drawerNavigation.closeDrawer();
+    navigation.navigate(SCREEN_NAMES.PROFILE_SETTINGS);
+  };
 
   return (
     <View style={styles.container}>
+      {tenantData?.logoUrl && (
+        <>
+          <View style={styles.orgLogoContainer}>
+            <Image
+              source={{uri: tenantData.logoUrl}}
+              style={styles.orgLogo}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.separator} />
+        </>
+      )}
       <View style={styles.profileContainer}>
         <View style={styles.profileIconContainer}>
-          <ProfileIcon />
+          {profileImageUrl ? (
+            <Image
+              source={{uri: profileImageUrl}}
+              style={styles.profileImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <ProfileIcon />
+          )}
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
@@ -40,9 +84,11 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
         </View>
       </View>
 
+      <View style={styles.separator} />
+
       {credits && getCreditsInfo && (
         <>
-          <View style={styles.creditContainer}>
+          <View>
             <View style={styles.creditHeader}>
               <BoltIcon width={16} height={16} />
               <Text style={styles.creditTitle}>{t('Credits.usage')}</Text>
@@ -68,32 +114,41 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
                     width: `${getCreditsInfo.usagePercentage}%`,
                     backgroundColor: getCreditsInfo.isLow
                       ? colors.softCoralRed
-                      : colors.azureBlue,
+                      : colors.ds.brand.logo,
                   },
                 ]}
               />
             </View>
           </View>
-          <View style={styles.separator} />
         </>
       )}
 
-      <TouchableOpacity
-        style={styles.logoutContainer}
-        onPress={openLogoutModal}>
-        <View style={styles.logoutIconContainer}>
-          <LogoutIcon />
-        </View>
-        <Text style={styles.logoutText}>{t('Logout.logout')}</Text>
-      </TouchableOpacity>
-      <View style={styles.carouselWrapper}>
-        <SecurityCarousel variant={CarouselVariant.DRAWER} />
+      <View style={styles.separator} />
+
+      <View style={styles.menuItemsWrapper}>
+        <MenuOption
+          icon={<ProfileSettingsIcon width={24} height={24} />}
+          text={t('Drawer.profileSettings')}
+          onPress={handleProfileSettingsPress}
+          gap={8}
+        />
+        <MenuOption
+          icon={<LogoutIcon />}
+          text={t('Logout.logout')}
+          onPress={openLogoutModal}
+          gap={8}
+        />
       </View>
+
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>
           {t('Common.version')}: {getAppVersion()}{' '}
-          {env.ENVIRONMENT === 'development' && '(Dev)'}
+          {env.ENVIRONMENT === 'development' && t('Drawer.dev')}
         </Text>
+      </View>
+
+      <View style={styles.logoContainer}>
+        <AllyLogoIcon />
       </View>
     </View>
   );
@@ -102,22 +157,30 @@ export const DrawerContent = ({openLogoutModal}: DrawerContentProps) => {
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingTop: '70@mvs',
+    paddingTop: '50@mvs',
     paddingHorizontal: '16@ms',
+  },
+  separator: {
+    height: '0.5@vs',
+    backgroundColor: colors.ds.stroke.primary,
+    marginVertical: '12@mvs',
   },
   profileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: '8@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
-    paddingBottom: '16@ms',
   },
   profileIconContainer: {
-    width: '40@ms',
-    height: '40@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '32@ms',
+    height: '32@ms',
+    borderRadius: '20@ms',
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: '28@ms',
+    height: '28@ms',
+    borderRadius: radius.full,
+    marginTop: '4@mvs',
   },
   textContainer: {
     flex: 1,
@@ -126,6 +189,7 @@ const styles = ScaledSheet.create({
     ...typography.body.large,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
+    marginBottom: '2@mvs',
   },
   email: {
     ...typography.body.small,
@@ -134,9 +198,6 @@ const styles = ScaledSheet.create({
   },
   emailSmall: {
     fontSize: '9@ms',
-  },
-  creditContainer: {
-    marginTop: '20@mvs',
   },
   creditHeader: {
     flexDirection: 'row',
@@ -180,41 +241,39 @@ const styles = ScaledSheet.create({
     height: '100%',
     borderRadius: '4@ms',
   },
-  separator: {
-    height: 0.5,
-    backgroundColor: colors.lightGray5,
-    marginTop: '20@mvs',
-  },
-  logoutContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '8@ms',
-    marginTop: '16@ms',
-  },
-  logoutIconContainer: {
-    width: '24@ms',
-    height: '24@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.label.large,
-    color: colors.ds.typography.highEmphasis,
-  },
-  carouselWrapper: {
+  menuItemsWrapper: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: '4@ms',
   },
   versionContainer: {
     alignItems: 'center',
     paddingBottom: '16@ms',
+    marginTop: 'auto',
   },
   versionText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  logoContainer: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: radius.lg,
+    padding: '12@ms',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '30@ms',
+    marginTop: '8@mvs',
+    marginHorizontal: '15@ms',
+  },
+  orgLogoContainer: {
+    width: '40@ms',
+    height: '40@ms',
+    overflow: 'hidden',
+  },
+  orgLogo: {
+    height: '100%',
+    width: '100%',
+    backgroundColor: 'red',
   },
 });

@@ -4,7 +4,6 @@ import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 import {useErrorToast} from '@/components';
 import {MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
 import {useStartScenarioSessionMutation} from '@/services';
-import {getErrorDetails} from '@/utils';
 
 import {useAppNavigation} from './useAppNavigation';
 import {usePermissionAlert} from './usePermissionAlert';
@@ -118,10 +117,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         setActiveSimulationId(err.data?.entityId || null);
         setShowActiveSimulationModal(true);
       } else {
-        showErrorToast(
-          getErrorDetails(error)?.message,
-          'Errors.startSimulation',
-        );
+        showErrorToast(error, 'Errors.startSimulation');
       }
     } finally {
       setIsCreatingRoom(false);

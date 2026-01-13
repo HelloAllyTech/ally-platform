@@ -15,6 +15,8 @@ import {
   CallLogInactiveIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
+  LeaderboardActiveIcon,
+  LeaderboardInactiveIcon,
   LearnActiveIcon,
   LearnInactiveIcon,
   SearchActiveIcon,
@@ -24,6 +26,7 @@ import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
+  // LeaderboardScreen,
   SearchScreen,
   SimulationsScreen,
   UserAnalyticsScreen,
@@ -50,6 +53,11 @@ const ALL_TABS = [
     component: UserAnalyticsScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_ANALYTICS_DASHBOARD],
   },
+  // {
+  //   name: SCREEN_NAMES.LEADERBOARD,
+  //   component: LeaderboardScreen,
+  //   requiredPermissions: [], // TODO: Add permission check later if needed
+  // },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,
@@ -92,6 +100,9 @@ const CustomTabBar = (props: BottomTabBarProps) => {
         <AnalyticsActiveIcon width={18} height={18} />
       ),
       [SCREEN_NAMES.COMMUNITY]: <CommunityActiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.LEADERBOARD]: (
+        <LeaderboardActiveIcon width={20} height={20} color={colors.blue} />
+      ),
       [SCREEN_NAMES.SEARCH]: (
         <SearchActiveIcon width={20} height={20} color={colors.blue} />
       ),
@@ -105,6 +116,9 @@ const CustomTabBar = (props: BottomTabBarProps) => {
       ),
       [SCREEN_NAMES.COMMUNITY]: (
         <CommunityInactiveIcon width={20} height={20} />
+      ),
+      [SCREEN_NAMES.LEADERBOARD]: (
+        <LeaderboardInactiveIcon width={20} height={20} />
       ),
       [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
       [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
