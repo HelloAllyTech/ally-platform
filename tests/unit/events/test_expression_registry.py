@@ -392,6 +392,11 @@ class TestEventOrchestrator:
                     "data": {},
                 },
                 {
+                    "id": "paraphrased-1",
+                    "detectionType": "HELPER_PARAPHRASED",
+                    "data": {},
+                },
+                {
                     "id": "time-1",
                     "detectionType": "TIME",
                     "data": {"time": 100, "condition": "LTE"},
@@ -414,9 +419,11 @@ class TestEventOrchestrator:
         scenario = create_test_scenario(metadata)
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
-        # SENTENCE_SIMILARITY and HELPER_INTERRUPTED should have trigger_multiple=True
+        # SENTENCE_SIMILARITY, HELPER_INTERRUPTED, and HELPER_PARAPHRASED
+        # should have trigger_multiple=True
         assert orchestrator.event_registry["similarity-1"]["trigger_multiple"] is True
         assert orchestrator.event_registry["interruption-1"]["trigger_multiple"] is True
+        assert orchestrator.event_registry["paraphrased-1"]["trigger_multiple"] is True
         # TIME, SCORE, COMBINATION should have trigger_multiple=False
         assert orchestrator.event_registry["time-1"]["trigger_multiple"] is False
         assert orchestrator.event_registry["score-1"]["trigger_multiple"] is False

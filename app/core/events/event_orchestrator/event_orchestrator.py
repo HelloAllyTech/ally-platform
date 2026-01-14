@@ -394,6 +394,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                     DetectionType.SEMANTIC_SIMILARITY,
                     DetectionType.BINARY_CLASSIFIER,
                     DetectionType.HELPER_INTERRUPTED,
+                    DetectionType.HELPER_PARAPHRASED,
                 )
 
             # Special case: termination events should only be sent once,
@@ -544,13 +545,15 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         else:
             # If event not in registry, create entry with trigger_multiple
             # based on event type
-            # SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, and
-            # HELPER_INTERRUPTED events can trigger multiple times
+            # SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER,
+            # HELPER_INTERRUPTED, and HELPER_PARAPHRASED events can trigger
+            # multiple times
             trigger_multiple = event_type in (
                 DetectionType.SENTENCE_SIMILARITY,
                 DetectionType.SEMANTIC_SIMILARITY,
                 DetectionType.BINARY_CLASSIFIER,
                 DetectionType.HELPER_INTERRUPTED,
+                DetectionType.HELPER_PARAPHRASED,
             )
             # If we are setting it to True immediately, count is 1.
             # If False, count is 0.

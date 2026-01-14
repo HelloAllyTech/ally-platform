@@ -16,6 +16,10 @@ from app.core.events.event_types.combination.combination_event import (
     CombinationEvent,
     ExpressionNode,
 )
+from app.core.events.event_types.helper_paraphrased.helper_paraphrased_event import (
+    HelperParaphrasedData,
+    HelperParaphrasedEvent,
+)
 from app.core.events.event_types.interruption.interruption_event import (
     InterruptionData,
     InterruptionEvent,
@@ -286,6 +290,29 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=interruption_data,
+                **common_fields,
+            )
+
+        elif detection_type == DetectionType.HELPER_PARAPHRASED:
+            # HelperParaphrasedData has no required fields, so data is optional
+            try:
+                helper_paraphrased_data = HelperParaphrasedData()
+                if raw_data and isinstance(raw_data, dict):
+                    helper_paraphrased_data = HelperParaphrasedData(**raw_data)
+            except Exception as e:
+                log.warning(
+                    "Event '%s' (HELPER_PARAPHRASED) invalid data: %s",
+                    event_id,
+                    e,
+                )
+                return None
+
+            return HelperParaphrasedEvent.create(
+                event_id=event_id,
+                visibility_type=visibility_type,
+                detection_type=detection_type,
+                data=helper_paraphrased_data,
+                embedding_client=embedding_client,
                 **common_fields,
             )
 
