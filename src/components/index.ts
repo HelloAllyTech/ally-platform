@@ -55,3 +55,5 @@ export {EmojiPicker} from './EmojiPicker';
 export type {EmojiPickerProps} from './EmojiPicker';
 export {ReactionsBottomSheet} from './ReactionsBottomSheet';
 export type {ReactionsBottomSheetProps} from './ReactionsBottomSheet';
+export {ReviewComment} from './ReviewComment';
+export type {ReviewCommentProps} from './ReviewComment';

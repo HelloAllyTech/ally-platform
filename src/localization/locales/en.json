@@ -491,5 +491,11 @@
       "title": "Week Warrior",
       "description": "Practice daily for 7 consecutive days (minimum 10 mins/day)"
     }
+  },
+  "ReviewComment": {
+    "like": "Like",
+    "reply": "Reply",
+    "replies": "{{count}} replies",
+    "repliesOne": "1 reply"
   }
 }
