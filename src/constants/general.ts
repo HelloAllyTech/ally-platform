@@ -150,6 +150,8 @@ export const API_ROUTES = {
   },
   REVIEWS: {
     REVIEWS: '/reviews',
+    ADD_REVIEW_COMMENT: (reviewId: string) => `/reviews/${reviewId}/comments`,
+    GET_MESSAGES: (reviewId: string) => `/reviews/${reviewId}/messages`,
     REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
       `/reviews/${reviewId}/reactions/count`,
