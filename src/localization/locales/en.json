@@ -491,5 +491,31 @@
       "title": "Week Warrior",
       "description": "Practice daily for 7 consecutive days (minimum 10 mins/day)"
     }
+  },
+ "Review": {
+    "header": {
+      "title": "Review"
+    },
+    "card": {
+      "sharedSimulationForReview": "Shared simulation for review",
+      "dateAndTime": "Date & time:",
+      "duration": "Duration:",
+      "reviewTranscript": "Review transcript",
+      "reaction": "Reaction",
+      "comment": "Comment",
+      "viewLess": "View less",
+      "viewMore": "View more"  
+    },
+    "filters": {
+      "all": "All",
+      "latest": "Latest",
+      "mostReviewed": "Most Reviewed",
+      "undiscovered": "Undiscovered"
+    },
+    "empty": {
+      "title": "No shared simulations found",
+      "description": "Your recent shared simulations will be listed here."
+    },
+    "fetchError" : "Failed to fetch reviews"
   }
 }
