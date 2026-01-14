@@ -1,6 +1,7 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.core.branching_instructions.base import BranchingInstruction
 from app.core.events.base import BaseEvent
 from app.core.graph.nodes import generate_response
 from app.core.graph.state import (
@@ -52,7 +53,8 @@ class TestGenerateResponse:
         # branching_instruction)
         msgs = [HumanMessage(content="hi"), HumanMessage(content="tell me more")]
         ev1 = FakeEvent(event_id="e1", branching_instruction=None)
-        ev2 = FakeEvent(event_id="e2", branching_instruction="probe on family")
+        branching_inst = BranchingInstruction.create("probe on family")
+        ev2 = FakeEvent(event_id="e2", branching_instruction=branching_inst)
 
         state = SimulationState(
             messages=msgs,
@@ -129,6 +131,9 @@ class TestGenerateResponse:
         )
 
         # Multiple branching instructions with different scores
+        low_inst = BranchingInstruction.create("low positive")
+        high_inst = BranchingInstruction.create("high negative")
+        medium_inst = BranchingInstruction.create("medium positive")
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
             permitted_events=[],
@@ -137,21 +142,21 @@ class TestGenerateResponse:
             current_score=0,
             branching_and_feedback_data=[
                 BranchingAndFeedbackData(
-                    branching_instruction="low positive",
+                    branching_instruction=low_inst,
                     feedback=EventFeedback(
                         emoji=":)", message="Low", show_feedback=True
                     ),
                     score=2,
                 ),
                 BranchingAndFeedbackData(
-                    branching_instruction="high negative",  # Highest magnitude
+                    branching_instruction=high_inst,  # Highest magnitude
                     feedback=EventFeedback(
                         emoji=":(", message="High", show_feedback=True
                     ),
                     score=-10,
                 ),
                 BranchingAndFeedbackData(
-                    branching_instruction="medium positive",
+                    branching_instruction=medium_inst,
                     feedback=EventFeedback(
                         emoji=":D", message="Medium", show_feedback=True
                     ),
@@ -526,6 +531,7 @@ class TestGenerateResponse:
             "app.core.graph.nodes.create_llm_client", fake_create_llm_client
         )
 
+        probe_inst = BranchingInstruction.create("probe deeper")
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
             permitted_events=[],
@@ -534,7 +540,7 @@ class TestGenerateResponse:
             current_score=0,
             branching_and_feedback_data=[
                 BranchingAndFeedbackData(
-                    branching_instruction="probe deeper",
+                    branching_instruction=probe_inst,
                     feedback=EventFeedback(
                         emoji=":)", message="Great job!", show_feedback=True
                     ),

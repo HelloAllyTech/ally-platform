@@ -1,5 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.core.branching_instructions.base import BranchingInstruction
 from app.core.constants import VisibilityType
 from app.core.events.base import BaseEvent
 from app.core.graph.utils import convert_messages_to_chat_messages, serialize_event
@@ -22,12 +23,13 @@ class TestUtils:
             async def detect_event(self, conversations):
                 return True
 
+        branching_inst = BranchingInstruction.create("ask_about_progress")
         event = DummyEvent(
             event_id="evt-123",
             score=10,
             emoji=":)",
             emoji_message="Great job",
-            branching_instruction="ask_about_progress",
+            branching_instruction=branching_inst,
             visibility_type=VisibilityType.PASSIVE,
             show_feedback=False,
             sentences=["one", "two"],

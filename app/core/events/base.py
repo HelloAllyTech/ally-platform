@@ -3,6 +3,7 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.core.branching_instructions.base import BranchingInstruction
 from app.core.constants import DetectionType, VisibilityType
 
 
@@ -77,7 +78,7 @@ class BaseEvent(BaseModel, ABC):
     score: Optional[int] = None
     emoji: Optional[str] = None
     emoji_message: Optional[str] = None
-    branching_instruction: Optional[str] = None
+    branching_instruction: Optional[BranchingInstruction] = None
     show_feedback: Optional[bool] = True
 
     detection_config: Optional[DetectionConfig] = Field(default_factory=DetectionConfig)

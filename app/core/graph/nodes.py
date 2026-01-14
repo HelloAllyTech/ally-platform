@@ -203,7 +203,12 @@ async def generate_response(
             selected_branching_event_data = max(
                 branching_events, key=lambda e: abs(e.score)
             )
-            next_instruction = selected_branching_event_data.branching_instruction
+            branching_instruction_obj = (
+                selected_branching_event_data.branching_instruction
+            )
+
+            # Use the branching instruction content directly (no substitution for now)
+            next_instruction = branching_instruction_obj.content
 
     # Step 2: Determine feedback message for UI
     # Priority 1: If branching event was selected, use its feedback

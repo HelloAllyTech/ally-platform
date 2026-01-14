@@ -5,6 +5,7 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
 from pydantic import BaseModel
 
+from app.core.branching_instructions.base import BranchingInstruction
 from app.core.events.base import BaseEvent
 
 T = TypeVar("T")
@@ -89,7 +90,9 @@ class BranchingAndFeedbackData:
     - If no branching events exist, the highest score event's feedback is used
     """
 
-    branching_instruction: Optional[str]  # For LLM guidance (conversation direction)
+    branching_instruction: Optional[
+        BranchingInstruction
+    ]  # For LLM guidance (conversation direction)
     feedback: Optional[EventFeedback]  # For UI display (user feedback)
     score: int  # Event score for priority selection
 

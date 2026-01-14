@@ -48,13 +48,20 @@ def serialize_event(
         termination_event_id and event.event_id == termination_event_id
     )
 
+    # Extract branching instruction content if it's a BranchingInstruction object
+    branch_instruction_value = None
+    if event.branching_instruction:
+        # BranchingInstruction object has a 'content' field with the
+        # current instruction text
+        branch_instruction_value = event.branching_instruction.content
+
     return {
         "id": event.event_id,
         "score": event.score or 0,
         "emoji": event.emoji or None,
         "visibilityType": event.visibility_type or None,
         "message": event.emoji_message or None,
-        "branchInstruction": event.branching_instruction or None,
+        "branchInstruction": branch_instruction_value,
         "sentences": getattr(event, "sentences", []),
         "feedbackStatus": bool(getattr(event, "show_feedback", True)),
         "autoTerminationStatus": is_termination_event,

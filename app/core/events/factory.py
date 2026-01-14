@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Literal, Mapping, Optional
 
+from app.core.branching_instructions.base import BranchingInstruction
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent, DetectionConfig
@@ -83,11 +84,19 @@ def _create_event_by_detection_type(
         max_occurrences=int(max_occ_val) if max_occ_val is not None else None,
     )
 
+    # Parse branching instruction if present
+    branching_instruction_str = ev.get("branchInstruction")
+    branching_instruction_obj = None
+    if branching_instruction_str:
+        branching_instruction_obj = BranchingInstruction.create(
+            branching_instruction_str
+        )
+
     common_fields = {
         "score": ev.get("score"),
         "emoji": ev.get("emoji"),
         "emoji_message": ev.get("message"),
-        "branching_instruction": ev.get("branchInstruction"),
+        "branching_instruction": branching_instruction_obj,
         "show_feedback": ev.get("feedbackStatus", True),
         "detection_config": detection_config,
     }

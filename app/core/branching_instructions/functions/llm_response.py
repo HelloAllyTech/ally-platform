@@ -1,0 +1,65 @@
+"""Function to generate LLM responses for branching instructions."""
+
+from typing import Optional
+
+from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.llms import create_llm_client
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+async def generate_llm_response(
+    content: str,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
+    llm_config: Optional[dict] = None,
+) -> str:
+    """
+    Generate an LLM response for the given content.
+
+    This function is used to substitute <llm_response> tags in branching instructions.
+    It sends the content to the LLM and returns the response text.
+
+    Args:
+        content: The prompt/content to send to the LLM
+        language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        llm_config: Optional LLM configuration dict with provider and model settings
+
+    Returns:
+        The LLM's response as a string
+
+    Raises:
+        Exception: If LLM invocation fails
+
+    Example:
+        >>> response = await generate_llm_response(
+        ...     "What is a good response to 'How are you?'",
+        ...     language_code="en-IN"
+        ... )
+        >>> print(response)
+        "I'm doing well, thank you for asking! How can I help you today?"
+    """
+    if not content:
+        logger.warning("Empty content provided to generate_llm_response")
+        return ""
+
+    try:
+        # Create LLM client with provided config or defaults
+        llm_client = create_llm_client(
+            llm_config=llm_config,
+            language_code=language_code,
+        )
+        llm_instance = llm_client.llm_instance
+
+        logger.debug(f"Generating LLM response for content: {content[:100]}...")
+
+        # Invoke LLM with the content
+        response = await llm_instance.ainvoke(content)
+
+        logger.debug(f"LLM response generated: {response.content[:100]}...")
+
+        return response.content
+
+    except Exception as e:
+        logger.error(f"Failed to generate LLM response: {e}")
+        raise

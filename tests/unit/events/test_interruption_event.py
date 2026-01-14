@@ -155,7 +155,7 @@ class TestInterruptionEventFactory:
         assert events[0].score == -3
         assert events[0].emoji == "⚠️"
         assert events[0].emoji_message == "You interrupted the client."
-        assert events[0].branching_instruction == "I notice you interrupted me."
+        assert events[0].branching_instruction.content == "I notice you interrupted me."
         assert events[0].visibility_type == VisibilityType.ACTIVE
         assert events[0].show_feedback is True
 
