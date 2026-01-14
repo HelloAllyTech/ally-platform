@@ -1,28 +1,38 @@
 import asyncio
 import random
-from datetime import datetime, timezone
+from typing import Optional, Set
 
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
-from livekit.plugins.langchain import LLMAdapter
 
 from app.core.config import settings
-from app.core.constants import DEFAULT_LANGUAGE_CODE, Environment
+from app.core.constants import DEFAULT_VAD_ACTIVATION_THRESHOLD, Environment
 from app.core.embeddings import OpenAIEmbeddingClient
-from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.events.schemas import CoreEventMessageType
-from app.core.graph import agent_graph
-from app.core.graph.utils import serialize_event
-from app.core.queue import msg_event_queue
-from app.stt import create_stt_client
-from app.tts import Gender, create_tts_client
-from app.utils.event_handler import create_conversation_handler
+from app.core.scenario.base import Scenario
+from app.llms import BaseLLMClient
+from app.stt import BaseSTTClient
+from app.tts import BaseTTSClient
+from app.utils.agent_utils import (
+    cleanup_background_tasks,
+    configure_llm_client,
+    configure_stt_client,
+    configure_tts_client,
+    create_agent_with_adapter,
+    initialize_agent_state,
+    should_say_opening_statement,
+)
+from app.utils.event_handler import (
+    create_connection_state_handler,
+    create_conversation_handler,
+    create_shutdown_handler,
+    create_termination_handler,
+    setup_interruption_detection,
+)
 from app.utils.logger import get_logger
 from app.utils.metadata_parser import parse_room_metadata
-from app.utils.queue_utils import send_final_score_to_core
 
 logger = get_logger(__name__)
 setup_logging(
@@ -32,403 +42,257 @@ setup_logging(
 )
 
 
-class Assistant(Agent):
-    """Custom agent implementation."""
-
-    def __init__(
-        self, instructions: str = "You're a simulation client", **kwargs
-    ) -> None:
-        super().__init__(instructions=instructions, **kwargs)
-
-
-def initialize_agent_state(room_name: str, scenario) -> None:
-    """Initialize agent graph state for the session."""
-    agent_graph.update_state(
-        {"configurable": {"thread_id": room_name}},
-        values={
-            "messages": [],
-            "permitted_events": scenario.events,
-            "events_accumulator": [],
-            "new_events": [],
-            "current_score": 0,
-            "branching_instructions": [],
-        },
-    )
-
-
-def create_agent_session(tts_config, vad, stt_config) -> AgentSession:
-    """Create and configure agent session with STT, TTS, and VAD."""
-    return AgentSession(
-        stt=stt_config,
-        tts=tts_config,
-        vad=vad,
-        turn_detection="vad",
-    )
-
-
-async def publish_termination_audio(message: str, session: AgentSession) -> None:
+class AgentWorker:
     """
-    Synthesize and publish termination message as audio.
+    Manages the full agent lifecycle: configuration → initialization → runtime.
 
-    Args:
-        message: Termination message to convert to audio
-        session: Agent session instance
+    Organized in clear phases for readability:
+    1. Configuration: Parse metadata, create clients (STT, TTS, LLM, embedding)
+    2. Initialization: Create session, agent, orchestrator, register callbacks
+    3. Runtime: Start session, initialize orchestrator, say opening statement
+
+    For evaluation/testing:
+    - Call configure() to set up clients without runtime components
+    - Access attributes directly: worker.scenario, worker.stt_client, etc.
+    - Methods are organized by phase, making it easy to test components independently
     """
-    try:
-        logger.info(f"Publishing termination audio: '{message}'")
 
-        await session.interrupt()
-        handler = session.say(message, allow_interruptions=False)
-        await handler.wait_for_playout()
+    def __init__(self, ctx: agents.JobContext):
+        """Initialize worker with job context."""
+        self.ctx = ctx
 
-        logger.info("Termination audio playback completed")
+        # ========== Configuration State (set in configure()) ==========
+        self.scenario: Optional[Scenario] = None
+        self.tts_client: Optional[BaseTTSClient] = None
+        self.stt_client: Optional[BaseSTTClient] = None
+        self.llm_client: Optional[BaseLLMClient] = None
+        self.embedding_client: Optional[OpenAIEmbeddingClient] = None
+        self.joined_iso: Optional[str] = None
 
-    except Exception as e:
-        logger.exception(f"Failed to publish termination audio: {e}")
-        raise
+        # ========== Runtime Components (set in initialize()) ==========
+        self.session: Optional[AgentSession] = None
+        self.event_orchestrator: Optional[EventOrchestrator] = None
+        self.agent: Optional[Agent] = None
+
+        # ========== State Tracking ==========
+        self.final_score_sent = False
+        self._background_tasks: Set[asyncio.Task] = set()
+
+    async def configure(self):
+        """
+        - Parse metadata and extract scenario
+        - Create all clients (STT, TTS, LLM, embedding)
+        - Initialize agent graph state
+
+        After this phase, you can access:
+        - self.scenario
+        - self.stt_client, self.tts_client, self.llm_client, self.embedding_client
+        """
+        # Setup embedding client (needed for metadata parsing)
+        self.embedding_client = OpenAIEmbeddingClient(
+            model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
+        )
+        logger.debug("Created shared embedding client for semantic similarity events")
+
+        # Parse metadata
+        rm_md_envelope = parse_room_metadata(
+            self.ctx.job.metadata, embedding_client=self.embedding_client
+        )
+        self.scenario = rm_md_envelope.scenario
+        logger.debug(f"Events in scenario: {str(self.scenario.events)}")
+
+        # Configure STT and TTS clients - using utility functions
+        self.stt_client = configure_stt_client(self.scenario)
+        self.tts_client = configure_tts_client(self.scenario)
+
+        # Configure LLM client
+        self.llm_client = configure_llm_client(self.scenario)
+
+        # Initialize agent state
+        self.joined_iso = initialize_agent_state(
+            thread_id=self.ctx.room.name,
+            scenario=self.scenario,
+        )
+
+    async def initialize(self):
+        """
+        Creates session, agent, orchestrator, and registers callbacks.
+        Must be called after configure().
+        """
+        # Create session (needs clients from configure phase)
+        self._create_session()
+
+        # Create agent (using utility function)
+        self.agent = create_agent_with_adapter(
+            thread_id=self.ctx.room.name,
+            room=self.ctx.room,
+            scenario=self.scenario,
+            agent_joined_at=self.joined_iso,
+            llm_client=self.llm_client,
+            embedding_client=self.embedding_client,
+        )
+
+        # Setup orchestrator (needs agent for callbacks)
+        self._setup_event_orchestrator()
+
+        # Register callbacks
+        self._register_callbacks()
+
+    def _create_session(self):
+        """Create agent session with STT and TTS."""
+        # VAD is always prewarmed in prewarm(), so retrieve it regardless
+        vad = self.ctx.proc.userdata.get("vad")
+        stt_instance = self.stt_client.stt_instance
+        tts_instance = self.tts_client.tts_instance
+
+        self.session = AgentSession(
+            stt=stt_instance,
+            tts=tts_instance,
+            vad=vad,
+            turn_detection="vad" if vad else None,
+        )
+
+    def _setup_event_orchestrator(self):
+        """Initialize event orchestrator with callbacks."""
+        # Create termination handler using utility
+        termination_handler = create_termination_handler(
+            session=self.session,
+            ctx=self.ctx,
+            background_tasks=self._background_tasks,
+        )
+
+        self.event_orchestrator = EventOrchestrator(
+            scenario=self.scenario,
+            termination_callback=termination_handler,
+            room=self.ctx.room,
+            thread_id=self.ctx.room.name,
+            agent_joined_at=self.joined_iso,
+        )
+
+        # Update termination handler with orchestrator reference
+        termination_handler.set_event_orchestrator(self.event_orchestrator)
+
+        logger.info(
+            f"Initialized EventOrchestrator with {len(self.scenario.events)} events"
+        )
+
+        # Update agent adapter config with orchestrator (now that it exists)
+        if hasattr(self.agent, "llm") and hasattr(self.agent.llm, "config"):
+            self.agent.llm.config["configurable"][
+                "event_orchestrator"
+            ] = self.event_orchestrator
+
+    def _register_callbacks(self):
+        """Register room, session, and shutdown callbacks."""
+        # Conversation handler (register on session)
+        conversation_handler, cleanup_conversation_handler = (
+            create_conversation_handler(self.ctx.room.name, self.joined_iso)
+        )
+        self.session.on("conversation_item_added")(conversation_handler)
+
+        # Store cleanup handler for shutdown
+        self._cleanup_conversation_handler = cleanup_conversation_handler
+
+        # Connection state handler
+        connection_handler = create_connection_state_handler(
+            event_orchestrator=self.event_orchestrator,
+            room_name=self.ctx.room.name,
+            final_score_sent_ref=lambda: self.final_score_sent,
+            set_final_score_sent=lambda val: setattr(self, "final_score_sent", val),
+            background_tasks=self._background_tasks,
+        )
+
+        @self.ctx.room.on("connection_state_changed")
+        def on_connection_state_changed(state: rtc.ConnectionState):
+            connection_handler(state)
+
+        # Shutdown handler
+        original_shutdown_handler = create_shutdown_handler(
+            event_orchestrator=self.event_orchestrator,
+            room_name=self.ctx.room.name,
+            final_score_sent_ref=lambda: self.final_score_sent,
+            set_final_score_sent=lambda val: setattr(self, "final_score_sent", val),
+            cleanup_background_tasks=lambda: cleanup_background_tasks(
+                self._background_tasks
+            ),
+        )
+
+        # Wrap shutdown handler to include conversation handler cleanup
+        async def shutdown_with_cleanup():
+            try:
+                self._cleanup_conversation_handler()
+            except Exception as e:
+                logger.debug(f"Error cleaning up conversation handler: {e}")
+            await original_shutdown_handler()
+
+        shutdown_handler = shutdown_with_cleanup
+
+        self.ctx.add_shutdown_callback(shutdown_handler)
+
+    async def start(self):
+        """
+        Connects to room, initializes orchestrator, sets up interruption detection,
+        and says opening statement.
+        """
+        # Start session and connect
+        await self.session.start(
+            room=self.ctx.room,
+            agent=self.agent,
+            room_input_options=RoomInputOptions(
+                noise_cancellation=noise_cancellation.BVC(),
+            ),
+        )
+        await self.ctx.connect()
+
+        # Setup interruption detection
+        setup_interruption_detection(self.session)
+
+        # Initialize event orchestrator (only after session is connected)
+        await self.event_orchestrator.initialize()
+
+        # Say opening statement if scenario has opening statements
+        if should_say_opening_statement(
+            scenario=self.scenario,
+            event_orchestrator=self.event_orchestrator,
+        ):
+            handler = self.session.say(
+                random.choice(self.scenario.prompt_data.opening_statements)
+            )
+            await handler.wait_for_playout()
 
 
 async def entrypoint(ctx: agents.JobContext):
-    """Main agent entrypoint handling room connection and conversation flow."""
+    """
+    Main agent entrypoint
 
-    # Create a single embedding client for all semantic similarity events
-    # in this agent call
-    embedding_client = OpenAIEmbeddingClient(
-        model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
-    )
-    logger.debug("Created shared embedding client for semantic similarity events")
-
-    # Initialize class-level embedding client for SemanticSimilarityEvent
-    # (once per session)
-    from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
-        SemanticSimilarityEvent,
-    )
-
-    SemanticSimilarityEvent._EMBEDDING_CLIENT = embedding_client
-
-    # Parse metadata with error handling
-    rm_md_envelope = parse_room_metadata(
-        ctx.job.metadata, embedding_client=embedding_client
-    )
-    scenario = rm_md_envelope.scenario
-    logger.debug(f"Events in scenario: {str(scenario.events)}")
-
-    # Get language code and configs from scenario
-    language_code = DEFAULT_LANGUAGE_CODE
-    stt_config_from_metadata = None
-    if scenario.language_config:
-        language_code = scenario.language_config.language_code
-        stt_config_from_metadata = scenario.language_config.stt_config
-
-    # Configure STT
-    try:
-        stt_client = create_stt_client(
-            stt_config=stt_config_from_metadata, language_code=language_code
-        )
-        stt_config = stt_client.stt_instance
-    except Exception as e:
-        logger.warning(f"STT config failed, using default: {e}")
-        stt_client = create_stt_client(language_code=language_code)
-        stt_config = stt_client.stt_instance
-
-    # Configure TTS
-    # Convert scenario.voice to dict format for create_tts_client
-    tts_config_from_metadata = None
-    if scenario.voice:
-        tts_config_from_metadata = {
-            "provider": scenario.voice.provider,
-            "name": scenario.voice.name,
-            "config": {
-                "model": scenario.voice.config.model,
-                "voice_id": scenario.voice.config.voice_id,
-                "speaker": scenario.voice.config.speaker,
-                "voice_name": scenario.voice.config.voice_name,
-                "gender": scenario.voice.config.gender,
-                "voice_cloning_key": scenario.voice.config.voice_cloning_key,
-                "instant_mode": scenario.voice.config.instant_mode,
-                "voice_provider": scenario.voice.config.voice_provider,
-            },
-        }
-
-    # Convert gender string to Gender enum
-    gender_enum = (
-        Gender(scenario.prompt_data.gender.lower())
-        if scenario.prompt_data.gender
-        else None
-    )
-
-    try:
-        tts_client = create_tts_client(
-            tts_config=tts_config_from_metadata,
-            language_code=language_code,
-            gender=gender_enum,
-        )
-        tts_config = tts_client.tts_instance
-    except Exception as e:
-        logger.warning(f"TTS config failed, using default: {e}")
-        if gender_enum:
-            tts_client = create_tts_client(
-                language_code=language_code, gender=gender_enum
-            )
-            tts_config = tts_client.tts_instance
-        else:
-            raise ValueError("Cannot create TTS: gender is required for fallback")
-
-    # Initialize state
-    initialize_agent_state(ctx.room.name, scenario)
-    joined_iso = datetime.now(timezone.utc).isoformat()
-
-    # Setup session
-    vad = ctx.proc.userdata.get("vad")
-    session = create_agent_session(tts_config, vad, stt_config)
-
-    # Initialize EventOrchestrator (termination callback will be set below)
-    event_orchestrator = EventOrchestrator(
-        scenario=scenario,
-        termination_callback=None,  # Set after defining the callback
-        room=ctx.room,
-        thread_id=ctx.room.name,
-        agent_joined_at=joined_iso,
-    )
-    logger.info(f"Initialized EventOrchestrator with {len(scenario.events)} events")
-
-    # Track if final score has been sent to prevent duplicates
-    final_score_sent = False
-
-    # Listen to connection state changes and push total score on disconnect
-    @ctx.room.on("connection_state_changed")
-    def on_connection_state_changed(state: rtc.ConnectionState):
-        nonlocal final_score_sent
-        logger.info(f"LiveKit Event: Connection state changed: {state}")
-
-        # Send final score when connection state changes to DISCONNECTED
-        if state == rtc.ConnectionState.CONN_DISCONNECTED:
-            if final_score_sent:
-                logger.info(
-                    "Final score already sent, skipping duplicate send on disconnect"
-                )
-                return
-
-            logger.info(
-                "Connection state is DISCONNECTED, sending final score to backend"
-            )
-            try:
-                asyncio.create_task(
-                    send_final_score_to_core(
-                        room_id=ctx.room.name,
-                        thread_id=ctx.room.name,
-                        event_orchestrator=event_orchestrator,
-                    )
-                )
-                final_score_sent = True
-                logger.info(
-                    "Initiated queue push for connection state change to DISCONNECTED"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to initiate queue push on connection state change: {e}"
-                )
-
-    async def handle_termination_task(event: BaseEvent):
-        """Handle session termination when a termination event occurs."""
-        logger.info(
-            f"Termination event '{event.event_id}' triggered. Initiating shutdown..."
-        )
-
-        try:
-            # Publish termination audio message - get from termination event config
-            termination_config = event_orchestrator.get_termination_config(
-                event.event_id
-            )
-            termination_message = (
-                termination_config.termination_message if termination_config else ""
-            )
-            logger.info(f"Using termination message: {termination_message}")
-            await publish_termination_audio(termination_message, session)
-
-        except Exception as e:
-            logger.exception(f"Error during termination audio playback: {e}")
-        finally:
-            # Shutdown the session - final score will be sent in on_shutdown
-            ctx.shutdown("Session terminated")
-            logger.info("Session shutdown completed")
-
-    # This function creates a background task to handle session termination.
-    # This is done to handle the case where termination event coming from
-    # langgraph flow terminates without publishing audio.
-    async def handle_termination(event: BaseEvent):
-        """Wrapper to execute termination as a background task."""
-        task = asyncio.create_task(handle_termination_task(event))
-        logger.info(f"Termination background task created for event '{event.event_id}'")
-        return task
-
-    # Set the termination callback
-    event_orchestrator.termination_callback = handle_termination
-
-    async def on_shutdown():
-        """Cleanup callback when session is shutting down."""
-        nonlocal final_score_sent
-        logger.debug("Shutdown callback triggered")
-
-        # Clean up conversation handler state (deduplication set)
-        try:
-            cleanup_conversation_handler()
-        except Exception as e:
-            logger.debug(f"Error cleaning up conversation handler: {e}")
-
-        # Send deferred termination event to Core (if any).
-        # Termination events are sent here AFTER the agent has finished
-        # speaking the termination message, ensuring the backend doesn't
-        # close the room prematurely when it receives the event with
-        # autoTerminationStatus=true.
-        if event_orchestrator.deferred_termination_event:
-            logger.info(
-                f"Sending deferred termination event "
-                f"{event_orchestrator.deferred_termination_event.event_id} "
-                f"to Core"
-            )
-            try:
-                # Get termination info from the deferred event's config
-                deferred_event = event_orchestrator.deferred_termination_event
-                termination_config = event_orchestrator.get_termination_config(
-                    deferred_event.event_id
-                )
-                termination_event_id = (
-                    termination_config.id if termination_config else None
-                )
-                termination_message = (
-                    termination_config.termination_message
-                    if termination_config
-                    else None
-                )
-
-                event_dict = serialize_event(
-                    deferred_event,
-                    termination_event_id=termination_event_id,
-                    termination_message=termination_message,
-                )
-                core_event_message = CoreEventMessageType.create(
-                    room_id=ctx.room.name, event_data=event_dict
-                )
-                await msg_event_queue.send_message(
-                    message_body=core_event_message.model_dump_json()
-                )
-                logger.info("Deferred termination event sent to Core successfully")
-            except Exception as e:
-                logger.error(f"Failed to send deferred termination event: {e}")
-
-        # Send final score after speaking and after pushing termination event
-        if not final_score_sent:
-            logger.info("Sending final score to backend in on_shutdown")
-            try:
-                await send_final_score_to_core(
-                    room_id=ctx.room.name,
-                    thread_id=ctx.room.name,
-                    event_orchestrator=event_orchestrator,
-                )
-                final_score_sent = True
-                logger.info("Final score sent successfully in on_shutdown")
-            except Exception as e:
-                logger.error(f"Failed to send final score in on_shutdown: {e}")
-        else:
-            logger.info(
-                "Final score already sent, skipping duplicate send in on_shutdown"
-            )
-
-        logger.info("Shutdown initiated")
-
-    ctx.add_shutdown_callback(on_shutdown)
-
-    # Create LLM adapter
-    agent_adapter = LLMAdapter(
-        graph=agent_graph,
-        config={
-            "configurable": {
-                "thread_id": ctx.room.name,
-                "room": ctx.room,
-                "scenario": scenario,
-                "agent_joined_at": joined_iso,
-                "event_orchestrator": event_orchestrator,
-            }
-        },
-    )
-
-    # Create agent
-    agent = Assistant(llm=agent_adapter)
-
-    # Register conversation handler with deduplication
-    conversation_handler, cleanup_conversation_handler = create_conversation_handler(
-        ctx.room.name, joined_iso
-    )
-    session.on("conversation_item_added")(conversation_handler)
-
-    # Start session
-    await session.start(
-        room=ctx.room,
-        agent=agent,
-        room_input_options=RoomInputOptions(
-            noise_cancellation=noise_cancellation.BVC(),
-        ),
-    )
-
-    await ctx.connect()
-
-    # Listen to LiveKit's playback_finished event to detect interruptions
-    try:
-        from livekit.agents.voice.io import PlaybackFinishedEvent
-
-        from app.core.events.event_types.interruption.interruption_event import (
-            set_interruption_detected,
-        )
-
-        @session.output.audio.on("playback_finished")
-        def on_playback_finished(event: PlaybackFinishedEvent):
-            logger.info(
-                f"LiveKit playback_finished event received: "
-                f"interrupted={event.interrupted}"
-            )
-            if event.interrupted:
-                logger.info(
-                    "LiveKit detected interruption: " "Agent's speech was interrupted"
-                )
-                # Set the interruption flag for the interruption event to detect
-                set_interruption_detected(True)
-                logger.info(
-                    "Interruption flag set to True - "
-                    "InterruptionEvent will detect this in next process_events cycle"
-                )
-            else:
-                # Reset flag when playback finishes normally
-                logger.debug(
-                    "Playback finished normally " "(not interrupted) - resetting flag"
-                )
-                set_interruption_detected(False)
-
-    except ImportError:
-        logger.warning(
-            "Could not import PlaybackFinishedEvent. "
-            "Interruption detection will not work."
-        )
-    except Exception as e:
-        logger.error(
-            f"Failed to set up interruption detection listener: {e}. "
-            "Interruption detection will not work."
-        )
-
-    # Initialise only after session is connected
-    await event_orchestrator.initialize()
-
-    # Only say opening statement if termination hasn't been initiated
-    if not event_orchestrator.is_termination_initiated():
-        await session.say(random.choice(scenario.prompt_data.opening_statements))
+    This function can be used with:
+        agent = Agent(options=WorkerOptions(...))
+        await agent.run_from_notebook(entrypoint)
+    """
+    worker = AgentWorker(ctx)
+    await worker.configure()  # Phase 1: Configure clients
+    await worker.initialize()  # Phase 2: Create session, agent, orchestrator
+    await worker.start()  # Phase 3: Connect and start
 
 
 def prewarm(proc: JobProcess):
     """Prewarm VAD model for faster startup."""
-    proc.userdata["vad"] = silero.VAD.load(activation_threshold=0.7)
+    proc.userdata["vad"] = silero.VAD.load(
+        activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD
+    )
 
 
 if __name__ == "__main__":
+    import sys
+
+    # Handle download-files command for Docker build
+    if len(sys.argv) > 1 and sys.argv[1] == "download-files":
+        # Pre-download VAD model files
+        logger.info("Downloading required model files...")
+        silero.VAD.load(activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD)
+        logger.info("Model files downloaded successfully")
+        sys.exit(0)
+
     agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME
     agents.cli.run_app(
         agents.WorkerOptions(

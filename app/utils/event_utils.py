@@ -3,7 +3,6 @@ from typing import Dict, Set
 from app.core.constants import ConditionOperator, ExpressionType
 from app.core.events.event_types.combination.constants import ExpressionNode
 from app.core.events.schemas import EventRegistryEntry
-from app.core.graph import agent_graph
 
 
 def evaluate_condition(
@@ -139,6 +138,9 @@ def extract_event_ids_from_expression(node: ExpressionNode) -> Set[str]:
 # Get the current state for a specific thread_id
 def get_current_score_from_graph(thread_id: str) -> int:
     """Get the current score from LangGraph state."""
+    # Lazy import to avoid circular dependency
+    from app.core.graph import agent_graph
+
     state = agent_graph.get_state({"configurable": {"thread_id": thread_id}})
     if state and state.values:
         return state.values.get("current_score", 0)

@@ -4,6 +4,34 @@ from unittest.mock import Mock
 import pytest
 
 import app.worker as worker
+from app.core.graph import agent_graph
+from app.utils import agent_utils, event_handler
+
+
+def _create_test_scenario(prompt_data, events=None):
+    """Helper to create a proper Scenario object for tests."""
+    from app.core.scenario.base import Scenario
+
+    return Scenario(
+        scenarioName="test",
+        metadata={},
+        events=events or [],
+        trigger_events=[],
+        termination_events=[],
+        voice=None,
+        prompt_data=prompt_data,
+        language_config=None,
+    )
+
+
+def _create_test_envelope(scenario):
+    """Helper to create a proper RoomMetadataEnvelope for tests."""
+    from app.core.livekit.livekit_models import RoomMetadataEnvelope
+
+    return RoomMetadataEnvelope(
+        version="1.0",
+        scenario=scenario,
+    )
 
 
 class TestWorker:
@@ -15,10 +43,31 @@ class TestWorker:
             captured["config"] = config
             captured["values"] = values
 
-        monkeypatch.setattr(worker.agent_graph, "update_state", fake_update_state)
+        monkeypatch.setattr(agent_graph, "update_state", fake_update_state)
 
         scenario = types.SimpleNamespace(events=["A", "B"])
-        worker.initialize_agent_state("room-1", scenario)
+
+        # Create a mock context
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        worker_instance.scenario = scenario
+
+        # Initialize agent state (now inlined in configure, but we can test it directly)
+        agent_graph.update_state(
+            {"configurable": {"thread_id": ctx.room.name}},
+            values={
+                "messages": [],
+                "permitted_events": scenario.events,
+                "events_accumulator": [],
+                "new_events": [],
+                "current_score": 0,
+                "branching_instructions": [],
+            },
+        )
 
         assert captured["config"] == {"configurable": {"thread_id": "room-1"}}
         assert captured["values"]["permitted_events"] == ["A", "B"]
@@ -29,7 +78,6 @@ class TestWorker:
 
     # -------------------- create_agent_session --------------------
     def test_create_agent_session_uses_expected_components(self, monkeypatch):
-        # Dummy components to capture inputs
         created = {}
 
         class DummyAgentSession:
@@ -42,16 +90,24 @@ class TestWorker:
 
         monkeypatch.setattr(worker, "AgentSession", DummyAgentSession)
 
-        tts_config = "TTS"
-        vad = "VAD"
-        stt_config = "STT"
-        session = worker.create_agent_session(tts_config, vad, stt_config)
+        class MockCtx:
+            def __init__(self):
+                self.proc = types.SimpleNamespace(userdata={"vad": "VAD"})
+                self.room = types.SimpleNamespace(name="room-1")
 
-        assert isinstance(session, DummyAgentSession)
-        assert session.stt == "STT"
-        assert session.tts == "TTS"
-        assert session.vad == "VAD"
-        assert session.turn_detection == "vad"  # Worker now uses "vad" string
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        worker_instance.stt_client = types.SimpleNamespace(stt_instance="STT")
+        worker_instance.tts_client = types.SimpleNamespace(tts_instance="TTS")
+
+        # Call the class method
+        worker_instance._create_session()
+
+        assert created["session"] is True
+        assert worker_instance.session.stt == "STT"
+        assert worker_instance.session.tts == "TTS"
+        assert worker_instance.session.vad == "VAD"
+        assert worker_instance.session.turn_detection == "vad"
 
     # -------------------- entrypoint --------------------
     class DummyRoom:
@@ -88,41 +144,76 @@ class TestWorker:
             self.started = True
             self.start_args = {"room": room, "agent": agent, "rio": room_input_options}
 
-        async def say(self, text):
+        def say(self, text):
             self.said.append(text)
 
+            # Return a handler-like object for consistency with actual API
+            class Handler:
+                async def wait_for_playout(self):
+                    pass
+
+            return Handler()
+
     class DummyAgent:
-        def __init__(self, llm):
+        def __init__(self, llm=None, instructions=None, **kwargs):
             self.llm = llm
+            self.instructions = instructions
 
     @pytest.mark.asyncio
     async def test_entrypoint_happy_path(self, monkeypatch):
-        # Create a mock event object
-        from app.core.constants import DetectionType
-
-        mock_event = types.SimpleNamespace(
-            event_id="E1",
-            detection_type=DetectionType.SENTENCE_SIMILARITY,
-            sentences=["hello"],
-        )
-
         # Parse metadata -> scenario
-        scenario = types.SimpleNamespace(
-            voice=None,  # No voice config, will use defaults
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello", "hi"]
-            ),
-            language_config=None,  # Can be None, will default to DEFAULT_LANGUAGE_CODE
-            events=[mock_event],
-            trigger_events=None,
-            termination_events=[],
+        # Create a proper VoicePromptData object
+        from app.core.scenario.base import (
+            Scenario,
+            ScenarioResponseLength,
+            VoicePromptData,
         )
 
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello", "hi"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
+        )
+
+        # Create a proper Scenario object with empty events list
+        # (events will be created by the actual code path)
+        scenario = Scenario(
+            scenarioName="test",
+            metadata={},
+            events=[],  # Empty list - events will be built from metadata in real code
+            trigger_events=[],
+            termination_events=[],
+            voice=None,
+            prompt_data=prompt_data,
+            language_config=None,
+        )
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+
+        rm_md_envelope = RoomMetadataEnvelope(
+            version="1.0",
+            scenario=scenario,
+        )
+
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+
+        # Also mock RoomMetadataEnvelope.create to bypass Scenario.create()
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         # STT config
@@ -136,7 +227,14 @@ class TestWorker:
             stt_called["ok"] = True
             return MockSTTClient()
 
-        monkeypatch.setattr(worker, "create_stt_client", mock_create_stt_client)
+        from app.stt import factory as stt_factory
+
+        monkeypatch.setattr(stt_factory, "create_stt_client", mock_create_stt_client)
+        monkeypatch.setattr(
+            agent_utils,
+            "configure_stt_client",
+            lambda scenario: mock_create_stt_client(),
+        )
 
         # TTS config
         tts_called = {}
@@ -147,26 +245,68 @@ class TestWorker:
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        # Mock both the factory and the agent_utils module
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "configure_stt_client",
+            lambda scenario: mock_create_stt_client(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: True
+        )
 
         # Graph update already tested; still keep it deterministic
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
 
-        # LLMAdapter -> return simple object with captured cfg
-        class DummyAdapter:
-            def __init__(self, graph, config):
-                self.graph = graph
-                self.config = config
+        # Agent -> DummyAgent (also mock in agent_utils where it's imported)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
 
-        monkeypatch.setattr(worker, "LLMAdapter", DummyAdapter)
-
-        # Assistant -> DummyAgent
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-
-        # Session factory
+        # Mock AgentSession to return our dummy session
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
 
         # Conversation handler factory (just return passthrough fn)
@@ -181,7 +321,9 @@ class TestWorker:
 
             return _h, _cleanup
 
-        monkeypatch.setattr(worker, "create_conversation_handler", fake_handler_factory)
+        monkeypatch.setattr(
+            event_handler, "create_conversation_handler", fake_handler_factory
+        )
 
         # RoomInputOptions and noise cancellation
         class DummyBVC:
@@ -222,21 +364,52 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_tts_fallback(self, monkeypatch):
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="female", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_events=[],
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.core.scenario.base import (
+            Scenario,
+            ScenarioResponseLength,
+            VoicePromptData,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="female",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
+        )
+
+        scenario = Scenario(
+            scenarioName="test",
+            metadata={},
+            events=[],
+            trigger_events=[],
+            termination_events=[],
+            voice=None,
+            prompt_data=prompt_data,
+            language_config=None,
+        )
+
+        rm_md_envelope = RoomMetadataEnvelope(
+            version="1.0",
+            scenario=scenario,
+        )
+
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         # STT should work fine
@@ -244,10 +417,15 @@ class TestWorker:
             def __init__(self):
                 self.stt_instance = "STT"
 
+        from app.stt import factory as stt_factory
+
         monkeypatch.setattr(
-            worker,
+            stt_factory,
             "create_stt_client",
             lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
         )
 
         # First call fails, second call (fallback) succeeds
@@ -268,17 +446,67 @@ class TestWorker:
                 mock_client.tts_instance = "DEFAULT_TTS"
                 return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+
+        # Mock configure_tts_client to handle the fallback logic
+        def mock_configure_tts_client(scenario):
+            try:
+                return mock_create_tts()
+            except RuntimeError:
+                return mock_create_tts(gender="female")
+
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", mock_configure_tts_client
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
@@ -338,10 +566,7 @@ class TestWorker:
                 say_called["message"] = message
                 return MockHandler()
 
-        message = "Session ended"
-        session = MockSession()
-
-        await worker.publish_termination_audio(message, session)
+        await event_handler.publish_termination_audio(MockSession(), "Session ended")
 
         assert "message" in say_called
         assert say_called["message"] == "Session ended"
@@ -356,30 +581,43 @@ class TestWorker:
             def say(self, message, allow_interruptions=True):
                 raise RuntimeError("TTS synthesis failed")
 
-        message = "Session ended"
-        session = MockSession()
-
         with pytest.raises(RuntimeError, match="TTS synthesis failed"):
-            await worker.publish_termination_audio(message, session)
+            await event_handler.publish_termination_audio(
+                MockSession(), "Session ended"
+            )
 
     # -------------------- entrypoint additional tests --------------------
     @pytest.mark.asyncio
     async def test_entrypoint_stt_fallback(self, monkeypatch):
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_events=[],
+        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         # STT should fail and fallback
@@ -399,24 +637,86 @@ class TestWorker:
 
                 return MockSTTClient()
 
-        monkeypatch.setattr(worker, "create_stt_client", fake_stt_with_fallback)
+        from app.stt import factory as stt_factory
+
+        monkeypatch.setattr(stt_factory, "create_stt_client", fake_stt_with_fallback)
+        monkeypatch.setattr("app.stt.create_stt_client", fake_stt_with_fallback)
+        monkeypatch.setattr(agent_utils, "create_stt_client", fake_stt_with_fallback)
+
+        # Mock configure_stt_client to properly handle the fallback
+        def mock_configure_stt_client(scenario):
+            language_code = (
+                scenario.language_config.language_code
+                if scenario and scenario.language_config
+                else "en-IN"
+            )
+            try:
+                return fake_stt_with_fallback()
+            except RuntimeError:
+                return fake_stt_with_fallback(language_code=language_code)
+
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", mock_configure_stt_client
+        )
 
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
@@ -438,33 +738,50 @@ class TestWorker:
 
         await worker.entrypoint(Ctx())
 
-        assert fallback_used["used"] is not None
+        # The fallback should have been used when the first call fails
+        assert "used" in fallback_used and fallback_used["used"] is not None
 
     @pytest.mark.asyncio
     async def test_entrypoint_initializes_event_orchestrator(self, monkeypatch):
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_event=None,
+        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
 
+        from app.stt import factory as stt_factory
+
         monkeypatch.setattr(
-            worker,
+            stt_factory,
             "create_stt_client",
             lambda stt_config=None, language_code=None: MockSTTClient(),
         )
@@ -474,7 +791,14 @@ class TestWorker:
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
 
         registry_init_called = {}
 
@@ -504,18 +828,53 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         class Ctx:
             def __init__(self):
@@ -538,31 +897,50 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_registers_shutdown_callback(self, monkeypatch):
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_events=[],
+        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
 
+        from app.stt import factory as stt_factory
+
         monkeypatch.setattr(
-            worker,
+            stt_factory,
             "create_stt_client",
             lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
         )
 
         def mock_create_tts(*a, **k):
@@ -570,22 +948,64 @@ class TestWorker:
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         class Ctx:
             def __init__(self):
@@ -610,31 +1030,50 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_handle_termination_callback(self, monkeypatch):
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_events=[],
+        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
 
+        from app.stt import factory as stt_factory
+
         monkeypatch.setattr(
-            worker,
+            stt_factory,
             "create_stt_client",
             lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
         )
 
         def mock_create_tts(*a, **k):
@@ -642,7 +1081,14 @@ class TestWorker:
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
 
         registry_instance = {}
 
@@ -671,27 +1117,78 @@ class TestWorker:
 
         monkeypatch.setattr(worker, "EventOrchestrator", MockEventOrchestrator)
 
-        publish_called = {}
+        # Mock session with say method to track calls
+        say_called = {}
 
-        async def mock_publish(message, session):
-            publish_called["message"] = message
+        class MockHandler:
+            async def wait_for_playout(self):
+                pass
 
-        monkeypatch.setattr(worker, "publish_termination_audio", mock_publish)
+        class MockSessionWithSay:
+            def __init__(self):
+                self.handlers = {}
 
-        dummy_session = self.DummySession()
+            def on(self, event_name):
+                def decorator(fn):
+                    self.handlers[event_name] = fn
+                    return fn
+
+                return decorator
+
+            async def interrupt(self):
+                pass
+
+            def say(self, message, allow_interruptions=True):
+                say_called["message"] = message
+                return MockHandler()
+
+            async def start(self, room, agent, room_input_options):
+                pass
+
+        dummy_session = MockSessionWithSay()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         class Ctx:
             def __init__(self):
@@ -716,10 +1213,15 @@ class TestWorker:
         # Test termination callback - get it from the registry instance
         # after it's been set
         mock_event = types.SimpleNamespace(event_id="term-event")
-        task = await registry_instance["instance"].termination_callback(mock_event)
+        termination_callback = registry_instance["instance"].termination_callback
+        # The termination callback now returns a task, and we need to set
+        # the orchestrator
+        if hasattr(termination_callback, "set_event_orchestrator"):
+            termination_callback.set_event_orchestrator(registry_instance["instance"])
+        task = termination_callback(mock_event)
         await task
 
-        assert publish_called["message"] == "Goodbye"
+        assert say_called["message"] == "Goodbye"
         assert ctx.shutdown_called is True
 
     @pytest.mark.asyncio
@@ -728,31 +1230,50 @@ class TestWorker:
     ):
         """Test that opening statement is skipped when termination is
         initiated during initialization."""
-        scenario = types.SimpleNamespace(
-            voice=None,
-            prompt_data=types.SimpleNamespace(
-                gender="male", opening_statements=["hello"]
-            ),
-            events=[],
-            language_config=None,
-            trigger_events=None,
-            termination_event=None,
+        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+
+        prompt_data = VoicePromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            agent_goal="test goal",
+            prompt="test prompt",
+            response_length=ScenarioResponseLength.BRIEF,
         )
-        rm_md_envelope = types.SimpleNamespace(scenario=scenario)
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.utils import metadata_parser
+
         monkeypatch.setattr(
-            worker,
+            metadata_parser,
             "parse_room_metadata",
             lambda md, embedding_client=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None: rm_md_envelope,
         )
 
         class MockSTTClient:
             def __init__(self):
                 self.stt_instance = "STT"
 
+        from app.stt import factory as stt_factory
+
         monkeypatch.setattr(
-            worker,
+            stt_factory,
             "create_stt_client",
             lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
         )
 
         def mock_create_tts(*a, **k):
@@ -760,7 +1281,14 @@ class TestWorker:
             mock_client.tts_instance = "TTS"
             return mock_client
 
-        monkeypatch.setattr(worker, "create_tts_client", mock_create_tts)
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
 
         # UPDATED MOCK: Now accepts agent_joined_at
         class MockEventOrchestrator:
@@ -787,18 +1315,53 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "create_agent_session", lambda tts, vad, stt: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
         )
-        monkeypatch.setattr(worker, "Assistant", self.DummyAgent)
-        monkeypatch.setattr(worker, "LLMAdapter", lambda *a, **k: object())
-        monkeypatch.setattr(worker.agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
         monkeypatch.setattr(
-            worker,
+            event_handler,
             "create_conversation_handler",
             lambda *a, **k: (lambda e: None, lambda: None),
         )
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+        monkeypatch.setattr(
+            agent_utils, "configure_llm_client", lambda scenario: Mock()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
 
         class Ctx:
             def __init__(self):

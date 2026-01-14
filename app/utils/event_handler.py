@@ -1,18 +1,38 @@
-"""Conversation event handlers for LiveKit sessions."""
+"""Event handlers for LiveKit sessions."""
+
+from __future__ import annotations
 
 import asyncio
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING, Callable, Optional, Set
 
-from livekit import rtc
+if TYPE_CHECKING:
+    from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
+
+from livekit import agents, rtc
 from livekit.agents import ConversationItemAddedEvent
 
-from app.core.events.base import ChatMessage
+from app.core.constants import SESSION_TERMINATED_MESSAGE
+from app.core.events.base import BaseEvent, ChatMessage
+from app.core.events.event_types.interruption.interruption_event import (
+    set_interruption_detected,
+)
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.queue import msg_event_queue
 from app.utils.logger import get_logger
+from app.utils.queue_utils import (
+    send_deferred_termination_event,
+    send_final_score_to_core,
+)
 
 logger = get_logger(__name__)
+
+# Conditional import for interruption detection
+try:
+    from livekit.agents.voice.io import PlaybackFinishedEvent
+except ImportError:
+    PlaybackFinishedEvent = None  # type: ignore
 
 
 def extract_content(item) -> str:
@@ -138,3 +158,281 @@ async def send_event_to_ui(
     except Exception as e:
         logger.debug(f"Failed to send custom event to frontend: {type(e).__name__}")
         return False
+
+
+def create_connection_state_handler(
+    event_orchestrator: "EventOrchestrator",
+    room_name: str,
+    final_score_sent_ref: Callable[[], bool],
+    set_final_score_sent: Callable[[bool], None],
+    background_tasks: Set[asyncio.Task],
+) -> Callable[[rtc.ConnectionState], None]:
+    """
+    Create a connection state change handler.
+
+    Args:
+        event_orchestrator: EventOrchestrator instance
+        room_name: Room identifier
+        final_score_sent_ref: Callable to get final_score_sent flag
+        set_final_score_sent: Callable to set final_score_sent flag
+        background_tasks: Set to track background tasks
+
+    Returns:
+        Connection state handler function
+    """
+
+    def on_connection_state_changed(state: rtc.ConnectionState):
+        """Handle connection state changes."""
+        logger.info(f"LiveKit Event: Connection state changed: {state}")
+
+        if state == rtc.ConnectionState.CONN_DISCONNECTED:
+            if final_score_sent_ref():
+                logger.info("Final score already sent, skipping duplicate send")
+                return
+
+            logger.info("Connection state is DISCONNECTED, sending final score")
+            try:
+                task = asyncio.create_task(
+                    send_final_score_to_core(
+                        room_id=room_name,
+                        thread_id=room_name,
+                        event_orchestrator=event_orchestrator,
+                    )
+                )
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
+                set_final_score_sent(True)
+            except Exception as e:
+                logger.error(f"Failed to send final score: {e}")
+
+    return on_connection_state_changed
+
+
+def setup_interruption_detection(session) -> None:
+    """
+    Setup LiveKit interruption detection listener.
+
+    Args:
+        session: AgentSession instance
+    """
+    if PlaybackFinishedEvent is None:
+        logger.warning(
+            "Could not import PlaybackFinishedEvent. "
+            "Interruption detection will not work."
+        )
+        return
+
+    try:
+
+        @session.output.audio.on("playback_finished")
+        def on_playback_finished(event: PlaybackFinishedEvent):
+            logger.info(
+                f"LiveKit playback_finished event received: "
+                f"interrupted={event.interrupted}"
+            )
+            if event.interrupted:
+                logger.info(
+                    "LiveKit detected interruption: Agent's speech was interrupted"
+                )
+                # Set the interruption flag for the interruption event to detect
+                set_interruption_detected(True)
+                logger.info(
+                    "Interruption flag set to True - "
+                    "InterruptionEvent will detect this in next process_events cycle"
+                )
+            else:
+                # Reset flag when playback finishes normally
+                logger.debug(
+                    "Playback finished normally (not interrupted) - resetting flag"
+                )
+                set_interruption_detected(False)
+
+    except Exception as e:
+        logger.error(
+            f"Failed to set up interruption detection listener: {e}. "
+            "Interruption detection will not work."
+        )
+
+
+def create_shutdown_handler(
+    event_orchestrator: "EventOrchestrator",
+    room_name: str,
+    final_score_sent_ref: Callable[[], bool],
+    set_final_score_sent: Callable[[bool], None],
+    cleanup_background_tasks: Callable[[], None],
+) -> Callable[[], None]:
+    """
+    Create a shutdown callback handler.
+
+    Args:
+        event_orchestrator: EventOrchestrator instance
+        room_name: Room identifier
+        final_score_sent_ref: Callable to get final_score_sent flag
+        set_final_score_sent: Callable to set final_score_sent flag
+        cleanup_background_tasks: Async function to cleanup background tasks
+
+    Returns:
+        Async shutdown handler function
+    """
+
+    async def on_shutdown():
+        """Cleanup callback when session is shutting down."""
+        # Lazy import to avoid circular dependency
+        from app.core.events.event_orchestrator.event_orchestrator import (  # noqa: F401, E501
+            EventOrchestrator,
+        )
+
+        logger.debug("Shutdown callback triggered")
+
+        # Send deferred termination event
+        if event_orchestrator.deferred_termination_event:
+            await send_deferred_termination_event(room_name, event_orchestrator)
+
+        # Send final score
+        if not final_score_sent_ref():
+            try:
+                await send_final_score_to_core(
+                    room_id=room_name,
+                    thread_id=room_name,
+                    event_orchestrator=event_orchestrator,
+                )
+                set_final_score_sent(True)
+                logger.info("Final score sent successfully")
+            except Exception as e:
+                logger.error(f"Failed to send final score: {e}")
+
+        # Cleanup background tasks
+        await cleanup_background_tasks()
+
+        logger.info("Shutdown initiated")
+
+    return on_shutdown
+
+
+# ====================================================================
+# Termination Handlers
+# ====================================================================
+
+
+async def publish_termination_audio(session, message: str) -> None:
+    """
+    Publish termination message as audio.
+
+    Args:
+        session: AgentSession instance
+        message: Termination message to speak
+
+    Raises:
+        Exception: If audio playback fails
+    """
+    if not session:
+        return
+
+    try:
+        logger.info(f"Publishing termination audio: '{message}'")
+        await session.interrupt()
+        handler = session.say(message, allow_interruptions=False)
+        await handler.wait_for_playout()
+        logger.info("Termination audio playback completed")
+    except Exception as e:
+        logger.exception(f"Failed to publish termination audio: {e}")
+        raise
+
+
+async def handle_termination(
+    event: BaseEvent,
+    event_orchestrator: "EventOrchestrator",
+    session,
+    ctx: agents.JobContext,
+) -> None:
+    """
+    Handle session termination when a termination event occurs.
+
+    Args:
+        event: Termination event that triggered shutdown
+        event_orchestrator: EventOrchestrator instance
+        session: AgentSession instance
+        ctx: JobContext for shutdown
+    """
+    # Lazy import to avoid circular dependency
+    from app.core.events.event_orchestrator.event_orchestrator import (  # noqa: F401
+        EventOrchestrator,
+    )
+
+    logger.info(
+        f"Termination event '{event.event_id}' triggered. Initiating shutdown..."
+    )
+
+    try:
+        termination_config = event_orchestrator.get_termination_config(event.event_id)
+        termination_message = (
+            termination_config.termination_message if termination_config else ""
+        )
+        logger.info(f"Using termination message: {termination_message}")
+
+        # Publish termination audio
+        if session:
+            await publish_termination_audio(session, termination_message)
+    except Exception as e:
+        logger.exception(f"Error during termination audio playback: {e}")
+    finally:
+        ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+        logger.info("Session shutdown completed")
+
+
+def create_termination_handler(
+    session,
+    ctx: agents.JobContext,
+    background_tasks: Set[asyncio.Task],
+) -> Callable[[BaseEvent], asyncio.Task]:
+    """
+    Create a termination handler that executes termination as a background task.
+
+    This handler needs to be created before EventOrchestrator (which takes it
+    as a callback), but the handler needs the orchestrator to get termination
+    config. We use a mutable reference pattern to update the orchestrator after
+    creation.
+
+    Args:
+        session: AgentSession instance
+        ctx: JobContext for shutdown
+        background_tasks: Set to track background tasks
+
+    Returns:
+        Termination callback function that can be updated with orchestrator reference
+    """
+    # Mutable reference to store orchestrator (updated after creation)
+    orchestrator_ref: list[Optional["EventOrchestrator"]] = [None]
+
+    def termination_callback(event: BaseEvent) -> asyncio.Task:
+        """
+        Handle termination event as a background task.
+
+        This is done to handle the case where termination event coming from
+        langgraph flow terminates without publishing audio.
+        """
+        if orchestrator_ref[0] is None:
+            logger.error("EventOrchestrator not set in termination handler")
+            return asyncio.create_task(asyncio.sleep(0))
+
+        task = asyncio.create_task(
+            handle_termination(
+                event=event,
+                event_orchestrator=orchestrator_ref[0],
+                session=session,
+                ctx=ctx,
+            )
+        )
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        logger.info(f"Termination background task created for event '{event.event_id}'")
+        return task
+
+    # Add method to update orchestrator reference
+    def set_event_orchestrator(event_orchestrator: "EventOrchestrator"):
+        """Update the event orchestrator reference."""
+        orchestrator_ref[0] = event_orchestrator
+
+    termination_callback.set_event_orchestrator = set_event_orchestrator
+
+    return termination_callback

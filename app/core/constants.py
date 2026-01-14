@@ -90,3 +90,8 @@ class ExpressionType(str, Enum):
     NOT = "NOT"
     AND = "AND"
     OR = "OR"
+
+
+# Worker configuration constants
+DEFAULT_VAD_ACTIVATION_THRESHOLD: Final[float] = 0.7
+SESSION_TERMINATED_MESSAGE: Final[str] = "Session terminated"

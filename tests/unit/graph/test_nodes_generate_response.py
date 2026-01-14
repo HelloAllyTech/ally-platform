@@ -36,13 +36,8 @@ class TestGenerateResponse:
     async def test_generate_response_builds_system_message_and_returns_ai_only(
         self, monkeypatch
     ):
-        # Monkeypatch create_llm_client to return FakeLLMClient
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="hello from llm")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="hello from llm")
 
         # Minimal BaseEvent subclass for new_events validation
         class FakeEvent(BaseEvent):
@@ -105,7 +100,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -123,12 +118,8 @@ class TestGenerateResponse:
     async def test_generate_response_selects_max_magnitude_branching_instruction(
         self, monkeypatch
     ):
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         # Multiple branching instructions with different scores
         low_inst = BranchingInstruction.create("low positive")
@@ -201,7 +192,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -210,12 +201,8 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_branching_instructions(self, monkeypatch):
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         # Events without branching instructions
         state = SimulationState(
@@ -280,7 +267,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -391,12 +378,8 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_language_config(self, monkeypatch):
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content=f"response in {language_code}")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response in en-US")
         monkeypatch.setattr("app.core.graph.nodes.DEFAULT_LANGUAGE_CODE", "en-US")
 
         state = SimulationState(
@@ -440,7 +423,7 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario", (), {"prompt_data": prompt_data, "language_config": None}
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -448,12 +431,8 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_preserves_state_fields(self, monkeypatch):
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         class FakeEvent(BaseEvent):
             async def detect_event(self, conversations):
@@ -509,7 +488,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -523,13 +502,8 @@ class TestGenerateResponse:
         self, monkeypatch
     ):
         """Test that feedback is selected from branching event when available"""
-
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         probe_inst = BranchingInstruction.create("probe deeper")
         state = SimulationState(
@@ -594,7 +568,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -607,13 +581,8 @@ class TestGenerateResponse:
     ):
         """Test that highest score event's feedback is selected
         when no branching events"""
-
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
@@ -684,7 +653,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 
@@ -694,13 +663,8 @@ class TestGenerateResponse:
     @pytest.mark.asyncio
     async def test_generate_response_handles_empty_feedback_message(self, monkeypatch):
         """Test that empty string is sent when feedback message is None"""
-
-        def fake_create_llm_client(llm_config=None, language_code=None):
-            return FakeLLMClient(content="response")
-
-        monkeypatch.setattr(
-            "app.core.graph.nodes.create_llm_client", fake_create_llm_client
-        )
+        # Use pre-configured LLM client (new approach)
+        llm_client = FakeLLMClient(content="response")
 
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
@@ -757,7 +721,7 @@ class TestGenerateResponse:
             (),
             {"prompt_data": prompt_data, "language_config": language_config},
         )()
-        config = {"configurable": {"scenario": scenario}}
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
         new_state = await generate_response(state, config=config)
 

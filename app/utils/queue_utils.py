@@ -1,6 +1,14 @@
 """Queue messaging utilities for session management and backend communication."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
+
 from app.core.events.schemas import CoreEventMessageType
+from app.core.graph.utils import serialize_event
 from app.core.queue import msg_event_queue
 from app.utils.event_utils import get_current_score_from_graph
 from app.utils.logger import get_logger
@@ -81,3 +89,50 @@ async def send_final_score_to_core(
 
     except Exception as e:
         logger.error(f"Failed to send end-of-session message to backend: {e}")
+
+
+async def send_deferred_termination_event(
+    room_id: str, event_orchestrator: "EventOrchestrator"
+) -> None:
+    """
+    Send deferred termination event to Core.
+
+    Termination events are deferred to ensure the agent completes speaking
+    the termination message before the backend receives autoTerminationStatus=true.
+
+    Args:
+        room_id: LiveKit room identifier
+        event_orchestrator: EventOrchestrator instance
+    """
+    # Lazy import to avoid circular dependency
+    from app.core.events.event_orchestrator.event_orchestrator import (  # noqa: F401
+        EventOrchestrator,
+    )
+
+    try:
+        deferred_event = event_orchestrator.deferred_termination_event
+        if not deferred_event:
+            return
+
+        termination_config = event_orchestrator.get_termination_config(
+            deferred_event.event_id
+        )
+        termination_event_id = termination_config.id if termination_config else None
+        termination_message = (
+            termination_config.termination_message if termination_config else None
+        )
+
+        event_dict = serialize_event(
+            deferred_event,
+            termination_event_id=termination_event_id,
+            termination_message=termination_message,
+        )
+        core_event_message = CoreEventMessageType.create(
+            room_id=room_id, event_data=event_dict
+        )
+        await msg_event_queue.send_message(
+            message_body=core_event_message.model_dump_json()
+        )
+        logger.info("Deferred termination event sent to Core")
+    except Exception as e:
+        logger.error(f"Failed to send deferred termination event: {e}")

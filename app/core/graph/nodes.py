@@ -35,12 +35,23 @@ async def process_events(
     elapsed_time = calculate_elapsed_time(config)
     live_score = get_live_score(config)
 
-    # Retrieve orchestrator once to use throughout the function
+    # Retrieve orchestrator and dependencies once to use throughout the function
     orchestrator = None
     room = None
+    embedding_client = None
     if config and "configurable" in config:
         orchestrator = config["configurable"].get("event_orchestrator")
         room = config["configurable"].get("room")
+        embedding_client = config["configurable"].get("embedding_client")
+
+    # Inject embedding client for SemanticSimilarityEvent
+    # (survives LangGraph serialization)
+    if embedding_client:
+        from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
+            SemanticSimilarityEvent,
+        )
+
+        SemanticSimilarityEvent._EMBEDDING_CLIENT = embedding_client
 
     logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
 
@@ -242,12 +253,26 @@ async def generate_response(
             next_instruction=next_instruction,
         )
 
-    # Get language code and LLM config from scenario
-    language_code = DEFAULT_LANGUAGE_CODE
-    llm_config_from_metadata = None
-    if scenario and scenario.language_config:
-        language_code = scenario.language_config.language_code
-        llm_config_from_metadata = scenario.language_config.llm_config
+    # Get LLM client from config (pre-configured in AgentSetup) or create dynamically
+    llm_client = None
+    if config and "configurable" in config:
+        llm_client = config["configurable"].get("llm_client")
+
+    # Fallback: Create LLM client dynamically if not provided (backward compatibility)
+    if llm_client is None:
+        language_code = DEFAULT_LANGUAGE_CODE
+        llm_config_from_metadata = None
+        if scenario and scenario.language_config:
+            language_code = scenario.language_config.language_code
+            llm_config_from_metadata = scenario.language_config.llm_config
+
+        try:
+            llm_client = create_llm_client(
+                llm_config=llm_config_from_metadata, language_code=language_code
+            )
+        except Exception as e:
+            logger.warning(f"LLM config failed for {language_code}, using default: {e}")
+            llm_client = create_llm_client(language_code=DEFAULT_LANGUAGE_CODE)
 
     # Prepare the messages for the LLM call without mutating the state
     messages_to_send = []
@@ -255,16 +280,8 @@ async def generate_response(
         messages_to_send.append(system_message)
     messages_to_send.extend(state.messages)
 
-    # Create response from LLM using config from metadata or defaults
-    try:
-        llm_client = create_llm_client(
-            llm_config=llm_config_from_metadata, language_code=language_code
-        )
-        llm_instance = llm_client.llm_instance
-    except Exception as e:
-        logger.warning(f"LLM config failed for {language_code}, using default: {e}")
-        llm_client = create_llm_client(language_code=DEFAULT_LANGUAGE_CODE)
-        llm_instance = llm_client.llm_instance
+    # Get LLM instance and generate response
+    llm_instance = llm_client.llm_instance
 
     response = await llm_instance.ainvoke(messages_to_send)
 
