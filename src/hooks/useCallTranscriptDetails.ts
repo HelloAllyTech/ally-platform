@@ -8,7 +8,7 @@ import {
 } from '@/services/callTranscriptApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryData} from '@/store/slices/summarySlice';
-import {ChatProvider} from '@/types';
+import {CallTranscriptMessage, ChatProvider} from '@/types';
 import {formatTimeToMMSS} from '@/utils/date';
 
 const LIMIT = 20;
@@ -89,7 +89,7 @@ export const useCallTranscriptDetails = (chatId: number) => {
     }
   }, [isLoading, hasMore, fetchMessages, offset]);
 
-  const formattedMessages = useMemo(
+  const formattedMessages = useMemo<CallTranscriptMessage[]>(
     () =>
       messages.map(message => ({
         id: message.messageId,

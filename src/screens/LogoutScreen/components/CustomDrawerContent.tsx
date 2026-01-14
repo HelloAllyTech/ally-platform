@@ -18,7 +18,7 @@ import {
   useUser,
 } from '@/hooks';
 import {useGetLogoUrlQuery} from '@/services/authApi';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, radius, typography} from '@/theme';
 import {getAppVersion} from '@/utils';
 
 import {MenuOption} from './MenuOption';
@@ -45,6 +45,18 @@ export const DrawerContent = ({
 
   return (
     <View style={styles.container}>
+      {tenantData?.logoUrl && (
+        <>
+          <View style={styles.orgLogoContainer}>
+            <Image
+              source={{uri: tenantData.logoUrl}}
+              style={styles.orgLogo}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.separator} />
+        </>
+      )}
       <View style={styles.profileContainer}>
         <View style={styles.profileIconContainer}>
           {profileImageUrl ? (
@@ -72,9 +84,11 @@ export const DrawerContent = ({
         </View>
       </View>
 
+      <View style={styles.separator} />
+
       {credits && getCreditsInfo && (
         <>
-          <View style={styles.creditContainer}>
+          <View>
             <View style={styles.creditHeader}>
               <BoltIcon width={16} height={16} />
               <Text style={styles.creditTitle}>{t('Credits.usage')}</Text>
@@ -100,15 +114,16 @@ export const DrawerContent = ({
                     width: `${getCreditsInfo.usagePercentage}%`,
                     backgroundColor: getCreditsInfo.isLow
                       ? colors.softCoralRed
-                      : colors.azureBlue,
+                      : colors.ds.brand.logo,
                   },
                 ]}
               />
             </View>
           </View>
-          <View style={styles.separator} />
         </>
       )}
+
+      <View style={styles.separator} />
 
       <View style={styles.menuItemsWrapper}>
         <MenuOption
@@ -133,13 +148,6 @@ export const DrawerContent = ({
       </View>
 
       <View style={styles.logoContainer}>
-        {tenantData?.logoUrl && (
-          <Image
-            source={{uri: tenantData.logoUrl}}
-            style={styles.orgLogo}
-            resizeMode="contain"
-          />
-        )}
         <AllyLogoIcon />
       </View>
     </View>
@@ -149,28 +157,30 @@ export const DrawerContent = ({
 const styles = ScaledSheet.create({
   container: {
     flex: 1,
-    paddingTop: '70@mvs',
+    paddingTop: '50@mvs',
     paddingHorizontal: '16@ms',
+  },
+  separator: {
+    height: '0.5@vs',
+    backgroundColor: colors.ds.stroke.primary,
+    marginVertical: '12@mvs',
   },
   profileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: '8@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
-    paddingBottom: '16@ms',
   },
   profileIconContainer: {
-    width: '40@ms',
-    height: '40@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '32@ms',
+    height: '32@ms',
     borderRadius: '20@ms',
     overflow: 'hidden',
   },
   profileImage: {
-    width: '100%',
-    height: '100%',
+    width: '28@ms',
+    height: '28@ms',
+    borderRadius: radius.full,
+    marginTop: '4@mvs',
   },
   textContainer: {
     flex: 1,
@@ -179,6 +189,7 @@ const styles = ScaledSheet.create({
     ...typography.body.large,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
+    marginBottom: '2@mvs',
   },
   email: {
     ...typography.body.small,
@@ -187,9 +198,6 @@ const styles = ScaledSheet.create({
   },
   emailSmall: {
     fontSize: '9@ms',
-  },
-  creditContainer: {
-    marginTop: '20@mvs',
   },
   creditHeader: {
     flexDirection: 'row',
@@ -233,11 +241,6 @@ const styles = ScaledSheet.create({
     height: '100%',
     borderRadius: '4@ms',
   },
-  separator: {
-    height: 0.5,
-    backgroundColor: colors.lightGray5,
-    marginTop: '20@mvs',
-  },
   menuItemsWrapper: {
     flex: 1,
   },
@@ -252,15 +255,25 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.mediumEmphasis,
   },
   logoContainer: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: radius.lg,
+    padding: '12@ms',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '2@ms',
-    marginBottom: '20@ms',
+    marginBottom: '30@ms',
     marginTop: '8@mvs',
+    marginHorizontal: '15@ms',
+  },
+  orgLogoContainer: {
+    width: '40@ms',
+    height: '40@ms',
+    overflow: 'hidden',
   },
   orgLogo: {
-    height: '40@ms',
-    width: '60@ms',
+    height: '100%',
+    width: '100%',
+    backgroundColor: 'red',
   },
 });

@@ -116,4 +116,12 @@ export const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
   },
+  privacyToggleContainer: {
+    position: 'absolute',
+    bottom: '20@vs',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
 });

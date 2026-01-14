@@ -86,7 +86,13 @@ jest.mock('@/theme', () => ({
         highEmphasis: '#000000',
         mediumEmphasis: '#666666',
       },
+      stroke: {
+        primary: '#d2d2d2',
+      },
     },
+  },
+  radius: {
+    full: 999,
   },
   fontFamily: {
     REPLAY_PRO: {

@@ -6,6 +6,7 @@ import {
   SimulationMessage,
   useLazyGetSimulationMessagesQuery,
 } from '@/services/simulationTranscriptApi';
+import {SimulationTranscriptMessage} from '@/types';
 import {formatTimeToMMSS} from '@/utils';
 
 const LIMIT = 10;
@@ -79,10 +80,12 @@ export const useSimulationTranscriptDetails = (
     }
   }, [isLoading, hasMore, fetchMessages, offset]);
 
-  const formattedMessages = useMemo(() => {
+  const formattedMessages = useMemo<SimulationTranscriptMessage[]>(() => {
     return messages.map(message => ({
       id: message.id,
       message: message.content,
+      startSeconds:
+        typeof message.startSeconds === 'number' ? message.startSeconds : 0,
       time: formatTimeToMMSS(
         typeof message.startSeconds === 'number' && message.startSeconds >= 0
           ? Math.round(message.startSeconds * 1000)
@@ -91,7 +94,7 @@ export const useSimulationTranscriptDetails = (
               new Date(sessionStartedAt).getTime()
             : 0,
       ),
-      counselor: message.senderId !== -1,
+      learner: message.senderId !== -1,
     }));
   }, [messages, sessionStartedAt]);
 
