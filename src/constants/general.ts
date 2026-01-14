@@ -156,6 +156,8 @@ export const API_ROUTES = {
     REACTIONS_COUNT: (reviewId: string | number) =>
       `/reviews/${reviewId}/reactions/count`,
     THREADS: (reviewId: string | number) => `/reviews/${reviewId}/threads`,
+    GET_THREAD_COMMENTS: (threadId: string) =>
+      `/reviews/threads/${threadId}/comments`,
   },
 } as const;
 

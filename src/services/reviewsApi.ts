@@ -1,66 +1,17 @@
 import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
+import {
+  AddReviewCommentRequest,
+  AddReviewCommentResponse,
+  GetMessagesRequest,
+  GetMessagesResponse,
+  GetThreadCommentsRequest,
+  GetThreadCommentsResponse,
+  ReviewsResponse,
+} from '@/types/reviews';
 
 import {api} from './api';
 
-interface ReviewRequest {
-  reviewId: string;
-  threadId?: string;
-  parentCommentId?: string;
-  messageId?: string;
-  selection?: Record<string, unknown>;
-  comment: string;
-}
-
-interface ReviewResponse {
-  success: boolean;
-}
-
-export interface MessageThreadComment {
-  id: string;
-  content: string;
-  createdAt: string;
-  createdBy: {
-    id: string;
-    name: string;
-    profileImage: string | null;
-  };
-  reactions: {
-    [reactionCode: string]: number;
-  };
-  replyCount: number;
-}
-
-export interface MessageThread {
-  id: string;
-  comments: MessageThreadComment[];
-  selection: Record<string, unknown>;
-  createdBy: {
-    id: string;
-    name: string;
-    profileImage: string | null;
-  };
-}
-
-export interface Message {
-  id: string;
-  content: string;
-  createdAt: string;
-  startSeconds: number;
-  endSeconds: number;
-  senderId: string;
-  threads: MessageThread[];
-}
-
-export interface GetMessagesResponse {
-  data: Message[];
-}
-
-export interface GetMessagesRequest {
-  reviewId: string;
-  offset?: number;
-  limit?: number;
-}
-
+// TODO_M: Remove once dependent changes are merged
 export enum ReviewFilter {
   ALL = 'ALL',
   LATEST = 'LATEST',
@@ -68,40 +19,12 @@ export enum ReviewFilter {
   UNDISCOVERED = 'UNDISCOVERED',
 }
 
-export interface ReviewScenario {
-  title: string;
-  createdAt: string;
-  duration: string;
-  description: string;
-  coverImageUrl?: string;
-  coverVideoUrl?: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  profileImage: string;
-}
-
-export interface ReviewItem {
-  id: string;
-  createdAt: string;
-  scenario: ReviewScenario;
-  reactions: {
-    [reaction_code: string]: number;
-  };
-  createdBy: User;
-  commentsCount: number;
-}
-
-export interface ReviewsResponse {
-  data: ReviewItem[];
-  count: number;
-}
-
 export const reviewsApi = api.injectEndpoints({
   endpoints: builder => ({
-    addReviewComment: builder.mutation<ReviewResponse, ReviewRequest>({
+    addReviewComment: builder.mutation<
+      AddReviewCommentResponse,
+      AddReviewCommentRequest
+    >({
       query: ({
         reviewId,
         threadId,
@@ -130,6 +53,20 @@ export const reviewsApi = api.injectEndpoints({
         };
       },
     }),
+    getThreadComments: builder.query<
+      GetThreadCommentsResponse,
+      GetThreadCommentsRequest
+    >({
+      query: ({threadId, offset, limit}) => {
+        return {
+          url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(threadId),
+          method: API_METHODS.GET,
+          ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
+            ? {body: {offset, limit}}
+            : {}),
+        };
+      },
+    }),
     getReviews: builder.query<
       ReviewsResponse | null,
       {sortBy: string; limit: number; offset: number}
@@ -146,6 +83,6 @@ export const reviewsApi = api.injectEndpoints({
 export const {
   useGetMessagesQuery,
   useAddReviewCommentMutation,
-  useGetReviewsQuery,
+  useGetThreadCommentsQuery,
   useLazyGetReviewsQuery,
 } = reviewsApi;
