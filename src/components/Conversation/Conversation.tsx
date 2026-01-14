@@ -46,9 +46,12 @@ export const Conversation: React.FC<ConversationProps> = ({
         <Text style={styles.messageContent}>
           {messageItem.messagePart.map(part => (
             <Text
-              onPress={() =>
-                onThreadClick?.(part.commentIds[0], messageItem.id)
-              }
+              onPress={() => {
+                if (part.commentIds.length > 0) {
+                  onThreadClick?.(part.commentIds[0], messageItem.id);
+                }
+              }}
+              disabled={part.commentIds.length === 0}
               key={part.text}
               style={[part.commentIds.length > 0 && styles.highlightedText]}>
               {part.text}
@@ -65,7 +68,12 @@ export const Conversation: React.FC<ConversationProps> = ({
       <Text style={styles.messageContent}>
         {messageItem.messagePart.map(part => (
           <Text
-            onPress={() => onThreadClick?.(part.commentIds[0], messageItem.id)}
+            onPress={() => {
+              if (part.commentIds.length > 0) {
+                onThreadClick?.(part.commentIds[0], messageItem.id);
+              }
+            }}
+            disabled={part.commentIds.length === 0}
             key={part.text}
             style={[part.commentIds.length > 0 && styles.highlightedText]}>
             {part.text}
