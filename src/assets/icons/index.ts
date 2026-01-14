@@ -208,6 +208,9 @@ export {
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
+  ReviewActiveIcon,
+  ReviewInactiveIcon,
+  ReviewTranscriptIcon,
   RightArrow,
   RunningSimulationIcon,
   SearchActiveIcon,
@@ -235,7 +238,4 @@ export {
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
-  ReviewActiveIcon,
-  ReviewInactiveIcon,
-  ReviewTranscriptIcon,
 };
