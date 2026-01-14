@@ -14,8 +14,7 @@ on:
           - prd
   push:
     branches:
-      - dev
-      - develop
+      - master
 
 env:
   ENABLE_DB_MIGRATION: "false"
@@ -69,8 +68,8 @@ jobs:
 
           if [ -z "$ENV" ]; then
             case "$BRANCH" in
-              "dev"|"develop")  ENV="dev" ;;
-              "main"|"master")
+              "master")  ENV="dev" ;;
+              "main")
                 echo "Production deployment must be manual via workflow_dispatch"
                 exit 1
                 ;;
