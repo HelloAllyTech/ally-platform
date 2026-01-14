@@ -18,6 +18,7 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import ChangeImageIcon from './changeImage.svg';
+import ReviewTranscriptIcon from './chatAddOn.svg';
 import CheckIcon from './check.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -88,6 +89,8 @@ import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import Replay10Icon from './replay10.svg';
 import ResumeIcon from './resume.svg';
+import ReviewActiveIcon from './reviewActive.svg';
+import ReviewInactiveIcon from './reviewInactive.svg';
 import RightArrow from './rightArrow.svg';
 import RunningSimulationIcon from './runningSimulation.svg';
 import SearchIcon from './search.svg';
@@ -205,6 +208,9 @@ export {
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
+  ReviewActiveIcon,
+  ReviewInactiveIcon,
+  ReviewTranscriptIcon,
   RightArrow,
   RunningSimulationIcon,
   SearchActiveIcon,

@@ -124,3 +124,119 @@ export const formatTimeToMMSS = (ms: number): string => {
     .toString()
     .padStart(2, '0')}`;
 };
+
+const SECONDS_IN = {
+  year: 31536000,
+  month: 2592000,
+  week: 604800,
+  day: 86400,
+  hour: 3600,
+  minute: 60,
+  second: 1,
+} as const;
+
+const TIME_THRESHOLDS: [keyof typeof SECONDS_IN, number][] = [
+  ['month', SECONDS_IN.month],
+  ['week', SECONDS_IN.week],
+  ['day', SECONDS_IN.day],
+  ['hour', SECONDS_IN.hour],
+  ['minute', SECONDS_IN.minute],
+  ['second', SECONDS_IN.second],
+];
+
+/**
+ * Pluralizes a word based on the value
+ * @param value - Value to pluralize
+ * @param unit - Unit to pluralize
+ * @returns Pluralized word (e.g., "1 year", "2 years")
+ * @example
+ * pluralize(1, 'year') // returns "1 year"
+ * pluralize(2, 'year') // returns "2 years"
+ */
+export const pluralize = (value: number, unit: string) =>
+  `${value} ${unit}${value === 1 ? '' : 's'}`;
+
+// Formats a date string into a date and time string
+// @param dateString - ISO date string or Date object
+// @returns Formatted date and time string (e.g., "February 18, 2025 11:05 AM")
+// @example
+// formatDateTime("2025-02-18T11:05:00Z") // returns "February 18, 2025 11:05 AM"
+// formatDateTime(new Date()) // returns current date and time
+export const formatDateTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date
+    .toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(' at ', ' ');
+};
+
+/**
+ * Formats a date string into a relative time string
+ * @param dateString - ISO date string or Date object
+ * @returns Formatted relative time string (e.g., "1 year ago")
+ * @example
+ * formatRelativeTime("2025-02-18T11:05:00Z") // returns "1 year ago"
+ * formatRelativeTime("2024-01-01T09:30:00Z") // returns "1 year ago"
+ */
+export const formatRelativeTime = (dateString: string): string => {
+  const diffSeconds = Math.floor(
+    (Date.now() - new Date(dateString).getTime()) / 1000,
+  );
+
+  if (diffSeconds < 1) return 'Just now';
+
+  const years = Math.floor(diffSeconds / SECONDS_IN.year);
+
+  if (years >= 2) return pluralize(years, 'year');
+
+  if (years === 1) {
+    const months = Math.floor(
+      (diffSeconds % SECONDS_IN.year) / SECONDS_IN.month,
+    );
+    return months === 0 ? '1 year' : `1 year ${pluralize(months, 'month')}`;
+  }
+
+  for (const [unit, seconds] of TIME_THRESHOLDS) {
+    const value = Math.floor(diffSeconds / seconds);
+    if (value >= 1) return pluralize(value, unit);
+  }
+
+  return 'Just now';
+};
+
+/**
+ * Formats duration in seconds to a human-readable string (hours and minutes)
+ * @param seconds - Duration in seconds
+ * @returns Formatted duration string (e.g., "1 hour 30 mins", "45 mins", "2 hours")
+ * @example
+ * formatDurationFromSeconds(5400) // returns "1 hour 30 mins"
+ * formatDurationFromSeconds(2700) // returns "45 mins"
+ * formatDurationFromSeconds(7200) // returns "2 hours"
+ */
+export const formatDurationFromSeconds = (seconds: string): string => {
+  const totalSeconds =
+    typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
+
+  if (isNaN(totalSeconds) || totalSeconds < 0) {
+    return '-';
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours > 0 && minutes > 0) {
+    return `${pluralize(hours, 'hour')} ${pluralize(minutes, 'min')}`;
+  } else if (hours > 0) {
+    return pluralize(hours, 'hour');
+  } else if (minutes > 0) {
+    return pluralize(minutes, 'min');
+  } else {
+    return pluralize(totalSeconds, 'sec');
+  }
+};
