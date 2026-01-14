@@ -1,5 +1,5 @@
 // src/hooks/__mocks__/mockReviewsData.ts
-import {ReviewItem, ReviewResponse} from '@/services/reviewsApi';
+import {ReviewItem, ReviewsResponse} from '@/services/reviewsApi';
 
 // Generate mock review items
 const generateMockReview = (id: number): ReviewItem => ({
@@ -34,7 +34,7 @@ export const mockGetReviews = async (params: {
   sortBy: string;
   limit: number;
   offset: number;
-}): Promise<{data: ReviewResponse | null}> => {
+}): Promise<{data: ReviewsResponse | null}> => {
   const {limit, offset} = params;
 
   // Simulate network delay
@@ -74,7 +74,7 @@ export const mockGetReviews = async (params: {
   // Get paginated slice
   const paginatedReviews = sortedReviews.slice(offset, offset + limit);
 
-  const response: ReviewResponse = {
+  const response: ReviewsResponse = {
     data: paginatedReviews,
     count: TOTAL_MOCK_REVIEWS,
   };
@@ -87,7 +87,7 @@ export const mockGetReviewsWithError = async (params: {
   sortBy: string;
   limit: number;
   offset: number;
-}): Promise<{data: ReviewResponse | null}> => {
+}): Promise<{data: ReviewsResponse | null}> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
 

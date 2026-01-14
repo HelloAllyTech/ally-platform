@@ -173,6 +173,8 @@ jest.mock('react-native-config', () => {
       ALLY_WEB_URL: 'https://test.example.com',
       MICROPHONE_SOCKET_PATH: '/test/socket',
       CLOUD_TELEPHONY_PATH: '/test/telephony',
+      GOOGLE_WEB_CLIENT_ID: 'test-google-web-client-id',
+      GOOGLE_IOS_CLIENT_ID: 'test-google-ios-client-id',
     },
   };
 });
