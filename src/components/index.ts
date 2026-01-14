@@ -54,3 +54,7 @@ export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
 export {SelectableTextArea} from './SelectableTextArea';
 export type {SelectableTextAreaProps} from './SelectableTextArea';
+export {CommentInput} from './CommentInput';
+export type {CommentInputProps} from './CommentInput';
+export {Conversation} from './Conversation';
+export type {ConversationProps} from './Conversation';
