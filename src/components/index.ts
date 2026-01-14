@@ -40,7 +40,6 @@ export {
   type CollapsibleButtonGroupProps,
 } from './ButtonGroup';
 export {EmptyTranscript} from './EmptyTranscript';
-export {TranscriptItem} from './TranscriptItem';
 export {DropdownMenu} from './DropdownMenu';
 export {EmptyState} from './EmptyState';
 export {FeedbackPopup} from './FeedbackPopup';
@@ -52,6 +51,10 @@ export {SimulationCard} from './SimulationCard';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {EmojiPicker} from './EmojiPicker';
+export type {EmojiPickerProps} from './EmojiPicker';
+export {ReactionsBottomSheet} from './ReactionsBottomSheet';
+export type {ReactionsBottomSheetProps} from './ReactionsBottomSheet';
 export {SelectableTextArea} from './SelectableTextArea';
 export type {SelectableTextAreaProps} from './SelectableTextArea';
 export {CommentInput} from './CommentInput';

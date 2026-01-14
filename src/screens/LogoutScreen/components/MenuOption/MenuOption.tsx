@@ -34,7 +34,7 @@ const styles = ScaledSheet.create({
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: '16@ms',
+    marginBottom: '16@ms',
   },
   optionIcon: {
     width: '24@ms',

@@ -348,8 +348,8 @@ export const SimulationPathDetailsScreen: React.FC<
 
       <SimulationDetailsModal
         visible={!!selectedSimulation?.sessionId}
-        simulation={selectedSimulation}
         onClose={handleCloseModal}
+        {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}
         isCreatingRoom={isCreatingRoom}
       />

@@ -205,6 +205,7 @@ export interface SimulationSummaryData {
   scenarioPathSessionId?: string | null;
   scenario?: {
     title?: string;
+    metadata?: ScenarioMetadata;
   };
   details?: {
     createdAt?: string;

@@ -24,6 +24,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   showHandle = true,
   index: initialIndex = 0,
   animationDuration = 300,
+  skipBottomSheetView = false,
+  enableContentPanningGesture = true,
+  enableDynamicSizing = true,
+  enableOverDrag = true,
+  overDragResistanceFactor = 0.5,
+  enableHandlePanningGesture = true,
 }) => {
   const bottomSheetRef = useRef<BottomSheetComponent>(null);
   const insets = useSafeAreaInsets();
@@ -45,7 +51,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
     // Add full expand point if allowed
     if (allowFullExpand) {
-      points.push('90%'); // Almost full screen
+      points.push('80%'); // Max 80% of screen height
     }
 
     return points;
@@ -102,6 +108,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       index={-1}
       snapPoints={snapPoints}
       enablePanDownToClose={enablePanDownToClose}
+      enableContentPanningGesture={enableContentPanningGesture}
+      enableDynamicSizing={enableDynamicSizing}
+      enableOverDrag={enableOverDrag}
+      overDragResistanceFactor={overDragResistanceFactor}
+      enableHandlePanningGesture={enableHandlePanningGesture}
       backdropComponent={showBackdrop ? renderBackdrop : undefined}
       handleIndicatorStyle={showHandle ? styles.handleIndicator : undefined}
       backgroundStyle={[styles.background, {backgroundColor}]}
@@ -110,9 +121,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       animationConfigs={{
         duration: animationDuration,
       }}>
-      <BottomSheetView style={[styles.content, {paddingBottom: insets.bottom}]}>
-        {children}
-      </BottomSheetView>
+      {skipBottomSheetView ? (
+        children
+      ) : (
+        <BottomSheetView
+          style={[styles.content, {paddingBottom: insets.bottom}]}>
+          {children}
+        </BottomSheetView>
+      )}
     </BottomSheetComponent>
   );
 };
