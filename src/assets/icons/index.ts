@@ -22,6 +22,7 @@ import ReviewTranscriptIcon from './chatAddOn.svg';
 import CheckIcon from './check.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
+import ChevronRight from './chevronRight.svg';
 import CloseIcon from './close.svg';
 import CloseCircle from './closeCircle.svg';
 import CommunityActiveIcon from './communityActive.svg';
@@ -129,6 +130,7 @@ export {
   AnalyticsInactiveIcon,
   ArrowDown,
   ArrowRight,
+  ChevronRight,
   AssessmentIcon,
   BarsIcon,
   BlueWarningIcon,

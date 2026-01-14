@@ -517,5 +517,17 @@
       "description": "Your recent shared simulations will be listed here."
     },
     "fetchError" : "Failed to fetch reviews"
+  },
+  "ReviewComment": {
+    "like": "Like",
+    "reply": "Reply",
+    "replies": "{{count}} replies",
+    "repliesOne": "1 reply"
+  },
+  "CommentsBottomSheet": {
+    "title": "Comments so far",
+    "moreComments": "{{count}} more comments",
+    "moreCommentsOne": "1 more comment",
+    "noComments": "No comments yet"
   }
 }
