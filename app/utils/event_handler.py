@@ -43,19 +43,37 @@ async def send_event_to_queue(event_data: str) -> None:
 
 def create_conversation_handler(room_id: str, joined_iso: str):
     """
-    Factory function to create conversation event handler.
+    Factory function to create conversation event handler with deduplication.
 
     Args:
         room_id: LiveKit room identifier
         joined_iso: ISO timestamp when agent joined
 
     Returns:
-        Event handler function for conversation_item_added events
+        Tuple of (handler_function, cleanup_function):
+        - handler_function: Event handler for conversation_item_added events
+        - cleanup_function: Function to clean up internal state (call on shutdown)
     """
+    seen_utterances = set()
 
     def on_conversation_item_added(event: ConversationItemAddedEvent):
-        role = "CLIENT" if event.item.role == "assistant" else "COUNSELOR"
         content = extract_content(event.item)
+
+        # Deduplication: Use content + timestamp as unique key
+        # This prevents processing the same utterance multiple times,
+        # which can happen when transcription publishing fails and retries
+        utterance_key = (content, event.created_at)
+
+        if utterance_key in seen_utterances:
+            logger.debug(
+                f"Skipping duplicate utterance: {content[:50]}..."
+                f" (timestamp: {event.created_at})"
+            )
+            return
+
+        seen_utterances.add(utterance_key)
+
+        role = "CLIENT" if event.item.role == "assistant" else "COUNSELOR"
 
         chat_message = ChatMessage(
             role=role,
@@ -80,7 +98,13 @@ def create_conversation_handler(room_id: str, joined_iso: str):
                 send_event_to_queue(core_event.model_dump_json())
             )
 
-    return on_conversation_item_added
+    def cleanup():
+        """Clean up the seen_utterances set."""
+        count = len(seen_utterances)
+        seen_utterances.clear()
+        logger.debug(f"Cleaned up {count} utterance entries from conversation handler")
+
+    return on_conversation_item_added, cleanup
 
 
 async def send_event_to_ui(
