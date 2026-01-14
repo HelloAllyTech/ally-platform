@@ -16,7 +16,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {ReviewTranscriptIcon} from '@/assets';
 import {VideoPreview} from '@/components';
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker';
-import {ReviewScenario, User} from '@/services/reviewsApi';
 import {
   colors,
   fontFamily,
@@ -26,6 +25,7 @@ import {
   theme,
   typography,
 } from '@/theme';
+import {ReviewScenario, User} from '@/types/reviews';
 import {
   formatDateTime,
   formatDurationFromSeconds,

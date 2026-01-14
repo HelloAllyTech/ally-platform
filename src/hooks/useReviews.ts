@@ -1,11 +1,8 @@
 import {useCallback, useEffect, useState} from 'react';
 
 import {mockGetReviews} from '@/screens/ReviewScreen/mockData';
-import {
-  ReviewFilter,
-  ReviewItem,
-  useLazyGetReviewsQuery,
-} from '@/services/reviewsApi';
+import {ReviewFilter, useLazyGetReviewsQuery} from '@/services/reviewsApi';
+import {ReviewItem} from '@/types/reviews';
 
 const PAGE_SIZE = 5;
 
