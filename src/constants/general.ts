@@ -155,6 +155,7 @@ export const API_ROUTES = {
     REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
       `/reviews/${reviewId}/reactions/count`,
+    THREADS: (reviewId: string | number) => `/reviews/${reviewId}/threads`,
   },
 } as const;
 
