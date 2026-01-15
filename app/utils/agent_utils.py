@@ -149,6 +149,7 @@ def create_agent_with_adapter(
     agent_joined_at: str,
     llm_client: BaseLLMClient,
     embedding_client: OpenAIEmbeddingClient,
+    event_orchestrator: EventOrchestrator,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -160,6 +161,7 @@ def create_agent_with_adapter(
         agent_joined_at: ISO timestamp when agent joined
         llm_client: LLM client instance
         embedding_client: Embedding client instance
+        event_orchestrator: EventOrchestrator instance
 
     Returns:
         Agent instance with LLM adapter
@@ -173,7 +175,7 @@ def create_agent_with_adapter(
                 "room": room,
                 "scenario": scenario,
                 "agent_joined_at": agent_joined_at,
-                "event_orchestrator": None,  # Will be set later
+                "event_orchestrator": event_orchestrator,
                 "llm_client": llm_client,
                 "embedding_client": embedding_client,
             }

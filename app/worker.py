@@ -122,6 +122,9 @@ class AgentWorker:
         # Create session (needs clients from configure phase)
         self._create_session()
 
+        # Setup orchestrator
+        self._setup_event_orchestrator()
+
         # Create agent (using utility function)
         self.agent = create_agent_with_adapter(
             thread_id=self.ctx.room.name,
@@ -130,10 +133,8 @@ class AgentWorker:
             agent_joined_at=self.joined_iso,
             llm_client=self.llm_client,
             embedding_client=self.embedding_client,
+            event_orchestrator=self.event_orchestrator,
         )
-
-        # Setup orchestrator (needs agent for callbacks)
-        self._setup_event_orchestrator()
 
         # Register callbacks
         self._register_callbacks()
@@ -175,12 +176,6 @@ class AgentWorker:
         logger.info(
             f"Initialized EventOrchestrator with {len(self.scenario.events)} events"
         )
-
-        # Update agent adapter config with orchestrator (now that it exists)
-        if hasattr(self.agent, "llm") and hasattr(self.agent.llm, "config"):
-            self.agent.llm.config["configurable"][
-                "event_orchestrator"
-            ] = self.event_orchestrator
 
     def _register_callbacks(self):
         """Register room, session, and shutdown callbacks."""
