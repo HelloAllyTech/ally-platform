@@ -61,13 +61,6 @@ export interface GetMessagesRequest {
   limit?: number;
 }
 
-export enum ReviewFilter {
-  ALL = 'ALL',
-  LATEST = 'LATEST',
-  MOST_REVIEWED = 'MOST_REVIEWED',
-  UNDISCOVERED = 'UNDISCOVERED',
-}
-
 export interface ReviewScenario {
   title: string;
   createdAt: string;

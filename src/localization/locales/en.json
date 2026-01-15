@@ -504,7 +504,8 @@
       "reaction": "Reaction",
       "comment": "Comment",
       "viewLess": "View less",
-      "viewMore": "View more"  
+      "viewMore": "View more" ,
+      "simulationDetails": "Simulation Details"
     },
     "filters": {
       "all": "All",

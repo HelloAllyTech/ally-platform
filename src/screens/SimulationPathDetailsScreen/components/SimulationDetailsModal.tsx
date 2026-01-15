@@ -29,6 +29,7 @@ export interface SimulationDetailsModalProps {
   headerTitle?: string;
   onStartSimulation?: () => void;
   isCreatingRoom?: boolean;
+  fitContent?: boolean;
 }
 
 export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
@@ -43,6 +44,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   headerTitle,
   onStartSimulation,
   isCreatingRoom = false,
+  fitContent = false,
 }) => {
   const {t} = useTranslate();
 
@@ -54,7 +56,11 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            fitContent && styles.modalContainerFitContent,
+          ]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>
               {headerTitle ? (
@@ -80,7 +86,11 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.contentContainer}>
+          <View
+            style={[
+              styles.contentContainer,
+              fitContent && styles.contentContainerFitContent,
+            ]}>
             <View style={styles.mediaContainer}>
               {coverVideoUrl ? (
                 <VideoPreview
@@ -98,7 +108,10 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
             </View>
 
             <ScrollView
-              style={styles.scrollContainer}
+              style={[
+                styles.scrollContainer,
+                fitContent && styles.scrollContainerFitContent,
+              ]}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               bounces={false}>
@@ -170,6 +183,10 @@ const styles = ScaledSheet.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
+  modalContainerFitContent: {
+    height: 'auto',
+    maxHeight: '90%',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,6 +219,9 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.ds.neutral.white,
   },
+  contentContainerFitContent: {
+    flex: 0,
+  },
   mediaContainer: {
     width: '100%',
     padding: '12@ms',
@@ -215,6 +235,9 @@ const styles = ScaledSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  scrollContainerFitContent: {
+    flex: 0,
   },
   scrollContent: {
     paddingHorizontal: '16@ms',
