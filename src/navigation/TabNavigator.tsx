@@ -28,8 +28,6 @@ import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
-  // ReviewScreen,
-  // LeaderboardScreen,
   SearchScreen,
   SimulationsScreen,
   UserAnalyticsScreen,
