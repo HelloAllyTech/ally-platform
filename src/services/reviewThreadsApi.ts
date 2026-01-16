@@ -315,7 +315,7 @@ export const reviewThreadsApi = api.injectEndpoints({
 
         // In production, make actual API call using baseQuery
         const result = await baseQuery({
-          url: API_ROUTES.REVIEWS.THREAD_COMMENTS(threadId),
+          url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(String(threadId)),
           method: API_METHODS.GET,
           params: {
             offset,

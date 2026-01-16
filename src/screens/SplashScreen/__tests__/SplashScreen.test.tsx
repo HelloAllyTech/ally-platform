@@ -40,6 +40,54 @@ jest.mock('react-native-linear-gradient', () => {
   return (props: any) => <View {...props} />;
 });
 
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  const Animated = {
+    View: View,
+  };
+  return {
+    __esModule: true,
+    default: Animated,
+    useSharedValue: (init: number) => {
+      const sharedValue = {value: init};
+      // Allow value to be updated for testing
+      return sharedValue;
+    },
+    useAnimatedStyle: (cb: () => any) => cb(),
+    withTiming: (toValue: number, config: any, callback?: () => void) => {
+      if (callback) {
+        setTimeout(callback, config?.duration || 0);
+      }
+      return toValue;
+    },
+    runOnJS: (fn: () => void) => fn,
+    interpolate: (
+      value: number,
+      inputRange: number[],
+      outputRange: number[],
+      options?: any,
+    ) => {
+      // Simple linear interpolation for testing
+      if (value <= inputRange[0]) return outputRange[0];
+      if (value >= inputRange[inputRange.length - 1])
+        return outputRange[outputRange.length - 1];
+      const index = inputRange.findIndex((v, i) => {
+        if (i === inputRange.length - 1) return true;
+        return value >= v && value < inputRange[i + 1];
+      });
+      if (index === -1) return outputRange[0];
+      const ratio =
+        (value - inputRange[index]) /
+        (inputRange[index + 1] - inputRange[index]);
+      return (
+        outputRange[index] +
+        (outputRange[index + 1] - outputRange[index]) * ratio
+      );
+    },
+  };
+});
+
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string) => key,
@@ -106,8 +154,8 @@ describe('SplashScreen', () => {
     });
   });
 
-  it('shows login button after animation finishes when unauthenticated', async () => {
-    const {getByTestId, queryByTestId} = render(
+  it('shows bottom sheet with email login after animation finishes when unauthenticated', async () => {
+    const {getByTestId} = render(
       <SafeAreaProvider
         initialMetrics={{
           frame: {x: 0, y: 0, width: 375, height: 812},
@@ -117,16 +165,11 @@ describe('SplashScreen', () => {
       </SafeAreaProvider>,
     );
 
-    // On animation finish, login button should appear (no update required)
-    await waitFor(() => expect(getByTestId('primary-button')).toBeTruthy());
-
-    // Tapping login shows email login content and hides button
-    fireEvent.press(getByTestId('primary-button'));
-    expect(getByTestId('email-login')).toBeTruthy();
-    expect(queryByTestId('primary-button')).toBeNull();
+    // On animation finish, bottom sheet with email login should appear directly (no update required)
+    await waitFor(() => expect(getByTestId('email-login')).toBeTruthy());
   });
 
-  it('shows ForceUpdateModal when update is required and hides login', async () => {
+  it('shows ForceUpdateModal when update is required and hides bottom sheet', async () => {
     (jest.requireMock('@/hooks').useForceUpdate as jest.Mock).mockReturnValue({
       versionInfo: {isUpdateRequired: true},
     });
@@ -143,8 +186,8 @@ describe('SplashScreen', () => {
 
     // ForceUpdate visible
     expect(getByTestId('force-update-modal')).toBeTruthy();
-    // Login button should not appear
-    expect(queryByTestId('primary-button')).toBeNull();
+    // Bottom sheet with email login should not appear
+    expect(queryByTestId('email-login')).toBeNull();
   });
 
   it('calls checkCounselorChat for authenticated counselor', async () => {
