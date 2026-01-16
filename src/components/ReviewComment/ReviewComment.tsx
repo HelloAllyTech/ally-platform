@@ -96,9 +96,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
           </View>
 
           {/* Separator Dot */}
-          {reactions.length > 0 && replyCount > 0 && (
-            <View style={styles.separatorDot} />
-          )}
+          {<View style={styles.separatorDot} />}
 
           {showReplyButton && (
             <TouchableOpacity

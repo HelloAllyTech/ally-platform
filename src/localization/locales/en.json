@@ -529,5 +529,10 @@
     "moreComments": "{{count}} more comments",
     "moreCommentsOne": "1 more comment",
     "noComments": "No comments yet"
+  },
+  "CommentThreadBottomSheet": {
+    "title": "Comment thread",
+    "addComment": "Add comment",
+    "noComments": "No comments yet"
   }
 }
