@@ -51,6 +51,7 @@ def _create_event_by_detection_type(
     logger=None,
     embedding_client: Optional[BaseEmbeddingClient] = None,
     language_code: Optional[str] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
 ) -> Optional[BaseEvent]:
     """
     Robust factory helper that creates event instances per detection type.
@@ -91,9 +92,13 @@ def _create_event_by_detection_type(
     # Parse branching instruction if present
     branching_instruction_str = ev.get("branchInstruction")
     branching_instruction_obj = None
+
     if branching_instruction_str:
+
+        prompt_data = metadata.get("promptData")
+
         branching_instruction_obj = BranchingInstruction.create(
-            branching_instruction_str
+            branching_instruction_str, prompt_data
         )
 
     common_fields = {
@@ -617,6 +622,7 @@ def build_events_from_metadata(
                 logger=log,
                 embedding_client=embedding_client,
                 language_code=language_code,
+                metadata=metadata,
             )
             if instance is None:
                 reason = (

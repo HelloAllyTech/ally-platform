@@ -11,7 +11,7 @@ from typing import List, Set, Tuple
 from app.core.branching_instructions.constants import BRANCHING_DYNAMIC_VARIABLES
 
 # Regex pattern to match <variable_name> tags
-VARIABLE_TAG_PATTERN = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_]*)>")
+VARIABLE_TAG_PATTERN = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_ ]*)>")
 
 
 def extract_variable_tags(instruction: str) -> List[str]:

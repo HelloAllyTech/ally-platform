@@ -25,6 +25,10 @@ SCENARIO_SAMPLE = {
             "openingStatements": ["Hi, I need some help."],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
+            "customFields": [
+                {"field": "favourite colour", "value": "Sky Blue"},
+                {"field": "occupation", "value": "Engineer"},
+            ],
         },
         "events": [
             {
@@ -49,9 +53,9 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "start speaking about your academics",
+                "branchInstruction": "speak about your favourite colour <favourite colour> and occupation as <occupation> Only",
                 "feedbackStatus": "True",
-                "detectionConfig": {"minGapTime": 20},
+                # "detectionConfig": {"minGapTime": 20},8
             },
             {
                 "id": "score-gte-5",
@@ -64,6 +68,7 @@ SCENARIO_SAMPLE = {
                 "detectionType": "SCORE",
                 "branchInstruction": "",
                 "feedbackStatus": "True",
+                "detectionConfig": {},
             },
             {
                 "id": "comb-score-lte-0_and_open-ended-question",
