@@ -1,5 +1,13 @@
 type CommentRange = {id: string; start: number; end: number};
 type Segment = {text: string; commentIds: string[]; start: number; end: number};
+/**
+ * Splits the given text into segments based on the provided comment ranges.
+ * Each segment contains text and an array of comment IDs covering that range.
+ *
+ * @param text - The message content to split into segments.
+ * @param ranges - Array of comment ranges specifying the covered index spans and their IDs.
+ * @returns An array of segments, each annotated with text and associated comment IDs.
+ */
 
 export function splitByCommentRanges(
   text: string,
@@ -60,3 +68,19 @@ export function splitByCommentRanges(
 
   return segments;
 }
+
+/**
+ * Sorts reactions by count in descending order and returns the top N reaction codes
+ * @param reactions - Object mapping reaction codes to their counts
+ * @param limit - Maximum number of reactions to return (default: all)
+ * @returns Array of reaction codes sorted by count (highest first)
+ */
+export const getTopReactions = (
+  reactions: Record<string, number>,
+  limit?: number,
+): string[] => {
+  return Object.entries(reactions)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .map(([reactionCode]) => reactionCode)
+    .slice(0, limit);
+};

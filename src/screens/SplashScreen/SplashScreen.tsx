@@ -19,7 +19,7 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {animations, LeftArrowIcon} from '@/assets';
-import {ForceUpdateModal, PrimaryButton, SecurityCarousel} from '@/components';
+import {ForceUpdateModal} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS, WINDOW_HEIGHT} from '@/constants';
 import {
   useCounselorChat,
@@ -42,7 +42,6 @@ export const SplashScreen: React.FC<
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [isAnimationEnded, setIsAnimationEnded] = useState(false);
   const [isSheetFullyOpen, setIsSheetFullyOpen] = useState(false);
-  const [isLoginButtonVisible, setIsLoginButtonVisible] = useState(false);
 
   const lottieRef = useRef<LottieView>(null);
   const insets = useSafeAreaInsets();
@@ -93,8 +92,7 @@ export const SplashScreen: React.FC<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onLoginPress = () => {
-    setIsLoginButtonVisible(false);
+  const displayBottomSheet = () => {
     setIsBottomSheetVisible(true);
     animationTranslateY.value = withTiming(
       -WINDOW_HEIGHT * 0.6,
@@ -109,11 +107,10 @@ export const SplashScreen: React.FC<
     if (!isAnimationEnded || versionInfo?.isUpdateRequired) {
       return;
     }
-
     if (!isUserLoading && !isAuthenticated) {
       // Show the login button only when the bottom sheet is NOT visible
       if (!isBottomSheetVisible) {
-        setIsLoginButtonVisible(true);
+        displayBottomSheet();
       }
     } else if (isAuthenticated) {
       if (permissions?.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)) {
@@ -292,21 +289,6 @@ export const SplashScreen: React.FC<
             end={{x: 0, y: 0}}
             style={styles.welcomeGradientContainer}
           />
-        )}
-
-        {isLoginButtonVisible && (
-          <LinearGradient
-            colors={['transparent', colors.lightGray18]}
-            locations={[0.2, 0.85]}
-            style={styles.bottomAbsoluteContainer}>
-            <SecurityCarousel />
-            <PrimaryButton
-              label={t('SplashScreen.login')}
-              onPress={onLoginPress}
-              customContainerStyle={styles.loginButtonContainer}
-              customTextStyle={styles.loginButtonText}
-            />
-          </LinearGradient>
         )}
 
         {isBottomSheetVisible && (
