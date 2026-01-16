@@ -7,15 +7,16 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('@/assets', () => ({ CloseIcon: () => null, conversation: 1 }));
+jest.mock('@/assets', () => ({ CloseIcon: () => null }));
 
 jest.mock('@/components', () => {
   const React = require('react');
-  const {Text} = require('react-native');
+  const {Text, View} = require('react-native');
   return {
     PrimaryButton: ({onPress, label}: any) => (
       <Text onPress={onPress}>{label}</Text>
     ),
+    SecurityCarousel: () => <View testID="security-carousel" />,
   };
 });
 
@@ -41,5 +42,13 @@ describe('StartSessionModal', () => {
     fireEvent.press(getByText('CallLogs.startSessionNow'));
     expect(onListenLive).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('renders SecurityCarousel when visible', () => {
+    const {getByTestId} = render(
+      <StartSessionModal visible onClose={jest.fn()} onListenLive={jest.fn()} />,
+    );
+
+    expect(getByTestId('security-carousel')).toBeTruthy();
   });
 });
