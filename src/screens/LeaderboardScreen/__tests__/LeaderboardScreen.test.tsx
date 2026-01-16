@@ -2,7 +2,7 @@ import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
-import {LeaderboardScreen, LeaderboardPeriod} from '../LeaderboardScreen';
+import {LeaderboardScreen} from '../LeaderboardScreen';
 
 // Mock react-i18next
 jest.mock('react-i18next', () => ({
@@ -88,9 +88,9 @@ describe('LeaderboardScreen', () => {
 
   it('renders period tabs', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Last Week')).toBeTruthy();
-    expect(getByText('Last Month')).toBeTruthy();
-    expect(getByText('Last Year')).toBeTruthy();
+    expect(getByText('Week')).toBeTruthy();
+    expect(getByText('Month')).toBeTruthy();
+    expect(getByText('Year')).toBeTruthy();
     expect(getByText('All Time')).toBeTruthy();
   });
 
@@ -102,8 +102,8 @@ describe('LeaderboardScreen', () => {
 
   it('highlights current user entry', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    // Current user should be "Yedhu krishnan" based on mockUtils
-    expect(getByText('Yedhu krishnan')).toBeTruthy();
+    // Current user should be "Yedhu Krishnan" based on mockUtils
+    expect(getByText('Yedhu Krishnan')).toBeTruthy();
   });
 
   it('displays badge count in header', () => {
@@ -113,9 +113,9 @@ describe('LeaderboardScreen', () => {
 
   it('changes active period when tab is pressed', () => {
     const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const lastMonthTab = getByText('Last Month');
+    const monthTab = getByText('Month');
 
-    fireEvent.press(lastMonthTab);
+    fireEvent.press(monthTab);
 
     // Re-render to see updated state
     rerender(
@@ -129,7 +129,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Tab should still be visible
-    expect(getByText('Last Month')).toBeTruthy();
+    expect(getByText('Month')).toBeTruthy();
   });
 
   it('renders rank badges for all entries', () => {

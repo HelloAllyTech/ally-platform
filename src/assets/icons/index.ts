@@ -6,6 +6,7 @@ import AnalyticsActiveIcon from './analyticsActive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
+import BadgeIcon from './badgeIcon.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
 import BoltIcon from './bolt.svg';
@@ -86,6 +87,9 @@ import PlayWhiteIcon from './playWhite.svg';
 import PrescriptionsIcon from './prescriptions.svg';
 import ProfileIcon from './profileIcon.svg';
 import ProfileSettingsIcon from './profileSettings.svg';
+import Rank1Icon from './rank1.svg';
+import Rank2Icon from './rank2.svg';
+import Rank3Icon from './rank3.svg';
 import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import Replay10Icon from './replay10.svg';
@@ -133,6 +137,7 @@ export {
   ChevronRight,
   AssessmentIcon,
   BarsIcon,
+  BadgeIcon,
   BlueWarningIcon,
   BoltIcon,
   BrightnessAlertIcon,
@@ -207,6 +212,9 @@ export {
   PrescriptionsIcon,
   ProfileIcon,
   ProfileSettingsIcon,
+  Rank1Icon,
+  Rank2Icon,
+  Rank3Icon,
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
