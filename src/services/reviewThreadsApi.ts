@@ -195,6 +195,25 @@ export interface ThreadsParams {
   limit: number;
 }
 
+export interface ThreadComment {
+  id: string | number;
+  content: string;
+  createdAt: string;
+  createdBy: CommentUser;
+  reactions: CommentReactions;
+}
+
+export interface ThreadCommentsResponse {
+  data: ThreadComment[];
+  count: number;
+}
+
+export interface ThreadCommentsParams {
+  threadId: string | number;
+  offset: number;
+  limit: number;
+}
+
 export const reviewThreadsApi = api.injectEndpoints({
   endpoints: builder => ({
     getThreads: builder.query<ThreadsResponse, ThreadsParams>({
@@ -235,7 +254,84 @@ export const reviewThreadsApi = api.injectEndpoints({
         return {data: result.data as ThreadsResponse};
       },
     }),
+    getThreadComments: builder.query<
+      ThreadCommentsResponse,
+      ThreadCommentsParams
+    >({
+      queryFn: async (
+        {threadId, offset, limit},
+        _queryApi,
+        _extraOptions,
+        baseQuery,
+      ) => {
+        // Return mock data in development mode
+        if (__DEV__) {
+          // Simulate network delay
+          await new Promise(resolve => setTimeout(resolve, 300));
+          // Generate mock comments for the thread
+          const mockComments: ThreadComment[] = Array.from(
+            {length: 10},
+            (_, i) => ({
+              id: `comment-${threadId}-${i + 1}`,
+              content:
+                i === 0
+                  ? 'Thank you James. Grief work is so nuanced - clients need to know all feelings are valid.'
+                  : `That's a good point ${i}`,
+              createdAt: new Date(Date.now() - i * 60000).toISOString(),
+              createdBy: {
+                id: `user-${i + 1}`,
+                name: [
+                  'Emily Chen',
+                  'Yedhu Krishnan',
+                  'Arjun Menon',
+                  'Sita Nair',
+                  'David Lee',
+                  'Evelyn Clark',
+                  'Frank Martin',
+                  'Gina Rodriguez',
+                  'Harry Styles',
+                  'John Doe',
+                ][i],
+                profileImage:
+                  i % 2 === 0 ? `https://i.pravatar.cc/32?img=${i + 1}` : null,
+              },
+              reactions: (i < 3
+                ? {
+                    '1F44D': Math.floor(Math.random() * 5) + 1,
+                    '2764-FE0F': Math.floor(Math.random() * 3),
+                  }
+                : {}) as CommentReactions,
+            }),
+          );
+
+          const paginatedComments = mockComments.slice(offset, offset + limit);
+          return {
+            data: {
+              data: paginatedComments,
+              count: mockComments.length,
+            },
+          };
+        }
+
+        // In production, make actual API call using baseQuery
+        const result = await baseQuery({
+          url: API_ROUTES.REVIEWS.THREAD_COMMENTS(threadId),
+          method: API_METHODS.GET,
+          params: {
+            offset,
+            limit,
+          },
+        });
+
+        if (result.error) {
+          return {error: result.error};
+        }
+
+        return {data: result.data as ThreadCommentsResponse};
+      },
+    }),
   }),
 });
 
-export const {useLazyGetThreadsQuery} = reviewThreadsApi;
+export const {useLazyGetThreadsQuery, useLazyGetThreadCommentsQuery} =
+  reviewThreadsApi;
