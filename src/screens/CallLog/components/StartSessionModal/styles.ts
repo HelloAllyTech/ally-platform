@@ -16,6 +16,7 @@ export const styles = ScaledSheet.create({
     paddingVertical: '16@mvs',
     paddingHorizontal: '20@ms',
     width: '85%',
+    overflow: 'hidden',
   },
   closeBtn: {
     position: 'absolute',
@@ -33,12 +34,8 @@ export const styles = ScaledSheet.create({
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
-  illustration: {
-    width: '180@ms',
-    height: '120@vs',
-    alignSelf: 'center',
-    marginVertical: '12@mvs',
-    resizeMode: 'contain',
+  carouselContainer: {
+    alignItems: 'center',
   },
   description: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

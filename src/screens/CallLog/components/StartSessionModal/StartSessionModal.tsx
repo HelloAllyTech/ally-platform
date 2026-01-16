@@ -1,15 +1,8 @@
 import React from 'react';
-import {
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 
-import {CloseIcon, conversation} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {CloseIcon} from '@/assets';
+import {PrimaryButton, SecurityCarousel} from '@/components';
 import {useTranslate} from '@/hooks';
 
 import {styles} from './styles';
@@ -51,7 +44,9 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             {t('CallLogs.start')}{' '}
             <Text style={styles.titleItalic}>{t('CallLogs.session')}</Text>
           </Text>
-          <Image source={conversation} style={styles.illustration} />
+          <View style={styles.carouselContainer}>
+            <SecurityCarousel />
+          </View>
           <Text style={styles.description}>
             {t('CallLogs.startSessionDescription')}
           </Text>
