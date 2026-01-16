@@ -1,30 +1,32 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {FlatList, Image, Text, TouchableOpacity, View} from 'react-native';
+import {
+  FlatList,
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {UserIcon} from '@/assets/icons';
+import {BadgeIcon, UserIcon} from '@/assets/icons';
 import {TabView} from '@/components';
-import {SCREEN_NAMES} from '@/constants';
+import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
+import {LeaderboardPeriod, RANK_ICON_MAP} from '@/constants/leaderboard';
 import {useAppNavigation} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 
 import {generateMockLeaderboardData} from './mockUtils';
-
-export enum LeaderboardPeriod {
-  LAST_WEEK = 'last_week',
-  LAST_MONTH = 'last_month',
-  LAST_YEAR = 'last_year',
-  ALL_TIME = 'all_time',
-}
 
 export interface LeaderboardEntry {
   id: string;
   rank: number;
   userName: string;
   avatarUrl?: string;
-  totalDuration: string; // e.g., "14 h 32 min"
+  totalDuration: string;
   badges: number;
   isCurrentUser?: boolean;
 }
@@ -33,47 +35,87 @@ export const LeaderboardScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
+
   const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>(
     LeaderboardPeriod.LAST_WEEK,
   );
 
-  // Mock current user rank - will come from API
+  // TODO: Remove this once we have the actual current user rank
   const currentUserRank = 24;
   const badgeCount = 3;
 
-  const leaderboardData = useMemo(() => {
-    return generateMockLeaderboardData(currentUserRank);
-  }, [currentUserRank]);
+  const leaderboardData = useMemo(
+    () => generateMockLeaderboardData(currentUserRank),
+    [currentUserRank],
+  );
+
+  const currentUserEntry = useMemo(
+    () => leaderboardData.find(e => e.isCurrentUser),
+    [leaderboardData],
+  );
+
+  const currentScrollOffsetY = useRef(0);
+  const currentUserRowTopPosition = useRef(0);
+  const flatListViewportHeight = useRef(0);
+  const leaderboardRowHeight = useRef(0);
+
+  // Controls visibility of sticky footer showing current user's row
+  const [shouldShowStickyFooter, setShouldShowStickyFooter] = useState(true);
 
   const handleBadgePress = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.ACHIEVEMENTS);
   }, [navigation]);
 
-  const renderRankBadge = (rank: number) => {
-    let badgeColor;
-    if (rank === 1) badgeColor = '#FFD700'; // Gold
-    if (rank === 2) badgeColor = colors.lightGray3; // Silver/Gray
-    if (rank === 3) badgeColor = '#CD7F32'; // Bronze
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrollOffsetY = e.nativeEvent.contentOffset.y;
+    currentScrollOffsetY.current = scrollOffsetY;
 
+    // Calculate if current user's row is fully visible in the viewport
+    const viewportBottom = scrollOffsetY + flatListViewportHeight.current;
+    const isCurrentUserRowFullyVisible =
+      currentUserRowTopPosition.current + leaderboardRowHeight.current <=
+      viewportBottom;
+
+    setShouldShowStickyFooter(!isCurrentUserRowFullyVisible);
+  };
+
+  const renderRankBadge = (rank: number) => {
+    if (RANK_ICON_MAP[rank]) {
+      const RankIcon = RANK_ICON_MAP[rank];
+      return <RankIcon />;
+    }
     return (
-      <View
-        style={[
-          styles.rankBadge,
-          {backgroundColor: badgeColor},
-          rank <= 3 && styles.topThreeBadge,
-        ]}>
-        <Text style={[styles.rankText, rank <= 3 && styles.topThreeRankText]}>
-          {rank}
-        </Text>
+      <View style={styles.rankBadge}>
+        <Text style={styles.rankText}>{rank}</Text>
       </View>
     );
   };
 
-  const renderLeaderboardItem = ({item}: {item: LeaderboardEntry}) => {
+  const renderLeaderboardItem = ({
+    item,
+    index,
+  }: {
+    item: LeaderboardEntry;
+    index: number;
+  }) => {
     const isHighlighted = item.isCurrentUser;
 
     return (
       <View
+        onLayout={e => {
+          const rowHeight = e.nativeEvent.layout.height;
+
+          // Measure row height once (from first non-highlighted item for consistency)
+          if (!leaderboardRowHeight.current && !isHighlighted) {
+            leaderboardRowHeight.current = rowHeight;
+          }
+
+          // Calculate and store the current user's row position when it's rendered
+          if (item.isCurrentUser && leaderboardRowHeight.current > 0) {
+            const calculatedTopPosition = index * leaderboardRowHeight.current;
+            currentUserRowTopPosition.current = calculatedTopPosition;
+          }
+        }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
         <View
           style={[
@@ -136,10 +178,8 @@ export const LeaderboardScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.badgeButton}
           onPress={handleBadgePress}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <View style={styles.badgeIcon}>
-            <Text style={styles.badgeIconText}>🏆</Text>
-          </View>
+          hitSlop={DEFAULT_HIT_SLOP}>
+          <BadgeIcon width={16} height={16} />
           <Text style={styles.badgeCount}>
             {badgeCount} {t('Leaderboard.badges')}
           </Text>
@@ -176,27 +216,23 @@ export const LeaderboardScreen: React.FC = () => {
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        {paddingTop: insets.top, paddingBottom: insets.bottom},
-      ]}>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
       {renderHeader()}
-      <View style={styles.content}>
+      <View style={styles.listContainer}>
         <View style={styles.tabContainer}>
-          <TabView<LeaderboardPeriod>
+          <TabView
             tabs={[
               {
                 key: LeaderboardPeriod.LAST_WEEK,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.week')}`,
+                label: t('Leaderboard.period.week'),
               },
               {
                 key: LeaderboardPeriod.LAST_MONTH,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.month')}`,
+                label: t('Leaderboard.period.month'),
               },
               {
                 key: LeaderboardPeriod.LAST_YEAR,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.year')}`,
+                label: t('Leaderboard.period.year'),
               },
               {
                 key: LeaderboardPeriod.ALL_TIME,
@@ -214,7 +250,21 @@ export const LeaderboardScreen: React.FC = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          onLayout={e => {
+            flatListViewportHeight.current = e.nativeEvent.layout.height;
+          }}
         />
+
+        {shouldShowStickyFooter && currentUserEntry && (
+          <View style={styles.stickyFooter}>
+            {renderLeaderboardItem({
+              item: currentUserEntry,
+              index: currentUserEntry.rank - 1,
+            })}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -258,10 +308,11 @@ const styles = ScaledSheet.create({
   badgeCount: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.label.medium,
-    color: colors.blue,
+    color: colors.ds.blue[500],
   },
-  content: {
+  listContainer: {
     flex: 1,
+    marginBottom: '100@ms',
   },
   tabContainer: {
     paddingHorizontal: '21@ms',
@@ -288,7 +339,6 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     paddingVertical: '12@ms',
     borderRadius: '8@ms',
-    marginBottom: '4@ms',
   },
   highlightedRow: {
     backgroundColor: colors.ds.blue[50],
@@ -296,8 +346,15 @@ const styles = ScaledSheet.create({
     borderColor: colors.ds.theme.primary,
     marginHorizontal: '12@ms',
   },
+  stickyFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.white,
+  },
   rankColumn: {
-    width: '45@ms',
+    width: '38@ms',
     alignItems: 'flex-start',
     marginLeft: '21@ms',
   },
@@ -307,32 +364,21 @@ const styles = ScaledSheet.create({
   rankColumnHeader: {
     width: '45@ms',
     alignItems: 'flex-start',
-    paddingLeft: 0,
   },
   userColumnHeader: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '6@ms',
-    paddingLeft: '2@ms',
-    minWidth: '150@ms',
+    minWidth: '160@ms',
   },
   durationColumnHeader: {
     width: '95@ms',
-    alignItems: 'flex-start',
-    paddingLeft: '6@ms',
   },
   badgesColumnHeader: {
     width: '60@ms',
-    alignItems: 'flex-start',
-    paddingLeft: '2@ms',
-    marginRight: '8@ms',
   },
   rankBadge: {
     width: '26@ms',
     height: '26@ms',
     borderRadius: '13@ms',
-    backgroundColor: colors.lightGray2,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -355,8 +401,8 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '6@ms',
-    paddingLeft: '2@ms',
-    minWidth: '150@ms',
+    marginRight: '10@ms',
+    minWidth: '160@ms',
   },
   avatarContainer: {
     width: '40@ms',
@@ -388,19 +434,13 @@ const styles = ScaledSheet.create({
   },
   durationColumn: {
     width: '95@ms',
-    alignItems: 'flex-start',
-    paddingLeft: '6@ms',
   },
   durationText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.tiny,
-    color: colors.ds.typography.highEmphasis,
   },
   badgesColumn: {
     width: '60@ms',
-    alignItems: 'flex-start',
-    paddingLeft: '2@ms',
-    marginRight: '8@ms',
   },
   badgesText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
