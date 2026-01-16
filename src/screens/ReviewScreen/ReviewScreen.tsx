@@ -3,30 +3,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyState, TabView, useToast} from '@/components';
+import {REVIEW_FILTERS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
-import {ReviewCard} from '@/screens/ReviewScreen/components/ReviewCard';
-import {ReviewFilter} from '@/services/reviewsApi';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
-const filters = [
-  {
-    key: ReviewFilter.ALL,
-    label: 'All',
-  },
-  {
-    key: ReviewFilter.LATEST,
-    label: 'Latest',
-  },
-  {
-    key: ReviewFilter.MOST_REVIEWED,
-    label: 'Most Reviewed',
-  },
-  {
-    key: ReviewFilter.UNDISCOVERED,
-    label: 'Undiscovered',
-  },
-];
+import {ReviewCard} from './components';
 
 export const SeparatorComponent = () => {
   return <View style={styles.itemSeparator} />;
@@ -62,6 +44,14 @@ export const ReviewScreen: React.FC = () => {
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{t('Review.header.title')} </Text>
       </View>
+      <View style={styles.tabContainer}>
+        <TabView
+          tabs={REVIEW_FILTERS}
+          tabWidthMode="content"
+          activeTab={selectedFilter}
+          onTabChange={setSelectedFilter}
+        />
+      </View>
 
       <FlatList
         contentContainerStyle={styles.list}
@@ -95,14 +85,6 @@ export const ReviewScreen: React.FC = () => {
             </View>
           ) : null
         }
-        ListHeaderComponent={
-          <TabView
-            tabs={filters}
-            tabWidthMode="content"
-            activeTab={selectedFilter}
-            onTabChange={setSelectedFilter}
-          />
-        }
         ItemSeparatorComponent={SeparatorComponent}
       />
     </View>
@@ -127,6 +109,10 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     ...typography.display.small,
     fontWeight: fontWeights.medium,
+  },
+  tabContainer: {
+    marginTop: '16@ms',
+    paddingHorizontal: '16@s',
   },
   list: {
     backgroundColor: colors.lightGray9,

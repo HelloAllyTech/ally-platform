@@ -1,5 +1,5 @@
 // src/hooks/__mocks__/mockReviewsData.ts
-import {ReviewItem, ReviewsResponse} from '@/services/reviewsApi';
+import {ReviewItem, ReviewsResponse} from '@/types/reviews';
 
 // Generate mock review items
 const generateMockReview = (id: number): ReviewItem => ({
