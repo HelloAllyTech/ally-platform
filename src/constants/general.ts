@@ -156,6 +156,8 @@ export const API_ROUTES = {
     REACTIONS_COUNT: (reviewId: string | number) =>
       `/reviews/${reviewId}/reactions/count`,
     THREADS: (reviewId: string | number) => `/reviews/${reviewId}/threads`,
+    GET_THREAD_COMMENTS: (threadId: string) =>
+      `/reviews/threads/${threadId}/comments`,
   },
 } as const;
 
@@ -215,7 +217,7 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   },
   titleCustomStyle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.white,
+    color: colors.charcoal2,
     ...typography.headline.tiny,
   },
 };

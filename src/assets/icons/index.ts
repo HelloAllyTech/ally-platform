@@ -19,7 +19,8 @@ import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
 import ChangeImageIcon from './changeImage.svg';
-import ReviewTranscriptIcon from './chatAddOn.svg';
+import ChatAddOnIcon from './chatAddOn.svg';
+import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -53,6 +54,7 @@ import GoogleIcon from './google.svg';
 import HandShareIcon from './handShare.svg';
 import HeadphoneIcon from './headphone.svg';
 import HeadsetMicIcon from './headsetMic.svg';
+import HelpIcon from './help.svg';
 import HexagonCloseIcon from './hexagonClose.svg';
 import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
@@ -149,11 +151,13 @@ export {
   CallLogActiveIcon,
   CallLogInactiveIcon,
   ChangeImageIcon,
+  ChatAddOnIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,
   CloseCircle,
   CloseIcon,
+  CommentIcon,
   CommunityActiveIcon,
   CommunityInactiveIcon,
   ContractIcon,
@@ -179,6 +183,7 @@ export {
   HandShareIcon,
   HeadphoneIcon,
   HeadsetMicIcon,
+  HelpIcon,
   HexagonCloseIcon,
   HourGlassIcon,
   InfoBlackCircleIcon,
@@ -220,7 +225,6 @@ export {
   ResumeIcon,
   ReviewActiveIcon,
   ReviewInactiveIcon,
-  ReviewTranscriptIcon,
   RightArrow,
   RunningSimulationIcon,
   SearchActiveIcon,
