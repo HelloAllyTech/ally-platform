@@ -217,7 +217,7 @@ export const defaultSecurityCarouselConfig: CarouselConfig = {
   },
   titleCustomStyle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.white,
+    color: colors.charcoal2,
     ...typography.headline.tiny,
   },
 };

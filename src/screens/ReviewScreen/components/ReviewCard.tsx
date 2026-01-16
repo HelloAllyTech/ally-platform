@@ -13,9 +13,8 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ReviewTranscriptIcon} from '@/assets';
+import {ChatAddOnIcon} from '@/assets';
 import {VideoPreview} from '@/components';
-import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker';
 import {
   colors,
   fontFamily,
@@ -32,6 +31,8 @@ import {
   formatRelativeTime,
   pluralize,
 } from '@/utils';
+
+import {ReactionsCount} from './ReactionsCount';
 
 dayjs.extend(relativeTime);
 
@@ -112,22 +113,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
     </View>
   );
 
-  const renderReactionBubble = (
-    reaction_code: string,
-    index: number,
-    total: number,
-  ) => (
-    <View
-      key={reaction_code}
-      style={[
-        styles.reactionBubble,
-        index < total - 1 && styles.reactionBubbleOverlap,
-        {zIndex: total - index},
-      ]}>
-      <Text>{EMOJI_UNICODE_MAP[reaction_code]}</Text>
-    </View>
-  );
-
   const renderSimulationCard = () => (
     <View style={styles.scenarioContainer}>
       <View style={styles.coverContainer}>
@@ -177,19 +162,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderReactionsAndComments = () => (
     <View style={styles.reactionCommentContainer}>
-      <TouchableOpacity style={styles.reactionCountContainer}>
-        <View style={styles.emojisContainer}>
-          {Object.keys(reactions)
-            .slice(0, 3)
-            .map((reaction_code, index, array) =>
-              renderReactionBubble(reaction_code, index, array.length),
-            )}
-        </View>
-        <Text style={styles.reactionText}>
-          {pluralize(totalReactions, t('Review.card.reaction'))}
-        </Text>
-      </TouchableOpacity>
-
+      <ReactionsCount
+        reviewId={id}
+        reactions={reactions}
+        totalReactions={totalReactions}
+      />
       <TouchableOpacity style={styles.commentCountContainer}>
         <Text style={styles.commentText}>
           {pluralize(commentsCount, t('Review.card.comment'))}
@@ -224,7 +201,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       <TouchableOpacity
         style={styles.reviewTranscriptContainer}
         onPress={handleReviewItemPress}>
-        <ReviewTranscriptIcon width={16} height={16} />
+        <ChatAddOnIcon width={16} height={16} />
         <Text style={styles.reviewTranscriptText}>
           {t('Review.card.reviewTranscript')}
         </Text>

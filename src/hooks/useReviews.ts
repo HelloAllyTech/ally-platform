@@ -1,70 +1,35 @@
 import {useCallback, useEffect, useState} from 'react';
 
+import {ReviewFilter} from '@/constants';
 import {mockGetReviews} from '@/screens/ReviewScreen/mockData';
-import {ReviewFilter, useLazyGetReviewsQuery} from '@/services/reviewsApi';
+import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
-const PAGE_SIZE = 5;
+const LIMIT = 5;
+const USE_MOCK = true;
 
 export const useReviews = () => {
-  const [page, setPage] = useState(1);
+  const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<ReviewFilter>(
     ReviewFilter.ALL,
   );
   const [getReviews, {isLoading, isFetching, error}] = useLazyGetReviewsQuery();
-
-  // Fetch reviews with current filter and page
-  //   const fetchReviews = useCallback(
-  //     async (pageNumber: number, reset: boolean = false) => {
-  //       const offset = (pageNumber - 1) * PAGE_SIZE;
-
-  //       try {
-  //         const response = await getReviews({
-  //           sortBy: filter,
-  //           limit: PAGE_SIZE,
-  //           offset,
-  //         });
-
-  //         if (response.data) {
-  //           const newReviews = response.data.data || [];
-  //           const count = response.data.count || 0;
-
-  //           if (reset) {
-  //             setReviews(newReviews);
-  //           } else {
-  //             setReviews(prev => [...prev, ...newReviews]);
-  //           }
-
-  //           setHasMore(
-  //             newReviews.length === PAGE_SIZE && pageNumber * PAGE_SIZE < count,
-  //           );
-  //         }
-  //       } catch (err) {
-  //         console.error('Error fetching reviews:', err);
-  //       }
-  //     },
-  //     [getReviews, filter],
-  //   );
-
-  const USE_MOCK = true;
   const fetchReviews = useCallback(
-    async (pageNumber: number, reset: boolean = false) => {
-      const offset = (pageNumber - 1) * PAGE_SIZE;
-
+    async (currentOffset: number, reset: boolean = false) => {
       try {
         // Use mock or real API based on flag
         const response = USE_MOCK
           ? await mockGetReviews({
               sortBy: selectedFilter,
-              limit: PAGE_SIZE,
-              offset,
+              limit: LIMIT,
+              offset: currentOffset,
             })
           : await getReviews({
               sortBy: selectedFilter,
-              limit: PAGE_SIZE,
-              offset,
+              limit: LIMIT,
+              offset: currentOffset,
             });
 
         if (response.data) {
@@ -77,41 +42,43 @@ export const useReviews = () => {
             setReviews(prev => [...prev, ...newReviews]);
           }
 
-          setHasMore(
-            newReviews.length === PAGE_SIZE && pageNumber * PAGE_SIZE < count,
-          );
+          const hasMoreItems =
+            newReviews.length === LIMIT &&
+            currentOffset + newReviews.length < count;
+
+          setHasMore(hasMoreItems);
         }
       } catch (err) {
         console.error('Error fetching reviews:', err);
       }
     },
-    [getReviews, selectedFilter, USE_MOCK],
+    [getReviews, selectedFilter],
   );
 
   // Reset and fetch when filter changes
   useEffect(() => {
-    setPage(1);
+    setOffset(0);
     setReviews([]);
     setHasMore(true);
-    fetchReviews(1, true);
+    fetchReviews(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFilter]);
 
   // Load more reviews (for infinite scroll)
   const loadMore = useCallback(() => {
     if (!isLoading && !isFetching && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchReviews(nextPage, false);
+      const newOffset = offset + LIMIT;
+      fetchReviews(newOffset, false);
+      setOffset(newOffset);
     }
-  }, [isLoading, isFetching, hasMore, page, fetchReviews]);
+  }, [isLoading, isFetching, hasMore, offset, fetchReviews]);
 
   // Refresh reviews
   const refresh = useCallback(() => {
-    setPage(1);
+    setOffset(0);
     setReviews([]);
     setHasMore(true);
-    fetchReviews(1, true);
+    fetchReviews(0, true);
   }, [fetchReviews]);
 
   return {
