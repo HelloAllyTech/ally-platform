@@ -205,6 +205,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             events=self.events,
             event_registry=self.event_registry,
             event_notifier=self.orchestrate_events,
+            get_live_score=lambda: self.live_score,
             room=self.room,
             default_seconds=60.0,
             agent_graph=agent_graph,

@@ -6,6 +6,7 @@ including trigger and revoke coroutines for different condition operators.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Awaitable, Callable, Dict, List, Optional, Set
 
 from livekit import rtc
@@ -13,6 +14,7 @@ from livekit import rtc
 from app.core.constants import ConditionOperator, DetectionType
 from app.core.events.base import BaseEvent
 from app.core.events.schemas import EventRegistryEntry
+from app.core.graph.utils import is_event_eligible
 from app.utils.event_utils import get_current_score_from_graph
 from app.utils.logger import get_logger
 
@@ -36,7 +38,8 @@ class TimeEventScheduler:
         self,
         events: List[BaseEvent],
         event_registry: Dict[str, EventRegistryEntry],
-        event_notifier: Callable[[rtc.Room, int, Optional[Set[str]]], Awaitable[tuple]],
+        event_notifier: Callable,
+        get_live_score: Callable[[], int],
         *,
         room: Optional[rtc.Room] = None,
         default_seconds: float = 60.0,
@@ -127,6 +130,10 @@ class TimeEventScheduler:
                     logger.warning("Unknown condition for event %s: %r", event_id, cond)
                     cond_enum = None
 
+                reg_entry = event_registry.get(event_id, {})
+                last_occurred = reg_entry.get("occurred_at")
+                occ_count = reg_entry.get("occurrence_count", 0)
+
                 # ---- LT / LTE ----
                 if cond_enum in (ConditionOperator.LT, ConditionOperator.LTE):
                     logger.info(
@@ -136,13 +143,45 @@ class TimeEventScheduler:
                         seconds,
                     )
 
+                    # 1. GET SCORE DIRECTLY VIA CALLBACK
+                    current_score = get_live_score()
+
+                    # 2. CHECK ELIGIBILITY
+                    if not is_event_eligible(
+                        event=ev,
+                        elapsed_time=0.0,
+                        current_score=current_score,
+                        last_occurred_at=last_occurred,
+                        occurrence_count=occ_count,
+                    ):
+                        logger.info(
+                            f"Skipping LT/LTE event {event_id}: "
+                            f"Not eligible (Score={current_score})."
+                        )
+                        continue
+
+                    logger.info(
+                        "Scheduling LT/LTE for %s: set True now, revoke after %s s",
+                        event_id,
+                        seconds,
+                    )
+
+                    # Update Registry
+                    now_utc = datetime.now(timezone.utc)
+
                     # State becomes True immediately - update dict directly
                     if event_id in event_registry:
                         event_registry[event_id]["happened"] = True
+                        event_registry[event_id]["occurred_at"] = now_utc
+                        event_registry[event_id]["occurrence_count"] = (
+                            event_registry[event_id].get("occurrence_count", 0) + 1
+                        )
                     else:
                         event_registry[event_id] = {
                             "happened": True,
                             "trigger_multiple": False,
+                            "occurred_at": now_utc,
+                            "occurrence_count": 1,
                         }
 
                     # Notify and capture branching instructions and additional score
@@ -202,10 +241,11 @@ class TimeEventScheduler:
 
                     task = asyncio.create_task(
                         self._time_trigger_coroutine(
-                            event_id,
+                            ev,
                             seconds,
                             event_registry,
                             event_notifier,
+                            get_live_score,
                             room,
                             agent_graph,
                             thread_id,
@@ -221,88 +261,79 @@ class TimeEventScheduler:
 
     async def _time_trigger_coroutine(
         self,
-        event_id: str,
+        event: BaseEvent,
         seconds: float,
         event_registry: Dict[str, EventRegistryEntry],
         event_notifier: Callable[[rtc.Room, int, Optional[Set[str]]], Awaitable[tuple]],
+        get_live_score: Callable[[], int],  # <--- Callback
         room: Optional[rtc.Room],
         agent_graph=None,
         thread_id: Optional[str] = None,
     ) -> None:
         """
-        Sleep for the given duration and then activate a TIME event.
-
-        Behavior:
-            After sleeping:
-                - Sets the event's "happened" to True.
-                - Calls event_notifier so UI/Core receive the event.
-                - Updates LangGraph state with branching instructions if available.
-
-        Args:
-            event_id:
-                The TIME event to trigger.
-            seconds:
-                Timer length before the event fires.
-            event_registry:
-                Dictionary mapping event_id to event state.
-            event_notifier:
-                Callback to notify about event changes.
-            room:
-                Optional LiveKit room for sending event notifications.
-            agent_graph:
-                Optional LangGraph instance for updating state.
-            thread_id:
-                Optional thread ID for the current conversation session.
+        Sleeps, then calls get_live_score() to check eligibility.
         """
+        event_id = event.event_id
         try:
-            logger.debug(
-                "Trigger coroutine sleeping for %s seconds (event=%s)",
-                seconds,
-                event_id,
-            )
+            logger.debug("Trigger sleeping for %s s (event=%s)", seconds, event_id)
             await asyncio.sleep(seconds)
 
-            logger.info("Time trigger fired: %s (after %s seconds)", event_id, seconds)
-            # Update dict directly
+            # 1. GET SCORE FRESH AFTER SLEEP
+            current_score = get_live_score()
+
+            # 2. Get Registry Data
+            reg_entry = event_registry.get(event_id, {})
+            last_occurred = reg_entry.get("occurred_at")
+            occ_count = reg_entry.get("occurrence_count", 0)
+
+            # 3. CHECK ELIGIBILITY
+            if not is_event_eligible(
+                event=event,
+                elapsed_time=seconds,
+                current_score=current_score,
+                last_occurred_at=last_occurred,
+                occurrence_count=occ_count,
+            ):
+                logger.info(
+                    f"Time event {event_id} woke up but "
+                    f"is NOT eligible. (Score: {current_score})"
+                )
+                return
+
+            logger.info("Time trigger fired: %s (after %s s)", event_id, seconds)
+
+            # 4. Update Registry
+            now_utc = datetime.now(timezone.utc)
             if event_id in event_registry:
                 event_registry[event_id]["happened"] = True
+                event_registry[event_id]["occurred_at"] = now_utc
+                event_registry[event_id]["occurrence_count"] = (
+                    event_registry[event_id].get("occurrence_count", 0) + 1
+                )
             else:
-                event_registry[event_id] = {"happened": True, "trigger_multiple": False}
+                event_registry[event_id] = {
+                    "happened": True,
+                    "trigger_multiple": False,
+                    "occurred_at": now_utc,
+                    "occurrence_count": 1,
+                }
 
             try:
-                # Get current score from graph state (for future use)
-                if agent_graph and thread_id:
-                    try:
-                        get_current_score_from_graph(thread_id)
-                    except Exception:
-                        logger.warning(
-                            f"Failed to get current score from graph for "
-                            f"event {event_id}, using 0"
-                        )
-
                 (
                     _,
                     additional_score,
                     branching_and_feedback_data,
                 ) = await event_notifier(room, detected_event_ids={event_id})
-                # Update graph state if graph and thread_id are provided
+
                 if agent_graph and thread_id:
                     state_updates = {}
                     if branching_and_feedback_data:
                         state_updates["branching_and_feedback_data"] = (
                             branching_and_feedback_data
                         )
-                        logger.info(
-                            f"Updating graph state with "
-                            f"{len(branching_and_feedback_data)} branching "
-                            f"and feedback data entries from time event {event_id}"
-                        )
                     if additional_score > 0:
                         state_updates["additional_score"] = additional_score
-                        logger.info(
-                            f"Updating graph state with additional score "
-                            f"{additional_score} from time event {event_id}"
-                        )
+
                     if state_updates:
                         agent_graph.update_state(
                             {"configurable": {"thread_id": thread_id}},

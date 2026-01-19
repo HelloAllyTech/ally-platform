@@ -71,6 +71,18 @@ SCENARIO_SAMPLE = {
                 "detectionConfig": {},
             },
             {
+                "id": "time-based-event-10s",
+                "name": "Time-based event at 10 seconds",
+                "description": "Triggers after 10 seconds from the start of the session.",
+                "score": 0,
+                "emoji": "⏱️",
+                "message": "10 seconds have passed!",
+                "detectionType": "TIME",
+                "feedbackStatus": "True",
+                "data": {"time": 10, "condition": "GTE"},
+                "detectionConfig": {"maxOccurrences": 0},
+            },
+            {
                 "id": "comb-score-lte-0_and_open-ended-question",
                 "name": "offered superficial hope",
                 "description": "",

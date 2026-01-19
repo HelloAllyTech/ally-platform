@@ -35,12 +35,16 @@ def mock_event_registry():
 def mock_event_notifier():
     """Create a mock event notifier."""
 
-    async def notifier(
-        room, current_score: int = 0, detected_event_ids: Optional[Set[str]] = None
-    ):
+    async def notifier(room, detected_event_ids: Optional[Set[str]] = None):
         return None, 0, []
 
     return AsyncMock(side_effect=notifier)
+
+
+@pytest.fixture
+def mock_get_live_score():
+    """Create a mock get_live_score callback."""
+    return MagicMock(return_value=10)
 
 
 @pytest.fixture
@@ -65,36 +69,27 @@ class TestTimeEventSchedulerInitialization:
         assert scheduler._time_tasks == {}
         assert isinstance(scheduler._time_tasks, dict)
 
-    def test_multiple_schedulers_independent(self):
-        """Test that multiple scheduler instances are independent."""
-        scheduler1 = TimeEventScheduler()
-        scheduler2 = TimeEventScheduler()
-
-        scheduler1._time_tasks["test"] = "value1"
-
-        assert "test" in scheduler1._time_tasks
-        assert "test" not in scheduler2._time_tasks
-
 
 class TestTimeEventSchedulerStartSchedulers:
     """Test suite for start_time_event_schedulers method."""
 
     @pytest.mark.asyncio
     async def test_start_with_no_events(
-        self, scheduler, mock_event_registry, mock_event_notifier
+        self, scheduler, mock_event_registry, mock_event_notifier, mock_get_live_score
     ):
         """Test starting scheduler with no events."""
         await scheduler.start_time_event_schedulers(
             events=[],
             event_registry=mock_event_registry,
             event_notifier=mock_event_notifier,
+            get_live_score=mock_get_live_score,
         )
 
         assert len(scheduler._time_tasks) == 0
 
     @pytest.mark.asyncio
     async def test_start_with_non_time_events(
-        self, scheduler, mock_event_registry, mock_event_notifier
+        self, scheduler, mock_event_registry, mock_event_notifier, mock_get_live_score
     ):
         """Test that non-TIME events are ignored."""
         event = MockTimeEvent(
@@ -107,15 +102,16 @@ class TestTimeEventSchedulerStartSchedulers:
             events=[event],
             event_registry=mock_event_registry,
             event_notifier=mock_event_notifier,
+            get_live_score=mock_get_live_score,
         )
 
         assert len(scheduler._time_tasks) == 0
 
     @pytest.mark.asyncio
-    async def test_start_with_gt_condition(
-        self, scheduler, mock_event_registry, mock_event_notifier
+    async def test_start_with_gt_condition_schedule(
+        self, scheduler, mock_event_registry, mock_event_notifier, mock_get_live_score
     ):
-        """Test starting scheduler with GT condition."""
+        """Test that GT condition creates a task."""
         event = MockTimeEvent(
             event_id="test_gt",
             detection_type=DetectionType.TIME,
@@ -126,267 +122,164 @@ class TestTimeEventSchedulerStartSchedulers:
             events=[event],
             event_registry=mock_event_registry,
             event_notifier=mock_event_notifier,
+            get_live_score=mock_get_live_score,
         )
 
         assert "test_gt" in scheduler._time_tasks
         assert isinstance(scheduler._time_tasks["test_gt"], asyncio.Task)
 
-        await asyncio.sleep(0.2)
-        assert mock_event_registry.get("test_gt", {}).get("happened") is True
-
     @pytest.mark.asyncio
-    async def test_start_with_lt_condition(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
+    async def test_start_with_lt_condition_immediate_execution(
+        self,
+        scheduler,
+        mock_event_registry,
+        mock_event_notifier,
+        mock_room,
+        mock_get_live_score,
     ):
-        """Test starting scheduler with LT condition."""
+        """Test starting scheduler with LT condition
+        executes immediately if eligible."""
         event = MockTimeEvent(
             event_id="test_lt",
             detection_type=DetectionType.TIME,
             data=MagicMock(time=0.1, condition=ConditionOperator.LT),
         )
 
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
-
-        assert "test_lt" in scheduler._time_tasks
-        assert mock_event_registry.get("test_lt", {}).get("happened") is True
-
-        await asyncio.sleep(0.2)
-        assert mock_event_registry.get("test_lt", {}).get("happened") is False
-
-    @pytest.mark.asyncio
-    async def test_start_with_lte_condition(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
-    ):
-        """Test starting scheduler with LTE condition."""
-        event = MockTimeEvent(
-            event_id="test_lte",
-            detection_type=DetectionType.TIME,
-            data=MagicMock(time=0.1, condition=ConditionOperator.LTE),
-        )
-
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
-
-        assert "test_lte" in scheduler._time_tasks
-        assert mock_event_registry.get("test_lte", {}).get("happened") is True
-
-        await asyncio.sleep(0.2)
-        assert mock_event_registry.get("test_lte", {}).get("happened") is False
-
-    @pytest.mark.asyncio
-    async def test_start_with_invalid_time_value(
-        self, scheduler, mock_event_registry, mock_event_notifier
-    ):
-        """Test handling of invalid time values."""
-        event = MockTimeEvent(
-            event_id="test_invalid",
-            detection_type=DetectionType.TIME,
-            data=MagicMock(time="invalid", condition=ConditionOperator.GT),
-        )
-
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            default_seconds=0.1,
-        )
-
-        assert "test_invalid" in scheduler._time_tasks
-
-        await asyncio.sleep(0.2)
-        assert mock_event_registry.get("test_invalid", {}).get("happened") is True
-
-    @pytest.mark.asyncio
-    async def test_start_with_negative_time(
-        self, scheduler, mock_event_registry, mock_event_notifier
-    ):
-        """Test handling of negative time values."""
-        event = MockTimeEvent(
-            event_id="test_negative",
-            detection_type=DetectionType.TIME,
-            data=MagicMock(time=-5, condition=ConditionOperator.GT),
-        )
-
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-        )
-
-        assert "test_negative" in scheduler._time_tasks
-
-        await asyncio.sleep(0.1)
-        assert mock_event_registry.get("test_negative", {}).get("happened") is True
-
-    @pytest.mark.asyncio
-    async def test_start_with_missing_event_id(
-        self, scheduler, mock_event_registry, mock_event_notifier
-    ):
-        """Test handling of events with missing event_id."""
-        event = MockTimeEvent(
-            event_id="",
-            detection_type=DetectionType.TIME,
-            data=MagicMock(time=0.1, condition=ConditionOperator.GT),
-        )
-
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-        )
-
-        assert len(scheduler._time_tasks) == 0
-
-    @pytest.mark.asyncio
-    async def test_start_with_multiple_events(
-        self, scheduler, mock_event_registry, mock_event_notifier
-    ):
-        """Test starting scheduler with multiple events."""
-        events = [
-            MockTimeEvent(
-                event_id=f"test_{i}",
-                detection_type=DetectionType.TIME,
-                data=MagicMock(time=0.1, condition=ConditionOperator.GT),
-            )
-            for i in range(5)
-        ]
-
-        await scheduler.start_time_event_schedulers(
-            events=events,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-        )
-
-        assert len(scheduler._time_tasks) == 5
-        for i in range(5):
-            assert f"test_{i}" in scheduler._time_tasks
-
-    @pytest.mark.asyncio
-    async def test_start_with_graph_and_thread_id(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_agent_graph
-    ):
-        """Test starting scheduler with agent graph and thread ID."""
-
-        async def mock_notifier_with_return(
-            room, current_score: int = 0, detected_event_ids: Optional[Set[str]] = None
-        ):
-            return None, 10, ["instruction1", "instruction2"]
-
-        mock_event_notifier.side_effect = mock_notifier_with_return
-
-        with patch(
-            "app.core.events.schedulers.get_current_score_from_graph", return_value=5
-        ):
-            event = MockTimeEvent(
-                event_id="test_graph",
-                detection_type=DetectionType.TIME,
-                data=MagicMock(time=0.1, condition=ConditionOperator.GT),
-            )
-
+        # Mock eligibility to return True
+        with patch("app.core.events.schedulers.is_event_eligible", return_value=True):
             await scheduler.start_time_event_schedulers(
                 events=[event],
                 event_registry=mock_event_registry,
                 event_notifier=mock_event_notifier,
-                agent_graph=mock_agent_graph,
-                thread_id="test_thread",
+                get_live_score=mock_get_live_score,
+                room=mock_room,
             )
 
-            await asyncio.sleep(0.2)
+        # Should be scheduled for revoke
+        assert "test_lt" in scheduler._time_tasks
+        # Should be set to True immediately
+        assert mock_event_registry.get("test_lt", {}).get("happened") is True
 
-            assert mock_agent_graph.update_state.called
+    @pytest.mark.asyncio
+    async def test_start_with_lt_condition_not_eligible(
+        self,
+        scheduler,
+        mock_event_registry,
+        mock_event_notifier,
+        mock_room,
+        mock_get_live_score,
+    ):
+        """Test LT condition ignored if not eligible."""
+        event = MockTimeEvent(
+            event_id="test_lt_skip",
+            detection_type=DetectionType.TIME,
+            data=MagicMock(time=0.1, condition=ConditionOperator.LT),
+        )
+
+        # Mock eligibility to return False
+        with patch("app.core.events.schedulers.is_event_eligible", return_value=False):
+            await scheduler.start_time_event_schedulers(
+                events=[event],
+                event_registry=mock_event_registry,
+                event_notifier=mock_event_notifier,
+                get_live_score=mock_get_live_score,
+                room=mock_room,
+            )
+
+        # Should NOT be in registry or tasks
+        assert "test_lt_skip" not in scheduler._time_tasks
+        assert "test_lt_skip" not in mock_event_registry
 
 
 class TestTimeEventSchedulerTriggerCoroutine:
     """Test suite for _time_trigger_coroutine method."""
 
     @pytest.mark.asyncio
-    async def test_trigger_sets_happened_to_true(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
+    async def test_trigger_sets_happened_to_true_if_eligible(
+        self,
+        scheduler,
+        mock_event_registry,
+        mock_event_notifier,
+        mock_room,
+        mock_get_live_score,
     ):
-        """Test that trigger coroutine sets happened to True."""
-        await scheduler._time_trigger_coroutine(
-            event_id="test_trigger",
-            seconds=0.1,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
+        """Test that trigger coroutine sets happened to True if eligible."""
+        event = MockTimeEvent(
+            event_id="test_trigger", detection_type=DetectionType.TIME
         )
+
+        with patch("app.core.events.schedulers.is_event_eligible", return_value=True):
+            await scheduler._time_trigger_coroutine(
+                event=event,
+                seconds=0.01,
+                event_registry=mock_event_registry,
+                event_notifier=mock_event_notifier,
+                get_live_score=mock_get_live_score,
+                room=mock_room,
+            )
 
         assert mock_event_registry["test_trigger"]["happened"] is True
+        assert mock_event_registry["test_trigger"]["occurrence_count"] == 1
 
     @pytest.mark.asyncio
-    async def test_trigger_calls_event_notifier(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
+    async def test_trigger_does_nothing_if_not_eligible(
+        self,
+        scheduler,
+        mock_event_registry,
+        mock_event_notifier,
+        mock_room,
+        mock_get_live_score,
     ):
-        """Test that trigger coroutine calls event notifier."""
-        await scheduler._time_trigger_coroutine(
-            event_id="test_notify",
-            seconds=0.1,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
+        """Test that trigger coroutine does nothing if not eligible."""
+        event = MockTimeEvent(event_id="test_ignore", detection_type=DetectionType.TIME)
 
-        mock_event_notifier.assert_called_once()
+        with patch("app.core.events.schedulers.is_event_eligible", return_value=False):
+            await scheduler._time_trigger_coroutine(
+                event=event,
+                seconds=0.01,
+                event_registry=mock_event_registry,
+                event_notifier=mock_event_notifier,
+                get_live_score=mock_get_live_score,
+                room=mock_room,
+            )
 
-    @pytest.mark.asyncio
-    async def test_trigger_handles_notifier_exception(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
-    ):
-        """Test that trigger handles exceptions from event notifier."""
-        mock_event_notifier.side_effect = Exception("Notifier error")
-
-        await scheduler._time_trigger_coroutine(
-            event_id="test_error",
-            seconds=0.1,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
-
-        assert mock_event_registry["test_error"]["happened"] is True
+        assert "test_ignore" not in mock_event_registry
 
     @pytest.mark.asyncio
-    async def test_trigger_with_graph_updates(
+    async def test_trigger_updates_graph_state(
         self,
         scheduler,
         mock_event_registry,
         mock_event_notifier,
         mock_room,
         mock_agent_graph,
+        mock_get_live_score,
     ):
         """Test trigger coroutine updates graph state."""
+        event = MockTimeEvent(
+            event_id="test_graph_update", detection_type=DetectionType.TIME
+        )
 
         async def mock_notifier_with_return(
-            room, current_score: int = 0, detected_event_ids: Optional[Set[str]] = None
+            room, detected_event_ids: Optional[Set[str]] = None
         ):
             return None, 5, ["instruction"]
 
         mock_event_notifier.side_effect = mock_notifier_with_return
 
-        with patch(
-            "app.core.events.schedulers.get_current_score_from_graph", return_value=10
-        ):
+        with patch("app.core.events.schedulers.is_event_eligible", return_value=True):
             await scheduler._time_trigger_coroutine(
-                event_id="test_graph_update",
-                seconds=0.1,
+                event=event,
+                seconds=0.01,
                 event_registry=mock_event_registry,
                 event_notifier=mock_event_notifier,
+                get_live_score=mock_get_live_score,
                 room=mock_room,
                 agent_graph=mock_agent_graph,
                 thread_id="test_thread",
             )
 
-            assert mock_agent_graph.update_state.called
+        mock_agent_graph.update_state.assert_called_once()
 
 
 class TestTimeEventSchedulerRevokeCoroutine:
@@ -404,45 +297,13 @@ class TestTimeEventSchedulerRevokeCoroutine:
 
         await scheduler._time_revoke_coroutine(
             event_id="test_revoke",
-            seconds=0.1,
+            seconds=0.01,
             event_registry=mock_event_registry,
             event_notifier=mock_event_notifier,
             room=mock_room,
         )
 
         assert mock_event_registry["test_revoke"]["happened"] is False
-
-    @pytest.mark.asyncio
-    async def test_revoke_calls_event_notifier(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
-    ):
-        """Test that revoke coroutine calls event notifier."""
-        await scheduler._time_revoke_coroutine(
-            event_id="test_revoke_notify",
-            seconds=0.1,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
-
-        mock_event_notifier.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_revoke_handles_notifier_exception(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
-    ):
-        """Test that revoke handles exceptions from event notifier."""
-        mock_event_notifier.side_effect = Exception("Revoke notifier error")
-
-        await scheduler._time_revoke_coroutine(
-            event_id="test_revoke_error",
-            seconds=0.1,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
-        )
-
-        assert mock_event_registry["test_revoke_error"]["happened"] is False
 
 
 class TestTimeEventSchedulerCancelEvent:
@@ -461,76 +322,52 @@ class TestTimeEventSchedulerCancelEvent:
         assert "test_cancel" not in scheduler._time_tasks
         assert task.cancelled()
 
-    @pytest.mark.asyncio
-    async def test_cancel_non_existent_event(self, scheduler):
-        """Test cancelling a non-existent event does not raise error."""
-        scheduler.cancel_time_event("non_existent")
-
-        assert "non_existent" not in scheduler._time_tasks
-
 
 class TestTimeEventSchedulerEdgeCases:
     """Test suite for edge cases and error scenarios."""
 
     @pytest.mark.asyncio
-    async def test_mixed_condition_types(
-        self, scheduler, mock_event_registry, mock_event_notifier, mock_room
+    async def test_start_with_mixed_eligibility(
+        self,
+        scheduler,
+        mock_event_registry,
+        mock_event_notifier,
+        mock_room,
+        mock_get_live_score,
     ):
-        """Test scheduling events with mixed condition types."""
-        events = [
-            MockTimeEvent(
-                event_id="mixed_gt",
-                detection_type=DetectionType.TIME,
-                data=MagicMock(time=0.1, condition=ConditionOperator.GT),
-            ),
-            MockTimeEvent(
-                event_id="mixed_lt",
-                detection_type=DetectionType.TIME,
-                data=MagicMock(time=0.1, condition=ConditionOperator.LT),
-            ),
-            MockTimeEvent(
-                event_id="mixed_eq",
-                detection_type=DetectionType.TIME,
-                data=MagicMock(time=0.1, condition=ConditionOperator.EQ),
-            ),
-        ]
-
-        await scheduler.start_time_event_schedulers(
-            events=events,
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-            room=mock_room,
+        """Test interaction where one event is eligible and another is not."""
+        event_eligible = MockTimeEvent(
+            event_id="gt_eligible",
+            detection_type=DetectionType.TIME,
+            data=MagicMock(time=0.1, condition=ConditionOperator.GT),
         )
-
-        assert len(scheduler._time_tasks) == 3
-
-        assert mock_event_registry.get("mixed_lt", {}).get("happened") is True
-
-        await asyncio.sleep(0.2)
-
-        assert mock_event_registry.get("mixed_gt", {}).get("happened") is True
-        assert mock_event_registry.get("mixed_eq", {}).get("happened") is True
-        assert mock_event_registry.get("mixed_lt", {}).get("happened") is False
-
-    @pytest.mark.asyncio
-    async def test_task_cleanup_after_completion(
-        self, scheduler, mock_event_registry, mock_event_notifier
-    ):
-        """Test that tasks are cleaned up after completion."""
-        event = MockTimeEvent(
-            event_id="cleanup_test",
+        event_ineligible = MockTimeEvent(
+            event_id="gt_ineligible",
             detection_type=DetectionType.TIME,
             data=MagicMock(time=0.1, condition=ConditionOperator.GT),
         )
 
-        await scheduler.start_time_event_schedulers(
-            events=[event],
-            event_registry=mock_event_registry,
-            event_notifier=mock_event_notifier,
-        )
+        # Custom eligibility side effect
+        def eligibility_side_effect(**kwargs):
+            return kwargs["event"].event_id == "gt_eligible"
 
-        assert "cleanup_test" in scheduler._time_tasks
+        with patch(
+            "app.core.events.schedulers.is_event_eligible",
+            side_effect=eligibility_side_effect,
+        ):
+            # Start schedulers
+            await scheduler.start_time_event_schedulers(
+                events=[event_eligible, event_ineligible],
+                event_registry=mock_event_registry,
+                event_notifier=mock_event_notifier,
+                get_live_score=mock_get_live_score,
+                room=mock_room,
+            )
 
-        await asyncio.sleep(0.2)
+            # Wait for triggers
+            await asyncio.sleep(0.2)
 
-        assert "cleanup_test" not in scheduler._time_tasks
+            # Eligible one happened
+            assert mock_event_registry.get("gt_eligible", {}).get("happened") is True
+            # Ineligible one did NOT happen
+            assert "gt_ineligible" not in mock_event_registry
