@@ -305,6 +305,9 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             - branching_and_feedback_data: List of BranchingAndFeedbackData objects
               (unified branching + feedback)
         """
+
+        elapsed_time = self._get_elapsed_time()
+
         # Combine detected event IDs with score-based event IDs
         all_detected_event_ids = (
             set(detected_event_ids) if detected_event_ids else set()
@@ -321,7 +324,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # Process score-based events and get additional score
         all_detected_event_ids, additional_score_from_triggered_events = (
             self._evaluate_and_handle_cascade_score_events(
-                detected_event_ids=all_detected_event_ids
+                detected_event_ids=all_detected_event_ids, elapsed_time=elapsed_time
             )
         )
 

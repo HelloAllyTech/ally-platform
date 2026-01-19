@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, List, Set, Tuple
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
+from app.core.graph.utils import is_event_eligible
 from app.utils.event_utils import evaluate_condition
 from app.utils.logger import get_logger
 
@@ -49,6 +50,10 @@ class ScoreEvaluatorMixin:
         """Initialize score evaluator state."""
         self.live_score = 0
         self._live_score_lock = asyncio.Lock()
+
+        self.score_based_events = [
+            e for e in self.events if e.detection_type == DetectionType.SCORE
+        ]
 
     def _calculate_total_score_from_events(self, events: List[BaseEvent]) -> int:
         """
@@ -94,7 +99,9 @@ class ScoreEvaluatorMixin:
 
         return total_score
 
-    def get_newly_triggered_score_events(self, current_score: int) -> Set[str]:
+    def get_newly_triggered_score_events(
+        self, current_score: int, elapsed_time: float
+    ) -> Set[str]:
         """
         Get the set of event IDs for score-based events that are newly triggered.
         1. Iterates through all score-based events
@@ -123,27 +130,35 @@ class ScoreEvaluatorMixin:
             )
 
             if condition_met:
-                # Only add to newly triggered if not already sent
-                if event.event_id not in self._sent_events:
-                    # Only add if condition is met AND it wasn't already True
-                    # (newly triggered)
-                    if not was_happened:
-                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
-                        newly_triggered_event_ids.add(event.event_id)
-                    else:
-                        # Condition is met but was already True - update state
-                        # but don't add to newly triggered
-                        self.set_event_state(event.event_id, True, DetectionType.SCORE)
-                else:
-                    # Event was already sent, but still update state to True
-                    # if condition is met
+                # If event is already active, keep it active
+                if was_happened:
                     self.set_event_state(event.event_id, True, DetectionType.SCORE)
+                    continue
+
+                # If event was NOT active, it's a candidate for a new trigger.
+                # 2. CHECK ELIGIBILITY (Cooldowns, Max Occurrences, Time Window)
+                last_occurred_at = event_data.get("occurred_at") if event_data else None
+                occurrence_count = (
+                    event_data.get("occurrence_count", 0) if event_data else 0
+                )
+
+                if is_event_eligible(
+                    event=event,
+                    elapsed_time=elapsed_time,
+                    current_score=current_score,
+                    last_occurred_at=last_occurred_at,
+                    occurrence_count=occurrence_count,
+                ):
+                    # Condition Met + Eligible -> Trigger
+                    self.set_event_state(event.event_id, True, DetectionType.SCORE)
+                    newly_triggered_event_ids.add(event.event_id)
+                else:
+                    # Condition Met + NOT Eligible -> Do not trigger, keep state False
+                    # (e.g. Score is 50, but we are in a cooldown)
+                    pass
+
             else:
-                # Condition is NOT met - set happened to False
-                # This ensures combination events that depend on this score
-                # event are properly re-evaluated
-                # This must happen even for sent events, so combination events
-                # can re-evaluate correctly
+                # Condition NOT Met -> Reset state to False
                 if was_happened:
                     logger.debug(
                         f"Score event {event.event_id} condition no longer "
@@ -155,7 +170,9 @@ class ScoreEvaluatorMixin:
         return newly_triggered_event_ids
 
     def _evaluate_and_handle_cascade_score_events(
-        self, detected_event_ids: Set[str]
+        self,
+        detected_event_ids: Set[str],
+        elapsed_time: float,
     ) -> Tuple[Set[str], int]:
         """
         Evaluate score-based events and track cascading score changes.
@@ -185,13 +202,9 @@ class ScoreEvaluatorMixin:
 
         # Calculate the score contribution from currently detected events
         # (similarity, time, combination, etc.)
-        # This excludes score-based events which will be evaluated in the
-        # cascade loop
         current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
 
         # Start with live_score + current cycle's event scores
-        # This ensures score-based events can trigger on the same cycle as
-        # the events that bring the score to threshold
         working_score = self.live_score + current_cycle_score
 
         if current_cycle_score != 0:
@@ -202,7 +215,7 @@ class ScoreEvaluatorMixin:
 
         # Evaluate score-based events against the working score
         newly_triggered_score_event_ids = self.get_newly_triggered_score_events(
-            working_score
+            working_score, elapsed_time
         )
 
         # Keep checking for newly triggered score-based events until no more
@@ -232,7 +245,7 @@ class ScoreEvaluatorMixin:
             # Check again with the new score to handle cascading
             # Loop will exit naturally when no more events trigger
             newly_triggered_score_event_ids = self.get_newly_triggered_score_events(
-                working_score
+                working_score, elapsed_time
             )
 
         return detected_event_ids, additional_score_from_triggered_events

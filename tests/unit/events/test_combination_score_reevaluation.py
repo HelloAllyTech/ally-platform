@@ -74,14 +74,6 @@ class TestCombinationScoreBugFix:
         """
         Test the bug fix: Combination event should not trigger when score
         condition is no longer met.
-
-        Scenario:
-        1. S1 = score < 10
-        2. SS1 = sentence similarity event (mocked)
-        3. C1 = S1 AND SS1
-        4. Initially score = 5, so S1 is true
-        5. Score increases to 50, so S1 should become false
-        6. When SS1 becomes true, C1 should NOT trigger because S1 is false
         """
         # Create S1: score < 10
         s1 = ScoreEvent.create(
@@ -117,13 +109,13 @@ class TestCombinationScoreBugFix:
 
         # Step 1: Initially score = 5, S1 should be true
         orchestrator.live_score = 5
-        triggered = orchestrator.get_newly_triggered_score_events(5)
+        triggered = orchestrator.get_newly_triggered_score_events(5, elapsed_time=0.0)
         assert "S1" in triggered
         assert orchestrator.get_event_state("S1") is True
 
         # Step 2: Score increases to 50, S1 should become false
         orchestrator.live_score = 50
-        triggered = orchestrator.get_newly_triggered_score_events(50)
+        triggered = orchestrator.get_newly_triggered_score_events(50, elapsed_time=10.0)
         assert "S1" not in triggered  # Not newly triggered
         assert orchestrator.get_event_state("S1") is False  # Should be false now
 
@@ -141,14 +133,6 @@ class TestCombinationScoreBugFix:
     ):
         """
         Test that combination event DOES trigger when both conditions are met.
-
-        Scenario:
-        1. S1 = score < 10
-        2. SS1 = sentence similarity event (mocked)
-        3. C1 = S1 AND SS1
-        4. Score = 5, so S1 is true
-        5. SS1 becomes true
-        6. C1 SHOULD trigger because both S1 and SS1 are true
         """
         # Create S1: score < 10
         s1 = ScoreEvent.create(
@@ -184,7 +168,7 @@ class TestCombinationScoreBugFix:
 
         # Step 1: Score = 5, S1 should be true
         orchestrator.live_score = 5
-        triggered = orchestrator.get_newly_triggered_score_events(5)
+        triggered = orchestrator.get_newly_triggered_score_events(5, elapsed_time=0.0)
         assert "S1" in triggered
         assert orchestrator.get_event_state("S1") is True
 
@@ -202,12 +186,6 @@ class TestCombinationScoreBugFix:
     ):
         """
         Test that score event state changes correctly as score fluctuates.
-
-        Scenario:
-        1. S1 = score < 10
-        2. Score = 5 -> S1 should be true
-        3. Score = 50 -> S1 should be false
-        4. Score = 3 -> S1 should be true again
         """
         # Create S1: score < 10
         s1 = ScoreEvent.create(
@@ -221,19 +199,17 @@ class TestCombinationScoreBugFix:
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
         # Score = 5, S1 should be true
-        triggered = orchestrator.get_newly_triggered_score_events(5)
+        triggered = orchestrator.get_newly_triggered_score_events(5, elapsed_time=0.0)
         assert "S1" in triggered
         assert orchestrator.get_event_state("S1") is True
 
         # Score = 50, S1 should be false
-        triggered = orchestrator.get_newly_triggered_score_events(50)
+        triggered = orchestrator.get_newly_triggered_score_events(50, elapsed_time=10.0)
         assert "S1" not in triggered
         assert orchestrator.get_event_state("S1") is False
 
         # Score = 3, S1 should be true again (but not newly triggered since it was sent)
-        # Note: In real scenario, if S1 was already sent, it won't be in newly triggered
-        # But the state should still be updated to true
-        triggered = orchestrator.get_newly_triggered_score_events(3)
+        triggered = orchestrator.get_newly_triggered_score_events(3, elapsed_time=20.0)
         assert orchestrator.get_event_state("S1") is True
 
     def test_sent_score_event_state_updates_for_combination_events(
@@ -242,20 +218,6 @@ class TestCombinationScoreBugFix:
         """
         Test that score events that were already sent still get their state updated
         for combination event evaluation.
-
-        This is the critical bug fix: Even if a score event was sent and is
-        in _sent_events, its state must still be updated to False when the
-        condition is no longer met, so that combination events depending
-        on it can be evaluated correctly.
-
-        Scenario:
-        1. S1 = score < 10 (in trigger_events list)
-        2. SS1 = sentence similarity event
-        3. C1 = S1 AND SS1
-        4. Score = 5, S1 triggers and is sent (added to _sent_events)
-        5. Score = 50, S1 condition no longer met, should be set to False
-        6. SS1 becomes true
-        7. C1 should NOT trigger because S1 is false
         """
         # Create S1: score < 10
         s1 = ScoreEvent.create(
@@ -291,7 +253,7 @@ class TestCombinationScoreBugFix:
 
         # Step 1: Score = 5, S1 should trigger
         orchestrator.live_score = 5
-        triggered = orchestrator.get_newly_triggered_score_events(5)
+        triggered = orchestrator.get_newly_triggered_score_events(5, elapsed_time=0.0)
         assert "S1" in triggered
         assert orchestrator.get_event_state("S1") is True
 
@@ -301,7 +263,7 @@ class TestCombinationScoreBugFix:
         # Step 3: Score increases to 50, S1 condition no longer met
         # Even though S1 is in _sent_events, its state should be updated to False
         orchestrator.live_score = 50
-        triggered = orchestrator.get_newly_triggered_score_events(50)
+        triggered = orchestrator.get_newly_triggered_score_events(50, elapsed_time=10.0)
         assert "S1" not in triggered  # Not newly triggered (already sent)
         assert orchestrator.get_event_state("S1") is False  # CRITICAL: Should be False
 
