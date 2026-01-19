@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
-from app.core.scenario.base import Scenario, ScenarioVoice, VoicePromptData
+from app.core.scenario.base import PromptData, Scenario, ScenarioVoice
 from app.utils.metadata_parser import parse_room_metadata
 from tests.fixtures.scenario_fixtures import (
     COMPLEX_SCENARIO_PAYLOAD,
@@ -57,7 +57,7 @@ class TestMetadataParsingIntegration:
         assert scenario.voice.config.model == "nova-2"
 
         # Verify prompt data integration
-        assert isinstance(scenario.prompt_data, VoicePromptData)
+        assert isinstance(scenario.prompt_data, PromptData)
         assert scenario.prompt_data.name == "Test Character"
 
     @pytest.mark.integration
@@ -74,7 +74,7 @@ class TestMetadataParsingIntegration:
         scenario = envelope.scenario
         assert scenario.name == "Minimal Scenario"
         assert isinstance(scenario.voice, ScenarioVoice)  # Minimal voice present
-        assert isinstance(scenario.prompt_data, VoicePromptData)
+        assert isinstance(scenario.prompt_data, PromptData)
 
     @pytest.mark.integration
     def test_complex_metadata_integration(self):

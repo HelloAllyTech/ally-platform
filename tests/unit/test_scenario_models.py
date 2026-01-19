@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.scenario.base import Scenario, ScenarioVoice, VoiceConfig, VoicePromptData
+from app.core.scenario.base import PromptData, Scenario, ScenarioVoice, VoiceConfig
 from tests.utils.test_helpers import AssertionHelpers
 
 
@@ -92,13 +92,13 @@ class TestScenarioVoice:
             ScenarioVoice(name="test", config=config)  # Missing provider
 
 
-class TestVoicePromptData:
-    """Test cases for VoicePromptData model."""
+class TestPromptData:
+    """Test cases for PromptData model."""
 
     @pytest.mark.unit
-    def test_voice_prompt_data_creation_full(self):
-        """Test creating VoicePromptData with all fields."""
-        prompt_data = VoicePromptData(
+    def test_prompt_data_creation_full(self):
+        """Test creating PromptData with all fields."""
+        prompt_data = PromptData(
             name="Test Character",
             age="25",
             gender="non-binary",
@@ -128,9 +128,9 @@ class TestVoicePromptData:
         assert len(prompt_data.opening_statements) == 2
 
     @pytest.mark.unit
-    def test_voice_prompt_data_required_fields_only(self):
-        """Test creating VoicePromptData with only required fields."""
-        prompt_data = VoicePromptData(
+    def test_prompt_data_required_fields_only(self):
+        """Test creating PromptData with only required fields."""
+        prompt_data = PromptData(
             name="Minimal Character",
             age="30",
             gender="female",
@@ -147,23 +147,23 @@ class TestVoicePromptData:
         assert prompt_data.personality is None  # Optional field
 
     @pytest.mark.unit
-    def test_voice_prompt_data_validation_errors(self):
-        """Test VoicePromptData validation with missing required fields."""
+    def test_prompt_data_validation_errors(self):
+        """Test PromptData validation with missing required fields."""
         from pydantic import ValidationError
 
         # Missing required fields
         with pytest.raises(ValidationError):
-            VoicePromptData()
+            PromptData()
 
         with pytest.raises(ValidationError):
-            VoicePromptData(name="Test")  # Missing other required fields
+            PromptData(name="Test")  # Missing other required fields
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
         "age_input,expected_age",
         [(25, "25"), ("30", "30"), (35.5, "35.5"), ("forty", "forty")],  # String input
     )
-    def test_voice_prompt_data_age_conversion(self, age_input, expected_age):
+    def test_prompt_data_age_conversion(self, age_input, expected_age):
         """Test age field conversion to string."""
         # Build via Scenario._build_prompt_data which handles age casting
         raw_payload = {
@@ -194,7 +194,7 @@ class TestScenario:
         voice = ScenarioVoice(
             name="test_voice", provider="deepgram", config=VoiceConfig()
         )
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Prompt User",
             age="25",
             gender="male",
@@ -224,7 +224,7 @@ class TestScenario:
         voice = ScenarioVoice(
             name="test_voice", provider="deepgram", config=VoiceConfig()
         )
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Prompt User",
             age="25",
             gender="male",
@@ -256,7 +256,7 @@ class TestScenario:
 
         # Verify prompt data was created
         if hasattr(scenario, "prompt_data") and scenario.prompt_data:
-            assert isinstance(scenario.prompt_data, VoicePromptData)
+            assert isinstance(scenario.prompt_data, PromptData)
             assert scenario.prompt_data.name == "Test Character"
 
     @pytest.mark.unit
@@ -439,7 +439,7 @@ class TestScenario:
 
         result = Scenario._build_prompt_data(raw_payload)
 
-        assert isinstance(result, VoicePromptData)
+        assert isinstance(result, PromptData)
         assert result.name == "Test Character"
         assert result.age == "25"  # Converted to string
         assert result.gender == "female"
@@ -478,7 +478,7 @@ class TestScenario:
             assert result is None
             mock_logger.error.assert_called_once()
             error_call = mock_logger.error.call_args[0][0]
-            assert "Error instantiating VoicePromptData" in error_call
+            assert "Error instantiating PromptData" in error_call
 
     @pytest.mark.unit
     def test_scenario_create_with_events_mocked(self):
@@ -547,7 +547,7 @@ class TestScenario:
         assert scenario.voice.provider == "openai"
 
         # Verify prompt data integration
-        assert isinstance(scenario.prompt_data, VoicePromptData)
+        assert isinstance(scenario.prompt_data, PromptData)
         assert scenario.prompt_data.name == "Integration Character"
         assert scenario.prompt_data.age == "40"
 
@@ -563,7 +563,7 @@ class TestScenario:
                 provider="openai",
                 config=VoiceConfig(model="tts-1"),
             ),
-            "prompt_data": VoicePromptData(
+            "prompt_data": PromptData(
                 name="Config Character",
                 age="22",
                 gender="female",

@@ -33,7 +33,7 @@ class ScenarioResponseLength(str, Enum):
     ELABORATE = "ELABORATE"
 
 
-class VoicePromptData(BaseModel):
+class PromptData(BaseModel):
     name: str = Field(...)
     age: str = Field(...)
     gender: str = Field(...)
@@ -109,7 +109,7 @@ class Scenario(BaseModel):
     )
     metadata: Dict[str, Any] = Field(default_factory=dict)
     voice: Optional[ScenarioVoice] = Field(default=None)
-    prompt_data: VoicePromptData = Field(default_factory=VoicePromptData)
+    prompt_data: PromptData = Field(default_factory=PromptData)
     language_config: Optional[LanguageConfig] = Field(default=None)
 
     model_config = {
@@ -211,10 +211,10 @@ class Scenario(BaseModel):
         )
 
     @staticmethod
-    def _build_prompt_data(raw: Mapping[str, Any]) -> VoicePromptData:
+    def _build_prompt_data(raw: Mapping[str, Any]) -> PromptData:
         """
         Parses the raw input dictionary, maps keys, and creates a
-        VoicePromptData object.
+        PromptData object.
         """
         prompt_data_dict = raw.get("promptData")
 
@@ -249,10 +249,10 @@ class Scenario(BaseModel):
                 "agent_dialogues": prompt_data_dict.get("agentDialogues"),
             }
 
-            prompt_data_obj = VoicePromptData(**mapped_data)
+            prompt_data_obj = PromptData(**mapped_data)
             return prompt_data_obj
         except Exception as e:
-            logger.error(f"Error instantiating VoicePromptData from mapped data: {e}")
+            logger.error(f"Error instantiating PromptData from mapped data: {e}")
             return None
 
     @staticmethod

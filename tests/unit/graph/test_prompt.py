@@ -1,5 +1,5 @@
 from app.core.graph.prompt import generate_system_message
-from app.core.scenario.base import VoicePromptData
+from app.core.scenario.base import PromptData
 
 
 def make_prompt_data(**overrides):
@@ -24,7 +24,7 @@ def make_prompt_data(**overrides):
         custom_fields=[],
     )
     base.update(overrides)
-    return VoicePromptData(**base)
+    return PromptData(**base)
 
 
 class TestPrompt:
