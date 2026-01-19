@@ -47,6 +47,20 @@ class SarvamTTSClient(BaseTTSClient):
         api_key: Optional API key (defaults to settings.SARVAM_API_KEY)
     """
 
+    # Define parameter metadata as class constant
+    # Parameter names must match Sarvam TTS API option names
+    PARAMETER_METADATA = {
+        "pace": {
+            "type": "float",
+            "range": [0.3, 3.0],
+            "default": 1.0,
+            "description": (
+                "Speech pace (speed) multiplier. 1.0 is normal speed, >1.0 is "
+                "faster, <1.0 is slower. Range: 0.3 (slowest) to 3.0 (fastest)."
+            ),
+        },
+    }
+
     def __init__(
         self,
         model: str,
