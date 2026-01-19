@@ -26,6 +26,7 @@ export type RootStackParamList = {
   };
   Achievements: undefined;
   ProfileSettings: undefined;
+  Reactions: {reviewId: string | number};
 };
 
 export type DrawerParamList = {

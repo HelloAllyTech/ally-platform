@@ -3,6 +3,8 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker';
+import {SCREEN_NAMES} from '@/constants';
+import {useAppNavigation} from '@/hooks';
 import {
   colors,
   fontFamily,
@@ -20,11 +22,12 @@ interface ReactionsCountProps {
   totalReactions: number;
 }
 export const ReactionsCount = ({
-  // reviewId,
+  reviewId,
   reactions,
   totalReactions = 0,
 }: ReactionsCountProps) => {
   const {t} = useTranslation();
+  const navigation = useAppNavigation();
   const renderReactionBubble = (
     reaction_code: string,
     index: number,
@@ -41,11 +44,15 @@ export const ReactionsCount = ({
     </View>
   );
 
+  const handleReactionsCountPress = () => {
+    navigation.navigate(SCREEN_NAMES.REACTIONS, {reviewId});
+  };
+
   return (
     <>
       <TouchableOpacity
         style={styles.reactionCountContainer}
-        onPress={() => {}}>
+        onPress={handleReactionsCountPress}>
         <View style={styles.emojisContainer}>
           {getTopReactions(reactions, 3).map((reaction_code, index, array) =>
             renderReactionBubble(reaction_code, index, array.length),
