@@ -66,3 +66,19 @@ export const playNotificationSound = async (soundFile: number) => {
     logger.error(`Failed to play notification sound: ${error}`);
   }
 };
+
+/**
+ * Converts a snake_case string to Title Case
+ * @param text - The snake_case string to convert
+ * @returns The Title Case string
+ * @example
+ * snakeCaseToTitleCase('simulation_minutes') // 'Simulation Minutes'
+ * snakeCaseToTitleCase('ACTIVE_DAY_STREAK') // 'Active Day Streak'
+ */
+export const snakeCaseToTitleCase = (text: string): string => {
+  return text
+    .toLowerCase()
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};

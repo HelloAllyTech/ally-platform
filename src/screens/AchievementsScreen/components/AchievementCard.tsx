@@ -1,47 +1,50 @@
-import React from 'react';
-import {useTranslation} from 'react-i18next';
-import {Text, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {memo} from 'react';
+import {Image, Text, View} from 'react-native';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {AchievementLockedIcon} from '@/assets/icons';
-import {colors, fontFamily, typography} from '@/theme';
-
-import {Achievement} from '../mockUtils';
+import {LockStatus} from '@/constants/badges';
+import {colors, fontFamily} from '@/theme';
+import {Badge} from '@/types';
 
 interface AchievementCardProps {
-  achievement: Achievement;
+  badge: Badge;
 }
 
-export const AchievementCard: React.FC<AchievementCardProps> = ({
-  achievement,
-}) => {
-  const {t} = useTranslation();
-  const isLocked = !achievement.isUnlocked;
+export const AchievementCard = memo<AchievementCardProps>(({badge}) => {
+  const isLocked = badge.lockStatus === LockStatus.LOCKED;
 
   return (
     <View style={[styles.achievementCard, isLocked && styles.lockedCard]}>
-      <View style={styles.iconContainer}>
+      <View
+        style={[styles.iconContainer, isLocked && styles.lockedIconContainer]}>
         {isLocked ? (
-          <AchievementLockedIcon width={60} height={60} />
+          <AchievementLockedIcon />
         ) : (
-          <Text style={styles.iconEmoji}>{achievement.icon}</Text>
+          <Image
+            source={{uri: badge.imageUrl}}
+            style={styles.badgeImage}
+            resizeMode="contain"
+          />
         )}
       </View>
       <View style={styles.textContainer}>
         <Text style={[styles.achievementTitle, isLocked && styles.lockedText]}>
-          {t(achievement.titleKey)}
+          {badge.name}
         </Text>
         <Text
           style={[
             styles.achievementDescription,
             isLocked && styles.lockedDescription,
           ]}>
-          {t(achievement.descriptionKey)}
+          {badge.description}
         </Text>
       </View>
     </View>
   );
-};
+});
+
+AchievementCard.displayName = 'AchievementCard';
 
 const styles = ScaledSheet.create({
   achievementCard: {
@@ -65,8 +68,12 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     marginRight: '16@ms',
   },
-  iconEmoji: {
-    fontSize: '32@ms',
+  lockedIconContainer: {
+    backgroundColor: 'transparent',
+  },
+  badgeImage: {
+    width: '60@ms',
+    height: '60@ms',
   },
   textContainer: {
     flex: 1,
@@ -74,14 +81,18 @@ const styles = ScaledSheet.create({
   },
   achievementTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    fontWeight: '600',
+    fontSize: ms(14),
+    lineHeight: ms(18),
+    letterSpacing: 0,
+    fontWeight: '500',
     color: colors.ds.typography.highEmphasis,
     marginBottom: '4@ms',
   },
   achievementDescription: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
+    fontSize: ms(13),
+    lineHeight: ms(18),
+    letterSpacing: 0,
     color: colors.ds.typography.mediumEmphasis,
   },
   lockedText: {

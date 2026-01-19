@@ -469,8 +469,12 @@
   },
   "Achievements": {
     "title": "Achievements",
+    "badges": "Badges",
+    "all": "All",
     "unlocked": "Unlocked",
     "locked": "Locked",
+    "error": "Failed to load achievements",
+    "noAchievements": "No achievements found",
     "firstSteps": {
       "title": "First Steps",
       "description": "Practice for at least 15 minutes at account level"
