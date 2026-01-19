@@ -462,10 +462,11 @@
       "allTime": "All time"
     }
   },
-  "ReactionsBottomSheet": {
+  "Reactions": {
     "title": "Reactions",
     "allFilter": "All",
-    "noReactionsYet": "No reactions yet"
+    "noReactionsYet": "No reactions yet",
+    "invalidReviewId": "Invalid review ID"
   },
   "Achievements": {
     "title": "Achievements",

@@ -6,7 +6,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
-import {ReactionFilterTabsProps} from './types';
+import {ReactionFilterTabsProps} from '../types';
 
 interface TabData {
   reaction: string | null;
@@ -25,7 +25,7 @@ export const ReactionFilterTabs: React.FC<ReactionFilterTabsProps> = ({
   const tabs = useMemo<TabData[]>(() => {
     const allTab: TabData = {
       reaction: null,
-      label: `${t('ReactionsBottomSheet.allFilter')} ${totalCount}`,
+      label: `${t('Reactions.allFilter')} ${totalCount}`,
       isSelected: selectedReaction === null,
     };
 
