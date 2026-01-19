@@ -91,5 +91,9 @@ class Settings(BaseSettings):
     DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)
     DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(...)
 
+    ENABLE_VOICE_EXPRESSIONS: bool = Field(
+        default=False, description="Enable dynamic voice expressions feature"
+    )
+
 
 settings = Settings()

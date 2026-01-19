@@ -21,6 +21,7 @@ def make_prompt_data(**overrides):
         tone=None,
         opening_statements=["Hi"],
         agent_goal=None,
+        custom_fields=[],
     )
     base.update(overrides)
     return VoicePromptData(**base)
@@ -70,3 +71,64 @@ class TestPrompt:
         # Minimal prompt intentionally excludes detailed fields like age,
         # gender, context
         # to keep the prompt focused on the critical instruction
+
+    def test_generate_system_message_with_gender_identity(self):
+        """Test that gender_identity is included when provided."""
+        pd = make_prompt_data(gender_identity="Non-binary")
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Your gender identity" in content
+        assert "Non-binary" in content
+
+    def test_generate_system_message_with_sexual_orientation(self):
+        """Test that sexual_orientation is included when provided."""
+        pd = make_prompt_data(sexual_orientation="Queer")
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Your sexual orientation" in content
+        assert "Queer" in content
+
+    def test_generate_system_message_with_session_behavior_guidelines(self):
+        """Test that session_behavior_guidelines are included when provided."""
+        pd = make_prompt_data(session_behavior_guidelines="Be empathetic and warm")
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "How will you behave in this session" in content
+        assert "Be empathetic and warm" in content
+
+    def test_generate_system_message_with_custom_fields(self):
+        """Test that custom_fields are formatted correctly."""
+        pd = make_prompt_data(
+            custom_fields=[
+                {"name": "Medical History", "value": "Diabetes"},
+                {"name": "Medications", "value": "Insulin"},
+            ]
+        )
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Medical History" in content
+        assert "Diabetes" in content
+        assert "Medications" in content
+        assert "Insulin" in content
+
+    def test_generate_system_message_custom_fields_empty_value_ignored(self):
+        """Test that custom fields with empty values are ignored."""
+        pd = make_prompt_data(
+            custom_fields=[
+                {"name": "Field1", "value": "Value1"},
+                {"name": "Field2", "value": ""},  # Empty value
+            ]
+        )
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Field1" in content
+        assert "Value1" in content
+        assert "Field2" not in content
+
+    def test_generate_system_message_custom_fields_empty_list(self):
+        """Test that empty custom_fields list returns empty string."""
+        pd = make_prompt_data(custom_fields=[])
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        # Should not crash and should work normally
+        assert "Your name" in content

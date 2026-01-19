@@ -1,5 +1,5 @@
 import types
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -243,6 +243,7 @@ class TestWorker:
             tts_called.setdefault("ok", True)
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         # Mock both the factory and the agent_utils module
@@ -444,6 +445,7 @@ class TestWorker:
                     fallback_used["used"] = gender
                 mock_client = Mock()
                 mock_client.tts_instance = "DEFAULT_TTS"
+                mock_client.set_defaults = AsyncMock()
                 return mock_client
 
         from app.tts import factory as tts_factory
@@ -662,6 +664,7 @@ class TestWorker:
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -789,6 +792,7 @@ class TestWorker:
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -946,6 +950,7 @@ class TestWorker:
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -1079,6 +1084,7 @@ class TestWorker:
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -1279,6 +1285,7 @@ class TestWorker:
         def mock_create_tts(*a, **k):
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
             return mock_client
 
         from app.tts import factory as tts_factory

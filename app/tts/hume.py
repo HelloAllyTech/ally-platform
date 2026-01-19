@@ -1,7 +1,8 @@
 """Hume.ai TTS provider implementation."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
+from langchain_core.tools import BaseTool
 from livekit.plugins.hume import TTS, VoiceByName, VoiceProvider
 
 from app.core.config import settings
@@ -36,6 +37,41 @@ class HumeTTSClient(BaseTTSClient):
         api_key: Optional API key (defaults to settings.HUME_API_KEY)
     """
 
+    # Define parameter metadata as class constant
+    # Parameter names must match Hume TTS API option names
+    PARAMETER_METADATA = {
+        "speed": {
+            "type": "float",
+            "range": [0.5, 2.0],
+            "default": 1.0,
+            "description": (
+                "Speech speed multiplier. 1.0 is normal speed, "
+                ">1.0 is faster, <1.0 is slower."
+            ),
+        },
+        "description": {
+            "type": "str",
+            "description": "Text instruction describing desired voice tone/emotion.",
+            "examples": [
+                "speak with excitement",
+                "sound empathetic and understanding",
+                "speak calmly and professionally",
+            ],
+        },
+    }
+
+    # Define text enhancement metadata as separate class constant
+    # Uncomment and customize if Hume supports text enhancement tags
+    # (e.g., audio tags, SSML)
+    # TEXT_ENHANCEMENT_METADATA = {
+    #     "instructions": """
+    #     - Expression tags: [surprised], [excited], [empathetic], [calm]
+    #       - place at start of sentences/phrases
+    #     - Break tags: <break time="1.5s" /> - use for natural pauses
+    #     Example: "[surprised] Really? <break time="1s" /> I didn't expect that."
+    #     """
+    # }
+
     def __init__(
         self,
         voice_name: str,
@@ -44,6 +80,7 @@ class HumeTTSClient(BaseTTSClient):
         voice_provider: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
+        super().__init__()  # Initialize base class parameter storage
         if not voice_name:
             raise ValueError("Hume TTS requires 'voice_name'")
 
@@ -210,3 +247,7 @@ class HumeTTSClient(BaseTTSClient):
                     f"pre-existing voices, 'CUSTOM_VOICE' for custom voices)."
                 ) from e
         return self._tts_instance
+
+    def get_tools(self) -> List[BaseTool]:
+        """Get single tool for setting voice parameters."""
+        return [self._create_set_voice_parameters_tool()]

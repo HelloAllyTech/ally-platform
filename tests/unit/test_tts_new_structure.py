@@ -353,6 +353,56 @@ class TestCreateTTSClientWithDefaults:
         )
 
     @pytest.mark.unit
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_default_non_binary(
+        self, mock_settings, mock_deepgram_client
+    ):
+        """Test creating TTS client with defaults for non-binary gender."""
+        mock_settings.DEFAULT_NON_BINARY_VOICE_MODEL = "nova-2-nb"
+        mock_settings.DEEPGRAM_API_KEY = "test-key"
+        mock_client = Mock()
+        mock_deepgram_client.return_value = mock_client
+
+        result = create_tts_client(language_code="en-IN", gender=Gender.NON_BINARY)
+
+        assert result == mock_client
+        mock_deepgram_client.assert_called_once_with(
+            model="nova-2-nb",
+            language_code="en-IN",
+            api_key="test-key",
+        )
+
+    @pytest.mark.unit
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_missing_setting_raises(
+        self, mock_settings, mock_deepgram_client
+    ):
+        """Test that missing gender-specific setting raises ValueError."""
+        mock_settings.DEFAULT_MALE_VOICE_MODEL = None
+        delattr(mock_settings, "DEFAULT_MALE_VOICE_MODEL")
+        mock_settings.DEEPGRAM_API_KEY = "test-key"
+
+        with pytest.raises(ValueError, match="Missing default Deepgram TTS settings"):
+            create_tts_client(language_code="en-IN", gender=Gender.MALE)
+
+    @pytest.mark.unit
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_creation_exception_raises(
+        self, mock_settings, mock_deepgram_client
+    ):
+        """Test that non-AttributeError exceptions in _get_default_tts_client
+        are raised."""
+        mock_settings.DEFAULT_MALE_VOICE_MODEL = "nova-2"
+        mock_settings.DEEPGRAM_API_KEY = "test-key"
+        mock_deepgram_client.side_effect = RuntimeError("Connection failed")
+
+        with pytest.raises(RuntimeError, match="Connection failed"):
+            create_tts_client(language_code="en-IN", gender=Gender.MALE)
+
+    @pytest.mark.unit
     def test_create_tts_client_requires_gender_when_no_config(self):
         """Test that gender is required when tts_config is None."""
         with pytest.raises(ValueError, match="gender is required"):
@@ -475,6 +525,135 @@ class TestCreateTTSClientWithConfig:
 
         with pytest.raises(ValueError, match="gender is required"):
             create_tts_client(tts_config=tts_config, language_code="en-IN")
+
+    @pytest.mark.unit
+    @patch("app.tts.factory.DeepgramTTSClient")
+    @patch("app.tts.factory.settings")
+    def test_create_tts_client_missing_provider_with_gender_falls_back(
+        self, mock_settings, mock_deepgram_client
+    ):
+        """Test that missing provider falls back to defaults when gender provided."""
+        mock_settings.DEFAULT_MALE_VOICE_MODEL = "nova-2"
+        mock_settings.DEEPGRAM_API_KEY = "test-key"
+        mock_client_instance = Mock()
+        mock_deepgram_client.return_value = mock_client_instance
+
+        tts_config = {"name": "test-voice", "config": {}}
+        result = create_tts_client(
+            tts_config=tts_config, language_code="en-IN", gender=Gender.MALE
+        )
+
+        assert result == mock_client_instance
+        mock_deepgram_client.assert_called_once()
+
+    @pytest.mark.unit
+    @patch("app.tts.factory.GoogleTTSClient")
+    def test_create_tts_client_with_google_config(self, mock_google_client):
+        """Test creating Google TTS client from config."""
+        mock_client_instance = Mock()
+        mock_google_client.from_config.return_value = mock_client_instance
+
+        tts_config = {
+            "provider": "google",
+            "name": "test-voice",
+            "config": {"model": "test-model", "voice_id": "test-voice-id"},
+        }
+        result = create_tts_client(tts_config=tts_config, language_code="en-IN")
+
+        mock_google_client.from_config.assert_called_once_with(
+            config=tts_config["config"], language_code="en-IN"
+        )
+        assert result == mock_client_instance
+
+    @pytest.mark.unit
+    @patch("app.tts.factory.HumeTTSClient")
+    def test_create_tts_client_with_hume_config(self, mock_hume_client):
+        """Test creating Hume TTS client from config."""
+        mock_client_instance = Mock()
+        mock_hume_client.from_config.return_value = mock_client_instance
+
+        tts_config = {
+            "provider": "hume",
+            "name": "test-voice",
+            "config": {"model": "test-model", "voice_id": "test-voice-id"},
+        }
+        result = create_tts_client(tts_config=tts_config, language_code="en-IN")
+
+        mock_hume_client.from_config.assert_called_once_with(
+            config=tts_config["config"], language_code="en-IN"
+        )
+        assert result == mock_client_instance
+
+    @pytest.mark.unit
+    @patch("app.tts.factory._get_default_tts_client")
+    def test_create_tts_client_unsupported_provider_falls_back(self, mock_get_default):
+        """Test that unsupported provider falls back to defaults."""
+        mock_client_instance = Mock()
+        mock_get_default.return_value = mock_client_instance
+
+        tts_config = {
+            "provider": "unsupported",
+            "name": "test-voice",
+            "config": {},
+        }
+        result = create_tts_client(
+            tts_config=tts_config, language_code="en-IN", gender=Gender.MALE
+        )
+
+        mock_get_default.assert_called_once_with(Gender.MALE, "en-IN")
+        assert result == mock_client_instance
+
+    @pytest.mark.unit
+    def test_create_tts_client_unsupported_provider_no_gender_raises(self):
+        """Test that unsupported provider without gender raises ValueError."""
+        tts_config = {
+            "provider": "unsupported",
+            "name": "test-voice",
+            "config": {},
+        }
+        with pytest.raises(
+            ValueError, match="Unsupported TTS provider.*gender is required"
+        ):
+            create_tts_client(tts_config=tts_config, language_code="en-IN")
+
+    @pytest.mark.unit
+    @patch("app.tts.factory._get_default_tts_client")
+    @patch("app.tts.factory.ElevenLabsTTSClient")
+    def test_create_tts_client_creation_failure_falls_back_with_gender(
+        self, mock_elevenlabs_client, mock_get_default
+    ):
+        """Test that TTS creation failure falls back when gender provided."""
+        mock_elevenlabs_client.from_config.side_effect = ValueError("Creation failed")
+        mock_fallback_client = Mock()
+        mock_get_default.return_value = mock_fallback_client
+
+        tts_config = {
+            "provider": "elevenlabs",
+            "name": "test-voice",
+            "config": {"voice_id": "invalid"},
+        }
+        result = create_tts_client(
+            tts_config=tts_config, language_code="en-IN", gender=Gender.MALE
+        )
+
+        mock_get_default.assert_called_once_with(Gender.MALE, "en-IN")
+        assert result == mock_fallback_client
+
+    @pytest.mark.unit
+    def test_create_tts_client_creation_failure_no_gender_raises(self):
+        """Test that TTS creation failure without gender raises ValueError."""
+        with patch("app.tts.factory.ElevenLabsTTSClient") as mock_elevenlabs:
+            mock_elevenlabs.from_config.side_effect = ValueError("Creation failed")
+
+            tts_config = {
+                "provider": "elevenlabs",
+                "name": "test-voice",
+                "config": {"voice_id": "invalid"},
+            }
+            with pytest.raises(
+                ValueError, match="Failed to create TTS client and gender is required"
+            ):
+                create_tts_client(tts_config=tts_config, language_code="en-IN")
 
 
 class TestGetDefaultTTSConfig:

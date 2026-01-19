@@ -108,6 +108,16 @@ class AgentWorker:
         # Configure LLM client
         self.llm_client = configure_llm_client(self.scenario)
 
+        # Generate and set default voice expression parameters
+        if settings.ENABLE_VOICE_EXPRESSIONS:
+            await self.tts_client.set_defaults(
+                scenario=self.scenario,
+                llm_client=self.llm_client,
+            )
+            logger.info(
+                f"TTS defaults set: {self.tts_client.get_defaults_for_learn_service()}"
+            )
+
         # Initialize agent state
         self.joined_iso = initialize_agent_state(
             thread_id=self.ctx.room.name,
@@ -134,6 +144,7 @@ class AgentWorker:
             llm_client=self.llm_client,
             embedding_client=self.embedding_client,
             event_orchestrator=self.event_orchestrator,
+            tts_client=self.tts_client,
         )
 
         # Register callbacks

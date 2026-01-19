@@ -126,16 +126,26 @@ def create_tts_client(
         return _get_default_tts_client(gender, language_code)
 
     config_dict = tts_config.get("config", {}) or {}
+    logger.debug(
+        f"[TTS Factory] Creating TTS client: provider={provider}, "
+        f"language_code={language_code}"
+    )
+    logger.debug(f"[TTS Factory] Config dict: {config_dict}")
 
     try:
         # Instantiate TTS client based on provider using from_config
         if provider == TTSProvider.DEEPGRAM:
+            logger.debug("[TTS Factory] Creating Deepgram TTS client")
             return DeepgramTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
             )
 
         elif provider == TTSProvider.ELEVENLABS:
+            logger.debug(
+                f"[TTS Factory] Creating ElevenLabs TTS client with config: "
+                f"{config_dict}"
+            )
             return ElevenLabsTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,

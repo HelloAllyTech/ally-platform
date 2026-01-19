@@ -217,3 +217,25 @@ def generate_system_message(
     )
 
     return SystemMessage(content=system_prompt.strip())
+
+
+def generate_prompt_content(
+    prompt_data: VoicePromptData, next_instruction: Optional[str] = None
+) -> str:
+    """
+    Generate prompt content string from VoicePromptData.
+
+    This is a convenience function that extracts the content string from
+    generate_system_message(). Used when you need the prompt as a string
+    rather than a SystemMessage object.
+
+    Args:
+        prompt_data: An instance of VoicePromptData containing all client info.
+        next_instruction: Optional conversation-specific directive
+            (branching instruction).
+
+    Returns:
+        The prompt content as a string.
+    """
+    system_message = generate_system_message(prompt_data, next_instruction)
+    return system_message.content

@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Set
+from typing import Optional, Set
 
 from livekit import rtc
 from livekit.agents import Agent
@@ -66,6 +66,14 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
     """
     tts_config_from_metadata = None
     if scenario.voice:
+        logger.debug(
+            f"[TTS Config] Building config from scenario.voice: "
+            f"provider={scenario.voice.provider}, name={scenario.voice.name}"
+        )
+        logger.debug(
+            f"[TTS Config] Voice config: model={scenario.voice.config.model}, "
+            f"voice_id={scenario.voice.config.voice_id}"
+        )
         tts_config_from_metadata = {
             "provider": scenario.voice.provider,
             "name": scenario.voice.name,
@@ -80,6 +88,9 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
                 "voice_provider": scenario.voice.config.voice_provider,
             },
         }
+        logger.debug(
+            f"[TTS Config] Built tts_config_from_metadata: {tts_config_from_metadata}"
+        )
 
     gender_enum = (
         Gender(scenario.prompt_data.gender.lower())
@@ -94,14 +105,26 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
     )
 
     try:
-        return create_tts_client(
+        logger.debug(
+            f"[TTS Config] Calling create_tts_client with "
+            f"tts_config={tts_config_from_metadata}, "
+            f"language_code={language_code}, gender={gender_enum}"
+        )
+        tts_client = create_tts_client(
             tts_config=tts_config_from_metadata,
             language_code=language_code,
             gender=gender_enum,
         )
+        logger.debug(
+            f"[TTS Config] Successfully created TTS client: {type(tts_client).__name__}"
+        )
+        return tts_client
     except Exception as e:
-        logger.warning(f"TTS config failed, using default: {e}")
+        logger.warning(f"[TTS Config] TTS config failed, using default: {e}")
         if gender_enum:
+            logger.debug(
+                f"[TTS Config] Falling back to default TTS with gender={gender_enum}"
+            )
             return create_tts_client(language_code=language_code, gender=gender_enum)
         else:
             raise ValueError("Cannot create TTS: gender is required for fallback")
@@ -150,6 +173,7 @@ def create_agent_with_adapter(
     llm_client: BaseLLMClient,
     embedding_client: OpenAIEmbeddingClient,
     event_orchestrator: EventOrchestrator,
+    tts_client: Optional[BaseTTSClient] = None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -162,24 +186,29 @@ def create_agent_with_adapter(
         llm_client: LLM client instance
         embedding_client: Embedding client instance
         event_orchestrator: EventOrchestrator instance
+        tts_client: Optional TTS client for voice expressions
 
     Returns:
         Agent instance with LLM adapter
     """
     # Create LLM adapter (event_orchestrator will be set after it's created)
+    configurable = {
+        "thread_id": thread_id,
+        "room": room,
+        "scenario": scenario,
+        "agent_joined_at": agent_joined_at,
+        "event_orchestrator": event_orchestrator,
+        "llm_client": llm_client,
+        "embedding_client": embedding_client,
+    }
+
+    # Add TTS client if provided
+    if tts_client:
+        configurable["tts_client"] = tts_client
+
     agent_adapter = LLMAdapter(
         graph=agent_graph,
-        config={
-            "configurable": {
-                "thread_id": thread_id,
-                "room": room,
-                "scenario": scenario,
-                "agent_joined_at": agent_joined_at,
-                "event_orchestrator": event_orchestrator,
-                "llm_client": llm_client,
-                "embedding_client": embedding_client,
-            }
-        },
+        config={"configurable": configurable},
     )
 
     # Create agent
