@@ -159,6 +159,9 @@ export const API_ROUTES = {
     GET_THREAD_COMMENTS: (threadId: string) =>
       `/reviews/threads/${threadId}/comments`,
   },
+  BADGES: {
+    AVAILABLE: '/badges/available',
+  },
 } as const;
 
 export const API_METHODS = {

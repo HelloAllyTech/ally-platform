@@ -1,6 +1,7 @@
 export * from './analyticsApi';
 export * from './api';
 export * from './authApi';
+export * from './badgesApi';
 export * from './callsApi';
 export * from './callSummaryApi';
 export * from './callTranscriptApi';
