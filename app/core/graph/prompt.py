@@ -3,7 +3,7 @@ from typing import Optional
 
 from langchain_core.messages import SystemMessage
 
-from app.core.scenario.base import VoicePromptData
+from app.core.scenario.base import PromptData
 
 # --- Constants ---
 
@@ -39,7 +39,7 @@ def _get_optional_block(label: str, value: Optional[str]) -> str:
     return ""
 
 
-def _get_gender_details(prompt_data: VoicePromptData) -> str:
+def _get_gender_details(prompt_data: PromptData) -> str:
     """Creates formatted blocks for optional gender identity and orientation."""
     content = ""
     if prompt_data.gender_identity:
@@ -49,7 +49,7 @@ def _get_gender_details(prompt_data: VoicePromptData) -> str:
     return content
 
 
-def _get_behavioral_guidelines(prompt_data: VoicePromptData) -> str:
+def _get_behavioral_guidelines(prompt_data: PromptData) -> str:
     """Returns specific session guidelines if provided."""
     if prompt_data.session_behavior_guidelines:
         return (
@@ -88,11 +88,11 @@ def _format_custom_fields(custom_fields: list) -> str:
 
 
 def generate_system_message(
-    prompt_data: VoicePromptData, next_instruction: Optional[str] = None
+    prompt_data: PromptData, next_instruction: Optional[str] = None
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
-    based on the structured VoicePromptData.
+    based on the structured PromptData.
 
     When a branching instruction is provided (next_instruction), this function
     generates a minimal, directive-focused prompt that prioritizes the
@@ -103,7 +103,7 @@ def generate_system_message(
     prompt with full character details, personality, and behavioral guidelines.
 
     Args:
-        prompt_data: An instance of VoicePromptData containing all client info.
+        prompt_data: An instance of PromptData containing all client info.
         next_instruction: Optional conversation-specific directive
             (branching instruction).
                          If provided, triggers minimal prompt mode.
@@ -220,17 +220,17 @@ def generate_system_message(
 
 
 def generate_prompt_content(
-    prompt_data: VoicePromptData, next_instruction: Optional[str] = None
+    prompt_data: PromptData, next_instruction: Optional[str] = None
 ) -> str:
     """
-    Generate prompt content string from VoicePromptData.
+    Generate prompt content string from PromptData.
 
     This is a convenience function that extracts the content string from
     generate_system_message(). Used when you need the prompt as a string
     rather than a SystemMessage object.
 
     Args:
-        prompt_data: An instance of VoicePromptData containing all client info.
+        prompt_data: An instance of PromptData containing all client info.
         next_instruction: Optional conversation-specific directive
             (branching instruction).
 

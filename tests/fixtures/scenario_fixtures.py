@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import factory
 
-from app.core.scenario.base import Scenario, ScenarioVoice, VoiceConfig, VoicePromptData
+from app.core.scenario.base import PromptData, Scenario, ScenarioVoice, VoiceConfig
 
 
 class VoiceConfigFactory(factory.Factory):
@@ -34,11 +34,11 @@ class ScenarioVoiceFactory(factory.Factory):
     config = factory.SubFactory(VoiceConfigFactory)
 
 
-class VoicePromptDataFactory(factory.Factory):
-    """Factory for creating VoicePromptData instances."""
+class PromptDataFactory(factory.Factory):
+    """Factory for creating PromptData instances."""
 
     class Meta:
-        model = VoicePromptData
+        model = PromptData
 
     name = factory.Faker("name")
     age = factory.LazyFunction(
@@ -82,7 +82,7 @@ class ScenarioFactory(factory.Factory):
     events = factory.LazyFunction(list)  # Empty list by default
     metadata = factory.LazyFunction(dict)  # Empty dict by default
     voice = factory.SubFactory(ScenarioVoiceFactory)
-    prompt_data = factory.SubFactory(VoicePromptDataFactory)
+    prompt_data = factory.SubFactory(PromptDataFactory)
 
 
 def create_mock_scenario(**overrides) -> Mock:

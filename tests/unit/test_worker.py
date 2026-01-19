@@ -163,13 +163,9 @@ class TestWorker:
     async def test_entrypoint_happy_path(self, monkeypatch):
         # Parse metadata -> scenario
         # Create a proper VoicePromptData object
-        from app.core.scenario.base import (
-            Scenario,
-            ScenarioResponseLength,
-            VoicePromptData,
-        )
+        from app.core.scenario.base import PromptData, Scenario, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
@@ -366,13 +362,9 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_tts_fallback(self, monkeypatch):
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.core.scenario.base import (
-            Scenario,
-            ScenarioResponseLength,
-            VoicePromptData,
-        )
+        from app.core.scenario.base import PromptData, Scenario, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="female",
@@ -591,9 +583,9 @@ class TestWorker:
     # -------------------- entrypoint additional tests --------------------
     @pytest.mark.asyncio
     async def test_entrypoint_stt_fallback(self, monkeypatch):
-        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+        from app.core.scenario.base import PromptData, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
@@ -746,9 +738,9 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_initializes_event_orchestrator(self, monkeypatch):
-        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+        from app.core.scenario.base import PromptData, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
@@ -901,9 +893,9 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_registers_shutdown_callback(self, monkeypatch):
-        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+        from app.core.scenario.base import PromptData, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
@@ -1035,9 +1027,9 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_handle_termination_callback(self, monkeypatch):
-        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+        from app.core.scenario.base import PromptData, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
@@ -1236,9 +1228,9 @@ class TestWorker:
     ):
         """Test that opening statement is skipped when termination is
         initiated during initialization."""
-        from app.core.scenario.base import ScenarioResponseLength, VoicePromptData
+        from app.core.scenario.base import PromptData, ScenarioResponseLength
 
-        prompt_data = VoicePromptData(
+        prompt_data = PromptData(
             name="Test Client",
             age="30",
             gender="male",
