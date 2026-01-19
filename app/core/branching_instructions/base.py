@@ -92,12 +92,14 @@ class BranchingInstruction:
         """
         Extracts and flattens data from prompt_data into a single key-value map.
         Handles 'context' and 'customFields' list.
+        Keys are normalized for case-insensitive lookup.
         """
-        mapping = {}
+        mapping: Dict[str, str] = {}
 
         if "context" in prompt_data:
-            mapping["your context"] = str(prompt_data["context"])
+            mapping["your context".casefold()] = str(prompt_data["context"])
 
+        # Handle custom fields
         custom_fields = prompt_data.get("customFields", [])
         if isinstance(custom_fields, list):
             for item in custom_fields:
@@ -105,27 +107,28 @@ class BranchingInstruction:
                 val = item.get("value")
 
                 if key and val:
-                    clean_key = key.strip()
-                    mapping[clean_key] = str(val)
+                    mapping[key.casefold().strip()] = str(val)
 
         return mapping
 
     @staticmethod
     def _resolve_static_variables(
-        content: str, tags: List[str], substitution_map: Dict[str, str]
+        content: str,
+        tags: List[str],
+        substitution_map: Dict[str, str],
     ) -> Tuple[str, List[str]]:
         """
-        Performs string substitution for found variables.
-        Returns the updated content and a list of tags that could not be resolved.
+        Performs case-insensitive string substitution for static variables.
+        Returns updated content and unresolved tags.
         """
-        unresolved_tags = []
+        unresolved_tags: List[str] = []
         updated_content = content
 
         for tag in tags:
-            # We look for the exact tag string in our map
-            # Because regex allows spaces, 'favourite colour' is a valid key
-            if tag in substitution_map:
-                value = substitution_map[tag]
+            normalized_tag = tag.casefold().strip()
+
+            if normalized_tag in substitution_map:
+                value = substitution_map[normalized_tag]
                 updated_content = updated_content.replace(f"<{tag}>", value)
             else:
                 unresolved_tags.append(tag)
