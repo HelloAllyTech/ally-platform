@@ -30,7 +30,7 @@ export interface ReviewCommentProps {
   /**
    * Callback when like button is pressed
    */
-  onLikePress?: () => void;
+  onAddReactionPress?: () => void;
   /**
    * Callback when reply button is pressed
    */

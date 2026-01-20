@@ -23,6 +23,9 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: '24@ms',
     gap: '16@vs',
   },
+  listStyle: {
+    flex: 1,
+  },
   threadContainer: {
     backgroundColor: colors.white,
     borderWidth: 0.5,
@@ -54,6 +57,8 @@ export const styles = ScaledSheet.create({
     lineHeight: '24@ms',
     color: colors.ds.typography.highEmphasis,
     letterSpacing: 0.25,
+    maxLines: 1,
+    textOverflow: 'ellipsis',
   },
   separatorLine: {
     height: 0.5,
@@ -65,7 +70,6 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: '5@s',
-    paddingTop: '10@mvs',
     paddingBottom: '2@mvs',
   },
   moreCommentsText: {

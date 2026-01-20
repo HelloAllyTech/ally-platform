@@ -8,7 +8,7 @@ export interface AddReviewCommentRequest {
 }
 
 export interface AddReviewCommentResponse {
-  success: boolean;
+  commentId: string;
 }
 
 export interface MessageThreadComment {
@@ -23,7 +23,7 @@ export interface MessageThreadComment {
   reactions: {
     [reactionCode: string]: number;
   };
-  replyCount: number;
+  replyCount?: number;
 }
 
 export interface MessageThread {
@@ -112,6 +112,36 @@ export interface MessageData {
   messagePart: MessagePart[];
 }
 
+export interface GetThreadsParams {
+  reviewId: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ThreadsResponse {
+  data: Thread[];
+  count: number;
+}
+
+export interface Thread {
+  id: string;
+  comments: MessageThreadComment[];
+  commentCount: number;
+  selectedText?: string;
+}
+
+export interface RepliesParams {
+  commentId: string;
+  offset?: number;
+  limit?: number;
+}
+
+export type MessageList = Record<string, MessageData[]> | [];
+export interface TextSelection {
+  selectedText: string;
+  startIndex: number;
+  endIndex: number;
+}
 export interface CreateReviewRequest {
   scenarioSessionId: string;
 }
