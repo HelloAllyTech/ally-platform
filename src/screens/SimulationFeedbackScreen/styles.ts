@@ -124,4 +124,7 @@ export const styles = ScaledSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
+  reviewIconButton: {
+    marginLeft: 'auto',
+  },
 });
