@@ -4,17 +4,14 @@ import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
-import {LeftArrow, RightArrow} from '@/assets/icons';
-import {BottomSheet} from '@/components/BottomSheet';
-import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
-import {ReviewComment} from '@/components/ReviewComment';
+import {LeftArrow, LeftArrowIcon} from '@/assets/icons';
+import {BottomSheet, ReviewComment} from '@/components';
 import {useTranslate} from '@/hooks';
-import {
-  useLazyGetThreadCommentsQuery,
-  type ThreadComment,
-} from '@/services/reviewThreadsApi';
+import {useLazyGetThreadCommentsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
+import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
+import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {CommentThreadBottomSheetProps} from './types';
@@ -27,7 +24,7 @@ export const CommentThreadBottomSheet: React.FC<
   visible,
   onClose,
   threadId,
-  onLikePress,
+  onAddReactionPress,
   onReplyPress,
   onAddCommentPress,
 }) => {
@@ -36,8 +33,8 @@ export const CommentThreadBottomSheet: React.FC<
   const [getThreadComments, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreadCommentsQuery();
   const [offset, setOffset] = React.useState(0);
-  const [accumulatedData, setAccumulatedData] = React.useState<{
-    data: ThreadComment[];
+  const [comments, setComments] = React.useState<{
+    data: MessageThreadComment[];
     count: number;
   } | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -46,7 +43,7 @@ export const CommentThreadBottomSheet: React.FC<
   useEffect(() => {
     if (visible && threadId) {
       setOffset(0);
-      setAccumulatedData(null);
+      setComments(null);
       getThreadComments({
         threadId,
         offset: 0,
@@ -60,10 +57,10 @@ export const CommentThreadBottomSheet: React.FC<
     if (apiData) {
       if (offset === 0) {
         // First page - replace data
-        setAccumulatedData({data: apiData.data, count: apiData.count});
+        setComments({data: apiData.data, count: apiData.count});
       } else {
         // Subsequent pages - append data, avoiding duplicates
-        setAccumulatedData(prev => {
+        setComments(prev => {
           if (!prev) return {data: apiData.data, count: apiData.count};
           const existingIds = new Set(prev.data.map(item => String(item.id)));
           const newItems = apiData.data.filter(
@@ -78,26 +75,15 @@ export const CommentThreadBottomSheet: React.FC<
     }
   }, [apiData, offset]);
 
-  const data = accumulatedData;
-
-  const getReactionsArray = useCallback(
-    (reactions: Record<string, number>): string[] => {
-      return Object.keys(reactions)
-        .filter(key => reactions[key] > 0)
-        .map(key => EMOJI_UNICODE_MAP[key] || key);
+  const handleReplyPress = useCallback(
+    (comment: MessageThreadComment) => {
+      onReplyPress?.(comment);
     },
-    [],
-  );
-
-  const getTotalReactionCount = useCallback(
-    (reactions: Record<string, number>): number => {
-      return Object.values(reactions).reduce((sum, count) => sum + count, 0);
-    },
-    [],
+    [onReplyPress],
   );
 
   const renderCommentItem = useCallback(
-    ({item: comment}: {item: ThreadComment}) => {
+    ({item: comment}: {item: MessageThreadComment}) => {
       const reactionsArray = getReactionsArray(comment.reactions);
       const reactionCount = getTotalReactionCount(comment.reactions);
 
@@ -110,15 +96,15 @@ export const CommentThreadBottomSheet: React.FC<
             profileImageUrl={comment.createdBy.profileImage}
             reactions={reactionsArray}
             reactionCount={reactionCount}
-            replyCount={0}
+            replyCount={comment.replyCount}
             showReplyButton
-            onLikePress={() => onLikePress?.(comment.id)}
-            onReplyPress={() => onReplyPress?.(comment.id)}
+            onAddReactionPress={() => onAddReactionPress?.(comment.id)}
+            onReplyPress={() => handleReplyPress(comment)}
           />
         </View>
       );
     },
-    [getReactionsArray, getTotalReactionCount, onLikePress, onReplyPress],
+    [onAddReactionPress, handleReplyPress],
   );
 
   const renderHeader = useCallback(() => {
@@ -143,14 +129,14 @@ export const CommentThreadBottomSheet: React.FC<
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
-    const hasMore = data && offset + LIMIT < data.count;
+    const hasMore = comments && offset + LIMIT < comments.count;
     if (!hasMore) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, data, offset]);
+  }, [isFetching, insets.bottom, comments, offset]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
@@ -170,7 +156,12 @@ export const CommentThreadBottomSheet: React.FC<
   }, [isLoading, t]);
 
   const loadMore = useCallback(() => {
-    if (!isFetching && data && offset + LIMIT < data.count && threadId) {
+    if (
+      !isFetching &&
+      comments &&
+      offset + LIMIT < comments.count &&
+      threadId
+    ) {
       const newOffset = offset + LIMIT;
       setOffset(newOffset);
       getThreadComments({
@@ -179,87 +170,85 @@ export const CommentThreadBottomSheet: React.FC<
         limit: LIMIT,
       });
     }
-  }, [offset, isFetching, data, threadId, getThreadComments]);
+  }, [offset, isFetching, comments, threadId, getThreadComments]);
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      allowFullExpand
-      skipBottomSheetView
-      enableContentPanningGesture
-      enableDynamicSizing
-      enableOverDrag
-      snapPoints={[]}
-      enableHandlePanningGesture>
-      <View style={styles.container}>
-        {isLoading && !data ? (
-          <>
-            {renderHeader()}
-            {renderEmpty()}
-          </>
-        ) : (
-          <>
-            {renderHeader()}
-            <BottomSheetFlatList
-              data={data?.data || []}
-              renderItem={renderCommentItem}
-              keyExtractor={item => item.id.toString()}
-              ListFooterComponent={renderFooter}
-              ListEmptyComponent={renderEmpty}
-              contentContainerStyle={[
-                styles.listContent,
-                {paddingBottom: insets.bottom + ms(100)},
-              ]}
-              showsVerticalScrollIndicator={false}
-              style={styles.listStyle}
-              removeClippedSubviews={false}
-              onEndReached={loadMore}
-              onEndReachedThreshold={0.3}
-            />
-            {/* Add Comment Input - Always visible at bottom */}
-            <View
-              style={[
-                styles.addCommentContainer,
-                {paddingBottom: insets.bottom + 16},
-              ]}>
-              <View style={styles.addCommentInputContainer}>
-                <BottomSheetTextInput
-                  style={styles.addCommentInput}
-                  placeholder={t('CommentThreadBottomSheet.addComment')}
-                  placeholderTextColor={colors.ds.typography.mediumEmphasis}
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline={false}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.sendButton,
-                    !commentText.trim() && styles.sendButtonDisabled,
-                  ]}
-                  onPress={() => {
-                    if (commentText.trim()) {
-                      onAddCommentPress?.(commentText);
-                      setCommentText('');
-                    }
-                  }}
-                  disabled={!commentText.trim()}
-                  activeOpacity={0.7}>
-                  <RightArrow
-                    width={ms(24)}
-                    height={ms(24)}
-                    color={
-                      commentText.trim()
-                        ? colors.white
-                        : colors.ds.typography.lowEmphasis
-                    }
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        allowFullExpand
+        skipBottomSheetView
+        enableContentPanningGesture
+        enableDynamicSizing
+        enableOverDrag
+        enableHandlePanningGesture>
+        <View style={styles.container}>
+          {isLoading && !comments ? (
+            <>
+              {renderHeader()}
+              {renderEmpty()}
+            </>
+          ) : (
+            <>
+              {renderHeader()}
+              <BottomSheetFlatList
+                data={comments?.data || []}
+                renderItem={renderCommentItem}
+                keyExtractor={item => item.id.toString()}
+                ListFooterComponent={renderFooter}
+                ListEmptyComponent={renderEmpty}
+                contentContainerStyle={[
+                  styles.listContent,
+                  {paddingBottom: insets.bottom + ms(60)},
+                ]}
+                showsVerticalScrollIndicator={false}
+                style={styles.listStyle}
+                removeClippedSubviews={false}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.3}
+              />
+              {/* Add Comment Input - Always visible at bottom */}
+              <View
+                style={[
+                  styles.addCommentContainer,
+                  {paddingBottom: insets.bottom},
+                ]}>
+                <View style={styles.addCommentInputContainer}>
+                  <BottomSheetTextInput
+                    style={styles.addCommentInput}
+                    placeholder={t('CommentThreadBottomSheet.addComment')}
+                    placeholderTextColor={colors.ds.typography.mediumEmphasis}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    multiline={false}
                   />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      !commentText.trim() && styles.sendButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      if (commentText.trim()) {
+                        onAddCommentPress?.(commentText);
+                        setCommentText('');
+                      }
+                    }}
+                    disabled={!commentText.trim()}
+                    activeOpacity={0.7}>
+                    <LeftArrowIcon
+                      color={colors.white}
+                      width={'32@ms'}
+                      height={'32@ms'}
+                      style={styles.arrowIcon}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </>
-        )}
-      </View>
-    </BottomSheet>
+            </>
+          )}
+        </View>
+      </BottomSheet>
+    </>
   );
 };

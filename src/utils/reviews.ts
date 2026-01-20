@@ -1,3 +1,5 @@
+import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
+
 type CommentRange = {id: string; start: number; end: number};
 type Segment = {text: string; commentIds: string[]; start: number; end: number};
 /**
@@ -83,4 +85,18 @@ export const getTopReactions = (
     .sort(([, countA], [, countB]) => countB - countA)
     .map(([reactionCode]) => reactionCode)
     .slice(0, limit);
+};
+
+export const getReactionsArray = (
+  reactions: Record<string, number>,
+): string[] => {
+  return Object.keys(reactions)
+    .filter(key => reactions[key] > 0)
+    .map(key => EMOJI_UNICODE_MAP[key] || '❤');
+};
+
+export const getTotalReactionCount = (
+  reactions: Record<string, number>,
+): number => {
+  return Object.values(reactions).reduce((sum, count) => sum + count, 0);
 };

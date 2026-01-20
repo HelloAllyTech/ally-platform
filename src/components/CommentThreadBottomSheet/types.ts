@@ -1,8 +1,10 @@
+import {MessageThreadComment} from '@/types/reviews';
+
 export interface CommentThreadBottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  threadId: string | number;
-  onLikePress?: (commentId: string | number) => void;
-  onReplyPress?: (commentId: string | number) => void;
+  threadId: string;
+  onAddReactionPress?: (commentId: string) => void;
+  onReplyPress?: (comment: MessageThreadComment) => void;
   onAddCommentPress?: (commentText: string) => void;
 }

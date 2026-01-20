@@ -59,6 +59,8 @@ export {CommentsBottomSheet} from './CommentsBottomSheet';
 export type {CommentsBottomSheetProps} from './CommentsBottomSheet';
 export {CommentThreadBottomSheet} from './CommentThreadBottomSheet';
 export type {CommentThreadBottomSheetProps} from './CommentThreadBottomSheet';
+export {ReplyBottomSheet} from './ReplyBottomSheet';
+export type {ReplyBottomSheetProps} from './ReplyBottomSheet';
 export {ReviewComment} from './ReviewComment';
 export type {ReviewCommentProps} from './ReviewComment';
 export {SelectableTextArea} from './SelectableTextArea';

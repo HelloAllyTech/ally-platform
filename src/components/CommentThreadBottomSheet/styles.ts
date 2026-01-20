@@ -62,8 +62,6 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: '24@s',
     paddingTop: '16@vs',
     backgroundColor: colors.white,
-    borderTopWidth: 0.5,
-    borderTopColor: colors.lightGray17,
   },
   addCommentInputContainer: {
     flexDirection: 'row',
@@ -95,5 +93,8 @@ export const styles = ScaledSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: 'rgba(0, 0, 0, 0.38)',
+  },
+  arrowIcon: {
+    transform: [{rotate: '180deg'}],
   },
 });
