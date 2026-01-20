@@ -336,7 +336,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.blue[50],
     borderWidth: '0.5@ms',
     borderColor: colors.ds.theme.primary,
-    marginHorizontal: '12@ms',
+    marginHorizontal: '8@ms',
   },
   stickyFooter: {
     position: 'absolute',

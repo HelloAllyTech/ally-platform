@@ -162,7 +162,7 @@ export const API_ROUTES = {
       `/reviews/threads/${threadId}/comments`,
   },
   BADGES: {
-    AVAILABLE: '/badges/available',
+    AVAILABLE: '/badges/me/available',
   },
   COMMUNITY: {
     LEADERBOARD: '/community/leaderboard',

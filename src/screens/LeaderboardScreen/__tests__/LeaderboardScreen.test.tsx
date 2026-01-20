@@ -124,9 +124,9 @@ describe('LeaderboardScreen', () => {
 
   it('renders period tabs', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Last week')).toBeTruthy();
-    expect(getByText('Last month')).toBeTruthy();
-    expect(getByText('Last year')).toBeTruthy();
+    expect(getByText('Last Week')).toBeTruthy();
+    expect(getByText('Last Month')).toBeTruthy();
+    expect(getByText('Last Year')).toBeTruthy();
     expect(getByText('All Time')).toBeTruthy();
   });
 
@@ -150,7 +150,7 @@ describe('LeaderboardScreen', () => {
 
   it('changes active period when tab is pressed', () => {
     const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthTab = getByText('Last month');
+    const monthTab = getByText('Last Month');
 
     fireEvent.press(monthTab);
 
@@ -166,7 +166,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Tab should still be visible
-    expect(getByText('Last month')).toBeTruthy();
+    expect(getByText('Last Month')).toBeTruthy();
   });
 
   it('renders rank badges for all entries', () => {
