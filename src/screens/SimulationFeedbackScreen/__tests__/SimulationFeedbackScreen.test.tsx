@@ -88,6 +88,12 @@ jest.mock('@/services', () => {
     useAddSimulationFeedbackMutation: () => [
       jest.fn().mockResolvedValue({data: {success: true}}),
     ],
+    useCreateReviewMutation: () => [
+      jest.fn().mockResolvedValue({data: {success: true}}),
+    ],
+    useUpdateReviewStatusMutation: () => [
+      jest.fn().mockResolvedValue({data: {success: true}}),
+    ],
     useLazyGetSimulationDetailsQuery,
     useGetUpcomingScenarioQuery: jest.fn(() => ({
       data: null,

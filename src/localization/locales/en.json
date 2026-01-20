@@ -407,7 +407,9 @@
     "almostThereTitle": "Almost there",
     "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready.",
     "keepItPrivate": "Keep it private",
-    "shareForReview": "Share for review"
+    "shareForReview": "Share for review",
+    "privacyUpdated": "Privacy setting updated",
+    "sharedForReview": "Transcript shared for review"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
@@ -417,7 +419,8 @@
     "toggleMic": "Failed to toggle microphone",
     "submitFeedback": "Failed to submit feedback",
     "uploadProfileImage": "Failed to upload profile image",
-    "removeProfileImage": "Failed to remove profile image"
+    "removeProfileImage": "Failed to remove profile image",
+    "updatePrivacy": "Failed to update privacy settings"
   },
   "Success": {
     "submitFeedback": "Feedback submitted successfully"

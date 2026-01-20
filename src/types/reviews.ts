@@ -111,3 +111,29 @@ export interface MessageData {
   senderId: string;
   messagePart: MessagePart[];
 }
+
+export interface CreateReviewRequest {
+  scenarioSessionId: string;
+}
+
+export interface CreateReviewResponse {
+  id: string;
+  scenarioSessionId: string;
+  status: ReviewStatus;
+  createdAt: string;
+}
+
+export enum ReviewStatus {
+  HIDDEN = 'HIDDEN',
+  IN_REVIEW = 'IN_REVIEW',
+}
+
+export interface UpdateReviewStatusRequest {
+  status: ReviewStatus;
+}
+
+export interface UpdateReviewStatusResponse {
+  id: string;
+  status: ReviewStatus;
+  updatedAt: string;
+}

@@ -26,16 +26,19 @@ import {
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
+  useCreateReviewMutation,
   useGetUpcomingScenarioQuery,
   useLazyGetSimulationDetailsQuery,
+  useUpdateReviewStatusMutation,
 } from '@/services';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
-import {SessionItemStatus} from '@/types';
+import {ReviewStatus, SessionItemStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
   FeedbackDropdown,
+  PrivacyToggle,
   SimulationSummary,
   SimulationSummarySkeleton,
   SimulationTranscript,
@@ -68,9 +71,17 @@ export const SimulationFeedbackScreen: React.FC<
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const [isPrivate, setIsPrivate] = useState(true);
+  const [reviewId, setReviewId] = useState<string | null>(null);
+  console.log('🚀 ~ SimulationFeedbackScreen ~ reviewId:', {
+    reviewId,
+    isPrivate,
+    scenarioSessionId,
+  });
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
+  const [createReview] = useCreateReviewMutation();
+  const [updateReviewStatus] = useUpdateReviewStatusMutation();
   const [
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
@@ -231,6 +242,50 @@ export const SimulationFeedbackScreen: React.FC<
 
   const handleSubmit = () => {
     setIsFeedbackPopupVisible(true);
+  };
+
+  const handlePrivacyToggle = async (isPrivateValue: boolean) => {
+    if (isPrivateValue === isPrivate) {
+      return;
+    }
+
+    setIsPrivate(isPrivateValue);
+
+    if (!scenarioSessionId) return;
+
+    try {
+      if (isPrivateValue) {
+        // User wants to keep it private (HIDDEN)
+        if (reviewId) {
+          await updateReviewStatus({
+            reviewId,
+            status: {status: ReviewStatus.HIDDEN},
+          }).unwrap();
+          showToast(t('SimulationFeedback.privacyUpdated'), 'success');
+        }
+      } else {
+        // User wants to share for review (IN_REVIEW)
+        if (reviewId) {
+          // Update existing review status
+          await updateReviewStatus({
+            reviewId,
+            status: {status: ReviewStatus.IN_REVIEW},
+          }).unwrap();
+          showToast(t('SimulationFeedback.sharedForReview'), 'success');
+        } else {
+          // Create new review
+          const response = await createReview({
+            scenarioSessionId: scenarioSessionId,
+          }).unwrap();
+          setReviewId(response.id);
+          showToast(t('SimulationFeedback.sharedForReview'), 'success');
+        }
+      }
+    } catch (error) {
+      showToast(t('Errors.updatePrivacy'), 'error');
+      // Revert the toggle state on error
+      setIsPrivate(!isPrivateValue);
+    }
   };
 
   const handleScrollToBottom = useCallback(() => {
@@ -463,9 +518,12 @@ export const SimulationFeedbackScreen: React.FC<
             // onSeek={setSeekTime}
             agentName={simulationDetails?.scenario?.metadata?.name}
           />
-          {/* <View style={styles.privacyToggleContainer}>
-            <PrivacyToggle isPrivate={isPrivate} onToggle={setIsPrivate} />
-          </View> */}
+          <View style={styles.privacyToggleContainer}>
+            <PrivacyToggle
+              isPrivate={isPrivate}
+              onToggle={handlePrivacyToggle}
+            />
+          </View>
         </>
       )}
       <FeedbackDropdown
