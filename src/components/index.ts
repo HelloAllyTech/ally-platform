@@ -67,3 +67,4 @@ export {CommentInput} from './CommentInput';
 export type {CommentInputProps} from './CommentInput';
 export {Conversation} from './Conversation';
 export type {ConversationProps} from './Conversation';
+export {BadgePopup} from './BadgePopup';
