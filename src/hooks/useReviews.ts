@@ -47,6 +47,8 @@ export const useReviews = () => {
             currentOffset + newReviews.length < count;
 
           setHasMore(hasMoreItems);
+        } else {
+          setHasMore(false);
         }
       } catch (err) {
         console.error('Error fetching reviews:', err);
