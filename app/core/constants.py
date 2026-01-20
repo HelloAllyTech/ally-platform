@@ -12,6 +12,12 @@ DEFAULT_LLM_CONFIG: Final[Dict[str, str]] = {
     "model": "gpt-4o-mini",
 }
 
+# Default LLM config for branching instruction resolution (structured output support)
+DEFAULT_BRANCHING_LLM_CONFIG: Final[Dict[str, str]] = {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+}
+
 
 class Environment(str, Enum):
     DEV = "DEV"

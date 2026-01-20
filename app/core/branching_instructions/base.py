@@ -2,10 +2,17 @@
 Data models for branching instructions.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.branching_instructions.parser import parse_instruction
+from app.core.branching_instructions.functions.llm_response import generate_llm_response
+from app.core.branching_instructions.parser import (
+    extract_llm_response_tags,
+    parse_instruction,
+)
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -44,6 +51,7 @@ class BranchingInstruction:
     variable_tags: List[str]
     static_tags: List[str]
     dynamic_tags: List[str]
+    _llm_resolved: bool = field(default=False, init=False, repr=False)
 
     @classmethod
     def create(
@@ -55,6 +63,9 @@ class BranchingInstruction:
         Args:
             instruction: Raw branching instruction string with variable tags
                 (e.g., "Hello <name>, respond to <last_helper_utterance>")
+            prompt_data: Optional dictionary containing substitution data for
+                static variables. If provided, static variables will be resolved
+                during creation.
 
         Returns:
             BranchingInstruction with parsed and categorized variables
@@ -134,3 +145,67 @@ class BranchingInstruction:
                 unresolved_tags.append(tag)
 
         return updated_content, unresolved_tags
+
+    def needs_llm_resolution(self) -> bool:
+        """
+        Check if llm_response tags need to be resolved.
+
+        Returns:
+            True if resolution is needed, False if already resolved
+        """
+        return not self._llm_resolved
+
+    async def resolve_llm_responses(
+        self,
+        llm_config: Optional[Dict[str, Any]] = None,
+        language_code: str = "en-US",
+    ) -> None:
+        """
+        Lazily substitute llm_response tags in the branching instruction.
+
+        This method is called once when the branching instruction is first used.
+        It extracts llm_response tags, calls the LLM for each, and substitutes
+        the results into the content.
+
+        Args:
+            llm_config: Optional LLM configuration dict
+            language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+
+        Example:
+            >>> instruction = BranchingInstruction.create(
+            ...     "Use <llm_response(facts about exercise)>"
+            ... )
+            >>> await instruction.resolve_llm_responses()
+            >>> # instruction.content now has the LLM response substituted
+        """
+        # Check if already resolved
+        if self._llm_resolved:
+            return
+
+        # Extract llm_response tags
+        llm_tags = extract_llm_response_tags(self.content)
+
+        if not llm_tags:
+            # No llm_response tags found, mark as resolved and return
+            self._llm_resolved = True
+            return
+
+        # Substitute each llm_response tag
+        for full_tag, parameter in llm_tags.items():
+            try:
+                # Generate LLM response for the parameter
+                llm_response = await generate_llm_response(
+                    content=parameter,
+                    language_code=language_code,
+                    llm_config=llm_config,
+                )
+
+                # Replace the tag with the LLM response
+                self.content = self.content.replace(f"<{full_tag}>", llm_response)
+
+            except Exception as e:
+                # Log error but don't fail - keep the tag as-is
+                logger.error(f"Failed to resolve llm_response tag '<{full_tag}>': {e}")
+
+        # Mark as resolved
+        self._llm_resolved = True

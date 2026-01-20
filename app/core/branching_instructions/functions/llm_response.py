@@ -2,11 +2,22 @@
 
 from typing import Optional
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import BaseModel
+
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.llms import create_llm_client
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# System prompt for LLM content generation
+SYSTEM_PROMPT = (
+    "You are a helpful AI assistant tasked with generating content based on user "
+    "requests. Provide clear, concise, and relevant responses that directly address "
+    "the user's input. Generate content that is appropriate for the given context "
+    "and deliver it in a natural, helpful, and professional manner."
+)
 
 
 async def generate_llm_response(
@@ -53,8 +64,19 @@ async def generate_llm_response(
 
         logger.debug(f"Generating LLM response for content: {content[:100]}...")
 
-        # Invoke LLM with the content
-        response = await llm_instance.ainvoke(content)
+        class LLMResponse(BaseModel):
+            content: str
+
+        # Create system message with instructions for content generation
+        system_message = SystemMessage(content=SYSTEM_PROMPT)
+
+        # Create user message with only the content
+        user_message = HumanMessage(content=content)
+
+        # Invoke LLM with structured messages
+        response = await llm_instance.with_structured_output(LLMResponse).ainvoke(
+            [system_message, user_message]
+        )
 
         logger.debug(f"LLM response generated: {response.content[:100]}...")
 

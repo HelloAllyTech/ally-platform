@@ -6,12 +6,15 @@ and categorizes them as static or dynamic.
 """
 
 import re
-from typing import List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from app.core.branching_instructions.constants import BRANCHING_DYNAMIC_VARIABLES
 
 # Regex pattern to match <variable_name> tags
 VARIABLE_TAG_PATTERN = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_ ]*)>")
+
+# Regex pattern to match <llm_response(parameter)> tags
+LLM_RESPONSE_PATTERN = re.compile(r"<llm_response\(([^)]+)\)>")
 
 
 def extract_variable_tags(instruction: str) -> List[str]:
@@ -97,3 +100,33 @@ def parse_instruction(instruction: str) -> Tuple[List[str], List[str], List[str]
     dynamic_tags = [tag for tag in unique_tags if is_dynamic_variable(tag)]
 
     return unique_tags, static_tags, dynamic_tags
+
+
+def extract_llm_response_tags(instruction: str) -> Dict[str, str]:
+    """
+    Extract llm_response tags with their parameters from a branching instruction.
+
+    Extracts tags in the format <llm_response(parameter)> and returns a mapping
+    of the full tag to its parameter.
+
+    Args:
+        instruction: Branching instruction string
+            (e.g., "respond with <llm_response(facts about exercise)>")
+
+    Returns:
+        Dict mapping full tag to parameter
+        (e.g., {"llm_response(facts about exercise)": "facts about exercise"})
+
+    Examples:
+        >>> extract_llm_response_tags("use <llm_response(facts about exercise)>")
+        {"llm_response(facts about exercise)": "facts about exercise"}
+
+        >>> extract_llm_response_tags("No llm_response here")
+        {}
+    """
+    matches = LLM_RESPONSE_PATTERN.findall(instruction)
+    result = {}
+    for param in matches:
+        full_tag = f"llm_response({param})"
+        result[full_tag] = param
+    return result

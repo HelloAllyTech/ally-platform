@@ -88,6 +88,11 @@ class LanguageConfig(BaseModel):
     language_code: str = Field(default=DEFAULT_LANGUAGE_CODE)
     stt_config: Optional[Dict[str, Any]] = Field(default=None)
     llm_config: Optional[Dict[str, Any]] = Field(default=None)
+    branching_llm_config: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="LLM config for branching instruction resolution "
+        "(structured output)",
+    )
 
 
 class Scenario(BaseModel):
@@ -125,6 +130,7 @@ class Scenario(BaseModel):
         cls,
         payload: Mapping[str, Any],
         embedding_client: Optional[BaseEmbeddingClient] = None,
+        branching_llm_config: Optional[Dict[str, Any]] = None,
     ) -> "Scenario":
         """
         Build a Scenario from:
@@ -138,6 +144,8 @@ class Scenario(BaseModel):
             payload: Scenario metadata
             embedding_client: Optional shared embedding client for
                 semantic similarity events
+            branching_llm_config: Optional LLM config for branching instruction
+                resolution (structured output support)
         """
         raw = cls._extract_scenario_section(payload)
         normalized = cls._normalize_top_level_fields(raw)
@@ -149,7 +157,9 @@ class Scenario(BaseModel):
         # Build voice from metadata (if present)
         voice_obj = cls._build_voice(raw)
         prompt_data = cls._build_prompt_data(raw)
-        language_config = cls._build_language_config(raw)
+        language_config = cls._build_language_config(
+            raw, branching_llm_config=branching_llm_config
+        )
         # Extract trigger_events (list of event IDs that should be sent).
         trigger_events = raw.get("triggerEvents") or []
         # Extract termination event configuration (supports both old and new keys)
@@ -320,7 +330,10 @@ class Scenario(BaseModel):
         return termination_events
 
     @staticmethod
-    def _build_language_config(raw: Mapping[str, Any]) -> LanguageConfig:
+    def _build_language_config(
+        raw: Mapping[str, Any],
+        branching_llm_config: Optional[Dict[str, Any]] = None,
+    ) -> LanguageConfig:
         """
         Extract language configuration from metadata.
 
@@ -330,9 +343,12 @@ class Scenario(BaseModel):
           uses language registry)
         - llm: Optional LLM provider configuration (currently unused -
           uses language registry)
+        - branching_llm_config: Optional LLM config for branching instruction
+          resolution (passed from worker)
 
         Args:
             raw: Raw scenario dictionary from metadata
+            branching_llm_config: Optional LLM config for branching (structured output)
 
         Returns:
             LanguageConfig object with language code and optional STT/LLM overrides
@@ -342,5 +358,8 @@ class Scenario(BaseModel):
         llm_config = raw.get("llm")
 
         return LanguageConfig(
-            language_code=language_code, stt_config=stt_config, llm_config=llm_config
+            language_code=language_code,
+            stt_config=stt_config,
+            llm_config=llm_config,
+            branching_llm_config=branching_llm_config,
         )

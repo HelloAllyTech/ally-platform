@@ -8,7 +8,11 @@ from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 
 from app.core.config import settings
-from app.core.constants import DEFAULT_VAD_ACTIVATION_THRESHOLD, Environment
+from app.core.constants import (
+    DEFAULT_BRANCHING_LLM_CONFIG,
+    DEFAULT_VAD_ACTIVATION_THRESHOLD,
+    Environment,
+)
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.scenario.base import Scenario
@@ -96,7 +100,9 @@ class AgentWorker:
 
         # Parse metadata
         rm_md_envelope = parse_room_metadata(
-            self.ctx.job.metadata, embedding_client=self.embedding_client
+            self.ctx.job.metadata,
+            embedding_client=self.embedding_client,
+            branching_llm_config=DEFAULT_BRANCHING_LLM_CONFIG,
         )
         self.scenario = rm_md_envelope.scenario
         logger.debug(f"Events in scenario: {str(self.scenario.events)}")

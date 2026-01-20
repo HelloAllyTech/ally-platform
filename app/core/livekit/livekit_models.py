@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class RoomMetadataEnvelope(BaseModel):
         cls,
         payload: Mapping[str, Any],
         embedding_client: Optional[BaseEmbeddingClient] = None,
+        branching_llm_config: Optional[Dict[str, Any]] = None,
     ) -> "RoomMetadataEnvelope":
         """
         Parse from a full BE payload. If only a scenario dict is passed,
@@ -29,7 +30,13 @@ class RoomMetadataEnvelope(BaseModel):
             payload: Room metadata payload
             embedding_client: Optional shared embedding client for
                 semantic similarity events
+            branching_llm_config: Optional LLM config for branching instruction
+                resolution (structured output support)
         """
-        scenario = Scenario.create(payload, embedding_client=embedding_client)
+        scenario = Scenario.create(
+            payload,
+            embedding_client=embedding_client,
+            branching_llm_config=branching_llm_config,
+        )
         version = payload.get("version", "1.0")
         return cls(version=version, scenario=scenario)

@@ -171,23 +171,23 @@ async def process_events(
     return update_dict
 
 
-async def generate_response(
+async def resolve_branching_instruction(
     state: SimulationState, config: Optional[RunnableConfig] = None
-) -> SimulationState:
+) -> dict:
     """
-    Generate LLM response and handle event feedback.
+    Resolve branching instruction with LLM calls if needed.
 
     This function:
-    1. Determines branching instruction for LLM
-       (only if branching_instruction exists)
-    2. Generates LLM response using the branching instruction (if any)
+    1. Determines branching instruction for LLM (only if branching_instruction exists)
+    2. Resolves LLM response tags in branching instructions (if needed)
     3. Selects feedback message to send to UI:
        - If branching event was selected: use its feedback
        - Otherwise: use highest score event's feedback
-    4. Sends feedback to UI after STT/TTS flow completes
-    5. Clears branching_and_feedback_data after processing
 
-    Branching Instruction Logic (matches old behavior):
+    This node is wrapped in a subgraph to prevent its LLM outputs from being
+    streamed to TTS/UI (workaround for LiveKit issue #2836).
+
+    Branching Instruction Logic:
     - Only use branching_instruction if it exists (highest score branching event)
     - If no branching_instruction exists, LLM response is generated without it
 
@@ -195,11 +195,8 @@ async def generate_response(
     - Priority 1: If branching event was selected, use its feedback for UI
     - Priority 2: Otherwise, use highest score event's feedback for UI
     """
-    logger.info("Generating response")
+    logger.info("Resolving branching instruction")
 
-    # Step 1: Determine branching instruction for LLM
-    # (only if branching_instruction exists)
-    # This matches old behavior - branching instructions only affect LLM if they exist
     next_instruction = None
     selected_branching_event_data = None
 
@@ -218,10 +215,31 @@ async def generate_response(
                 selected_branching_event_data.branching_instruction
             )
 
-            # Use the branching instruction content directly (no substitution for now)
+            # Lazily resolve llm_response tags if present (one-time operation)
+            # Check flag first to avoid method call overhead on subsequent turns
+            if branching_instruction_obj.needs_llm_resolution():
+                # Get language_code and branching_llm_config from scenario if available
+                # Use dedicated branching_llm_config for structured output support,
+                # falling back to llm_config if not specified
+                language_code = DEFAULT_LANGUAGE_CODE
+                llm_config_for_branching = None
+                if config and "configurable" in config:
+                    scenario = config["configurable"].get("scenario")
+                    if scenario and hasattr(scenario, "language_config"):
+                        language_code = scenario.language_config.language_code
+                        llm_config_for_branching = (
+                            scenario.language_config.branching_llm_config
+                        )
+
+                await branching_instruction_obj.resolve_llm_responses(
+                    llm_config=llm_config_for_branching,
+                    language_code=language_code,
+                )
+
+            # Use the branching instruction content (with llm_response tags resolved)
             next_instruction = branching_instruction_obj.content
 
-    # Step 2: Determine feedback message for UI
+    # Determine feedback message for UI
     # Priority 1: If branching event was selected, use its feedback
     # Priority 2: Otherwise, use highest score event's feedback
     feedback_to_send = None
@@ -241,6 +259,30 @@ async def generate_response(
                 f"Priority 2: Selected highest score event "
                 f"(score={selected_event_data.score}) for UI feedback"
             )
+
+    return {
+        "next_instruction": next_instruction,
+        "feedback_to_send": feedback_to_send,
+    }
+
+
+async def generate_response(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> SimulationState:
+    """
+    Generate LLM response and handle event feedback.
+
+    This function:
+    1. Uses resolved branching instruction from state (resolved in previous node)
+    2. Generates LLM response using the branching instruction (if any)
+    3. Sends feedback to UI after STT/TTS flow completes
+    4. Clears branching_and_feedback_data after processing
+    """
+    logger.info("Generating response")
+
+    # Use resolved branching instruction from state
+    next_instruction = state.next_instruction
+    feedback_to_send = state.feedback_to_send
 
     # Build system message from scenario and prepend only for the LLM call
     scenario = (
@@ -372,6 +414,8 @@ async def generate_response(
         current_score=state.current_score,
         new_events=[],
         branching_and_feedback_data=[],  # Clear after use
+        next_instruction=None,  # Reset after use
+        feedback_to_send=None,  # Reset after use
     )
 
 

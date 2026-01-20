@@ -2,13 +2,12 @@
 
 from typing import Optional
 
-from app.core.graph.state import SimulationState
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def get_chat_summary(state: SimulationState) -> Optional[str]:
+def get_chat_summary() -> Optional[str]:
     """
     Generate a summary of the conversation.
 

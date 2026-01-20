@@ -2,12 +2,8 @@
 
 from typing import Optional
 
-from langchain_core.messages import AIMessage
 
-from app.core.graph.state import SimulationState
-
-
-def get_last_helper_utterance(state: SimulationState) -> Optional[str]:
+def get_last_helper_utterance() -> Optional[str]:
     """
     Extract the last AI (helper) message from conversation state.
 
@@ -26,11 +22,4 @@ def get_last_helper_utterance(state: SimulationState) -> Optional[str]:
         >>> get_last_helper_utterance(state)
         "Hi there!"
     """
-    if not state.messages:
-        return None
-
-    for message in reversed(state.messages):
-        if isinstance(message, AIMessage):
-            return message.content
-
     return None

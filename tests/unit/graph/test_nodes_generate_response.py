@@ -178,6 +178,8 @@ class TestGenerateResponse:
                 "opening_statements": ["Hi"],
                 "agent_goal": None,
                 "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
                 "prompt": None,
             },
         )()

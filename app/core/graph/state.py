@@ -121,6 +121,28 @@ def add_branching_and_feedback_data(
     return left + right  # Accumulate: add new data to existing ones
 
 
+def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional[str]:
+    """
+    Reducer to replace next_instruction.
+
+    Always replaces with the new value (right).
+    This allows nodes to set or clear the instruction.
+    """
+    return right
+
+
+def replace_feedback_to_send(
+    _: Optional[EventFeedback], right: Optional[EventFeedback]
+) -> Optional[EventFeedback]:
+    """
+    Reducer to replace feedback_to_send.
+
+    Always replaces with the new value (right).
+    This allows nodes to set or clear the feedback.
+    """
+    return right
+
+
 class SimulationState(BaseModel):
     """
     State model for the LangGraph simulation workflow.
@@ -130,6 +152,8 @@ class SimulationState(BaseModel):
     - Events (permitted, detected, accumulated)
     - Score tracking
     - Branching and feedback data (unified structure for branching + feedback)
+    - Resolved branching instruction (for LLM)
+    - Feedback to send (for UI)
     """
 
     messages: Annotated[List[AnyMessage], add_messages]
@@ -142,3 +166,9 @@ class SimulationState(BaseModel):
     branching_and_feedback_data: Annotated[
         List[BranchingAndFeedbackData], add_branching_and_feedback_data
     ]  # Unified data: branching instructions + feedback messages
+    next_instruction: Annotated[Optional[str], replace_next_instruction] = (
+        None  # Resolved branching instruction for LLM
+    )
+    feedback_to_send: Annotated[Optional[EventFeedback], replace_feedback_to_send] = (
+        None  # Feedback to send to UI
+    )

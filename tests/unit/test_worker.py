@@ -202,14 +202,16 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
 
         # Also mock RoomMetadataEnvelope.create to bypass Scenario.create()
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         # STT config
@@ -257,7 +259,9 @@ class TestWorker:
             lambda scenario: mock_create_stt_client(),
         )
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -397,12 +401,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         # STT should work fine
@@ -457,7 +463,9 @@ class TestWorker:
             agent_utils, "configure_tts_client", mock_configure_tts_client
         )
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -606,12 +614,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         # STT should fail and fallback
@@ -668,7 +678,9 @@ class TestWorker:
             agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
         )
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -761,12 +773,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         class MockSTTClient:
@@ -836,7 +850,9 @@ class TestWorker:
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -916,12 +932,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         class MockSTTClient:
@@ -968,7 +986,9 @@ class TestWorker:
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -1050,12 +1070,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         class MockSTTClient:
@@ -1157,7 +1179,9 @@ class TestWorker:
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
@@ -1251,12 +1275,14 @@ class TestWorker:
         monkeypatch.setattr(
             metadata_parser,
             "parse_room_metadata",
-            lambda md, embedding_client=None: rm_md_envelope,
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
         monkeypatch.setattr(
             RoomMetadataEnvelope,
             "create",
-            lambda payload, embedding_client=None: rm_md_envelope,
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
         )
 
         class MockSTTClient:
@@ -1326,7 +1352,9 @@ class TestWorker:
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
         monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
         monkeypatch.setattr(
-            agent_utils, "configure_llm_client", lambda scenario: Mock()
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
         )
         monkeypatch.setattr(
             agent_utils,
