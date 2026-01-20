@@ -479,6 +479,7 @@
     "locked": "Locked",
     "error": "Failed to load achievements",
     "noAchievements": "No achievements found",
+    "earnedNewBadge": "You earned a new badge",
     "firstSteps": {
       "title": "First Steps",
       "description": "Practice for at least 15 minutes at account level"

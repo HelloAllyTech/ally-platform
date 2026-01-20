@@ -1,5 +1,5 @@
-import {API_METHODS, API_ROUTES} from '@/constants';
-import {BadgesResponse} from '@/types';
+import {API_METHODS, API_ROUTES, ViewedStatus} from '@/constants';
+import {BadgesResponse, GetBadgesResponse} from '@/types';
 
 import {api} from './api';
 
@@ -12,7 +12,23 @@ export const badgesApi = api.injectEndpoints({
       }),
       providesTags: ['Badges'],
     }),
+    getBadges: builder.query<GetBadgesResponse, ViewedStatus>({
+      query: (viewedStatus: ViewedStatus) => ({
+        url: API_ROUTES.BADGES.GET_BADGES(viewedStatus),
+        method: API_METHODS.GET,
+      }),
+    }),
+    markBadgeAsViewed: builder.mutation<void, string>({
+      query: badgeId => ({
+        url: API_ROUTES.BADGES.MARK_BADGE_AS_VIEWED(badgeId),
+        method: API_METHODS.POST,
+      }),
+    }),
   }),
 });
 
-export const {useGetAvailableBadgesQuery} = badgesApi;
+export const {
+  useGetAvailableBadgesQuery,
+  useGetBadgesQuery,
+  useMarkBadgeAsViewedMutation,
+} = badgesApi;

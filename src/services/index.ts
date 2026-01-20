@@ -10,3 +10,6 @@ export * from './reviewsApi';
 export * from './searchApi';
 export * from './settingsApi';
 export * from './simulationsApi';
+export * from './badgesApi';
+export * from './reactionsApi';
+export * from './reviewsApi';
