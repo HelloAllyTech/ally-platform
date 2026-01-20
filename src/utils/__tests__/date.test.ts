@@ -2,6 +2,7 @@ import {
   calculateDuration,
   formatDate,
   formatDateWithOrdinal,
+  formatMinutesToDuration,
   formatTime,
   formatTimeHHmm,
 } from '../date';
@@ -27,5 +28,15 @@ describe('Date Utilities', () => {
 
   it('should format date with ordinal correctly', () => {
     expect(formatDateWithOrdinal('2025-05-09')).toBe('9th May 2025');
+  });
+
+  describe('formatMinutesToDuration', () => {
+    it('should format minutes to abbreviated duration', () => {
+      expect(formatMinutesToDuration(90)).toBe('1 h 30 min');
+      expect(formatMinutesToDuration(45)).toBe('45 min');
+      expect(formatMinutesToDuration(120)).toBe('2 h');
+      expect(formatMinutesToDuration(872)).toBe('14 h 32 min');
+      expect(formatMinutesToDuration(0)).toBe('0 min');
+    });
   });
 });

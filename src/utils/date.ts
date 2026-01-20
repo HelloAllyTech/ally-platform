@@ -240,3 +240,24 @@ export const formatDurationFromSeconds = (seconds: string): string => {
     return pluralize(totalSeconds, 'sec');
   }
 };
+
+/**
+ * Formats minutes into abbreviated duration string
+ * @param minutes - Duration in minutes
+ * @returns Abbreviated duration (e.g., "1 h 30 min", "45 min")
+ * @example
+ * formatMinutesToDuration(90) // returns "1 h 30 min"
+ * formatMinutesToDuration(45) // returns "45 min"
+ */
+export const formatMinutesToDuration = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours} h ${remainingMinutes} min`;
+  } else if (hours > 0) {
+    return `${hours} h`;
+  } else {
+    return `${remainingMinutes} min`;
+  }
+};
