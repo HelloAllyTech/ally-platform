@@ -1,7 +1,9 @@
 import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 
+import {AddReactionIcon} from '@/assets/icons';
 import {useTranslate} from '@/hooks';
+import {colors} from '@/theme';
 
 import {styles} from './styles';
 import {ReviewCommentProps} from './types';
@@ -14,7 +16,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   reactions = [],
   reactionCount = 0,
   replyCount = 0,
-  onLikePress,
+  onAddReactionPress,
   onReplyPress,
   onCommentPress,
   showReplyButton = true,
@@ -67,9 +69,13 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
           <View style={styles.footerRowLeft}>
             <TouchableOpacity
               style={styles.likeButton}
-              onPress={onLikePress}
+              onPress={onAddReactionPress}
               activeOpacity={0.7}>
-              <Text style={styles.likeText}>{t('ReviewComment.like')}</Text>
+              <AddReactionIcon
+                width={20}
+                height={20}
+                color={colors.ds.icon.default}
+              />
             </TouchableOpacity>
             {/* Reactions */}
             {reactions.length > 0 && (
@@ -96,7 +102,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
           </View>
 
           {/* Separator Dot */}
-          {reactions.length > 0 && replyCount > 0 && (
+          {(replyCount > 0 || showReplyButton) && (
             <View style={styles.separatorDot} />
           )}
 

@@ -534,9 +534,20 @@
     "repliesOne": "1 reply"
   },
   "CommentsBottomSheet": {
-    "title": "Comments so far",
+    "title": "Comments",
     "moreComments": "{{count}} more comments",
     "moreCommentsOne": "1 more comment",
+    "noComments": "No comments yet",
+    "selectedText": "Selected text:"
+  },
+  "CommentThreadBottomSheet": {
+    "title": "Comment thread",
+    "addComment": "Add comment",
     "noComments": "No comments yet"
+  },
+  "ReplyBottomSheet": {
+    "title": "Replies",
+    "addReply": "Add reply",
+    "noReplies": "No replies yet"
   }
 }

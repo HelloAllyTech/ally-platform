@@ -160,9 +160,15 @@ export const API_ROUTES = {
     THREADS: (reviewId: string | number) => `/reviews/${reviewId}/threads`,
     GET_THREAD_COMMENTS: (threadId: string) =>
       `/reviews/threads/${threadId}/comments`,
+    GET_COMMENT_REPLIES: (commentId: string) =>
+      `/reviews/comments/${commentId}/replies`,
   },
   BADGES: {
-    AVAILABLE: '/badges/available',
+    AVAILABLE: '/badges/me/available',
+  },
+  COMMUNITY: {
+    LEADERBOARD: '/community/leaderboard',
+    MY_RANK: '/community/leaderboard/my-rank',
   },
 } as const;
 

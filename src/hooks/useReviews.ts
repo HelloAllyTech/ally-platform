@@ -6,7 +6,7 @@ import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
 const LIMIT = 5;
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 export const useReviews = () => {
   const [offset, setOffset] = useState<number>(0);
