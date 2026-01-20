@@ -24,7 +24,10 @@ export const legacyColors = {
   white3: '#FDFDFD',
   white4: '#ECECEC',
   roseWhite: '#FFF0F1',
+  whiteTransparent0: 'rgba(255, 255, 255, 0)',
   whiteTransparent10: 'rgba(255, 255, 255, 0.1)',
+  whiteTransparent40: 'rgba(255, 255, 255, 0.4)',
+  whiteTransparent60: 'rgba(255, 255, 255, 0.6)',
   whiteTransparent90: 'rgba(255, 255, 255, 0.9)',
 
   // Blacks

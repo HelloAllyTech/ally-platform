@@ -70,7 +70,7 @@ export const styles = ScaledSheet.create({
     alignSelf: 'stretch',
   },
   footerRow: {
-    marginTop: '10@mvs',
+    marginTop: '8@mvs',
     flexDirection: 'row',
     alignItems: 'center',
     gap: '4@ms',

@@ -10,16 +10,9 @@ export interface CommentsBottomSheetProps {
   /**
    * Review ID to fetch threads for
    */
-  reviewId: string | number;
+  reviewId: string;
   /**
    * Callback when a comment is pressed
    */
-  onCommentPress?: (threadId: string | number) => void;
-  /**
-   * Callback when "more comments" is pressed
-   */
-  onMoreCommentsPress?: (
-    threadId: string | number,
-    remainingCount: number,
-  ) => void;
+  onCommentPress?: (threadId: string) => void;
 }
