@@ -1,29 +1,35 @@
-import React, {useCallback, useRef} from 'react';
-import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
+import React, {useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ActivityIndicator, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {BottomSheet} from '@/components/BottomSheet';
+import {LeftArrowIcon} from '@/assets';
+import {useAppNavigation} from '@/hooks';
 import {useReactions} from '@/hooks/useReactions';
 import {useReactionsMock} from '@/hooks/useReactions.mock';
+import {RootStackScreenProps} from '@/navigation';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
-import {ReactionFilterTabs} from './ReactionFilterTabs';
-import {ReactionListItem} from './ReactionListItem';
-import {ReactionData, ReactionsBottomSheetProps} from './types';
+import {ReactionFilterTabs, ReactionListItem} from './components';
+import {ReactionData} from './types';
 
 const USE_MOCK_DATA = __DEV__;
 
-export const ReactionsBottomSheet: React.FC<ReactionsBottomSheetProps> = ({
-  visible,
-  onClose,
-  reviewId,
-}) => {
+type Props = RootStackScreenProps<'Reactions'>;
+
+export const ReactionsScreen: React.FC<Props> = ({route}) => {
+  const {reviewId} = route.params;
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
-  const listRef = useRef<React.ComponentRef<typeof BottomSheetFlatList>>(null);
+  const navigation = useAppNavigation();
 
   const useReactionsHook = USE_MOCK_DATA ? useReactionsMock : useReactions;
   const {
@@ -36,6 +42,10 @@ export const ReactionsBottomSheet: React.FC<ReactionsBottomSheetProps> = ({
     handleReactionFilter,
     loadMore,
   } = useReactionsHook(reviewId);
+
+  const handleBackPress = () => {
+    navigation.goBack();
+  };
 
   const renderReactionItem = useCallback(
     ({item}: {item: ReactionData}) => <ReactionListItem item={item} />,
@@ -63,9 +73,7 @@ export const ReactionsBottomSheet: React.FC<ReactionsBottomSheetProps> = ({
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>
-          {t('ReactionsBottomSheet.noReactionsYet')}
-        </Text>
+        <Text style={styles.emptyText}>{t('Reactions.noReactionsYet')}</Text>
       </View>
     );
   }, [isLoading, isFetching, t]);
@@ -80,56 +88,49 @@ export const ReactionsBottomSheet: React.FC<ReactionsBottomSheetProps> = ({
     [],
   );
 
-  const shouldShow = visible && !!reviewId;
-
   return (
-    <BottomSheet
-      visible={shouldShow}
-      onClose={onClose}
-      initialSnapPoint={60}
-      allowFullExpand
-      skipBottomSheetView
-      enableContentPanningGesture={false}
-      enableDynamicSizing={false}
-      enableOverDrag={false}
-      overDragResistanceFactor={0}
-      enableHandlePanningGesture>
-      <View style={styles.sheetContainer}>
-        <View style={styles.fixedHeader}>
-          <Text style={styles.title}>{t('ReactionsBottomSheet.title')}</Text>
-
-          <ReactionFilterTabs
-            summary={summary}
-            selectedReaction={selectedReaction}
-            totalCount={totalCount}
-            onFilterChange={handleReactionFilter}
-          />
+    <SafeAreaView
+      style={[
+        styles.sheetContainer,
+        {paddingTop: insets.top, paddingBottom: insets.bottom},
+      ]}>
+      <View style={styles.fixedHeader}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <LeftArrowIcon color={colors.black} />
+          </TouchableOpacity>
+          <Text style={styles.title}>{t('Reactions.title')}</Text>
         </View>
-
-        {reviewId && (
-          <BottomSheetFlatList
-            ref={listRef}
-            data={reactions}
-            keyExtractor={keyExtractor}
-            renderItem={renderReactionItem}
-            contentContainerStyle={[
-              styles.listContent,
-              reactions.length === 0 &&
-                !isLoading &&
-                !isFetching &&
-                styles.listContentEmpty,
-            ]}
-            style={styles.list}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.3}
-            removeClippedSubviews={false}
-            ListFooterComponent={renderFooter}
-            ListEmptyComponent={renderEmptyComponent}
-            showsVerticalScrollIndicator
-          />
-        )}
+        <ReactionFilterTabs
+          summary={summary}
+          selectedReaction={selectedReaction}
+          totalCount={totalCount}
+          onFilterChange={handleReactionFilter}
+        />
       </View>
-    </BottomSheet>
+
+      {reviewId && (
+        <FlatList
+          data={reactions}
+          keyExtractor={keyExtractor}
+          renderItem={renderReactionItem}
+          contentContainerStyle={[
+            styles.listContent,
+            reactions.length === 0 &&
+              !isLoading &&
+              !isFetching &&
+              styles.listContentEmpty,
+          ]}
+          style={styles.list}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          removeClippedSubviews={false}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmptyComponent}
+          showsVerticalScrollIndicator
+        />
+      )}
+    </SafeAreaView>
   );
 };
 
@@ -138,16 +139,23 @@ const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  backButton: {
+    marginRight: '16@ms',
+  },
   fixedHeader: {
     backgroundColor: colors.white,
     zIndex: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: '10@ms',
   },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.headline.small,
     fontWeight: fontWeights.medium,
     color: colors.ds.typography.highEmphasis,
-    textAlign: 'center',
   },
   list: {
     flex: 1,

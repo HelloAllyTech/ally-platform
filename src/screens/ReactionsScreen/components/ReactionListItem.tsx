@@ -5,7 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
-import {ReactionListItemProps} from './types';
+import {ReactionListItemProps} from '../types';
 
 export const ReactionListItem: React.FC<ReactionListItemProps> = memo(
   ({item}) => {

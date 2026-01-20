@@ -1,3 +1,5 @@
+import {useCallback, useRef} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -18,6 +20,7 @@ export const ReviewScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {showToast} = useToast();
+  const isFirstFocus = useRef(true);
 
   const {
     reviews,
@@ -30,6 +33,17 @@ export const ReviewScreen: React.FC = () => {
     refresh,
     setSelectedFilter,
   } = useReviews();
+
+  // Refresh reviews when screen comes into focus (skip initial mount)
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      refresh();
+    }, [refresh]),
+  );
 
   if (error) {
     showToast(t('Review.fetchError'), 'error');

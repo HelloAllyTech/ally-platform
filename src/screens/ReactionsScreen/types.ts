@@ -1,11 +1,5 @@
 import {ReactionSummary} from '@/hooks/useReactions';
 
-export interface ReactionsBottomSheetProps {
-  visible: boolean;
-  onClose: () => void;
-  reviewId: string | number | null;
-}
-
 export interface ReactionFilterTabsProps {
   summary: ReactionSummary[];
   selectedReaction: string | null;

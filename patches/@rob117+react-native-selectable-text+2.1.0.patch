@@ -1,0 +1,103 @@
+diff --git a/node_modules/@rob117/react-native-selectable-text/android/src/main/java/com/selectabletext/SelectableTextView.kt b/node_modules/@rob117/react-native-selectable-text/android/src/main/java/com/selectabletext/SelectableTextView.kt
+index d25fffa..a0f2fb1 100644
+--- a/node_modules/@rob117/react-native-selectable-text/android/src/main/java/com/selectabletext/SelectableTextView.kt
++++ b/node_modules/@rob117/react-native-selectable-text/android/src/main/java/com/selectabletext/SelectableTextView.kt
+@@ -62,8 +62,8 @@ class SelectableTextView : FrameLayout {
+         val selectedText = textView.text.toString().substring(selectionStart, selectionEnd)
+         val chosenOption = menuOptions[item?.itemId ?: 0]
+         
+-        // Send event to React Native
+-        onSelectionEvent(chosenOption, selectedText)
++        // Send event to React Native with indices
++        onSelectionEvent(chosenOption, selectedText, selectionStart, selectionEnd)
+         
+         mode?.finish()
+         return true
+@@ -75,12 +75,14 @@ class SelectableTextView : FrameLayout {
+     }
+   }
+   
+-  private fun onSelectionEvent(chosenOption: String, highlightedText: String) {
++  private fun onSelectionEvent(chosenOption: String, highlightedText: String, startIndex: Int, endIndex: Int) {
+     val reactContext = context as ReactContext
+     val params = Arguments.createMap().apply {
+       putInt("viewTag", id)
+       putString("chosenOption", chosenOption)
+       putString("highlightedText", highlightedText)
++      putInt("startIndex", startIndex)
++      putInt("endIndex", endIndex)
+     }
+     
+     reactContext
+diff --git a/node_modules/@rob117/react-native-selectable-text/ios/SelectableTextView.mm b/node_modules/@rob117/react-native-selectable-text/ios/SelectableTextView.mm
+index 6dcb0b3..3d3c894 100644
+--- a/node_modules/@rob117/react-native-selectable-text/ios/SelectableTextView.mm
++++ b/node_modules/@rob117/react-native-selectable-text/ios/SelectableTextView.mm
+@@ -542,6 +542,10 @@ - (void)handleMenuSelection:(NSString *)selectedOption
+     NSRange selectedRange = _textView.selectedRange;
+     NSString *selectedText = @"";
+     
++    // Calculate indices: use 0 if NSNotFound
++    NSInteger startIndex = (selectedRange.location != NSNotFound) ? selectedRange.location : 0;
++    NSInteger endIndex = (selectedRange.location != NSNotFound) ? (selectedRange.location + selectedRange.length) : 0;
++    
+     if (selectedRange.location != NSNotFound && selectedRange.length > 0) {
+         selectedText = [_textView.text substringWithRange:selectedRange];
+     }
+@@ -550,6 +554,7 @@ - (void)handleMenuSelection:(NSString *)selectedOption
+     NSLog(@"iOS SelectableText - Selected: '%@' with option: '%@'", selectedText, selectedOption);
+     NSLog(@"iOS SelectableText - Selected range: location=%lu, length=%lu", 
+           (unsigned long)selectedRange.location, (unsigned long)selectedRange.length);
++    NSLog(@"iOS SelectableText - Indices: startIndex=%ld, endIndex=%ld", (long)startIndex, (long)endIndex);
+     
+     // Clear selection
+     _textView.selectedRange = NSMakeRange(0, 0);
+@@ -562,7 +567,9 @@ - (void)handleMenuSelection:(NSString *)selectedOption
+         NSLog(@"iOS SelectableText - Emitting selection event via Fabric eventEmitter");
+         SelectableTextViewEventEmitter::OnSelection selectionEvent = {
+             .chosenOption = std::string([selectedOption UTF8String]),
+-            .highlightedText = std::string([selectedText UTF8String])
++            .highlightedText = std::string([selectedText UTF8String]),
++            .startIndex = static_cast<int>(startIndex),
++            .endIndex = static_cast<int>(endIndex)
+         };
+         eventEmitter->onSelection(selectionEvent);
+     } else {
+diff --git a/node_modules/@rob117/react-native-selectable-text/src/SelectableTextView.tsx b/node_modules/@rob117/react-native-selectable-text/src/SelectableTextView.tsx
+index a8d22f7..5685823 100644
+--- a/node_modules/@rob117/react-native-selectable-text/src/SelectableTextView.tsx
++++ b/node_modules/@rob117/react-native-selectable-text/src/SelectableTextView.tsx
+@@ -29,12 +29,16 @@ export const SelectableTextView: React.FC<SelectableTextViewProps> = ({
+           viewTag: number;
+           chosenOption: string;
+           highlightedText: string;
++          startIndex: number;
++          endIndex: number;
+         }) => {
+           const viewTag = findNodeHandle(viewRef.current);
+           if (viewTag === eventData.viewTag) {
+             onSelection({
+               chosenOption: eventData.chosenOption,
+               highlightedText: eventData.highlightedText,
++              startIndex: eventData.startIndex,
++              endIndex: eventData.endIndex,
+             });
+           }
+         }
+diff --git a/node_modules/@rob117/react-native-selectable-text/src/SelectableTextViewNativeComponent.ts b/node_modules/@rob117/react-native-selectable-text/src/SelectableTextViewNativeComponent.ts
+index a64470e..a08b959 100644
+--- a/node_modules/@rob117/react-native-selectable-text/src/SelectableTextViewNativeComponent.ts
++++ b/node_modules/@rob117/react-native-selectable-text/src/SelectableTextViewNativeComponent.ts
+@@ -1,9 +1,12 @@
+ import { codegenNativeComponent, type ViewProps } from 'react-native';
+ import type { DirectEventHandler } from 'react-native/Libraries/Types/CodegenTypesNamespace';
++import type { Int32 } from 'react-native/Libraries/Types/CodegenTypes';
+ 
+ export interface SelectionEvent {
+   chosenOption: string;
+   highlightedText: string;
++  startIndex: Int32;
++  endIndex: Int32;
+ }
+ 
+ interface NativeProps extends ViewProps {

@@ -150,6 +150,8 @@ export const API_ROUTES = {
   },
   REVIEWS: {
     REVIEWS: '/reviews',
+    CREATE_REVIEW: '/reviews',
+    UPDATE_REVIEW_STATUS: (reviewId: string) => `/reviews/${reviewId}`,
     ADD_REVIEW_COMMENT: (reviewId: string) => `/reviews/${reviewId}/comments`,
     GET_MESSAGES: (reviewId: string) => `/reviews/${reviewId}/messages`,
     REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
@@ -160,6 +162,9 @@ export const API_ROUTES = {
       `/reviews/threads/${threadId}/comments`,
     GET_COMMENT_REPLIES: (commentId: string) =>
       `/reviews/comments/${commentId}/replies`,
+  },
+  BADGES: {
+    AVAILABLE: '/badges/available',
   },
 } as const;
 

@@ -8,7 +8,7 @@ export interface AddReviewCommentRequest {
 }
 
 export interface AddReviewCommentResponse {
-  success: boolean;
+  commentId: string;
 }
 
 export interface MessageThreadComment {
@@ -134,4 +134,36 @@ export interface RepliesParams {
   commentId: string;
   offset?: number;
   limit?: number;
+}
+
+export type MessageList = Record<string, MessageData[]> | [];
+export interface TextSelection {
+  selectedText: string;
+  startIndex: number;
+  endIndex: number;
+}
+export interface CreateReviewRequest {
+  scenarioSessionId: string;
+}
+
+export interface CreateReviewResponse {
+  id: string;
+  scenarioSessionId: string;
+  status: ReviewStatus;
+  createdAt: string;
+}
+
+export enum ReviewStatus {
+  HIDDEN = 'HIDDEN',
+  IN_REVIEW = 'IN_REVIEW',
+}
+
+export interface UpdateReviewStatusRequest {
+  status: ReviewStatus;
+}
+
+export interface UpdateReviewStatusResponse {
+  id: string;
+  status: ReviewStatus;
+  updatedAt: string;
 }

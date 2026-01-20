@@ -15,7 +15,9 @@ export const SCREEN_NAMES = {
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',
   PROFILE_SETTINGS: 'ProfileSettings',
+  REVIEW_DETAILS: 'ReviewDetails',
 
+  REACTIONS: 'Reactions',
   // Tab Screens
   HOME_TAB: 'HomeTab',
   COMMUNITY: 'Community',
