@@ -95,10 +95,6 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.surface.background,
   },
   inputContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: 'transparent',
     paddingHorizontal: '24@ms',
     borderWidth: 0.5,
