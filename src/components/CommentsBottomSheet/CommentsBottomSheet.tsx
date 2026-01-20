@@ -6,16 +6,13 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
 import {ChevronRight} from '@/assets/icons';
-import {BottomSheet} from '@/components/BottomSheet';
-import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
-import {ReviewComment} from '@/components/ReviewComment';
+import {BottomSheet, ReviewComment} from '@/components';
 import {useTranslate} from '@/hooks';
-import {
-  useLazyGetThreadsQuery,
-  type ThreadsResponse,
-} from '@/services/reviewThreadsApi';
+import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
+import {ThreadsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
+import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {CommentsBottomSheetProps} from './types';
@@ -27,21 +24,21 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
   onClose,
   reviewId,
   onCommentPress,
-  onMoreCommentsPress,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const [getThreads, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreadsQuery();
+
   const [offset, setOffset] = React.useState(0);
-  const [accumulatedData, setAccumulatedData] =
+  const [commentsData, setCommentsData] =
     React.useState<ThreadsResponse | null>(null);
 
   // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
     if (visible && reviewId) {
       setOffset(0);
-      setAccumulatedData(null);
+      setCommentsData(null);
       getThreads({
         reviewId,
         offset: 0,
@@ -55,10 +52,10 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
     if (apiData) {
       if (offset === 0) {
         // First page - replace data
-        setAccumulatedData({data: apiData.data, count: apiData.count});
+        setCommentsData({data: apiData.data, count: apiData.count});
       } else {
         // Subsequent pages - append data
-        setAccumulatedData(prev => {
+        setCommentsData(prev => {
           if (!prev) return apiData;
           return {
             data: [...prev.data, ...apiData.data],
@@ -69,26 +66,8 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
     }
   }, [apiData, offset]);
 
-  const data = accumulatedData;
-
-  const getReactionsArray = useCallback(
-    (reactions: Record<string, number>): string[] => {
-      return Object.keys(reactions)
-        .filter(key => reactions[key] > 0)
-        .map(key => EMOJI_UNICODE_MAP[key] || key);
-    },
-    [],
-  );
-
-  const getTotalReactionCount = useCallback(
-    (reactions: Record<string, number>): number => {
-      return Object.values(reactions).reduce((sum, count) => sum + count, 0);
-    },
-    [],
-  );
-
   const renderThreadItem = useCallback(
-    ({item: thread}: {item: NonNullable<typeof data>['data'][0]}) => {
+    ({item: thread}: {item: NonNullable<typeof commentsData>['data'][0]}) => {
       if (!thread.comments || thread.comments.length === 0) {
         return null;
       }
@@ -99,7 +78,10 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
       const reactionCount = getTotalReactionCount(firstComment.reactions);
 
       return (
-        <View style={styles.threadContainer}>
+        <TouchableOpacity
+          style={styles.threadContainer}
+          onPress={() => onCommentPress?.(thread.id)}
+          activeOpacity={0.7}>
           {/* Selected Text Section - if available */}
           {thread.selectedText && (
             <View style={styles.selectedTextContainer}>
@@ -107,7 +89,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
                 style={styles.selectedText}
                 numberOfLines={1}
                 ellipsizeMode="tail">
-                Selected text: "{thread.selectedText}"
+                {t('CommentsBottomSheet.selectedText')} "{thread.selectedText}"
               </Text>
             </View>
           )}
@@ -128,9 +110,9 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
             {remainingCount > 0 && (
               <LinearGradient
                 colors={[
-                  'rgba(255, 255, 255, 0)',
-                  'rgba(255, 255, 255, 0.4)',
-                  'rgba(255, 255, 255, 0.6)',
+                  colors.whiteTransparent0,
+                  colors.whiteTransparent40,
+                  colors.whiteTransparent60,
                 ]}
                 start={{x: 0, y: 0}}
                 end={{x: 0, y: 1}}
@@ -145,10 +127,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
           {remainingCount > 0 && (
             <>
               <View style={styles.separatorLine} />
-              <TouchableOpacity
-                style={styles.moreCommentsContainer}
-                onPress={() => onMoreCommentsPress?.(thread.id, remainingCount)}
-                activeOpacity={0.7}>
+              <View style={styles.moreCommentsContainer}>
                 <Text style={styles.moreCommentsText}>
                   {remainingCount === 1
                     ? t('CommentsBottomSheet.moreCommentsOne')
@@ -161,19 +140,13 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
                   height={ms(20)}
                   color={colors.ds.typography.mediumEmphasis}
                 />
-              </TouchableOpacity>
+              </View>
             </>
           )}
-        </View>
+        </TouchableOpacity>
       );
     },
-    [
-      getReactionsArray,
-      getTotalReactionCount,
-      onCommentPress,
-      onMoreCommentsPress,
-      t,
-    ],
+    [onCommentPress, t],
   );
 
   const renderHeader = useCallback(() => {
@@ -186,17 +159,22 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
-    const hasMore = data && offset + LIMIT < data.count;
+    const hasMore = commentsData && offset + LIMIT < commentsData.count;
     if (!hasMore) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, data, offset]);
+  }, [isFetching, insets.bottom, commentsData, offset]);
 
   const loadMore = useCallback(() => {
-    if (!isFetching && data && offset + LIMIT < data.count && reviewId) {
+    if (
+      !isFetching &&
+      commentsData &&
+      offset + LIMIT < commentsData.count &&
+      reviewId
+    ) {
       const newOffset = offset + LIMIT;
       setOffset(newOffset);
       getThreads({
@@ -205,7 +183,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
         limit: LIMIT,
       });
     }
-  }, [offset, isFetching, data, reviewId, getThreads]);
+  }, [offset, isFetching, commentsData, reviewId, getThreads]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
@@ -236,14 +214,14 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
       enableOverDrag
       enableHandlePanningGesture>
       <View style={styles.container}>
-        {isLoading && !data ? (
+        {isLoading && !commentsData ? (
           <>
             {renderHeader()}
             {renderEmpty()}
           </>
         ) : (
           <BottomSheetFlatList
-            data={data?.data || []}
+            data={commentsData?.data || []}
             renderItem={renderThreadItem}
             keyExtractor={item => item.id.toString()}
             ListHeaderComponent={renderHeader}
