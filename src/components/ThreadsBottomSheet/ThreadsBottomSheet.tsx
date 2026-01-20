@@ -98,7 +98,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
           <View style={styles.commentWrapper}>
             <ReviewComment
               name={firstComment.createdBy.name}
-              time={formatRelativeTime(firstComment.createdAt)}
+              time={
+                firstComment.createdAt
+                  ? formatRelativeTime(firstComment.createdAt)
+                  : ''
+              }
               comment={firstComment.content}
               profileImageUrl={firstComment.createdBy.profileImage}
               reactions={reactionsArray}

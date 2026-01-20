@@ -7,7 +7,7 @@ import {ms} from 'react-native-size-matters';
 import {LeftArrow, LeftArrowIcon} from '@/assets/icons';
 import {BottomSheet, ReviewComment} from '@/components';
 import {useTranslate} from '@/hooks';
-import {useLazyGetThreadCommentsQuery} from '@/services/reviewThreadsApi';
+import {useLazyGetThreadComments1Query} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
@@ -31,7 +31,7 @@ export const CommentThreadBottomSheet: React.FC<
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const [getThreadComments, {data: apiData, isLoading, isFetching}] =
-    useLazyGetThreadCommentsQuery();
+    useLazyGetThreadComments1Query();
   const [offset, setOffset] = React.useState(0);
   const [comments, setComments] = React.useState<{
     data: MessageThreadComment[];
@@ -91,7 +91,9 @@ export const CommentThreadBottomSheet: React.FC<
         <View style={styles.commentItemContainer}>
           <ReviewComment
             name={comment.createdBy.name}
-            time={formatRelativeTime(comment.createdAt)}
+            time={
+              comment.createdAt ? formatRelativeTime(comment.createdAt) : ''
+            }
             comment={comment.content}
             profileImageUrl={comment.createdBy.profileImage}
             reactions={reactionsArray}

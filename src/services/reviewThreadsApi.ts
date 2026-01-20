@@ -11,7 +11,6 @@ import {api} from './api';
 import {
   generateMockCommentReplies,
   generateMockThreadComments,
-  generateMockThreadsData,
 } from './reviewThreadsApi.mock';
 
 export const reviewThreadsApi = api.injectEndpoints({
@@ -23,24 +22,12 @@ export const reviewThreadsApi = api.injectEndpoints({
         _extraOptions,
         baseQuery,
       ) => {
-        // Return mock data in development mode
-        if (__DEV__) {
-          // Simulate network delay
-          await new Promise(resolve => setTimeout(resolve, 300));
-          const allData = generateMockThreadsData();
-          const paginatedData = allData.data.slice(
-            offset,
-            (offset ?? 0) + (limit ?? 0),
-          );
-          return {data: {data: paginatedData, count: allData.count}};
-        }
-
-        // In production, make actual API call using baseQuery
+        console.log('reviewId', reviewId);
         const result = await baseQuery({
           url: API_ROUTES.REVIEWS.THREADS(reviewId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {body: {offset, limit}}
+            ? {params: {offset, limit}}
             : {}),
         });
 
@@ -51,7 +38,7 @@ export const reviewThreadsApi = api.injectEndpoints({
         return {data: result.data as ThreadsResponse};
       },
     }),
-    getThreadComments: builder.query<
+    getThreadComments1: builder.query<
       GetThreadCommentsResponse,
       GetThreadCommentsRequest
     >({
@@ -140,6 +127,6 @@ export const reviewThreadsApi = api.injectEndpoints({
 
 export const {
   useLazyGetThreadsQuery,
-  useLazyGetThreadCommentsQuery,
+  useLazyGetThreadComments1Query,
   useLazyGetCommentRepliesQuery,
 } = reviewThreadsApi;
