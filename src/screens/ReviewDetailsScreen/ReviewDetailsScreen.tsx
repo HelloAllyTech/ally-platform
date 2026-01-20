@@ -2,18 +2,26 @@ import {useEffect, useMemo, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
 import {ActivityIndicator, StyleSheet, View} from 'react-native';
 
-import {CommentInput, Conversation} from '@/components';
+import {
+  CommentInput,
+  CommentThreadBottomSheet,
+  Conversation,
+  ReplyBottomSheet,
+  ThreadsBottomSheet,
+} from '@/components';
+import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAddReviewCommentMutation} from '@/services/reviewsApi';
 import {Message, MessageData, TextSelection} from '@/types/reviews';
 import {splitByCommentRanges} from '@/utils/reviews';
 
 import {dummyConversationMessages} from './dummyConversation';
+import {useReviewComments} from './hooks/useReviewComments';
 
 export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
   // Assume the route params contain reviewId
   const route = useRoute<any>();
-  const {reviewId: _reviewId} = route.params as {reviewId: string};
+  const {reviewId: _reviewId} = route.params;
 
   // TODO_M: uncomment GET MESSAGE once the API is implemented
   // const {data, isLoading, isError} = useGetMessagesQuery({reviewId});
@@ -24,6 +32,20 @@ export const ReviewDetailsScreen: React.FC = () => {
   // ADD REVIEW COMMENT API
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
+
+  const {
+    isCommentsBottomSheetVisible,
+    closeCommentsBottomSheet,
+    onThreadPress,
+    isCommentThreadBottomSheetVisible,
+    closeCommentThreadBottomSheet,
+    selectedThreadId,
+    isReplyBottomSheetVisible,
+    closeReplyBottomSheet,
+    selectedComment,
+    onReplyPress,
+    showCommentsBottomSheet,
+  } = useReviewComments();
 
   const [comment, setComment] = useState('');
   const [showCommentInput, setShowCommentInput] = useState(false);
@@ -189,6 +211,45 @@ export const ReviewDetailsScreen: React.FC = () => {
           isLoading={isAddingComment}
         />
       )}
+      <InteractionsBar
+        reviewId={_reviewId}
+        reactions={{}}
+        commentsCount={0}
+        onCommentPress={showCommentsBottomSheet}
+      />
+      <ThreadsBottomSheet
+        visible={isCommentsBottomSheetVisible}
+        onClose={closeCommentsBottomSheet}
+        reviewId={_reviewId}
+        onThreadPress={onThreadPress}
+      />
+      <CommentThreadBottomSheet
+        visible={isCommentThreadBottomSheetVisible}
+        onClose={closeCommentThreadBottomSheet}
+        threadId={selectedThreadId || ''}
+        onAddReactionPress={_commentId => {
+          // Handle add reaction press
+        }}
+        onReplyPress={onReplyPress}
+        onSubmitComment={_commentText => {
+          // Handle add comment press
+        }}
+      />
+      <ReplyBottomSheet
+        visible={isReplyBottomSheetVisible}
+        onClose={closeReplyBottomSheet}
+        commentId={selectedComment?.id || ''}
+        originalComment={selectedComment || null}
+        onAddReactionPress={_commentId => {
+          // Handle add reaction press
+        }}
+        onReplyPress={_commentId => {
+          // Handle reply press
+        }}
+        onSubmitReplyPress={_commentText => {
+          // Handle add comment press
+        }}
+      />
     </>
   );
 };

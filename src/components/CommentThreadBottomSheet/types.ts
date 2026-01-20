@@ -6,5 +6,5 @@ export interface CommentThreadBottomSheetProps {
   threadId: string;
   onAddReactionPress?: (commentId: string) => void;
   onReplyPress?: (comment: MessageThreadComment) => void;
-  onAddCommentPress?: (commentText: string) => void;
+  onSubmitComment?: (commentText: string) => void;
 }

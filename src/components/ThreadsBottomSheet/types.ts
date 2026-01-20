@@ -1,4 +1,4 @@
-export interface CommentsBottomSheetProps {
+export interface ThreadsBottomSheetProps {
   /**
    * Whether the bottom sheet is visible
    */
@@ -14,5 +14,5 @@ export interface CommentsBottomSheetProps {
   /**
    * Callback when a comment is pressed
    */
-  onCommentPress?: (threadId: string) => void;
+  onThreadPress?: (threadId: string) => void;
 }

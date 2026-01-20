@@ -26,7 +26,7 @@ export const CommentThreadBottomSheet: React.FC<
   threadId,
   onAddReactionPress,
   onReplyPress,
-  onAddCommentPress,
+  onSubmitComment,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -230,7 +230,7 @@ export const CommentThreadBottomSheet: React.FC<
                     ]}
                     onPress={() => {
                       if (commentText.trim()) {
-                        onAddCommentPress?.(commentText);
+                        onSubmitComment?.(commentText);
                         setCommentText('');
                       }
                     }}

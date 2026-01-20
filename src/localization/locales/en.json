@@ -533,11 +533,11 @@
     "replies": "{{count}} replies",
     "repliesOne": "1 reply"
   },
-  "CommentsBottomSheet": {
+  "ThreadsBottomSheet": {
     "title": "Comments",
-    "moreComments": "{{count}} more comments",
-    "moreCommentsOne": "1 more comment",
-    "noComments": "No comments yet",
+    "moreThreads": "{{count}} more threads",
+    "moreThreadsOne": "1 more thread",
+    "noThreads": "No threads yet",
     "selectedText": "Selected text:"
   },
   "CommentThreadBottomSheet": {

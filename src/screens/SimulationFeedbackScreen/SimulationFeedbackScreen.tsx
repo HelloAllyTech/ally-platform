@@ -251,8 +251,9 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const handleViewReview = () => {
-    // TODO: Navigate to review screen when implemented
-    // navigation.navigate('ReviewScreen', { reviewId });
+    navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {
+      reviewId: reviewId || '',
+    });
   };
 
   const handlePrivacyToggle = async (isPrivateValue: boolean) => {

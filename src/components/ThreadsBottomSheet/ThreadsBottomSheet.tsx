@@ -15,15 +15,15 @@ import {formatRelativeTime} from '@/utils/date';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
-import {CommentsBottomSheetProps} from './types';
+import {ThreadsBottomSheetProps} from './types';
 
 const LIMIT = 3;
 
-export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
+export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
   onClose,
   reviewId,
-  onCommentPress,
+  onThreadPress,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -80,7 +80,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
       return (
         <TouchableOpacity
           style={styles.threadContainer}
-          onPress={() => onCommentPress?.(thread.id)}
+          onPress={() => onThreadPress?.(thread.id)}
           activeOpacity={0.7}>
           {/* Selected Text Section - if available */}
           {thread.selectedText && (
@@ -89,7 +89,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
                 style={styles.selectedText}
                 numberOfLines={1}
                 ellipsizeMode="tail">
-                {t('CommentsBottomSheet.selectedText')} "{thread.selectedText}"
+                {t('ThreadsBottomSheet.selectedText')} "{thread.selectedText}"
               </Text>
             </View>
           )}
@@ -105,7 +105,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
               reactionCount={reactionCount}
               replyCount={firstComment.replyCount}
               showReplyButton={false}
-              onCommentPress={() => onCommentPress?.(thread.id)}
+              onCommentPress={() => onThreadPress?.(thread.id)}
             />
             {remainingCount > 0 && (
               <LinearGradient
@@ -130,8 +130,8 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
               <View style={styles.moreCommentsContainer}>
                 <Text style={styles.moreCommentsText}>
                   {remainingCount === 1
-                    ? t('CommentsBottomSheet.moreCommentsOne')
-                    : t('CommentsBottomSheet.moreComments', {
+                    ? t('ThreadsBottomSheet.moreThreadsOne')
+                    : t('ThreadsBottomSheet.moreThreads', {
                         count: remainingCount,
                       })}
                 </Text>
@@ -146,13 +146,13 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
         </TouchableOpacity>
       );
     },
-    [onCommentPress, t],
+    [onThreadPress, t],
   );
 
   const renderHeader = useCallback(() => {
     return (
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('CommentsBottomSheet.title')}</Text>
+        <Text style={styles.headerTitle}>{t('ThreadsBottomSheet.title')}</Text>
       </View>
     );
   }, [t]);
@@ -196,7 +196,7 @@ export const CommentsBottomSheet: React.FC<CommentsBottomSheetProps> = ({
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {t('CommentsBottomSheet.noComments')}
+          {t('ThreadsBottomSheet.noThreads')}
         </Text>
       </View>
     );
