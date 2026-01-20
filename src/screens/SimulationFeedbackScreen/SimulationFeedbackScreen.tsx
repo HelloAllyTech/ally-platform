@@ -11,7 +11,7 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {ArrowDown, ChevronDown, LeftArrowIcon} from '@/assets';
+import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
 import {
   SCREEN_NAMES,
@@ -231,12 +231,28 @@ export const SimulationFeedbackScreen: React.FC<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenarioSessionId]);
 
+  useEffect(() => {
+    if (simulationDetails?.reviewId) {
+      setReviewId(simulationDetails.reviewId);
+      if (simulationDetails.reviewStatus === ReviewStatus.IN_REVIEW) {
+        setIsPrivate(false);
+      } else if (simulationDetails.reviewStatus === ReviewStatus.HIDDEN) {
+        setIsPrivate(true);
+      }
+    }
+  }, [simulationDetails?.reviewId, simulationDetails?.reviewStatus]);
+
   const hideFeedbackPopup = () => {
     setIsFeedbackPopupVisible(false);
   };
 
   const handleSubmit = () => {
     setIsFeedbackPopupVisible(true);
+  };
+
+  const handleViewReview = () => {
+    // TODO: Navigate to review screen when implemented
+    // navigation.navigate('ReviewScreen', { reviewId });
   };
 
   const handlePrivacyToggle = async (isPrivateValue: boolean) => {
@@ -441,6 +457,14 @@ export const SimulationFeedbackScreen: React.FC<
               </Text>
             )}
           </View>
+          {!!reviewId && (
+            <TouchableOpacity
+              onPress={handleViewReview}
+              style={styles.reviewIconButton}
+              activeOpacity={0.7}>
+              <CommentIcon width={20} height={20} color={colors.black} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       {showSummary && (
