@@ -22,3 +22,19 @@ export interface BadgeCategoryGroup {
 }
 
 export type BadgesResponse = BadgeCategoryGroup[];
+
+export interface UserBadge {
+  id: string;
+  badgeId: string;
+  userId: number;
+  viewedStatus: ViewedStatus;
+  createdAt: string;
+  code: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+}
+
+export interface GetBadgesResponse {
+  data: UserBadge[];
+}
