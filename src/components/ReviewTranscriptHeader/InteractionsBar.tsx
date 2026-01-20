@@ -19,11 +19,13 @@ interface InteractionsBarProps {
   reviewId: string;
   reactions: Record<string, number>;
   commentsCount: number;
+  onCommentPress?: () => void;
 }
 export const InteractionsBar = ({
   reviewId,
   reactions,
   commentsCount,
+  onCommentPress,
 }: InteractionsBarProps) => {
   const totalReactions = reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
@@ -31,7 +33,7 @@ export const InteractionsBar = ({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.iconContainer}>
+      <TouchableOpacity style={styles.iconContainer} onPress={onCommentPress}>
         <CommentIcon width={20} height={20} />
         {commentsCount > 0 && (
           <View style={styles.badge}>

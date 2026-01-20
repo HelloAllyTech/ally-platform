@@ -25,7 +25,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   originalComment,
   onAddReactionPress,
   onReplyPress,
-  onAddReplyPress,
+  onSubmitReplyPress,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -233,7 +233,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
                   ]}
                   onPress={() => {
                     if (replyText.trim()) {
-                      onAddReplyPress?.(replyText);
+                      onSubmitReplyPress?.(replyText);
                       setReplyText('');
                     }
                   }}
