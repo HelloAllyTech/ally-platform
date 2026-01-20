@@ -72,11 +72,6 @@ export const SimulationFeedbackScreen: React.FC<
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const [isPrivate, setIsPrivate] = useState(true);
   const [reviewId, setReviewId] = useState<string | null>(null);
-  console.log('🚀 ~ SimulationFeedbackScreen ~ reviewId:', {
-    reviewId,
-    isPrivate,
-    scenarioSessionId,
-  });
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
