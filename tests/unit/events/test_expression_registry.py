@@ -65,9 +65,9 @@ class TestEventOrchestrator:
         assert len(orchestrator.event_registry) == 3
         # All events start as False in setup_initial_state()
         # TIME and SCORE events are only evaluated in async initialize()
-        assert orchestrator.event_registry["event-1"]["happened"] is False
-        assert orchestrator.event_registry["event-2"]["happened"] is False
-        assert orchestrator.event_registry["event-3"]["happened"] is False
+        assert orchestrator.event_registry["event-1"].happened is False
+        assert orchestrator.event_registry["event-2"].happened is False
+        assert orchestrator.event_registry["event-3"].happened is False
         assert len(orchestrator.expression_list) == 0  # No combination events
 
     def test_initialize_adds_combination_events_to_expression_list(
@@ -106,16 +106,16 @@ class TestEventOrchestrator:
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
         # Initially all False
-        assert orchestrator.event_registry["event-1"]["happened"] is False
-        assert orchestrator.event_registry["event-2"]["happened"] is False
+        assert orchestrator.event_registry["event-1"].happened is False
+        assert orchestrator.event_registry["event-2"].happened is False
 
         # Update with detected events
         result = orchestrator.update(detected_event_ids={"event-1"})
 
-        assert orchestrator.event_registry["event-1"]["happened"] is True
-        assert orchestrator.event_registry["event-2"]["happened"] is False
-        assert result["event-1"]["happened"] is True
-        assert result["event-2"]["happened"] is False
+        assert orchestrator.event_registry["event-1"].happened is True
+        assert orchestrator.event_registry["event-2"].happened is False
+        assert result["event-1"].happened is True
+        assert result["event-2"].happened is False
 
     def test_evaluate_expression_identifier_returns_event_state(
         self, mock_room, thread_id
@@ -338,10 +338,10 @@ class TestEventOrchestrator:
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
         orchestrator.set_event_state("event-1", True)
-        assert orchestrator.event_registry["event-1"]["happened"] is True
+        assert orchestrator.event_registry["event-1"].happened is True
 
         orchestrator.set_event_state("event-1", False)
-        assert orchestrator.event_registry["event-1"]["happened"] is False
+        assert orchestrator.event_registry["event-1"].happened is False
 
     def test_evaluate_expression_invalid_identifier_returns_false(
         self, mock_room, thread_id
@@ -421,13 +421,13 @@ class TestEventOrchestrator:
 
         # SENTENCE_SIMILARITY, HELPER_INTERRUPTED, and HELPER_PARAPHRASED
         # should have trigger_multiple=True
-        assert orchestrator.event_registry["similarity-1"]["trigger_multiple"] is True
-        assert orchestrator.event_registry["interruption-1"]["trigger_multiple"] is True
-        assert orchestrator.event_registry["paraphrased-1"]["trigger_multiple"] is True
+        assert orchestrator.event_registry["similarity-1"].trigger_multiple is True
+        assert orchestrator.event_registry["interruption-1"].trigger_multiple is True
+        assert orchestrator.event_registry["paraphrased-1"].trigger_multiple is True
         # TIME, SCORE, COMBINATION should have trigger_multiple=False
-        assert orchestrator.event_registry["time-1"]["trigger_multiple"] is False
-        assert orchestrator.event_registry["score-1"]["trigger_multiple"] is False
-        assert orchestrator.event_registry["combo-1"]["trigger_multiple"] is False
+        assert orchestrator.event_registry["time-1"].trigger_multiple is False
+        assert orchestrator.event_registry["score-1"].trigger_multiple is False
+        assert orchestrator.event_registry["combo-1"].trigger_multiple is False
 
     def test_trigger_events_filtering(self, mock_room, thread_id):
         """Test that trigger_events list filters which events are sent."""

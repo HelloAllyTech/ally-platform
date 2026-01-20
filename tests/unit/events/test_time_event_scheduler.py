@@ -158,7 +158,10 @@ class TestTimeEventSchedulerStartSchedulers:
         # Should be scheduled for revoke
         assert "test_lt" in scheduler._time_tasks
         # Should be set to True immediately
-        assert mock_event_registry.get("test_lt", {}).get("happened") is True
+        assert (
+            mock_event_registry.get("test_lt") is not None
+            and mock_event_registry["test_lt"].happened is True
+        )
 
     @pytest.mark.asyncio
     async def test_start_with_lt_condition_not_eligible(
@@ -218,8 +221,8 @@ class TestTimeEventSchedulerTriggerCoroutine:
                 room=mock_room,
             )
 
-        assert mock_event_registry["test_trigger"]["happened"] is True
-        assert mock_event_registry["test_trigger"]["occurrence_count"] == 1
+        assert mock_event_registry["test_trigger"].happened is True
+        assert mock_event_registry["test_trigger"].occurrence_count == 1
 
     @pytest.mark.asyncio
     async def test_trigger_does_nothing_if_not_eligible(
@@ -290,10 +293,12 @@ class TestTimeEventSchedulerRevokeCoroutine:
         self, scheduler, mock_event_registry, mock_event_notifier, mock_room
     ):
         """Test that revoke coroutine sets happened to False."""
-        mock_event_registry["test_revoke"] = {
-            "happened": True,
-            "trigger_multiple": False,
-        }
+        from app.core.events.schemas import EventRegistryEntry
+
+        mock_event_registry["test_revoke"] = EventRegistryEntry(
+            happened=True,
+            trigger_multiple=False,
+        )
 
         await scheduler._time_revoke_coroutine(
             event_id="test_revoke",
@@ -303,7 +308,7 @@ class TestTimeEventSchedulerRevokeCoroutine:
             room=mock_room,
         )
 
-        assert mock_event_registry["test_revoke"]["happened"] is False
+        assert mock_event_registry["test_revoke"].happened is False
 
 
 class TestTimeEventSchedulerCancelEvent:
@@ -368,6 +373,9 @@ class TestTimeEventSchedulerEdgeCases:
             await asyncio.sleep(0.2)
 
             # Eligible one happened
-            assert mock_event_registry.get("gt_eligible", {}).get("happened") is True
+            assert (
+                mock_event_registry.get("gt_eligible") is not None
+                and mock_event_registry["gt_eligible"].happened is True
+            )
             # Ineligible one did NOT happen
             assert "gt_ineligible" not in mock_event_registry

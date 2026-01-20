@@ -50,20 +50,19 @@ class TimeEventScheduler:
         Start asyncio timers for all TIME-based events.
 
         Behavior:
-            - LT / LTE:
-                  Immediately sets the event's "happened" to True, notifies UI/Core,
-                  and schedules a revoke after `seconds` (sets happened=False).
+            - LT / LTE: Immediately sets the event's happened attribute to True,
+              notifies UI/Core, and schedules a revoke after `seconds`
+              (sets happened=False).
 
-            - GT / GTE / EQ / unknown:
-                  Schedules a trigger after `seconds`, which sets the event's "happened"
-                  to True and notifies UI/Core when the timer completes.
+            - GT / GTE / EQ / unknown: Schedules a trigger after `seconds`,
+              which sets the event's happened attribute to True and notifies
+              UI/Core when the timer completes.
 
         Args:
             events:
                 List of all events (will filter for TIME events).
             event_registry:
-                Dictionary mapping event_id to event state (with 'happened'
-                and 'trigger_multiple' keys).
+                Dictionary mapping event_id to EventRegistryEntry objects.
             event_notifier:
                 Callback to notify about event changes:
                 (detected_event_ids: set, room: rtc.Room, current_score: int)
@@ -130,9 +129,9 @@ class TimeEventScheduler:
                     logger.warning("Unknown condition for event %s: %r", event_id, cond)
                     cond_enum = None
 
-                reg_entry = event_registry.get(event_id, {})
-                last_occurred = reg_entry.get("occurred_at")
-                occ_count = reg_entry.get("occurrence_count", 0)
+                reg_entry = event_registry.get(event_id)
+                last_occurred = reg_entry.occurred_at if reg_entry else None
+                occ_count = reg_entry.occurrence_count if reg_entry else 0
 
                 # ---- LT / LTE ----
                 if cond_enum in (ConditionOperator.LT, ConditionOperator.LTE):
@@ -171,18 +170,16 @@ class TimeEventScheduler:
 
                     # State becomes True immediately - update dict directly
                     if event_id in event_registry:
-                        event_registry[event_id]["happened"] = True
-                        event_registry[event_id]["occurred_at"] = now_utc
-                        event_registry[event_id]["occurrence_count"] = (
-                            event_registry[event_id].get("occurrence_count", 0) + 1
-                        )
+                        event_registry[event_id].happened = True
+                        event_registry[event_id].occurred_at = now_utc
+                        event_registry[event_id].occurrence_count += 1
                     else:
-                        event_registry[event_id] = {
-                            "happened": True,
-                            "trigger_multiple": False,
-                            "occurred_at": now_utc,
-                            "occurrence_count": 1,
-                        }
+                        event_registry[event_id] = EventRegistryEntry(
+                            happened=True,
+                            trigger_multiple=False,
+                            occurred_at=now_utc,
+                            occurrence_count=1,
+                        )
 
                     # Notify and capture branching instructions and additional score
                     try:
@@ -282,9 +279,9 @@ class TimeEventScheduler:
             current_score = get_live_score()
 
             # 2. Get Registry Data
-            reg_entry = event_registry.get(event_id, {})
-            last_occurred = reg_entry.get("occurred_at")
-            occ_count = reg_entry.get("occurrence_count", 0)
+            reg_entry = event_registry.get(event_id)
+            last_occurred = reg_entry.occurred_at if reg_entry else None
+            occ_count = reg_entry.occurrence_count if reg_entry else 0
 
             # 3. CHECK ELIGIBILITY
             if not is_event_eligible(
@@ -305,18 +302,16 @@ class TimeEventScheduler:
             # 4. Update Registry
             now_utc = datetime.now(timezone.utc)
             if event_id in event_registry:
-                event_registry[event_id]["happened"] = True
-                event_registry[event_id]["occurred_at"] = now_utc
-                event_registry[event_id]["occurrence_count"] = (
-                    event_registry[event_id].get("occurrence_count", 0) + 1
-                )
+                event_registry[event_id].happened = True
+                event_registry[event_id].occurred_at = now_utc
+                event_registry[event_id].occurrence_count += 1
             else:
-                event_registry[event_id] = {
-                    "happened": True,
-                    "trigger_multiple": False,
-                    "occurred_at": now_utc,
-                    "occurrence_count": 1,
-                }
+                event_registry[event_id] = EventRegistryEntry(
+                    happened=True,
+                    trigger_multiple=False,
+                    occurred_at=now_utc,
+                    occurrence_count=1,
+                )
 
             try:
                 (
@@ -366,7 +361,7 @@ class TimeEventScheduler:
 
         Behavior:
             After sleeping:
-                - Sets the event's "happened" to False.
+                - Sets the event's happened attribute to False.
                 - Calls event_notifier so UI/Core receive the change.
 
         Used only for LT / LTE semantics.
@@ -396,12 +391,12 @@ class TimeEventScheduler:
             logger.info("Time revoke fired: %s (after %s seconds)", event_id, seconds)
             # Update dict directly
             if event_id in event_registry:
-                event_registry[event_id]["happened"] = False
+                event_registry[event_id].happened = False
             else:
-                event_registry[event_id] = {
-                    "happened": False,
-                    "trigger_multiple": False,
-                }
+                event_registry[event_id] = EventRegistryEntry(
+                    happened=False,
+                    trigger_multiple=False,
+                )
 
             try:
                 # Get current score from graph state for revoke (for future use)

@@ -565,7 +565,5 @@ class TestSemanticSimilarityEventIntegration:
 
         # Verify the event is in the orchestrator with trigger_multiple=True
         assert "semantic_reg_test" in orchestrator.event_registry
-        assert (
-            orchestrator.event_registry["semantic_reg_test"]["trigger_multiple"] is True
-        )
-        assert orchestrator.event_registry["semantic_reg_test"]["happened"] is False
+        assert orchestrator.event_registry["semantic_reg_test"].trigger_multiple is True
+        assert orchestrator.event_registry["semantic_reg_test"].happened is False

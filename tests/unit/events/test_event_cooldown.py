@@ -68,8 +68,8 @@ def test_orchestrator_updates_timestamp_on_first_occurrence(orchestrator):
 
     entry = orchestrator.event_registry[event_id]
 
-    assert entry["happened"] is True
-    assert isinstance(entry["occurred_at"], datetime)
+    assert entry.happened is True
+    assert isinstance(entry.occurred_at, datetime)
 
 
 def test_orchestrator_updates_timestamp_on_subsequent_occurrence(orchestrator):
@@ -85,7 +85,7 @@ def test_orchestrator_updates_timestamp_on_subsequent_occurrence(orchestrator):
         mock_dt.timezone = timezone
         orchestrator.set_event_state(event_id, True, DetectionType.SENTENCE_SIMILARITY)
 
-        entry_t0 = orchestrator.event_registry[event_id]["occurred_at"]
+        entry_t0 = orchestrator.event_registry[event_id].occurred_at
         assert entry_t0 == t0
 
     # 2. Trigger Second Time
@@ -95,7 +95,7 @@ def test_orchestrator_updates_timestamp_on_subsequent_occurrence(orchestrator):
         mock_dt.timezone = timezone
         orchestrator.set_event_state(event_id, True, DetectionType.SENTENCE_SIMILARITY)
 
-        entry_t1 = orchestrator.event_registry[event_id]["occurred_at"]
+        entry_t1 = orchestrator.event_registry[event_id].occurred_at
 
         assert entry_t1 == t1
         assert entry_t1 > entry_t0

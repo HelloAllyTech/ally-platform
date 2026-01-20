@@ -65,12 +65,14 @@ def test_orchestrator_initializes_count_to_zero(orchestrator):
     event_id = "new_event"
 
     # Manually adding to registry to simulate initialization
-    orchestrator.event_registry[event_id] = {
-        "happened": False,
-        "trigger_multiple": True,
-        "occurred_at": None,
-        "occurrence_count": 0,
-    }
+    from app.core.events.schemas import EventRegistryEntry
+
+    orchestrator.event_registry[event_id] = EventRegistryEntry(
+        happened=False,
+        trigger_multiple=True,
+        occurred_at=None,
+        occurrence_count=0,
+    )
 
     assert orchestrator.get_occurrence_count(event_id) == 0
 

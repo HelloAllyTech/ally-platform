@@ -72,7 +72,7 @@ def evaluate_expression(
         event_data = event_registry.get(node.id)
         if event_data is None:
             return False
-        return event_data.get("happened", False)
+        return event_data.happened
 
     # NOT: Logical negation operator
     # Evaluates the operand first (recursively), then negates the result

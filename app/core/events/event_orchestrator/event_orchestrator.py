@@ -126,13 +126,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
     def setup_initial_state(self) -> None:
         """
         Initialize registry state (synchronous). Does NOT start timers.
-        Creates event_registry entries with structure:
-        {
-            "happened": false,  # Initial state based on event type
-            "trigger_multiple": bool  # True for SENTENCE_SIMILARITY and
-                                      # SEMANTIC_SIMILARITY, False for
-                                      # TIME/SCORE/COMBINATION
-        }
+        Creates event_registry entries as EventRegistryEntry objects with:
+            - happened: bool = False  # Initial state based on event type
+            - trigger_multiple: bool  # True for SENTENCE_SIMILARITY and
+                                     # SEMANTIC_SIMILARITY, False for
+                                     # TIME/SCORE/COMBINATION
+            - occurred_at: Optional[datetime] = None
+            - occurrence_count: int = 0
         Build expression list for combination events, excluding those with
         circular dependencies.
         """
@@ -260,7 +260,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         happened_event_ids = {
             event_id
             for event_id, event_data in self.event_registry.items()
-            if event_data.get("happened", False)
+            if event_data.happened
         }
         event_map = {event.event_id: event for event in self.events}
         happened_events = [
@@ -388,7 +388,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 continue
 
             # Get trigger_multiple from event_data, or derive from event type if missing
-            trigger_multiple = event_data.get("trigger_multiple")
+            trigger_multiple = event_data.trigger_multiple
 
             # Fall back to event type-based logic if trigger_multiple is None
             # This ensures HELPER_INTERRUPTED and other event types default to True
@@ -510,42 +510,40 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
     def get_event_state(self, event_id: str) -> bool:
         """
-        Get the current "happened" state of an event.
+        Get the current happened state of an event.
 
         Args:
             event_id: The event ID to check
 
         Returns:
-            True if event's "happened" is True, False otherwise
+            True if event's happened attribute is True, False otherwise
         """
         event_data = self.event_registry.get(event_id)
         if event_data is None:
             return False
-        return event_data.get("happened", False)
+        return event_data.happened
 
     def set_event_state(
         self, event_id: str, state: bool, event_type: DetectionType = None
     ) -> None:
         """
-        Manually set the "happened" state of an event.
+        Manually set the happened state of an event.
 
         Args:
             event_id: The event ID to update
-            state: The new "happened" value (True/False)
+            state: The new happened value (True/False)
         """
         timestamp = None
         if state:
             timestamp = datetime.now(timezone.utc)
 
         if event_id in self.event_registry:
-            self.event_registry[event_id]["happened"] = state
+            self.event_registry[event_id].happened = state
             # Only run if state is false
             if state:
                 # Get current count (default to 0 just in case) and increment
-                current_count = self.event_registry[event_id].get("occurrence_count", 0)
-                self.event_registry[event_id]["occurrence_count"] = current_count + 1
-
-                self.event_registry[event_id]["occurred_at"] = timestamp
+                self.event_registry[event_id].occurrence_count += 1
+                self.event_registry[event_id].occurred_at = timestamp
         else:
             # If event not in registry, create entry with trigger_multiple
             # based on event type
@@ -563,12 +561,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             # If False, count is 0.
             initial_count = 1 if state else 0
 
-            self.event_registry[event_id] = {
-                "happened": state,
-                "trigger_multiple": trigger_multiple,
-                "occurred_at": timestamp,
-                "occurrence_count": initial_count,
-            }
+            self.event_registry[event_id] = EventRegistryEntry(
+                happened=state,
+                trigger_multiple=trigger_multiple,
+                occurred_at=timestamp,
+                occurrence_count=initial_count,
+            )
 
     def is_termination_initiated(self) -> bool:
         """
@@ -583,13 +581,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         """Returns the timestamp of when the event last occurred, or None."""
         event_data = self.event_registry.get(event_id)
         if event_data:
-            return event_data.get("occurred_at")
+            return event_data.occurred_at
         return None
 
     def get_occurrence_count(self, event_id: str) -> int:
         entry = self.event_registry.get(event_id)
         if entry:
-            return entry.get("occurrence_count", 0)
+            return entry.occurrence_count
         return 0
 
     def _get_elapsed_time(self) -> float:

@@ -106,7 +106,7 @@ class ScoreEvaluatorMixin:
         Get the set of event IDs for score-based events that are newly triggered.
         1. Iterates through all score-based events
         2. Evaluates their conditions against the current score
-        3. Updates their "happened" state based on whether the condition is met
+        3. Updates their happened state based on whether the condition is met
         4. Returns the set of event IDs that newly became True (weren't True before)
         5. Events that are already in the _sent_events set are skipped
 
@@ -121,7 +121,7 @@ class ScoreEvaluatorMixin:
         for event in self.score_based_events:
             # Check if event was already happened (prevents infinite loop)
             event_data = self.event_registry.get(event.event_id)
-            was_happened = event_data.get("happened", False) if event_data else False
+            was_happened = event_data.happened if event_data else False
 
             condition_met = evaluate_condition(
                 value=current_score,
@@ -137,10 +137,8 @@ class ScoreEvaluatorMixin:
 
                 # If event was NOT active, it's a candidate for a new trigger.
                 # 2. CHECK ELIGIBILITY (Cooldowns, Max Occurrences, Time Window)
-                last_occurred_at = event_data.get("occurred_at") if event_data else None
-                occurrence_count = (
-                    event_data.get("occurrence_count", 0) if event_data else 0
-                )
+                last_occurred_at = event_data.occurred_at if event_data else None
+                occurrence_count = event_data.occurrence_count if event_data else 0
 
                 if is_event_eligible(
                     event=event,

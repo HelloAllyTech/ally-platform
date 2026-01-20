@@ -15,7 +15,7 @@ from app.utils import get_current_iso_timestamp
 from app.utils.datetime_utils import get_current_iso_timestamp as get_iso_timestamp
 
 
-class EventRegistryEntry(TypedDict):
+class EventRegistryEntry(BaseModel):
     """
     Structure for an event registry entry.
 
@@ -27,10 +27,10 @@ class EventRegistryEntry(TypedDict):
                          (trigger once)
     """
 
-    happened: bool
-    trigger_multiple: bool
-    occurred_at: Optional[datetime]
-    occurrence_count: int
+    happened: bool = False
+    trigger_multiple: bool = False
+    occurred_at: Optional[datetime] = None
+    occurrence_count: int = 0
 
 
 class ExpressionListEntry(TypedDict):
