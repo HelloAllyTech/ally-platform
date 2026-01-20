@@ -26,13 +26,49 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-// Mock navigation
+// Mock navigation and useLeaderboard
 jest.mock('@/hooks', () => ({
   useAppNavigation: () => ({
     navigate: jest.fn(),
   }),
   useTranslate: () => ({
     t: (key: string) => key,
+  }),
+  useLeaderboard: () => ({
+    leaderboardData: [
+      {
+        userId: 1,
+        rank: 1,
+        name: 'Sarah Johnson',
+        profileImageUrl: '',
+        minutesPlayed: 1200,
+        badgeCount: 25,
+        isCurrentUser: false,
+      },
+      {
+        userId: 999,
+        rank: 24,
+        name: 'Yedhu Krishnan',
+        profileImageUrl: '',
+        minutesPlayed: 872,
+        badgeCount: 12,
+        isCurrentUser: true,
+      },
+    ],
+    currentUserEntry: {
+      userId: 999,
+      name: 'Yedhu Krishnan',
+      profileImageUrl: '',
+      rank: 24,
+      minutesPlayed: 872,
+      badgeCount: 12,
+      window: 'LAST_WEEK',
+      isCurrentUser: true,
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    totalCount: 50,
   }),
 }));
 
@@ -88,9 +124,9 @@ describe('LeaderboardScreen', () => {
 
   it('renders period tabs', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Week')).toBeTruthy();
-    expect(getByText('Month')).toBeTruthy();
-    expect(getByText('Year')).toBeTruthy();
+    expect(getByText('Last Week')).toBeTruthy();
+    expect(getByText('Last Month')).toBeTruthy();
+    expect(getByText('Last Year')).toBeTruthy();
     expect(getByText('All Time')).toBeTruthy();
   });
 
@@ -101,19 +137,20 @@ describe('LeaderboardScreen', () => {
   });
 
   it('highlights current user entry', () => {
-    const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
+    const {getAllByText} = renderWithSafeArea(<LeaderboardScreen />);
     // Current user should be "Yedhu Krishnan" based on mockUtils
-    expect(getByText('Yedhu Krishnan')).toBeTruthy();
+    // Should appear at least once (in main list)
+    expect(getAllByText('Yedhu Krishnan').length).toBeGreaterThan(0);
   });
 
   it('displays badge count in header', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText(/3 badges/)).toBeTruthy();
+    expect(getByText(/12 badges/)).toBeTruthy();
   });
 
   it('changes active period when tab is pressed', () => {
     const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthTab = getByText('Month');
+    const monthTab = getByText('Last Month');
 
     fireEvent.press(monthTab);
 
@@ -129,7 +166,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Tab should still be visible
-    expect(getByText('Month')).toBeTruthy();
+    expect(getByText('Last Month')).toBeTruthy();
   });
 
   it('renders rank badges for all entries', () => {

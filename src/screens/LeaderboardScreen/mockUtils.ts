@@ -1,4 +1,4 @@
-import {LeaderboardEntry} from './LeaderboardScreen';
+import {LeaderboardEntry} from '@/types/leaderboard';
 
 const NAMES = [
   'Sarah Johnson',
@@ -20,30 +20,36 @@ const NAMES = [
 
 const TOTAL_ENTRIES = 50;
 
+export interface LeaderboardEntryWithCurrentUser extends LeaderboardEntry {
+  isCurrentUser?: boolean;
+}
+
 export const generateMockLeaderboardData = (
   currentUserRank: number,
-): LeaderboardEntry[] => {
-  const entries: LeaderboardEntry[] = [];
+  currentUserId: number = 999,
+  currentUserName: string = 'Yedhu Krishnan',
+): LeaderboardEntryWithCurrentUser[] => {
+  const entries: LeaderboardEntryWithCurrentUser[] = [];
 
   for (let rank = 1; rank <= TOTAL_ENTRIES; rank++) {
     if (rank === currentUserRank) {
       entries.push({
-        id: 'current-user',
+        userId: currentUserId,
         rank,
-        userName: 'Yedhu Krishnan',
-        totalDuration: '14 h 32 min',
-        badges: 12,
+        name: currentUserName,
+        profileImageUrl: '',
+        minutesPlayed: 872, // 14 h 32 min = 872 minutes
+        badgeCount: 12,
         isCurrentUser: true,
       });
     } else {
       entries.push({
-        id: `user-${rank}`,
+        userId: rank,
         rank,
-        userName: NAMES[(rank - 1) % NAMES.length],
-        totalDuration: `${Math.floor(Math.random() * 20) + 5} h ${Math.floor(
-          Math.random() * 60,
-        )} min`,
-        badges: Math.floor(Math.random() * 30) + 5,
+        name: NAMES[(rank - 1) % NAMES.length],
+        profileImageUrl: '',
+        minutesPlayed: Math.floor(Math.random() * 1000) + 300, // 5h to 21h
+        badgeCount: Math.floor(Math.random() * 30) + 5,
       });
     }
   }

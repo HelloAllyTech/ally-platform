@@ -9,6 +9,7 @@ export * from './useForceUpdate';
 export * from './useGoogleLogin';
 export * from './useHardwareBackPressHandler';
 export * from './useKeyboardState';
+export * from './useLeaderboard';
 export * from './useListeningScreen';
 export * from './useLiveAudioStream';
 export * from './useNavigationAwareCounselorChat';

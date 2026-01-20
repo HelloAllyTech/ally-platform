@@ -1,6 +1,7 @@
 import {ScenarioStatus} from '@/constants';
 
 import {AudioTrackRef} from './audio';
+import {ReviewStatus} from './reviews';
 
 export interface TriggerWarning {
   id: string;
@@ -203,6 +204,8 @@ export interface SimulationSummaryData {
   metadata: SummaryMetadata | null;
   hasFeedback: boolean;
   scenarioPathSessionId?: string | null;
+  reviewId?: string | null;
+  reviewStatus?: ReviewStatus | null;
   scenario?: {
     title?: string;
     metadata?: ScenarioMetadata;

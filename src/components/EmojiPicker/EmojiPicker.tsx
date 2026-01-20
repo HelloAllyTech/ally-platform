@@ -81,7 +81,11 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   );
 
   const IconComponent = icon || (
-    <AddReactionIcon width={ms(19)} height={ms(19)} />
+    <AddReactionIcon
+      width={ms(19)}
+      height={ms(19)}
+      color={colors.ds.grey[900]}
+    />
   );
 
   return (
