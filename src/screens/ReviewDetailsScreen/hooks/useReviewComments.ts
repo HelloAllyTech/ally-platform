@@ -3,7 +3,7 @@ import {useState} from 'react';
 import {MessageThreadComment} from '@/types/reviews';
 
 export const useReviewComments = () => {
-  const [isCommentsBottomSheetVisible, setIsCommentsBottomSheetVisible] =
+  const [isThreadsBottomSheetVisible, setIsThreadsBottomSheetVisible] =
     useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [
@@ -15,22 +15,22 @@ export const useReviewComments = () => {
   const [selectedComment, setSelectedComment] =
     useState<MessageThreadComment | null>(null);
 
-  const showCommentsBottomSheet = () => {
-    setIsCommentsBottomSheetVisible(true);
+  const showThreadsBottomSheet = () => {
+    setIsThreadsBottomSheetVisible(true);
   };
 
-  const closeCommentsBottomSheet = () => {
-    setIsCommentsBottomSheetVisible(false);
+  const closeThreadsBottomSheet = () => {
+    setIsThreadsBottomSheetVisible(false);
   };
 
   const closeCommentThreadBottomSheet = () => {
     setIsCommentThreadBottomSheetVisible(false);
-    setIsCommentsBottomSheetVisible(true);
+    setIsThreadsBottomSheetVisible(true);
   };
 
   const onThreadPress = (threadId: string) => {
     setSelectedThreadId(threadId);
-    setIsCommentsBottomSheetVisible(false);
+    setIsThreadsBottomSheetVisible(false);
     setIsCommentThreadBottomSheetVisible(true);
   };
 
@@ -46,8 +46,8 @@ export const useReviewComments = () => {
   };
 
   return {
-    isCommentsBottomSheetVisible,
-    closeCommentsBottomSheet,
+    isThreadsBottomSheetVisible,
+    closeThreadsBottomSheet,
     onThreadPress,
     isCommentThreadBottomSheetVisible,
     closeCommentThreadBottomSheet,
@@ -57,6 +57,6 @@ export const useReviewComments = () => {
     selectedComment,
     setSelectedComment,
     onReplyPress,
-    showCommentsBottomSheet,
+    showThreadsBottomSheet,
   };
 };

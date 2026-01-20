@@ -46,11 +46,6 @@ export const Conversation: React.FC<ConversationProps> = ({
         <Text style={styles.messageContent}>
           {messageItem.messagePart.map(part => (
             <Text
-              onPress={() => {
-                if (part.commentIds.length > 0) {
-                  onThreadClick?.(part.commentIds[0], messageItem.id);
-                }
-              }}
               disabled={part.commentIds.length === 0}
               key={part.text}
               style={[part.commentIds.length > 0 && styles.highlightedText]}>
@@ -68,11 +63,6 @@ export const Conversation: React.FC<ConversationProps> = ({
       <Text style={styles.messageContent}>
         {messageItem.messagePart.map(part => (
           <Text
-            onPress={() => {
-              if (part.commentIds.length > 0) {
-                onThreadClick?.(part.commentIds[0], messageItem.id);
-              }
-            }}
             disabled={part.commentIds.length === 0}
             key={part.text}
             style={[part.commentIds.length > 0 && styles.highlightedText]}>
@@ -86,6 +76,9 @@ export const Conversation: React.FC<ConversationProps> = ({
   const renderItem = ({item}: {item: MessageData}) => (
     <MessageComponent
       timestamp={formatTimestamp(item.startSeconds)}
+      onPress={() => {
+        onThreadClick?.(item.id, item.id);
+      }}
       message={
         isSelectable
           ? renderSelectableMessage(item)
