@@ -8,7 +8,7 @@ export interface AddReviewCommentRequest {
 }
 
 export interface AddReviewCommentResponse {
-  success: boolean;
+  commentId: string;
 }
 
 export interface MessageThreadComment {
@@ -110,4 +110,11 @@ export interface MessageData {
   endSeconds: number;
   senderId: string;
   messagePart: MessagePart[];
+}
+
+export type MessageList = Record<string, MessageData[]> | [];
+export interface TextSelection {
+  selectedText: string;
+  startIndex: number;
+  endIndex: number;
 }
