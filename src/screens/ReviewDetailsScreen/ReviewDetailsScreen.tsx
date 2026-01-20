@@ -1,9 +1,10 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, StyleSheet, View} from 'react-native';
+import {ActivityIndicator, SafeAreaView, StyleSheet, View} from 'react-native';
 
-import {CommentInput, Conversation} from '@/components';
+import {CommentInput, CommentsBottomSheet, Conversation} from '@/components';
 import {useAddReviewCommentMutation} from '@/services/reviewsApi';
+import {colors} from '@/theme';
 import {Message, MessageData, TextSelection} from '@/types/reviews';
 import {splitByCommentRanges} from '@/utils/reviews';
 
@@ -13,7 +14,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
   // Assume the route params contain reviewId
   const route = useRoute<any>();
-  const {reviewId: _reviewId} = route.params as {reviewId: string};
+  const {reviewId: _reviewId} = route?.params || ({} as {reviewId: string});
 
   // TODO_M: uncomment GET MESSAGE once the API is implemented
   // const {data, isLoading, isError} = useGetMessagesQuery({reviewId});
@@ -34,6 +35,7 @@ export const ReviewDetailsScreen: React.FC = () => {
     MessageData[]
   >([]);
 
+  const [showCommentsBottomSheet, setShowCommentsBottomSheet] = useState(false);
   useEffect(() => {
     if (data?.data && data.data.length > 0) {
       mapMessages(data.data);
@@ -159,6 +161,10 @@ export const ReviewDetailsScreen: React.FC = () => {
   };
 
   const handleThreadClick = (threadId: string, messageId: string) => {
+    if (!showCommentInput) {
+      setShowCommentsBottomSheet(true);
+    }
+    console.log('threadId', threadId);
     const message = data?.data?.find(
       messageItem => messageItem.id === messageId,
     );
@@ -168,7 +174,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   };
 
   return (
-    <>
+    <SafeAreaView style={styles.safe}>
       {/* Main conversation/messages view */}
       <Conversation
         messages={conversationMessages}
@@ -189,11 +195,23 @@ export const ReviewDetailsScreen: React.FC = () => {
           isLoading={isAddingComment}
         />
       )}
-    </>
+      <CommentsBottomSheet
+        visible={showCommentsBottomSheet}
+        // TODO: get reviewId from route params
+        reviewId={1}
+        onClose={() => {
+          setShowCommentsBottomSheet(false);
+        }}
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
