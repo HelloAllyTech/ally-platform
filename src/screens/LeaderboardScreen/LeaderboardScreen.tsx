@@ -1,6 +1,7 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   NativeScrollEvent,
@@ -16,20 +17,10 @@ import {BadgeIcon, UserIcon} from '@/assets/icons';
 import {TabView} from '@/components';
 import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
 import {LeaderboardPeriod, RANK_ICON_MAP} from '@/constants/leaderboard';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useLeaderboard} from '@/hooks';
+import {LeaderboardEntryWithCurrentUser} from '@/screens/LeaderboardScreen/mockUtils';
 import {colors, fontFamily, typography} from '@/theme';
-
-import {generateMockLeaderboardData} from './mockUtils';
-
-export interface LeaderboardEntry {
-  id: string;
-  rank: number;
-  userName: string;
-  avatarUrl?: string;
-  totalDuration: string;
-  badges: number;
-  isCurrentUser?: boolean;
-}
+import {formatMinutesToDuration} from '@/utils';
 
 export const LeaderboardScreen: React.FC = () => {
   const {t} = useTranslation();
@@ -40,19 +31,12 @@ export const LeaderboardScreen: React.FC = () => {
     LeaderboardPeriod.LAST_WEEK,
   );
 
-  // TODO: Remove this once we have the actual current user rank
-  const currentUserRank = 24;
-  const badgeCount = 3;
-
-  const leaderboardData = useMemo(
-    () => generateMockLeaderboardData(currentUserRank),
-    [currentUserRank],
-  );
-
-  const currentUserEntry = useMemo(
-    () => leaderboardData.find(e => e.isCurrentUser),
-    [leaderboardData],
-  );
+  // Fetch leaderboard data using the hook
+  const {leaderboardData, currentUserEntry, isLoading} = useLeaderboard({
+    window: activePeriod,
+    limit: 50,
+    offset: 0,
+  });
 
   const currentScrollOffsetY = useRef(0);
   const currentUserRowTopPosition = useRef(0);
@@ -95,7 +79,7 @@ export const LeaderboardScreen: React.FC = () => {
     item,
     index,
   }: {
-    item: LeaderboardEntry;
+    item: LeaderboardEntryWithCurrentUser;
     index: number;
   }) => {
     const isHighlighted = item.isCurrentUser;
@@ -126,9 +110,9 @@ export const LeaderboardScreen: React.FC = () => {
         </View>
         <View style={styles.userColumn}>
           <View style={styles.avatarContainer}>
-            {item.avatarUrl ? (
+            {item.profileImageUrl ? (
               <Image
-                source={{uri: item.avatarUrl}}
+                source={{uri: item.profileImageUrl}}
                 style={styles.avatar}
                 resizeMode="cover"
               />
@@ -144,7 +128,7 @@ export const LeaderboardScreen: React.FC = () => {
               isHighlighted && styles.highlightedUserName,
             ]}
             numberOfLines={1}>
-            {item.userName}
+            {item.name}
           </Text>
         </View>
         <View style={styles.durationColumn}>
@@ -153,7 +137,7 @@ export const LeaderboardScreen: React.FC = () => {
               styles.durationText,
               isHighlighted && styles.highlightedText,
             ]}>
-            {item.totalDuration}
+            {formatMinutesToDuration(item.minutesPlayed)}
           </Text>
         </View>
         <View style={styles.badgesColumn}>
@@ -162,7 +146,7 @@ export const LeaderboardScreen: React.FC = () => {
               styles.badgesText,
               isHighlighted && styles.highlightedText,
             ]}>
-            {item.badges}
+            {item.badgeCount}
           </Text>
         </View>
       </View>
@@ -181,7 +165,7 @@ export const LeaderboardScreen: React.FC = () => {
           hitSlop={DEFAULT_HIT_SLOP}>
           <BadgeIcon width={16} height={16} />
           <Text style={styles.badgeCount}>
-            {badgeCount} {t('Leaderboard.badges')}
+            {currentUserEntry?.badgeCount ?? 0} {t('Leaderboard.badges')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -224,15 +208,15 @@ export const LeaderboardScreen: React.FC = () => {
             tabs={[
               {
                 key: LeaderboardPeriod.LAST_WEEK,
-                label: t('Leaderboard.period.week'),
+                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.week')}`,
               },
               {
                 key: LeaderboardPeriod.LAST_MONTH,
-                label: t('Leaderboard.period.month'),
+                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.month')}`,
               },
               {
                 key: LeaderboardPeriod.LAST_YEAR,
-                label: t('Leaderboard.period.year'),
+                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.year')}`,
               },
               {
                 key: LeaderboardPeriod.ALL_TIME,
@@ -244,26 +228,34 @@ export const LeaderboardScreen: React.FC = () => {
           />
         </View>
         {renderTableHeader()}
-        <FlatList
-          data={leaderboardData}
-          renderItem={renderLeaderboardItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          onLayout={e => {
-            flatListViewportHeight.current = e.nativeEvent.layout.height;
-          }}
-        />
-
-        {shouldShowStickyFooter && currentUserEntry && (
-          <View style={styles.stickyFooter}>
-            {renderLeaderboardItem({
-              item: currentUserEntry,
-              index: currentUserEntry.rank - 1,
-            })}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.ds.theme.primary} />
           </View>
+        ) : (
+          <>
+            <FlatList
+              data={leaderboardData}
+              renderItem={renderLeaderboardItem}
+              keyExtractor={item => item.userId.toString()}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+              onLayout={e => {
+                flatListViewportHeight.current = e.nativeEvent.layout.height;
+              }}
+            />
+
+            {shouldShowStickyFooter && currentUserEntry && (
+              <View style={styles.stickyFooter}>
+                {renderLeaderboardItem({
+                  item: currentUserEntry,
+                  index: currentUserEntry.rank - 1,
+                })}
+              </View>
+            )}
+          </>
         )}
       </View>
     </View>
@@ -370,7 +362,7 @@ const styles = ScaledSheet.create({
     minWidth: '160@ms',
   },
   durationColumnHeader: {
-    width: '95@ms',
+    width: '88@ms',
   },
   badgesColumnHeader: {
     width: '60@ms',
@@ -450,5 +442,11 @@ const styles = ScaledSheet.create({
   highlightedText: {
     color: colors.blue,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: '40@ms',
   },
 });

@@ -164,6 +164,10 @@ export const API_ROUTES = {
   BADGES: {
     AVAILABLE: '/badges/available',
   },
+  COMMUNITY: {
+    LEADERBOARD: '/community/leaderboard',
+    MY_RANK: '/community/leaderboard/my-rank',
+  },
 } as const;
 
 export const API_METHODS = {

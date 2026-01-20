@@ -9,8 +9,8 @@ export const RANK_ICON_MAP: Record<number, React.FC<SvgProps>> = {
 };
 
 export enum LeaderboardPeriod {
-  LAST_WEEK = 'last_week',
-  LAST_MONTH = 'last_month',
-  LAST_YEAR = 'last_year',
-  ALL_TIME = 'all_time',
+  LAST_WEEK = 'LAST_WEEK',
+  LAST_MONTH = 'LAST_MONTH',
+  LAST_YEAR = 'LAST_YEAR',
+  ALL_TIME = 'ALL_TIME',
 }
