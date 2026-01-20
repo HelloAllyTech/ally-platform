@@ -51,3 +51,6 @@ export * from './fields';
 
 // Badge types
 export * from './badges';
+
+// Review types
+export * from './reviews';

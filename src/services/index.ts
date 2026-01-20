@@ -6,6 +6,7 @@ export * from './callsApi';
 export * from './callSummaryApi';
 export * from './callTranscriptApi';
 export * from './placesApi';
+export * from './reviewsApi';
 export * from './searchApi';
 export * from './settingsApi';
 export * from './simulationsApi';
