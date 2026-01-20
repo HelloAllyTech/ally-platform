@@ -92,6 +92,7 @@ def build_voice_expression_prompt(
     enhancement_instructions: Optional[str],
     prompt_with_enhancement: str,
     prompt_parameters_only: str,
+    current_parameters: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Build the voice expression generation prompt.
@@ -105,10 +106,19 @@ def build_voice_expression_prompt(
         enhancement_instructions: Text enhancement instructions if supported
         prompt_with_enhancement: Prompt template with text enhancement
         prompt_parameters_only: Prompt template for parameters only
+        current_parameters: Current parameter values for context (optional)
 
     Returns:
         Formatted prompt string
     """
+    # Format current parameters for prompt
+    if current_parameters:
+        import json
+
+        current_parameters_json = json.dumps(current_parameters, indent=2)
+    else:
+        current_parameters_json = "No current parameters available (first utterance)."
+
     if enhancement_instructions:
         return prompt_with_enhancement.format(
             persona_context=persona_context_text,
@@ -117,6 +127,7 @@ def build_voice_expression_prompt(
             response_text=response_text,
             parameter_metadata=parameter_metadata_json,
             text_enhancement_instructions=enhancement_instructions,
+            current_parameters=current_parameters_json,
         )
     else:
         return prompt_parameters_only.format(
@@ -125,6 +136,7 @@ def build_voice_expression_prompt(
             conversation_history_count=conversation_history_count,
             response_text=response_text,
             parameter_metadata=parameter_metadata_json,
+            current_parameters=current_parameters_json,
         )
 
 
@@ -217,6 +229,70 @@ def parse_llm_json_response(response: Any) -> Optional[Dict[str, Any]]:
         f"Content type: {type(response)}, Content preview: {content[:200]}..."
     )
     return None
+
+
+def smooth_parameter_changes(
+    new_params: Dict[str, Any],
+    current_params: Dict[str, Any],
+    parameter_metadata: Dict[str, Any],
+    smoothing_factor: float = 0.3,
+) -> Dict[str, Any]:
+    """
+    Smooth parameter changes to prevent jarring jumps.
+
+    Uses a moving average approach: new_value = current_value * (1 - factor) +
+    target_value * factor
+
+    Args:
+        new_params: New parameter values from LLM
+        current_params: Current parameter values
+        parameter_metadata: Parameter metadata with ranges
+        smoothing_factor: Smoothing factor (0.0 = no change, 1.0 = instant change)
+            Default 0.3 means 30% of the change is applied immediately
+
+    Returns:
+        Smoothed parameter dict
+    """
+    if not current_params:
+        # No current params - use new params as-is (first utterance)
+        return new_params.copy()
+
+    smoothed = {}
+    for param_name, new_value in new_params.items():
+        if param_name not in current_params:
+            # New parameter - use as-is
+            smoothed[param_name] = new_value
+            continue
+
+        current_value = current_params[param_name]
+        param_meta = parameter_metadata.get(param_name, {})
+
+        # Get parameter range for validation
+        param_range = param_meta.get("range")
+        if not param_range or len(param_range) != 2:
+            # No range info - apply smoothing directly
+            smoothed[param_name] = (
+                current_value * (1 - smoothing_factor) + new_value * smoothing_factor
+            )
+            continue
+
+        min_val, max_val = param_range[0], param_range[1]
+
+        # Ensure values are within range
+        current_value = max(min_val, min(max_val, current_value))
+        new_value = max(min_val, min(max_val, new_value))
+
+        # Apply smoothing (moving average)
+        smoothed_value = (
+            current_value * (1 - smoothing_factor) + new_value * smoothing_factor
+        )
+
+        # Ensure smoothed value is within range
+        smoothed_value = max(min_val, min(max_val, smoothed_value))
+
+        smoothed[param_name] = smoothed_value
+
+    return smoothed
 
 
 def extract_voice_expression_result(

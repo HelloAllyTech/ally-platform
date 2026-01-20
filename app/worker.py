@@ -116,13 +116,20 @@ class AgentWorker:
 
         # Generate and set default voice expression parameters
         if settings.ENABLE_VOICE_EXPRESSIONS:
-            await self.tts_client.set_defaults(
+            from app.speech_prosody.service import SpeechProsodyService
+
+            prosody_service = SpeechProsodyService(self.tts_client)
+            await prosody_service.generate_and_set_defaults(
                 scenario=self.scenario,
                 llm_client=self.llm_client,
             )
-            logger.info(
-                f"TTS defaults set: {self.tts_client.get_defaults_for_learn_service()}"
-            )
+            # Get defaults from prosody service (single source of truth)
+            defaults = prosody_service.get_default_parameters()
+            logger.info(f"TTS defaults set: {defaults}")
+
+            # Sync to TTS client for backward compatibility with
+            # get_defaults_for_learn_service()
+            self.tts_client._default_params = defaults.copy()
 
         # Initialize agent state
         self.joined_iso = initialize_agent_state(

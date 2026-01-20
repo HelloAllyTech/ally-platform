@@ -59,6 +59,26 @@ class SarvamTTSClient(BaseTTSClient):
                 "faster, <1.0 is slower. Range: 0.3 (slowest) to 3.0 (fastest)."
             ),
         },
+        "pitch": {
+            "type": "float",
+            "range": [-0.75, 0.75],
+            "default": 0.0,
+            "description": (
+                "Pitch shift in semitones. Positive values = higher pitch "
+                "(stress/anxiety). Negative values = lower pitch (sadness/relaxation). "
+                "0.0 = no change. Range: -0.75 to +0.75."
+            ),
+        },
+        "loudness": {
+            "type": "float",
+            "range": [0.1, 3.0],
+            "default": 1.0,
+            "description": (
+                "Volume/loudness multiplier. 1.0 = normal volume. Higher values "
+                "(1.5-3.0) = louder (excitement). Lower values (0.1-0.7) = quieter "
+                "(shame/withdrawal). Range: 0.1 to 3.0."
+            ),
+        },
     }
 
     def __init__(

@@ -242,6 +242,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         # Mock both the factory and the agent_utils module
@@ -444,6 +447,9 @@ class TestWorker:
                 mock_client = Mock()
                 mock_client.tts_instance = "DEFAULT_TTS"
                 mock_client.set_defaults = AsyncMock()
+                mock_client.get_parameter_metadata = Mock(return_value={})
+                mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+                mock_client._apply_parameters_dict = Mock()
                 return mock_client
 
         from app.tts import factory as tts_factory
@@ -667,6 +673,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -799,6 +808,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -961,6 +973,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -1099,6 +1114,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         from app.tts import factory as tts_factory
@@ -1304,6 +1322,9 @@ class TestWorker:
             mock_client = Mock()
             mock_client.tts_instance = "TTS"
             mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
             return mock_client
 
         from app.tts import factory as tts_factory

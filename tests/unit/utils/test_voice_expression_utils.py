@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from app.utils import voice_expression_utils as ve_utils
+from app.speech_prosody import utils as ve_utils
 
 
 class TestFormatConversationHistory:
@@ -153,6 +153,108 @@ class TestFormatPersonaContext:
         assert "Tone: Warm" in result
 
 
+class TestExtractPersonaContextFromPromptData:
+    """Test cases for extract_persona_context_from_prompt_data function."""
+
+    @pytest.mark.unit
+    def test_extract_persona_context_none(self):
+        """Test with None prompt_data."""
+        result = ve_utils.extract_persona_context_from_prompt_data(None)
+        assert result is None
+
+    @pytest.mark.unit
+    def test_extract_persona_context_all_fields(self):
+        """Test extraction with all essential fields present."""
+        mock_prompt_data = Mock()
+        mock_prompt_data.personality = "Friendly and outgoing"
+        mock_prompt_data.tone = "Warm and professional"
+        mock_prompt_data.emotional_needs = "Understanding and validation"
+        mock_prompt_data.starting_state = "Calm and ready"
+        mock_prompt_data.context = "Therapy session"
+
+        result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
+
+        assert result is not None
+        assert result["personality"] == "Friendly and outgoing"
+        assert result["tone"] == "Warm and professional"
+        assert result["emotional_needs"] == "Understanding and validation"
+        assert result["starting_state"] == "Calm and ready"
+        assert result["context"] == "Therapy session"
+
+    @pytest.mark.unit
+    def test_extract_persona_context_partial_fields(self):
+        """Test extraction with only some fields present."""
+        mock_prompt_data = Mock()
+        mock_prompt_data.personality = "Shy"
+        mock_prompt_data.tone = "Gentle"
+        # Other fields are missing
+
+        result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
+
+        assert result is not None
+        assert result["personality"] == "Shy"
+        assert result["tone"] == "Gentle"
+        assert "emotional_needs" not in result
+        assert "starting_state" not in result
+
+    @pytest.mark.unit
+    def test_extract_persona_context_missing_fields(self):
+        """Test extraction when fields don't exist (defensive)."""
+        mock_prompt_data = Mock()
+        # No attributes set - getattr will return None
+
+        result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
+
+        assert result is None
+
+    @pytest.mark.unit
+    def test_extract_persona_context_empty_strings(self):
+        """Test extraction with empty string values (should be skipped)."""
+        mock_prompt_data = Mock()
+        mock_prompt_data.personality = ""
+        mock_prompt_data.tone = "   "  # Whitespace only
+        mock_prompt_data.context = "Valid context"
+
+        result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
+
+        assert result is not None
+        assert "personality" not in result
+        assert "tone" not in result
+        assert result["context"] == "Valid context"
+
+    @pytest.mark.unit
+    def test_extract_persona_context_custom_whitelist(self):
+        """Test extraction with custom field whitelist."""
+        mock_prompt_data = Mock()
+        mock_prompt_data.personality = "Friendly"
+        mock_prompt_data.tone = "Warm"
+        mock_prompt_data.custom_field = "Custom value"
+
+        custom_whitelist = {"personality": "Personality", "custom_field": "Custom"}
+
+        result = ve_utils.extract_persona_context_from_prompt_data(
+            mock_prompt_data, field_whitelist=custom_whitelist
+        )
+
+        assert result is not None
+        assert result["personality"] == "Friendly"
+        assert result["custom_field"] == "Custom value"
+        assert "tone" not in result  # Not in whitelist
+
+    @pytest.mark.unit
+    def test_extract_persona_context_non_string_values(self):
+        """Test extraction with non-string values (should be skipped)."""
+        mock_prompt_data = Mock()
+        mock_prompt_data.personality = 123  # Not a string
+        mock_prompt_data.tone = "Warm"  # Valid string
+
+        result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
+
+        assert result is not None
+        assert "personality" not in result  # Non-string skipped
+        assert result["tone"] == "Warm"
+
+
 class TestBuildVoiceExpressionPrompt:
     """Test cases for build_voice_expression_prompt function."""
 
@@ -168,7 +270,7 @@ class TestBuildVoiceExpressionPrompt:
             "Enhancement: {text_enhancement_instructions}"
         )
 
-        result = ve_utils.build_voice_expression_prompt(
+        result = ve_utils.build_prosody_prompt(
             response_text="Hello",
             parameter_metadata_json='{"speed": 1.0}',
             persona_context_text="Personality: Friendly",
@@ -197,7 +299,7 @@ class TestBuildVoiceExpressionPrompt:
             "Metadata: {parameter_metadata}"
         )
 
-        result = ve_utils.build_voice_expression_prompt(
+        result = ve_utils.build_prosody_prompt(
             response_text="Hello",
             parameter_metadata_json='{"speed": 1.0}',
             persona_context_text="Personality: Friendly",
@@ -295,7 +397,7 @@ class TestParseLLMJSONResponse:
         mock_response = Mock()
         mock_response.content = '{"speed": 1.0, invalid}'
 
-        with patch("app.utils.voice_expression_utils.logger") as mock_logger:
+        with patch("app.speech_prosody.utils.logger") as mock_logger:
             result = ve_utils.parse_llm_json_response(mock_response)
 
         assert result is None
@@ -352,7 +454,7 @@ class TestExtractVoiceExpressionResult:
             "enhanced_text": "Hello [excited] world",
         }
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, "Use [tags]", "Hello world"
         )
 
@@ -366,7 +468,7 @@ class TestExtractVoiceExpressionResult:
             "parameters": {"speed": 1.0},
         }
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, "Use [tags]", "Hello world"
         )
 
@@ -380,7 +482,7 @@ class TestExtractVoiceExpressionResult:
             "enhanced_text": "Hello [excited] world",
         }
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, "Use [tags]", "Hello world"
         )
 
@@ -395,7 +497,7 @@ class TestExtractVoiceExpressionResult:
             "pitch": 0.5,
         }
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, None, "Hello world"
         )
 
@@ -410,8 +512,8 @@ class TestExtractVoiceExpressionResult:
             "enhanced_text": {"invalid": "dict"},
         }
 
-        with patch("app.utils.voice_expression_utils.logger") as mock_logger:
-            params, enhanced = ve_utils.extract_voice_expression_result(
+        with patch("app.speech_prosody.utils.logger") as mock_logger:
+            params, enhanced = ve_utils.extract_prosody_result(
                 result_dict, "Use [tags]", "Hello world"
             )
 
@@ -424,7 +526,7 @@ class TestExtractVoiceExpressionResult:
         """Test extraction with empty result dict."""
         result_dict = {}
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, None, "Hello world"
         )
 
@@ -436,7 +538,7 @@ class TestExtractVoiceExpressionResult:
         """Test extraction with empty result dict when enhancement is supported."""
         result_dict = {}
 
-        params, enhanced = ve_utils.extract_voice_expression_result(
+        params, enhanced = ve_utils.extract_prosody_result(
             result_dict, "Use [tags]", "Hello world"
         )
 

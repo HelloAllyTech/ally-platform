@@ -38,6 +38,26 @@ class ElevenLabsTTSClient(BaseTTSClient):
                 "<1.0 is slower. Range: 0.7 to 1.2."
             ),
         },
+        "stability": {
+            "type": "float",
+            "range": [0.0, 1.0],
+            "default": 0.71,
+            "description": (
+                "Voice stability/consistency. Lower values (0.0-0.5) = more "
+                "expressive/emotional variation. Higher values (0.7-1.0) = more "
+                "stable/controlled voice. Range: 0.0 to 1.0."
+            ),
+        },
+        "similarity_boost": {
+            "type": "float",
+            "range": [0.0, 1.0],
+            "default": 0.5,
+            "description": (
+                "Similarity to original voice. Higher values (0.7-1.0) = closer "
+                "match to original voice character. Lower values (0.0-0.5) = more "
+                "deviation in style/timbre. Range: 0.0 to 1.0."
+            ),
+        },
     }
 
     # Define text enhancement metadata for audio tags (v3 models only)
@@ -64,17 +84,33 @@ IMPORTANT NOTES:
   (v3 is in alpha/research preview)
 - Pause durations are approximate and may vary
 
-Examples:
-- "[empathetic] I understand how you're feeling. [pause] That must be really difficult."
-- "[excited] Great news! [laughs] I'm so happy for you!"
-- "[whispers] Don't tell anyone, but [pause] I have a secret."
-- "[calm] Let's take a deep breath. [short pause] Everything will be okay."
+THERAPY SESSION SPECIFIC RULES:
+1. "Vulnerable Pause": Add [long pause] or [pause] before/after vulnerable
+   admissions or difficult revelations. Example: "[long pause] I've never told
+   anyone this before [pause] but..."
+2. "Anxious Rush": Use [rushed] at the start of sentences when character is
+   anxious or overwhelmed. Example: "[rushed] I just can't seem to catch my
+   breath [pause] everything feels so overwhelming."
+3. "Heavy Sigh": Add [sighs] or [clears throat] before heavy emotional moments
+   or when processing difficult information. Example: "[sighs] I've been
+   carrying this for so long [pause] I don't even know where to start."
+4. "Processing Break": Add [pause] or [long pause] when character is
+   processing difficult emotions or trauma. Example: "That memory [pause] it's
+   still so vivid [long pause] I can feel it in my body."
 
-When using audio tags:
+GENERAL USAGE:
 1. Place emotion/delivery tags at the start of sentences or phrases
 2. Use pause tags between phrases for natural rhythm
 3. Combine tags naturally: "[surprised] Really? [pause] I didn't expect that."
 4. Avoid overusing tags - use them for emphasis and natural expression
+5. For therapy sessions, prioritize vulnerable pauses and processing breaks
+   to create space for emotional processing
+
+Examples:
+- "[empathetic] I understand how you're feeling. [pause] That must be really difficult."
+- "[sighs] I've been thinking about this a lot [long pause] and I realize..."
+- "[rushed] I just can't stop worrying [pause] it's like my mind won't shut off."
+- "[calm] Let's take a deep breath. [short pause] Everything will be okay."
         """,
     }
 

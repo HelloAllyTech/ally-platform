@@ -40,6 +40,104 @@ class GoogleTTSClient(BaseTTSClient):
         credentials_file: Optional path to credentials JSON file
     """
 
+    # Define parameter metadata as class constant
+    # Parameter names must match Google TTS API option names
+    PARAMETER_METADATA = {
+        "speaking_rate": {
+            "type": "float",
+            "range": [0.25, 2.0],
+            "default": 1.0,
+            "description": (
+                "Speech rate multiplier. 1.0 is normal speed, >1.0 is faster, "
+                "<1.0 is slower. Range: 0.25 to 2.0."
+            ),
+        },
+        "pitch": {
+            "type": "float",
+            "range": [-20.0, 20.0],
+            "default": 0.0,
+            "description": (
+                "Pitch shift in semitones. Positive values = higher pitch "
+                "(stress/anxiety). Negative values = lower pitch "
+                "(sadness/relaxation). 0.0 = no change. Range: -20.0 to +20.0."
+            ),
+        },
+        "volume_gain_db": {
+            "type": "float",
+            "range": [-96.0, 16.0],
+            "default": 0.0,
+            "description": (
+                "Volume gain in decibels. Positive values = louder (excitement). "
+                "Negative values = quieter (shame/withdrawal). 0.0 = no change. "
+                "Range: -96.0 to +16.0 dB (recommended: ≤ +10 dB)."
+            ),
+        },
+    }
+
+    # Define text enhancement metadata for SSML prosody tags
+    TEXT_ENHANCEMENT_METADATA = {
+        "instructions": """
+Google Cloud TTS supports SSML (Speech Synthesis Markup Language) for fine-grained
+control over speech prosody. SSML tags can be embedded in the text to control
+rate, pitch, and volume at specific points.
+
+IMPORTANT NOTES:
+- SSML must be enabled in TTS initialization (enable_ssml=True)
+- SSML is NOT compatible with streaming mode (use_streaming=False required)
+- SSML is NOT compatible with markup input (use_markup=False required)
+- Wrap entire text in <speak>...</speak> tags when using SSML
+
+SSML PROSODY TAGS:
+- <prosody rate="...">: Controls speech rate
+  * Values: "x-slow", "slow", "medium", "fast", "x-fast", or numeric (0.25-2.0)
+  * Example: <prosody rate="slow">Take your time</prosody>
+- <prosody pitch="...">: Controls pitch
+  * Values: "+Nst" or "-Nst" (semitones), or "x-low", "low", "medium", "high", "x-high"
+  * Example: <prosody pitch="+2st">This is higher</prosody>
+- <prosody volume="...">: Controls volume
+  * Values: "silent", "x-soft", "soft", "medium", "loud", "x-loud", or "+Nd%" or "-Nd%"
+  * Example: <prosody volume="soft">Whisper this</prosody>
+
+OTHER USEFUL SSML TAGS:
+- <break time="Ns"/>: Pause for N seconds (e.g., <break time="1.5s"/>)
+- <emphasis level="strong">text</emphasis>: Emphasize text
+- <say-as interpret-as="number">123</say-as>: Control how numbers are spoken
+
+THERAPY SESSION SPECIFIC RULES:
+1. "Vulnerable Pause": Use <break time="2s"/> or <break time="3s"/> before/after
+   vulnerable admissions. Example: <break time="2s"/>I've never told anyone this
+   before<break time="1.5s"/>but...
+2. "Anxious Rush": Use <prosody rate="fast"> for anxious moments. Example:
+   <prosody rate="fast">I just can't seem to catch my breath</prosody>
+   <break time="1s"/>everything feels so overwhelming.
+3. "Heavy Sigh": Use <break time="1.5s"/> before heavy emotional moments.
+   Example: <break time="1.5s"/>I've been carrying this for so long
+   <break time="2s"/>I don't even know where to start.
+4. "Processing Break": Use <break time="1s"/> or <break time="2s"/> when
+   processing difficult emotions. Example: That memory<break time="1.5s"/>it's
+   still so vivid<break time="2s"/>I can feel it in my body.
+5. "Emotional Emphasis": Use <emphasis level="strong"> for breakthrough moments
+   or important revelations. Example: <emphasis level="strong">I finally
+   understand</emphasis><break time="1s"/>what I need to do.
+
+GENERAL USAGE:
+1. Always wrap SSML text in <speak>...</speak> tags
+2. Combine prosody tags naturally: <prosody rate="slow" pitch="-2st">Take
+   your time</prosody>
+3. Use breaks for natural rhythm and emotional processing
+4. Avoid overusing tags - use them for emphasis and natural expression
+5. For therapy sessions, prioritize vulnerable pauses and processing breaks
+
+Examples:
+- <speak><prosody rate="slow" pitch="-2st">I understand how you're feeling.
+  </prosody><break time="1.5s"/>That must be really difficult.</speak>
+- <speak><break time="2s"/>I've been thinking about this a lot<break time="1.5s"/>
+  and I realize<break time="1s"/>I need to make a change.</speak>
+- <speak><prosody rate="fast" pitch="+3st">I just can't stop worrying</prosody>
+  <break time="1s"/>it's like my mind won't shut off.</speak>
+        """,
+    }
+
     def __init__(
         self,
         language_code: str,

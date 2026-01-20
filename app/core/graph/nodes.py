@@ -528,26 +528,26 @@ async def apply_voice_expressions(
                 conversation_history.append({"role": role, "content": content})
 
     # Extract persona context from scenario - ONLY essential fields for
-    # voice expression decisions
+    # voice expression decisions (defensive extraction handles missing fields)
     persona_context = None
     if scenario and scenario.prompt_data:
-        prompt_data = scenario.prompt_data
-        # Only include fields directly relevant to voice expression decisions
-        persona_context = {}
-        if prompt_data.personality:
-            persona_context["personality"] = prompt_data.personality
-        if prompt_data.tone:
-            persona_context["tone"] = prompt_data.tone
-        if prompt_data.emotional_needs:
-            persona_context["emotional_needs"] = prompt_data.emotional_needs
-        if prompt_data.starting_state:
-            persona_context["starting_state"] = prompt_data.starting_state
-        if prompt_data.context:
-            persona_context["context"] = prompt_data.context
+        from app.speech_prosody.utils import extract_persona_context_from_prompt_data
 
-        # Only set if we have at least one field
-        if not persona_context:
-            persona_context = None
+        logger.debug(
+            f"[Speech Prosody] Extracting persona context from scenario "
+            f"'{scenario.name if scenario.name else 'unnamed'}'"
+        )
+        persona_context = extract_persona_context_from_prompt_data(scenario.prompt_data)
+        if persona_context:
+            logger.debug(
+                f"[Speech Prosody] Successfully extracted persona context "
+                f"with {len(persona_context)} fields"
+            )
+        else:
+            logger.debug(
+                "[Speech Prosody] No persona context extracted "
+                "(no valid fields found in prompt_data)"
+            )
 
     # Note: response_text comes from the agent's LLM response in generate_response node
     # It should not contain parameters dict - parameters are generated separately
@@ -559,7 +559,10 @@ async def apply_voice_expressions(
     #    → applies via update_options() to TTS
     # 2. Returns enhanced text (if supported) or original text (if not supported)
     # CRITICAL: Parameters go ONLY to update_options(), never to message content
-    enhanced_text = await tts_client.generate_and_apply_voice_expressions(
+    from app.speech_prosody.service import SpeechProsodyService
+
+    prosody_service = SpeechProsodyService(tts_client)
+    enhanced_text = await prosody_service.generate_and_apply_runtime(
         response_text=response_text,
         llm_client=llm_client,
         conversation_history=conversation_history if conversation_history else None,
