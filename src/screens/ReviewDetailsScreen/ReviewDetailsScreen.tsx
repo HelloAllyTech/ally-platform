@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, StyleSheet, View} from 'react-native';
+import {ActivityIndicator, SafeAreaView, StyleSheet, View} from 'react-native';
 
 import {
   CommentInput,
@@ -11,6 +11,7 @@ import {
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAddReviewCommentMutation} from '@/services/reviewsApi';
+import {colors} from '@/theme';
 import {Message, MessageData, TextSelection} from '@/types/reviews';
 import {splitByCommentRanges} from '@/utils/reviews';
 
@@ -34,8 +35,8 @@ export const ReviewDetailsScreen: React.FC = () => {
     useAddReviewCommentMutation();
 
   const {
-    isCommentsBottomSheetVisible,
-    closeCommentsBottomSheet,
+    isThreadsBottomSheetVisible,
+    closeThreadsBottomSheet,
     onThreadPress,
     isCommentThreadBottomSheetVisible,
     closeCommentThreadBottomSheet,
@@ -44,7 +45,7 @@ export const ReviewDetailsScreen: React.FC = () => {
     closeReplyBottomSheet,
     selectedComment,
     onReplyPress,
-    showCommentsBottomSheet,
+    showThreadsBottomSheet,
   } = useReviewComments();
 
   const [comment, setComment] = useState('');
@@ -181,6 +182,10 @@ export const ReviewDetailsScreen: React.FC = () => {
   };
 
   const handleThreadClick = (threadId: string, messageId: string) => {
+    if (!showCommentInput) {
+      showThreadsBottomSheet();
+    }
+    console.log('threadId', threadId);
     const message = data?.data?.find(
       messageItem => messageItem.id === messageId,
     );
@@ -190,7 +195,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   };
 
   return (
-    <>
+    <SafeAreaView style={styles.safe}>
       {/* Main conversation/messages view */}
       <Conversation
         messages={conversationMessages}
@@ -215,11 +220,11 @@ export const ReviewDetailsScreen: React.FC = () => {
         reviewId={_reviewId}
         reactions={{}}
         commentsCount={0}
-        onCommentPress={showCommentsBottomSheet}
+        onCommentPress={showThreadsBottomSheet}
       />
       <ThreadsBottomSheet
-        visible={isCommentsBottomSheetVisible}
-        onClose={closeCommentsBottomSheet}
+        visible={isThreadsBottomSheetVisible}
+        onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}
         onThreadPress={onThreadPress}
       />
@@ -250,11 +255,15 @@ export const ReviewDetailsScreen: React.FC = () => {
           // Handle add comment press
         }}
       />
-    </>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
