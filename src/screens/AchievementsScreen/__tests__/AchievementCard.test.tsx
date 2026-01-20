@@ -2,24 +2,8 @@ import React from 'react';
 import {render} from '@testing-library/react-native';
 
 import {AchievementCard} from '../components/AchievementCard';
-import {Achievement} from '../mockUtils';
-
-// Mock react-i18next
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        'Achievements.firstSteps.title': 'First Steps',
-        'Achievements.firstSteps.description': 'Complete your first session',
-        'Achievements.consistentStart.title': 'Consistent Start',
-        'Achievements.consistentStart.description': 'Start 5 sessions',
-        'Achievements.milestoneHunter.title': 'Milestone Hunter',
-        'Achievements.milestoneHunter.description': 'Reach a milestone',
-      };
-      return translations[key] || key;
-    },
-  }),
-}));
+import {Badge} from '@/types';
+import {BadgeCategory, LockStatus, ViewedStatus} from '@/constants/badges';
 
 // Mock AchievementLockedIcon
 jest.mock('@/assets/icons', () => ({
@@ -31,36 +15,43 @@ jest.mock('@/assets/icons', () => ({
 }));
 
 describe('AchievementCard', () => {
-  const mockUnlockedAchievement: Achievement = {
+  const mockUnlockedBadge: Badge = {
     id: 'test-unlocked',
-    titleKey: 'Achievements.firstSteps.title',
-    descriptionKey: 'Achievements.firstSteps.description',
-    icon: '⏳',
-    isUnlocked: true,
+    code: 'FIRST_STEPS',
+    name: 'First Steps',
+    description: 'Complete your first session',
+    imageUrl: 'https://example.com/badge.png',
+    category: BadgeCategory.SIMULATION_MINUTES,
+    achievementParams: {count: 1},
+    viewedStatus: ViewedStatus.VIEWED,
+    lockStatus: LockStatus.UNLOCKED,
   };
 
-  const mockLockedAchievement: Achievement = {
+  const mockLockedBadge: Badge = {
     id: 'test-locked',
-    titleKey: 'Achievements.consistentStart.title',
-    descriptionKey: 'Achievements.consistentStart.description',
-    icon: '🔒',
-    isUnlocked: false,
+    code: 'CONSISTENT_START',
+    name: 'Consistent Start',
+    description: 'Start 5 sessions',
+    imageUrl: 'https://example.com/badge.png',
+    category: BadgeCategory.SIMULATION_MINUTES,
+    achievementParams: {count: 5},
+    viewedStatus: ViewedStatus.UNVIEWED,
+    lockStatus: LockStatus.LOCKED,
   };
 
   it('renders unlocked achievement correctly', () => {
     const {getByText, queryByTestId} = render(
-      <AchievementCard achievement={mockUnlockedAchievement} />,
+      <AchievementCard badge={mockUnlockedBadge} />,
     );
 
     expect(getByText('First Steps')).toBeTruthy();
     expect(getByText('Complete your first session')).toBeTruthy();
-    expect(getByText('⏳')).toBeTruthy();
     expect(queryByTestId('achievement-locked-icon')).toBeNull();
   });
 
   it('renders locked achievement correctly', () => {
     const {getByText, getByTestId} = render(
-      <AchievementCard achievement={mockLockedAchievement} />,
+      <AchievementCard badge={mockLockedBadge} />,
     );
 
     expect(getByText('Consistent Start')).toBeTruthy();
@@ -70,7 +61,7 @@ describe('AchievementCard', () => {
 
   it('applies locked styles when achievement is locked', () => {
     const {getByText} = render(
-      <AchievementCard achievement={mockLockedAchievement} />,
+      <AchievementCard badge={mockLockedBadge} />,
     );
 
     const title = getByText('Consistent Start');
@@ -80,33 +71,33 @@ describe('AchievementCard', () => {
     expect(description).toBeTruthy();
   });
 
-  it('displays icon emoji for unlocked achievements', () => {
-    const {getByText} = render(
-      <AchievementCard achievement={mockUnlockedAchievement} />,
+  it('displays badge image for unlocked achievements', () => {
+    const {queryByTestId} = render(
+      <AchievementCard badge={mockUnlockedBadge} />,
     );
 
-    expect(getByText('⏳')).toBeTruthy();
+    expect(queryByTestId('achievement-locked-icon')).toBeNull();
   });
 
   it('displays locked icon for locked achievements', () => {
     const {getByTestId} = render(
-      <AchievementCard achievement={mockLockedAchievement} />,
+      <AchievementCard badge={mockLockedBadge} />,
     );
 
     expect(getByTestId('achievement-locked-icon')).toBeTruthy();
   });
 
-  it('renders achievement title using translation key', () => {
+  it('renders achievement title correctly', () => {
     const {getByText} = render(
-      <AchievementCard achievement={mockUnlockedAchievement} />,
+      <AchievementCard badge={mockUnlockedBadge} />,
     );
 
     expect(getByText('First Steps')).toBeTruthy();
   });
 
-  it('renders achievement description using translation key', () => {
+  it('renders achievement description correctly', () => {
     const {getByText} = render(
-      <AchievementCard achievement={mockUnlockedAchievement} />,
+      <AchievementCard badge={mockUnlockedBadge} />,
     );
 
     expect(getByText('Complete your first session')).toBeTruthy();

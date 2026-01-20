@@ -5,7 +5,7 @@ import {Message as MessageComponent} from '@/components/Message';
 import {SelectableTextArea} from '@/components/SelectableTextArea/SelectableTextArea';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
-import {MessageData} from '@/types/reviews';
+import {MessageData, TextSelection} from '@/types/reviews';
 
 const formatTimestamp = (startSeconds: number) => {
   const minutes = Math.floor(startSeconds / 60);
@@ -15,8 +15,8 @@ const formatTimestamp = (startSeconds: number) => {
 export interface ConversationProps {
   messages: MessageData[];
   isSelectable?: boolean;
-  onSelection?: (selection: string, messageId: string) => void;
-  currentHighlightedText?: string;
+  onSelection?: (selection: TextSelection, messageId: string) => void;
+  currentHighlightedText?: TextSelection | null;
   onThreadClick?: (threadId: string, messageId: string) => void;
 }
 
@@ -33,14 +33,14 @@ export const Conversation: React.FC<ConversationProps> = ({
     </View>
   );
 
-  const handleSelection = (selection: string, messageId: string) => {
+  const handleSelection = (selection: TextSelection, messageId: string) => {
     onSelection?.(selection, messageId);
   };
 
   const renderSelectableMessage = (messageItem: MessageData) => (
     <SelectableTextArea
       menuOptions={['Add Comment']}
-      onSelection={selection => handleSelection?.(selection, messageItem.id)}>
+      onSelection={selection => handleSelection(selection, messageItem.id)}>
       <Text>
         <Text style={styles.userName}>{messageItem.senderId}:</Text>{' '}
         <Text style={styles.messageContent}>

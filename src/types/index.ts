@@ -37,7 +37,20 @@ export type {SimulationTranscriptMessage} from './simulationTranscript';
 // Credits types
 export * from './credits';
 
+// General types (additional exports)
 export * from './general';
+
+// Message types (additional exports)
 export * from './message';
+
+// Force Update types
 export * from './forceUpdate';
+
+// Fields types
 export * from './fields';
+
+// Badge types
+export * from './badges';
+
+// Review types
+export * from './reviews';

@@ -17,3 +17,5 @@ export {LeaderboardScreen} from './LeaderboardScreen';
 export {AchievementsScreen} from './AchievementsScreen';
 export {ProfileSettingsScreen} from './ProfileSettingsScreen';
 export {ReviewScreen} from './ReviewScreen';
+export {ReviewDetailsScreen} from './ReviewDetailsScreen/ReviewDetailsScreen';
+export {ReactionsScreen} from './ReactionsScreen';
