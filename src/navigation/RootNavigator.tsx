@@ -21,6 +21,7 @@ import {
   CallSummaryScreen,
   ListeningScreen,
   ProfileSettingsScreen,
+  ReactionsScreen,
   SimulationAssistantScreen,
   SimulationDetailsScreen,
   SimulationFeedbackScreen,
@@ -249,6 +250,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.PROFILE_SETTINGS}
             component={ProfileSettingsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.REACTIONS}
+            component={ReactionsScreen}
           />
         </>
       ) : (

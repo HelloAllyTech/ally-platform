@@ -2,11 +2,15 @@ import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {
   AddReviewCommentRequest,
   AddReviewCommentResponse,
+  CreateReviewRequest,
+  CreateReviewResponse,
   GetMessagesRequest,
   GetMessagesResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
   ReviewsResponse,
+  UpdateReviewStatusRequest,
+  UpdateReviewStatusResponse,
 } from '@/types/reviews';
 
 import {api} from './api';
@@ -21,6 +25,23 @@ export enum ReviewFilter {
 
 export const reviewsApi = api.injectEndpoints({
   endpoints: builder => ({
+    createReview: builder.mutation<CreateReviewResponse, CreateReviewRequest>({
+      query: body => ({
+        url: API_ROUTES.REVIEWS.CREATE_REVIEW,
+        method: API_METHODS.POST,
+        body,
+      }),
+    }),
+    updateReviewStatus: builder.mutation<
+      UpdateReviewStatusResponse,
+      {reviewId: string; status: UpdateReviewStatusRequest}
+    >({
+      query: ({reviewId, status}) => ({
+        url: API_ROUTES.REVIEWS.UPDATE_REVIEW_STATUS(reviewId),
+        method: API_METHODS.PATCH,
+        body: status,
+      }),
+    }),
     addReviewComment: builder.mutation<
       AddReviewCommentResponse,
       AddReviewCommentRequest
@@ -81,6 +102,8 @@ export const reviewsApi = api.injectEndpoints({
 });
 
 export const {
+  useCreateReviewMutation,
+  useUpdateReviewStatusMutation,
   useGetMessagesQuery,
   useAddReviewCommentMutation,
   useGetThreadCommentsQuery,

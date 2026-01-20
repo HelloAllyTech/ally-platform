@@ -54,13 +54,33 @@ jest.mock('@/assets/icons', () => ({
 
 // Mock AchievementCard
 jest.mock('../components/AchievementCard', () => ({
-  AchievementCard: ({achievement}: {achievement: any}) => {
+  AchievementCard: ({badge}: {badge: any}) => {
     const React = require('react');
     const {Text, View} = require('react-native');
     return (
-      <View testID={`achievement-card-${achievement.id}`}>
-        <Text>{achievement.titleKey}</Text>
-        <Text>{achievement.descriptionKey}</Text>
+      <View testID={`achievement-card-${badge.id}`}>
+        <Text>{badge.name}</Text>
+        <Text>{badge.description}</Text>
+      </View>
+    );
+  },
+}));
+
+// Mock TabView component
+jest.mock('@/components', () => ({
+  TabView: ({tabs, activeTab, onTabChange}: any) => {
+    const React = require('react');
+    const {View, TouchableOpacity, Text} = require('react-native');
+    return (
+      <View testID="tab-view">
+        {tabs.map((tab: any) => (
+          <TouchableOpacity
+            key={tab.key}
+            testID={`tab-${tab.key}`}
+            onPress={() => onTabChange(tab.key)}>
+            <Text>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   },
@@ -109,57 +129,58 @@ describe('AchievementsScreen', () => {
     }
   });
 
-  it('renders unlocked achievements section', () => {
-    const {getByText, getAllByTestId} = renderWithSafeArea(
+  it('renders filter tabs', () => {
+    const {getByTestId} = renderWithSafeArea(
       <AchievementsScreen />,
     );
 
-    expect(getByText('Unlocked')).toBeTruthy();
-    // Should have unlocked achievement cards
-    const unlockedCards = getAllByTestId(/achievement-card-(first-steps|consistent-start|milestone-hunter)/);
-    expect(unlockedCards.length).toBeGreaterThan(0);
+    expect(getByTestId('tab-view')).toBeTruthy();
+    expect(getByTestId('tab-all')).toBeTruthy();
+    expect(getByTestId('tab-unlocked')).toBeTruthy();
   });
 
-  it('renders locked achievements section', () => {
-    const {getByText, getAllByTestId} = renderWithSafeArea(
+  it('renders both unlocked and locked badges in all tab', () => {
+    const {getAllByTestId} = renderWithSafeArea(
       <AchievementsScreen />,
     );
 
-    expect(getByText('Locked')).toBeTruthy();
-    // Should have locked achievement cards
-    const lockedCards = getAllByTestId(/achievement-card-(consistent-start-locked|365-champion|week-warrior)/);
-    expect(lockedCards.length).toBeGreaterThan(0);
+    // In "all" tab, should show both unlocked and locked badges
+    const allCards = getAllByTestId(/achievement-card-badge-/);
+    expect(allCards.length).toBeGreaterThan(0);
   });
 
-  it('separates unlocked and locked achievements into different sections', () => {
-    const {getByText} = renderWithSafeArea(<AchievementsScreen />);
+  it('filters to show only unlocked badges when unlocked tab is selected', () => {
+    const {getByTestId, getAllByTestId} = renderWithSafeArea(
+      <AchievementsScreen />,
+    );
 
-    const unlockedSection = getByText('Unlocked');
-    const lockedSection = getByText('Locked');
+    // Click on unlocked tab
+    const unlockedTab = getByTestId('tab-unlocked');
+    fireEvent.press(unlockedTab);
 
-    expect(unlockedSection).toBeTruthy();
-    expect(lockedSection).toBeTruthy();
+    // Should only show unlocked badges (3 in mock data: badge-1, badge-2, badge-8)
+    const unlockedCards = getAllByTestId(/achievement-card-badge-/);
+    expect(unlockedCards.length).toBe(3);
   });
 
-  it('renders all achievement cards', () => {
+  it('renders all achievement cards in all tab', () => {
     const {getAllByTestId} = renderWithSafeArea(<AchievementsScreen />);
 
-    // Should render all 6 achievements from mockUtils
-    const achievementCards = getAllByTestId(/achievement-card-/);
-    expect(achievementCards.length).toBe(6);
+    // Should render all 10 badges from mockData
+    const achievementCards = getAllByTestId(/achievement-card-badge-/);
+    expect(achievementCards.length).toBe(10);
   });
 
-  it('does not render unlocked section if no unlocked achievements', () => {
-    // This test would require mocking generateMockAchievements to return empty unlocked array
-    // For now, we test that it renders when there are unlocked achievements
+  it('shows categories in the view', () => {
     const {getByText} = renderWithSafeArea(<AchievementsScreen />);
-    expect(getByText('Unlocked')).toBeTruthy();
+    
+    // Should show category names from mockData
+    expect(getByText('Journey')).toBeTruthy();
+    expect(getByText('Momentum')).toBeTruthy();
   });
 
-  it('does not render locked section if no locked achievements', () => {
-    // This test would require mocking generateMockAchievements to return empty locked array
-    // For now, we test that it renders when there are locked achievements
+  it('shows badges label', () => {
     const {getByText} = renderWithSafeArea(<AchievementsScreen />);
-    expect(getByText('Locked')).toBeTruthy();
+    expect(getByText('Achievements.badges')).toBeTruthy();
   });
 });
