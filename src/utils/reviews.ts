@@ -88,15 +88,19 @@ export const getTopReactions = (
 };
 
 export const getReactionsArray = (
-  reactions: Record<string, number>,
+  reactions?: Record<string, number>,
 ): string[] => {
-  return Object.keys(reactions)
-    .filter(key => reactions[key] > 0)
-    .map(key => EMOJI_UNICODE_MAP[key] || '❤');
+  return reactions
+    ? Object.keys(reactions)
+        .filter(key => reactions[key] > 0)
+        .map(key => EMOJI_UNICODE_MAP[key] || '❤')
+    : [];
 };
 
 export const getTotalReactionCount = (
-  reactions: Record<string, number>,
+  reactions?: Record<string, number>,
 ): number => {
-  return Object.values(reactions).reduce((sum, count) => sum + count, 0);
+  return reactions
+    ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
+    : 0;
 };

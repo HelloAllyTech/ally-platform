@@ -22,7 +22,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   showReplyButton = true,
 }) => {
   const {t} = useTranslate();
-  const initials = name.charAt(0).toUpperCase();
+  const initials = name ? name.charAt(0).toUpperCase() : '';
 
   const getRepliesText = () => {
     if (replyCount === 1) {

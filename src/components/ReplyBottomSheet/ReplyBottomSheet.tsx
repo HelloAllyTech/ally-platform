@@ -81,7 +81,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         <View style={styles.replyItemContainer}>
           <ReviewComment
             name={reply.createdBy.name}
-            time={formatRelativeTime(reply.createdAt)}
+            time={reply.createdAt ? formatRelativeTime(reply.createdAt) : ''}
             comment={reply.content}
             profileImageUrl={reply.createdBy.profileImage}
             reactions={reactionsArray}
@@ -125,7 +125,11 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       <View style={styles.originalCommentContainer}>
         <ReviewComment
           name={originalComment.createdBy.name}
-          time={formatRelativeTime(originalComment.createdAt)}
+          time={
+            originalComment.createdAt
+              ? formatRelativeTime(originalComment.createdAt)
+              : ''
+          }
           comment={originalComment.content}
           profileImageUrl={originalComment.createdBy.profileImage}
           reactions={reactionsArray}

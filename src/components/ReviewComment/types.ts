@@ -2,15 +2,15 @@ export interface ReviewCommentProps {
   /**
    * User's name
    */
-  name: string;
+  name?: string;
   /**
    * Time text (e.g., "30 min", "2 hours")
    */
-  time: string;
+  time?: string;
   /**
    * Comment text content
    */
-  comment: string;
+  comment?: string;
   /**
    * User's profile image URL (optional)
    */

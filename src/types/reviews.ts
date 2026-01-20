@@ -13,14 +13,14 @@ export interface AddReviewCommentResponse {
 
 export interface MessageThreadComment {
   id: string;
-  content: string;
-  createdAt: string;
+  content?: string;
+  createdAt?: string;
   createdBy: {
-    id: string;
-    name: string;
-    profileImage: string | null;
+    id?: string;
+    name?: string;
+    profileImage?: string | null;
   };
-  reactions: {
+  reactions?: {
     [reactionCode: string]: number;
   };
   replyCount?: number;
