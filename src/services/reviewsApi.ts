@@ -70,7 +70,7 @@ export const reviewsApi = api.injectEndpoints({
         return {
           url: API_ROUTES.REVIEWS.GET_MESSAGES(reviewId),
           method: API_METHODS.GET,
-          body: {offset, limit},
+          params: {offset, limit},
         };
       },
     }),
