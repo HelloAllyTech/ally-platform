@@ -181,7 +181,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const onDisconnected = () => {
       setIsConnecting(false);
       if (!isDisconnecting) {
-        playNotificationSound(sounds.simulationAutoTermination);
+        playNotificationSound(sounds.endSimulation);
         setIsDisconnecting(true);
         setIsMicEnabled(false);
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
