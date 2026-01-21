@@ -523,8 +523,8 @@
       "undiscovered": "Undiscovered"
     },
     "empty": {
-      "title": "No shared simulations found",
-      "description": "Your recent shared simulations will be listed here."
+      "title": "No shared sessions yet",
+      "description": "Shared user transcripts will be available here for review."
     },
     "fetchError" : "Failed to fetch reviews"
   },

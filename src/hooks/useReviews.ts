@@ -5,7 +5,7 @@ import {mockGetReviews} from '@/screens/ReviewScreen/mockData';
 import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
-const LIMIT = 5;
+const LIMIT = 10;
 const USE_MOCK = false;
 
 export const useReviews = () => {
