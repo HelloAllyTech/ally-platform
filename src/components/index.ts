@@ -55,6 +55,7 @@ export {EmojiPicker} from './EmojiPicker';
 export type {EmojiPickerProps} from './EmojiPicker';
 export {ThreadsBottomSheet} from './ThreadsBottomSheet';
 export type {ThreadsBottomSheetProps} from './ThreadsBottomSheet';
+export {MessageThreadsBottomSheet} from './MessageThreadsBottomSheet';
 export {CommentThreadBottomSheet} from './CommentThreadBottomSheet';
 export type {CommentThreadBottomSheetProps} from './CommentThreadBottomSheet';
 export {ReplyBottomSheet} from './ReplyBottomSheet';

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
 import {ActivityIndicator, SafeAreaView, StyleSheet, View} from 'react-native';
 
@@ -6,6 +6,7 @@ import {
   CommentInput,
   CommentThreadBottomSheet,
   Conversation,
+  MessageThreadsBottomSheet,
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
@@ -15,7 +16,12 @@ import {
   useGetMessagesQuery,
 } from '@/services/reviewsApi';
 import {colors} from '@/theme';
-import {MessageData, TextSelection} from '@/types/reviews';
+import {
+  Message,
+  MessageData,
+  MessageThread,
+  TextSelection,
+} from '@/types/reviews';
 import {splitByCommentRanges} from '@/utils/reviews';
 
 import {useReviewComments} from './hooks/useReviewComments';
@@ -24,14 +30,27 @@ const MESSAGES_PER_PAGE = 10;
 
 export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
-  // Assume the route params contain reviewId
   const route = useRoute<any>();
   const {reviewId: _reviewId} = route.params || {};
 
-  // Pagination state
+  // State management
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [rawMessages, setRawMessages] = useState<Message[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<
+    MessageData[]
+  >([]);
+  const [comment, setComment] = useState('');
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [currentHighlightedText, setCurrentHighlightedText] =
+    useState<TextSelection | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>();
+  const [isMessageThreadsVisible, setIsMessageThreadsVisible] = useState(false);
+  const [selectedMessageForThreads, setSelectedMessageForThreads] = useState<
+    string | null
+  >(null);
 
+  // API hooks
   const {
     data: messagesData,
     isLoading,
@@ -42,10 +61,10 @@ export const ReviewDetailsScreen: React.FC = () => {
     {skip: !_reviewId},
   );
 
-  // ADD REVIEW COMMENT API
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
 
+  // Custom hooks
   const {
     isThreadsBottomSheetVisible,
     closeThreadsBottomSheet,
@@ -60,97 +79,139 @@ export const ReviewDetailsScreen: React.FC = () => {
     showThreadsBottomSheet,
   } = useReviewComments();
 
-  const [comment, setComment] = useState('');
-  const [showCommentInput, setShowCommentInput] = useState(false);
-  const [currentHighlightedText, setCurrentHighlightedText] =
-    useState<TextSelection | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>();
-  const [conversationMessages, setConversationMessages] = useState<
-    MessageData[]
-  >([]);
+  // Helper to map message threads to comment ranges
+  const mapMessageThreads = useCallback((threads: MessageThread[]) => {
+    return threads.map(thread => ({
+      id: thread.id,
+      start: thread.selection.startIndex as number,
+      end: thread.selection.endIndex as number,
+    }));
+  }, []);
 
-  // Update conversationMessages when new data is fetched
-  useEffect(() => {
-    if (messagesData?.data) {
-      const newMessages = messagesData.data;
-      const mappedMessages = newMessages.map(message => ({
+  // Helper to map raw message to conversation format
+  const mapMessageToConversation = useCallback(
+    (message: Message): MessageData => {
+      return {
         id: message.id,
         content: message.content,
         startSeconds: message.startSeconds,
         endSeconds: message.endSeconds,
         senderId: message.senderId,
+        createdAt: message.createdAt,
         messagePart: splitByCommentRanges(
           message.content,
-          message.threads.map(thread => ({
-            id: thread.id,
-            start: thread.selection.startIndex as number,
-            end: thread.selection.endIndex as number,
-          })),
+          mapMessageThreads(message.threads),
         ),
-      }));
+      };
+    },
+    [mapMessageThreads],
+  );
 
-      // If offset is 0, replace all messages (initial load or refresh)
-      if (offset === 0) {
-        setConversationMessages(mappedMessages as unknown as MessageData[]);
-      } else {
-        // Append new messages, avoiding duplicates
-        setConversationMessages(prev => {
-          const existingIds = new Set(prev.map(m => m.id));
-          const uniqueNewMessages = mappedMessages.filter(
-            m => !existingIds.has(m.id),
-          );
-          return [...prev, ...uniqueNewMessages] as MessageData[];
-        });
-      }
+  // Helper to merge messages avoiding duplicates
+  const mergeMessages = useCallback(
+    <T extends {id: string}>(existing: T[], newItems: T[]): T[] => {
+      const existingIds = new Set(existing.map(m => m.id));
+      const uniqueNewItems = newItems.filter(m => !existingIds.has(m.id));
+      return [...existing, ...uniqueNewItems];
+    },
+    [],
+  );
 
-      // Check if there are more messages to load
-      if (newMessages.length < MESSAGES_PER_PAGE) {
-        setHasMore(false);
-      }
-    }
-  }, [messagesData, offset]);
+  // Update messages when new data is fetched
+  useEffect(() => {
+    if (!messagesData?.data) return;
 
-  // Helper function to map thread ranges
-  const mapThreadRanges = useCallback((threads: any[]) => {
-    return threads.map(thread => ({
-      id: thread.id,
-      start: thread.selection.startIndex,
-      end: thread.selection.endIndex,
-    }));
-  }, []);
+    const newMessages = messagesData.data;
+    const isInitialLoad = offset === 0;
 
-  // Update a specific message with new comment thread
+    // Update raw messages
+    setRawMessages(prev =>
+      isInitialLoad ? newMessages : mergeMessages(prev, newMessages),
+    );
+
+    // Map and update conversation messages
+    const mappedMessages = newMessages.map(mapMessageToConversation);
+    setConversationMessages(prev =>
+      isInitialLoad ? mappedMessages : mergeMessages(prev, mappedMessages),
+    );
+
+    // Update pagination state
+    setHasMore(newMessages.length >= MESSAGES_PER_PAGE);
+  }, [messagesData, offset, mapMessageToConversation, mergeMessages]);
+
+  // Create a new thread object
+  const createNewThread = useCallback(
+    (commentId: string, selection: TextSelection): MessageThread => ({
+      id: commentId,
+      selection: {
+        startIndex: selection.startIndex,
+        endIndex: selection.endIndex,
+        selectedText: selection.selectedText,
+      },
+      comments: [],
+      createdBy: {
+        id: '',
+        name: '',
+        profileImage: null,
+      },
+    }),
+    [],
+  );
+
+  // Update message with new comment thread
   const updateMessage = useCallback(
-    (payload: any) => {
+    (payload: {
+      selection: TextSelection;
+      commentId: string;
+      messageId: string;
+    }) => {
       const {selection, commentId, messageId} = payload;
 
+      // Update raw messages with new thread
+      setRawMessages(prev => {
+        const messageIndex = prev.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) return prev;
+
+        const updatedMessages = [...prev];
+        const newThread = createNewThread(commentId, selection);
+
+        updatedMessages[messageIndex] = {
+          ...updatedMessages[messageIndex],
+          threads: [...updatedMessages[messageIndex].threads, newThread],
+        };
+
+        return updatedMessages;
+      });
+
+      // Update conversation messages with new message parts
       setConversationMessages(prev => {
         const messageIndex = prev.findIndex(m => m.id === messageId);
-
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
         const currentMessage = updatedMessages[messageIndex];
+        const rawMessage = rawMessages.find(m => m.id === messageId);
 
-        // Get existing threads from the message
-        const existingThreads =
-          messagesData?.data?.find(m => m.id === messageId)?.threads || [];
+        if (!rawMessage) return prev;
 
-        // Create new message part with updated threads
-        const newMessagePart = splitByCommentRanges(currentMessage.content, [
-          ...mapThreadRanges(existingThreads),
+        // Recalculate message parts with all threads
+        const allThreadRanges = [
+          ...mapMessageThreads(rawMessage.threads),
           {id: commentId, start: selection.startIndex, end: selection.endIndex},
-        ]);
+        ];
 
         updatedMessages[messageIndex] = {
           ...currentMessage,
-          messagePart: newMessagePart,
+          messagePart: splitByCommentRanges(
+            currentMessage.content,
+            allThreadRanges,
+          ),
         };
 
         return updatedMessages;
       });
     },
-    [messagesData, mapThreadRanges],
+    [rawMessages, createNewThread, mapMessageThreads],
   );
 
   // Pagination callbacks
@@ -163,10 +224,108 @@ export const ReviewDetailsScreen: React.FC = () => {
   const refreshMessages = useCallback(() => {
     setOffset(0);
     setHasMore(true);
+    setRawMessages([]);
     setConversationMessages([]);
   }, []);
 
-  // Early returns after all hooks
+  // Comment input handlers - MUST be before early returns
+  const handleChangeComment = useCallback((text: string) => {
+    setComment(text);
+  }, []);
+
+  const resetCommentInput = useCallback(() => {
+    setShowCommentInput(false);
+    setComment('');
+    setCurrentHighlightedText(null);
+    setSelectedMessageId(null);
+  }, []);
+
+  const handleSelection = useCallback(
+    (selection: TextSelection, messageId: string) => {
+      setShowCommentInput(true);
+      setCurrentHighlightedText(selection);
+      setSelectedMessageId(messageId);
+    },
+    [],
+  );
+
+  const handleSendComment = useCallback(async () => {
+    if (
+      !selectedMessageId ||
+      !comment.trim() ||
+      !currentHighlightedText?.selectedText
+    ) {
+      return;
+    }
+
+    try {
+      const payload = {
+        reviewId: _reviewId,
+        messageId: selectedMessageId,
+        selection: currentHighlightedText,
+        content: comment.trim(),
+        ...(selectedComment?.id && {parentCommentId: selectedComment.id}),
+        ...(selectedThreadId && {threadId: selectedThreadId}),
+      };
+
+      const response = await addReviewComment(payload);
+
+      if (response.data?.commentId) {
+        updateMessage({
+          selection: currentHighlightedText,
+          commentId: response.data.commentId,
+          messageId: selectedMessageId,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    } finally {
+      resetCommentInput();
+    }
+  }, [
+    selectedMessageId,
+    comment,
+    currentHighlightedText,
+    _reviewId,
+    selectedComment,
+    selectedThreadId,
+    addReviewComment,
+    updateMessage,
+    resetCommentInput,
+  ]);
+
+  const handleThreadClick = useCallback(
+    (threadId: string, messageId: string) => {
+      if (!showCommentInput) {
+        setSelectedMessageForThreads(messageId);
+        setIsMessageThreadsVisible(true);
+      }
+    },
+    [showCommentInput],
+  );
+
+  const handleCloseMessageThreads = useCallback(() => {
+    setIsMessageThreadsVisible(false);
+    setSelectedMessageForThreads(null);
+  }, []);
+
+  const handleMessageThreadPress = useCallback(
+    (threadId: string) => {
+      // Close message threads bottom sheet and open comment thread bottom sheet
+      setIsMessageThreadsVisible(false);
+      onThreadPress(threadId);
+    },
+    [onThreadPress],
+  );
+
+  // Get threads for selected message
+  const selectedMessageThreads = useMemo(() => {
+    if (!selectedMessageForThreads) return [];
+    const message = rawMessages.find(m => m.id === selectedMessageForThreads);
+    return message?.threads || [];
+  }, [selectedMessageForThreads, rawMessages]);
+
+  // Early returns after ALL hooks
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -182,76 +341,6 @@ export const ReviewDetailsScreen: React.FC = () => {
       </View>
     );
   }
-
-  const handleChangeComment = (text: string) => {
-    setComment(text);
-  };
-
-  const handleSendComment = async () => {
-    if (
-      selectedMessageId &&
-      comment.trim().length > 0 &&
-      currentHighlightedText?.selectedText
-    ) {
-      try {
-        const payload: {
-          reviewId: string;
-          messageId: string;
-          selection: TextSelection;
-          content: string;
-          parentCommentId?: string;
-          threadId?: string;
-        } = {
-          reviewId: _reviewId,
-          messageId: selectedMessageId,
-          selection: currentHighlightedText,
-          content: comment,
-        };
-
-        if (selectedComment?.id) payload.parentCommentId = selectedComment?.id;
-
-        if (selectedThreadId) payload.threadId = selectedThreadId;
-        console.log('payload', payload);
-        const response = await addReviewComment(payload);
-        console.log('response', response);
-        if (response.data) {
-          updateMessage({
-            ...payload,
-            commentId: response.data.commentId,
-          });
-        }
-      } catch (error) {
-        // logger.error(error);
-      } finally {
-        resetCommentInput();
-      }
-    }
-  };
-
-  const handleSelection = (selection: TextSelection, messageId: string) => {
-    setShowCommentInput(true);
-    setCurrentHighlightedText(selection);
-    setSelectedMessageId(messageId);
-  };
-
-  const resetCommentInput = () => {
-    setShowCommentInput(false);
-    setComment('');
-    setCurrentHighlightedText(null);
-    setSelectedMessageId(null);
-  };
-
-  const handleThreadClick = (threadId: string, messageId: string) => {
-    if (!showCommentInput) {
-      showThreadsBottomSheet();
-    }
-    const message = conversationMessages?.find(
-      messageItem => messageItem.id === messageId,
-    );
-    if (message) {
-      // TODO_M: Fetch thread comments and list them in bottomsheet
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -290,6 +379,14 @@ export const ReviewDetailsScreen: React.FC = () => {
         onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}
         onThreadPress={onThreadPress}
+      />
+      <MessageThreadsBottomSheet
+        visible={isMessageThreadsVisible}
+        onClose={handleCloseMessageThreads}
+        messageId={selectedMessageForThreads || ''}
+        reviewId={_reviewId}
+        threads={selectedMessageThreads}
+        onThreadPress={handleMessageThreadPress}
       />
       <CommentThreadBottomSheet
         visible={isCommentThreadBottomSheetVisible}
