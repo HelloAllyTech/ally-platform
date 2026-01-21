@@ -28,4 +28,3 @@ export * from './useTranslate';
 export * from './useUser';
 export * from './useProfileImage';
 export * from './useReviews';
-export * from './useBadgePopup';
