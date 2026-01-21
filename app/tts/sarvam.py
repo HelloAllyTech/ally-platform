@@ -71,12 +71,12 @@ class SarvamTTSClient(BaseTTSClient):
         },
         "loudness": {
             "type": "float",
-            "range": [0.1, 3.0],
+            "range": [0.5, 2.0],
             "default": 1.0,
             "description": (
                 "Volume/loudness multiplier. 1.0 = normal volume. Higher values "
-                "(1.5-3.0) = louder (excitement). Lower values (0.1-0.7) = quieter "
-                "(shame/withdrawal). Range: 0.1 to 3.0."
+                "(1.5-2.0) = louder (excitement). Lower values (0.5-0.7) = quieter "
+                "(shame/withdrawal). Range: 0.5 to 2.0."
             ),
         },
     }
