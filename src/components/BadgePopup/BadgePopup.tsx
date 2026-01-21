@@ -12,11 +12,12 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {useBadge} from '@/hooks/useBadge';
+import {useBadgePopup} from '@/hooks/useBadgePopup';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export const BadgePopup = () => {
-  const {currentBadge, isFirstBadge, isBadgesLoading, closeBadge} = useBadge();
+  const {currentBadge, isFirstBadge, isBadgesLoading, closeBadge} =
+    useBadgePopup();
 
   const {t} = useTranslation();
   const [isLayoutReady, setIsLayoutReady] = useState(false);
@@ -25,8 +26,7 @@ export const BadgePopup = () => {
     if (currentBadge) {
       setIsLayoutReady(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBadge?.id]);
+  }, [currentBadge]);
 
   const handleImageContainerLayout = useCallback(() => {
     requestAnimationFrame(() => {
@@ -38,11 +38,9 @@ export const BadgePopup = () => {
     return <ConfettiCannon fadeOut count={100} origin={{x: 0, y: 0}} />;
   };
 
-  const shouldShowModal = currentBadge !== null;
-
   return (
     <Modal
-      visible={shouldShowModal}
+      visible={!!currentBadge}
       transparent
       animationType="none"
       onRequestClose={closeBadge}
@@ -85,7 +83,7 @@ export const BadgePopup = () => {
           </View>
         ) : null}
       </View>
-      {isFirstBadge && shouldShowModal && renderConfetti()}
+      {isFirstBadge && renderConfetti()}
     </Modal>
   );
 };
