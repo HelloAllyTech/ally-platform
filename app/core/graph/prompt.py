@@ -3,6 +3,7 @@ from typing import Optional
 
 from langchain_core.messages import SystemMessage
 
+from app.core.config import settings
 from app.core.scenario.base import PromptData
 
 # --- Constants ---
@@ -88,7 +89,9 @@ def _format_custom_fields(custom_fields: list) -> str:
 
 
 def generate_system_message(
-    prompt_data: PromptData, next_instruction: Optional[str] = None
+    prompt_data: PromptData,
+    next_instruction: Optional[str] = None,
+    language_code: Optional[str] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -107,6 +110,7 @@ def generate_system_message(
         next_instruction: Optional conversation-specific directive
             (branching instruction).
                          If provided, triggers minimal prompt mode.
+        language_code: Optional language code for multilingual enhancements.
 
     Returns:
         A SystemMessage object with the complete, formatted prompt.
@@ -137,7 +141,24 @@ def generate_system_message(
         """
         ).strip()
 
-        return SystemMessage(content=minimal_prompt)
+        system_message = SystemMessage(content=minimal_prompt)
+
+        # Apply multilingual enhancements if CoTR method is selected
+        # Only apply for non-English languages
+        if (
+            settings.MULTILINGUAL_METHOD == "cotr"
+            and language_code
+            and not language_code.startswith("en")
+        ):
+            from app.multilingual.cotr import enhance_system_message_with_cotr
+
+            system_message = enhance_system_message_with_cotr(
+                system_message=system_message,
+                language_code=language_code,
+                prompt_data=prompt_data,
+            )
+
+        return system_message
 
     # Otherwise, use the full detailed prompt (original behavior)
 
@@ -216,11 +237,30 @@ def generate_system_message(
     """
     )
 
-    return SystemMessage(content=system_prompt.strip())
+    system_message = SystemMessage(content=system_prompt.strip())
+
+    # Apply multilingual enhancements if CoTR method is selected
+    # Only apply for non-English languages
+    if (
+        settings.MULTILINGUAL_METHOD == "cotr"
+        and language_code
+        and not language_code.startswith("en")
+    ):
+        from app.multilingual.cotr import enhance_system_message_with_cotr
+
+        system_message = enhance_system_message_with_cotr(
+            system_message=system_message,
+            language_code=language_code,
+            prompt_data=prompt_data,
+        )
+
+    return system_message
 
 
 def generate_prompt_content(
-    prompt_data: PromptData, next_instruction: Optional[str] = None
+    prompt_data: PromptData,
+    next_instruction: Optional[str] = None,
+    language_code: Optional[str] = None,
 ) -> str:
     """
     Generate prompt content string from PromptData.
@@ -233,9 +273,12 @@ def generate_prompt_content(
         prompt_data: An instance of PromptData containing all client info.
         next_instruction: Optional conversation-specific directive
             (branching instruction).
+        language_code: Optional language code for multilingual enhancements.
 
     Returns:
         The prompt content as a string.
     """
-    system_message = generate_system_message(prompt_data, next_instruction)
+    system_message = generate_system_message(
+        prompt_data, next_instruction, language_code
+    )
     return system_message.content

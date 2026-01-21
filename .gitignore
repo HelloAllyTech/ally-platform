@@ -227,6 +227,9 @@ media/
 static/collected/
 staticfiles/
 
+# Evaluation logs
+evaluation_logs/
+
 # Backup files
 *.bak
 *.backup

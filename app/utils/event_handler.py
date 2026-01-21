@@ -191,6 +191,18 @@ def create_connection_state_handler(
                 return
 
             logger.info("Connection state is DISCONNECTED, sending final score")
+
+            # End conversation logging if logging is enabled
+            try:
+                from app.core.config import settings
+
+                if settings.EVALUATION_LOGGING_ENABLED:
+                    from app.evaluation.logger import evaluation_logger
+
+                    evaluation_logger.end_conversation(room_name)
+            except Exception as e:
+                logger.debug(f"Failed to end conversation logging: {e}")
+
             try:
                 task = asyncio.create_task(
                     send_final_score_to_core(
@@ -283,6 +295,17 @@ def create_shutdown_handler(
         )
 
         logger.debug("Shutdown callback triggered")
+
+        # End conversation logging if logging is enabled
+        try:
+            from app.core.config import settings
+
+            if settings.EVALUATION_LOGGING_ENABLED:
+                from app.evaluation.logger import evaluation_logger
+
+                evaluation_logger.end_conversation(room_name)
+        except Exception as e:
+            logger.debug(f"Failed to end conversation logging: {e}")
 
         # Send deferred termination event
         if event_orchestrator.deferred_termination_event:

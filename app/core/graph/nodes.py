@@ -5,6 +5,7 @@ from typing import Optional, cast
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
+from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.schemas import CustomUIEventMessageType
@@ -292,11 +293,18 @@ async def generate_response(
     scenario = (
         cast(Scenario, config["configurable"].get("scenario")) if config else None
     )
+
+    # Get language code for multilingual enhancements
+    language_code = DEFAULT_LANGUAGE_CODE
+    if scenario and scenario.language_config:
+        language_code = scenario.language_config.language_code
+
     system_message = None
     if scenario is not None:
         system_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
+            language_code=language_code,
         )
 
     # Get LLM client from config (pre-configured in AgentSetup) or create dynamically
@@ -306,10 +314,8 @@ async def generate_response(
 
     # Fallback: Create LLM client dynamically if not provided (backward compatibility)
     if llm_client is None:
-        language_code = DEFAULT_LANGUAGE_CODE
         llm_config_from_metadata = None
         if scenario and scenario.language_config:
-            language_code = scenario.language_config.language_code
             llm_config_from_metadata = scenario.language_config.llm_config
 
         try:
@@ -331,6 +337,41 @@ async def generate_response(
 
     # Generate response - no tools, just generate response text
     response = await llm_instance.ainvoke(messages_to_send)
+
+    # Log interaction for evaluation if logging is enabled
+    if settings.EVALUATION_LOGGING_ENABLED:
+        try:
+            from app.evaluation.logger import evaluation_logger
+
+            # Get session/room ID from config
+            session_id = None
+            if config and "configurable" in config:
+                room = config["configurable"].get("room")
+                if room and hasattr(room, "name"):
+                    session_id = room.name
+
+            # Get last user message
+            last_user_message = None
+            for msg in reversed(state.messages):
+                if isinstance(msg, HumanMessage) and hasattr(msg, "content"):
+                    last_user_message = msg.content
+                    break
+
+            if last_user_message:
+                evaluation_logger.log_interaction(
+                    input_text=last_user_message,
+                    output_text=response.content,
+                    language_code=language_code,
+                    method=settings.MULTILINGUAL_METHOD,
+                    metadata={
+                        "scenario_id": scenario.name if scenario else None,
+                        "model": getattr(llm_instance, "model_name", None)
+                        or getattr(llm_instance, "model", None),
+                    },
+                    session_id=session_id,  # Pass session_id for conversation tracking
+                )
+        except Exception as e:
+            logger.warning(f"Failed to log interaction for evaluation: {e}")
 
     # Prepare the final messages
     # Note: response.content is the agent's conversation response
