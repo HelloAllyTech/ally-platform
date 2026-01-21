@@ -10,7 +10,6 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # Whitelist of PromptData fields relevant for prosody decisions
-# This makes it easy to add/remove fields without breaking code
 PERSONA_CONTEXT_FIELDS = {
     "personality": "Personality",
     "tone": "Tone",
@@ -167,7 +166,8 @@ def build_prosody_prompt(
         parameter_metadata_json: JSON string of parameter metadata
         persona_context_text: Formatted persona context
         conversation_history_text: Formatted conversation history
-        conversation_history_count: Number of messages in history
+        conversation_history_count: Number of messages in history (unused,
+            kept for compatibility)
         enhancement_instructions: Text enhancement instructions if supported
         prompt_with_enhancement: Prompt template with text enhancement
         prompt_parameters_only: Prompt template for parameters only
@@ -191,7 +191,6 @@ def build_prosody_prompt(
             conversation_history=conversation_history_text,
             conversation_history_count=conversation_history_count,
             response_text=response_text,
-            termination_context="",  # Empty - LLM will infer from message text
             parameter_metadata=parameter_metadata_json,
             text_enhancement_instructions=enhancement_instructions,
             current_parameters=current_parameters_json,
@@ -203,7 +202,6 @@ def build_prosody_prompt(
             conversation_history=conversation_history_text,
             conversation_history_count=conversation_history_count,
             response_text=response_text,
-            termination_context="",  # Empty - LLM will infer from message text
             parameter_metadata=parameter_metadata_json,
             current_parameters=current_parameters_json,
         )

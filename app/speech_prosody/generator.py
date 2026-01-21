@@ -48,22 +48,18 @@ async def generate_default_parameters(
 
         parameter_metadata_json = json.dumps(parameter_metadata, indent=2)
 
-        # Include opening statements in prompt if available
-        opening_statements_section = ""
-        if (
-            scenario.prompt_data
-            and scenario.prompt_data.opening_statements
-            and len(scenario.prompt_data.opening_statements) > 0
-        ):
+        # Format opening statements if available
+        opening_statements = scenario.prompt_data.opening_statements
+        if opening_statements and len(opening_statements) > 0:
             opening_statements_text = "\n".join(
-                f"- {stmt}" for stmt in scenario.prompt_data.opening_statements
+                f"- {stmt}" for stmt in opening_statements
             )
             opening_statements_section = (
-                f"\nOPENING STATEMENTS (first words the character will say):\n"
+                "OPENING STATEMENTS (analyze emotional tone and physiological state):\n"
                 f"{opening_statements_text}\n"
-                f"\nConsider how the character's initial greeting/opening reflects "
-                f"their baseline physiological state.\n"
             )
+        else:
+            opening_statements_section = ""
 
         # Create generation prompt with metadata
         generation_prompt = prompts.DEFAULT_GENERATION_PROMPT.format(
