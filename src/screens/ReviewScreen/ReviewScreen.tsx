@@ -4,6 +4,7 @@ import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {EmptyReviewIcon} from '@/assets';
 import {EmptyState, TabView, useToast} from '@/components';
 import {REVIEW_FILTERS} from '@/constants';
 import {useTranslate} from '@/hooks';
@@ -89,6 +90,7 @@ export const ReviewScreen: React.FC = () => {
             <EmptyState
               title={t('Review.empty.title')}
               description={t('Review.empty.description')}
+              icon={EmptyReviewIcon}
             />
           ) : null
         }
