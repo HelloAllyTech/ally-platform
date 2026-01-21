@@ -1,12 +1,12 @@
-import {useCallback, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyState, TabView, useToast} from '@/components';
-import {REVIEW_FILTERS} from '@/constants';
-import {useTranslate} from '@/hooks';
+import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
@@ -20,6 +20,7 @@ export const ReviewScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {showToast} = useToast();
+  const navigation = useAppNavigation();
   const isFirstFocus = useRef(true);
 
   const {
@@ -45,9 +46,16 @@ export const ReviewScreen: React.FC = () => {
     }, [refresh]),
   );
 
-  if (error) {
-    showToast(t('Review.fetchError'), 'error');
-  }
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      showToast(t('Review.fetchError'), 'error');
+    }
+  }, [error, showToast, t]);
+
+  const handleReviewPress = (reviewId: string) => {
+    navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {reviewId});
+  };
 
   return (
     <View
@@ -77,6 +85,7 @@ export const ReviewScreen: React.FC = () => {
             user={item.createdBy}
             scenario={item.scenario}
             commentsCount={item.commentsCount}
+            onReviewPress={() => handleReviewPress(item.id)}
             reactions={item.reactions}
           />
         )}

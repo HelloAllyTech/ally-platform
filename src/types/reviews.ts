@@ -1,10 +1,16 @@
+export interface TextSelection {
+  selectedText: string;
+  startIndex: number;
+  endIndex: number;
+}
+
 export interface AddReviewCommentRequest {
   reviewId: string;
   threadId?: string;
   parentCommentId?: string;
   messageId?: string;
-  selection?: Record<string, unknown>;
-  comment: string;
+  selection?: TextSelection;
+  content: string;
 }
 
 export interface AddReviewCommentResponse {
@@ -137,11 +143,6 @@ export interface RepliesParams {
 }
 
 export type MessageList = Record<string, MessageData[]> | [];
-export interface TextSelection {
-  selectedText: string;
-  startIndex: number;
-  endIndex: number;
-}
 export interface CreateReviewRequest {
   scenarioSessionId: string;
 }

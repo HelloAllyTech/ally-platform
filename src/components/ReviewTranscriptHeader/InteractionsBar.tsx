@@ -71,6 +71,7 @@ const styles = ScaledSheet.create({
     paddingVertical: '8@s',
     paddingLeft: '8@s',
     paddingRight: '16@s',
+    marginHorizontal: '16@s',
     gap: '8@s',
     shadowColor: colors.black,
     shadowOffset: {

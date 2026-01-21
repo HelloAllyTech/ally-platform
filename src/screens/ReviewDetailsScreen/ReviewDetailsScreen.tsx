@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
 import {ActivityIndicator, SafeAreaView, StyleSheet, View} from 'react-native';
 
@@ -10,25 +10,37 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
-import {useAddReviewCommentMutation} from '@/services/reviewsApi';
+import {
+  useAddReviewCommentMutation,
+  useGetMessagesQuery,
+} from '@/services/reviewsApi';
 import {colors} from '@/theme';
-import {Message, MessageData, TextSelection} from '@/types/reviews';
+import {MessageData, TextSelection} from '@/types/reviews';
 import {splitByCommentRanges} from '@/utils/reviews';
 
-import {dummyConversationMessages} from './dummyConversation';
 import {useReviewComments} from './hooks/useReviewComments';
+
+const MESSAGES_PER_PAGE = 10;
 
 export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
   // Assume the route params contain reviewId
   const route = useRoute<any>();
-  const {reviewId: _reviewId} = route.params;
+  const {reviewId: _reviewId} = route.params || {};
 
-  // TODO_M: uncomment GET MESSAGE once the API is implemented
-  // const {data, isLoading, isError} = useGetMessagesQuery({reviewId});
-  const isLoading = false;
-  const isError = false;
-  const data = useMemo(() => ({data: dummyConversationMessages}), []);
+  // Pagination state
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const {
+    data: messagesData,
+    isLoading,
+    isFetching,
+    isError,
+  } = useGetMessagesQuery(
+    {reviewId: _reviewId, offset, limit: MESSAGES_PER_PAGE},
+    {skip: !_reviewId},
+  );
 
   // ADD REVIEW COMMENT API
   const [addReviewComment, {isLoading: isAddingComment}] =
@@ -57,13 +69,104 @@ export const ReviewDetailsScreen: React.FC = () => {
     MessageData[]
   >([]);
 
+  // Update conversationMessages when new data is fetched
   useEffect(() => {
-    if (data?.data && data.data.length > 0) {
-      mapMessages(data.data);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+    if (messagesData?.data) {
+      const newMessages = messagesData.data;
+      const mappedMessages = newMessages.map(message => ({
+        id: message.id,
+        content: message.content,
+        startSeconds: message.startSeconds,
+        endSeconds: message.endSeconds,
+        senderId: message.senderId,
+        messagePart: splitByCommentRanges(
+          message.content,
+          message.threads.map(thread => ({
+            id: thread.id,
+            start: thread.selection.startIndex as number,
+            end: thread.selection.endIndex as number,
+          })),
+        ),
+      }));
 
+      // If offset is 0, replace all messages (initial load or refresh)
+      if (offset === 0) {
+        setConversationMessages(mappedMessages as unknown as MessageData[]);
+      } else {
+        // Append new messages, avoiding duplicates
+        setConversationMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const uniqueNewMessages = mappedMessages.filter(
+            m => !existingIds.has(m.id),
+          );
+          return [...prev, ...uniqueNewMessages] as MessageData[];
+        });
+      }
+
+      // Check if there are more messages to load
+      if (newMessages.length < MESSAGES_PER_PAGE) {
+        setHasMore(false);
+      }
+    }
+  }, [messagesData, offset]);
+
+  // Helper function to map thread ranges
+  const mapThreadRanges = useCallback((threads: any[]) => {
+    return threads.map(thread => ({
+      id: thread.id,
+      start: thread.selection.startIndex,
+      end: thread.selection.endIndex,
+    }));
+  }, []);
+
+  // Update a specific message with new comment thread
+  const updateMessage = useCallback(
+    (payload: any) => {
+      const {selection, commentId, messageId} = payload;
+
+      setConversationMessages(prev => {
+        const messageIndex = prev.findIndex(m => m.id === messageId);
+
+        if (messageIndex === -1) return prev;
+
+        const updatedMessages = [...prev];
+        const currentMessage = updatedMessages[messageIndex];
+
+        // Get existing threads from the message
+        const existingThreads =
+          messagesData?.data?.find(m => m.id === messageId)?.threads || [];
+
+        // Create new message part with updated threads
+        const newMessagePart = splitByCommentRanges(currentMessage.content, [
+          ...mapThreadRanges(existingThreads),
+          {id: commentId, start: selection.startIndex, end: selection.endIndex},
+        ]);
+
+        updatedMessages[messageIndex] = {
+          ...currentMessage,
+          messagePart: newMessagePart,
+        };
+
+        return updatedMessages;
+      });
+    },
+    [messagesData, mapThreadRanges],
+  );
+
+  // Pagination callbacks
+  const loadMoreMessages = useCallback(() => {
+    if (!isFetching && hasMore) {
+      setOffset(prev => prev + MESSAGES_PER_PAGE);
+    }
+  }, [isFetching, hasMore]);
+
+  const refreshMessages = useCallback(() => {
+    setOffset(0);
+    setHasMore(true);
+    setConversationMessages([]);
+  }, []);
+
+  // Early returns after all hooks
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -84,32 +187,6 @@ export const ReviewDetailsScreen: React.FC = () => {
     setComment(text);
   };
 
-  const updateMessage = (
-    id: string,
-    selection: TextSelection,
-    commentId: string,
-  ) => {
-    const messageId = data.data.findIndex(message => message.id === id);
-    if (messageId) {
-      const message = data.data[messageId];
-      const newMessagePart = splitByCommentRanges(message.content, [
-        ...mapThreadRanges(message.threads),
-        {id: commentId, start: selection.startIndex, end: selection.endIndex},
-      ]);
-      const currentConversationMessages = [...conversationMessages];
-      const mappedMessageIndex = currentConversationMessages.findIndex(
-        messageItem => messageItem.id === id,
-      );
-      if (mappedMessageIndex) {
-        currentConversationMessages.splice(mappedMessageIndex, 1, {
-          ...currentConversationMessages[mappedMessageIndex],
-          messagePart: newMessagePart,
-        });
-      }
-      setConversationMessages(currentConversationMessages);
-    }
-  };
-
   const handleSendComment = async () => {
     if (
       selectedMessageId &&
@@ -117,21 +194,31 @@ export const ReviewDetailsScreen: React.FC = () => {
       currentHighlightedText?.selectedText
     ) {
       try {
-        const response = await addReviewComment({
+        const payload: {
+          reviewId: string;
+          messageId: string;
+          selection: TextSelection;
+          content: string;
+          parentCommentId?: string;
+          threadId?: string;
+        } = {
           reviewId: _reviewId,
           messageId: selectedMessageId,
-          comment,
-        });
+          selection: currentHighlightedText,
+          content: comment,
+        };
+
+        if (selectedComment?.id) payload.parentCommentId = selectedComment?.id;
+
+        if (selectedThreadId) payload.threadId = selectedThreadId;
+        console.log('payload', payload);
+        const response = await addReviewComment(payload);
+        console.log('response', response);
         if (response.data) {
-          if (currentHighlightedText) {
-            updateMessage(
-              selectedMessageId,
-              currentHighlightedText,
-              response.data?.commentId,
-            );
-          } else {
-            // TODO_M: Logic to append new comment in the thread/comment/reply
-          }
+          updateMessage({
+            ...payload,
+            commentId: response.data.commentId,
+          });
         }
       } catch (error) {
         // logger.error(error);
@@ -154,39 +241,11 @@ export const ReviewDetailsScreen: React.FC = () => {
     setSelectedMessageId(null);
   };
 
-  const mapThreadRanges = threads => {
-    return threads.map(thread => {
-      return {
-        id: thread.id,
-        start: thread.selection.startIndex,
-        end: thread.selection.endIndex,
-      };
-    });
-  };
-
-  const mapMessages = (messageData: Message[]) => {
-    const mappedMessages = messageData.map(message => {
-      return {
-        id: message.id,
-        messages: message.content,
-        startSeconds: message.startSeconds,
-        endSeconds: message.endSeconds,
-        senderId: message.senderId,
-        messagePart: splitByCommentRanges(
-          message.content,
-          mapThreadRanges(message.threads),
-        ),
-      };
-    });
-    setConversationMessages(mappedMessages as unknown as MessageData[]);
-  };
-
   const handleThreadClick = (threadId: string, messageId: string) => {
     if (!showCommentInput) {
       showThreadsBottomSheet();
     }
-    console.log('threadId', threadId);
-    const message = data?.data?.find(
+    const message = conversationMessages?.find(
       messageItem => messageItem.id === messageId,
     );
     if (message) {
@@ -201,8 +260,12 @@ export const ReviewDetailsScreen: React.FC = () => {
         messages={conversationMessages}
         isSelectable={isSelectable}
         onSelection={handleSelection}
-        currentHighlightedText={currentHighlightedText}
         onThreadClick={handleThreadClick}
+        onLoadMore={loadMoreMessages}
+        isLoadingMore={isFetching && offset > 0}
+        hasMore={hasMore}
+        onRefresh={refreshMessages}
+        isRefreshing={isFetching && offset === 0}
       />
       {/* Floating input at the bottom */}
       {showCommentInput && (

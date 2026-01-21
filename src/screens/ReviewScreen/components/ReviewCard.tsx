@@ -46,6 +46,7 @@ interface ReviewCardProps {
   };
   titleNumberOfLines?: number;
   descriptionNumberOfLines?: number;
+  onReviewPress: (reviewId?: string) => void;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -56,6 +57,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   reactions = {},
   titleNumberOfLines = 1,
   descriptionNumberOfLines = 2,
+  onReviewPress,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
@@ -68,8 +70,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   );
 
   const handleReviewItemPress = () => {
-    console.log('review item pressed', id);
-    // TODO: Implement review transcript press
+    onReviewPress?.(id);
   };
 
   const toggleDescription = () => {

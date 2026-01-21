@@ -4,10 +4,11 @@ import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {runOnJS} from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {fontFamily, typography} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 export interface MessageProps {
   timestamp: string;
+  senderId: number;
   message: React.ReactNode;
   containerStyle?: ViewStyle;
   timestampStyle?: TextStyle;
@@ -20,6 +21,7 @@ export const Message: React.FC<MessageProps> = ({
   message,
   containerStyle,
   timestampStyle,
+  senderId,
   onPress = () => {},
 }) => {
   const longPressRef = useRef<any>(null);
@@ -32,7 +34,12 @@ export const Message: React.FC<MessageProps> = ({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text>
+      <Text style={[styles.timestamp, timestampStyle]}>
+        <Text style={styles.userName}>
+          {senderId === -1 ? 'AI Client' : 'User'}
+        </Text>{' '}
+        ({timestamp})
+      </Text>
       <GestureDetector gesture={tapGesture}>
         <View style={[styles.messageContainer, styles.message]}>{message}</View>
       </GestureDetector>
@@ -42,10 +49,9 @@ export const Message: React.FC<MessageProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    flexDirection: 'row',
-    gap: '16@ms',
+    flexDirection: 'column',
     paddingHorizontal: '16@ms',
-    paddingVertical: '12@mvs',
+    paddingVertical: '6@mvs',
   },
   timestamp: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -66,6 +72,6 @@ const styles = ScaledSheet.create({
   userName: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
-    color: 'rgba(0, 0, 0, 0.87)',
+    color: colors.ds.theme.primary,
   },
 });

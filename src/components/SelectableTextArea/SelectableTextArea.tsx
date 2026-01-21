@@ -1,6 +1,6 @@
 import type {FC, ReactNode} from 'react';
 import {SelectableTextView} from '@rob117/react-native-selectable-text';
-import {StyleSheet, View, ViewStyle} from 'react-native';
+import {StyleSheet} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {TextSelection} from '@/types/reviews';
@@ -24,13 +24,11 @@ export interface SelectableTextAreaProps {
   children: ReactNode;
   onSelection?: (selection: TextSelection) => void;
   menuOptions?: string[];
-  containerStyle?: ViewStyle;
 }
 
 export const SelectableTextArea: FC<SelectableTextAreaProps> = ({
   onSelection,
   menuOptions = ['Copy'],
-  containerStyle,
   children,
 }) => {
   const handleSelection = (evt: SelectionEvent) => {
@@ -39,14 +37,12 @@ export const SelectableTextArea: FC<SelectableTextAreaProps> = ({
   };
 
   return (
-    <View style={[containerStyle]}>
-      <SelectableTextView
-        menuOptions={menuOptions}
-        onSelection={handleSelection as (event: LibrarySelectionEvent) => void}
-        style={StyleSheet.flatten(styles.selectableView)}>
-        {children}
-      </SelectableTextView>
-    </View>
+    <SelectableTextView
+      menuOptions={menuOptions}
+      onSelection={handleSelection as (event: LibrarySelectionEvent) => void}
+      style={StyleSheet.flatten(styles.selectableView)}>
+      {children}
+    </SelectableTextView>
   );
 };
 

@@ -6,8 +6,6 @@ import {
   CreateReviewResponse,
   GetMessagesRequest,
   GetMessagesResponse,
-  GetThreadCommentsRequest,
-  GetThreadCommentsResponse,
   ReviewsResponse,
   UpdateReviewStatusRequest,
   UpdateReviewStatusResponse,
@@ -52,7 +50,7 @@ export const reviewsApi = api.injectEndpoints({
         parentCommentId,
         messageId,
         selection,
-        comment,
+        content,
       }) => ({
         url: API_ROUTES.REVIEWS.ADD_REVIEW_COMMENT(reviewId),
         method: API_METHODS.POST,
@@ -61,7 +59,7 @@ export const reviewsApi = api.injectEndpoints({
           parentCommentId,
           messageId,
           selection,
-          comment,
+          content,
         },
       }),
     }),
@@ -70,21 +68,7 @@ export const reviewsApi = api.injectEndpoints({
         return {
           url: API_ROUTES.REVIEWS.GET_MESSAGES(reviewId),
           method: API_METHODS.GET,
-          body: {offset, limit},
-        };
-      },
-    }),
-    getThreadComments: builder.query<
-      GetThreadCommentsResponse,
-      GetThreadCommentsRequest
-    >({
-      query: ({threadId, offset, limit}) => {
-        return {
-          url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(threadId),
-          method: API_METHODS.GET,
-          ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {body: {offset, limit}}
-            : {}),
+          params: {offset, limit},
         };
       },
     }),
@@ -106,6 +90,5 @@ export const {
   useUpdateReviewStatusMutation,
   useGetMessagesQuery,
   useAddReviewCommentMutation,
-  useGetThreadCommentsQuery,
   useLazyGetReviewsQuery,
 } = reviewsApi;
