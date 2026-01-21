@@ -83,7 +83,7 @@ export const reviewsApi = api.injectEndpoints({
           url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(threadId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {body: {offset, limit}}
+            ? {params: {offset, limit}}
             : {}),
         };
       },
@@ -106,6 +106,6 @@ export const {
   useUpdateReviewStatusMutation,
   useGetMessagesQuery,
   useAddReviewCommentMutation,
-  useGetThreadCommentsQuery,
+  useLazyGetThreadCommentsQuery,
   useLazyGetReviewsQuery,
 } = reviewsApi;

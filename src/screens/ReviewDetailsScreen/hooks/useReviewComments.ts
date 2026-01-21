@@ -25,7 +25,6 @@ export const useReviewComments = () => {
 
   const closeCommentThreadBottomSheet = () => {
     setIsCommentThreadBottomSheetVisible(false);
-    setIsThreadsBottomSheetVisible(true);
   };
 
   const onThreadPress = (threadId: string) => {
@@ -36,13 +35,22 @@ export const useReviewComments = () => {
 
   const closeReplyBottomSheet = () => {
     setIsReplyBottomSheetVisible(false);
-    setIsCommentThreadBottomSheetVisible(true);
   };
 
   const onReplyPress = (comment: MessageThreadComment) => {
     setSelectedComment(comment);
     setIsCommentThreadBottomSheetVisible(false);
     setIsReplyBottomSheetVisible(true);
+  };
+
+  const hideReplyBottomSheet = () => {
+    setIsReplyBottomSheetVisible(false);
+    setIsCommentThreadBottomSheetVisible(true);
+  };
+
+  const hideCommentThreadBottomSheet = () => {
+    setIsCommentThreadBottomSheetVisible(false);
+    setIsThreadsBottomSheetVisible(true);
   };
 
   return {
@@ -58,5 +66,7 @@ export const useReviewComments = () => {
     setSelectedComment,
     onReplyPress,
     showThreadsBottomSheet,
+    hideReplyBottomSheet,
+    hideCommentThreadBottomSheet,
   };
 };

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {BottomSheetFlatList, BottomSheetTextInput} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import {ms} from 'react-native-size-matters';
 import {LeftArrow, LeftArrowIcon} from '@/assets/icons';
 import {BottomSheet, ReviewComment} from '@/components';
 import {useTranslate} from '@/hooks';
-import {useLazyGetThreadComments1Query} from '@/services/reviewThreadsApi';
+import {useLazyGetThreadCommentsQuery} from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
@@ -27,23 +27,28 @@ export const CommentThreadBottomSheet: React.FC<
   onAddReactionPress,
   onReplyPress,
   onSubmitComment,
+  hideCommentThreadBottomSheet,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const [getThreadComments, {data: apiData, isLoading, isFetching}] =
-    useLazyGetThreadComments1Query();
+    useLazyGetThreadCommentsQuery();
   const [offset, setOffset] = React.useState(0);
   const [comments, setComments] = React.useState<{
     data: MessageThreadComment[];
     count: number;
   } | null>(null);
+  const [hasMore, setHasMore] = React.useState(false);
   const [commentText, setCommentText] = useState('');
+  const isLoadingRef = useRef(false);
 
   // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
     if (visible && threadId) {
       setOffset(0);
       setComments(null);
+      setHasMore(false);
+      isLoadingRef.current = false;
       getThreadComments({
         threadId,
         offset: 0,
@@ -52,28 +57,28 @@ export const CommentThreadBottomSheet: React.FC<
     }
   }, [visible, threadId, getThreadComments]);
 
-  // Accumulate API data for pagination
+  // Process data only if it's for a new offset
   React.useEffect(() => {
-    if (apiData) {
-      if (offset === 0) {
-        // First page - replace data
-        setComments({data: apiData.data, count: apiData.count});
-      } else {
-        // Subsequent pages - append data, avoiding duplicates
-        setComments(prev => {
-          if (!prev) return {data: apiData.data, count: apiData.count};
-          const existingIds = new Set(prev.data.map(item => String(item.id)));
-          const newItems = apiData.data.filter(
-            item => !existingIds.has(String(item.id)),
-          );
-          return {
-            data: [...prev.data, ...newItems],
-            count: apiData.count,
-          };
-        });
-      }
+    if (apiData && visible) {
+      const newComments = apiData.data;
+
+      setComments(prev => {
+        const updated = prev
+          ? {data: [...prev.data, ...newComments], count: apiData.count}
+          : apiData;
+        if (updated.data.length >= apiData.count) {
+          setHasMore(false);
+        }
+        return updated;
+      });
+      isLoadingRef.current = false;
     }
-  }, [apiData, offset]);
+  }, [apiData, visible]);
+
+  // Update loading ref
+  useEffect(() => {
+    isLoadingRef.current = isLoading || isFetching;
+  }, [isLoading, isFetching]);
 
   const handleReplyPress = useCallback(
     (comment: MessageThreadComment) => {
@@ -114,7 +119,7 @@ export const CommentThreadBottomSheet: React.FC<
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={onClose}
+          onPress={hideCommentThreadBottomSheet}
           activeOpacity={0.7}>
           <LeftArrow
             width={ms(12)}
@@ -127,18 +132,17 @@ export const CommentThreadBottomSheet: React.FC<
         </Text>
       </View>
     );
-  }, [onClose, t]);
+  }, [hideCommentThreadBottomSheet, t]);
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
-    const hasMore = comments && offset + LIMIT < comments.count;
     if (!hasMore) return null;
     return (
-      <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
+      <View style={[styles.footer, {paddingBottom: insets.bottom + ms(60)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, comments, offset]);
+  }, [isFetching, insets.bottom, hasMore]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
@@ -158,21 +162,22 @@ export const CommentThreadBottomSheet: React.FC<
   }, [isLoading, t]);
 
   const loadMore = useCallback(() => {
-    if (
-      !isFetching &&
-      comments &&
-      offset + LIMIT < comments.count &&
-      threadId
-    ) {
-      const newOffset = offset + LIMIT;
-      setOffset(newOffset);
+    if (!visible) return;
+    if (isLoadingRef.current || !hasMore || !threadId) {
+      return;
+    }
+
+    isLoadingRef.current = true;
+    setOffset(prevOffset => {
+      const newOffset = prevOffset + LIMIT;
       getThreadComments({
         threadId,
         offset: newOffset,
         limit: LIMIT,
       });
-    }
-  }, [offset, isFetching, comments, threadId, getThreadComments]);
+      return newOffset;
+    });
+  }, [hasMore, threadId, getThreadComments, visible]);
 
   return (
     <>
@@ -180,6 +185,7 @@ export const CommentThreadBottomSheet: React.FC<
         visible={visible}
         onClose={onClose}
         allowFullExpand
+        snapPoints={['80%']}
         skipBottomSheetView
         enableContentPanningGesture
         enableDynamicSizing
@@ -195,6 +201,7 @@ export const CommentThreadBottomSheet: React.FC<
             <>
               {renderHeader()}
               <BottomSheetFlatList
+                scrollEnabled={false}
                 data={comments?.data || []}
                 renderItem={renderCommentItem}
                 keyExtractor={item => item.id.toString()}
@@ -202,7 +209,7 @@ export const CommentThreadBottomSheet: React.FC<
                 ListEmptyComponent={renderEmpty}
                 contentContainerStyle={[
                   styles.listContent,
-                  {paddingBottom: insets.bottom + ms(60)},
+                  {paddingBottom: insets.bottom + ms(100)},
                 ]}
                 showsVerticalScrollIndicator={false}
                 style={styles.listStyle}

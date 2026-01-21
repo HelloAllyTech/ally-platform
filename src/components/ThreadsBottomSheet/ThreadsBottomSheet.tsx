@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, {useCallback, useEffect} from 'react';
 import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
@@ -17,7 +18,7 @@ import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 import {styles} from './styles';
 import {ThreadsBottomSheetProps} from './types';
 
-const LIMIT = 3;
+const LIMIT = 20;
 
 export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
@@ -33,10 +34,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const [offset, setOffset] = React.useState(0);
   const [commentsData, setCommentsData] =
     React.useState<ThreadsResponse | null>(null);
+  const [hasMore, setHasMore] = React.useState(true);
 
   // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
-    if (visible && reviewId) {
+    if (visible) {
       setOffset(0);
       setCommentsData(null);
       getThreads({
@@ -44,27 +46,30 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         offset: 0,
         limit: LIMIT,
       });
+    } else {
+      setCommentsData(null);
+      setOffset(0);
     }
-  }, [visible, reviewId, getThreads]);
+  }, [visible]);
 
   // Accumulate API data for pagination
   React.useEffect(() => {
-    if (apiData) {
+    if (apiData && visible) {
+      const newThreads = apiData.data;
       if (offset === 0) {
-        // First page - replace data
-        setCommentsData({data: apiData.data, count: apiData.count});
+        setCommentsData(apiData);
       } else {
-        // Subsequent pages - append data
         setCommentsData(prev => {
-          if (!prev) return apiData;
-          return {
-            data: [...prev.data, ...apiData.data],
-            count: apiData.count,
-          };
+          if (!prev) {
+            // If prev is null, just use the new apiData directly
+            return apiData;
+          }
+          return {data: [...prev.data, ...newThreads], count: apiData.count};
         });
       }
+      setHasMore(apiData.count > (commentsData?.data.length || 0));
     }
-  }, [apiData, offset]);
+  }, [apiData]);
 
   const renderThreadItem = useCallback(
     ({item: thread}: {item: NonNullable<typeof commentsData>['data'][0]}) => {
@@ -163,31 +168,31 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
-    const hasMore = commentsData && offset + LIMIT < commentsData.count;
     if (!hasMore) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, commentsData, offset]);
+  }, [isFetching, insets.bottom, hasMore]);
+
+  console.log('commentsData', commentsData);
 
   const loadMore = useCallback(() => {
-    if (
-      !isFetching &&
-      commentsData &&
-      offset + LIMIT < commentsData.count &&
-      reviewId
-    ) {
-      const newOffset = offset + LIMIT;
-      setOffset(newOffset);
+    if (!visible) return;
+    if (isLoading || isFetching || !hasMore || !reviewId) {
+      return;
+    }
+    setOffset(prevOffset => {
+      const newOffset = prevOffset + LIMIT;
       getThreads({
         reviewId,
         offset: newOffset,
         limit: LIMIT,
       });
-    }
-  }, [offset, isFetching, commentsData, reviewId, getThreads]);
+      return newOffset;
+    });
+  }, [hasMore, reviewId, isFetching]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
@@ -236,7 +241,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
             style={styles.listStyle}
             removeClippedSubviews={false}
             onEndReached={loadMore}
-            onEndReachedThreshold={0.3}
+            onEndReachedThreshold={0.5}
           />
         )}
       </View>
