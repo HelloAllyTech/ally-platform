@@ -74,14 +74,19 @@ CURRENT PARAMETERS (PRIMARY BASELINE - USE THESE AS STARTING POINT):
 {current_parameters}
 
 ⚠️ CRITICAL RULE #1: The CURRENT PARAMETERS above are your PRIMARY BASELINE.
-   - DEFAULT BEHAVIOR: Return these EXACT values (copy them exactly)
-   - ONLY make changes when there is a CLEAR marked event (branching
-     instruction, significant topic shift, major emotional change)
-   - When making changes, calculate: new_value = current_value ±
-     (current_value × 0.01 to 0.03)
-   - Example: If current pace is 1.1, max change is 1.1 × 0.03 = 0.033,
-     so new pace should be 1.1 ± 0.033 (1.067 to 1.133)
-   - NEVER make changes larger than 3% for pace, 5% for pitch/loudness
+   - NATURAL VARIATION: Allow subtle natural variation (1-2%) even without
+     marked events to simulate natural speech patterns
+   - When NO marked event: Apply 1-2% natural variation based on response
+     text emotional tone
+   - When marked event EXISTS: Apply 3-5% variation (pace/speed: 3%, pitch/loudness: 5%)
+   - Example natural variation: If current value is X, natural range is
+     X ± (X × 0.02) - 2% variation
+   - Example marked event: If current value is X, max change is X × 0.03 = 0.03X,
+     so new value should be X ± 0.03X - 3% variation
+   - NEVER make changes larger than 2% for natural variation, 3% for pace/speed
+     with marked events, 5% for pitch/loudness with marked events
+   - NOTE: Parameter names and ranges vary by provider - check AVAILABLE PARAMETERS
+     section below for exact parameter names and valid ranges
 
 PERSONA CONTEXT (for prosody decisions):
 {persona_context}
@@ -161,40 +166,57 @@ Start with current parameters as baseline, then make MINIMAL adjustments
    CRITICAL: Only change parameters when there is a SIGNIFICANT shift. Otherwise,
    keep parameters stable to maintain emotional continuity.
 
-   CHANGE parameters when you see in conversation history:
-   - Branching instructions (indicates an event/trigger occurred - significant moment)
-   - Significant emotional state shifts (e.g., calm → anxious, sad → breakthrough)
-   - Topic changes that affect emotional tone (e.g., trauma mention, crisis moment)
-   - Clear emotional momentum shifts (escalating tension, de-escalating release)
-   - Cognitive load changes (processing heavy emotions, breakthrough moments)
-   - Significant context changes (e.g., ending conversations, major shifts)
+   CHANGE parameters when you see MARKED EVENTS (these warrant 3-5% variation):
+   - Major topic shifts (e.g., normal conversation → trauma/crisis mention)
+   - Significant emotional state shifts (e.g., calm → panic, sad → breakthrough)
+   - Crisis moments or urgent situations (e.g., "I need help", "I'm in crisis")
+   - Breakthrough or revelation moments (e.g., "I finally understand", "I see it now")
+   - Termination or ending signals (e.g., "I have to go", "I can't continue")
+   - Sudden dramatic shifts in conversation tone or intensity
+   - Response text contains strong emotional words: panic, crisis, trauma, urgent,
+     desperate, relief, overwhelmed, ending, goodbye, breakthrough
 
-   KEEP parameters STABLE when:
+   KEEP parameters STABLE (use 1-2% natural variation only) when:
    - Conversation is continuing normally without significant shifts
    - Emotional state is consistent with previous utterances
-   - No branching instructions or events in recent history
-   - Only minor emotional fluctuations (maintain baseline)
+   - No marked events (major topic shifts, crisis moments, breakthroughs) in
+     recent history
+   - Only minor emotional fluctuations (maintain baseline with natural variation)
+   - Response text shows normal emotional range without dramatic intensity
 
    ⚠️ ADJUSTMENT GUIDELINES (CRITICAL - FOLLOW STRICTLY):
 
-   STEP 1: Copy current parameter values EXACTLY as your starting point
-   STEP 2: Check if there's a CLEAR marked event (branching instruction,
-     major topic shift)
-   STEP 3: If NO marked event → Return current values EXACTLY (no changes)
+   STEP 1: Start with current parameter values as your baseline
+   STEP 2: Check if there's a CLEAR marked event
+     Marked events include: major topic shifts, significant emotional changes,
+     crisis moments, breakthrough moments, termination signals, or sudden
+     dramatic shifts in conversation tone or intensity
+   STEP 3: If NO marked event → Apply 1-2% natural variation based on
+     response text emotional tone:
+     * Natural variation: current_value × 0.01 to 0.02 (1-2%)
+     * Formula: new_value = current_value ± (current_value × 0.02)
+     * Example: If current is X, range is X ± (X × 0.02) = X × 0.98 to X × 1.02
+     * Apply this formula to ALL parameters (pace/speed, pitch, loudness/volume)
    STEP 4: If marked event → Calculate new values using formula:
      * new_value = current_value ± (current_value × MAX_PERCENTAGE)
-     * Speed/pace: MAX 3% = current_value × 0.03 (e.g., 1.1 → 1.067 to
-       1.133, NOT 1.1 → 0.9)
-     * Pitch: MAX 5% = current_value × 0.05 (e.g., -0.6 → -0.63 to -0.57,
-       NOT -0.6 → -0.7)
-     * Loudness: MAX 5% = current_value × 0.05 (e.g., 0.55 → 0.523 to
-       0.578, NOT 0.55 → 0.5)
+     * Pace/Speed: MAX 3% = current_value × 0.03
+     * Pitch: MAX 5% = current_value × 0.05
+     * Loudness/Volume: MAX 5% = current_value × 0.05
+     * NOTE: Use actual parameter names from AVAILABLE PARAMETERS section
+     * (e.g., "speed" for ElevenLabs, "pace" for Sarvam, "speaking_rate" for Google)
    STEP 5: Verify your calculated values are within the limits above
 
-   MATHEMATICAL CONSTRAINT: If current pace is 1.1, the next pace MUST be
-   between 1.067 and 1.133 (1.1 ± 3%)
-   If you calculate a value outside this range, you MUST adjust it to stay
-   within limits.
+   MATHEMATICAL CONSTRAINT: For any current value X:
+   - Natural variation: Next value MUST be between X × 0.98 and X × 1.02
+     (X ± 2%)
+   - Marked event (pace/speed): Next value MUST be between X × 0.97 and
+     X × 1.03 (X ± 3%)
+   - Marked event (pitch/loudness): Next value MUST be between X × 0.95 and
+     X × 1.05 (X ± 5%)
+   - If you calculate a value outside this range, you MUST adjust it to stay
+     within limits
+   - ALSO ensure final values are within the provider's valid range
+     (check AVAILABLE PARAMETERS)
 
 7. TEXT ENHANCEMENT FOR THERAPY SESSIONS:
    - "Vulnerable Pause": Add longer pauses before/after vulnerable admissions
@@ -206,45 +228,81 @@ Start with current parameters as baseline, then make MINIMAL adjustments
 
 ⚠️ GENERATION INSTRUCTIONS (FOLLOW IN ORDER - DO NOT SKIP STEPS):
 
-STEP 1: Copy current parameter values EXACTLY into your response
-   Example: If current is {{"pace": 1.1, "pitch": -0.6, "loudness": 0.55}},
-            start with: {{"pace": 1.1, "pitch": -0.6, "loudness": 0.55}}
+STEP 1: Start with current parameter values as your baseline
+   Example: If current parameters are {{"param1": value1, "param2": value2, ...}},
+            use these exact values as your starting point
+   NOTE: Parameter names vary by provider - use the exact names from CURRENT PARAMETERS
 
-STEP 2: Check conversation history for CLEAR marked events
-   - Look for: branching instructions, major topic shifts, significant emotional changes
-   - If NO marked event found → STOP HERE, return current values EXACTLY (no changes)
+STEP 2: Check conversation history and response text for CLEAR marked events
+
+   WHAT ARE MARKED EVENTS?
+   Marked events are significant moments that warrant larger parameter changes (3-5%):
+   - Major topic shifts (e.g., suddenly discussing trauma, crisis, breakthrough)
+   - Significant emotional state changes (e.g., calm → panic, sad → relief,
+     anxious → breakthrough)
+   - Crisis moments or urgent situations mentioned
+   - Breakthrough or revelation moments
+   - Termination or ending signals
+   - Sudden shifts in conversation tone or intensity
+
+   HOW TO IDENTIFY MARKED EVENTS:
+   - Look for dramatic emotional words in response text: "panic", "crisis",
+     "breakthrough", "trauma", "urgent", "desperate", "relief", "overwhelmed",
+     "ending", "goodbye"
+   - Look for major topic changes in conversation history
+     (e.g., normal chat → trauma mention)
+   - Look for significant emotional shifts
+     (e.g., discussing daily life → discussing abuse)
+   - If response text shows strong emotional intensity or major topic shift →
+     MARKED EVENT
+
+   - If NO marked event found → Apply 1-2% natural variation based on
+     response text emotional tone (e.g., if current is X, range is X × 0.98
+     to X × 1.02)
+   - If marked event found → Apply 3-5% variation (pace/speed: 3%, pitch/loudness: 5%)
 
 STEP 3: If marked event found → Calculate new values using formula:
    - new_value = current_value ± (current_value × percentage_limit)
-   - Pace: current_value × 0.03 max (e.g., 1.1 → 1.067 to 1.133)
-   - Pitch: current_value × 0.05 max (e.g., -0.6 → -0.63 to -0.57)
-   - Loudness: current_value × 0.05 max (e.g., 0.55 → 0.523 to 0.578)
+   - Pace/Speed: current_value × 0.03 max (range: current × 0.97 to current × 1.03)
+   - Pitch: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
+   - Loudness/Volume: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
+   - Use actual parameter names from AVAILABLE PARAMETERS section
 
 STEP 4: VERIFY your calculated values:
    - Calculate: |new_value - current_value| / current_value × 100
-   - If result > 3% for pace or > 5% for pitch/loudness → ADJUST to stay within limit
-   - Example: If you calculated pace 0.9 from current 1.1, that's 18% change → TOO LARGE
-             → Adjust to 1.067 (3% decrease) or 1.133 (3% increase)
+   - If NO marked event: Result should be ≤ 2% for all parameters
+   - If marked event: Result should be ≤ 3% for pace, ≤ 5% for pitch/loudness
+   - If result exceeds limit → ADJUST to stay within limit
+   - Example: If current is X and you calculated X × 0.82 (18% decrease),
+     that's TOO LARGE → Adjust to X × 0.97 (3% decrease) or X × 1.03
+     (3% increase)
 
 STEP 5: Generate enhanced text with therapy-specific tags if text enhancement
 is supported
 
-⚠️ EXAMPLES OF WHAT NOT TO DO (VIOLATIONS FROM YOUR LOGS):
-- Current pace: 1.1 → Next: 0.9 (WRONG - 18.2% change, max is 3% = 1.067 to 1.133)
-- Current pitch: -0.6 → Next: -0.7 (WRONG - 16.7% change, max is 5% = -0.63 to -0.57)
-- Current loudness: 0.55 → Next: 0.5 (WRONG - 9.1% change, max is 5% = 0.523 to 0.578)
-- No marked event but changing parameters anyway (WRONG - return current values EXACTLY)
+⚠️ EXAMPLES OF WHAT NOT TO DO:
+- Returning formulas: {{"pace": 1.455 * 0.97}} (WRONG - return calculated value: 1.412)
+- Current value 1.455 → Next: 1.192 (WRONG - 18% change, max is 3% =
+  1.412 to 1.499)
+- Current value 0.525 → Next: 0.436 (WRONG - 17% change, max is 5% =
+  0.499 to 0.551)
+- Current value 0.665 → Next: 0.605 (WRONG - 9% change, max is 5% =
+  0.632 to 0.698)
+- No marked event but making changes larger than 2%
+  (WRONG - max 2% for natural variation)
 
 ✅ EXAMPLES OF CORRECT BEHAVIOR:
-- Current pace: 1.1, no marked event → Return: {{"pace": 1.1}} (EXACT, no change)
-- Current pace: 1.1, marked event → Return: {{"pace": 1.067}} (3%
-  decrease) or {{"pace": 1.133}} (3% increase)
-- Current pitch: -0.6, no marked event → Return: {{"pitch": -0.6}} (EXACT,
-  no change)
-- Current pitch: -0.6, marked event → Return: {{"pitch": -0.63}} (5%
-  decrease) or {{"pitch": -0.57}} (5% increase)
-- Current loudness: 0.55, no marked event → Return: {{"loudness": 0.55}}
-  (EXACT, no change)
+- Current pace: 1.455, no marked event → Calculate: 1.455 × 0.98 = 1.426,
+  Return: {{"pace": 1.426}}
+- Current pace: 1.455, marked event → Calculate: 1.455 × 0.97 = 1.412,
+  Return: {{"pace": 1.412}}
+- Current pitch: 0.525, no marked event → Calculate: 0.525 × 1.02 = 0.536,
+  Return: {{"pitch": 0.536}}
+- Current pitch: 0.525, marked event → Calculate: 0.525 × 1.05 = 0.551,
+  Return: {{"pitch": 0.551}}
+- Always calculate the numeric value first, then return the calculated number
+- Always use actual parameter names from CURRENT PARAMETERS and
+  AVAILABLE PARAMETERS sections
 
 Return a JSON object with this exact structure:
 {{
@@ -261,15 +319,26 @@ Return a JSON object with this exact structure:
    NOT contain the parameters dict.
 3. Parameters go in the "parameters" field ONLY - never in "enhanced_text".
 4. Start your response with {{ and end with }}. Nothing else.
-5. ⚠️ DEFAULT: Return current parameter values EXACTLY (copy them) unless
-   there's a CLEAR marked event.
-6. ⚠️ MAXIMUM CHANGES (MATHEMATICAL LIMITS):
-   - Pace: current_value × 0.03 max (3% change)
-   - Pitch: current_value × 0.05 max (5% change)
-   - Loudness: current_value × 0.05 max (5% change)
-7. ⚠️ BEFORE RETURNING: Calculate percentage change for each parameter.
-   If any parameter exceeds its limit, ADJUST it to stay within the limit.
-8. Prioritize smooth transitions over emotional accuracy - drastic changes
+5. ⚠️ CRITICAL: Return CALCULATED NUMERIC VALUES, NOT FORMULAS:
+   - WRONG: {{"pace": 1.455 * 0.97}} (formula, not a number)
+   - CORRECT: {{"pace": 1.412}} (calculated value: 1.455 × 0.97 = 1.412)
+   - You MUST calculate the actual numeric value before returning it
+   - Example: If current is 1.455 and you want 3% decrease, calculate:
+     1.455 × 0.97 = 1.412 (return 1.412, NOT "1.455 * 0.97")
+6. ⚠️ NATURAL VARIATION (when NO marked event):
+   - Apply 1-2% subtle variation based on response text emotional tone
+   - Calculate: new_value = current_value × (0.98 to 1.02)
+   - Return the calculated numeric value, not the formula
+7. ⚠️ MAXIMUM CHANGES WITH MARKED EVENTS:
+   - Pace/Speed: new_value = current_value × (0.97 to 1.03) - calculate and
+     return numeric value
+   - Pitch: new_value = current_value × (0.95 to 1.05) - calculate and
+     return numeric value
+   - Loudness/Volume: new_value = current_value × (0.95 to 1.05) -
+     calculate and return numeric value
+8. ⚠️ BEFORE RETURNING: Calculate the actual numeric value for each parameter.
+   Do NOT return formulas like "X * 0.97" - calculate and return the number.
+9. Prioritize smooth transitions over emotional accuracy - drastic changes
    sound unnatural and jarring.
 """
 
@@ -281,14 +350,19 @@ CURRENT PARAMETERS (PRIMARY BASELINE - USE THESE AS STARTING POINT):
 {current_parameters}
 
 ⚠️ CRITICAL RULE #1: The CURRENT PARAMETERS above are your PRIMARY BASELINE.
-   - DEFAULT BEHAVIOR: Return these EXACT values (copy them exactly)
-   - ONLY make changes when there is a CLEAR marked event (branching
-     instruction, significant topic shift, major emotional change)
-   - When making changes, calculate: new_value = current_value ±
-     (current_value × 0.01 to 0.03)
-   - Example: If current pace is 1.1, max change is 1.1 × 0.03 = 0.033,
-     so new pace should be 1.1 ± 0.033 (1.067 to 1.133)
-   - NEVER make changes larger than 3% for pace, 5% for pitch/loudness
+   - NATURAL VARIATION: Allow subtle natural variation (1-2%) even without
+     marked events to simulate natural speech patterns
+   - When NO marked event: Apply 1-2% natural variation based on response
+     text emotional tone
+   - When marked event EXISTS: Apply 3-5% variation (pace/speed: 3%, pitch/loudness: 5%)
+   - Example natural variation: If current value is X, natural range is
+     X ± (X × 0.02) - 2% variation
+   - Example marked event: If current value is X, max change is X × 0.03 = 0.03X,
+     so new value should be X ± 0.03X - 3% variation
+   - NEVER make changes larger than 2% for natural variation, 3% for pace/speed
+     with marked events, 5% for pitch/loudness with marked events
+   - NOTE: Parameter names and ranges vary by provider - check AVAILABLE PARAMETERS
+     section below for exact parameter names and valid ranges
 
 PERSONA CONTEXT (for prosody decisions):
 {persona_context}
@@ -367,89 +441,153 @@ Start with current parameters as baseline, then make MINIMAL adjustments
    CRITICAL: Only change parameters when there is a SIGNIFICANT shift. Otherwise,
    keep parameters stable to maintain emotional continuity.
 
-   CHANGE parameters when you see in conversation history:
-   - Branching instructions (indicates an event/trigger occurred - significant moment)
-   - Significant emotional state shifts (e.g., calm → anxious, sad → breakthrough)
-   - Topic changes that affect emotional tone (e.g., trauma mention, crisis moment)
-   - Clear emotional momentum shifts (escalating tension, de-escalating release)
-   - Cognitive load changes (processing heavy emotions, breakthrough moments)
-   - Significant context changes (e.g., ending conversations, major shifts)
+   CHANGE parameters when you see MARKED EVENTS (these warrant 3-5% variation):
+   - Major topic shifts (e.g., normal conversation → trauma/crisis mention)
+   - Significant emotional state shifts (e.g., calm → panic, sad → breakthrough)
+   - Crisis moments or urgent situations (e.g., "I need help", "I'm in crisis")
+   - Breakthrough or revelation moments (e.g., "I finally understand", "I see it now")
+   - Termination or ending signals (e.g., "I have to go", "I can't continue")
+   - Sudden dramatic shifts in conversation tone or intensity
+   - Response text contains strong emotional words: panic, crisis, trauma, urgent,
+     desperate, relief, overwhelmed, ending, goodbye, breakthrough
 
-   KEEP parameters STABLE when:
+   KEEP parameters STABLE (use 1-2% natural variation only) when:
    - Conversation is continuing normally without significant shifts
    - Emotional state is consistent with previous utterances
-   - No branching instructions or events in recent history
-   - Only minor emotional fluctuations (maintain baseline)
+   - No marked events (major topic shifts, crisis moments, breakthroughs) in
+     recent history
+   - Only minor emotional fluctuations (maintain baseline with natural variation)
+   - Response text shows normal emotional range without dramatic intensity
 
    ⚠️ ADJUSTMENT GUIDELINES (CRITICAL - FOLLOW STRICTLY):
 
-   STEP 1: Copy current parameter values EXACTLY as your starting point
-   STEP 2: Check if there's a CLEAR marked event (branching instruction,
-     major topic shift)
-   STEP 3: If NO marked event → Return current values EXACTLY (no changes)
+   STEP 1: Start with current parameter values as your baseline
+   STEP 2: Check if there's a CLEAR marked event
+     Marked events include: major topic shifts, significant emotional changes,
+     crisis moments, breakthrough moments, termination signals, or sudden
+     dramatic shifts in conversation tone or intensity
+   STEP 3: If NO marked event → Apply 1-2% natural variation based on
+     response text emotional tone:
+     * Natural variation: current_value × 0.01 to 0.02 (1-2%)
+     * Formula: new_value = current_value ± (current_value × 0.02)
+     * Example: If current is X, range is X ± (X × 0.02) = X × 0.98 to X × 1.02
+     * Apply this formula to ALL parameters (pace/speed, pitch, loudness/volume)
    STEP 4: If marked event → Calculate new values using formula:
      * new_value = current_value ± (current_value × MAX_PERCENTAGE)
-     * Speed/pace: MAX 3% = current_value × 0.03 (e.g., 1.1 → 1.067 to
-       1.133, NOT 1.1 → 0.9)
-     * Pitch: MAX 5% = current_value × 0.05 (e.g., -0.6 → -0.63 to -0.57,
-       NOT -0.6 → -0.7)
-     * Loudness: MAX 5% = current_value × 0.05 (e.g., 0.55 → 0.523 to
-       0.578, NOT 0.55 → 0.5)
+     * Pace/Speed: MAX 3% = current_value × 0.03
+     * Pitch: MAX 5% = current_value × 0.05
+     * Loudness/Volume: MAX 5% = current_value × 0.05
+     * NOTE: Use actual parameter names from AVAILABLE PARAMETERS section
+     * (e.g., "speed" for ElevenLabs, "pace" for Sarvam, "speaking_rate" for Google)
    STEP 5: Verify your calculated values are within the limits above
 
-   MATHEMATICAL CONSTRAINT: If current pace is 1.1, the next pace MUST be
-   between 1.067 and 1.133 (1.1 ± 3%)
-   If you calculate a value outside this range, you MUST adjust it to stay
-   within limits.
+   MATHEMATICAL CONSTRAINT: For any current value X:
+   - Natural variation: Next value MUST be between X × 0.98 and X × 1.02
+     (X ± 2%)
+   - Marked event (pace/speed): Next value MUST be between X × 0.97 and
+     X × 1.03 (X ± 3%)
+   - Marked event (pitch/loudness): Next value MUST be between X × 0.95 and
+     X × 1.05 (X ± 5%)
+   - If you calculate a value outside this range, you MUST adjust it to stay
+     within limits
+   - ALSO ensure final values are within the provider's valid range
+     (check AVAILABLE PARAMETERS)
 
 ⚠️ GENERATION INSTRUCTIONS (FOLLOW IN ORDER - DO NOT SKIP STEPS):
 
-STEP 1: Copy current parameter values EXACTLY into your response
-   Example: If current is {{"pace": 1.1, "pitch": -0.6, "loudness": 0.55}},
-            start with: {{"pace": 1.1, "pitch": -0.6, "loudness": 0.55}}
+STEP 1: Start with current parameter values as your baseline
+   Example: If current parameters are {{"param1": value1, "param2": value2, ...}},
+            use these exact values as your starting point
+   NOTE: Parameter names vary by provider - use the exact names from CURRENT PARAMETERS
 
-STEP 2: Check conversation history for CLEAR marked events
-   - Look for: branching instructions, major topic shifts, significant emotional changes
-   - If NO marked event found → STOP HERE, return current values EXACTLY (no changes)
+STEP 2: Check conversation history and response text for CLEAR marked events
+
+   WHAT ARE MARKED EVENTS?
+   Marked events are significant moments that warrant larger parameter changes (3-5%):
+   - Major topic shifts (e.g., suddenly discussing trauma, crisis, breakthrough)
+   - Significant emotional state changes (e.g., calm → panic, sad → relief,
+     anxious → breakthrough)
+   - Crisis moments or urgent situations mentioned
+   - Breakthrough or revelation moments
+   - Termination or ending signals
+   - Sudden shifts in conversation tone or intensity
+
+   HOW TO IDENTIFY MARKED EVENTS:
+   - Look for dramatic emotional words in response text: "panic", "crisis",
+     "breakthrough", "trauma", "urgent", "desperate", "relief", "overwhelmed",
+     "ending", "goodbye"
+   - Look for major topic changes in conversation history
+     (e.g., normal chat → trauma mention)
+   - Look for significant emotional shifts
+     (e.g., discussing daily life → discussing abuse)
+   - If response text shows strong emotional intensity or major topic shift →
+     MARKED EVENT
+
+   - If NO marked event found → Apply 1-2% natural variation based on
+     response text emotional tone (e.g., if current is X, range is X × 0.98
+     to X × 1.02)
+   - If marked event found → Apply 3-5% variation (pace/speed: 3%, pitch/loudness: 5%)
 
 STEP 3: If marked event found → Calculate new values using formula:
    - new_value = current_value ± (current_value × percentage_limit)
-   - Pace: current_value × 0.03 max (e.g., 1.1 → 1.067 to 1.133)
-   - Pitch: current_value × 0.05 max (e.g., -0.6 → -0.63 to -0.57)
-   - Loudness: current_value × 0.05 max (e.g., 0.55 → 0.523 to 0.578)
+   - Pace/Speed: current_value × 0.03 max (range: current × 0.97 to current × 1.03)
+   - Pitch: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
+   - Loudness/Volume: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
+   - Use actual parameter names from AVAILABLE PARAMETERS section
 
 STEP 4: VERIFY your calculated values:
    - Calculate: |new_value - current_value| / current_value × 100
-   - If result > 3% for pace or > 5% for pitch/loudness → ADJUST to stay within limit
-   - Example: If you calculated pace 0.9 from current 1.1, that's 18% change → TOO LARGE
-             → Adjust to 1.067 (3% decrease) or 1.133 (3% increase)
+   - If NO marked event: Result should be ≤ 2% for all parameters
+   - If marked event: Result should be ≤ 3% for pace, ≤ 5% for pitch/loudness
+   - If result exceeds limit → ADJUST to stay within limit
+   - Example: If current is X and you calculated X × 0.82 (18% decrease),
+     that's TOO LARGE → Adjust to X × 0.97 (3% decrease) or X × 1.03
+     (3% increase)
 
-⚠️ EXAMPLES OF WHAT NOT TO DO (VIOLATIONS FROM YOUR LOGS):
-- Current pace: 1.1 → Next: 0.9 (WRONG - 18.2% change, max is 3% = 1.067 to 1.133)
-- Current pitch: -0.6 → Next: -0.7 (WRONG - 16.7% change, max is 5% = -0.63 to -0.57)
-- Current loudness: 0.55 → Next: 0.5 (WRONG - 9.1% change, max is 5% = 0.523 to 0.578)
-- No marked event but changing parameters anyway (WRONG - return current values EXACTLY)
+⚠️ EXAMPLES OF WHAT NOT TO DO:
+- Returning formulas: {{"pace": 1.455 * 0.97}} (WRONG - return calculated value: 1.412)
+- Current value 1.455 → Next: 1.192 (WRONG - 18% change, max is 3% =
+  1.412 to 1.499)
+- Current value 0.525 → Next: 0.436 (WRONG - 17% change, max is 5% =
+  0.499 to 0.551)
+- Current value 0.665 → Next: 0.605 (WRONG - 9% change, max is 5% =
+  0.632 to 0.698)
+- No marked event but making changes larger than 2%
+  (WRONG - max 2% for natural variation)
 
 ✅ EXAMPLES OF CORRECT BEHAVIOR:
-- Current pace: 1.1, no marked event → Return: {{"pace": 1.1}} (EXACT, no change)
-- Current pace: 1.1, marked event → Return: {{"pace": 1.067}} (3%
-  decrease) or {{"pace": 1.133}} (3% increase)
-- Current pitch: -0.6, no marked event → Return: {{"pitch": -0.6}} (EXACT,
-  no change)
-- Current pitch: -0.6, marked event → Return: {{"pitch": -0.63}} (5%
-  decrease) or {{"pitch": -0.57}} (5% increase)
-- Current loudness: 0.55, no marked event → Return: {{"loudness": 0.55}}
-  (EXACT, no change)
+- Current pace: 1.455, no marked event → Calculate: 1.455 × 0.98 = 1.426,
+  Return: {{"pace": 1.426}}
+- Current pace: 1.455, marked event → Calculate: 1.455 × 0.97 = 1.412,
+  Return: {{"pace": 1.412}}
+- Current pitch: 0.525, no marked event → Calculate: 0.525 × 1.02 = 0.536,
+  Return: {{"pitch": 0.536}}
+- Current pitch: 0.525, marked event → Calculate: 0.525 × 1.05 = 0.551,
+  Return: {{"pitch": 0.551}}
+- Always calculate the numeric value first, then return the calculated number
+- Always use actual parameter names from CURRENT PARAMETERS and
+  AVAILABLE PARAMETERS sections
 
 ⚠️ CRITICAL RULES (VIOLATIONS WILL CAUSE JARRING TRANSITIONS):
 1. Return ONLY the JSON object. No explanatory text, no comments.
-2. ⚠️ DEFAULT: Return current parameter values EXACTLY (copy them) unless
-   there's a CLEAR marked event.
-3. ⚠️ MAXIMUM CHANGES (MATHEMATICAL LIMITS):
-   - Pace: current_value × 0.03 max (3% change)
-   - Pitch: current_value × 0.05 max (5% change)
-   - Loudness: current_value × 0.05 max (5% change)
-4. ⚠️ BEFORE RETURNING: Calculate percentage change for each parameter.
-   If any parameter exceeds its limit, ADJUST it to stay within the limit.
-5. Start your response with {{ and end with }}. Nothing else.
+2. ⚠️ CRITICAL: Return CALCULATED NUMERIC VALUES, NOT FORMULAS:
+   - WRONG: {{"pace": 1.455 * 0.97}} (formula, not a number)
+   - CORRECT: {{"pace": 1.412}} (calculated value: 1.455 × 0.97 = 1.412)
+   - You MUST calculate the actual numeric value before returning it
+   - Example: If current is 1.455 and you want 3% decrease, calculate:
+     1.455 × 0.97 = 1.412 (return 1.412, NOT "1.455 * 0.97")
+3. ⚠️ NATURAL VARIATION (when NO marked event):
+   - Apply 1-2% subtle variation based on response text emotional tone
+   - Calculate: new_value = current_value × (0.98 to 1.02)
+   - Return the calculated numeric value, not the formula
+4. ⚠️ MAXIMUM CHANGES WITH MARKED EVENTS:
+   - Pace/Speed: new_value = current_value × (0.97 to 1.03) - calculate and
+     return numeric value
+   - Pitch: new_value = current_value × (0.95 to 1.05) - calculate and
+     return numeric value
+   - Loudness/Volume: new_value = current_value × (0.95 to 1.05) -
+     calculate and return numeric value
+5. ⚠️ BEFORE RETURNING: Calculate the actual numeric value for each parameter.
+   Do NOT return formulas like "X * 0.97" - calculate and return the number.
+6. Start your response with {{ and end with }}. Nothing else.
 """

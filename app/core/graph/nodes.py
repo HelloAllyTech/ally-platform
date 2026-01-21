@@ -541,12 +541,18 @@ async def apply_voice_expressions(
     # CRITICAL: Parameters go ONLY to update_options(), never to message content
     from app.speech_prosody.service import generate_and_apply_prosody_for_message
 
+    # Get current parameters from TTS client for context
+    current_parameters = None
+    if hasattr(tts_client, "_current_params") and tts_client._current_params:
+        current_parameters = tts_client._current_params.copy()
+
     enhanced_text = await generate_and_apply_prosody_for_message(
         tts_client=tts_client,
         message_text=response_text,
         llm_client=llm_client,
         scenario=scenario,
         conversation_history=conversation_history,
+        current_parameters=current_parameters,
     )
 
     # For providers WITH text enhancement:

@@ -196,9 +196,70 @@ class SarvamTTSClient(BaseTTSClient):
     def tts_instance(self) -> sarvam.TTS:
         """Get the underlying Sarvam TTS instance."""
         if self._tts_instance is None:
+            # Create TTS instance - parameters will be set via update_options()
+            # before synthesis starts
             self._tts_instance = sarvam.TTS(
                 target_language_code=self._target_language,
                 speaker=self._speaker,
                 api_key=self._api_key,
             )
+            # Apply current parameters immediately after creation
+            # This ensures they're set before WebSocket session starts
+            if hasattr(self, "_current_params") and self._current_params:
+                valid_params = {
+                    k: v
+                    for k, v in self._current_params.items()
+                    if k in ["pace", "pitch", "loudness"]
+                }
+                if valid_params:
+                    try:
+                        if hasattr(self._tts_instance, "update_options"):
+                            self._tts_instance.update_options(**valid_params)
+                    except Exception as e:
+                        logger.warning(
+                            f"[Sarvam] Failed to apply parameters to new instance: "
+                            f"{e}"
+                        )
         return self._tts_instance
+
+    def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
+        """
+        Apply validated parameters dict to Sarvam TTS instance.
+
+        For Sarvam TTS, we need to ensure parameters are set before the WebSocket
+        session starts. If the instance already exists, we use update_options().
+        If it doesn't exist yet, parameters will be set when it's created.
+
+        Args:
+            params_dict: Validated dict with parameter names as keys
+        """
+        try:
+            if not params_dict:
+                logger.debug("[Sarvam] No parameters to apply (empty dict)")
+                return
+
+            # Update stored parameters first
+            if not hasattr(self, "_current_params"):
+                self._current_params = {}
+            self._current_params.update(params_dict)
+
+            # If TTS instance already exists, update it
+            if self._tts_instance is not None:
+                if hasattr(self._tts_instance, "update_options"):
+                    self._tts_instance.update_options(**params_dict)
+                else:
+                    logger.warning(
+                        "[Sarvam] TTS instance does not have update_options() "
+                        "method. Parameters will be applied on next instance "
+                        "creation."
+                    )
+            else:
+                # Instance doesn't exist yet - parameters will be set when
+                # tts_instance property is accessed
+                logger.debug(
+                    "[Sarvam] TTS instance not created yet. Parameters "
+                    "will be applied when instance is created."
+                )
+
+        except Exception as e:
+            logger.error(f"[Sarvam] Failed to update TTS options: {e}", exc_info=True)
