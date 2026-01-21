@@ -2,7 +2,11 @@
 Tests for variable substitution in BranchingInstruction.
 """
 
+from langchain_core.messages import AIMessage, HumanMessage
+
 from app.core.branching_instructions.base import BranchingInstruction
+from app.core.branching_instructions.constants import ReservedBranchingVariable
+from app.core.graph import SimulationState
 
 
 class TestVariableSubstitution:
@@ -108,3 +112,61 @@ class TestVariableSubstitution:
 
         assert bi.content == "Hello <user_name>"
         assert bi.static_tags == ["user_name"]
+
+    def test_resolve_last_helper_utterance_success(self):
+        """Should substitute LAST_HELPER_UTTERANCE with actual last Human message."""
+        # 1. Setup State
+        state = SimulationState(
+            messages=[
+                AIMessage(content="System prompt"),
+                HumanMessage(content="I am the helper user"),
+            ],
+            permitted_events=[],
+            events_accumulator=[],
+            current_score=0,
+            new_events=[],
+            branching_and_feedback_data=[],
+        )
+
+        instruction = BranchingInstruction(
+            # FIX: No extra angle brackets needed if Enum value already has them
+            content=f"Repeat: "
+            f"<{ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value}>",
+            variable_tags=[],
+            static_tags=[],
+            # Parser usually strips brackets for the list, so this is correct
+            dynamic_tags=["last_helper_utterance"],
+        )
+
+        # 3. Execute
+        result = instruction.resolve_dynamic_branching_instruction(state.messages)
+
+        # 4. Assert
+        assert result == "Repeat: I am the helper user"
+
+    def test_resolve_last_helper_utterance_no_history(self):
+        """Should return raw instruction if tag exists but no Human history exists."""
+        state = SimulationState(
+            messages=[AIMessage(content="Only AI here")],
+            permitted_events=[],
+            events_accumulator=[],
+            current_score=0,
+            new_events=[],
+            branching_and_feedback_data=[],
+        )
+
+        instruction = BranchingInstruction(
+            content=f"Recall:"
+            f" <{ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value}>",
+            variable_tags=[],
+            static_tags=[],
+            dynamic_tags=["last_helper_utterance"],
+        )
+
+        result = instruction.resolve_dynamic_branching_instruction(state.messages)
+
+        # Should fallback to the original string gracefully
+        assert (
+            result
+            == f"Recall: <{ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value}>"
+        )

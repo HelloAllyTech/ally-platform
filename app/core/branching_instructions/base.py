@@ -5,6 +5,12 @@ Data models for branching instructions.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from langchain_core.messages import BaseMessage
+
+from app.core.branching_instructions.constants import ReservedBranchingVariable
+from app.core.branching_instructions.functions.last_helper_utterance import (
+    resolve_last_helper_utterance,
+)
 from app.core.branching_instructions.functions.llm_response import generate_llm_response
 from app.core.branching_instructions.parser import (
     extract_llm_response_tags,
@@ -207,5 +213,25 @@ class BranchingInstruction:
                 # Log error but don't fail - keep the tag as-is
                 logger.error(f"Failed to resolve llm_response tag '<{full_tag}>': {e}")
 
-        # Mark as resolved
         self._llm_resolved = True
+
+    def resolve_dynamic_branching_instruction(self, messages: List[BaseMessage]) -> str:
+        """
+        Returns the content with dynamic placeholders resolved against the chat history.
+
+        Args:
+            messages: The list of chat messages.
+
+        Returns:
+            The fully resolved instruction string.
+        """
+        # Optimization: Skip if no dynamic tags exist
+        if not self.dynamic_tags:
+            return self.content
+
+        resolved_content = self.content
+
+        if ReservedBranchingVariable.LAST_HELPER_UTTERANCE in resolved_content:
+            resolved_content = resolve_last_helper_utterance(resolved_content, messages)
+
+        return resolved_content

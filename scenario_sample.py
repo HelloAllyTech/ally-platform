@@ -53,9 +53,9 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "speak about your favourite colour <favourite colour> and occupation as <occupation> Only",
+                "branchInstruction": "speak about your favourite colour <favourite colour> "
+                "and occupation as <occupation> and <last_helper_utterance>",
                 "feedbackStatus": "True",
-                # "detectionConfig": {"minGapTime": 20},8
             },
             {
                 "id": "score-gte-5",

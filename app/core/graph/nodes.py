@@ -237,7 +237,11 @@ async def resolve_branching_instruction(
                 )
 
             # Use the branching instruction content (with llm_response tags resolved)
-            next_instruction = branching_instruction_obj.content
+            next_instruction = (
+                branching_instruction_obj.resolve_dynamic_branching_instruction(
+                    state.messages
+                )
+            )
 
     # Determine feedback message for UI
     # Priority 1: If branching event was selected, use its feedback
