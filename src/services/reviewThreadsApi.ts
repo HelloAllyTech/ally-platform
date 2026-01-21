@@ -22,7 +22,6 @@ export const reviewThreadsApi = api.injectEndpoints({
         _extraOptions,
         baseQuery,
       ) => {
-        console.log('reviewId', reviewId);
         const result = await baseQuery({
           url: API_ROUTES.REVIEWS.THREADS(reviewId),
           method: API_METHODS.GET,

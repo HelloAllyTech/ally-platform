@@ -1,12 +1,10 @@
 import {useCallback, useEffect, useState} from 'react';
 
 import {ReviewFilter} from '@/constants';
-import {mockGetReviews} from '@/screens/ReviewScreen/mockData';
 import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
 const LIMIT = 5;
-const USE_MOCK = false;
 
 export const useReviews = () => {
   const [offset, setOffset] = useState<number>(0);
@@ -20,17 +18,11 @@ export const useReviews = () => {
     async (currentOffset: number, reset: boolean = false) => {
       try {
         // Use mock or real API based on flag
-        const response = USE_MOCK
-          ? await mockGetReviews({
-              sortBy: selectedFilter,
-              limit: LIMIT,
-              offset: currentOffset,
-            })
-          : await getReviews({
-              sortBy: selectedFilter,
-              limit: LIMIT,
-              offset: currentOffset,
-            });
+        const response = await getReviews({
+          sortBy: selectedFilter,
+          limit: LIMIT,
+          offset: currentOffset,
+        });
 
         if (response.data) {
           const newReviews = response.data.data || [];

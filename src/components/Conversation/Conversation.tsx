@@ -1,4 +1,4 @@
-import {FlatList, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Message as MessageComponent} from '@/components/Message';
@@ -16,16 +16,24 @@ export interface ConversationProps {
   messages: MessageData[];
   isSelectable?: boolean;
   onSelection?: (selection: TextSelection, messageId: string) => void;
-  currentHighlightedText?: TextSelection | null;
   onThreadClick?: (threadId: string, messageId: string) => void;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
   messages,
   isSelectable = true,
   onSelection,
-  currentHighlightedText,
   onThreadClick,
+  onLoadMore,
+  isLoadingMore = false,
+  hasMore = false,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
@@ -41,18 +49,15 @@ export const Conversation: React.FC<ConversationProps> = ({
     <SelectableTextArea
       menuOptions={['Add Comment']}
       onSelection={selection => handleSelection(selection, messageItem.id)}>
-      <Text>
-        <Text style={styles.userName}>{messageItem.senderId}:</Text>{' '}
-        <Text style={styles.messageContent}>
-          {messageItem.messagePart.map(part => (
-            <Text
-              disabled={part.commentIds.length === 0}
-              key={part.text}
-              style={[part.commentIds.length > 0 && styles.highlightedText]}>
-              {part.text}
-            </Text>
-          ))}
-        </Text>
+      <Text style={styles.messageContent}>
+        {messageItem.messagePart.map((part, index) => (
+          <Text
+            disabled={part.commentIds.length === 0}
+            key={`${messageItem.id}-${index}`}
+            style={[part.commentIds.length > 0 && styles.highlightedText]}>
+            {part.text}
+          </Text>
+        ))}
       </Text>
     </SelectableTextArea>
   );
@@ -61,10 +66,10 @@ export const Conversation: React.FC<ConversationProps> = ({
     <Text>
       <Text style={styles.userName}>{messageItem.senderId}:</Text>{' '}
       <Text style={styles.messageContent}>
-        {messageItem.messagePart.map(part => (
+        {messageItem.messagePart.map((part, index) => (
           <Text
             disabled={part.commentIds.length === 0}
-            key={part.text}
+            key={`${messageItem.id}-${index}`}
             style={[part.commentIds.length > 0 && styles.highlightedText]}>
             {part.text}
           </Text>
@@ -76,9 +81,8 @@ export const Conversation: React.FC<ConversationProps> = ({
   const renderItem = ({item}: {item: MessageData}) => (
     <MessageComponent
       timestamp={formatTimestamp(item.startSeconds)}
-      onPress={() => {
-        onThreadClick?.(item.id, item.id);
-      }}
+      senderId={Number(item.senderId)}
+      onPress={() => onThreadClick?.(item.id, item.id)}
       message={
         isSelectable
           ? renderSelectableMessage(item)
@@ -87,6 +91,15 @@ export const Conversation: React.FC<ConversationProps> = ({
     />
   );
 
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={colors.ds.theme.primary} />
+      </View>
+    );
+  };
+
   return (
     <FlatList
       data={messages}
@@ -94,6 +107,11 @@ export const Conversation: React.FC<ConversationProps> = ({
       contentContainerStyle={styles.listContainer}
       renderItem={renderItem}
       ListEmptyComponent={renderEmptyComponent}
+      ListFooterComponent={renderFooter}
+      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReachedThreshold={0.5}
+      refreshing={isRefreshing}
+      onRefresh={onRefresh}
     />
   );
 };
@@ -124,5 +142,10 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.amber[50],
     borderBottomWidth: '1@ms',
     borderBottomColor: colors.ds.amber[500],
+  },
+  footerLoader: {
+    paddingVertical: '16@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

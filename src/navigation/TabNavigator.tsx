@@ -28,6 +28,7 @@ import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
+  ReviewScreen,
   SearchScreen,
   SimulationsScreen,
   UserAnalyticsScreen,
@@ -49,11 +50,11 @@ const ALL_TABS = [
     // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
     requiredPermissions: [],
   },
-  // {
-  //   name: SCREEN_NAMES.REVIEW,
-  //   component: ReviewScreen,
-  //   requiredPermissions: [USER_PERMISSIONS.VIEW_REVIEWS],
-  // },
+  {
+    name: SCREEN_NAMES.REVIEW,
+    component: ReviewScreen,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_REVIEWS],
+  },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
