@@ -7,10 +7,7 @@ import {GetBadgesResponse, UserBadge} from '@/types';
 
 const USE_MOCK_DATA = true;
 
-export const useBadge = (
-  autoCloseDelay: number | null = 5000,
-  viewedStatus: ViewedStatus = ViewedStatus.UNVIEWED,
-) => {
+export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
   const [currentBadge, setCurrentBadge] = useState<UserBadge | null>(null);
   const [badgeQueue, setBadgeQueue] = useState<UserBadge[]>([]);
   const [isFirstBadge, setIsFirstBadge] = useState(false);
@@ -18,15 +15,16 @@ export const useBadge = (
   const clearBadgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstBadgeRef = useRef(false);
 
-  const apiResult = useGetBadgesQuery(viewedStatus, {
+  const apiResult = useGetBadgesQuery(ViewedStatus.UNVIEWED, {
     skip: USE_MOCK_DATA,
   });
   const [markBadgeAsViewed] = useMarkBadgeAsViewedMutation();
 
   // Memoize mock badges to prevent recreating on every render
   const mockBadges = useMemo(
-    () => (USE_MOCK_DATA ? getMockBadgesResponse(viewedStatus) : undefined),
-    [viewedStatus],
+    () =>
+      USE_MOCK_DATA ? getMockBadgesResponse(ViewedStatus.UNVIEWED) : undefined,
+    [],
   );
 
   // Get badges from mock or API
@@ -37,17 +35,14 @@ export const useBadge = (
   const isBadgesLoading = USE_MOCK_DATA ? false : apiResult.isLoading;
 
   useEffect(() => {
-    if (badges?.data?.length && badges?.data?.length > 0 && !currentBadge) {
+    if (badges?.data && !currentBadge) {
       const [firstBadge, ...rest] = badges?.data;
       const timeoutId = setTimeout(() => {
         setCurrentBadge(firstBadge);
         const isFirstEver = !hasShownFirstBadgeRef.current;
         setIsFirstBadge(isFirstEver);
         hasShownFirstBadgeRef.current = true;
-
-        if (rest.length > 0) {
-          setBadgeQueue(rest);
-        }
+        setBadgeQueue(rest);
       }, 1000);
 
       return () => {
