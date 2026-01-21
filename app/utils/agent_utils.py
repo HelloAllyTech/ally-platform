@@ -11,7 +11,6 @@ from livekit.plugins.langchain import LLMAdapter
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.graph import agent_graph
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient, create_llm_client
 from app.stt import BaseSTTClient, create_stt_client
@@ -206,6 +205,9 @@ def create_agent_with_adapter(
     if tts_client:
         configurable["tts_client"] = tts_client
 
+    # Lazy import to avoid circular dependency
+    from app.core.graph import agent_graph
+
     agent_adapter = LLMAdapter(
         graph=agent_graph,
         config={"configurable": configurable},
@@ -233,6 +235,9 @@ def initialize_agent_state(thread_id: str, scenario: Scenario) -> str:
     Returns:
         ISO timestamp string of when agent joined
     """
+    # Lazy import to avoid circular dependency
+    from app.core.graph import agent_graph
+
     agent_graph.update_state(
         {"configurable": {"thread_id": thread_id}},
         values={

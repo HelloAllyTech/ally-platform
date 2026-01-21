@@ -18,7 +18,6 @@ from app.core.events.event_types.combination.constants import (
 )
 from app.core.events.schedulers import TimeEventScheduler
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
-from app.core.graph import agent_graph
 from app.core.graph.state import BranchingAndFeedbackData
 from app.core.graph.utils import is_event_eligible
 from app.core.scenario.base import Scenario, TerminationEvent
@@ -188,6 +187,9 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         # Update graph state with initial branching_and_feedback_data
         # if any were triggered
+        # Lazy import to avoid circular dependency
+        from app.core.graph import agent_graph
+
         if agent_graph and self.thread_id and branching_and_feedback_data:
             logger.info(
                 f"Updating graph state with {len(branching_and_feedback_data)} "
