@@ -52,7 +52,7 @@ export const reviewsApi = api.injectEndpoints({
         parentCommentId,
         messageId,
         selection,
-        comment,
+        content,
       }) => ({
         url: API_ROUTES.REVIEWS.ADD_REVIEW_COMMENT(reviewId),
         method: API_METHODS.POST,
@@ -61,7 +61,7 @@ export const reviewsApi = api.injectEndpoints({
           parentCommentId,
           messageId,
           selection,
-          comment,
+          content,
         },
       }),
     }),
