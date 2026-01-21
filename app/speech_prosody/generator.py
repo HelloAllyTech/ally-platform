@@ -5,7 +5,6 @@ LLM generation logic for speech prosody.
 import json
 from typing import Any, Dict, List, Optional
 
-from app.core.graph.prompt import generate_prompt_content
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
 from app.speech_prosody import prompts
@@ -38,6 +37,9 @@ async def generate_default_parameters(
     """
     try:
         # Get prompt content (same as agent LLM uses)
+        # Import here to avoid circular dependency with app.core.graph
+        from app.core.graph.prompt import generate_prompt_content
+
         prompt_content = generate_prompt_content(
             prompt_data=scenario.prompt_data,
             next_instruction=None,

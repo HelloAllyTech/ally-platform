@@ -48,9 +48,24 @@ def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
 
     Returns:
         Compiled subgraph that applies voice expressions
+
+    Raises:
+        ImportError: If apply_voice_expressions cannot be imported
+        Exception: If subgraph compilation fails
     """
     # Import here to avoid import error when feature is disabled
-    from app.core.graph.nodes import apply_voice_expressions
+    try:
+        from app.core.graph.nodes import apply_voice_expressions
+    except ImportError as e:
+        from app.utils.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.error(
+            f"Failed to import apply_voice_expressions: {e}. "
+            f"Check for circular dependencies or missing modules.",
+            exc_info=True,
+        )
+        raise
 
     subgraph = StateGraph(SimulationState)
     subgraph.add_node("apply_voice_expressions", apply_voice_expressions)

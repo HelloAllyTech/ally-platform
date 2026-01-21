@@ -1254,12 +1254,11 @@ class TestWorker:
         # after it's been set
         mock_event = types.SimpleNamespace(event_id="term-event")
         termination_callback = registry_instance["instance"].termination_callback
-        # The termination callback now returns a task, and we need to set
+        # The termination callback is now async, and we need to set
         # the orchestrator
         if hasattr(termination_callback, "set_event_orchestrator"):
             termination_callback.set_event_orchestrator(registry_instance["instance"])
-        task = termination_callback(mock_event)
-        await task
+        await termination_callback(mock_event)
 
         assert say_called["message"] == "Goodbye"
         assert ctx.shutdown_called is True

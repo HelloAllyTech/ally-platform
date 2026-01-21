@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, Optional, Set
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Set
 
 if TYPE_CHECKING:
     from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
@@ -384,49 +384,50 @@ def create_termination_handler(
     session,
     ctx: agents.JobContext,
     background_tasks: Set[asyncio.Task],
-) -> Callable[[BaseEvent], asyncio.Task]:
+) -> Callable[[BaseEvent], Awaitable[None]]:
     """
-    Create a termination handler that executes termination as a background task.
+    Create a termination handler that executes termination directly
+    (not as background task).
 
     This handler needs to be created before EventOrchestrator (which takes it
     as a callback), but the handler needs the orchestrator to get termination
     config. We use a mutable reference pattern to update the orchestrator after
     creation.
 
+    The handler is async and awaited directly to ensure termination audio
+    completes before shutdown. It's not added to background_tasks to prevent
+    cancellation during cleanup.
+
     Args:
         session: AgentSession instance
         ctx: JobContext for shutdown
-        background_tasks: Set to track background tasks
+        background_tasks: Set to track background tasks (not used for termination)
 
     Returns:
-        Termination callback function that can be updated with orchestrator reference
+        Async termination callback function that can be updated with
+        orchestrator reference
     """
     # Mutable reference to store orchestrator (updated after creation)
     orchestrator_ref: list[Optional["EventOrchestrator"]] = [None]
 
-    def termination_callback(event: BaseEvent) -> asyncio.Task:
+    async def termination_callback(event: BaseEvent) -> None:
         """
-        Handle termination event as a background task.
+        Handle termination event directly (not as background task).
 
-        This is done to handle the case where termination event coming from
-        langgraph flow terminates without publishing audio.
+        This ensures the termination audio completes before ctx.shutdown() is called,
+        preventing the task from being canceled during cleanup.
         """
         if orchestrator_ref[0] is None:
             logger.error("EventOrchestrator not set in termination handler")
-            return asyncio.create_task(asyncio.sleep(0))
+            return
 
-        task = asyncio.create_task(
-            handle_termination(
-                event=event,
-                event_orchestrator=orchestrator_ref[0],
-                session=session,
-                ctx=ctx,
-            )
+        logger.info(f"Termination callback invoked for event '{event.event_id}'")
+        await handle_termination(
+            event=event,
+            event_orchestrator=orchestrator_ref[0],
+            session=session,
+            ctx=ctx,
         )
-        background_tasks.add(task)
-        task.add_done_callback(background_tasks.discard)
-        logger.info(f"Termination background task created for event '{event.event_id}'")
-        return task
 
     # Add method to update orchestrator reference
     def set_event_orchestrator(event_orchestrator: "EventOrchestrator"):
