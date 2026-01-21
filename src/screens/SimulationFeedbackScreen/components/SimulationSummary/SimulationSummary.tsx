@@ -123,8 +123,6 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
     );
   };
 
-  if (!data) return null;
-
   const positives =
     data?.details?.summary?.feedback?.positives || data?.whatWentWell || [];
   const improvements =
@@ -136,19 +134,19 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
 
   return (
     <View style={styles.container}>
-      {data.scenario?.title && (
-        <Text style={styles.scenarioName}>{data.scenario.title}</Text>
+      {data?.scenario?.title && (
+        <Text style={styles.scenarioName}>{data?.scenario.title}</Text>
       )}
       <View style={styles.metricsContainer}>
         <MetricCard label={t('SimulationFeedback.sessionDuration')}>
           <Text style={styles.metricValue}>
-            {getDuration(data.startedAt, data.endedAt)}
+            {getDuration(data?.startedAt, data?.endedAt)}
           </Text>
         </MetricCard>
         <MetricCard label={t('SimulationFeedback.totalScore')}>
           <View style={styles.metricValueContainer}>
             <Text style={styles.metricValue}>
-              {`${data.score ?? '0'} `}
+              {`${data?.score ?? '0'} `}
               <Text style={styles.metricBenchmark}>
                 {t('SimulationFeedback.benchmark', {
                   benchmark: MAX_SUMMARY_SCORE,

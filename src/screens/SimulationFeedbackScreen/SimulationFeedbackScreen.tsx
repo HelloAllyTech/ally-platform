@@ -482,9 +482,7 @@ export const SimulationFeedbackScreen: React.FC<
             <SimulationSummarySkeleton />
           ) : (
             <>
-              {simulationDetails && (
-                <SimulationSummary data={simulationDetails} />
-              )}
+              <SimulationSummary data={simulationDetails ?? null} />
               {isEventCompleted && (
                 <>
                   {/* Transition message section */}
