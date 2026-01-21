@@ -1,6 +1,5 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
 import {
-  GetThreadCommentsRequest,
   GetThreadCommentsResponse,
   GetThreadsParams,
   RepliesParams,
@@ -8,10 +7,6 @@ import {
 } from '@/types/reviews';
 
 import {api} from './api';
-import {
-  generateMockCommentReplies,
-  generateMockThreadComments,
-} from './reviewThreadsApi.mock';
 
 export const reviewThreadsApi = api.injectEndpoints({
   endpoints: builder => ({
@@ -37,48 +32,6 @@ export const reviewThreadsApi = api.injectEndpoints({
         return {data: result.data as ThreadsResponse};
       },
     }),
-    getThreadComments1: builder.query<
-      GetThreadCommentsResponse,
-      GetThreadCommentsRequest
-    >({
-      queryFn: async (
-        {threadId, offset, limit},
-        _queryApi,
-        _extraOptions,
-        baseQuery,
-      ) => {
-        // Return mock data in development mode
-        if (__DEV__) {
-          // Simulate network delay
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          const {data, count} = generateMockThreadComments(
-            threadId,
-            offset ?? 0,
-            limit ?? 0,
-          );
-
-          return {
-            data: {data, count},
-          };
-        }
-
-        // In production, make actual API call using baseQuery
-        const result = await baseQuery({
-          url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(String(threadId)),
-          method: API_METHODS.GET,
-          ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {body: {offset, limit}}
-            : {}),
-        });
-
-        if (result.error) {
-          return {error: result.error};
-        }
-
-        return {data: result.data as GetThreadCommentsResponse};
-      },
-    }),
     getCommentReplies: builder.query<GetThreadCommentsResponse, RepliesParams>({
       queryFn: async (
         {commentId, offset, limit},
@@ -86,31 +39,11 @@ export const reviewThreadsApi = api.injectEndpoints({
         _extraOptions,
         baseQuery,
       ) => {
-        // Return mock data in development mode
-        if (__DEV__) {
-          // Simulate network delay
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          const {data, count} = generateMockCommentReplies(
-            commentId,
-            offset ?? 0,
-            limit ?? 10,
-          );
-
-          return {
-            data: {
-              data,
-              count,
-            },
-          };
-        }
-
-        // In production, make actual API call using baseQuery
         const result = await baseQuery({
           url: API_ROUTES.REVIEWS.GET_COMMENT_REPLIES(String(commentId)),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {body: {offset, limit}}
+            ? {params: {offset, limit}}
             : {}),
         });
 
@@ -124,8 +57,5 @@ export const reviewThreadsApi = api.injectEndpoints({
   }),
 });
 
-export const {
-  useLazyGetThreadsQuery,
-  useLazyGetThreadComments1Query,
-  useLazyGetCommentRepliesQuery,
-} = reviewThreadsApi;
+export const {useLazyGetThreadsQuery, useLazyGetCommentRepliesQuery} =
+  reviewThreadsApi;

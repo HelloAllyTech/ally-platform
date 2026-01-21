@@ -77,6 +77,8 @@ export const ReviewDetailsScreen: React.FC = () => {
     selectedComment,
     onReplyPress,
     showThreadsBottomSheet,
+    hideReplyBottomSheet,
+    hideCommentThreadBottomSheet,
   } = useReviewComments();
 
   // Helper to map message threads to comment ranges
@@ -399,6 +401,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         onSubmitComment={_commentText => {
           // Handle add comment press
         }}
+        hideCommentThreadBottomSheet={hideCommentThreadBottomSheet}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
@@ -414,6 +417,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         onSubmitReplyPress={_commentText => {
           // Handle add comment press
         }}
+        hideReplyBottomSheet={hideReplyBottomSheet}
       />
     </SafeAreaView>
   );
