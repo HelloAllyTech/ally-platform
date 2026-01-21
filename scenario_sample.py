@@ -34,15 +34,27 @@ SCENARIO_SAMPLE = {
             {
                 "id": "superficial-hope",
                 "name": "offered superficial hope",
-                "description": "",
+                "description": "Therapist provided superficial encouragement without validating the patient's emotional state, causing the patient to feel misunderstood and disconnected.",
                 "score": -5,
                 "emoji": ":confused:",
                 "message": "You wanted to encourage the client, instead try to validate their emotions so that they feel understood.",
                 "branchInstruction": "I am not sure if you understand what I am feeling.",
                 "detectionType": "SENTENCE_SIMILARITY",
-                "sentences": ["Hi", "Hello"],
+                "sentences": [
+                    "Don't worry, everything will be fine",
+                    "You'll get through this",
+                    "It's not that bad",
+                    "Just stay positive",
+                    "Things will work out",
+                    "You're overthinking this",
+                    "Just try to be more optimistic",
+                    "It could be worse",
+                    "You should just focus on the positive",
+                    "Everything happens for a reason",
+                ],
                 "feedbackStatus": "True",
-                "detectionConfig": {"minScore": 5, "maxScore": 10},
+                # Removed detectionConfig restriction for testing termination
+                # "detectionConfig": {"minScore": 5, "maxScore": 10},
             },
             {
                 "id": "warm-greeting",
@@ -135,7 +147,7 @@ SCENARIO_SAMPLE = {
         "autoTerminationEvents": [
             {
                 "id": "superficial-hope",
-                "terminationMessage": "Termination message is being played",
+                "terminationMessage": "I'm sorry, but I don't think this is helping. I don't feel like you really understand what I'm going through, and I think I need to end this conversation. Thank you for trying, but I need to go now.",
             }
         ],
         "voice": {

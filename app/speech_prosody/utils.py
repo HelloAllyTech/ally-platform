@@ -99,32 +99,13 @@ def extract_persona_context_from_prompt_data(
                 extracted_fields.append(field_name)
             else:
                 missing_fields.append(field_name)
-        except (AttributeError, TypeError) as e:
+        except (AttributeError, TypeError):
             # Field doesn't exist or isn't accessible - skip it
             missing_fields.append(field_name)
-            logger.debug(
-                f"[Speech Prosody] Could not extract field '{field_name}' "
-                f"from prompt_data: {e}"
-            )
             continue
-
-    # Log extraction results for testing
-    if extracted_fields:
-        logger.info(
-            f"[Speech Prosody] Extracted persona context fields: {extracted_fields}"
-        )
-    if missing_fields:
-        logger.debug(
-            f"[Speech Prosody] Missing/empty persona context fields: {missing_fields}"
-        )
 
     # Return None if no valid fields were extracted
     result = persona_context if persona_context else None
-    if result is None:
-        logger.debug(
-            "[Speech Prosody] No valid persona context fields extracted "
-            f"(checked {len(field_whitelist)} fields)"
-        )
     return result
 
 
@@ -164,12 +145,6 @@ def format_persona_context(
         "\n".join(persona_lines) if persona_lines else "No persona context available."
     )
 
-    # Log formatting results for testing
-    logger.debug(
-        f"[Speech Prosody] Formatted persona context with {len(formatted_fields)} "
-        f"fields: {formatted_fields}"
-    )
-
     return result
 
 
@@ -202,48 +177,35 @@ def build_prosody_prompt(
         Formatted prompt string
     """
     # Format current parameters for prompt
-    if current_parameters:
+    if current_parameters and len(current_parameters) > 0:
         current_parameters_json = json.dumps(current_parameters, indent=2)
     else:
-        current_parameters_json = "No current parameters available (first utterance)."
+        current_parameters_json = (
+            "No current parameters available. Generate appropriate parameters "
+            "based on the response text, persona, and context."
+        )
 
     if enhancement_instructions:
-        logger.debug(
-            "[Speech Prosody] Building prompt with text enhancement support "
-            f"(history: {conversation_history_count} messages, "
-            f"response length: {len(response_text)} chars)"
-        )
         prompt = prompt_with_enhancement.format(
             persona_context=persona_context_text,
             conversation_history=conversation_history_text,
             conversation_history_count=conversation_history_count,
             response_text=response_text,
+            termination_context="",  # Empty - LLM will infer from message text
             parameter_metadata=parameter_metadata_json,
             text_enhancement_instructions=enhancement_instructions,
             current_parameters=current_parameters_json,
         )
-        logger.debug(
-            f"[Speech Prosody] Generated prompt length: {len(prompt)} chars "
-            f"(with enhancement template)"
-        )
         return prompt
     else:
-        logger.debug(
-            "[Speech Prosody] Building prompt without text enhancement "
-            f"(history: {conversation_history_count} messages, "
-            f"response length: {len(response_text)} chars)"
-        )
         prompt = prompt_parameters_only.format(
             persona_context=persona_context_text,
             conversation_history=conversation_history_text,
             conversation_history_count=conversation_history_count,
             response_text=response_text,
+            termination_context="",  # Empty - LLM will infer from message text
             parameter_metadata=parameter_metadata_json,
             current_parameters=current_parameters_json,
-        )
-        logger.debug(
-            f"[Speech Prosody] Generated prompt length: {len(prompt)} chars "
-            f"(parameters-only template)"
         )
         return prompt
 
@@ -288,23 +250,13 @@ def parse_llm_json_response(response: Any) -> Optional[Dict[str, Any]]:
         parsed = json.loads(content)
         # Only return dictionaries, not arrays or other types
         if isinstance(parsed, dict):
-            logger.debug(
-                f"Successfully parsed JSON from LLM response (JSON mode): {parsed}"
-            )
             return parsed
         else:
             # If content is valid JSON but not a dict (e.g., array), return None
             # Don't try substring extraction - the content was already valid JSON
-            logger.debug(
-                f"Parsed JSON is not a dict (type: {type(parsed)}), "
-                f"ignoring. Content: {content[:200]}..."
-            )
             return None
-    except json.JSONDecodeError as e:
-        logger.debug(
-            f"Failed to parse entire content as JSON: {e}. "
-            f"Content: {content[:200]}..."
-        )
+    except json.JSONDecodeError:
+        pass
 
     # If that fails, try to extract JSON from content (for regular responses)
     # Look for JSON object that starts with { and ends with }
@@ -317,21 +269,9 @@ def parse_llm_json_response(response: Any) -> Optional[Dict[str, Any]]:
                 parsed = json.loads(json_str)
                 # Only return dictionaries, not arrays or other types
                 if isinstance(parsed, dict):
-                    logger.debug(
-                        f"Successfully extracted and parsed JSON from LLM "
-                        f"response: {parsed}"
-                    )
                     return parsed
-                else:
-                    logger.debug(
-                        f"Extracted JSON is not a dict (type: {type(parsed)}), "
-                        f"ignoring. Extracted: {json_str[:200]}..."
-                    )
-            except json.JSONDecodeError as e:
-                logger.debug(
-                    f"Failed to parse extracted JSON: {e}. "
-                    f"Extracted: {json_str[:200]}..."
-                )
+            except json.JSONDecodeError:
+                pass
 
     logger.warning(
         f"Failed to parse JSON from LLM response. "

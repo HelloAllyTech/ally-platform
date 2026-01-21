@@ -314,31 +314,6 @@ def create_shutdown_handler(
 # ====================================================================
 
 
-async def publish_termination_audio(session, message: str) -> None:
-    """
-    Publish termination message as audio.
-
-    Args:
-        session: AgentSession instance
-        message: Termination message to speak
-
-    Raises:
-        Exception: If audio playback fails
-    """
-    if not session:
-        return
-
-    try:
-        logger.info(f"Publishing termination audio: '{message}'")
-        await session.interrupt()
-        handler = session.say(message, allow_interruptions=False)
-        await handler.wait_for_playout()
-        logger.info("Termination audio playback completed")
-    except Exception as e:
-        logger.exception(f"Failed to publish termination audio: {e}")
-        raise
-
-
 async def handle_termination(
     event: BaseEvent,
     event_orchestrator: "EventOrchestrator",
@@ -363,45 +338,43 @@ async def handle_termination(
         f"Termination event '{event.event_id}' triggered. Initiating shutdown..."
     )
 
-    try:
-        termination_config = event_orchestrator.get_termination_config(event.event_id)
-        termination_message = (
-            termination_config.termination_message if termination_config else ""
-        )
-        logger.info(f"Using termination message: {termination_message}")
+    termination_config = event_orchestrator.get_termination_config(event.event_id)
+    termination_message = (
+        termination_config.termination_message if termination_config else ""
+    )
+    logger.info(f"Using termination message: {termination_message}")
 
-        # Publish termination audio
-        if session:
-            await publish_termination_audio(session, termination_message)
-    except Exception as e:
-        logger.exception(f"Error during termination audio playback: {e}")
-    finally:
-        ctx.shutdown(SESSION_TERMINATED_MESSAGE)
-        logger.info("Session shutdown completed")
+    # NOTE: This function is only used as a fallback if worker-based termination
+    # signaling is not available. Normally, termination is handled in entrypoint
+    # context via worker._handle_termination_in_entrypoint_context().
+    logger.info("Fallback termination handler - proceeding with shutdown")
+    ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+    logger.info("Session shutdown completed")
 
 
 def create_termination_handler(
     session,
     ctx: agents.JobContext,
-    background_tasks: Set[asyncio.Task],
+    background_tasks: Optional[Set[asyncio.Task]] = None,
+    worker=None,  # Optional AgentWorker reference for entrypoint-based termination
 ) -> Callable[[BaseEvent], Awaitable[None]]:
     """
-    Create a termination handler that executes termination directly
-    (not as background task).
+    Create a termination handler that signals entrypoint context for termination.
 
     This handler needs to be created before EventOrchestrator (which takes it
     as a callback), but the handler needs the orchestrator to get termination
     config. We use a mutable reference pattern to update the orchestrator after
     creation.
 
-    The handler is async and awaited directly to ensure termination audio
-    completes before shutdown. It's not added to background_tasks to prevent
-    cancellation during cleanup.
+    The handler signals the entrypoint context (via worker._termination_event) to
+    handle termination audio playback. This allows audio to play reliably because
+    it runs in the main async context, not the graph context.
 
     Args:
-        session: AgentSession instance
-        ctx: JobContext for shutdown
-        background_tasks: Set to track background tasks (not used for termination)
+        session: AgentSession instance (used in fallback path only)
+        ctx: JobContext for shutdown (used in fallback path only)
+        background_tasks: Optional set of background tasks (used in fallback path only)
+        worker: Optional AgentWorker reference for entrypoint-based termination
 
     Returns:
         Async termination callback function that can be updated with
@@ -412,22 +385,61 @@ def create_termination_handler(
 
     async def termination_callback(event: BaseEvent) -> None:
         """
-        Handle termination event directly (not as background task).
+        Handle termination event.
 
-        This ensures the termination audio completes before ctx.shutdown() is called,
-        preventing the task from being canceled during cleanup.
+        NEW APPROACH: Signal termination to entrypoint context instead of
+        handling it directly. This allows audio to play reliably because
+        entrypoint runs in main async context, not graph context.
         """
         if orchestrator_ref[0] is None:
             logger.error("EventOrchestrator not set in termination handler")
             return
 
-        logger.info(f"Termination callback invoked for event '{event.event_id}'")
-        await handle_termination(
-            event=event,
-            event_orchestrator=orchestrator_ref[0],
-            session=session,
-            ctx=ctx,
+        logger.info(
+            f"Termination callback invoked for event '{event.event_id}'. "
+            f"Signaling entrypoint context for termination handling."
         )
+
+        # Get termination message
+        termination_config = orchestrator_ref[0].get_termination_config(event.event_id)
+        termination_message = (
+            termination_config.termination_message if termination_config else ""
+        )
+
+        # If worker is provided, signal termination to entrypoint context
+        # This allows audio to play reliably (runs in main async context)
+        if worker is not None and hasattr(worker, "_termination_event"):
+            logger.info(
+                f"Signaling termination to entrypoint context with message: "
+                f"'{termination_message}'"
+            )
+            worker._termination_message = termination_message
+            worker._termination_event.set()  # Signal entrypoint context
+            logger.info("Termination signal sent to entrypoint context")
+        else:
+            # Fallback: Use old approach if worker not available
+            logger.warning(
+                "Worker not available - using fallback termination handling "
+                "(may not work reliably in graph context)"
+            )
+            if background_tasks is not None:
+                termination_task = asyncio.create_task(
+                    handle_termination(
+                        event=event,
+                        event_orchestrator=orchestrator_ref[0],
+                        session=session,
+                        ctx=ctx,
+                    )
+                )
+                background_tasks.add(termination_task)
+                termination_task.add_done_callback(background_tasks.discard)
+            else:
+                await handle_termination(
+                    event=event,
+                    event_orchestrator=orchestrator_ref[0],
+                    session=session,
+                    ctx=ctx,
+                )
 
     # Add method to update orchestrator reference
     def set_event_orchestrator(event_orchestrator: "EventOrchestrator"):

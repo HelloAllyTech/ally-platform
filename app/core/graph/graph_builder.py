@@ -2,7 +2,6 @@ from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.core.config import settings
 from app.core.graph.nodes import (
     generate_response,
     process_events,
@@ -53,19 +52,7 @@ def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
         ImportError: If apply_voice_expressions cannot be imported
         Exception: If subgraph compilation fails
     """
-    # Import here to avoid import error when feature is disabled
-    try:
-        from app.core.graph.nodes import apply_voice_expressions
-    except ImportError as e:
-        from app.utils.logger import get_logger
-
-        logger = get_logger(__name__)
-        logger.error(
-            f"Failed to import apply_voice_expressions: {e}. "
-            f"Check for circular dependencies or missing modules.",
-            exc_info=True,
-        )
-        raise
+    from app.core.graph.nodes import apply_voice_expressions
 
     subgraph = StateGraph(SimulationState)
     subgraph.add_node("apply_voice_expressions", apply_voice_expressions)
@@ -83,8 +70,8 @@ def build_graph() -> StateGraph[SimulationState]:
     2. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
     3. generate_response: Generates LLM response based on detected events
-    4. apply_voice_expressions: Applies voice expression tool calls from LLM
-       (as subgraph) [if enabled]
+    4. apply_voice_expressions: Applies voice expression parameters and text enhancement
+       (as subgraph)
 
     Note: resolve_branching_instruction and apply_voice_expressions are subgraphs to
     prevent their LLM outputs from being streamed. With subgraphs=False
@@ -109,15 +96,12 @@ def build_graph() -> StateGraph[SimulationState]:
     graph.add_edge("process_events", "resolve_branching_instruction")
     graph.add_edge("resolve_branching_instruction", "generate_response")
 
-    if settings.ENABLE_VOICE_EXPRESSIONS:
-        # Build the apply_voice_expressions subgraph and add it as a node
-        # This prevents its LLM outputs (for voice expression parameters) from being
-        # streamed
-        voice_expressions_subgraph = build_voice_expressions_subgraph()
-        graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
-        graph.add_edge("generate_response", "apply_voice_expressions")
-        graph.add_edge("apply_voice_expressions", END)
-    else:
-        graph.add_edge("generate_response", END)
+    # Build the apply_voice_expressions subgraph and add it as a node
+    # This prevents its LLM outputs (for voice expression parameters) from being
+    # streamed
+    voice_expressions_subgraph = build_voice_expressions_subgraph()
+    graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
+    graph.add_edge("generate_response", "apply_voice_expressions")
+    graph.add_edge("apply_voice_expressions", END)
 
     return graph

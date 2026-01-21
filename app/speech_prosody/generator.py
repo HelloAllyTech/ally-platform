@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
 from app.speech_prosody import prompts
+from app.speech_prosody.constants import DEFAULT_CONVERSATION_HISTORY_LIMIT
 from app.speech_prosody.utils import (
     build_prosody_prompt,
     extract_prosody_result,
@@ -47,38 +48,33 @@ async def generate_default_parameters(
 
         parameter_metadata_json = json.dumps(parameter_metadata, indent=2)
 
-        logger.info(
-            f"[Speech Prosody] Generating default parameters "
-            f"(scenario: {scenario.name if scenario.name else 'unnamed'}, "
-            f"metadata params: {list(parameter_metadata.keys())})"
-        )
+        # Include opening statements in prompt if available
+        opening_statements_section = ""
+        if (
+            scenario.prompt_data
+            and scenario.prompt_data.opening_statements
+            and len(scenario.prompt_data.opening_statements) > 0
+        ):
+            opening_statements_text = "\n".join(
+                f"- {stmt}" for stmt in scenario.prompt_data.opening_statements
+            )
+            opening_statements_section = (
+                f"\nOPENING STATEMENTS (first words the character will say):\n"
+                f"{opening_statements_text}\n"
+                f"\nConsider how the character's initial greeting/opening reflects "
+                f"their baseline physiological state.\n"
+            )
 
         # Create generation prompt with metadata
         generation_prompt = prompts.DEFAULT_GENERATION_PROMPT.format(
             prompt_content=prompt_content,
+            opening_statements_section=opening_statements_section,
             parameter_metadata=parameter_metadata_json,
-        )
-
-        logger.debug(
-            f"[Speech Prosody] Default generation prompt length: "
-            f"{len(generation_prompt)} chars, "
-            f"prompt_content length: {len(prompt_content)} chars"
         )
 
         # Invoke LLM with JSON mode for better JSON parsing
         llm_instance = llm_client.llm_instance
         response = await invoke_llm_with_json_mode(llm_instance, generation_prompt)
-
-        # Log response for debugging
-        logger.debug(
-            f"[Speech Prosody] LLM response type: {type(response)}, "
-            f"has content: {hasattr(response, 'content')}"
-        )
-        if hasattr(response, "content"):
-            logger.debug(
-                f"[Speech Prosody] LLM response content preview: "
-                f"{str(response.content)[:200]}..."
-            )
 
         # Parse JSON dict from LLM response
         params_dict = parse_llm_json_response(response)
@@ -89,12 +85,6 @@ async def generate_default_parameters(
                 "for default parameters"
             )
             return None
-
-        logger.info(
-            f"[Speech Prosody] Successfully generated default parameters: "
-            f"{list(params_dict.keys())}"
-        )
-        logger.debug(f"[Speech Prosody] Default parameter values: {params_dict}")
 
         return params_dict
 
@@ -109,7 +99,7 @@ async def generate_runtime_parameters(
     parameter_metadata: Dict[str, Any],
     conversation_history: Optional[List[Dict[str, str]]] = None,
     persona_context: Optional[Dict[str, Any]] = None,
-    conversation_history_limit: int = 10,
+    conversation_history_limit: int = DEFAULT_CONVERSATION_HISTORY_LIMIT,
     enhancement_instructions: Optional[str] = None,
     current_parameters: Optional[Dict[str, Any]] = None,
 ) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -145,15 +135,6 @@ async def generate_runtime_parameters(
         )
         persona_context_text = format_persona_context(persona_context)
 
-        logger.info(
-            f"[Speech Prosody] Generating runtime parameters "
-            f"(response length: {len(response_text)} chars, "
-            f"history: {conversation_history_count} messages, "
-            f"persona fields: "
-            f"{list(persona_context.keys()) if persona_context else 'none'}, "
-            f"metadata params: {list(parameter_metadata.keys())})"
-        )
-
         # Build prompt
         generation_prompt = build_prosody_prompt(
             response_text=response_text,
@@ -169,7 +150,6 @@ async def generate_runtime_parameters(
 
         # Invoke LLM
         llm_instance = llm_client.llm_instance
-        logger.debug("[Speech Prosody] Invoking LLM for runtime parameter generation")
         response = await invoke_llm_with_json_mode(llm_instance, generation_prompt)
 
         # Parse JSON response
@@ -181,27 +161,10 @@ async def generate_runtime_parameters(
             )
             return None, None
 
-        logger.debug(
-            f"[Speech Prosody] Successfully parsed LLM response "
-            f"(keys: {list(result_dict.keys())})"
-        )
-
         # Extract parameters and enhanced text
         params_dict, enhanced_text = extract_prosody_result(
             result_dict, enhancement_instructions, response_text
         )
-
-        if params_dict:
-            logger.debug(
-                f"[Speech Prosody] Extracted {len(params_dict)} parameters: "
-                f"{list(params_dict.keys())}"
-            )
-        if enhanced_text and enhanced_text != response_text:
-            logger.debug(
-                f"[Speech Prosody] Text enhancement applied "
-                f"(original: {len(response_text)} chars, "
-                f"enhanced: {len(enhanced_text)} chars)"
-            )
 
         return params_dict, enhanced_text
 

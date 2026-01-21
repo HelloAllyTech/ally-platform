@@ -86,8 +86,6 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # Flag to track if termination flow has started.
         # Once started, additional termination events will be ignored.
         self._termination_flow_started: bool = False
-        # Store session reference for termination
-        self._session = None
         # Track if termination has been initiated (session-level flag)
         self._termination_initiated = False
         self.room = room

@@ -217,10 +217,6 @@ class EventSender:
             )
             return
 
-        # Mark that termination flow has started
-        self._termination_flow_started = True
-        logger.info("Termination flow started")
-
         # Select the termination event with highest magnitude score
         selected_event = self._select_highest_magnitude_termination_event(
             triggered_termination_events
@@ -232,6 +228,15 @@ class EventSender:
         # Get termination message from config
         config = self.get_termination_config(selected_event.event_id)
         termination_message = config.termination_message if config else None
+
+        # NOTE: Termination audio is now handled in entrypoint context (not here).
+        # The termination callback will signal the entrypoint context, which will
+        # play the audio reliably because it runs in the main async context.
+        # No need to attempt audio playback here - it will be handled in entrypoint.
+
+        # Mark that termination flow has started
+        self._termination_flow_started = True
+        logger.info("Termination flow started")
 
         # Only call termination callback once per session
         if self.termination_callback and not self._termination_initiated:

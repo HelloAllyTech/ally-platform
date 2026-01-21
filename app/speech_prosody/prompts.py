@@ -8,7 +8,7 @@ the character's voice using prosody science principles.
 
 SCENARIO PROMPT:
 {prompt_content}
-
+{opening_statements_section}
 AVAILABLE PARAMETERS:
 {parameter_metadata}
 
@@ -69,6 +69,8 @@ CONVERSATION HISTORY (last {conversation_history_count} messages):
 CURRENT RESPONSE TEXT:
 {response_text}
 
+{termination_context}
+
 CURRENT PARAMETERS (for context):
 {current_parameters}
 
@@ -108,6 +110,7 @@ Move from "guessing an emotion" to "simulating a physiological state" based on:
    - Topic changes that affect emotional tone (e.g., trauma mention, crisis moment)
    - Clear emotional momentum shifts (escalating tension, de-escalating release)
    - Cognitive load changes (processing heavy emotions, breakthrough moments)
+   - Significant context changes (e.g., ending conversations, major shifts)
 
    KEEP parameters STABLE when:
    - Conversation is continuing normally without significant shifts
@@ -182,6 +185,8 @@ CONVERSATION HISTORY (last {conversation_history_count} messages):
 CURRENT RESPONSE TEXT:
 {response_text}
 
+{termination_context}
+
 CURRENT PARAMETERS (for context):
 {current_parameters}
 
@@ -219,6 +224,7 @@ Move from "guessing an emotion" to "simulating a physiological state" based on:
    - Topic changes that affect emotional tone (e.g., trauma mention, crisis moment)
    - Clear emotional momentum shifts (escalating tension, de-escalating release)
    - Cognitive load changes (processing heavy emotions, breakthrough moments)
+   - Significant context changes (e.g., ending conversations, major shifts)
 
    KEEP parameters STABLE when:
    - Conversation is continuing normally without significant shifts

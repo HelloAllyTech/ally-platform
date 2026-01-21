@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.constants import (
     DEFAULT_BRANCHING_LLM_CONFIG,
     DEFAULT_VAD_ACTIVATION_THRESHOLD,
+    SESSION_TERMINATED_MESSAGE,
     Environment,
 )
 from app.core.embeddings import OpenAIEmbeddingClient
@@ -82,6 +83,12 @@ class AgentWorker:
         self.final_score_sent = False
         self._background_tasks: Set[asyncio.Task] = set()
 
+        # ========== Termination Handling (for entrypoint context) ==========
+        # Use asyncio.Event to signal termination from graph context
+        # to entrypoint context
+        self._termination_event: Optional[asyncio.Event] = None
+        self._termination_message: Optional[str] = None
+
     async def configure(self):
         """
         - Parse metadata and extract scenario
@@ -115,21 +122,19 @@ class AgentWorker:
         self.llm_client = configure_llm_client(self.scenario)
 
         # Generate and set default voice expression parameters
-        if settings.ENABLE_VOICE_EXPRESSIONS:
-            from app.speech_prosody.service import SpeechProsodyService
+        from app.speech_prosody.service import SpeechProsodyService
 
-            prosody_service = SpeechProsodyService(self.tts_client)
-            await prosody_service.generate_and_set_defaults(
-                scenario=self.scenario,
-                llm_client=self.llm_client,
-            )
-            # Get defaults from prosody service (single source of truth)
-            defaults = prosody_service.get_default_parameters()
-            logger.info(f"TTS defaults set: {defaults}")
+        prosody_service = SpeechProsodyService(self.tts_client)
+        await prosody_service.generate_and_set_defaults(
+            scenario=self.scenario,
+            llm_client=self.llm_client,
+        )
+        # Get defaults from prosody service (single source of truth)
+        defaults = prosody_service.get_default_parameters()
 
-            # Sync to TTS client for backward compatibility with
-            # get_defaults_for_learn_service()
-            self.tts_client._default_params = defaults.copy()
+        # Sync to TTS client for backward compatibility with
+        # get_defaults_for_learn_service()
+        self.tts_client._default_params = defaults.copy()
 
         # Initialize agent state
         self.joined_iso = initialize_agent_state(
@@ -179,11 +184,13 @@ class AgentWorker:
 
     def _setup_event_orchestrator(self):
         """Initialize event orchestrator with callbacks."""
-        # Create termination handler using utility
+        # Create termination handler that signals entrypoint context instead of
+        # handling termination directly (which runs in graph context)
         termination_handler = create_termination_handler(
             session=self.session,
             ctx=self.ctx,
             background_tasks=self._background_tasks,
+            worker=self,  # Pass worker reference so handler can signal termination
         )
 
         self.event_orchestrator = EventOrchestrator(
@@ -253,6 +260,9 @@ class AgentWorker:
         Connects to room, initializes orchestrator, sets up interruption detection,
         and says opening statement.
         """
+        # Initialize termination event for entrypoint-based termination handling
+        self._termination_event = asyncio.Event()
+
         # Start session and connect
         await self.session.start(
             room=self.ctx.room,
@@ -279,6 +289,96 @@ class AgentWorker:
             )
             await handler.wait_for_playout()
 
+    async def _handle_termination_in_entrypoint_context(self):
+        """
+        Background task that waits for termination signal and handles it
+        in entrypoint context (not graph context).
+
+        This allows termination audio to play reliably because it runs
+        in the main async context, not the graph context.
+        """
+        if not self._termination_event:
+            return
+
+        try:
+            # Wait for termination event to be set
+            await self._termination_event.wait()
+
+            if not self._termination_message:
+                logger.warning(
+                    "Termination event set but no message - proceeding with shutdown"
+                )
+                self.ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+                return
+
+            # Step 1: Generate new prosody parameters for termination message
+            # Termination is a significant moment - pass current parameters for context
+            # so LLM can make informed decisions about the transition
+            from app.speech_prosody.service import (
+                SpeechProsodyService,
+                generate_and_apply_prosody_for_message,
+            )
+
+            # Get current parameters for context (LLM will decide on transition)
+            prosody_service = SpeechProsodyService(self.tts_client)
+            current_params = prosody_service.get_current_parameters()
+
+            # Generate parameters for termination message
+            # Pass current parameters so LLM can make context-aware decisions
+            # about the transition (dramatic shift vs subtle change)
+            termination_text_to_say = await generate_and_apply_prosody_for_message(
+                tts_client=self.tts_client,
+                message_text=self._termination_message,
+                llm_client=self.llm_client,
+                scenario=self.scenario,
+                conversation_history=None,  # No history for termination
+                conversation_history_limit=0,
+                current_parameters=current_params,  # Pass current for context
+            )
+
+            if not termination_text_to_say:
+                termination_text_to_say = self._termination_message
+
+            # Step 2: Interrupt any current speech to prevent other utterances
+            # from playing
+            try:
+                import asyncio
+
+                await asyncio.wait_for(self.session.interrupt(), timeout=2.0)
+            except (asyncio.TimeoutError, Exception) as e:
+                logger.warning(f"Error interrupting speech: {e}. Continuing anyway.")
+
+            # Step 3: Play termination audio in entrypoint context
+            try:
+                handler = self.session.say(
+                    termination_text_to_say, allow_interruptions=False
+                )
+
+                # Wait for playout
+                try:
+                    await asyncio.wait_for(handler.wait_for_playout(), timeout=15.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+                    logger.warning(
+                        f"Termination audio did not complete: {e}. "
+                        "Proceeding with shutdown anyway."
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to play termination audio in entrypoint context: {e}. "
+                    "Proceeding with shutdown."
+                )
+
+            # Shutdown after audio completes (or if it failed)
+            self.ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+
+        except Exception as e:
+            logger.exception(f"Error in termination handler task: {e}")
+            # Ensure shutdown happens even if there's an error
+            try:
+                self.ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+            except Exception:
+                pass
+
 
 async def entrypoint(ctx: agents.JobContext):
     """
@@ -292,6 +392,16 @@ async def entrypoint(ctx: agents.JobContext):
     await worker.configure()  # Phase 1: Configure clients
     await worker.initialize()  # Phase 2: Create session, agent, orchestrator
     await worker.start()  # Phase 3: Connect and start
+
+    # Start background task to handle termination in entrypoint context
+    # This allows termination audio to play reliably (runs in main async context)
+    termination_task = asyncio.create_task(
+        worker._handle_termination_in_entrypoint_context()
+    )
+    worker._background_tasks.add(termination_task)
+    termination_task.add_done_callback(worker._background_tasks.discard)
+
+    logger.info("Termination handler task started in entrypoint context")
 
 
 def prewarm(proc: JobProcess):

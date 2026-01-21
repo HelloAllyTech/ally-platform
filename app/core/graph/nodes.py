@@ -445,8 +445,6 @@ async def apply_voice_expressions(
     Returns:
         Updated simulation state with enhanced message content if text was enhanced
     """
-    logger.debug("Applying voice expressions")
-
     # Get TTS client, LLM client, and scenario from config
     tts_client = None
     llm_client = None
@@ -531,28 +529,6 @@ async def apply_voice_expressions(
             if content:
                 conversation_history.append({"role": role, "content": content})
 
-    # Extract persona context from scenario - ONLY essential fields for
-    # voice expression decisions (defensive extraction handles missing fields)
-    persona_context = None
-    if scenario and scenario.prompt_data:
-        from app.speech_prosody.utils import extract_persona_context_from_prompt_data
-
-        logger.debug(
-            f"[Speech Prosody] Extracting persona context from scenario "
-            f"'{scenario.name if scenario.name else 'unnamed'}'"
-        )
-        persona_context = extract_persona_context_from_prompt_data(scenario.prompt_data)
-        if persona_context:
-            logger.debug(
-                f"[Speech Prosody] Successfully extracted persona context "
-                f"with {len(persona_context)} fields"
-            )
-        else:
-            logger.debug(
-                "[Speech Prosody] No persona context extracted "
-                "(no valid fields found in prompt_data)"
-            )
-
     # Note: response_text comes from the agent's LLM response in generate_response node
     # It should not contain parameters dict - parameters are generated separately
 
@@ -563,15 +539,14 @@ async def apply_voice_expressions(
     #    → applies via update_options() to TTS
     # 2. Returns enhanced text (if supported) or original text (if not supported)
     # CRITICAL: Parameters go ONLY to update_options(), never to message content
-    from app.speech_prosody.service import SpeechProsodyService
+    from app.speech_prosody.service import generate_and_apply_prosody_for_message
 
-    prosody_service = SpeechProsodyService(tts_client)
-    enhanced_text = await prosody_service.generate_and_apply_runtime(
-        response_text=response_text,
+    enhanced_text = await generate_and_apply_prosody_for_message(
+        tts_client=tts_client,
+        message_text=response_text,
         llm_client=llm_client,
-        conversation_history=conversation_history if conversation_history else None,
-        persona_context=persona_context,
-        conversation_history_limit=10,
+        scenario=scenario,
+        conversation_history=conversation_history,
     )
 
     # For providers WITH text enhancement:
