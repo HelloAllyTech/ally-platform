@@ -4,7 +4,7 @@ import {ReviewFilter} from '@/constants';
 import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
-const LIMIT = 5;
+const LIMIT = 10;
 
 export const useReviews = () => {
   const [offset, setOffset] = useState<number>(0);
@@ -17,7 +17,6 @@ export const useReviews = () => {
   const fetchReviews = useCallback(
     async (currentOffset: number, reset: boolean = false) => {
       try {
-        // Use mock or real API based on flag
         const response = await getReviews({
           sortBy: selectedFilter,
           limit: LIMIT,

@@ -40,6 +40,7 @@ import DownArrowIcon from './downArrow.svg';
 import DrawerMenuIcon from './drawerMenu.svg';
 import EditIcon from './edit.svg';
 import EditSquareIcon from './editSquare.svg';
+import EmptyReviewIcon from './emptyReviews.svg';
 import EmptyTranscriptIcon from './emptyTranscript.svg';
 import EndSessionIcon from './endSession.svg';
 import ExportIcon from './export.svg';
@@ -171,6 +172,7 @@ export {
   DrawerMenuIcon,
   EditIcon,
   EditSquareIcon,
+  EmptyReviewIcon,
   EmptyTranscriptIcon,
   EndSessionIcon,
   ExportIcon,
