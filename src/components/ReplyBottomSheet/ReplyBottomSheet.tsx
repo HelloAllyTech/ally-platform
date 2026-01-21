@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {BottomSheetFlatList, BottomSheetTextInput} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   onAddReactionPress,
   onReplyPress,
   onSubmitReplyPress,
+  hideReplyBottomSheet,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -36,13 +37,17 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     data: MessageThreadComment[];
     count: number;
   } | null>(null);
+  const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
+  const isLoadingRef = useRef(false);
 
   // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
     if (visible && commentId && originalComment) {
       setOffset(0);
       setReplies(null);
+      setHasMore(false);
+      isLoadingRef.current = false;
       getCommentReplies({
         commentId,
         offset: 0,
@@ -51,26 +56,30 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     }
   }, [visible, commentId, originalComment, getCommentReplies]);
 
-  // Accumulate API data for pagination
+  // Process data only if it's for a new offset
   React.useEffect(() => {
-    if (apiData) {
-      if (offset === 0) {
-        setReplies({data: apiData.data, count: apiData.count});
-      } else {
-        setReplies(prev => {
-          if (!prev) return {data: apiData.data, count: apiData.count};
-          const existingIds = new Set(prev.data.map(item => String(item.id)));
-          const newItems = apiData.data.filter(
-            item => !existingIds.has(String(item.id)),
-          );
-          return {
-            data: [...prev.data, ...newItems],
-            count: apiData.count,
-          };
-        });
-      }
+    if (apiData && visible) {
+      const newReplies = apiData.data;
+
+      setReplies(prev => {
+        const updated = prev
+          ? {data: [...prev.data, ...newReplies], count: apiData.count}
+          : apiData;
+        if (updated.data.length >= apiData.count) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+        return updated;
+      });
+      isLoadingRef.current = false;
     }
-  }, [apiData, offset]);
+  }, [apiData, visible]);
+
+  // Update loading ref
+  useEffect(() => {
+    isLoadingRef.current = isLoading || isFetching;
+  }, [isLoading, isFetching]);
 
   const renderReplyItem = useCallback(
     ({item: reply}: {item: MessageThreadComment}) => {
@@ -87,7 +96,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             reactions={reactionsArray}
             reactionCount={reactionCount}
             replyCount={0}
-            showReplyButton
+            showReplyButton={false}
             onAddReactionPress={() => onAddReactionPress?.(reply.id)}
             onReplyPress={() => onReplyPress?.(reply.id)}
           />
@@ -102,7 +111,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={onClose}
+          onPress={hideReplyBottomSheet}
           activeOpacity={0.7}>
           <LeftArrow
             width={ms(12)}
@@ -113,7 +122,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         <Text style={styles.headerTitle}>{t('ReplyBottomSheet.title')}</Text>
       </View>
     );
-  }, [onClose, t]);
+  }, [hideReplyBottomSheet, t]);
 
   const renderOriginalComment = useCallback(() => {
     if (!originalComment) return null;
@@ -135,7 +144,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           reactions={reactionsArray}
           reactionCount={reactionCount}
           replyCount={0}
-          showReplyButton
+          showReplyButton={false}
           onAddReactionPress={() => onAddReactionPress?.(originalComment.id)}
         />
       </View>
@@ -143,27 +152,32 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   }, [originalComment, onAddReactionPress]);
 
   const renderFooter = useCallback(() => {
-    if (!isFetching && !replies?.data.length) return null;
-    const hasMore = replies && offset + LIMIT < replies.count;
+    if (!isFetching) return null;
     if (!hasMore) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(100)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, replies, offset]);
+  }, [isFetching, insets.bottom, hasMore]);
 
   const loadMore = useCallback(() => {
-    if (!isFetching && replies && offset + LIMIT < replies.count && commentId) {
-      const newOffset = offset + LIMIT;
-      setOffset(newOffset);
+    if (!visible) return;
+    if (isLoadingRef.current || !hasMore || !commentId) {
+      return;
+    }
+
+    isLoadingRef.current = true;
+    setOffset(prevOffset => {
+      const newOffset = prevOffset + LIMIT;
       getCommentReplies({
         commentId,
         offset: newOffset,
         limit: LIMIT,
       });
-    }
-  }, [offset, isFetching, replies, commentId, getCommentReplies]);
+      return newOffset;
+    });
+  }, [hasMore, commentId, getCommentReplies, visible]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
@@ -173,88 +187,87 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         </View>
       );
     }
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>{t('ReplyBottomSheet.noReplies')}</Text>
-      </View>
-    );
-  }, [isLoading, t]);
+    return <View style={styles.emptyContainer} />;
+  }, [isLoading]);
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      allowFullExpand
-      skipBottomSheetView
-      enableContentPanningGesture
-      enableDynamicSizing
-      enableOverDrag
-      enableHandlePanningGesture>
-      <View style={styles.container}>
-        {isLoading && !replies ? (
-          <>
-            {renderHeader()}
-            {renderEmpty()}
-          </>
-        ) : (
-          <>
-            {renderHeader()}
-            {renderOriginalComment()}
-            <BottomSheetFlatList
-              data={replies?.data || []}
-              renderItem={renderReplyItem}
-              keyExtractor={item => item.id.toString()}
-              ListFooterComponent={renderFooter}
-              ListEmptyComponent={renderEmpty}
-              contentContainerStyle={[
-                styles.listContent,
-                {paddingBottom: insets.bottom + ms(100)},
-              ]}
-              showsVerticalScrollIndicator={false}
-              style={styles.listStyle}
-              removeClippedSubviews={false}
-              onEndReached={loadMore}
-              onEndReachedThreshold={0.3}
-            />
-            <View
-              style={[
-                styles.addReplyContainer,
-                {paddingBottom: insets.bottom + 16},
-              ]}>
-              <View style={styles.addReplyInputContainer}>
-                <BottomSheetTextInput
-                  style={styles.addReplyInput}
-                  placeholder={t('ReplyBottomSheet.addReply')}
-                  placeholderTextColor={colors.ds.typography.mediumEmphasis}
-                  value={replyText}
-                  onChangeText={setReplyText}
-                  multiline={false}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.sendButton,
-                    !replyText.trim() && styles.sendButtonDisabled,
-                  ]}
-                  onPress={() => {
-                    if (replyText.trim()) {
-                      onSubmitReplyPress?.(replyText);
-                      setReplyText('');
-                    }
-                  }}
-                  disabled={!replyText.trim()}
-                  activeOpacity={0.7}>
-                  <LeftArrowIcon
-                    color={colors.white}
-                    width={'32@ms'}
-                    height={'32@ms'}
-                    style={styles.arrowIcon}
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        allowFullExpand
+        skipBottomSheetView
+        enableContentPanningGesture
+        enableDynamicSizing
+        enableOverDrag
+        enableHandlePanningGesture>
+        <View style={styles.container}>
+          {isLoading && !replies ? (
+            <>
+              {renderHeader()}
+              {renderEmpty()}
+            </>
+          ) : (
+            <>
+              {renderHeader()}
+              {renderOriginalComment()}
+              <BottomSheetFlatList
+                data={replies?.data || []}
+                renderItem={renderReplyItem}
+                keyExtractor={item => item.id.toString()}
+                ListFooterComponent={renderFooter}
+                ListEmptyComponent={renderEmpty}
+                contentContainerStyle={[
+                  styles.listContent,
+                  {paddingBottom: insets.bottom + ms(200)},
+                ]}
+                showsVerticalScrollIndicator={false}
+                style={styles.listStyle}
+                removeClippedSubviews={false}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.3}
+                scrollEnabled={false}
+              />
+              <View
+                style={[
+                  styles.addReplyContainer,
+                  {paddingBottom: insets.bottom},
+                ]}>
+                <View style={styles.addReplyInputContainer}>
+                  <BottomSheetTextInput
+                    style={styles.addReplyInput}
+                    placeholder={t('ReplyBottomSheet.addReply')}
+                    placeholderTextColor={colors.ds.typography.mediumEmphasis}
+                    value={replyText}
+                    onChangeText={setReplyText}
+                    multiline={false}
                   />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      !replyText.trim() && styles.sendButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      if (replyText.trim()) {
+                        onSubmitReplyPress?.(replyText);
+                        setReplyText('');
+                      }
+                    }}
+                    disabled={!replyText.trim()}
+                    activeOpacity={0.7}>
+                    <LeftArrowIcon
+                      color={colors.white}
+                      width={'32@ms'}
+                      height={'32@ms'}
+                      style={styles.arrowIcon}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </>
-        )}
-      </View>
-    </BottomSheet>
+            </>
+          )}
+        </View>
+      </BottomSheet>
+    </>
   );
 };

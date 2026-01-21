@@ -8,4 +8,5 @@ export interface ReplyBottomSheetProps {
   onAddReactionPress?: (commentId: string) => void;
   onReplyPress?: (commentId: string) => void;
   onSubmitReplyPress?: (replyText: string) => void;
+  hideReplyBottomSheet: () => void;
 }

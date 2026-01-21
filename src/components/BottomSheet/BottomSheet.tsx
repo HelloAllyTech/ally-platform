@@ -106,7 +106,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <BottomSheetComponent
       ref={bottomSheetRef}
       index={-1}
-      snapPoints={snapPoints}
+      snapPoints={[]}
       enablePanDownToClose={enablePanDownToClose}
       enableContentPanningGesture={enableContentPanningGesture}
       enableDynamicSizing={enableDynamicSizing}
