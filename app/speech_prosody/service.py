@@ -98,6 +98,9 @@ class SpeechProsodyService:
             self.tts_client._default_params = validated_dict.copy()
             self.tts_client._current_params = validated_dict.copy()
 
+            # Log default parameters
+            logger.info(f"[Speech Prosody] Set default parameters: {validated_dict}")
+
             # Apply parameters directly
             self.tts_client._apply_parameters_dict(validated_dict)
 
@@ -224,7 +227,8 @@ class SpeechProsodyService:
             # Apply parameters to TTS
             self.tts_client._apply_parameters_dict(validated_dict)
 
-            # Parameters applied successfully
+            # Log successfully applied parameters
+            logger.info(f"[Speech Prosody] Applied parameters: {validated_dict}")
         else:
             logger.warning(
                 "[Speech Prosody] No valid prosody parameters "
