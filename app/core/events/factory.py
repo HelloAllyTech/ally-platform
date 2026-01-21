@@ -253,7 +253,7 @@ def _create_event_by_detection_type(
             )
 
         elif detection_type == DetectionType.HELPER_UTTERANCE_LENGTH:
-            if not raw_data or not isinstance(raw_data, dict):
+            if raw_data is None or not isinstance(raw_data, dict):
                 log.warning(
                     "Event '%s' (HELPER_UTTERANCE_LENGTH) missing/invalid data: %r",
                     event_id,

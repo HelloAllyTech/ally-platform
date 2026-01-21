@@ -58,15 +58,20 @@ class TestUtteranceLengthData:
     def test_valid_max_only(self):
         """Test that max_length only (less than) is valid."""
         data = UtteranceLengthData(max_length=50)
-        assert data.min_length is None
+        assert data.min_length == 0
         assert data.max_length == 50
 
-    def test_invalid_no_limits(self):
-        """Test that at least one limit must be provided."""
-        with pytest.raises(
-            ValueError, match="At least one of min_length or max_length"
-        ):
-            UtteranceLengthData()
+    def test_valid_no_limits_with_defaults(self):
+        """Test that no limits provided uses defaults (min=0, max=None)."""
+        data = UtteranceLengthData()
+        assert data.min_length == 0
+        assert data.max_length is None
+
+    def test_valid_explicit_none_values(self):
+        """Test that explicit None values are supported for both min and max."""
+        data = UtteranceLengthData(min_length=None, max_length=None)
+        assert data.min_length is None
+        assert data.max_length is None
 
     def test_invalid_min_greater_than_max(self):
         """Test that min_length cannot be greater than max_length."""
@@ -380,7 +385,7 @@ class TestUtteranceLengthEventFactory:
 
         events = build_events_from_metadata(metadata)
         assert len(events) == 1
-        assert events[0].data.min_length is None
+        assert events[0].data.min_length == 0
         assert events[0].data.max_length == 50
 
     def test_build_utterance_length_event_missing_data_warns(self):
@@ -436,22 +441,22 @@ class TestUtteranceLengthEventFactory:
         assert len(events) == 0
         assert any("invalid" in w.lower() for w in logger.warnings)
 
-    def test_build_utterance_length_event_no_limits_warns(self):
-        """Test that missing both limits warns and skips event."""
-        logger = DummyLogger()
+    def test_build_utterance_length_event_no_limits_succeeds(self):
+        """Test that missing both limits uses defaults (min=0, max=None)."""
         metadata = {
             "events": [
                 {
                     "id": "utterance-length-1",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {},  # no limits
+                    "data": {},  # no limits, should use defaults
                 }
             ]
         }
 
-        events = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
-        assert len(events) == 0
-        assert any("invalid" in w.lower() for w in logger.warnings)
+        events = build_events_from_metadata(metadata)
+        assert len(events) == 1
+        assert events[0].data.min_length == 0
+        assert events[0].data.max_length is None
 
     def test_build_mixed_event_types_including_utterance_length(self):
         """Test building multiple event types including utterance length."""

@@ -78,21 +78,10 @@ class UtteranceLengthEvent(BaseEvent):
         # Get the character length of the message
         message_length = len(last_message.content) if last_message.content else 0
 
-        # Check if length matches the criteria
-        min_length = self.data.min_length
-        max_length = self.data.max_length
-
-        # If only min_length is provided, check if length >= min_length
-        if min_length is not None and max_length is None:
-            return message_length >= min_length
-
-        # If only max_length is provided, check if length <= max_length
-        if min_length is None and max_length is not None:
-            return message_length <= max_length
-
-        # If both are provided, check if length is in range [min_length, max_length]
-        if min_length is not None and max_length is not None:
-            return min_length <= message_length <= max_length
-
-        # Should not reach here due to validation, but return False as fallback
-        return False
+        # Check if length is within the specified range
+        min_len = self.data.min_length if self.data.min_length is not None else 0
+        if message_length < min_len:
+            return False
+        if self.data.max_length is not None and message_length > self.data.max_length:
+            return False
+        return True
