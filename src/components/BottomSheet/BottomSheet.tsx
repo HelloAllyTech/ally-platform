@@ -30,6 +30,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   enableOverDrag = true,
   overDragResistanceFactor = 0.5,
   enableHandlePanningGesture = true,
+  footerComponent,
 }) => {
   const bottomSheetRef = useRef<BottomSheetComponent>(null);
   const insets = useSafeAreaInsets();
@@ -106,11 +107,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <BottomSheetComponent
       ref={bottomSheetRef}
       index={-1}
-      snapPoints={[]}
       enablePanDownToClose={enablePanDownToClose}
       enableContentPanningGesture={enableContentPanningGesture}
       enableDynamicSizing={enableDynamicSizing}
       enableOverDrag={enableOverDrag}
+      footerComponent={footerComponent}
       overDragResistanceFactor={overDragResistanceFactor}
       enableHandlePanningGesture={enableHandlePanningGesture}
       backdropComponent={showBackdrop ? renderBackdrop : undefined}
@@ -120,7 +121,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       animateOnMount={false}
       animationConfigs={{
         duration: animationDuration,
-      }}>
+      }}
+      keyboardBehavior="interactive"
+      keyboardBlurBehavior="restore">
       {skipBottomSheetView ? (
         children
       ) : (

@@ -7,6 +7,13 @@ export const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  listWrapper: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
