@@ -8,4 +8,5 @@ export interface CommentThreadBottomSheetProps {
   onReplyPress?: (comment: MessageThreadComment) => void;
   onSubmitComment?: (commentText: string) => void;
   hideCommentThreadBottomSheet: () => void;
+  footerComponent?: React.ReactNode;
 }
