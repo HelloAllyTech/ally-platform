@@ -27,6 +27,9 @@ export const LeaderboardScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
 
+  // TODO: Replace with actual feature flag
+  const showRankColumn = true;
+
   const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>(
     LeaderboardPeriod.LAST_WEEK,
   );
@@ -101,14 +104,16 @@ export const LeaderboardScreen: React.FC = () => {
           }
         }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
-        <View
-          style={[
-            styles.rankColumn,
-            isHighlighted && styles.highlightedRankColumn,
-          ]}>
-          {renderRankBadge(item.rank)}
-        </View>
-        <View style={styles.userColumn}>
+        {showRankColumn && (
+          <View
+            style={[
+              styles.rankColumn,
+              isHighlighted && styles.highlightedRankColumn,
+            ]}>
+            {renderRankBadge(item.rank)}
+          </View>
+        )}
+        <View style={[styles.userColumn, !showRankColumn && styles.marginL21]}>
           <View style={styles.avatarContainer}>
             {item.profileImageUrl ? (
               <Image
@@ -175,11 +180,13 @@ export const LeaderboardScreen: React.FC = () => {
   const renderTableHeader = () => {
     return (
       <View style={styles.tableHeader}>
-        <View style={styles.rankColumnHeader}>
-          <Text style={styles.headerText}>
-            {t('Leaderboard.tableHeaders.rank')}
-          </Text>
-        </View>
+        {showRankColumn && (
+          <View style={styles.rankColumnHeader}>
+            <Text style={styles.headerText}>
+              {t('Leaderboard.tableHeaders.rank')}
+            </Text>
+          </View>
+        )}
         <View style={styles.userColumnHeader}>
           <Text style={styles.headerText}>
             {t('Leaderboard.tableHeaders.user')}
@@ -448,5 +455,8 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: '40@ms',
+  },
+  marginL21: {
+    marginLeft: '21@ms',
   },
 });
