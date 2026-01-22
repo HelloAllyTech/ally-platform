@@ -20,6 +20,7 @@ export enum USER_PERMISSIONS {
   VIEW_MESSAGES = 'view:messages',
   EDIT_MESSAGE_FEEDBACK = 'edit:message:feedback',
   VIEW_REVIEWS = 'view:reviews',
+  VIEW_COMMUNITY_LEADERBOARD = 'view:community:leaderboard',
 }
 
 export const MICROPHONE_PERMISSION =
