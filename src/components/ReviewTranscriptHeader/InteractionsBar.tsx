@@ -1,9 +1,8 @@
-import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CommentIcon} from '@/assets';
-import {ReactionsCount} from '@/screens/ReviewScreen/components/ReactionsCount';
+import {ReactionsCount} from '@/screens/ReviewScreen/components';
 import {
   colors,
   fontFamily,
@@ -35,7 +34,7 @@ export const InteractionsBar = ({
     <View style={styles.container}>
       <TouchableOpacity style={styles.iconContainer} onPress={onCommentPress}>
         <CommentIcon width={20} height={20} />
-        {commentsCount > 0 && (
+        {!!commentsCount && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
               {commentsCount > 99 ? '99+' : commentsCount}
@@ -46,15 +45,15 @@ export const InteractionsBar = ({
       <TouchableOpacity style={styles.iconContainer}>
         <EmojiPicker onEmojiSelect={() => {}} />
       </TouchableOpacity>
-      {totalReactions > 0 && (
-        <React.Fragment>
+      {!!totalReactions && (
+        <>
           <View style={styles.divider} />
           <ReactionsCount
             reviewId={reviewId}
             reactions={reactions}
             totalReactions={totalReactions}
           />
-        </React.Fragment>
+        </>
       )}
     </View>
   );
@@ -64,6 +63,7 @@ const styles = ScaledSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'center',
     backgroundColor: colors.ds.neutral.white,
     borderRadius: radius.full,
     borderWidth: 0.5,
@@ -71,7 +71,6 @@ const styles = ScaledSheet.create({
     paddingVertical: '8@s',
     paddingLeft: '8@s',
     paddingRight: '16@s',
-    marginHorizontal: '16@s',
     gap: '8@s',
     shadowColor: colors.black,
     shadowOffset: {
