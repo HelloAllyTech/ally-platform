@@ -1,4 +1,5 @@
 import {ReactNode} from 'react';
+import {BottomSheetFooterProps} from '@gorhom/bottom-sheet';
 import {BottomSheetModalMethods} from '@gorhom/bottom-sheet/lib/typescript/types';
 
 export interface BottomSheetProps {
@@ -119,6 +120,11 @@ export interface BottomSheetProps {
    * Default: true
    */
   enableHandlePanningGesture?: boolean;
+  /**
+   * Footer component to render at the bottom of the bottom sheet
+   * Default: undefined
+   */
+  footerComponent?: React.FC<BottomSheetFooterProps>;
 }
 
 export interface BottomSheetRef extends BottomSheetModalMethods {}
