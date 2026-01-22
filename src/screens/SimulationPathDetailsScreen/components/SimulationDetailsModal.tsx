@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Image,
   Modal,
@@ -10,7 +9,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {PrimaryButton, VideoPreview} from '@/components';
+import {CustomDropdown, PrimaryButton, VideoPreview} from '@/components';
 import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -30,6 +29,11 @@ export interface SimulationDetailsModalProps {
   onStartSimulation?: () => void;
   isCreatingRoom?: boolean;
   fitContent?: boolean;
+  selectedLanguage?: string;
+  languageOptions?: string[];
+  onLanguageSelect?: (language: string) => void;
+  isLanguageDropdownOpen?: boolean;
+  setIsLanguageDropdownOpen?: (open: boolean) => void;
 }
 
 export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
@@ -45,6 +49,11 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
   onStartSimulation,
   isCreatingRoom = false,
   fitContent = false,
+  selectedLanguage = '',
+  languageOptions = [],
+  onLanguageSelect,
+  isLanguageDropdownOpen = false,
+  setIsLanguageDropdownOpen,
 }) => {
   const {t} = useTranslate();
 
@@ -91,6 +100,20 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               styles.contentContainer,
               fitContent && styles.contentContainerFitContent,
             ]}>
+            {/* Language Dropdown - Above Image */}
+            {languageOptions.length > 0 && onLanguageSelect && (
+              <View style={styles.languageDropdownContainer}>
+                <CustomDropdown
+                  value={selectedLanguage}
+                  options={languageOptions}
+                  onSelect={onLanguageSelect}
+                  isOpen={isLanguageDropdownOpen}
+                  setIsOpen={setIsLanguageDropdownOpen || (() => {})}
+                  disabled={isCreatingRoom}
+                />
+              </View>
+            )}
+
             <View style={styles.mediaContainer}>
               {coverVideoUrl ? (
                 <VideoPreview
@@ -293,6 +316,10 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.label.large,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  languageDropdownContainer: {
+    marginBottom: '12@ms',
+    paddingHorizontal: '0@ms',
   },
   buttonContainer: {
     backgroundColor: colors.ds.neutral.white,

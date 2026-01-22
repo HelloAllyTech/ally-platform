@@ -78,12 +78,18 @@ describe('constants/general', () => {
 
   it('all API routes for users', () => {
     expect(API_ROUTES.USERS.ME).toBe('/users/me');
+    expect(API_ROUTES.USERS.GET_USER_PREFERENCES).toBe('/users/me/preferences');
+    expect(API_ROUTES.USERS.UPDATE_USER_PREFERENCES).toBe('/users/preferences');
   });
 
   it('chat routes with parameters', () => {
     expect(API_ROUTES.CHATS.BY_ID(123)).toBe('/chats/123');
     expect(API_ROUTES.CHATS.END(456)).toBe('/chats/456/end');
     expect(API_ROUTES.CHATS.NOTES(789)).toBe('/chats/789/notes');
+  });
+
+  it('all API routes for learn/simulations', () => {
+    expect(API_ROUTES.LEARN.GET_AVAILABLE_LANGUAGES).toBe('/learn/scenario-languages');
   });
 
   it('all tag colors defined', () => {

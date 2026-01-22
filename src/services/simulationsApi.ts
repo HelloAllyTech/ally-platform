@@ -17,8 +17,37 @@ import {
 
 import {api} from './api';
 
+export interface LanguageOption {
+  language_id: number;
+  label: string;
+  active: boolean;
+  translationCode?: string;
+  value?: string;
+}
+
+export interface AvailableLanguagesParams {
+  active?: boolean;
+  hasVoices?: boolean;
+}
+
 export const simulationsApi = api.injectEndpoints({
   endpoints: builder => ({
+    /**
+     * Get all available languages for scenarios
+     * @param {AvailableLanguagesParams} params - Optional query parameters (active and/or hasVoices)
+     * @returns {Promise<LanguageOption[]>} List of available languages with their codes and labels
+     */
+    getAvailableLanguages: builder.query<
+      LanguageOption[],
+      AvailableLanguagesParams
+    >({
+      query: (params = {}) => ({
+        url: API_ROUTES.LEARN.GET_AVAILABLE_LANGUAGES,
+        method: API_METHODS.GET,
+        params,
+      }),
+    }),
+
     listRooms: builder.query<RoomListResponse, void>({
       query: () => ({
         url: API_ROUTES.LEARN.ROOMS,
@@ -70,14 +99,19 @@ export const simulationsApi = api.injectEndpoints({
 
     startScenarioSession: builder.mutation<
       ScenarioSessionStartResponse,
-      {scenarioId: number; scenarioPathSessionItemId?: string}
+      {
+        scenarioId: number;
+        scenarioPathSessionItemId?: string;
+        languageId?: number;
+      }
     >({
-      query: ({scenarioId, scenarioPathSessionItemId}) => ({
+      query: ({scenarioId, scenarioPathSessionItemId, languageId}) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
         body: {
           scenarioId,
           ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
+          ...(languageId && {languageId}),
         },
       }),
     }),
@@ -165,6 +199,7 @@ export const simulationsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetAvailableLanguagesQuery,
   useListRoomsQuery,
   useGetScenariosQuery,
   useAddSimulationFeedbackMutation,
