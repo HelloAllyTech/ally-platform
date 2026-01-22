@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {env} from '@/config/env';
 import {
   SCREEN_NAMES,
   SimulationEventStatus,
@@ -463,7 +464,7 @@ export const SimulationFeedbackScreen: React.FC<
               </Text>
             )}
           </View>
-          {!!reviewId && !showSummary && (
+          {env.PEER_REVIEW_FLAG && !!reviewId && !showSummary && (
             <TouchableOpacity
               onPress={handleViewReview}
               style={styles.reviewIconButton}
@@ -541,12 +542,14 @@ export const SimulationFeedbackScreen: React.FC<
             // onSeek={setSeekTime}
             agentName={simulationDetails?.scenario?.metadata?.name}
           />
-          <View style={styles.privacyToggleContainer}>
-            <PrivacyToggle
-              isPrivate={isPrivate}
-              onToggle={handlePrivacyToggle}
-            />
-          </View>
+          {env.PEER_REVIEW_FLAG && (
+            <View style={styles.privacyToggleContainer}>
+              <PrivacyToggle
+                isPrivate={isPrivate}
+                onToggle={handlePrivacyToggle}
+              />
+            </View>
+          )}
         </>
       )}
       <FeedbackDropdown

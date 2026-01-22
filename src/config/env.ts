@@ -9,6 +9,8 @@ export interface Env {
   CLOUD_TELEPHONY_PATH: string;
   GOOGLE_WEB_CLIENT_ID: string;
   GOOGLE_IOS_CLIENT_ID: string;
+  PEER_REVIEW_FLAG: boolean;
+  LEADERBOARD_FLAG: boolean;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -42,4 +44,6 @@ export const env: Env = {
     Config.GOOGLE_IOS_CLIENT_ID,
     'GOOGLE_IOS_CLIENT_ID',
   ),
+  PEER_REVIEW_FLAG: Config.PEER_REVIEW_FLAG === 'true',
+  LEADERBOARD_FLAG: Config.LEADERBOARD_FLAG === 'true',
 };
