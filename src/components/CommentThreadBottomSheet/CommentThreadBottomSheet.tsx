@@ -247,8 +247,8 @@ export const CommentThreadBottomSheet: React.FC<
                     activeOpacity={0.7}>
                     <LeftArrowIcon
                       color={colors.white}
-                      width={'32@ms'}
-                      height={'32@ms'}
+                      width={32}
+                      height={32}
                       style={styles.arrowIcon}
                     />
                   </TouchableOpacity>

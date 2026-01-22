@@ -80,8 +80,8 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         ) : (
           <LeftArrowIcon
             color={colors.white}
-            width={'32@ms'}
-            height={'32@ms'}
+            width={32}
+            height={32}
             style={styles.arrowIcon}
           />
         )}
