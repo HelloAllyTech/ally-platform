@@ -115,7 +115,8 @@
   "lint-staged": {
     "src/**/*.{js,jsx,ts,tsx}": [
       "eslint --fix",
-      "prettier --write --plugin=prettier-plugin-unused-imports-configurable"
+      "prettier --write --plugin=prettier-plugin-unused-imports-configurable",
+      "jest --bail --findRelatedTests --passWithNoTests"
     ]
   }
 }
