@@ -58,18 +58,21 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       const newThreads = apiData.data;
       if (offset === 0) {
         setCommentsData(apiData);
+        setHasMore(apiData.count > LIMIT);
       } else {
         setCommentsData(prev => {
           if (!prev) {
+            setHasMore(apiData.count > LIMIT);
             // If prev is null, just use the new apiData directly
             return apiData;
           }
-          return {data: [...prev.data, ...newThreads], count: apiData.count};
+          const updated = [...prev.data, ...newThreads];
+          setHasMore(apiData.count > updated.length);
+          return {data: updated, count: apiData.count};
         });
       }
-      setHasMore(apiData.count > (commentsData?.data.length || 0));
     }
-  }, [apiData]);
+  }, [apiData, visible]);
 
   const renderThreadItem = useCallback(
     ({item: thread}: {item: NonNullable<typeof commentsData>['data'][0]}) => {
@@ -176,8 +179,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     );
   }, [isFetching, insets.bottom, hasMore]);
 
-  console.log('commentsData', commentsData);
-
   const loadMore = useCallback(() => {
     if (!visible) return;
     if (isLoading || isFetching || !hasMore || !reviewId) {
@@ -192,7 +193,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       });
       return newOffset;
     });
-  }, [hasMore, reviewId, isFetching]);
+  }, [hasMore, reviewId, isFetching, isLoading]);
 
   const renderEmpty = useCallback(() => {
     if (isLoading) {
