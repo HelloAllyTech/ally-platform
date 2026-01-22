@@ -222,6 +222,7 @@ export interface SimulationSummaryData {
         positives?: string[];
         improvements?: string[];
       };
+      errorMessage?: string;
     };
   };
 }

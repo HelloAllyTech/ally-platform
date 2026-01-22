@@ -87,6 +87,8 @@ export const API_ROUTES = {
     PROFILE_IMAGE_URL: '/users/profile-image-url',
     PROFILE_IMAGE: '/users/profile-image',
     LOGO_URL: '/users/tenant',
+    UPDATE_USER_PREFERENCES: '/users/preferences',
+    GET_USER_PREFERENCES: '/users/me/preferences',
   },
   CHATS: {
     ROOT: '/chats',
@@ -148,6 +150,7 @@ export const API_ROUTES = {
       `/learn/scenario-paths/${scenarioPathSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
+    GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
   },
   REVIEWS: {
     REVIEWS: '/reviews',

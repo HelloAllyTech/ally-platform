@@ -18,6 +18,7 @@ interface UseStartSimulationReturn {
     scenarioId: number,
     scenarioPathSessionItemId?: string,
     pathId?: string,
+    languageId?: number,
   ) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
@@ -63,6 +64,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
     scenarioId: number,
     scenarioPathSessionItemId?: string,
     pathId?: string,
+    languageId?: number,
   ) => {
     try {
       if (!isMicPermissionGranted) {
@@ -94,6 +96,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
       const startResp = await startScenarioSession({
         scenarioId,
         ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
+        ...(languageId && {languageId}),
       }).unwrap();
 
       if (startResp) {

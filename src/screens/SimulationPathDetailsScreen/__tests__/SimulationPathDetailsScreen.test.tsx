@@ -11,6 +11,7 @@ jest.mock('@react-navigation/native', () => ({
     params: {pathId: 'test-path-id'},
   })),
   useFocusEffect: jest.fn(),
+  useIsFocused: jest.fn(() => true),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -58,6 +59,19 @@ jest.mock('@/hooks', () => ({
   })),
 }));
 
+jest.mock('../components/PathSimulationCard', () => {
+  const React = require('react');
+  const {View, Text} = require('react-native');
+  return {
+    PathSimulationCard: ({title, order, isNext}: any) => (
+      <View testID="path-simulation-card">
+        <Text>{`${order}. ${title}`}</Text>
+        {isNext && <Text testID="next-badge">Next</Text>}
+      </View>
+    ),
+  };
+});
+
 jest.mock('@/components', () => {
   const React = require('react');
   const {View, TouchableOpacity, Text} = require('react-native');
@@ -72,6 +86,13 @@ jest.mock('@/components', () => {
         <Text>{isLoading ? 'Loading...' : label}</Text>
       </TouchableOpacity>
     ),
+    CustomDropdown: ({value, options, onSelect}: any) => (
+      <TouchableOpacity
+        testID="custom-dropdown"
+        onPress={() => onSelect && onSelect(options[0])}>
+        <Text>{value || 'Select'}</Text>
+      </TouchableOpacity>
+    ),
     EmptyState: ({title}: any) => <Text testID="empty-state">{title}</Text>,
     useToast: jest.fn(() => ({
       showToast: mockShowToast,
@@ -83,16 +104,49 @@ const mockShowToast = jest.fn();
 const mockCreatePathSession = jest.fn();
 const mockGetScenarioSessionByPathItem = jest.fn();
 
-jest.mock('@/services', () => ({
-  useGetSimulationPathDetailsQuery: jest.fn(),
-  useCreatePathSessionMutation: jest.fn(() => [
+// Define language data outside the mock to ensure it's the same reference
+const mockLanguagesData = [
+  {
+    language_id: 1,
+    label: 'English',
+    active: true,
+    translationCode: 'en',
+    value: 'en-IN',
+  },
+  {
+    language_id: 2,
+    label: 'Spanish',
+    active: true,
+    translationCode: 'es',
+    value: 'es-ES',
+  },
+];
+
+const mockPreferencesData = {data: {default_language_id: 1}};
+
+jest.mock('@/services', () => {
+  return {
+    useGetSimulationPathDetailsQuery: jest.fn(),
+    useCreatePathSessionMutation: jest.fn(() => [
     mockCreatePathSession,
     {isLoading: false},
   ]),
   useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
     mockGetScenarioSessionByPathItem,
   ]),
-}));
+    useGetAvailableLanguagesQuery: jest.fn(() => ({
+      data: mockLanguagesData,
+    })),
+    useGetUserPreferencesQuery: jest.fn(() => ({
+      data: mockPreferencesData,
+      refetch: jest.fn().mockResolvedValue({data: mockPreferencesData}),
+    })),
+    useLazyGetUserPreferencesQuery: jest.fn(() => [
+      jest.fn().mockResolvedValue({data: mockPreferencesData}),
+      {data: mockPreferencesData},
+    ]),
+  };
+});
 
 const mockNavigation = {
   goBack: jest.fn(),
@@ -286,10 +340,10 @@ describe('SimulationPathDetailsScreen', () => {
       />,
     );
 
-    // Check for simulation order labels
-    expect(getAllByText(/Simulation 1/)).toHaveLength(2); // Label + Title
-    expect(getAllByText(/Simulation 2/)).toHaveLength(2);
-    expect(getAllByText(/Simulation 3/)).toHaveLength(2);
+    // Check for simulation cards with order labels
+    expect(getAllByText(/1\. Simulation 1/)).toHaveLength(1);
+    expect(getAllByText(/2\. Simulation 2/)).toHaveLength(1);
+    expect(getAllByText(/3\. Simulation 3/)).toHaveLength(1);
   });
 
   it('should render "Next" badge for the next simulation', () => {

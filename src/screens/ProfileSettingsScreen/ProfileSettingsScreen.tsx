@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -11,13 +11,18 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {CustomModal, PrimaryButton} from '@/components';
+import {CustomDropdown, CustomModal, PrimaryButton} from '@/components';
 import {
   useAppNavigation,
   useProfileImage,
   useTranslate,
   useUser,
 } from '@/hooks';
+import {
+  useGetAvailableLanguagesQuery,
+  useGetUserPreferencesQuery,
+  useUpdateUserPreferencesMutation,
+} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ProfileImageBottomSheet} from './components/ProfileImageBottomSheet';
@@ -33,6 +38,49 @@ export const ProfileSettingsScreen: React.FC = () => {
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [languageOptions, setLanguageOptions] = useState<string[]>([]);
+  const [languageMap, setLanguageMap] = useState<Map<string, number>>(
+    new Map(),
+  );
+
+  // Fetch available languages
+  const {data: languagesData} = useGetAvailableLanguagesQuery({
+    active: true,
+    hasVoices: true,
+  });
+
+  // Fetch user preferences
+  const {data: preferencesData} = useGetUserPreferencesQuery();
+
+  // Update user preferences mutation
+  const [updateUserPreferences, {isLoading: isUpdatingPreferences}] =
+    useUpdateUserPreferencesMutation();
+
+  // Initialize languages
+  useEffect(() => {
+    if (languagesData && Array.isArray(languagesData)) {
+      const options = languagesData.map(lang => lang.label);
+      const map = new Map(
+        languagesData.map(lang => [lang.label, lang.language_id]),
+      );
+      setLanguageOptions(options);
+      setLanguageMap(map);
+    }
+  }, [languagesData]);
+
+  // Set selected language from preferences
+  useEffect(() => {
+    if (preferencesData?.data?.default_language_id && languagesData) {
+      const selectedLang = languagesData.find(
+        lang => lang.language_id === preferencesData.data.default_language_id,
+      );
+      if (selectedLang) {
+        setSelectedLanguage(selectedLang.label);
+      }
+    }
+  }, [preferencesData, languagesData]);
 
   const {
     previewImageUri,
@@ -68,6 +116,21 @@ export const ProfileSettingsScreen: React.FC = () => {
   const onRemoveImage = () => {
     setIsBottomSheetVisible(false);
     handleRemoveImage();
+  };
+
+  const handleLanguageSelect = async (selectedLabel: string) => {
+    setSelectedLanguage(selectedLabel);
+    const languageId = languageMap.get(selectedLabel);
+
+    if (languageId) {
+      try {
+        await updateUserPreferences({
+          default_language_id: languageId,
+        }).unwrap();
+      } catch (error) {
+        console.error('Error updating language preference:', error);
+      }
+    }
   };
 
   const handleBackPress = () => {
@@ -162,6 +225,27 @@ export const ProfileSettingsScreen: React.FC = () => {
             <Text style={styles.fieldLabel}>{t('ProfileSettings.email')}</Text>
             <View style={styles.fieldValue}>
               <Text style={styles.fieldValueText}>{email || '—'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {t('ProfileSettings.language')}
+            </Text>
+            <View style={styles.dropdownContainer}>
+              {isUpdatingPreferences && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="small" color={colors.azureBlue} />
+                </View>
+              )}
+              <CustomDropdown
+                value={selectedLanguage}
+                options={languageOptions}
+                onSelect={handleLanguageSelect}
+                isOpen={isLanguageDropdownOpen}
+                setIsOpen={setIsLanguageDropdownOpen}
+                disabled={isUpdatingPreferences || languageOptions.length === 0}
+              />
             </View>
           </View>
         </View>
@@ -324,5 +408,8 @@ const styles = ScaledSheet.create({
   },
   saveButton: {
     width: '100%',
+  },
+  dropdownContainer: {
+    position: 'relative',
   },
 });

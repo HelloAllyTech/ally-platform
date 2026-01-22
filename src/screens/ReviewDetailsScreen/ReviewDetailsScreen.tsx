@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, SafeAreaView, StyleSheet, View} from 'react-native';
+import {ActivityIndicator, SafeAreaView, View} from 'react-native';
+import {ScaledSheet} from 'react-native-size-matters';
 
 import {
   CommentInput,
@@ -370,12 +371,15 @@ export const ReviewDetailsScreen: React.FC = () => {
           isLoading={isAddingComment}
         />
       )}
-      <InteractionsBar
-        reviewId={_reviewId}
-        reactions={{}}
-        commentsCount={0}
-        onCommentPress={showThreadsBottomSheet}
-      />
+      <View style={styles.interactionsBarContainer}>
+        <InteractionsBar
+          reviewId={_reviewId}
+          reactions={{}}
+          commentsCount={0}
+          onCommentPress={showThreadsBottomSheet}
+        />
+      </View>
+
       <ThreadsBottomSheet
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
@@ -423,7 +427,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,
@@ -432,6 +436,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  interactionsBarContainer: {
+    position: 'absolute',
+    bottom: '30@vs',
+    left: 0,
+    right: 0,
   },
 });
 
