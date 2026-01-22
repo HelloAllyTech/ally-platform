@@ -417,9 +417,9 @@ export const SimulationFeedbackScreen: React.FC<
     );
   };
   const showTranscript = !isSimulationDetailsLoading && !showSummary;
-  const disableDropdown =
-    !fromLogs ||
-    !permissions?.includes(USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES);
+  const hasScenarioMessagesPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+  );
 
   return (
     <SafeAreaView
@@ -437,28 +437,27 @@ export const SimulationFeedbackScreen: React.FC<
             </TouchableOpacity>
           )}
           <View style={globalStyles.column}>
-            <TouchableOpacity
-              style={[
-                globalStyles.rowCenter,
-                !fromLogs && styles.titleExtraPadding,
-              ]}
-              onPress={onHeaderPress}
-              disabled={disableDropdown}
-              activeOpacity={0.8}>
-              {renderTitle()}
-              {fromLogs && (
+            {hasScenarioMessagesPermission && (
+              <TouchableOpacity
+                style={[
+                  globalStyles.rowCenter,
+                  !fromLogs && styles.titleExtraPadding,
+                ]}
+                onPress={onHeaderPress}
+                activeOpacity={0.8}>
+                {renderTitle()}
                 <View style={styles.arrowDownContainer}>
                   <ArrowDown width={9} height={5} />
                 </View>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
             {fromLogs && simulationDetails?.metadata?.sessionName && (
               <Text style={styles.subTitle}>
                 {simulationDetails.metadata.sessionName}
               </Text>
             )}
           </View>
-          {!!reviewId && (
+          {!!reviewId && !showSummary && (
             <TouchableOpacity
               onPress={handleViewReview}
               style={styles.reviewIconButton}
