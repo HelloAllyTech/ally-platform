@@ -209,14 +209,15 @@ class TestGenerateResponse:
         # Use pre-configured LLM client (new approach)
         llm_client = FakeLLMClient(content="response")
 
-        # Events without branching instructions
+        # Events without branching instructions (now in non_branching_feedback_data)
         state = SimulationState(
             messages=[HumanMessage(content="hi")],
             permitted_events=[],
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_and_feedback_data=[
+            branching_and_feedback_data=[],
+            non_branching_feedback_data=[
                 BranchingAndFeedbackData(
                     branching_instruction=None,
                     feedback=EventFeedback(
@@ -280,6 +281,7 @@ class TestGenerateResponse:
 
         # Branching and feedback data should be cleared after use
         assert new_state.branching_and_feedback_data == []
+        assert new_state.non_branching_feedback_data == []
 
     @pytest.mark.asyncio
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):

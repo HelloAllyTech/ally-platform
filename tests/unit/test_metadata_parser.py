@@ -58,13 +58,10 @@ class TestParseRoomMetadata:
         monkeypatch.setattr(settings, "ENV", Environment.LOCAL)
 
         # Patch the module-level import used inside the function:
-        # implementation does `from scenario_sample import
-        # SCENARIO_SAMPLE_MALAYALAM_ENGLISH`.
+        # implementation does `from scenario_sample import SCENARIO_SAMPLE`.
         import scenario_sample
 
-        monkeypatch.setattr(
-            scenario_sample, "SCENARIO_SAMPLE_MALAYALAM_ENGLISH", LOCAL_SCENARIO_SAMPLE
-        )
+        monkeypatch.setattr(scenario_sample, "SCENARIO_SAMPLE", LOCAL_SCENARIO_SAMPLE)
 
         with patch(
             "app.core.livekit.livekit_models.RoomMetadataEnvelope.create"

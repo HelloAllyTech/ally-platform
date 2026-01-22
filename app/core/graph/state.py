@@ -129,6 +129,32 @@ def add_branching_and_feedback_data(
     return unique_by(left + right, key=lambda x: x.event_id)
 
 
+def add_non_branching_feedback_data(
+    left: List[BranchingAndFeedbackData], right: List[BranchingAndFeedbackData]
+) -> List[BranchingAndFeedbackData]:
+    """
+    Reducer for non-branching feedback data.
+
+    Non-branching events are processed asynchronously
+    and don't block the conversation.
+    When data is provided (right has items), accumulate with existing data.
+    When an empty list is provided (right is empty), clear all data.
+
+    Args:
+        left: Existing non-branching feedback data in state
+        right: New data to add (or empty list to clear)
+
+    Returns:
+        List[BranchingAndFeedbackData]: The unified,
+        deduplicated list, or an empty list.
+
+    """
+    if not right:
+        return []
+    # TODO: find the duplication and remove unique by
+    return unique_by(left + right, key=lambda x: x.event_id)
+
+
 def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional[str]:
     """
     Reducer to replace next_instruction.
@@ -160,6 +186,7 @@ class SimulationState(BaseModel):
     - Events (permitted, detected, accumulated)
     - Score tracking
     - Branching and feedback data (unified structure for branching + feedback)
+    - Non-branching feedback data (processed asynchronously, doesn't block)
     - Resolved branching instruction (for LLM)
     - Feedback to send (for UI)
     """
@@ -173,7 +200,10 @@ class SimulationState(BaseModel):
     current_score: Annotated[int, add_scores]
     branching_and_feedback_data: Annotated[
         List[BranchingAndFeedbackData], add_branching_and_feedback_data
-    ]  # Unified data: branching instructions + feedback messages
+    ]  # Only branching events (with branching_instruction, processed sequentially)
+    non_branching_feedback_data: Annotated[
+        List[BranchingAndFeedbackData], add_non_branching_feedback_data
+    ] = []  # Non-branching events (feedback only, processed asynchronously)
     next_instruction: Annotated[Optional[str], replace_next_instruction] = (
         None  # Resolved branching instruction for LLM
     )

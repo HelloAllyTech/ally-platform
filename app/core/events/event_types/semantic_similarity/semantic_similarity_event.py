@@ -9,6 +9,7 @@ from typing import ClassVar, Dict, List, Optional, Tuple, override
 import numpy as np
 from pydantic import PrivateAttr
 
+from app.core.config import settings
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.semantic_similarity.constants import (
@@ -45,6 +46,11 @@ class SemanticSimilarityEvent(BaseEvent):
 
     # Shared cache across instances: (sentences_hash, threshold) -> patterns
     _PATTERN_CACHE: ClassVar[Dict[Tuple[int, float], List[EmbeddedPattern]]] = {}
+
+    # Input embedding cache: text -> embedding (prevents duplicate API calls)
+    # Uses FIFO eviction when cache exceeds max size to prevent memory issues
+    _INPUT_EMBEDDING_CACHE: ClassVar[Dict[str, np.ndarray]] = {}
+    _INPUT_CACHE_MAX_SIZE: ClassVar[int] = 1000  # Limit cache size
 
     # Class-level embedding client registry
     # Why: LangGraph's MemorySaver checkpointer serializes state between
@@ -143,8 +149,13 @@ class SemanticSimilarityEvent(BaseEvent):
             return False
 
         # Get embedding for the input sentence
+        # (with caching to avoid duplicate API calls if optimizations enabled)
         try:
-            input_embedding = await self._get_embedding(sentence)
+            if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
+                input_embedding = await self._get_embedding_cached(sentence)
+            else:
+                # Old behavior: no cache
+                input_embedding = await self._get_embedding(sentence)
         except Exception as e:
             logger.exception(f"Failed to get embedding for input sentence: {e}")
             return False
@@ -233,6 +244,49 @@ class SemanticSimilarityEvent(BaseEvent):
                 f".create() class method with an embedding_client."
             )
         return await self._EMBEDDING_CLIENT.get_embedding(text)
+
+    async def _get_embedding_cached(self, text: str) -> np.ndarray:
+        """
+        Get embedding for text with caching to avoid duplicate API calls.
+
+        This optimization prevents multiple semantic similarity events from making
+        duplicate API calls when checking the same input text. Uses FIFO eviction
+        when cache exceeds max size to prevent memory issues.
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Numpy array of embedding values
+        """
+        # Check cache first
+        if text in self._INPUT_EMBEDDING_CACHE:
+            logger.debug(f"Using cached embedding for text: '{text[:50]}...'")
+            return self._INPUT_EMBEDDING_CACHE[text]
+
+        # Get embedding from API
+        embedding = await self._get_embedding(text)
+
+        # Add to cache (with size limit using FIFO eviction)
+        if len(self._INPUT_EMBEDDING_CACHE) >= self._INPUT_CACHE_MAX_SIZE:
+            # Remove oldest entry (FIFO eviction)
+            # Note: For true LRU, would need OrderedDict,
+            # but FIFO is simpler and sufficient
+            oldest_key = next(iter(self._INPUT_EMBEDDING_CACHE))
+            del self._INPUT_EMBEDDING_CACHE[oldest_key]
+            logger.debug(
+                f"Evicted oldest embedding from cache "
+                f"(size limit: {self._INPUT_CACHE_MAX_SIZE})"
+            )
+
+        self._INPUT_EMBEDDING_CACHE[text] = embedding
+        cache_size = len(self._INPUT_EMBEDDING_CACHE)
+        logger.debug(
+            f"Cached embedding for text: '{text[:50]}...' "
+            f"(cache size: {cache_size})"
+        )
+
+        return embedding
 
     async def _get_embeddings_batch(self, texts: List[str]) -> List[np.ndarray]:
         """

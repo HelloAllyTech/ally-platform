@@ -10,7 +10,7 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.schemas import CustomUIEventMessageType
 from app.core.graph.prompt import generate_system_message
-from app.core.graph.state import SimulationState
+from app.core.graph.state import BranchingAndFeedbackData, SimulationState
 from app.core.graph.utils import (
     calculate_elapsed_time,
     convert_messages_to_chat_messages,
@@ -21,22 +21,17 @@ from app.core.scenario.base import Scenario
 from app.llms import create_llm_client
 from app.utils.event_handler import send_event_to_ui
 from app.utils.logger import logger
+from app.utils.timing_utils import TimingContext, time_operation
 
 
-async def process_events(
-    state: SimulationState, config: Optional[RunnableConfig] = None
-) -> dict:
-    """
-    Process events, optimizing detection based on Time, Score, and Cooldown windows.
-    Collects branching_and_feedback_data for later processing.
-    """
-
-    # 1. Prepare Context ---
+def _prepare_event_context(
+    state: SimulationState, config: Optional[RunnableConfig]
+) -> tuple:
+    """Prepare context for event processing."""
     chat_messages = convert_messages_to_chat_messages(state.messages)
     elapsed_time = calculate_elapsed_time(config)
     live_score = get_live_score(config)
 
-    # Retrieve orchestrator and dependencies once to use throughout the function
     orchestrator = None
     room = None
     embedding_client = None
@@ -46,7 +41,6 @@ async def process_events(
         embedding_client = config["configurable"].get("embedding_client")
 
     # Inject embedding client for SemanticSimilarityEvent
-    # (survives LangGraph serialization)
     if embedding_client:
         from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
             SemanticSimilarityEvent,
@@ -55,19 +49,59 @@ async def process_events(
         SemanticSimilarityEvent._EMBEDDING_CLIENT = embedding_client
 
     logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
+    return chat_messages, elapsed_time, live_score, orchestrator, room
+
+
+async def _detect_events(
+    permitted_events: list[BaseEvent],
+    chat_messages: list,
+    elapsed_time: float,
+    live_score: int,
+    orchestrator,
+) -> tuple[list[tuple[str, BaseEvent]], list[BaseEvent]]:
+    """
+    Detect events that are eligible and trigger detection.
+
+    All eligible events are detected in parallel for optimal performance.
+
+    Returns:
+        Tuple of (detected_events_with_timestamps, new_events)
+        - detected_events_with_timestamps: List of (timestamp, event) tuples
+        - new_events: List of detected events (without timestamps)
+    """
 
     async def detect_single_event(event: BaseEvent):
-        if await event.detect_event(chat_messages):
-            return event
+        """
+        Detect a single event with error handling and timeout.
+
+        Adds timeout to prevent slow API calls from blocking all event detection.
+        This improves reliability and prevents cascading delays.
+        """
+        try:
+            if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
+                # Add timeout to prevent slow API calls from blocking everything
+                # 10 seconds is reasonable for API calls (binary classifier, embeddings)
+                result = await asyncio.wait_for(
+                    event.detect_event(chat_messages), timeout=10.0
+                )
+            else:
+                # Old behavior: no timeout
+                result = await event.detect_event(chat_messages)
+            if result:
+                return event
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"Event {event.event_id} detection timed out after 10s, skipping"
+            )
+        except Exception as e:
+            logger.exception(f"Event {event.event_id} detection failed: {e}")
         return None
 
-    # 2. Filter Events & Create Tasks ---
-    tasks = []
+    # Collect eligible events
+    eligible_events = []
     skipped_count = 0
 
-    for event in state.permitted_events:
-        # Fetch last occurrence time and
-        # occurrence count safely (if orchestrator exists)
+    for event in permitted_events:
         last_occurred_at = None
         occurrence_count = 0
 
@@ -75,11 +109,10 @@ async def process_events(
             last_occurred_at = orchestrator.get_last_occurred_at(event.event_id)
             occurrence_count = orchestrator.get_occurrence_count(event.event_id)
 
-        # Check ALL windows (Time, Score, Cooldown)
         if is_event_eligible(
             event, elapsed_time, live_score, last_occurred_at, occurrence_count
         ):
-            tasks.append(asyncio.create_task(detect_single_event(event)))
+            eligible_events.append(event)
         else:
             skipped_count += 1
 
@@ -88,60 +121,109 @@ async def process_events(
             f"Event optimization: Skipped {skipped_count} events (outside windows)."
         )
 
-    # 3. Process Detection Results ---
-    detected_events = []
-    if tasks:
-        # Preserve completion order
-        for t in asyncio.as_completed(tasks):
+    # Detect all eligible events in parallel
+    detection_tasks = [
+        asyncio.create_task(detect_single_event(event)) for event in eligible_events
+    ]
+
+    detected_events_with_timestamps = []
+
+    if detection_tasks:
+        logger.debug(f"Detecting {len(detection_tasks)} events in parallel")
+        for t in asyncio.as_completed(detection_tasks):
             result = await t
             if result is not None:
                 timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-                detected_events.append((timestamp, result))
+                detected_events_with_timestamps.append((timestamp, result))
 
-    logger.debug(f"Detected Event number: {len(detected_events)}")
+    logger.debug(f"Detected {len(detected_events_with_timestamps)} events")
+    new_events = [event for _, event in detected_events_with_timestamps]
+    return detected_events_with_timestamps, new_events
 
-    new_events = [event for _, event in detected_events]
 
-    # 4. Orchestration (Backend Sync & Logic) ---
-    additional_score_from_triggered_events = 0
-    branching_and_feedback_data = []
+def _split_events_by_type(
+    all_feedback_data: list[BranchingAndFeedbackData],
+) -> tuple[list[BranchingAndFeedbackData], list[BranchingAndFeedbackData]]:
+    """Split events into branching and non-branching based on feature flag."""
+    if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
+        # NEW WAY: Split events into branching vs non-branching
+        with time_operation("Event split (parallel mode)"):
+            branching_and_feedback_data = []
+            non_branching_feedback_data = []
 
-    if orchestrator is not None:
-        detected_event_ids = {event.event_id for event in new_events}
+            for data in all_feedback_data:
+                if data.branching_instruction is not None:
+                    branching_and_feedback_data.append(data)
+                else:
+                    non_branching_feedback_data.append(data)
 
-        # Updates registry, evaluates expressions, sends to Core
-        (
-            _,
-            additional_score_from_triggered_events,
-            branching_and_feedback_data,
-        ) = await orchestrator.orchestrate_events(
+        logger.info(
+            f"[PARALLEL MODE] Event split: "
+            f"{len(branching_and_feedback_data)} branching, "
+            f"{len(non_branching_feedback_data)} non-branching"
+        )
+    else:
+        # OLD WAY: All events go into branching_and_feedback_data
+        with time_operation("Event split (sequential mode)"):
+            branching_and_feedback_data = all_feedback_data.copy()
+            non_branching_feedback_data = []
+
+        logger.info(
+            f"[SEQUENTIAL MODE] All {len(branching_and_feedback_data)} events "
+            f"processed sequentially"
+        )
+
+    return branching_and_feedback_data, non_branching_feedback_data
+
+
+def _log_event_data(all_feedback_data: list[BranchingAndFeedbackData]) -> None:
+    """Log collected event data for debugging."""
+    if not all_feedback_data:
+        return
+
+    logger.info("Branching and Feedback Data Collected:")
+    for idx, data in enumerate(all_feedback_data, 1):
+        feedback_msg = (
+            data.feedback.message if data.feedback and data.feedback.message else "None"
+        )
+        event_type = "BRANCHING" if data.branching_instruction else "NON-BRANCHING"
+        logger.info(
+            f"    [{idx}] [{event_type}] Event Score: {data.score} | "
+            f"Branching: {data.branching_instruction or 'None'} | "
+            f"Feedback: {feedback_msg}"
+        )
+
+
+async def _orchestrate_and_split_events(
+    orchestrator,
+    room,
+    new_events: list[BaseEvent],
+) -> tuple[int, list[BranchingAndFeedbackData], list[BranchingAndFeedbackData]]:
+    """Orchestrate events and split them by type."""
+    detected_event_ids = {event.event_id for event in new_events}
+
+    with time_operation("Event orchestration"):
+        _, additional_score, all_feedback_data = await orchestrator.orchestrate_events(
             room=room,
             detected_event_ids=(detected_event_ids if detected_event_ids else None),
         )
 
-        # Log results
-        if branching_and_feedback_data:
-            logger.info("Branching and Feedback Data Collected:")
-            for idx, data in enumerate(branching_and_feedback_data, 1):
-                feedback_msg = (
-                    data.feedback.message
-                    if data.feedback and data.feedback.message
-                    else "None"
-                )
-                logger.info(
-                    f"    [{idx}] Event Score: {data.score} | "
-                    f"Branching: {data.branching_instruction or 'None'} | "
-                    f"Feedback: {feedback_msg}"
-                )
+    logger.info(
+        f"Event orchestration completed (total events: {len(all_feedback_data)})"
+    )
 
-        if additional_score_from_triggered_events != 0:
-            logger.info(
-                f"Additional score from triggered "
-                f"events: {additional_score_from_triggered_events:+d}"
-            )
+    branching_data, non_branching_data = _split_events_by_type(all_feedback_data)
+    _log_event_data(all_feedback_data)
 
-    # 5. State Updates ---
-    # Calculate score delta for THIS turn to update LangChain state
+    return additional_score, branching_data, non_branching_data
+
+
+def _calculate_score_updates(
+    state: SimulationState,
+    new_events: list[BaseEvent],
+    additional_score_from_triggered_events: int,
+) -> int:
+    """Calculate score updates for this turn."""
     direct_score_change = sum(event.score for event in new_events if event.score)
     total_turn_score_delta = (
         direct_score_change + additional_score_from_triggered_events
@@ -154,6 +236,18 @@ async def process_events(
             f"(Delta: {total_turn_score_delta:+d})"
         )
 
+    return new_current_score
+
+
+def _build_state_update_dict(
+    state: SimulationState,
+    detected_events: list,
+    new_events: list[BaseEvent],
+    new_current_score: int,
+    branching_and_feedback_data: list[BranchingAndFeedbackData],
+    non_branching_feedback_data: list[BranchingAndFeedbackData],
+) -> dict:
+    """Build the state update dictionary."""
     update_dict = {
         "messages": state.messages,
         "permitted_events": state.permitted_events,
@@ -164,12 +258,95 @@ async def process_events(
 
     if branching_and_feedback_data:
         update_dict["branching_and_feedback_data"] = branching_and_feedback_data
+        mode_text = (
+            "branching events for sequential processing"
+            if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS
+            else "events for sequential processing (legacy mode)"
+        )
+        logger.info(f"Stored {len(branching_and_feedback_data)} {mode_text}")
+
+    if non_branching_feedback_data:
+        update_dict["non_branching_feedback_data"] = non_branching_feedback_data
         logger.info(
-            f"Stored {len(branching_and_feedback_data)} branching_and_feedback_data"
-            f" entries in state"
+            f"Stored {len(non_branching_feedback_data)} non-branching events "
+            f"(processed asynchronously, no blocking)"
         )
 
     return update_dict
+
+
+async def process_events(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Process events, optimizing detection based on Time, Score, and Cooldown windows.
+    Collects branching_and_feedback_data for later processing.
+
+    NOTE: orchestrate_events processes ALL events in registry where happened=True,
+    not just the ones we pass. This means we cannot safely call it multiple times
+    with subsets of events, as it would cause double-processing, double-scoring,
+    and duplicate event sending.
+    """
+    with TimingContext("process_events") as timing:
+        # 1. Prepare context
+        with timing.operation("Context preparation"):
+            chat_messages, elapsed_time, live_score, orchestrator, room = (
+                _prepare_event_context(state, config)
+            )
+
+        # 2. Detect events in parallel
+        with timing.operation("Event detection"):
+            detected_events, new_events = await _detect_events(
+                state.permitted_events,
+                chat_messages,
+                elapsed_time,
+                live_score,
+                orchestrator,
+            )
+
+        # 3. Orchestrate and split events
+        # (all events together to avoid duplicate processing)
+        # CRITICAL: orchestrate_events has side effects:
+        # - Sends events to Core (SQS) via _send_events_to_core
+        # - Updates live_score via _update_live_score
+        # - Handles termination callbacks via _handle_termination_events
+        # All of these happen inside orchestrate_events, so they're preserved.
+        additional_score = 0
+        branching_and_feedback_data = []
+        non_branching_feedback_data = []
+
+        if orchestrator is not None:
+            with timing.operation("Orchestration and splitting"):
+                (
+                    additional_score,
+                    branching_and_feedback_data,
+                    non_branching_feedback_data,
+                ) = await _orchestrate_and_split_events(orchestrator, room, new_events)
+
+            if additional_score != 0:
+                logger.info(
+                    f"Additional score from triggered events: {additional_score:+d}"
+                )
+
+        # 4. Calculate score updates
+        with timing.operation("Score calculation"):
+            new_current_score = _calculate_score_updates(
+                state, new_events, additional_score
+            )
+
+        # 5. Build state update dict
+        with timing.operation("State update dict building"):
+            result = _build_state_update_dict(
+                state,
+                detected_events,
+                new_events,
+                new_current_score,
+                branching_and_feedback_data,
+                non_branching_feedback_data,
+            )
+
+        timing.log_summary()
+        return result
 
 
 async def resolve_branching_instruction(
@@ -181,9 +358,9 @@ async def resolve_branching_instruction(
     This function:
     1. Determines branching instruction for LLM (only if branching_instruction exists)
     2. Resolves LLM response tags in branching instructions (if needed)
-    3. Selects feedback message to send to UI:
+    3. Selects feedback message from branching events only:
        - If branching event was selected: use its feedback
-       - Otherwise: use highest score event's feedback
+       - Non-branching events are handled separately (merged in generate_response)
 
     This node is wrapped in a subgraph to prevent its LLM outputs from being
     streamed to TTS/UI (workaround for LiveKit issue #2836).
@@ -194,66 +371,85 @@ async def resolve_branching_instruction(
 
     Feedback Selection Logic:
     - Priority 1: If branching event was selected, use its feedback for UI
-    - Priority 2: Otherwise, use highest score event's feedback for UI
+    - Priority 2: Non-branching events are merged in generate_response
     """
     logger.info("Resolving branching instruction")
 
     next_instruction = None
     selected_branching_event_data = None
 
-    if state.branching_and_feedback_data:
-        # Find events with branching instructions
-        branching_events = [
-            ed for ed in state.branching_and_feedback_data if ed.branching_instruction
-        ]
+    with TimingContext("Branching instruction resolution") as timing:
+        # Process events based on feature flag
+        # In parallel mode: only branching events are here
+        # In sequential mode: all events are here (old behavior)
+        if state.branching_and_feedback_data:
+            # All events in branching_and_feedback_data have branching_instruction
+            # (they were filtered in process_events)
+            branching_events = state.branching_and_feedback_data
 
-        if branching_events:
-            # Use highest score event with branching instruction for LLM
-            selected_branching_event_data = max(
-                branching_events, key=lambda e: abs(e.score)
-            )
-            branching_instruction_obj = (
-                selected_branching_event_data.branching_instruction
-            )
+            if branching_events:
+                # Filter to only events with branching instructions
+                # (in parallel mode, all have them; in sequential mode, we filter)
+                events_with_branching = [
+                    ed
+                    for ed in branching_events
+                    if ed.branching_instruction is not None
+                ]
 
-            # Lazily resolve llm_response tags if present (one-time operation)
-            # Check flag first to avoid method call overhead on subsequent turns
-            if branching_instruction_obj.needs_llm_resolution():
-                # Get language_code and branching_llm_config from scenario if available
-                # Use dedicated branching_llm_config for structured output support,
-                # falling back to llm_config if not specified
-                language_code = DEFAULT_LANGUAGE_CODE
-                llm_config_for_branching = None
-                if config and "configurable" in config:
-                    scenario = config["configurable"].get("scenario")
-                    if scenario and hasattr(scenario, "language_config"):
-                        language_code = scenario.language_config.language_code
-                        llm_config_for_branching = (
-                            scenario.language_config.branching_llm_config
+                if events_with_branching:
+                    # Use highest score event with branching instruction for LLM
+                    selected_branching_event_data = max(
+                        events_with_branching, key=lambda e: abs(e.score)
+                    )
+                    branching_instruction_obj = (
+                        selected_branching_event_data.branching_instruction
+                    )
+
+                    # Lazily resolve llm_response tags if present (BLOCKING operation)
+                    # This is the only blocking step - non-branching events skip this
+                    if branching_instruction_obj.needs_llm_resolution():
+                        # Get language_code and branching_llm_config from scenario
+                        # Use dedicated branching_llm_config for structured output,
+                        # falling back to llm_config if not specified
+                        language_code = DEFAULT_LANGUAGE_CODE
+                        llm_config_for_branching = None
+                        if config and "configurable" in config:
+                            scenario = config["configurable"].get("scenario")
+                            if scenario and hasattr(scenario, "language_config"):
+                                language_code = scenario.language_config.language_code
+                                llm_config_for_branching = (
+                                    scenario.language_config.branching_llm_config
+                                )
+
+                        logger.info(
+                            "Resolving LLM response tags for branching instruction "
+                            "(this may block on LLM call)"
                         )
+                        with timing.operation("LLM resolution (blocking)"):
+                            await branching_instruction_obj.resolve_llm_responses(
+                                llm_config=llm_config_for_branching,
+                                language_code=language_code,
+                            )
 
-                await branching_instruction_obj.resolve_llm_responses(
-                    llm_config=llm_config_for_branching,
-                    language_code=language_code,
-                )
+                    # Use the branching instruction content
+                    # (with llm_response tags resolved)
+                    next_instruction = (
+                        branching_instruction_obj.resolve_dynamic_branching_instruction(
+                            state.messages
+                        )
+                    )
 
-            # Use the branching instruction content (with llm_response tags resolved)
-            next_instruction = (
-                branching_instruction_obj.resolve_dynamic_branching_instruction(
-                    state.messages
-                )
-            )
-
-    # Determine feedback message for UI
+    # Determine feedback message for UI from branching events only
     # Priority 1: If branching event was selected, use its feedback
-    # Priority 2: Otherwise, use highest score event's feedback
+    # Priority 2: Non-branching events are merged in generate_response
     feedback_to_send = None
     if selected_branching_event_data and selected_branching_event_data.feedback:
         # Use feedback from the selected branching event
         feedback_to_send = selected_branching_event_data.feedback
         logger.info("Priority 1: Using feedback from selected branching event for UI")
     elif state.branching_and_feedback_data:
-        # No branching event selected, use highest score event's feedback
+        # Fallback: use highest score branching event's feedback
+        # (though this shouldn't happen if selected_branching_event_data is set)
         events_with_feedback = [
             ed for ed in state.branching_and_feedback_data if ed.feedback is not None
         ]
@@ -261,7 +457,7 @@ async def resolve_branching_instruction(
             selected_event_data = max(events_with_feedback, key=lambda e: abs(e.score))
             feedback_to_send = selected_event_data.feedback
             logger.info(
-                f"Priority 2: Selected highest score event "
+                f"Fallback: Selected highest score branching event "
                 f"(score={selected_event_data.score}) for UI feedback"
             )
 
@@ -280,14 +476,37 @@ async def generate_response(
     This function:
     1. Uses resolved branching instruction from state (resolved in previous node)
     2. Generates LLM response using the branching instruction (if any)
-    3. Sends feedback to UI after STT/TTS flow completes
-    4. Clears branching_and_feedback_data after processing
+    3. Merges feedback from branching and non-branching events:
+       - Priority 1: Branching event feedback (from resolve_branching_instruction)
+       - Priority 2: Highest score non-branching event feedback
+    4. Sends feedback to UI after STT/TTS flow completes
+    5. Clears branching_and_feedback_data and
+       non_branching_feedback_data after processing
     """
     logger.info("Generating response")
 
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
     feedback_to_send = state.feedback_to_send
+
+    # Merge feedback selection: Priority 1 = branching, Priority 2 = non-branching
+    # If no branching feedback was selected, use highest score non-branching feedback
+    # (Only in parallel mode - in sequential mode, non_branching_feedback_data is empty)
+    if (
+        not feedback_to_send
+        and state.non_branching_feedback_data
+        and settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS
+    ):
+        events_with_feedback = [
+            ed for ed in state.non_branching_feedback_data if ed.feedback is not None
+        ]
+        if events_with_feedback:
+            selected_event_data = max(events_with_feedback, key=lambda e: abs(e.score))
+            feedback_to_send = selected_event_data.feedback
+            logger.info(
+                f"Priority 2: Selected highest score non-branching event "
+                f"(score={selected_event_data.score}) for UI feedback"
+            )
 
     # Build system message from scenario and prepend only for the LLM call
     scenario = (
@@ -408,20 +627,43 @@ async def generate_response(
     if config and "configurable" in config:
         room = config["configurable"].get("room")
         if room is not None:
-            # Calculate cumulative score from ACTIVE events only
-            # (events with feedback object)
+            # Calculate cumulative score from ALL ACTIVE events
+            # (both branching and non-branching events with feedback)
             # ACTIVE events always have a feedback object
             # (even if message is None)
-            # This matches the old behavior: sum(event.score for event in events)
-            # where events were only ACTIVE events
-            active_events_data = [
-                ed
-                for ed in state.branching_and_feedback_data
-                if ed.feedback is not None
-            ]
+            all_active_events_data = []
+
+            # Add branching events with feedback
+            # (including events without branching instructions
+            # for backward compatibility)
+            if state.branching_and_feedback_data:
+                branching_active = [
+                    ed
+                    for ed in state.branching_and_feedback_data
+                    if ed.feedback is not None
+                ]
+                all_active_events_data.extend(branching_active)
+
+            # Add non-branching events with feedback
+            if state.non_branching_feedback_data:
+                non_branching_active = [
+                    ed
+                    for ed in state.non_branching_feedback_data
+                    if ed.feedback is not None
+                ]
+                all_active_events_data.extend(non_branching_active)
 
             logger.info("Calculating cumulative score for UI:")
-            logger.info(f"     ACTIVE events count: {len(active_events_data)}")
+            branching_count = len(
+                [ed for ed in state.branching_and_feedback_data if ed.feedback]
+            )
+            non_branching_count = len(
+                [ed for ed in state.non_branching_feedback_data if ed.feedback]
+            )
+            logger.info(
+                f"     ACTIVE events count: {len(all_active_events_data)} "
+                f"({branching_count} branching + {non_branching_count} non-branching)"
+            )
 
             # Send score if there are ACTIVE events (matches old behavior)
             # Cumulative score includes ALL ACTIVE events, even if they don't
@@ -429,17 +671,17 @@ async def generate_response(
             # Old behavior: process_events_for_ui would return None only if
             # no events
             # If events exist, score is always sent even if message/emoji are None
-            if active_events_data:
+            if all_active_events_data:
                 # Cumulative score: sum of scores from all ACTIVE events
-                cumulative_score = sum(ed.score for ed in active_events_data)
-                logger.info(
-                    f"     Individual scores: {[ed.score for ed in active_events_data]}"
-                )
+                # (both branching and non-branching)
+                cumulative_score = sum(ed.score for ed in all_active_events_data)
+                individual_scores = [ed.score for ed in all_active_events_data]
+                logger.info(f"     Individual scores: {individual_scores}")
                 logger.info(f"     ➜ Cumulative score: {cumulative_score}")
 
-                detected_event_ids = [ed.event_id for ed in active_events_data]
+                detected_event_ids = [ed.event_id for ed in all_active_events_data]
                 # Handle feedback message - assign empty string if not present
-                # Even if ACTIVE events exist, they may not have feedback messages
+                # Even if ACTIVE events exist, they may not have feedback
                 if feedback_to_send:
                     # Feedback object exists, but message might be None
                     feedback_message = (
@@ -483,6 +725,7 @@ async def generate_response(
         current_score=state.current_score,
         new_events=[],
         branching_and_feedback_data=[],  # Clear after use
+        non_branching_feedback_data=[],  # Clear after use
         next_instruction=None,  # Reset after use
         feedback_to_send=None,  # Reset after use
     )

@@ -40,6 +40,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=10,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -67,6 +68,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=10,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         # Mock EventOrchestrator
@@ -138,6 +140,7 @@ class TestProcessEvents:
                     event_id="time_event_id",
                 )
             ],
+            non_branching_feedback_data=[],
         )
 
         class MockEventOrchestrator:
@@ -200,6 +203,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=10,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -222,6 +226,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=10,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -244,6 +249,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=0,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         new_state = await process_events(state, config=None)
@@ -269,6 +275,7 @@ class TestProcessEvents:
             new_events=[],
             current_score=0,
             branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
         )
 
         class MockEventOrchestrator:

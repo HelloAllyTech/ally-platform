@@ -35,6 +35,7 @@ def base_state():
         new_events=[],
         current_score=0,
         branching_and_feedback_data=[],
+        non_branching_feedback_data=[],
     )
 
 

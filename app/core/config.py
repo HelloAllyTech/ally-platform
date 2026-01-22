@@ -111,5 +111,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Event processing feature flags
+    ENABLE_EVENT_DETECTION_OPTIMIZATIONS: bool = Field(
+        default=True,
+        description=(
+            "Enable all event processing optimizations. "
+            "When True: "
+            "- Parallel processing: branching events sequential, "
+            "non-branching events async "
+            "- Input embedding cache: avoids duplicate API calls "
+            "- Timeout handling: 10s timeout prevents blocking "
+            "When False: all events processed sequentially, "
+            "no cache, no timeout (old behavior)."
+        ),
+    )
+
 
 settings = Settings()

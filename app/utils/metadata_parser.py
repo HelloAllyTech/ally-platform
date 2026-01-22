@@ -36,9 +36,9 @@ def parse_room_metadata(
     if parsed is None:
         if settings.ENV == Environment.LOCAL:
             logger.warning("Missing/invalid metadata in local; using SCENARIO_SAMPLE.")
-            from scenario_sample import SCENARIO_SAMPLE_MALAYALAM_ENGLISH
+            from scenario_sample import SCENARIO_SAMPLE
 
-            parsed = SCENARIO_SAMPLE_MALAYALAM_ENGLISH
+            parsed = SCENARIO_SAMPLE
         else:
             raise ValueError("Metadata missing or invalid.")
 
