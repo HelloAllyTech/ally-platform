@@ -88,6 +88,7 @@ export const SimulationFeedbackScreen: React.FC<
       pollingInterval,
     },
   );
+  const {showToast} = useToast();
 
   useEffect(() => {
     if (
@@ -106,6 +107,12 @@ export const SimulationFeedbackScreen: React.FC<
     nextSimulationPollingAttemptsRef.current = 0;
   }, [scenarioSessionId]);
 
+  useEffect(() => {
+    if (simulationDetails?.details?.summary?.errorMessage) {
+      showToast(simulationDetails.details.summary.errorMessage, 'error');
+    }
+  }, [showToast, simulationDetails?.details?.summary?.errorMessage]);
+
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
@@ -120,7 +127,6 @@ export const SimulationFeedbackScreen: React.FC<
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
-  const {showToast} = useToast();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
