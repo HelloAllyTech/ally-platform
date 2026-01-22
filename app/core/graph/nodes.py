@@ -298,6 +298,15 @@ async def generate_response(
     language_code = DEFAULT_LANGUAGE_CODE
     if scenario and scenario.language_config:
         language_code = scenario.language_config.language_code
+        logger.info(
+            f"Using language code '{language_code}' from scenario "
+            f"(multilingual method: {settings.MULTILINGUAL_METHOD})"
+        )
+    else:
+        logger.info(
+            f"Using default language code '{language_code}' "
+            f"(multilingual method: {settings.MULTILINGUAL_METHOD})"
+        )
 
     system_message = None
     if scenario is not None:

@@ -62,6 +62,10 @@ def apply_cotr_enhancement(
     is_non_english = not language_code.startswith("en")
 
     if not is_non_english:
+        logger.info(
+            f"CoTR skipped: Language '{language_code}' is English, "
+            "no enhancement needed"
+        )
         return base_prompt  # No enhancement needed for English
 
     # Check if metadata is already translated
@@ -292,9 +296,10 @@ constructions
     """
 
     enhanced_prompt = f"{base_prompt}\n\n{cotr_instructions}"
-    logger.debug(
-        f"Applied CoTR enhancement for {language_code} "
-        f"(metadata_translated={metadata_is_translated})"
+    logger.info(
+        f"Applied CoTR enhancement for language '{language_code}' "
+        f"(metadata_translated={metadata_is_translated}, "
+        f"is_indian_language={is_indian_language})"
     )
 
     return enhanced_prompt
