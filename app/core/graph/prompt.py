@@ -148,6 +148,7 @@ def generate_system_message(
         if (
             settings.MULTILINGUAL_METHOD == "cotr"
             and language_code
+            and isinstance(language_code, str)
             and not language_code.startswith("en")
         ):
             from app.multilingual.cotr import enhance_system_message_with_cotr
@@ -244,6 +245,7 @@ def generate_system_message(
     if (
         settings.MULTILINGUAL_METHOD == "cotr"
         and language_code
+        and isinstance(language_code, str)
         and not language_code.startswith("en")
     ):
         from app.multilingual.cotr import enhance_system_message_with_cotr

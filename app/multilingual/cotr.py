@@ -51,6 +51,14 @@ def apply_cotr_enhancement(
         Enhanced prompt with CoTR instructions
     """
     # Detect if this is a non-English language
+    # Ensure language_code is a string before calling string methods
+    if not isinstance(language_code, str):
+        logger.warning(
+            f"Invalid language_code type: {type(language_code)}, "
+            f"expected str. Returning base prompt unchanged."
+        )
+        return base_prompt
+
     is_non_english = not language_code.startswith("en")
 
     if not is_non_english:

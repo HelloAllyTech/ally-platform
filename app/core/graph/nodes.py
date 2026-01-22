@@ -358,11 +358,24 @@ async def generate_response(
                     break
 
             if last_user_message:
+                # Ensure language_code is a string (fallback to default if None)
+                safe_language_code = (
+                    language_code
+                    if isinstance(language_code, str) and language_code
+                    else DEFAULT_LANGUAGE_CODE
+                )
+                # Ensure method is a string (fallback to "none" if invalid)
+                safe_method = (
+                    settings.MULTILINGUAL_METHOD
+                    if isinstance(settings.MULTILINGUAL_METHOD, str)
+                    else "none"
+                )
+
                 evaluation_logger.log_interaction(
                     input_text=last_user_message,
                     output_text=response.content,
-                    language_code=language_code,
-                    method=settings.MULTILINGUAL_METHOD,
+                    language_code=safe_language_code,
+                    method=safe_method,
                     metadata={
                         "scenario_id": scenario.name if scenario else None,
                         "model": getattr(llm_instance, "model_name", None)
