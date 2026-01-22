@@ -100,7 +100,8 @@
     "profileImage": "Profile image",
     "changeImage": "Change image",
     "removeImage": "Remove image",
-    "imageRequirements": "1:1 ratio (max 2MB)"
+    "imageRequirements": "1:1 ratio (max 2MB)",
+    "language": "Language"
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",
@@ -381,7 +382,8 @@
     "failedToLoadPathDetails": "Failed to load path details",
     "noActiveSimulation": "No active simulation found",
     "sessionEndedSuccessfully": "Session ended successfully",
-    "triggerWarnings": "Trigger warnings"
+    "triggerWarnings": "Trigger warnings",
+    "language": "Select Language"
   },
   "SimulationFeedback": {
     "title": "Simulation",

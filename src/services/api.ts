@@ -142,6 +142,7 @@ export const api = createApi({
     'SimulationPathDetails',
     'User',
     'Badges',
+    'UserPreferences',
   ],
   endpoints: () => ({}),
 });

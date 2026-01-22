@@ -239,7 +239,7 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
   },
   selectedItem: {
-    color: colors.teal,
+    color: colors.ds.theme.primary,
     fontWeight: '500',
   },
   hiddenTextContainer: {

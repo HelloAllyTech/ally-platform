@@ -12,6 +12,7 @@ import {simulationsApi} from '../simulationsApi';
 describe('simulationsApi', () => {
   it('exposes simulation endpoints', () => {
     const e = (simulationsApi as any).endpoints;
+    expect(e.getAvailableLanguages).toBeTruthy();
     expect(e.listRooms).toBeTruthy();
     expect(e.getScenarios).toBeTruthy();
     expect(e.getScenarioById).toBeTruthy();
@@ -21,6 +22,11 @@ describe('simulationsApi', () => {
     expect(e.startScenarioSession).toBeTruthy();
     expect(e.endScenarioSession).toBeTruthy();
     expect(e.getSimulationCredits).toBeTruthy();
+  });
+
+  it('has getAvailableLanguages endpoint with correct type', () => {
+    const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+    expect(endpoint.matchFulfilled).toBeDefined();
   });
 
   it('has listRooms endpoint with correct type', () => {
@@ -70,6 +76,7 @@ describe('simulationsApi', () => {
 
   it('exports all hooks', () => {
     const {
+      useGetAvailableLanguagesQuery,
       useListRoomsQuery,
       useGetScenariosQuery,
       useAddSimulationFeedbackMutation,
@@ -81,6 +88,7 @@ describe('simulationsApi', () => {
       useLazyGetSimulationCreditsQuery,
     } = require('../simulationsApi');
 
+    expect(useGetAvailableLanguagesQuery).toBeDefined();
     expect(useListRoomsQuery).toBeDefined();
     expect(useGetScenariosQuery).toBeDefined();
     expect(useAddSimulationFeedbackMutation).toBeDefined();
@@ -91,6 +99,32 @@ describe('simulationsApi', () => {
     expect(useLazyGetSimulationDetailsQuery).toBeDefined();
     expect(useLazyGetSimulationCreditsQuery).toBeDefined();
   });
+
+  describe('getAvailableLanguages endpoint', () => {
+    it('should have correct query type', () => {
+      const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+      expect(endpoint).toBeDefined();
+      expect(endpoint.matchFulfilled).toBeDefined();
+    });
+
+    it('should accept AvailableLanguagesParams with active property', () => {
+      const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+      expect(endpoint).toBeDefined();
+    });
+
+    it('should accept AvailableLanguagesParams with hasVoices property', () => {
+      const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+      expect(endpoint).toBeDefined();
+    });
+
+    it('should accept empty params', () => {
+      const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+      expect(endpoint).toBeDefined();
+    });
+
+    it('should return an array of LanguageOption', () => {
+      const endpoint = (simulationsApi as any).endpoints.getAvailableLanguages;
+      expect(endpoint.matchFulfilled).toBeDefined();
+    });
+  });
 });
-
-

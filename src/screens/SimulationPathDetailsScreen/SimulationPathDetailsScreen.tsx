@@ -1,4 +1,5 @@
-import React, {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   FlatList,
@@ -30,7 +31,9 @@ import type {RootStackScreenProps} from '@/navigation/types';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {
   useCreatePathSessionMutation,
+  useGetAvailableLanguagesQuery,
   useGetSimulationPathDetailsQuery,
+  useGetUserPreferencesQuery,
   useLazyGetScenarioSessionByPathItemQuery,
 } from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
@@ -44,6 +47,7 @@ import {SimulationDetailsModal} from './components/SimulationDetailsModal';
 export const SimulationPathDetailsScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.SIMULATION_PATH_DETAILS>
 > = ({navigation, route}) => {
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {pathId} = route.params;
@@ -66,10 +70,58 @@ export const SimulationPathDetailsScreen: React.FC<
     useState<PathScenario | null>(null);
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [languageOptions, setLanguageOptions] = useState<string[]>([]);
+  const [languageMap, setLanguageMap] = useState<Map<string, number>>(
+    new Map(),
+  );
+
   const {credits, getCreditsInfo} = useSimulationCredits();
   const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = React.useCallback(async () => {
+  // Fetch available languages
+  const {data: languagesData} = useGetAvailableLanguagesQuery({
+    active: true,
+    hasVoices: true,
+  });
+
+  // Fetch user preferences to get default language
+  const {data: preferencesData, refetch: refetchPreferences} =
+    useGetUserPreferencesQuery();
+
+  // Refetch preferences when screen is focused
+  useEffect(() => {
+    if (isFocused) {
+      refetchPreferences();
+    }
+  }, [isFocused, refetchPreferences]);
+
+  // Initialize languages
+  useEffect(() => {
+    if (languagesData && Array.isArray(languagesData)) {
+      const options = languagesData.map(lang => lang.label);
+      const map = new Map(
+        languagesData.map(lang => [lang.label, lang.language_id]),
+      );
+      setLanguageOptions(options);
+      setLanguageMap(map);
+
+      // Set default language from user preferences or first option
+      if (preferencesData?.data?.default_language_id && languagesData) {
+        const selectedLang = languagesData.find(
+          lang => lang.language_id === preferencesData.data.default_language_id,
+        );
+        if (selectedLang) {
+          setSelectedLanguage(selectedLang.label);
+        }
+      } else if (options.length > 0) {
+        setSelectedLanguage(options[0]);
+      }
+    }
+  }, [languagesData, preferencesData]);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await refetchPathDetails();
@@ -208,10 +260,12 @@ export const SimulationPathDetailsScreen: React.FC<
    */
   const handleStartSimulation = () => {
     if (selectedSimulation) {
+      const languageId = languageMap.get(selectedLanguage);
       startSimulation(
         selectedSimulation.scenarioId,
         selectedSimulation.sessionId || undefined,
         pathId,
+        languageId,
       ).finally(() => {
         handleCloseModal();
       });
@@ -352,6 +406,11 @@ export const SimulationPathDetailsScreen: React.FC<
         {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}
         isCreatingRoom={isCreatingRoom}
+        selectedLanguage={selectedLanguage}
+        languageOptions={languageOptions}
+        onLanguageSelect={setSelectedLanguage}
+        isLanguageDropdownOpen={isLanguageDropdownOpen}
+        setIsLanguageDropdownOpen={setIsLanguageDropdownOpen}
       />
 
       {/* Active Simulation Modal - Separate from Details Modal */}

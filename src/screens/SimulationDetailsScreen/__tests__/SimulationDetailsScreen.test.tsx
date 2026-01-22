@@ -13,6 +13,19 @@ jest.mock('@react-navigation/native', () => ({
 const mockStartSimulation = jest.fn();
 const mockCloseActiveSimulationModal = jest.fn();
 
+// Define mock data outside mocks to ensure consistent references
+const mockLanguagesData = [
+  {
+    language_id: 1,
+    label: 'English',
+    active: true,
+    translationCode: 'en',
+    value: 'en-IN',
+  },
+];
+
+const mockPreferencesData = {data: {default_language_id: 1}};
+
 jest.mock('@/hooks', () => {
   const mockNavigate = jest.fn();
   const mockGoBack = jest.fn();
@@ -38,7 +51,7 @@ jest.mock('@/hooks', () => {
 
 jest.mock('@/components', () => {
   const React = require('react');
-  const {TouchableOpacity, Text} = require('react-native');
+  const {TouchableOpacity, Text, View} = require('react-native');
   return {
     __esModule: true,
     PrimaryButton: ({label, onPress, isLoading}: any) => (
@@ -49,6 +62,13 @@ jest.mock('@/components', () => {
         <Text>{label}</Text>
       </TouchableOpacity>
     ),
+    CustomDropdown: ({value, options, onSelect}: any) => (
+      <TouchableOpacity
+        testID="custom-dropdown"
+        onPress={() => onSelect && onSelect(options[0])}>
+        <Text>{value || 'Select'}</Text>
+      </TouchableOpacity>
+    ),
     IllustratedModal: () => null,
     useToast: () => ({showToast: jest.fn()}),
     VideoPreview: () => null,
@@ -57,11 +77,12 @@ jest.mock('@/components', () => {
 
 jest.mock('../components', () => {
   const React = require('react');
-  const {View} = require('react-native');
+  const {View, Text} = require('react-native');
   return {
     __esModule: true,
     ActiveSimulationModal: (props: any) =>
       props.visible ? <View testID="active-sim-modal" /> : null,
+    SimulationDetailsModal: () => null,
   };
 });
 
@@ -71,6 +92,31 @@ jest.mock('@/utils', () => ({
   getTriggerWarningNames: jest.fn((triggerWarnings) => 
     triggerWarnings?.map((tw: any) => tw.name) || []
   ),
+}));
+
+jest.mock('@/services', () => ({
+  __esModule: true,
+  useGetSimulationDetailsQuery: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    error: undefined,
+  })),
+  useGetSimulationMetricsQuery: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+  })),
+  useGetAvailableLanguagesQuery: jest.fn(() => ({
+    data: mockLanguagesData,
+  })),
+  useGetUserPreferencesQuery: jest.fn(() => ({
+    data: mockPreferencesData,
+    refetch: jest.fn().mockResolvedValue({data: mockPreferencesData}),
+  })),
+  useLazyGetUserPreferencesQuery: jest.fn(() => [
+    jest.fn().mockResolvedValue({data: mockPreferencesData}),
+    {data: mockPreferencesData},
+  ]),
+  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [jest.fn()]),
 }));
 
 describe('SimulationDetailsScreen', () => {
@@ -121,7 +167,13 @@ describe('SimulationDetailsScreen', () => {
     fireEvent.press(button);
 
     await waitFor(() => {
-      expect(mockStartSimulation).toHaveBeenCalledWith(scenario.id);
+      // startSimulation is called with (scenarioId, sessionId, pathId, languageId)
+      expect(mockStartSimulation).toHaveBeenCalledWith(
+        scenario.id,
+        undefined,
+        undefined,
+        1, // languageId from mock preferences
+      );
     });
   });
 

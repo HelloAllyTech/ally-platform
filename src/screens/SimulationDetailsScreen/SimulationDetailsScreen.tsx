@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
 import {
+  CustomDropdown,
   IllustratedModal,
   PrimaryButton,
   useToast,
@@ -28,6 +29,10 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {
+  useGetAvailableLanguagesQuery,
+  useGetUserPreferencesQuery,
+} from '@/services';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
@@ -53,6 +58,53 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   } = useStartSimulation();
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [languageOptions, setLanguageOptions] = useState<string[]>([]);
+  const [languageMap, setLanguageMap] = useState<Map<string, number>>(
+    new Map(),
+  );
+
+  // Fetch available languages
+  const {data: languagesData} = useGetAvailableLanguagesQuery({
+    active: true,
+    hasVoices: true,
+  });
+
+  // Fetch user preferences to get default language
+  const {data: preferencesData, refetch: refetchPreferences} =
+    useGetUserPreferencesQuery();
+
+  // Refetch preferences when screen is focused
+  useEffect(() => {
+    if (isFocused) {
+      refetchPreferences();
+    }
+  }, [isFocused, refetchPreferences]);
+
+  // Initialize languages
+  useEffect(() => {
+    if (languagesData && Array.isArray(languagesData)) {
+      const options = languagesData.map(lang => lang.label);
+      const map = new Map(
+        languagesData.map(lang => [lang.label, lang.language_id]),
+      );
+      setLanguageOptions(options);
+      setLanguageMap(map);
+
+      // Set default language from user preferences or first option
+      if (preferencesData?.data?.default_language_id && languagesData) {
+        const selectedLang = languagesData.find(
+          lang => lang.language_id === preferencesData.data.default_language_id,
+        );
+        if (selectedLang) {
+          setSelectedLanguage(selectedLang.label);
+        }
+      } else if (options.length > 0) {
+        setSelectedLanguage(options[0]);
+      }
+    }
+  }, [languagesData, preferencesData]);
 
   useEffect(() => {
     if (getCreditsInfo?.isLow) {
@@ -73,8 +125,13 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     showToast(t('SimulationAssistant.linkCopiedToClipboard'), 'success');
   };
 
+  const handleLanguageSelect = (selectedLabel: string) => {
+    setSelectedLanguage(selectedLabel);
+  };
+
   const startSimulationPress = () => {
-    startSimulation(scenario.id);
+    const languageId = languageMap.get(selectedLanguage);
+    startSimulation(scenario.id, undefined, undefined, languageId);
   };
 
   const renderLoadingOverlay = () => {
@@ -93,18 +150,33 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {!!videoUrl && (
-          <VideoPreview
-            videoUrl={videoUrl}
-            autoPlay={false}
-            shouldPause={!isFocused}
-            testID="scenario-video-preview"
+        {/* Language Dropdown */}
+        <View style={styles.languageDropdownContainer}>
+          <CustomDropdown
+            value={selectedLanguage}
+            options={languageOptions}
+            onSelect={handleLanguageSelect}
+            placeholder={t('Simulations.language')}
+            isOpen={isLanguageDropdownOpen}
+            setIsOpen={setIsLanguageDropdownOpen}
+            disabled={languageOptions.length === 0 || isCreatingRoom}
           />
-        )}
+        </View>
 
-        {!videoUrl && !!imageUrl && (
-          <Image source={{uri: imageUrl}} style={styles.cover} />
-        )}
+        <View style={styles.imageContainer}>
+          {!!videoUrl && (
+            <VideoPreview
+              videoUrl={videoUrl}
+              autoPlay={false}
+              shouldPause={!isFocused}
+              testID="scenario-video-preview"
+            />
+          )}
+
+          {!videoUrl && !!imageUrl && (
+            <Image source={{uri: imageUrl}} style={styles.cover} />
+          )}
+        </View>
 
         <View style={styles.row}>
           <Text style={styles.cardTitle}>{scenario.title || ''}</Text>
@@ -211,6 +283,10 @@ const styles = ScaledSheet.create({
   container: {
     paddingHorizontal: '16@ms',
     paddingBottom: '90@ms',
+  },
+  imageContainer: {
+    position: 'relative',
+    marginBottom: '12@ms',
   },
   cover: {
     width: '100%',
@@ -327,5 +403,19 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.label.large,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  languageDropdownContainer: {
+    marginBottom: '12@ms',
+    paddingHorizontal: '0@ms',
+  },
+  languageSection: {
+    marginBottom: '16@ms',
+  },
+  languageLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: colors.black,
+    fontSize: '14@ms',
+    marginBottom: '8@ms',
+    fontWeight: '500',
   },
 });

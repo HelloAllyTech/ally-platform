@@ -97,7 +97,7 @@ const styles = ScaledSheet.create({
     width: '100%',
     borderRadius: '12@ms',
     backgroundColor: colors.ds.whiteAlpha[50],
-    borderWidth: '1.5@ms',
+    borderWidth: '6@ms',
     borderColor: 'transparent',
   },
   activeContainerBorder: {
