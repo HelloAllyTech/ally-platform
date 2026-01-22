@@ -13,3 +13,4 @@ export * from './simulationsApi';
 export * from './badgesApi';
 export * from './reactionsApi';
 export * from './reviewsApi';
+export * from './userApi';

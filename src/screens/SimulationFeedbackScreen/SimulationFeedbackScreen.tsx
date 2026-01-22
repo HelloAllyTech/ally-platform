@@ -88,6 +88,7 @@ export const SimulationFeedbackScreen: React.FC<
       pollingInterval,
     },
   );
+  const {showToast} = useToast();
 
   useEffect(() => {
     if (
@@ -106,6 +107,12 @@ export const SimulationFeedbackScreen: React.FC<
     nextSimulationPollingAttemptsRef.current = 0;
   }, [scenarioSessionId]);
 
+  useEffect(() => {
+    if (simulationDetails?.details?.summary?.errorMessage) {
+      showToast(simulationDetails.details.summary.errorMessage, 'error');
+    }
+  }, [showToast, simulationDetails?.details?.summary?.errorMessage]);
+
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
@@ -120,7 +127,6 @@ export const SimulationFeedbackScreen: React.FC<
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
-  const {showToast} = useToast();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -417,9 +423,9 @@ export const SimulationFeedbackScreen: React.FC<
     );
   };
   const showTranscript = !isSimulationDetailsLoading && !showSummary;
-  const disableDropdown =
-    !fromLogs ||
-    !permissions?.includes(USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES);
+  const hasScenarioMessagesPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+  );
 
   return (
     <SafeAreaView
@@ -437,28 +443,27 @@ export const SimulationFeedbackScreen: React.FC<
             </TouchableOpacity>
           )}
           <View style={globalStyles.column}>
-            <TouchableOpacity
-              style={[
-                globalStyles.rowCenter,
-                !fromLogs && styles.titleExtraPadding,
-              ]}
-              onPress={onHeaderPress}
-              disabled={disableDropdown}
-              activeOpacity={0.8}>
-              {renderTitle()}
-              {fromLogs && (
+            {hasScenarioMessagesPermission && (
+              <TouchableOpacity
+                style={[
+                  globalStyles.rowCenter,
+                  !fromLogs && styles.titleExtraPadding,
+                ]}
+                onPress={onHeaderPress}
+                activeOpacity={0.8}>
+                {renderTitle()}
                 <View style={styles.arrowDownContainer}>
                   <ArrowDown width={9} height={5} />
                 </View>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
             {fromLogs && simulationDetails?.metadata?.sessionName && (
               <Text style={styles.subTitle}>
                 {simulationDetails.metadata.sessionName}
               </Text>
             )}
           </View>
-          {!!reviewId && (
+          {!!reviewId && !showSummary && (
             <TouchableOpacity
               onPress={handleViewReview}
               style={styles.reviewIconButton}

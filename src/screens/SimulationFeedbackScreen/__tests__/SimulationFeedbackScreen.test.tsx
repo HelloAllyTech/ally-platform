@@ -43,6 +43,7 @@ jest.mock('@/assets', () => {
     ArrowDown: () => <Text testID="arrow-down" />,
     ChevronDown: () => <Text testID="chevron-down" />,
     LeftArrowIcon: () => <Text testID="left-arrow-icon" />,
+    CommentIcon: () => <Text testID="comment-icon" />,
   };
 });
 
