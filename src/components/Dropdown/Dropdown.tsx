@@ -89,7 +89,7 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
 
   const dynamicStyles = {
     mainContainer: {
-      zIndex: isOpen ? zIndex : 1,
+      zIndex: isOpen ? zIndex : 0,
     },
   };
 
