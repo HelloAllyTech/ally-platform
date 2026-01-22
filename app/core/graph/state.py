@@ -95,30 +95,38 @@ class BranchingAndFeedbackData:
     ]  # For LLM guidance (conversation direction)
     feedback: Optional[EventFeedback]  # For UI display (user feedback)
     score: int  # Event score for priority selection
+    event_id: str
 
 
 def add_branching_and_feedback_data(
     left: List[BranchingAndFeedbackData], right: List[BranchingAndFeedbackData]
 ) -> List[BranchingAndFeedbackData]:
     """
-    Reducer to accumulate or clear branching and feedback data.
+    Reducer for `branching_and_feedback_data` that
+     handles both accumulation and clearing.
 
-    When data is provided (right has items), accumulate with existing data.
-    When an empty list is provided (right is empty), clear all data.
-
-    This allows the generate_response node to clear branching_and_feedback_data
-    after processing by returning an empty list.
+    Behaviors:
+    1. Clear State: If `right` is an empty list, the state is reset to an empty list.
+       This is typically used by `generate_response` to clear processed data after use.
+    2. Accumulate & Deduplicate: If `right`contains data,
+       it is merged with `left`.
+       The result is deduplicated by `event_id` (keeping the first occurrence)
+       to prevent duplicate entries if the graph execution loops
+        or processes redundant events.
 
     Args:
-        left: Existing branching and feedback data in state
-        right: New data to add (or empty list to clear)
+        left: The existing list of data in the state.
+        right: The new list of data to merge, or an empty list to trigger a clear.
 
     Returns:
-        Accumulated data, or empty list if right was empty
+        List[BranchingAndFeedbackData]: The unified,
+        deduplicated list, or an empty list.
+
     """
     if not right:
-        return right  # Clear: replace with empty list
-    return left + right  # Accumulate: add new data to existing ones
+        return []
+    # TODO: find the duplication and remove unique by
+    return unique_by(left + right, key=lambda x: x.event_id)
 
 
 def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional[str]:

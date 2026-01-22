@@ -138,6 +138,7 @@ class TestGenerateResponse:
                         emoji=":)", message="Low", show_feedback=True
                     ),
                     score=2,
+                    event_id="e1",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=high_inst,  # Highest magnitude
@@ -145,6 +146,7 @@ class TestGenerateResponse:
                         emoji=":(", message="High", show_feedback=True
                     ),
                     score=-10,
+                    event_id="e2",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=medium_inst,
@@ -152,6 +154,7 @@ class TestGenerateResponse:
                         emoji=":D", message="Medium", show_feedback=True
                     ),
                     score=5,
+                    event_id="e3",
                 ),
             ],
         )
@@ -220,6 +223,7 @@ class TestGenerateResponse:
                         emoji=":)", message="Good", show_feedback=True
                     ),
                     score=5,
+                    event_id="e1",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=None,
@@ -227,6 +231,7 @@ class TestGenerateResponse:
                         emoji=":D", message="Great", show_feedback=True
                     ),
                     score=3,
+                    event_id="e2",
                 ),
             ],
         )
@@ -521,6 +526,7 @@ class TestGenerateResponse:
                         emoji=":)", message="Great job!", show_feedback=True
                     ),
                     score=10,
+                    event_id="e1",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=None,
@@ -528,6 +534,7 @@ class TestGenerateResponse:
                         emoji=":D", message="Excellent", show_feedback=True
                     ),
                     score=15,  # Higher score but no branching instruction
+                    event_id="e2",
                 ),
             ],
         )
@@ -599,6 +606,7 @@ class TestGenerateResponse:
                         emoji=":)", message="Good", show_feedback=True
                     ),
                     score=5,
+                    event_id="e1",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=None,
@@ -606,6 +614,7 @@ class TestGenerateResponse:
                         emoji=":D", message="Excellent", show_feedback=True
                     ),
                     score=15,  # Highest score
+                    event_id="e2",
                 ),
                 BranchingAndFeedbackData(
                     branching_instruction=None,
@@ -613,6 +622,7 @@ class TestGenerateResponse:
                         emoji=":(", message="Bad", show_feedback=True
                     ),
                     score=-10,  # Highest magnitude (negative)
+                    event_id="e3",
                 ),
             ],
         )
@@ -681,6 +691,7 @@ class TestGenerateResponse:
                         emoji=None, message=None, show_feedback=True
                     ),
                     score=10,  # Score exists but no message
+                    event_id="e1",
                 ),
             ],
         )

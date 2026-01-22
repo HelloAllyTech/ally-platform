@@ -55,6 +55,12 @@ class CustomUIEventMessageTypeData(BaseModel):
     emoji: Optional[str] = Field(..., description="Event emoji")
     message: Optional[str] = Field(..., description="Event message")
     show_feedback: bool = Field(..., description="Show feedback button")
+    event_id: Optional[str] = Field(
+        None, description="ID of the event that triggered feedback"
+    )
+    detected_event_ids: Optional[list[str]] = Field(
+        None, description="List of all detected event IDs"
+    )
 
 
 class CoreEventType(BaseModel):
@@ -125,6 +131,7 @@ class CustomUIEventMessageType(BaseModel):
         message: Optional[str],
         timestamp: Optional[str] = None,
         show_feedback: Optional[bool] = True,
+        detected_event_ids: Optional[list[str]] = None,
     ) -> "CustomUIEventMessageType":
         """Create a custom event with current timestamp."""
         if timestamp is None:
@@ -133,7 +140,11 @@ class CustomUIEventMessageType(BaseModel):
         return cls(
             version="1.0",
             data=CustomUIEventMessageTypeData(
-                score=score, emoji=emoji, message=message, show_feedback=show_feedback
+                score=score,
+                emoji=emoji,
+                message=message,
+                show_feedback=show_feedback,
+                detected_event_ids=detected_event_ids,
             ),
             timestamp=timestamp,
         )

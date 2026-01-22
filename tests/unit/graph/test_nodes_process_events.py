@@ -84,6 +84,7 @@ class TestProcessEvents:
                                 emoji=":)", message="Probe", show_feedback=True
                             ),
                             score=3,
+                            event_id="test_event_id",
                         )
                     ],
                 )
@@ -134,6 +135,7 @@ class TestProcessEvents:
                         emoji=":)", message="Time", show_feedback=True
                     ),
                     score=5,
+                    event_id="time_event_id",
                 )
             ],
         )
@@ -152,6 +154,7 @@ class TestProcessEvents:
                                 emoji=":D", message="Event", show_feedback=True
                             ),
                             score=3,
+                            event_id="event_instruction_id",
                         )
                     ],
                 )

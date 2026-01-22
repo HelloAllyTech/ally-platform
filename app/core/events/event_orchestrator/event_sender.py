@@ -102,6 +102,7 @@ class EventSender:
                 branching_instruction=event.branching_instruction,
                 feedback=feedback,
                 score=event.score if event.score is not None else 0,
+                event_id=event.event_id,
             )
 
             data_list.append(data)

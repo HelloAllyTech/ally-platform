@@ -53,6 +53,7 @@ class TestResolveBranchingInstruction:
                 branching_instruction=instruction,
                 feedback=EventFeedback(emoji="💪", message="Exercise time"),
                 score=10,
+                event_id="test_event_id",
             ),
         ]
 
@@ -80,6 +81,7 @@ class TestResolveBranchingInstruction:
                 branching_instruction=instruction,
                 feedback=EventFeedback(emoji="👍", message="Good"),
                 score=10,
+                event_id="test_event_id",
             ),
         ]
 

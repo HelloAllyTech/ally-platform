@@ -144,3 +144,24 @@ class TestUIEventSender:
 
         assert sent["data"]["emoji"] == "🎉"
         assert sent["data"]["show_feedback"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_event_with_detected_event_ids(self):
+        """Test that detected_event_ids are passed through."""
+        room = FakeRoom()
+        event_ids = ["event1", "event2"]
+        evt = CustomUIEventMessageType.create(
+            score=10,
+            emoji="✅",
+            message="Events detected",
+            show_feedback=True,
+            detected_event_ids=event_ids,
+        )
+
+        ok = await send_event_to_ui(evt, room)
+        assert ok is True
+
+        payload = room.local_participant.published[-1]
+        sent = json.loads(payload["data"].decode("utf-8"))
+
+        assert sent["data"]["detected_event_ids"] == event_ids

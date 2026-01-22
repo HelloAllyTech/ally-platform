@@ -437,6 +437,7 @@ async def generate_response(
                 )
                 logger.info(f"     ➜ Cumulative score: {cumulative_score}")
 
+                detected_event_ids = [ed.event_id for ed in active_events_data]
                 # Handle feedback message - assign empty string if not present
                 # Even if ACTIVE events exist, they may not have feedback messages
                 if feedback_to_send:
@@ -468,6 +469,7 @@ async def generate_response(
                         "%Y-%m-%dT%H:%M:%S.%fZ"
                     ),
                     show_feedback=show_feedback,
+                    detected_event_ids=detected_event_ids,
                 )
 
                 logger.info("Sending feedback to UI:")
