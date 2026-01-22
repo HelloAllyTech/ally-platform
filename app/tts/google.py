@@ -331,3 +331,68 @@ Examples:
 
             self._tts_instance = google.TTS(**tts_kwargs)
         return self._tts_instance
+
+    def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
+        """
+        Apply validated parameters dict to Google TTS instance.
+
+        Google TTS update_options() only supports 'speaking_rate' parameter.
+        Other parameters like 'pitch' and 'volume_gain_db' are not supported
+        via update_options() and should be handled via SSML in the text input.
+
+        Args:
+            params_dict: Validated dict with parameter names as keys
+        """
+        try:
+            if self.tts_instance is None:
+                logger.warning(
+                    "[Google TTS] Cannot apply parameters: TTS instance is None"
+                )
+                return
+
+            if not params_dict:
+                logger.debug("[Google TTS] No parameters to apply (empty dict)")
+                return
+
+            # Google TTS update_options() only supports 'speaking_rate'
+            # Filter out unsupported parameters
+            supported_params = {}
+            unsupported_params = []
+
+            if "speaking_rate" in params_dict:
+                supported_params["speaking_rate"] = params_dict["speaking_rate"]
+
+            # Log warnings for unsupported parameters
+            for param_name in ["pitch", "volume_gain_db"]:
+                if param_name in params_dict:
+                    unsupported_params.append(param_name)
+                    logger.warning(
+                        f"[Google TTS] Parameter '{param_name}' is not supported "
+                        f"via update_options(). Use SSML prosody tags in text "
+                        f"input instead. See TEXT_ENHANCEMENT_METADATA for details."
+                    )
+
+            # Apply only supported parameters
+            if supported_params:
+                if hasattr(self.tts_instance, "update_options"):
+                    self.tts_instance.update_options(**supported_params)
+                    logger.debug(
+                        f"[Google TTS] Successfully updated options: "
+                        f"{supported_params}"
+                    )
+                else:
+                    logger.warning(
+                        "[Google TTS] TTS instance does not have "
+                        "update_options() method"
+                    )
+            elif unsupported_params:
+                logger.info(
+                    f"[Google TTS] No supported parameters to apply. "
+                    f"Unsupported parameters: {unsupported_params}. "
+                    f"Use SSML prosody tags in text input instead."
+                )
+
+        except Exception as e:
+            logger.error(
+                f"[Google TTS] Failed to update TTS options: {e}", exc_info=True
+            )
