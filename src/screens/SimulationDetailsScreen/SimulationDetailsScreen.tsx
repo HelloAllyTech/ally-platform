@@ -24,15 +24,12 @@ import {isIOS, LOW_CREDITS_MODAL_DISPLAY_MS} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
+  useLanguageDropdown,
   useSimulationCredits,
   useStartSimulation,
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {
-  useGetAvailableLanguagesQuery,
-  useGetUserPreferencesQuery,
-} from '@/services';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
@@ -58,53 +55,16 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   } = useStartSimulation();
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
-  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
-  const [languageOptions, setLanguageOptions] = useState<string[]>([]);
-  const [languageMap, setLanguageMap] = useState<Map<string, number>>(
-    new Map(),
-  );
 
-  // Fetch available languages
-  const {data: languagesData} = useGetAvailableLanguagesQuery({
-    active: true,
-    hasVoices: true,
-  });
-
-  // Fetch user preferences to get default language
-  const {data: preferencesData, refetch: refetchPreferences} =
-    useGetUserPreferencesQuery();
-
-  // Refetch preferences when screen is focused
-  useEffect(() => {
-    if (isFocused) {
-      refetchPreferences();
-    }
-  }, [isFocused, refetchPreferences]);
-
-  // Initialize languages
-  useEffect(() => {
-    if (languagesData && Array.isArray(languagesData)) {
-      const options = languagesData.map(lang => lang.label);
-      const map = new Map(
-        languagesData.map(lang => [lang.label, lang.language_id]),
-      );
-      setLanguageOptions(options);
-      setLanguageMap(map);
-
-      // Set default language from user preferences or first option
-      if (preferencesData?.data?.default_language_id && languagesData) {
-        const selectedLang = languagesData.find(
-          lang => lang.language_id === preferencesData.data.default_language_id,
-        );
-        if (selectedLang) {
-          setSelectedLanguage(selectedLang.label);
-        }
-      } else if (options.length > 0) {
-        setSelectedLanguage(options[0]);
-      }
-    }
-  }, [languagesData, preferencesData]);
+  // Use custom hook for language dropdown management
+  const {
+    selectedLanguage,
+    setSelectedLanguage,
+    isLanguageDropdownOpen,
+    setIsLanguageDropdownOpen,
+    languageOptions,
+    languageMap,
+  } = useLanguageDropdown({isFocused});
 
   useEffect(() => {
     if (getCreditsInfo?.isLow) {

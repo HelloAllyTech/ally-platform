@@ -3,14 +3,23 @@ import {
   BottomSheetFlatList,
   BottomSheetFooter,
   BottomSheetFooterProps,
-  BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
-import {LeftArrow, LeftArrowIcon} from '@/assets/icons';
-import {BottomSheet, ReviewComment} from '@/components';
+import {LeftArrow} from '@/assets/icons';
+import {
+  BottomSheet,
+  CommentBottomSheetFooter,
+  ReviewComment,
+} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useLazyGetCommentRepliesQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
@@ -22,51 +31,6 @@ import {styles} from './styles';
 import {ReplyBottomSheetProps} from './types';
 
 const LIMIT = 20;
-
-// Memoized footer content to prevent remounting while allowing re-renders
-const FooterContent = React.memo<{
-  replyText: string;
-  setReplyText: (text: string) => void;
-  onSubmitReplyPress?: (text: string) => void;
-  placeholder: string;
-}>(({replyText, setReplyText, onSubmitReplyPress, placeholder}) => {
-  return (
-    <View style={[styles.addReplyContainer, {paddingTop: ms(20)}]}>
-      <View style={styles.addReplyInputContainer}>
-        <BottomSheetTextInput
-          style={styles.addReplyInput}
-          placeholder={placeholder}
-          placeholderTextColor={colors.ds.typography.mediumEmphasis}
-          value={replyText}
-          onChangeText={setReplyText}
-          multiline={false}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            !replyText.trim() && styles.sendButtonDisabled,
-          ]}
-          onPress={() => {
-            if (replyText.trim()) {
-              onSubmitReplyPress?.(replyText);
-              setReplyText('');
-            }
-          }}
-          disabled={!replyText.trim()}
-          activeOpacity={0.7}>
-          <LeftArrowIcon
-            color={colors.white}
-            width={32}
-            height={32}
-            style={styles.arrowIcon}
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-});
-
-FooterContent.displayName = 'FooterContent';
 
 export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   visible,
@@ -89,7 +53,14 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   } | null>(null);
   const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
-  const currentCommentIdRef = useRef<string>('');
+
+  // Dismiss keyboard when bottom sheet closes
+  useEffect(() => {
+    if (!visible) {
+      Keyboard.dismiss();
+      setReplyText('');
+    }
+  }, [visible]);
 
   // Common function to handle API response and update state
   const handleApiResponse = useCallback(
@@ -125,7 +96,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         offsetRef.current = 0;
         setReplies(null);
         setHasMore(false);
-        currentCommentIdRef.current = commentId;
         const result = await getCommentReplies({
           commentId,
           offset: 0,
@@ -138,7 +108,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         setReplies(null);
         offsetRef.current = 0;
         setHasMore(false);
-        currentCommentIdRef.current = '';
       }
     };
 
@@ -190,6 +159,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('ReplyBottomSheet.title')}</Text>
+        <View style={styles.headerSpacer} />
       </View>
     );
   }, [hideReplyBottomSheet, t]);
@@ -295,12 +265,13 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       return (
         <BottomSheetFooter
           animatedFooterPosition={props.animatedFooterPosition}
-          bottomInset={current.insetsBottom}>
-          <FooterContent
-            replyText={current.replyText}
-            setReplyText={current.setReplyText}
-            onSubmitReplyPress={current.onSubmitReplyPress}
+          bottomInset={0}>
+          <CommentBottomSheetFooter
+            text={current.replyText}
+            setText={current.setReplyText}
+            onSubmit={current.onSubmitReplyPress}
             placeholder={current.placeholderText}
+            bottomInset={current.insetsBottom}
           />
         </BottomSheetFooter>
       );
