@@ -133,7 +133,7 @@ export interface Thread {
   id: string;
   comments: MessageThreadComment[];
   commentCount: number;
-  selectedText?: string;
+  message?: MessageData;
 }
 
 export interface RepliesParams {

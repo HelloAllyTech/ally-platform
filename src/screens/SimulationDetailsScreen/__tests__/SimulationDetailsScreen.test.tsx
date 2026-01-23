@@ -13,18 +13,6 @@ jest.mock('@react-navigation/native', () => ({
 const mockStartSimulation = jest.fn();
 const mockCloseActiveSimulationModal = jest.fn();
 
-// Define mock data outside mocks to ensure consistent references
-const mockLanguagesData = [
-  {
-    language_id: 1,
-    label: 'English',
-    active: true,
-    translationCode: 'en',
-    value: 'en-IN',
-  },
-];
-
-const mockPreferencesData = {data: {default_language_id: 1}};
 
 jest.mock('@/hooks', () => {
   const mockNavigate = jest.fn();
@@ -45,6 +33,15 @@ jest.mock('@/hooks', () => {
       startSimulation: mockStartSimulation,
       closeActiveSimulationModal: mockCloseActiveSimulationModal,
       setShowActiveSimulationModal: jest.fn(),
+    }),
+    useLanguageDropdown: () => ({
+      selectedLanguage: 'English',
+      setSelectedLanguage: jest.fn(),
+      isLanguageDropdownOpen: false,
+      setIsLanguageDropdownOpen: jest.fn(),
+      languageOptions: ['English'],
+      languageMap: new Map([['English', 1]]),
+      isLoading: false,
     }),
   };
 });
@@ -105,18 +102,6 @@ jest.mock('@/services', () => ({
     data: undefined,
     isLoading: false,
   })),
-  useGetAvailableLanguagesQuery: jest.fn(() => ({
-    data: mockLanguagesData,
-  })),
-  useGetUserPreferencesQuery: jest.fn(() => ({
-    data: mockPreferencesData,
-    refetch: jest.fn().mockResolvedValue({data: mockPreferencesData}),
-  })),
-  useLazyGetUserPreferencesQuery: jest.fn(() => [
-    jest.fn().mockResolvedValue({data: mockPreferencesData}),
-    {data: mockPreferencesData},
-  ]),
-  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [jest.fn()]),
 }));
 
 describe('SimulationDetailsScreen', () => {

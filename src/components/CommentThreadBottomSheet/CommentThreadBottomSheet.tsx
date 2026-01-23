@@ -3,14 +3,23 @@ import {
   BottomSheetFlatList,
   BottomSheetFooter,
   BottomSheetFooterProps,
-  BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
-import {LeftArrow, LeftArrowIcon} from '@/assets/icons';
-import {BottomSheet, ReviewComment} from '@/components';
+import {LeftArrow} from '@/assets/icons';
+import {
+  BottomSheet,
+  CommentBottomSheetFooter,
+  ReviewComment,
+} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useLazyGetThreadCommentsQuery} from '@/services/reviewsApi';
 import {colors} from '@/theme';
@@ -22,51 +31,6 @@ import {styles} from './styles';
 import {CommentThreadBottomSheetProps} from './types';
 
 const LIMIT = 20;
-
-// Memoized footer content to prevent remounting while allowing re-renders
-const FooterContent = React.memo<{
-  commentText: string;
-  setCommentText: (text: string) => void;
-  onSubmitComment?: (text: string) => void;
-  placeholder: string;
-}>(({commentText, setCommentText, onSubmitComment, placeholder}) => {
-  return (
-    <View style={[styles.addCommentContainer, {paddingTop: ms(20)}]}>
-      <View style={styles.addCommentInputContainer}>
-        <BottomSheetTextInput
-          style={styles.addCommentInput}
-          placeholder={placeholder}
-          placeholderTextColor={colors.ds.typography.mediumEmphasis}
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline={false}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            !commentText.trim() && styles.sendButtonDisabled,
-          ]}
-          onPress={() => {
-            if (commentText.trim()) {
-              onSubmitComment?.(commentText);
-              setCommentText('');
-            }
-          }}
-          disabled={!commentText.trim()}
-          activeOpacity={0.7}>
-          <LeftArrowIcon
-            color={colors.white}
-            width={32}
-            height={32}
-            style={styles.arrowIcon}
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-});
-
-FooterContent.displayName = 'FooterContent';
 
 export const CommentThreadBottomSheet: React.FC<
   CommentThreadBottomSheetProps
@@ -90,13 +54,15 @@ export const CommentThreadBottomSheet: React.FC<
   } | null>(null);
   const [hasMore, setHasMore] = React.useState(false);
   const [commentText, setCommentText] = useState('');
-  const commentTextRef = React.useRef(commentText);
-  const currentThreadIdRef = React.useRef<string>('');
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
-  // Keep ref in sync with state
-  React.useEffect(() => {
-    commentTextRef.current = commentText;
-  }, [commentText]);
+  // Dismiss keyboard when bottom sheet closes
+  useEffect(() => {
+    if (!visible) {
+      Keyboard.dismiss();
+      setCommentText('');
+    }
+  }, [visible]);
 
   // Common function to handle API response and update state
   const handleApiResponse = useCallback(
@@ -121,6 +87,7 @@ export const CommentThreadBottomSheet: React.FC<
         }
         return updated;
       });
+      setHasLoadedOnce(true);
     },
     [threadId],
   );
@@ -132,7 +99,7 @@ export const CommentThreadBottomSheet: React.FC<
         offsetRef.current = 0;
         setComments(null);
         setHasMore(false);
-        currentThreadIdRef.current = threadId;
+        setHasLoadedOnce(false);
         const result = await getThreadComments({
           threadId,
           offset: 0,
@@ -140,12 +107,15 @@ export const CommentThreadBottomSheet: React.FC<
         });
         if (result.data) {
           handleApiResponse(result.data, threadId);
+        } else {
+          // If no data returned, mark as loaded to show empty state
+          setHasLoadedOnce(true);
         }
       } else {
         setComments(null);
         offsetRef.current = 0;
         setHasMore(false);
-        currentThreadIdRef.current = '';
+        setHasLoadedOnce(false);
       }
     };
 
@@ -202,6 +172,7 @@ export const CommentThreadBottomSheet: React.FC<
         <Text style={styles.headerTitle}>
           {t('CommentThreadBottomSheet.title')}
         </Text>
+        <View style={styles.headerSpacer} />
       </View>
     );
   }, [hideCommentThreadBottomSheet, t]);
@@ -217,7 +188,8 @@ export const CommentThreadBottomSheet: React.FC<
   }, [isFetching, insets.bottom, hasMore]);
 
   const renderEmpty = useCallback(() => {
-    if (isLoading) {
+    // Only show loading or empty state if we've loaded at least once to prevent the flash of "no comments" before initial load
+    if (!hasLoadedOnce || isLoading) {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.ds.theme.primary} />
@@ -231,7 +203,7 @@ export const CommentThreadBottomSheet: React.FC<
         </Text>
       </View>
     );
-  }, [isLoading, t]);
+  }, [isLoading, hasLoadedOnce, t]);
 
   const loadMore = useCallback(async () => {
     if (!visible) return;
@@ -289,12 +261,13 @@ export const CommentThreadBottomSheet: React.FC<
       return (
         <BottomSheetFooter
           animatedFooterPosition={props.animatedFooterPosition}
-          bottomInset={current.insetsBottom}>
-          <FooterContent
-            commentText={current.commentText}
-            setCommentText={current.setCommentText}
-            onSubmitComment={current.onSubmitComment}
+          bottomInset={0}>
+          <CommentBottomSheetFooter
+            text={current.commentText}
+            setText={current.setCommentText}
+            onSubmit={current.onSubmitComment}
             placeholder={current.placeholderText}
+            bottomInset={current.insetsBottom}
           />
         </BottomSheetFooter>
       );
