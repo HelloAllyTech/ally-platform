@@ -56,7 +56,9 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         {/* Header: Name and Time */}
         <View style={styles.headerRow}>
           <View style={styles.nameTimeRow}>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+              {name}
+            </Text>
             <Text style={styles.timeAgo}>{time}</Text>
           </View>
         </View>
@@ -110,7 +112,8 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
             <TouchableOpacity
               style={styles.repliesButton}
               onPress={onReplyPress}
-              activeOpacity={0.7}>
+              activeOpacity={0.7}
+              hitSlop={10}>
               <Text style={styles.likeText}>{t('ReviewComment.reply')}</Text>
             </TouchableOpacity>
           )}
@@ -120,7 +123,8 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
             <TouchableOpacity
               style={styles.repliesButton}
               onPress={onReplyPress}
-              activeOpacity={0.7}>
+              activeOpacity={0.7}
+              hitSlop={10}>
               <Text style={styles.repliesText}>{getRepliesText()}</Text>
             </TouchableOpacity>
           )}

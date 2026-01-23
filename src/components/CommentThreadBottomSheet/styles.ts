@@ -13,19 +13,26 @@ export const styles = ScaledSheet.create({
     paddingHorizontal: '24@s',
     paddingTop: '8@vs',
     paddingBottom: '8@mvs',
-    gap: '11@s',
+    position: 'relative',
   },
   backButton: {
     padding: '8@s',
     marginLeft: '-8@s',
+    zIndex: 1,
   },
   headerTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '18@ms',
     lineHeight: '32@ms',
     color: colors.ds.typography.highEmphasis,
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
     textAlign: 'center',
+  },
+  headerSpacer: {
+    width: '28@s', // Approximate width of back button (12 + 8*2 padding)
+    zIndex: 1,
   },
   listContent: {
     paddingHorizontal: '24@s',
@@ -55,12 +62,9 @@ export const styles = ScaledSheet.create({
     color: colors.ds.typography.mediumEmphasis,
   },
   addCommentContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: '24@s',
     paddingTop: '16@vs',
+    paddingBottom: 0,
     backgroundColor: colors.white,
   },
   addCommentInputContainer: {

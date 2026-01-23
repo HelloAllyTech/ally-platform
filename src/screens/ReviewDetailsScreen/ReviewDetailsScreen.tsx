@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
 import {ActivityIndicator, SafeAreaView, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -33,6 +33,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
   const route = useRoute<any>();
   const {reviewId: _reviewId} = route.params || {};
+  const currentMessageIdRef = useRef<string | null>(null);
 
   // State management
   const [offset, setOffset] = useState(0);
@@ -313,14 +314,51 @@ export const ReviewDetailsScreen: React.FC = () => {
   }, []);
 
   const handleMessageThreadPress = useCallback(
-    (threadId: string) => {
+    (threadId: string, messageId: string) => {
       // Close message threads bottom sheet and open comment thread bottom sheet
+      currentMessageIdRef.current = messageId;
       setIsMessageThreadsVisible(false);
       onThreadPress(threadId);
     },
     [onThreadPress],
   );
 
+  const handleHideCommentThreadBottomSheet = () => {
+    if (currentMessageIdRef.current) {
+      setIsMessageThreadsVisible(true);
+      setSelectedMessageForThreads(currentMessageIdRef.current);
+    }
+    hideCommentThreadBottomSheet({
+      shouldShowThreadsBottomSheet: !!currentMessageIdRef.current,
+    });
+  };
+
+  const handleSubmitThreadComment = useCallback(
+    async (commentText: string) => {
+      if (!commentText || !selectedThreadId) {
+        return;
+      }
+
+      try {
+        const payload = {
+          reviewId: _reviewId,
+          content: commentText,
+          threadId: selectedThreadId,
+        };
+
+        const response = await addReviewComment(payload);
+
+        if (response.data?.commentId) {
+          // TODO_M: logic to update comments state
+        }
+      } catch (error) {
+        console.error('Failed to add comment:', error);
+      } finally {
+        resetCommentInput();
+      }
+    },
+    [selectedThreadId, addReviewComment, resetCommentInput, _reviewId],
+  );
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
     if (!selectedMessageForThreads) return [];
@@ -390,7 +428,10 @@ export const ReviewDetailsScreen: React.FC = () => {
         visible={isMessageThreadsVisible}
         onClose={handleCloseMessageThreads}
         messageId={selectedMessageForThreads || ''}
-        reviewId={_reviewId}
+        message={
+          conversationMessages.find(m => m.id === selectedMessageForThreads)
+            ?.content || ''
+        }
         threads={selectedMessageThreads}
         onThreadPress={handleMessageThreadPress}
       />
@@ -404,8 +445,9 @@ export const ReviewDetailsScreen: React.FC = () => {
         onReplyPress={onReplyPress}
         onSubmitComment={_commentText => {
           // Handle add comment press
+          handleSubmitThreadComment(_commentText);
         }}
-        hideCommentThreadBottomSheet={hideCommentThreadBottomSheet}
+        hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
