@@ -20,8 +20,11 @@ import {
   CommentBottomSheetFooter,
   ReviewComment,
 } from '@/components';
-import {useTranslate} from '@/hooks';
-import {useLazyGetThreadCommentsQuery} from '@/services/reviewsApi';
+import {useTranslate, useUser} from '@/hooks';
+import {
+  useAddReviewCommentMutation,
+  useLazyGetThreadCommentsQuery,
+} from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
@@ -37,17 +40,22 @@ export const CommentThreadBottomSheet: React.FC<
 > = ({
   visible,
   onClose,
+  reviewId,
   threadId,
   onAddReactionPress,
   onReplyPress,
-  onSubmitComment,
   hideCommentThreadBottomSheet,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
-  const [getThreadComments, {isLoading, isFetching}] =
-    useLazyGetThreadCommentsQuery();
   const offsetRef = React.useRef(0);
+  const {userData} = useUser();
+  const {
+    id: userId,
+    name: userName,
+    profileImageUrl: userProfileImage,
+  } = userData || {};
+
   const [comments, setComments] = React.useState<{
     data: MessageThreadComment[];
     count: number;
@@ -55,6 +63,12 @@ export const CommentThreadBottomSheet: React.FC<
   const [hasMore, setHasMore] = React.useState(false);
   const [commentText, setCommentText] = useState('');
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+
+  const [getThreadComments, {isLoading, isFetching}] =
+    useLazyGetThreadCommentsQuery();
+
+  const [addReviewComment, {isLoading: isAddingComment}] =
+    useAddReviewCommentMutation();
 
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
@@ -127,6 +141,56 @@ export const CommentThreadBottomSheet: React.FC<
       onReplyPress?.(comment);
     },
     [onReplyPress],
+  );
+
+  const onSubmitComment = useCallback(
+    async (comment: string) => {
+      if (!comment || !threadId) {
+        return;
+      }
+
+      try {
+        const payload = {
+          reviewId: reviewId,
+          content: comment,
+          threadId: threadId,
+        };
+
+        const newCommentObj: MessageThreadComment = {
+          id: '',
+          content: comment,
+          createdBy: {
+            id: userId?.toString(),
+            name: userName,
+            profileImage: userProfileImage,
+          },
+          reactions: {},
+          replyCount: 0,
+        };
+
+        const response = await addReviewComment(payload);
+
+        if (response.data?.comment?.id) {
+          newCommentObj.id = response.data?.comment?.id;
+          newCommentObj.createdAt = response.data?.comment?.createdAt;
+          setComments(prev => {
+            if (prev) {
+              return {
+                data: [...prev.data, newCommentObj],
+                count: prev.count + 1,
+              };
+            }
+            return {data: [newCommentObj], count: 1};
+          });
+        }
+      } catch (error) {
+        console.error('Failed to add comment:', error);
+      } finally {
+        setCommentText('');
+        Keyboard.dismiss();
+      }
+    },
+    [addReviewComment, reviewId, threadId, userId, userName, userProfileImage],
   );
 
   const renderCommentItem = useCallback(
@@ -241,6 +305,7 @@ export const CommentThreadBottomSheet: React.FC<
     onSubmitComment,
     placeholderText,
     insetsBottom: insets.bottom,
+    isLoading: isAddingComment,
   });
 
   // Update ref synchronously (not in useEffect) to ensure current values
@@ -250,6 +315,7 @@ export const CommentThreadBottomSheet: React.FC<
     onSubmitComment,
     placeholderText,
     insetsBottom: insets.bottom,
+    isLoading: isAddingComment,
   };
 
   // Completely stable callback - reference never changes
@@ -268,6 +334,7 @@ export const CommentThreadBottomSheet: React.FC<
             onSubmit={current.onSubmitComment}
             placeholder={current.placeholderText}
             bottomInset={current.insetsBottom}
+            isLoading={current.isLoading}
           />
         </BottomSheetFooter>
       );

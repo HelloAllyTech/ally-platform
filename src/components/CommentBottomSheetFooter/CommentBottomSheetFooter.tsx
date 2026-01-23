@@ -1,6 +1,6 @@
 import React from 'react';
 import {BottomSheetTextInput} from '@gorhom/bottom-sheet';
-import {TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, TouchableOpacity, View} from 'react-native';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {colors} from '@/theme';
@@ -13,12 +13,20 @@ export interface CommentBottomSheetFooterProps {
   onSubmit?: (text: string) => void;
   placeholder: string;
   bottomInset: number;
+  isLoading?: boolean;
 }
 
 // Memoized footer content to prevent remounting while allowing re-renders
 export const CommentBottomSheetFooter =
   React.memo<CommentBottomSheetFooterProps>(
-    ({text, setText, onSubmit, placeholder, bottomInset}) => {
+    ({
+      text,
+      setText,
+      onSubmit,
+      placeholder,
+      bottomInset,
+      isLoading = false,
+    }) => {
       return (
         <View style={[styles.container, {paddingBottom: bottomInset}]}>
           <View style={styles.inputContainer}>
@@ -41,14 +49,18 @@ export const CommentBottomSheetFooter =
                   setText('');
                 }
               }}
-              disabled={!text.trim()}
+              disabled={!text.trim() || isLoading}
               activeOpacity={0.7}>
-              <LeftArrowIcon
-                color={colors.white}
-                width={32}
-                height={32}
-                style={styles.arrowIcon}
-              />
+              {isLoading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <LeftArrowIcon
+                  color={colors.white}
+                  width={32}
+                  height={32}
+                  style={styles.arrowIcon}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
