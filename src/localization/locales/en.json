@@ -516,7 +516,9 @@
       "comment": "Comment",
       "viewLess": "View less",
       "viewMore": "View more" ,
-      "simulationDetails": "Simulation Details"
+      "simulationDetails": "Simulation Details",
+      "collapse": "Collapse",
+      "noComments": "No comments yet"
     },
     "filters": {
       "all": "All",

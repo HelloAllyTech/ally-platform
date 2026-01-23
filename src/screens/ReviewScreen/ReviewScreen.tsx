@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -35,6 +35,10 @@ export const ReviewScreen: React.FC = () => {
     refresh,
     setSelectedFilter,
   } = useReviews();
+  console.log('🚀 ~ ReviewScreen ~ reviews:', reviews);
+
+  // State for expanded cards
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
   // Refresh reviews when screen comes into focus (skip initial mount)
   useFocusEffect(
@@ -56,6 +60,10 @@ export const ReviewScreen: React.FC = () => {
 
   const handleReviewPress = (reviewId: string) => {
     navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {reviewId});
+  };
+
+  const handleCommentPress = (reviewId: string) => {
+    setExpandedReviewId(prevId => (prevId === reviewId ? null : reviewId));
   };
 
   return (
@@ -87,7 +95,9 @@ export const ReviewScreen: React.FC = () => {
             scenario={item.scenario}
             commentsCount={item.commentsCount}
             onReviewPress={() => handleReviewPress(item.id)}
+            onCommentPress={handleCommentPress}
             reactions={item.reactions}
+            isExpanded={expandedReviewId === item.id}
           />
         )}
         onEndReached={loadMore}
@@ -131,9 +141,9 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.ds.typography.highEmphasis,
     ...typography.display.small,
-    fontWeight: fontWeights.medium,
+    fontWeight: fontWeights.light,
+    color: colors.ds.typography.highEmphasis,
   },
   tabContainer: {
     marginTop: '16@ms',
