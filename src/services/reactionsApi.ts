@@ -26,7 +26,9 @@ export interface ReactionsParams {
 }
 
 export interface ReactionsCountResponse {
-  [reactionCode: string]: number;
+  reactions: {
+    [reactionCode: string]: number;
+  };
 }
 
 export const reactionsApi = api.injectEndpoints({
