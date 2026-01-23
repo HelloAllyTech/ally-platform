@@ -14,7 +14,10 @@ export interface AddReviewCommentRequest {
 }
 
 export interface AddReviewCommentResponse {
-  commentId: string;
+  comment: {
+    id: string;
+    createdAt: string;
+  };
 }
 
 export interface MessageThreadComment {

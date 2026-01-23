@@ -274,10 +274,10 @@ export const ReviewDetailsScreen: React.FC = () => {
 
       const response = await addReviewComment(payload);
 
-      if (response.data?.commentId) {
+      if (response.data?.comment?.id) {
         updateMessage({
           selection: currentHighlightedText,
-          commentId: response.data.commentId,
+          commentId: response.data.comment.id,
           messageId: selectedMessageId,
         });
       }
@@ -327,38 +327,12 @@ export const ReviewDetailsScreen: React.FC = () => {
     if (currentMessageIdRef.current) {
       setIsMessageThreadsVisible(true);
       setSelectedMessageForThreads(currentMessageIdRef.current);
+      hideCommentThreadBottomSheet({shouldShowThreadsBottomSheet: false});
+    } else {
+      hideCommentThreadBottomSheet({shouldShowThreadsBottomSheet: true});
     }
-    hideCommentThreadBottomSheet({
-      shouldShowThreadsBottomSheet: !!currentMessageIdRef.current,
-    });
   };
 
-  const handleSubmitThreadComment = useCallback(
-    async (commentText: string) => {
-      if (!commentText || !selectedThreadId) {
-        return;
-      }
-
-      try {
-        const payload = {
-          reviewId: _reviewId,
-          content: commentText,
-          threadId: selectedThreadId,
-        };
-
-        const response = await addReviewComment(payload);
-
-        if (response.data?.commentId) {
-          // TODO_M: logic to update comments state
-        }
-      } catch (error) {
-        console.error('Failed to add comment:', error);
-      } finally {
-        resetCommentInput();
-      }
-    },
-    [selectedThreadId, addReviewComment, resetCommentInput, _reviewId],
-  );
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
     if (!selectedMessageForThreads) return [];
@@ -438,15 +412,12 @@ export const ReviewDetailsScreen: React.FC = () => {
       <CommentThreadBottomSheet
         visible={isCommentThreadBottomSheetVisible}
         onClose={closeCommentThreadBottomSheet}
+        reviewId={_reviewId}
         threadId={selectedThreadId || ''}
         onAddReactionPress={_commentId => {
           // Handle add reaction press
         }}
         onReplyPress={onReplyPress}
-        onSubmitComment={_commentText => {
-          // Handle add comment press
-          handleSubmitThreadComment(_commentText);
-        }}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
       <ReplyBottomSheet
