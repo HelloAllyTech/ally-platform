@@ -50,6 +50,7 @@ export const styles = ScaledSheet.create({
     gap: '6@s',
   },
   name: {
+    maxWidth: '80%',
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
     lineHeight: '18@ms',
