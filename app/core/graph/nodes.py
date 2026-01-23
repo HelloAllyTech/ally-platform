@@ -401,32 +401,29 @@ async def resolve_branching_instruction(
                     selected_branching_event_data = max(
                         events_with_branching, key=lambda e: abs(e.score)
                     )
-                    branching_instruction_obj = (
-                        selected_branching_event_data.branching_instruction
-                    )
+                    instruction = selected_branching_event_data.branching_instruction
+
+                    # Get language_code and branching_llm_config from scenario
+                    # Use dedicated branching_llm_config for structured output,
+                    # falling back to llm_config if not specified
+                    language_code = DEFAULT_LANGUAGE_CODE
+                    llm_config_for_branching = None
+                    if config and "configurable" in config:
+                        scenario = config["configurable"].get("scenario")
+                        if scenario and hasattr(scenario, "language_config"):
+                            language_code = scenario.language_config.language_code
+                            llm_config_for_branching = (
+                                scenario.language_config.branching_llm_config
+                            )
 
                     # Lazily resolve llm_response tags if present (BLOCKING operation)
-                    # This is the only blocking step - non-branching events skip this
-                    if branching_instruction_obj.needs_llm_resolution():
-                        # Get language_code and branching_llm_config from scenario
-                        # Use dedicated branching_llm_config for structured output,
-                        # falling back to llm_config if not specified
-                        language_code = DEFAULT_LANGUAGE_CODE
-                        llm_config_for_branching = None
-                        if config and "configurable" in config:
-                            scenario = config["configurable"].get("scenario")
-                            if scenario and hasattr(scenario, "language_config"):
-                                language_code = scenario.language_config.language_code
-                                llm_config_for_branching = (
-                                    scenario.language_config.branching_llm_config
-                                )
-
+                    if instruction.needs_llm_resolution():
                         logger.info(
                             "Resolving LLM response tags for branching instruction "
                             "(this may block on LLM call)"
                         )
                         with timing.operation("LLM resolution (blocking)"):
-                            await branching_instruction_obj.resolve_llm_responses(
+                            await instruction.resolve_llm_responses(
                                 llm_config=llm_config_for_branching,
                                 language_code=language_code,
                             )
@@ -434,10 +431,14 @@ async def resolve_branching_instruction(
                     # Use the branching instruction content
                     # (with llm_response tags resolved)
                     next_instruction = (
-                        branching_instruction_obj.resolve_dynamic_branching_instruction(
-                            state.messages
+                        await instruction.resolve_dynamic_branching_instruction(
+                            messages=state.messages,
+                            llm_config=llm_config_for_branching,
+                            language_code=language_code,
                         )
                     )
+
+                    print("using next instruction", next_instruction)
 
     # Determine feedback message for UI from branching events only
     # Priority 1: If branching event was selected, use its feedback

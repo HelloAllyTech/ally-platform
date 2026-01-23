@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from langchain_core.messages import BaseMessage
 
 from app.core.branching_instructions.constants import ReservedBranchingVariable
+from app.core.branching_instructions.functions.chat_summary import resolve_chat_summary
 from app.core.branching_instructions.functions.last_helper_utterance import (
     resolve_last_helper_utterance,
 )
@@ -16,6 +17,7 @@ from app.core.branching_instructions.parser import (
     extract_llm_response_tags,
     parse_instruction,
 )
+from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -215,15 +217,14 @@ class BranchingInstruction:
 
         self._llm_resolved = True
 
-    def resolve_dynamic_branching_instruction(self, messages: List[BaseMessage]) -> str:
+    async def resolve_dynamic_branching_instruction(
+        self,
+        messages: List[BaseMessage],
+        language_code: str = DEFAULT_LANGUAGE_CODE,
+        llm_config: Optional[dict] = None,
+    ) -> str:
         """
         Returns the content with dynamic placeholders resolved against the chat history.
-
-        Args:
-            messages: The list of chat messages.
-
-        Returns:
-            The fully resolved instruction string.
         """
         # Optimization: Skip if no dynamic tags exist
         if not self.dynamic_tags:
@@ -233,5 +234,13 @@ class BranchingInstruction:
 
         if ReservedBranchingVariable.LAST_HELPER_UTTERANCE in resolved_content:
             resolved_content = resolve_last_helper_utterance(resolved_content, messages)
+
+        if ReservedBranchingVariable.CHAT_SUMMARY in resolved_content:
+            resolved_content = await resolve_chat_summary(
+                content=resolved_content,
+                messages=messages,
+                language_code=language_code,
+                llm_config=llm_config,
+            )
 
         return resolved_content

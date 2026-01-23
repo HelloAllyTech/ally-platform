@@ -66,7 +66,7 @@ SCENARIO_SAMPLE = {
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
                 "branchInstruction": "speak about your favourite colour <favourite colour> "
-                "and occupation as <occupation> and <last_helper_utterance>",
+                "and occupation as <occupation> and <last_helper_utterance> and <chat_summary>",
                 "feedbackStatus": "True",
             },
             {
@@ -92,7 +92,6 @@ SCENARIO_SAMPLE = {
                 "detectionType": "TIME",
                 "feedbackStatus": "True",
                 "data": {"time": 10, "condition": "GTE"},
-                "detectionConfig": {"maxOccurrences": 0},
             },
             {
                 "id": "comb-score-lte-0_and_open-ended-question",
@@ -143,6 +142,7 @@ SCENARIO_SAMPLE = {
             "superficial-hope",
             "comb-score-lte-0_and_open-ended-question",
             "warm-greeting",
+            "time-based-event-10s",
         ],
         "autoTerminationEvents": [
             {

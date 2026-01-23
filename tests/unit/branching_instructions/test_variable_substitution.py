@@ -2,6 +2,9 @@
 Tests for variable substitution in BranchingInstruction.
 """
 
+from unittest.mock import AsyncMock
+
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.branching_instructions.base import BranchingInstruction
@@ -113,8 +116,15 @@ class TestVariableSubstitution:
         assert bi.content == "Hello <user_name>"
         assert bi.static_tags == ["user_name"]
 
-    def test_resolve_last_helper_utterance_success(self):
+    @pytest.mark.asyncio
+    async def test_resolve_dynamic_branching_instruction_substitution(self, mocker):
         """Should substitute LAST_HELPER_UTTERANCE with actual last Human message."""
+        # Mock chat summary resolution to isolate the test
+        mocker.patch(
+            "app.core.branching_instructions.base.resolve_chat_summary",
+            new_callable=AsyncMock,
+        )
+
         # 1. Setup State
         state = SimulationState(
             messages=[
@@ -139,13 +149,22 @@ class TestVariableSubstitution:
         )
 
         # 3. Execute
-        result = instruction.resolve_dynamic_branching_instruction(state.messages)
+        result = await instruction.resolve_dynamic_branching_instruction(
+            state.messages, "en-US"
+        )
 
         # 4. Assert
         assert result == "Repeat: I am the helper user"
 
-    def test_resolve_last_helper_utterance_no_history(self):
+    @pytest.mark.asyncio
+    async def test_resolve_dynamic_branching_instruction_missing_history(self, mocker):
         """Should return raw instruction if tag exists but no Human history exists."""
+        # Mock chat summary resolution to isolate the test
+        mocker.patch(
+            "app.core.branching_instructions.base.resolve_chat_summary",
+            new_callable=AsyncMock,
+        )
+
         state = SimulationState(
             messages=[AIMessage(content="Only AI here")],
             permitted_events=[],
@@ -163,10 +182,93 @@ class TestVariableSubstitution:
             dynamic_tags=["last_helper_utterance"],
         )
 
-        result = instruction.resolve_dynamic_branching_instruction(state.messages)
+        result = await instruction.resolve_dynamic_branching_instruction(
+            state.messages, "en-US"
+        )
 
         # Should fallback to the original string gracefully
         assert (
             result
             == f"Recall: <{ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value}>"
         )
+
+    @pytest.mark.asyncio
+    async def test_resolve_dynamic_chat_summary(self, mocker):
+        """Should substitute <chat_summary> by calling the resolver."""
+        # 1. Arrange
+        mock_resolver = mocker.patch(
+            "app.core.branching_instructions.base.resolve_chat_summary",
+            new_callable=AsyncMock,
+            # Make it pass the content through but with the tag replaced
+            side_effect=lambda content, **kwargs: content.replace(
+                f"<{ReservedBranchingVariable.CHAT_SUMMARY.value}>", "Mocked Summary"
+            ),
+        )
+        messages = [HumanMessage(content="Some history")]
+
+        instruction = BranchingInstruction(
+            content=f"Summary: <{ReservedBranchingVariable.CHAT_SUMMARY.value}>",
+            variable_tags=[ReservedBranchingVariable.CHAT_SUMMARY.value],
+            static_tags=[],
+            dynamic_tags=[ReservedBranchingVariable.CHAT_SUMMARY.value],
+        )
+
+        # 2. Act
+        result = await instruction.resolve_dynamic_branching_instruction(
+            messages=messages, language_code="en-US", llm_config={"provider": "test"}
+        )
+
+        # 3. Assert
+        assert result == "Summary: Mocked Summary"
+        mock_resolver.assert_awaited_once_with(
+            content=instruction.content,
+            messages=messages,
+            language_code="en-US",
+            llm_config={"provider": "test"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_resolve_dynamic_all_tags(self, mocker):
+        """Should substitute all dynamic tags in one call."""
+        # 1. Arrange
+        mock_summary_resolver = mocker.patch(
+            "app.core.branching_instructions.base.resolve_chat_summary",
+            new_callable=AsyncMock,
+            side_effect=lambda content, **kwargs: content.replace(
+                f"<{ReservedBranchingVariable.CHAT_SUMMARY.value}>", "Mocked Summary"
+            ),
+        )
+        messages = [
+            AIMessage(content="First AI message"),
+            HumanMessage(content="This is the last helper utterance"),
+        ]
+
+        instruction_content = (
+            f"Utterance: <{ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value}>. "
+            f"Summary: <{ReservedBranchingVariable.CHAT_SUMMARY.value}>"
+        )
+
+        instruction = BranchingInstruction(
+            content=instruction_content,
+            variable_tags=[
+                ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value,
+                ReservedBranchingVariable.CHAT_SUMMARY.value,
+            ],
+            static_tags=[],
+            dynamic_tags=[
+                ReservedBranchingVariable.LAST_HELPER_UTTERANCE.value,
+                ReservedBranchingVariable.CHAT_SUMMARY.value,
+            ],
+        )
+
+        # 2. Act
+        result = await instruction.resolve_dynamic_branching_instruction(
+            messages=messages, language_code="en-US", llm_config={"provider": "test"}
+        )
+
+        # 3. Assert
+        expected_result = (
+            "Utterance: This is the last helper utterance. Summary: Mocked Summary"
+        )
+        assert result == expected_result
+        mock_summary_resolver.assert_awaited_once()
