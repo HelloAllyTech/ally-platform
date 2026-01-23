@@ -43,4 +43,8 @@ export interface ReviewCommentProps {
    * Whether to show the reply button
    */
   showReplyButton?: boolean;
+  /**
+   * Whether to show the add reaction button (emoji picker)
+   */
+  showAddReactionButton?: boolean;
 }

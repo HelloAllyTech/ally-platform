@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -15,6 +15,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChatAddOnIcon} from '@/assets';
 import {VideoPreview} from '@/components';
+import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {
   colors,
   fontFamily,
@@ -32,6 +33,7 @@ import {
   pluralize,
 } from '@/utils';
 
+import {ExpandedComments} from './ExpandedComments';
 import {ReactionsCount} from './ReactionsCount';
 
 dayjs.extend(relativeTime);
@@ -47,6 +49,8 @@ interface ReviewCardProps {
   titleNumberOfLines?: number;
   descriptionNumberOfLines?: number;
   onReviewPress: (reviewId?: string) => void;
+  onCommentPress?: (reviewId: string) => void;
+  isExpanded?: boolean;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -58,11 +62,23 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   titleNumberOfLines = 1,
   descriptionNumberOfLines = 2,
   onReviewPress,
+  onCommentPress,
+  isExpanded = false,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const isFocused = useIsFocused();
   const {t} = useTranslation();
+
+  // Fetch threads when expanded
+  const [getThreads, {data: threadsData, isLoading: isLoadingThreads}] =
+    useLazyGetThreadsQuery();
+
+  useEffect(() => {
+    if (isExpanded && !threadsData) {
+      getThreads({reviewId: id, offset: 0, limit: 2});
+    }
+  }, [isExpanded, id, getThreads, threadsData]);
 
   const totalReactions = Object.values(reactions).reduce(
     (sum, count) => sum + count,
@@ -168,7 +184,9 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         reactions={reactions}
         totalReactions={totalReactions}
       />
-      <TouchableOpacity style={styles.commentCountContainer}>
+      <TouchableOpacity
+        style={styles.commentCountContainer}
+        onPress={() => onCommentPress?.(id)}>
         <Text style={styles.commentText}>
           {pluralize(commentsCount, t('Review.card.comment'))}
         </Text>
@@ -211,6 +229,16 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       <View style={styles.separator} />
 
       {renderReactionsAndComments()}
+
+      <ExpandedComments
+        isExpanded={isExpanded}
+        isLoading={isLoadingThreads}
+        threadsData={threadsData}
+        reviewId={id}
+        onCollapsePress={() => onCommentPress?.(id)}
+        onCommentPress={onReviewPress}
+        t={t}
+      />
     </View>
   );
 };

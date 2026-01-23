@@ -1,2 +1,3 @@
-export * from './ReviewCard';
-export * from './ReactionsCount';
+export {ReviewCard} from './ReviewCard';
+export {ReactionsCount} from './ReactionsCount';
+export {ExpandedComments} from './ExpandedComments';

@@ -14,14 +14,11 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon} from '@/assets';
 import {useAppNavigation} from '@/hooks';
 import {useReactions} from '@/hooks/useReactions';
-import {useReactionsMock} from '@/hooks/useReactions.mock';
 import {RootStackScreenProps} from '@/navigation';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ReactionFilterTabs, ReactionListItem} from './components';
 import {ReactionData} from './types';
-
-const USE_MOCK_DATA = __DEV__;
 
 type Props = RootStackScreenProps<'Reactions'>;
 
@@ -31,7 +28,6 @@ export const ReactionsScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const navigation = useAppNavigation();
 
-  const useReactionsHook = USE_MOCK_DATA ? useReactionsMock : useReactions;
   const {
     reactions,
     selectedReaction,
@@ -41,7 +37,7 @@ export const ReactionsScreen: React.FC<Props> = ({route}) => {
     isFetching,
     handleReactionFilter,
     loadMore,
-  } = useReactionsHook(reviewId);
+  } = useReactions(reviewId);
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -53,15 +49,13 @@ export const ReactionsScreen: React.FC<Props> = ({route}) => {
   );
 
   const renderFooter = useCallback(() => {
+    if (!isFetching) return null;
+
     const bottomPadding = insets.bottom + ms(120);
 
     return (
       <View style={[styles.footerSpacer, {paddingBottom: bottomPadding}]}>
-        <ActivityIndicator
-          size="small"
-          color={colors.ds.theme.primary}
-          style={{opacity: isFetching ? 1 : 0}}
-        />
+        <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
   }, [isFetching, insets.bottom]);
