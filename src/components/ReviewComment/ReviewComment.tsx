@@ -20,6 +20,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   onReplyPress,
   onCommentPress,
   showReplyButton = true,
+  showAddReactionButton = true,
 }) => {
   const {t} = useTranslate();
   const initials = name ? name.charAt(0).toUpperCase() : '';
@@ -69,16 +70,18 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         {/* Footer: Like, Reactions, Replies */}
         <View style={styles.footerRow}>
           <View style={styles.footerRowLeft}>
-            <TouchableOpacity
-              style={styles.likeButton}
-              onPress={onAddReactionPress}
-              activeOpacity={0.7}>
-              <AddReactionIcon
-                width={20}
-                height={20}
-                color={colors.ds.icon.default}
-              />
-            </TouchableOpacity>
+            {showAddReactionButton && (
+              <TouchableOpacity
+                style={styles.likeButton}
+                onPress={onAddReactionPress}
+                activeOpacity={0.7}>
+                <AddReactionIcon
+                  width={20}
+                  height={20}
+                  color={colors.ds.icon.default}
+                />
+              </TouchableOpacity>
+            )}
             {/* Reactions */}
             {reactions.length > 0 && (
               <View style={styles.reactionsContainer}>
