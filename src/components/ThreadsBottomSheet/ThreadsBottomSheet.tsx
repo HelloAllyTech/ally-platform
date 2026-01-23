@@ -91,13 +91,14 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
           onPress={() => onThreadPress?.(thread.id)}
           activeOpacity={0.7}>
           {/* Selected Text Section - if available */}
-          {thread.selectedText && (
+          {thread.message?.content && (
             <View style={styles.selectedTextContainer}>
               <Text
                 style={styles.selectedText}
                 numberOfLines={1}
                 ellipsizeMode="tail">
-                {t('ThreadsBottomSheet.selectedText')} "{thread.selectedText}"
+                {t('ThreadsBottomSheet.selectedText')} "
+                {thread.message?.content}"
               </Text>
             </View>
           )}

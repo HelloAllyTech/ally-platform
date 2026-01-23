@@ -51,6 +51,8 @@ export {SimulationCard} from './SimulationCard';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {CommentBottomSheetFooter} from './CommentBottomSheetFooter';
+export type {CommentBottomSheetFooterProps} from './CommentBottomSheetFooter';
 export {EmojiPicker} from './EmojiPicker';
 export type {EmojiPickerProps} from './EmojiPicker';
 export {ThreadsBottomSheet} from './ThreadsBottomSheet';
