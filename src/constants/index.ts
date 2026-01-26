@@ -2,6 +2,7 @@ export * from './general';
 export * from './asyncStorage';
 export * from './analytics';
 export * from './badges';
+export * from './badgePopup';
 export * from './simulations';
 export * from './chat';
 export * from './dates';
