@@ -7,6 +7,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   RefreshControl,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -141,64 +142,68 @@ export const LeaderboardScreen: React.FC = () => {
         onLayout={e => {
           const rowHeight = e.nativeEvent.layout.height;
 
-          // Measure row height once (from first non-highlighted item for consistency)
+          // Measure full row height (including separator) for scroll calculations
           if (!leaderboardRowHeight.current && !isHighlighted) {
             leaderboardRowHeight.current = rowHeight;
           }
         }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
-        {showRankColumn && (
+        <View style={styles.rowContent}>
+          {showRankColumn && (
+            <View
+              style={[
+                styles.rankColumn,
+                isHighlighted && styles.highlightedRankColumn,
+              ]}>
+              {renderRankBadge(item.rank)}
+            </View>
+          )}
           <View
-            style={[
-              styles.rankColumn,
-              isHighlighted && styles.highlightedRankColumn,
-            ]}>
-            {renderRankBadge(item.rank)}
+            style={[styles.userColumn, !showRankColumn && styles.marginL21]}>
+            <View style={styles.avatarContainer}>
+              {item.profileImageUrl ? (
+                <Image
+                  source={{uri: item.profileImageUrl}}
+                  style={styles.avatar}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarInitial}>
+                    {item.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text
+              style={[
+                styles.userName,
+                isHighlighted && styles.highlightedUserName,
+              ]}
+              numberOfLines={1}>
+              {item.name}
+            </Text>
           </View>
-        )}
-        <View style={[styles.userColumn, !showRankColumn && styles.marginL21]}>
-          <View style={styles.avatarContainer}>
-            {item.profileImageUrl ? (
-              <Image
-                source={{uri: item.profileImageUrl}}
-                style={styles.avatar}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarInitial}>
-                  {item.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
+          <View style={styles.durationColumn}>
+            <Text
+              style={[
+                styles.durationText,
+                isHighlighted && styles.highlightedText,
+              ]}>
+              {formatMinutesToDuration(item.minutesPlayed)}
+            </Text>
           </View>
-          <Text
-            style={[
-              styles.userName,
-              isHighlighted && styles.highlightedUserName,
-            ]}
-            numberOfLines={1}>
-            {item.name}
-          </Text>
+          <View style={styles.badgesColumn}>
+            <Text
+              style={[
+                styles.badgesText,
+                isHighlighted && styles.highlightedText,
+              ]}>
+              {item.badgeCount}
+            </Text>
+          </View>
         </View>
-        <View style={styles.durationColumn}>
-          <Text
-            style={[
-              styles.durationText,
-              isHighlighted && styles.highlightedText,
-            ]}>
-            {formatMinutesToDuration(item.minutesPlayed)}
-          </Text>
-        </View>
-        <View style={styles.badgesColumn}>
-          <Text
-            style={[
-              styles.badgesText,
-              isHighlighted && styles.highlightedText,
-            ]}>
-            {item.badgeCount}
-          </Text>
-        </View>
+        {!isHighlighted && <View style={styles.rowSeparator} />}
       </View>
     );
   };
@@ -428,16 +433,25 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
   },
   leaderboardRow: {
+    paddingVertical: '10@ms',
+  },
+  rowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: '12@ms',
-    borderRadius: '8@ms',
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.ds.stroke.primary,
+    marginHorizontal: '21@ms',
+    marginTop: '12@ms',
   },
   highlightedRow: {
     backgroundColor: colors.ds.blue[50],
     borderWidth: '0.5@ms',
     borderColor: colors.ds.theme.primary,
     marginHorizontal: '8@ms',
+    paddingLeft: '5@ms',
+    borderRadius: '8@ms',
   },
   stickyFooter: {
     position: 'absolute',
