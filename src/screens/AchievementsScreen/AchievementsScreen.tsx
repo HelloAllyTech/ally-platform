@@ -1,6 +1,12 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -8,12 +14,12 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {TabView} from '@/components';
 import {LockStatus} from '@/constants/badges';
 import {useAppNavigation} from '@/hooks';
-// import {useGetAvailableBadgesQuery} from '@/services';
+import {useGetAvailableBadgesQuery} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 import {BadgeCategoryGroup} from '@/types/badges';
+import {snakeCaseToTitleCase} from '@/utils/common';
 
 import {AchievementCard} from './components';
-import {mockBadgesData} from './mockData';
 
 type FilterType = 'all' | 'unlocked';
 
@@ -23,9 +29,7 @@ export const AchievementsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
 
-  // TODO: Replace with API call when ready
-  // const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
-  const badgesResponse = mockBadgesData;
+  const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
 
   // Memoize tab configuration
   const tabs = useMemo(
@@ -67,7 +71,9 @@ export const AchievementsScreen: React.FC = () => {
     (categoryGroup: BadgeCategoryGroup, index: number) => (
       <View key={`${categoryGroup.category}-${index}`} style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{categoryGroup.category}</Text>
+          <Text style={styles.sectionTitle}>
+            {snakeCaseToTitleCase(categoryGroup.category)}
+          </Text>
           <View style={styles.sectionLine} />
         </View>
         {categoryGroup.badges.map(badge => (
@@ -88,6 +94,32 @@ export const AchievementsScreen: React.FC = () => {
     ),
     [t],
   );
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>
+            {t('Achievements.error', 'Failed to load achievements')}
+          </Text>
+        </View>
+      );
+    }
+
+    if (filteredCategories.length === 0) {
+      return renderEmptyState();
+    }
+
+    return filteredCategories.map(renderCategorySection);
+  };
 
   return (
     <View
@@ -124,9 +156,7 @@ export const AchievementsScreen: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {filteredCategories.length === 0
-          ? renderEmptyState()
-          : filteredCategories.map(renderCategorySection)}
+        {renderContent()}
       </ScrollView>
     </View>
   );
@@ -209,6 +239,18 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: '48@ms',
+  },
+  errorText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.feedback.error,
     textAlign: 'center',
   },
 });
