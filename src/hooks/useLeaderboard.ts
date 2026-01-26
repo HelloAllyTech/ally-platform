@@ -1,47 +1,53 @@
-import {useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {LeaderboardPeriod} from '@/constants/leaderboard';
-import {
-  generateMockLeaderboardData,
-  LeaderboardEntryWithCurrentUser,
-} from '@/screens/LeaderboardScreen/mockUtils';
 import {
   useGetLeaderboardQuery,
   useGetMyRankQuery,
 } from '@/services/leaderboardApi';
 import {LeaderboardEntry, MyRankResponse} from '@/types/leaderboard';
 
-// Toggle this to switch between mock data and real API
-const USE_MOCK_DATA = true;
+export interface LeaderboardEntryWithCurrentUser extends LeaderboardEntry {
+  isCurrentUser?: boolean;
+}
 
 interface UseLeaderboardParams {
   window: LeaderboardPeriod;
   limit?: number;
-  offset?: number;
 }
 
 interface UseLeaderboardResult {
-  leaderboardData: LeaderboardEntryWithCurrentUser[];
+  data: LeaderboardEntryWithCurrentUser[];
   currentUserEntry: (MyRankResponse & {isCurrentUser: boolean}) | null;
   isLoading: boolean;
+  isRefreshing: boolean;
+  isLoadingMore: boolean;
   isError: boolean;
   error: unknown;
-  totalCount: number;
+  hasMore: boolean;
+  loadMore: () => void;
+  refresh: () => void;
 }
 
 export const useLeaderboard = ({
   window,
   limit = 50,
-  offset = 0,
 }: UseLeaderboardParams): UseLeaderboardResult => {
+  const [offset, setOffset] = useState(0);
+  const [allData, setAllData] = useState<LeaderboardEntry[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const {
     data: leaderboardResponse,
     isLoading: isLeaderboardLoading,
+    isFetching: isLeaderboardFetching,
     isError: isLeaderboardError,
     error: leaderboardError,
   } = useGetLeaderboardQuery(
     {window, limit, offset},
-    {skip: USE_MOCK_DATA}, // Skip API call if using mock data
+    {
+      refetchOnMountOrArgChange: true,
+    },
   );
 
   const {
@@ -49,41 +55,51 @@ export const useLeaderboard = ({
     isLoading: isMyRankLoading,
     isError: isMyRankError,
     error: myRankError,
-  } = useGetMyRankQuery({window}, {skip: USE_MOCK_DATA}); // Skip API call if using mock data
-
-  // Mock data - always computed but only used when USE_MOCK_DATA is true
-  const mockLeaderboardData = useMemo(
-    () => generateMockLeaderboardData(24, 999, 'Yedhu Krishnan'),
-    [],
+  } = useGetMyRankQuery(
+    {window},
+    {
+      refetchOnMountOrArgChange: true,
+    },
   );
 
-  const mockCurrentUserEntry = useMemo(
-    () => ({
-      userId: 999,
-      name: 'Yedhu Krishnan',
-      profileImageUrl: '',
-      rank: 24,
-      minutesPlayed: 872,
-      badgeCount: 12,
-      window,
-      isCurrentUser: true,
-    }),
-    [window],
-  );
+  // Accumulate data when new page loads (based on leaderboardResponse only)
+  useEffect(() => {
+    if (!leaderboardResponse?.data || isLeaderboardLoading) return;
 
-  const leaderboardData: LeaderboardEntryWithCurrentUser[] = useMemo(() => {
-    if (!leaderboardResponse?.data) {
+    setAllData(prev => {
+      // If offset is 0, replace data (refresh or initial load)
+      if (offset === 0) {
+        return leaderboardResponse.data;
+      }
+
+      // Otherwise append for pagination with deduplication
+      const existingIds = new Set(prev.map(u => u.userId));
+      const newData = leaderboardResponse.data.filter(
+        u => !existingIds.has(u.userId),
+      );
+
+      return [...prev, ...newData];
+    });
+  }, [leaderboardResponse?.data, isLeaderboardLoading, offset]);
+
+  // Reset when period changes
+  useEffect(() => {
+    setOffset(0);
+  }, [window]);
+
+  // Process accumulated data with isCurrentUser flag
+  const dataWithFlags: LeaderboardEntryWithCurrentUser[] = useMemo(() => {
+    if (!allData.length) {
       return [];
     }
 
-    // Mark current user in leaderboard data
-    return leaderboardResponse.data.map((entry: LeaderboardEntry) => ({
+    return allData.map((entry: LeaderboardEntry) => ({
       ...entry,
       isCurrentUser: myRankResponse
         ? entry.userId === myRankResponse.userId
         : false,
     }));
-  }, [leaderboardResponse, myRankResponse]);
+  }, [allData, myRankResponse]);
 
   const currentUserEntry = useMemo(() => {
     if (!myRankResponse) {
@@ -95,24 +111,36 @@ export const useLeaderboard = ({
     };
   }, [myRankResponse]);
 
-  // Return mock data or API data based on toggle
-  if (USE_MOCK_DATA) {
-    return {
-      leaderboardData: mockLeaderboardData,
-      currentUserEntry: mockCurrentUserEntry,
-      isLoading: false,
-      isError: false,
-      error: null,
-      totalCount: mockLeaderboardData.length,
-    };
-  }
+  const totalCount = leaderboardResponse?.totalCount ?? 0;
+  const hasMore = allData.length < totalCount;
+
+  const loadMore = useCallback(() => {
+    if (!isLeaderboardFetching && hasMore) {
+      setOffset(prev => prev + limit);
+    }
+  }, [isLeaderboardFetching, hasMore, limit]);
+
+  const refresh = useCallback(() => {
+    setIsRefreshing(true);
+    setOffset(0);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 500);
+  }, []);
+
+  const isInitialLoading = isLeaderboardLoading && offset === 0;
+  const isLoadingMore = isLeaderboardFetching && offset > 0;
 
   return {
-    leaderboardData: leaderboardData,
-    currentUserEntry: currentUserEntry,
-    isLoading: isLeaderboardLoading || isMyRankLoading,
+    data: dataWithFlags,
+    currentUserEntry,
+    isLoading: isInitialLoading || isMyRankLoading,
+    isRefreshing,
+    isLoadingMore,
     isError: isLeaderboardError || isMyRankError,
     error: leaderboardError || myRankError,
-    totalCount: leaderboardResponse?.totalCount ?? 0,
+    hasMore,
+    loadMore,
+    refresh,
   };
 };

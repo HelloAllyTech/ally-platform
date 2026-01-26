@@ -2,6 +2,7 @@ import {SvgProps} from 'react-native-svg';
 
 import {Rank1Icon, Rank2Icon, Rank3Icon} from '@/assets/icons';
 
+export const LEADERBOARD_FETCH_LIMIT = 30;
 export const RANK_ICON_MAP: Record<number, React.FC<SvgProps>> = {
   1: Rank1Icon,
   2: Rank2Icon,
