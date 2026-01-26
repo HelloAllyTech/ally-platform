@@ -2,6 +2,97 @@ import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
+// Mock services before importing the component
+jest.mock('@/services', () => ({
+  useGetAvailableBadgesQuery: () => ({
+    data: [
+      {
+        category: 'Journey',
+        badges: [
+          {
+            id: 'badge-1',
+            name: 'First Steps',
+            description: 'Complete your first session',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-2',
+            name: 'Consistent Start',
+            description: 'Start 5 sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-3',
+            name: 'Milestone Hunter',
+            description: 'Reach a milestone',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-4',
+            name: '365 Champion',
+            description: 'Complete 365 sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+        ],
+      },
+      {
+        category: 'Momentum',
+        badges: [
+          {
+            id: 'badge-5',
+            name: 'Week Warrior',
+            description: 'Complete a week of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-6',
+            name: 'Month Master',
+            description: 'Complete a month of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-7',
+            name: 'Year Champion',
+            description: 'Complete a year of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-8',
+            name: 'Streak Keeper',
+            description: 'Maintain a 7-day streak',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-9',
+            name: 'Early Bird',
+            description: 'Complete 5 morning sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+          {
+            id: 'badge-10',
+            name: 'Night Owl',
+            description: 'Complete 5 evening sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+          },
+        ],
+      },
+    ],
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+}));
+
 import {AchievementsScreen} from '../AchievementsScreen';
 
 // Mock react-i18next
