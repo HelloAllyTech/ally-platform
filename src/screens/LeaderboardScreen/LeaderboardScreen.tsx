@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   ActivityIndicator,
@@ -6,6 +6,7 @@ import {
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  RefreshControl,
   Text,
   TouchableOpacity,
   View,
@@ -13,12 +14,19 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {BadgeIcon, UserIcon} from '@/assets/icons';
+import {BadgeIcon} from '@/assets/icons';
 import {TabView} from '@/components';
 import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
-import {LeaderboardPeriod, RANK_ICON_MAP} from '@/constants/leaderboard';
-import {useAppNavigation, useLeaderboard} from '@/hooks';
-import {LeaderboardEntryWithCurrentUser} from '@/screens/LeaderboardScreen/mockUtils';
+import {
+  LEADERBOARD_FETCH_LIMIT,
+  LeaderboardPeriod,
+  RANK_ICON_MAP,
+} from '@/constants/leaderboard';
+import {
+  LeaderboardEntryWithCurrentUser,
+  useAppNavigation,
+  useLeaderboard,
+} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 import {formatMinutesToDuration} from '@/utils';
 
@@ -35,35 +43,78 @@ export const LeaderboardScreen: React.FC = () => {
   );
 
   // Fetch leaderboard data using the hook
-  const {leaderboardData, currentUserEntry, isLoading} = useLeaderboard({
+  const {
+    data: leaderboardData,
+    currentUserEntry,
+    isLoading,
+    isRefreshing,
+    isLoadingMore,
+    loadMore,
+    refresh,
+  } = useLeaderboard({
     window: activePeriod,
-    limit: 50,
-    offset: 0,
+    limit: LEADERBOARD_FETCH_LIMIT,
   });
 
   const currentScrollOffsetY = useRef(0);
-  const currentUserRowTopPosition = useRef(0);
   const flatListViewportHeight = useRef(0);
   const leaderboardRowHeight = useRef(0);
 
   // Controls visibility of sticky footer showing current user's row
-  const [shouldShowStickyFooter, setShouldShowStickyFooter] = useState(true);
+  const [shouldShowStickyFooter, setShouldShowStickyFooter] = useState(false);
+
+  // Calculate current user position based on index in the list
+  const currentUserPosition = useMemo(() => {
+    if (!currentUserEntry || !leaderboardRowHeight.current) {
+      return 0;
+    }
+    // Find the index of current user in leaderboardData
+    const currentUserIndex = leaderboardData.findIndex(
+      entry => entry.userId === currentUserEntry.userId,
+    );
+    if (currentUserIndex === -1) return 0;
+    return currentUserIndex * leaderboardRowHeight.current;
+  }, [currentUserEntry, leaderboardData]);
 
   const handleBadgePress = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.ACHIEVEMENTS);
   }, [navigation]);
 
+  // Calculate if sticky footer should be shown based on scroll position
+  const calculateStickyFooterVisibility = useCallback(
+    (scrollOffsetY: number) => {
+      if (
+        !currentUserEntry ||
+        !leaderboardRowHeight.current ||
+        !flatListViewportHeight.current
+      ) {
+        return false;
+      }
+
+      const viewportBottom = scrollOffsetY + flatListViewportHeight.current;
+      const currentUserRowTop = currentUserPosition;
+
+      // Show sticky footer ONLY if current user row is below the viewport
+      // (not yet scrolled to, still ahead)
+      return currentUserRowTop > viewportBottom;
+    },
+    [currentUserEntry, currentUserPosition],
+  );
+
+  // Calculate initial sticky footer visibility when data loads
+  useEffect(() => {
+    const isRowBelowViewport = calculateStickyFooterVisibility(
+      currentScrollOffsetY.current,
+    );
+    setShouldShowStickyFooter(isRowBelowViewport);
+  }, [calculateStickyFooterVisibility, leaderboardData]);
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollOffsetY = e.nativeEvent.contentOffset.y;
     currentScrollOffsetY.current = scrollOffsetY;
 
-    // Calculate if current user's row is fully visible in the viewport
-    const viewportBottom = scrollOffsetY + flatListViewportHeight.current;
-    const isCurrentUserRowFullyVisible =
-      currentUserRowTopPosition.current + leaderboardRowHeight.current <=
-      viewportBottom;
-
-    setShouldShowStickyFooter(!isCurrentUserRowFullyVisible);
+    const isRowBelowViewport = calculateStickyFooterVisibility(scrollOffsetY);
+    setShouldShowStickyFooter(isRowBelowViewport);
   };
 
   const renderRankBadge = (rank: number) => {
@@ -80,10 +131,8 @@ export const LeaderboardScreen: React.FC = () => {
 
   const renderLeaderboardItem = ({
     item,
-    index,
   }: {
     item: LeaderboardEntryWithCurrentUser;
-    index: number;
   }) => {
     const isHighlighted = item.isCurrentUser;
 
@@ -95,12 +144,6 @@ export const LeaderboardScreen: React.FC = () => {
           // Measure row height once (from first non-highlighted item for consistency)
           if (!leaderboardRowHeight.current && !isHighlighted) {
             leaderboardRowHeight.current = rowHeight;
-          }
-
-          // Calculate and store the current user's row position when it's rendered
-          if (item.isCurrentUser && leaderboardRowHeight.current > 0) {
-            const calculatedTopPosition = index * leaderboardRowHeight.current;
-            currentUserRowTopPosition.current = calculatedTopPosition;
           }
         }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
@@ -123,7 +166,9 @@ export const LeaderboardScreen: React.FC = () => {
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <UserIcon width={24} height={24} />
+                <Text style={styles.avatarInitial}>
+                  {item.name.charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
           </View>
@@ -206,6 +251,26 @@ export const LeaderboardScreen: React.FC = () => {
     );
   };
 
+  const renderEmptyComponent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyStateContainer}>
+        <Text style={styles.emptyStateTitle}>
+          {t('Leaderboard.emptyState.title')}
+        </Text>
+        <Text style={styles.emptyStateDescription}>
+          {t('Leaderboard.emptyState.description')}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       {renderHeader()}
@@ -215,15 +280,15 @@ export const LeaderboardScreen: React.FC = () => {
             tabs={[
               {
                 key: LeaderboardPeriod.LAST_WEEK,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.week')}`,
+                label: `7 ${t('Leaderboard.period.days')}`,
               },
               {
                 key: LeaderboardPeriod.LAST_MONTH,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.month')}`,
+                label: `30 ${t('Leaderboard.period.days')}`,
               },
               {
                 key: LeaderboardPeriod.LAST_YEAR,
-                label: `${t('Leaderboard.period.last')} ${t('Leaderboard.period.year')}`,
+                label: `365 ${t('Leaderboard.period.days')}`,
               },
               {
                 key: LeaderboardPeriod.ALL_TIME,
@@ -232,6 +297,7 @@ export const LeaderboardScreen: React.FC = () => {
             ]}
             activeTab={activePeriod}
             onTabChange={setActivePeriod}
+            labelTextStyle={typography.body.tiny}
           />
         </View>
         {renderTableHeader()}
@@ -245,23 +311,48 @@ export const LeaderboardScreen: React.FC = () => {
               data={leaderboardData}
               renderItem={renderLeaderboardItem}
               keyExtractor={item => item.userId.toString()}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={
+                leaderboardData.length === 0
+                  ? styles.emptyListContent
+                  : styles.listContent
+              }
               showsVerticalScrollIndicator={false}
               onScroll={handleScroll}
               scrollEventThrottle={16}
               onLayout={e => {
                 flatListViewportHeight.current = e.nativeEvent.layout.height;
               }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={refresh}
+                  tintColor={colors.ds.theme.primary}
+                />
+              }
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
+              ListEmptyComponent={renderEmptyComponent()}
+              ListFooterComponent={
+                isLoadingMore ? (
+                  <View style={styles.footerLoader}>
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.ds.theme.primary}
+                    />
+                  </View>
+                ) : null
+              }
             />
 
-            {shouldShowStickyFooter && currentUserEntry && (
-              <View style={styles.stickyFooter}>
-                {renderLeaderboardItem({
-                  item: currentUserEntry,
-                  index: currentUserEntry.rank - 1,
-                })}
-              </View>
-            )}
+            {shouldShowStickyFooter &&
+              !!leaderboardData.length &&
+              !!currentUserEntry?.rank && (
+                <View style={styles.stickyFooter}>
+                  {renderLeaderboardItem({
+                    item: currentUserEntry,
+                  })}
+                </View>
+              )}
           </>
         )}
       </View>
@@ -333,6 +424,9 @@ const styles = ScaledSheet.create({
   listContent: {
     paddingBottom: '100@ms',
   },
+  emptyListContent: {
+    flexGrow: 1,
+  },
   leaderboardRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -389,7 +483,7 @@ const styles = ScaledSheet.create({
   rankText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.label.medium,
-    color: colors.ds.typography.highEmphasis,
+    color: colors.ds.typography.mediumEmphasis,
   },
   topThreeRankText: {
     color: colors.white,
@@ -404,8 +498,8 @@ const styles = ScaledSheet.create({
     minWidth: '160@ms',
   },
   avatarContainer: {
-    width: '40@ms',
-    height: '40@ms',
+    width: '36@ms',
+    height: '36@ms',
   },
   avatar: {
     width: '100%',
@@ -416,9 +510,17 @@ const styles = ScaledSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: '20@ms',
-    backgroundColor: colors.lightGray1,
+    backgroundColor: colors.ds.grey[100],
     justifyContent: 'center',
     alignItems: 'center',
+    borderColor: colors.ds.stroke.primary,
+    borderWidth: 0.5,
+  },
+  avatarInitial: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+    color: colors.ds.icon.default,
+    fontWeight: '600',
   },
   userName: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -455,6 +557,30 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: '40@ms',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: '40@ms',
+    paddingVertical: '60@ms',
+  },
+  emptyStateTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.headline.small,
+    color: colors.ds.typography.highEmphasis,
+    textAlign: 'center',
+    marginBottom: '12@ms',
+  },
+  emptyStateDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
+  },
+  footerLoader: {
+    paddingVertical: '20@ms',
+    alignItems: 'center',
   },
   marginL21: {
     marginLeft: '21@ms',
