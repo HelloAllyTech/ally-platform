@@ -127,6 +127,7 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string) => key,
   }),
+  useHardwareBackPressHandler: jest.fn(),
 }));
 
 // Mock LeftArrowIcon

@@ -13,7 +13,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {LeftArrowIcon} from '@/assets/icons';
 import {TabView} from '@/components';
 import {LockStatus} from '@/constants/badges';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetAvailableBadgesQuery} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 import {BadgeCategoryGroup} from '@/types/badges';
@@ -21,22 +21,32 @@ import {snakeCaseToTitleCase} from '@/utils/common';
 
 import {AchievementCard} from './components';
 
-type FilterType = 'all' | 'unlocked';
+enum FilterType {
+  ALL = 'all',
+  UNLOCKED = 'unlocked',
+}
 
 export const AchievementsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>(
+    FilterType.ALL,
+  );
 
   const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
+
+  useHardwareBackPressHandler(() => {
+    handleGoBack();
+    return true;
+  });
 
   // Memoize tab configuration
   const tabs = useMemo(
     () => [
-      {key: 'all' as FilterType, label: t('Achievements.all', 'All')},
+      {key: FilterType.ALL, label: t('Achievements.all', 'All')},
       {
-        key: 'unlocked' as FilterType,
+        key: FilterType.UNLOCKED,
         label: t('Achievements.unlocked', 'Unlocked'),
       },
     ],
@@ -48,7 +58,7 @@ export const AchievementsScreen: React.FC = () => {
       return [];
     }
 
-    if (selectedFilter === 'all') {
+    if (selectedFilter === FilterType.ALL) {
       return badgesResponse;
     }
 

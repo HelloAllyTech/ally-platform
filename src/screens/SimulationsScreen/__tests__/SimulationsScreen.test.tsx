@@ -100,6 +100,7 @@ jest.mock('@/components', () => {
         <Text>{title}</Text>
       </TouchableOpacity>
     ),
+    BadgePopup: () => <View testID="badge-popup" />,
   };
 });
 
