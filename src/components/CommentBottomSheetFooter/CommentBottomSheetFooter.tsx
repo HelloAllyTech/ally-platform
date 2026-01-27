@@ -1,6 +1,11 @@
 import React from 'react';
 import {BottomSheetTextInput} from '@gorhom/bottom-sheet';
-import {ActivityIndicator, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {colors} from '@/theme';
@@ -47,6 +52,7 @@ export const CommentBottomSheetFooter =
                 if (text.trim()) {
                   onSubmit?.(text);
                   setText('');
+                  Keyboard.dismiss();
                 }
               }}
               disabled={!text.trim() || isLoading}
