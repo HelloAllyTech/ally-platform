@@ -33,6 +33,7 @@ export interface MessageThreadComment {
     [reactionCode: string]: number;
   };
   replyCount?: number;
+  myReaction?: string | null;
 }
 
 export interface MessageThread {
@@ -76,10 +77,13 @@ export interface GetThreadCommentsResponse {
   data: MessageThreadComment[];
   count: number;
 }
+
+export interface ScenarioSessionData {
+  duration: string;
+  createdAt: string;
+}
 export interface ReviewScenario {
   title: string;
-  createdAt: string;
-  duration: string;
   description: string;
   coverImageUrl?: string;
   coverVideoUrl?: string;
@@ -93,11 +97,16 @@ export interface ReviewItem {
   id: string;
   createdAt: string;
   scenario: ReviewScenario;
+  scenarioSession: ScenarioSessionData;
   reactions: {
     [reaction_code: string]: number;
   };
   createdBy: User;
   commentsCount: number;
+}
+
+export interface GetReviewByIdResponse extends ReviewItem {
+  myReaction: string | null;
 }
 export interface ReviewsResponse {
   data: ReviewItem[];

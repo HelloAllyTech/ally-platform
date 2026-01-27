@@ -6,12 +6,13 @@ import {
   CreateReviewResponse,
   GetMessagesRequest,
   GetMessagesResponse,
+  GetReviewByIdResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
   ReviewsResponse,
   UpdateReviewStatusRequest,
   UpdateReviewStatusResponse,
-} from '@/types/reviews';
+} from '@/types';
 
 import {api} from './api';
 
@@ -98,6 +99,12 @@ export const reviewsApi = api.injectEndpoints({
         params: {sortBy, limit, offset, order: SortOrder.DESC},
       }),
     }),
+    getReviewById: builder.query<GetReviewByIdResponse, {reviewId: string}>({
+      query: ({reviewId}) => ({
+        url: API_ROUTES.REVIEWS.REVIEW_BY_ID(reviewId),
+        method: API_METHODS.GET,
+      }),
+    }),
   }),
 });
 
@@ -107,5 +114,7 @@ export const {
   useGetMessagesQuery,
   useAddReviewCommentMutation,
   useLazyGetThreadCommentsQuery,
+  useGetReviewsQuery,
   useLazyGetReviewsQuery,
+  useGetReviewByIdQuery,
 } = reviewsApi;
