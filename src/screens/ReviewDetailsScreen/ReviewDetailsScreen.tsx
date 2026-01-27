@@ -275,10 +275,10 @@ export const ReviewDetailsScreen: React.FC = () => {
 
       const response = await addReviewComment(payload);
 
-      if (response.data?.comment?.id) {
+      if (response.data?.thread?.id) {
         updateMessage({
           selection: currentHighlightedText,
-          commentId: response.data.comment.id,
+          commentId: response.data.thread.id,
           messageId: selectedMessageId,
         });
       }
@@ -430,10 +430,8 @@ export const ReviewDetailsScreen: React.FC = () => {
         onReplyPress={_commentId => {
           // Handle reply press
         }}
-        onSubmitReplyPress={_commentText => {
-          // Handle add comment press
-        }}
         hideReplyBottomSheet={hideReplyBottomSheet}
+        reviewId={_reviewId}
       />
     </SafeAreaView>
   );
