@@ -14,7 +14,15 @@ export interface AddReviewCommentRequest {
 }
 
 export interface AddReviewCommentResponse {
-  comment: {
+  comment?: {
+    id: string;
+    createdAt: string;
+  };
+  thread?: {
+    id: string;
+    createdAt: string;
+  };
+  reply?: {
     id: string;
     createdAt: string;
   };

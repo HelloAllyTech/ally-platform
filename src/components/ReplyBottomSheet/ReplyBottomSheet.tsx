@@ -21,6 +21,8 @@ import {
   ReviewComment,
 } from '@/components';
 import {useTranslate} from '@/hooks';
+import {useUser} from '@/hooks/useUser';
+import {useAddReviewCommentMutation} from '@/services/reviewsApi';
 import {useLazyGetCommentRepliesQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
@@ -39,7 +41,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   originalComment,
   onAddReactionPress,
   onReplyPress,
-  onSubmitReplyPress,
+  reviewId,
   hideReplyBottomSheet,
 }) => {
   const {t} = useTranslate();
@@ -47,6 +49,13 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const [getCommentReplies, {isLoading, isFetching}] =
     useLazyGetCommentRepliesQuery();
   const offsetRef = useRef(0);
+  const {userData} = useUser();
+  const {
+    id: userId,
+    name: userName,
+    profileImageUrl: userProfileImage,
+  } = userData || {};
+
   const [replies, setReplies] = React.useState<{
     data: MessageThreadComment[];
     count: number;
@@ -61,6 +70,9 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       setReplyText('');
     }
   }, [visible]);
+
+  const [addReviewComment, {isLoading: isAddingComment}] =
+    useAddReviewCommentMutation();
 
   // Common function to handle API response and update state
   const handleApiResponse = useCallback(
@@ -119,6 +131,63 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     getCommentReplies,
     handleApiResponse,
   ]);
+
+  const {id: parentCommentId} = originalComment || {};
+  const onSubmitReplyPress = useCallback(
+    async (comment: string) => {
+      if (!comment || !parentCommentId) {
+        return;
+      }
+
+      try {
+        const payload = {
+          reviewId: reviewId,
+          content: comment,
+          parentCommentId: parentCommentId,
+        };
+
+        const newReplyObj: MessageThreadComment = {
+          id: '',
+          content: comment,
+          createdBy: {
+            id: userId?.toString(),
+            name: userName,
+            profileImage: userProfileImage,
+          },
+          reactions: {},
+        };
+
+        const response = await addReviewComment(payload);
+
+        if (response.data?.reply?.id) {
+          newReplyObj.id = response.data?.reply?.id;
+          newReplyObj.createdAt = response.data?.reply?.createdAt;
+          setReplies(prev => {
+            if (prev) {
+              return {
+                data: [...prev.data, newReplyObj],
+                count: prev.count + 1,
+              };
+            }
+            return {data: [newReplyObj], count: 1};
+          });
+        }
+      } catch (error) {
+        console.error('Failed to add reply:', error);
+      } finally {
+        setReplyText('');
+        Keyboard.dismiss();
+      }
+    },
+    [
+      addReviewComment,
+      reviewId,
+      parentCommentId,
+      userId,
+      userName,
+      userProfileImage,
+    ],
+  );
 
   const renderReplyItem = useCallback(
     ({item: reply}: {item: MessageThreadComment}) => {
@@ -245,6 +314,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     onSubmitReplyPress,
     placeholderText,
     insetsBottom: insets.bottom,
+    isLoading: isAddingComment,
   });
 
   // Update ref synchronously (not in useEffect) to ensure current values
@@ -254,6 +324,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     onSubmitReplyPress,
     placeholderText,
     insetsBottom: insets.bottom,
+    isLoading: isAddingComment,
   };
 
   // Completely stable callback - reference never changes
@@ -272,6 +343,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             onSubmit={current.onSubmitReplyPress}
             placeholder={current.placeholderText}
             bottomInset={current.insetsBottom}
+            isLoading={current.isLoading}
           />
         </BottomSheetFooter>
       );
@@ -310,7 +382,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
                   ListEmptyComponent={renderEmpty}
                   contentContainerStyle={[
                     styles.listContent,
-                    {paddingBottom: ms(150)},
+                    {paddingBottom: ms(250)},
                   ]}
                   showsVerticalScrollIndicator={false}
                   style={styles.listStyle}
