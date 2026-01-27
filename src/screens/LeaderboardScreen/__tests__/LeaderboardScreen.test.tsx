@@ -130,7 +130,7 @@ describe('LeaderboardScreen', () => {
   it('renders period tabs', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
     expect(getByText('7 days')).toBeTruthy();
-    expect(getByText('30 days')).toBeTruthy();
+    expect(getByText('28 days')).toBeTruthy();
     expect(getByText('365 days')).toBeTruthy();
     expect(getByText('All Time')).toBeTruthy();
   });
@@ -155,7 +155,7 @@ describe('LeaderboardScreen', () => {
 
   it('changes active period when tab is pressed', () => {
     const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthTab = getByText('30 days');
+    const monthTab = getByText('28 days');
 
     fireEvent.press(monthTab);
 
@@ -171,7 +171,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Tab should still be visible
-    expect(getByText('30 days')).toBeTruthy();
+    expect(getByText('28 days')).toBeTruthy();
   });
 
   it('renders rank badges for all entries', () => {
