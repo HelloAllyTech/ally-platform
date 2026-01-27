@@ -12,6 +12,7 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {
   useAddReviewCommentMutation,
   useGetMessagesQuery,
@@ -51,6 +52,13 @@ export const ReviewDetailsScreen: React.FC = () => {
   const [selectedMessageForThreads, setSelectedMessageForThreads] = useState<
     string | null
   >(null);
+  const navigation = useAppNavigation();
+
+  useHardwareBackPressHandler(() => {
+    handleCloseMessageThreads();
+    navigation.goBack();
+    return true;
+  });
 
   // API hooks
   const {

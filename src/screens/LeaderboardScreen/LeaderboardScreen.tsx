@@ -289,7 +289,7 @@ export const LeaderboardScreen: React.FC = () => {
               },
               {
                 key: LeaderboardPeriod.LAST_MONTH,
-                label: `30 ${t('Leaderboard.period.days')}`,
+                label: `28 ${t('Leaderboard.period.days')}`,
               },
               {
                 key: LeaderboardPeriod.LAST_YEAR,
