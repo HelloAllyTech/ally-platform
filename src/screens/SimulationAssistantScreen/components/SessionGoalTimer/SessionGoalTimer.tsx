@@ -151,7 +151,7 @@ const styles = ScaledSheet.create({
   },
   progressBarBackground: {
     width: '100%',
-    height: '6@vs',
+    height: '14@vs',
     backgroundColor: '#94a3b8', // slate-400
     borderRadius: '8@ms',
     overflow: 'hidden',
