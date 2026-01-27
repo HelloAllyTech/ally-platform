@@ -81,6 +81,7 @@ export const ReviewDetailsScreen: React.FC = () => {
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,
+    closeCommentBottomSheet,
   } = useReviewComments();
 
   // Helper to map message threads to comment ranges
@@ -323,14 +324,13 @@ export const ReviewDetailsScreen: React.FC = () => {
     [onThreadPress],
   );
 
-  // TOOD_M: Logic to handle back button for message threads bottom sheet
-  // const handleHideCommentThreadBottomSheet = () => {
-  //   if (currentMessageIdRef.current) {
-  //     setIsMessageThreadsVisible(true);
-  //     setSelectedMessageForThreads(currentMessageIdRef.current);
-  //   }
-  //   hideCommentThreadBottomSheet();
-  // };
+  const handleHideCommentThreadBottomSheet = () => {
+    if (currentMessageIdRef.current) {
+      setIsMessageThreadsVisible(true);
+      setSelectedMessageForThreads(currentMessageIdRef.current);
+      closeCommentBottomSheet();
+    }
+  };
 
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
@@ -417,7 +417,7 @@ export const ReviewDetailsScreen: React.FC = () => {
           // Handle add reaction press
         }}
         onReplyPress={onReplyPress}
-        hideCommentThreadBottomSheet={hideCommentThreadBottomSheet}
+        hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}

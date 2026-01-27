@@ -53,6 +53,10 @@ export const useReviewComments = () => {
     setIsThreadsBottomSheetVisible(true);
   };
 
+  const closeCommentBottomSheet = () => {
+    setIsCommentThreadBottomSheetVisible(false);
+  };
+
   return {
     isThreadsBottomSheetVisible,
     closeThreadsBottomSheet,
@@ -68,5 +72,6 @@ export const useReviewComments = () => {
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,
+    closeCommentBottomSheet,
   };
 };
