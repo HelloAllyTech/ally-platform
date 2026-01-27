@@ -49,6 +49,8 @@ export interface Scenario {
   deletedAt?: string | null;
   isGlobal?: boolean;
   terminationEvent?: unknown;
+  timerMode?: boolean;
+  maxTimeValue?: string;
 }
 
 export interface ScenariosResponse {
