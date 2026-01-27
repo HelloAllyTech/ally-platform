@@ -48,15 +48,9 @@ export const useReviewComments = () => {
     setIsCommentThreadBottomSheetVisible(true);
   };
 
-  const hideCommentThreadBottomSheet = ({
-    shouldShowThreadsBottomSheet = true,
-  }: {
-    shouldShowThreadsBottomSheet?: boolean;
-  }) => {
+  const hideCommentThreadBottomSheet = () => {
     setIsCommentThreadBottomSheetVisible(false);
-    if (shouldShowThreadsBottomSheet) {
-      setIsThreadsBottomSheetVisible(true);
-    }
+    setIsThreadsBottomSheetVisible(true);
   };
 
   return {
