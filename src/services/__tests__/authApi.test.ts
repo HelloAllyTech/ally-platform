@@ -93,6 +93,7 @@ describe('authApi endpoints', () => {
         UserRole.CLIENT,
         UserRole.COUNSELOR,
         UserRole.LEARNER,
+        UserRole.REVIEWER,
         UserRole.ADMIN,
         UserRole.SUPER_ADMIN,
       ];
@@ -102,7 +103,7 @@ describe('authApi endpoints', () => {
         allowedRoles: allRoles,
       } as any;
       
-      expect(request.allowedRoles).toHaveLength(5);
+      expect(request.allowedRoles).toHaveLength(6);
       expect(request.allowedRoles).toContain(UserRole.ADMIN);
       expect(request.allowedRoles).toContain(UserRole.SUPER_ADMIN);
     });
