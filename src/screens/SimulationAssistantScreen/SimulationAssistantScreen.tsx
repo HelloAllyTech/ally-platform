@@ -19,6 +19,7 @@ import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
 import {
+  DEFAULT_MAX_TIME_VALUE,
   MINUTES_IN_MS,
   SCREEN_NAMES,
   SECONDS_IN_MS,
@@ -41,6 +42,7 @@ import {
 import {
   EndingSoonModal,
   LiveFeedback,
+  SessionGoalTimer,
   SessionScoreMeter,
   SimulationControls,
   SimulationTimer,
@@ -324,6 +326,17 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         <View style={styles.contentContainer}>
           {isSimulationInProgress && startTime && (
             <SimulationTimer startTime={startTime} />
+          )}
+
+          {isSimulationInProgress && startTime && scenario?.timerMode && (
+            <SessionGoalTimer
+              startTime={startTime}
+              maxTimeValue={
+                scenario?.maxTimeValue
+                  ? scenario?.maxTimeValue
+                  : DEFAULT_MAX_TIME_VALUE
+              }
+            />
           )}
           <>
             {!isSimulationInProgress ? (
