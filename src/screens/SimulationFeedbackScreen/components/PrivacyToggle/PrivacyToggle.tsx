@@ -52,11 +52,11 @@ const styles = ScaledSheet.create({
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
     shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
   innerContainer: {
     flexDirection: 'row',
@@ -78,11 +78,11 @@ const styles = ScaledSheet.create({
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
     shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
   text: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

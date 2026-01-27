@@ -80,7 +80,7 @@ export const SimulationTranscript: React.FC<{
         message={message}
         speakerLabel={speaker}
         isActive={index === activeIndex}
-        onPress={onSeek ? () => onSeek(startSeconds) : undefined}
+        // onPress={onSeek ? () => onSeek(startSeconds) : undefined}
         isLearner={learner}
       />
     );
