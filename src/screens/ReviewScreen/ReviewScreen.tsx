@@ -35,7 +35,6 @@ export const ReviewScreen: React.FC = () => {
     refresh,
     setSelectedFilter,
   } = useReviews();
-  console.log('🚀 ~ ReviewScreen ~ reviews:', reviews);
 
   // State for expanded cards
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);

@@ -5,5 +5,8 @@
 echo "🔍 Running TypeScript type checking..."
 npx tsc --noEmit
 
-# Run lint-staged (ESLint, Prettier, and Tests on staged files only)
+# Run tests
+npm test
+
+# Run lint-staged (ESLint and Prettier)
 npx lint-staged

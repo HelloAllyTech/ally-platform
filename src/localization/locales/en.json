@@ -451,7 +451,7 @@
     "submitButton": "Submit"
   },
   "Leaderboard": {
-    "title": "Leaderboard",
+    "title": "Community",
     "badges": "Badges",
     "tableHeaders": {
       "rank": "Rank",
@@ -460,11 +460,12 @@
       "badges": "Badges"
     },
     "period": {
-      "last": "Last",
-      "week": "week",
-      "month": "month",
-      "year": "year",
+      "days": "days",
       "allTime": "All time"
+    },
+    "emptyState": {
+      "title": "No leaderboard data yet",
+      "description": "Start practicing to see your progress and compete with others"
     }
   },
   "Reactions": {
