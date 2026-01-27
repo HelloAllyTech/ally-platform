@@ -1,10 +1,12 @@
 import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
+import {ms} from 'react-native-size-matters';
 
-import {AddReactionIcon} from '@/assets/icons';
+import {AddReactionIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
+import {EmojiPicker} from '../EmojiPicker';
 import {styles} from './styles';
 import {ReviewCommentProps} from './types';
 
@@ -16,11 +18,14 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   reactions = [],
   reactionCount = 0,
   replyCount = 0,
-  onAddReactionPress,
+  onAddReactionPress: _onAddReactionPress,
   onReplyPress,
   onCommentPress,
   showReplyButton = true,
+  onEmojiSelect,
+  disableAddReactionButton = true,
   showAddReactionButton = true,
+  selectedEmoji,
 }) => {
   const {t} = useTranslate();
   const initials = name ? name.charAt(0).toUpperCase() : '';
@@ -71,16 +76,25 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         <View style={styles.footerRow}>
           <View style={styles.footerRowLeft}>
             {showAddReactionButton && (
-              <TouchableOpacity
-                style={styles.likeButton}
-                onPress={onAddReactionPress}
-                activeOpacity={0.7}>
-                <AddReactionIcon
-                  width={20}
-                  height={20}
-                  color={colors.ds.icon.default}
-                />
-              </TouchableOpacity>
+              <>
+                {disableAddReactionButton ? (
+                  <View style={styles.likeButton}>
+                    <AddReactionIcon
+                      width={ms(16)}
+                      height={ms(16)}
+                      color={colors.ds.icon.default}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.likeButton}>
+                    <EmojiPicker
+                      containerOffsetX={ms(70)}
+                      onEmojiSelect={onEmojiSelect || (() => {})}
+                      selectedEmoji={selectedEmoji}
+                    />
+                  </View>
+                )}
+              </>
             )}
             {/* Reactions */}
             {reactions.length > 0 && (

@@ -2,6 +2,12 @@ import {API_METHODS, API_ROUTES} from '@/constants';
 
 import {api} from './api';
 
+export enum ReactionAction {
+  ADD = 'ADD',
+  REMOVE = 'REMOVE',
+  UPDATE = 'UPDATE',
+}
+
 export interface ReactionUser {
   id: string | number;
   name: string;
@@ -31,6 +37,12 @@ export interface ReactionsCountResponse {
   };
 }
 
+export interface AddReactionRequest {
+  id: string;
+  reaction: string;
+  action: ReactionAction;
+}
+
 export const reactionsApi = api.injectEndpoints({
   endpoints: builder => ({
     getReactions: builder.query<ReactionsResponse, ReactionsParams>({
@@ -50,8 +62,26 @@ export const reactionsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
     }),
+    addReactionToComment: builder.mutation<void, AddReactionRequest>({
+      query: ({id, reaction, action}) => ({
+        url: API_ROUTES.REVIEWS.ADD_REACTION_TO_COMMENT(id),
+        method: API_METHODS.POST,
+        body: {reaction, action},
+      }),
+    }),
+    addReactionToReview: builder.mutation<void, AddReactionRequest>({
+      query: ({id, reaction, action}) => ({
+        url: API_ROUTES.REVIEWS.ADD_REACTION_TO_REVIEW(id),
+        method: API_METHODS.POST,
+        body: {reaction, action},
+      }),
+    }),
   }),
 });
 
-export const {useLazyGetReactionsQuery, useLazyGetReactionsCountQuery} =
-  reactionsApi;
+export const {
+  useLazyGetReactionsQuery,
+  useLazyGetReactionsCountQuery,
+  useAddReactionToCommentMutation,
+  useAddReactionToReviewMutation,
+} = reactionsApi;

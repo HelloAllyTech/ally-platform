@@ -208,7 +208,6 @@ const styles = ScaledSheet.create({
   },
   modalContainerFitContent: {
     height: 'auto',
-    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',
@@ -222,6 +221,7 @@ const styles = ScaledSheet.create({
     ...typography.display.small,
     fontWeight: fontWeights.light,
     color: colors.ds.typography.highEmphasis,
+    maxWidth: '90%',
   },
   headerTitleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

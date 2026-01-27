@@ -1,8 +1,8 @@
 export interface EmojiPickerProps {
   /** Array of currently selected emoji Unicode values (e.g., '1F44D' for 👍) */
-  selectedEmojis?: string[];
+  selectedEmoji?: string | null;
   /** Callback when an emoji is selected or deselected. Receives Unicode value (e.g., '1F44D') */
-  onEmojiSelect: (unicode: string, isSelected: boolean) => void;
+  onEmojiSelect: (currentEmoji: string | null, unicode: string) => void;
   /** Horizontal offset for positioning the emoji list */
   containerOffsetX?: number;
   /** Custom icon component (defaults to add_reaction.svg) */
