@@ -333,6 +333,10 @@
     "endSimulation": "End Simulation",
     "endSimulationConfirmation": "Are you sure you want to end this simulation?"
   },
+  "SimulationTimer": {
+    "sessionTimer": "Session Timer",
+    "timeRemaining": "Time Remaining"
+  },
   "NetworkLogs": {
     "logs": "Logs"
   },

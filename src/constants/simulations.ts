@@ -55,3 +55,5 @@ export enum SimulationEventStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
 }
+
+export const DEFAULT_MAX_TIME_VALUE = '00:10:00';
