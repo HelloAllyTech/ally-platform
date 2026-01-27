@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, Text, TextStyle, View, ViewStyle} from 'react-native';
+import {Text, TextStyle, View, ViewStyle} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
@@ -13,7 +13,6 @@ export type SimulationTranscriptItemProps = {
   messageTextStyle?: TextStyle;
   messageStyle?: TextStyle;
   isActive?: boolean;
-  onPress?: () => void;
   isLearner?: boolean;
 };
 
@@ -28,14 +27,10 @@ export const SimulationTranscriptItem: React.FC<
   messageTextStyle,
   messageStyle,
   isActive = false,
-  onPress,
   isLearner = false,
 }) => {
   return (
-    <Pressable
-      style={[styles.messageContainer, containerStyle]}
-      onPress={onPress}
-      disabled={!onPress}>
+    <View style={[styles.messageContainer, containerStyle]}>
       <View style={styles.leftContainer}>
         <View
           style={[
@@ -65,7 +60,7 @@ export const SimulationTranscriptItem: React.FC<
           <Text style={[styles.message, messageStyle]}>{message}</Text>
         </Text>
       </View>
-    </Pressable>
+    </View>
   );
 };
 

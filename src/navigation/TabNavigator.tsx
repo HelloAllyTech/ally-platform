@@ -24,7 +24,6 @@ import {
   SearchActiveIcon,
   SearchInactiveIcon,
 } from '@/assets';
-import {env} from '@/config/env';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
@@ -52,29 +51,21 @@ const ALL_TABS = [
     // The tab is mandatory for all users as logout drawer has this tab. The permission checks are done in the CallLogsScreen.
     requiredPermissions: [],
   },
-  ...(env.PEER_REVIEW_FLAG
-    ? [
-        {
-          name: SCREEN_NAMES.REVIEW,
-          component: ReviewScreen,
-          requiredPermissions: [USER_PERMISSIONS.VIEW_REVIEWS],
-        },
-      ]
-    : []),
+  {
+    name: SCREEN_NAMES.REVIEW,
+    component: ReviewScreen,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_REVIEWS],
+  },
   {
     name: SCREEN_NAMES.USER_ANALYTICS,
     component: UserAnalyticsScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_ANALYTICS_DASHBOARD],
   },
-  ...(env.LEADERBOARD_FLAG
-    ? [
-        {
-          name: SCREEN_NAMES.LEADERBOARD,
-          component: LeaderboardScreen,
-          requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD],
-        },
-      ]
-    : []),
+  {
+    name: SCREEN_NAMES.LEADERBOARD,
+    component: LeaderboardScreen,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD],
+  },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,

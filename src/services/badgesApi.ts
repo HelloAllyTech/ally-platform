@@ -17,12 +17,20 @@ export const badgesApi = api.injectEndpoints({
         url: API_ROUTES.BADGES.GET_BADGES(viewedStatus),
         method: API_METHODS.GET,
       }),
+      providesTags: (result, error, viewedStatus) => [
+        {type: 'Badges', id: `LIST-${viewedStatus}`},
+      ],
     }),
     markBadgeAsViewed: builder.mutation<void, string>({
       query: badgeId => ({
         url: API_ROUTES.BADGES.MARK_BADGE_AS_VIEWED(badgeId),
-        method: API_METHODS.POST,
+        method: API_METHODS.PATCH,
       }),
+      invalidatesTags: [
+        {type: 'Badges', id: `LIST-${ViewedStatus.UNVIEWED}`},
+        {type: 'Badges', id: `LIST-${ViewedStatus.VIEWED}`},
+        'Badges',
+      ],
     }),
   }),
 });
