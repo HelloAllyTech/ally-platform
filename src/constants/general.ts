@@ -199,6 +199,13 @@ export const API_METHODS = {
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
 export const PRIVACY_POLICY_URL = 'https://helloally.ai/policy';
 
+export const SIMULATION_START_NOTIFICATION = {
+  TITLE: 'Before you get started',
+  DESCRIPTION:
+    'At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!',
+  START_SESSION: 'Start Session',
+};
+
 export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
   {image: carousel1, textKey: 'Carousel.slide1'},
   {image: carousel2, textKey: 'Carousel.slide2'},
