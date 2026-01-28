@@ -3,6 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {Message as MessageComponent} from '@/components/Message';
 import {SelectableTextArea} from '@/components/SelectableTextArea/SelectableTextArea';
+import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -43,6 +44,27 @@ export const Conversation: React.FC<ConversationProps> = ({
 
   const handleSelection = (selection: TextSelection, messageId: string) => {
     onSelection?.(selection, messageId);
+  };
+
+  const renderSelectableMessageV2 = (messageItem: MessageData) => {
+    const highlightedPartIndices = messageItem.messagePart
+      .map((part, index) => (part.commentIds.length > 0 ? index : -1))
+      .filter(index => index !== -1);
+    return (
+      <SelectableTextInput
+        parts={messageItem.messagePart.map(part => part.text)}
+        highlightedPartIndices={highlightedPartIndices}
+        highlightStyle={styles.highlightedText}
+        partTextStyle={styles.messageContent}
+        separator=""
+        key={`${messageItem.id}`}
+        onAddComment={selectionData =>
+          handleSelection(selectionData, messageItem.id)
+        }
+        multiline
+        editable={false}
+      />
+    );
   };
 
   const renderSelectableMessage = (messageItem: MessageData) => (
