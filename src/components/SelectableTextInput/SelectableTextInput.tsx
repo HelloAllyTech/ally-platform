@@ -40,13 +40,6 @@ export interface SelectableTextInputProps {
   highlightedPartIndices?: number[];
   placeholder?: string;
   multiline?: boolean;
-  /**
-   * Set to false to make text selectable but not editable.
-   * Note: On Android, editable={false} may limit text selection capabilities.
-   * For best results on Android, consider using editable={true} and handling
-   * onChangeText to prevent modifications if needed.
-   */
-  editable?: boolean;
 }
 
 export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
@@ -61,7 +54,6 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   highlightedPartIndices = [],
   placeholder,
   multiline = false,
-  editable = false,
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [selection, setSelection] = useState({start: 0, end: 0});
@@ -170,10 +162,11 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
       <TextInput
         ref={inputRef}
         value={displayText}
-        editable={editable}
+        editable
         selectTextOnFocus={false}
-        selectionColor={colors.ds.theme.primary}
+        selectionColor="rgba(173, 216, 230, 0.5)"
         onSelectionChange={handleSelectionChange}
+        showSoftInputOnFocus={false}
         style={[
           styles.textInput,
           textStyle,
@@ -189,6 +182,8 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         importantForAutofill="no"
         // Prevent text selection handles from showing default menu
         caretHidden={false}
+        cursorColor="transparent"
+        selectionHandleColor="transparent"
       />
 
       <Modal
