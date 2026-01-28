@@ -459,9 +459,6 @@ export const ReviewDetailsScreen: React.FC = () => {
         onClose={closeCommentThreadBottomSheet}
         reviewId={_reviewId}
         threadId={selectedThreadId || ''}
-        onAddReactionPress={_commentId => {
-          // Handle add reaction press
-        }}
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
@@ -470,12 +467,6 @@ export const ReviewDetailsScreen: React.FC = () => {
         onClose={closeReplyBottomSheet}
         commentId={selectedComment?.id || ''}
         originalComment={selectedComment || null}
-        onAddReactionPress={_commentId => {
-          // Handle add reaction press
-        }}
-        onReplyPress={_commentId => {
-          // Handle reply press
-        }}
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
       />
