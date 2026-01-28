@@ -46,8 +46,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   onClose,
   commentId,
   originalComment,
-  onAddReactionPress,
-  onReplyPress,
   reviewId,
   hideReplyBottomSheet,
 }) => {
@@ -247,8 +245,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             reactionCount={reactionCount}
             replyCount={0}
             showReplyButton={false}
-            onAddReactionPress={() => onAddReactionPress?.(reply.id)}
-            onReplyPress={() => onReplyPress?.(reply.id)}
             onEmojiSelect={(currentEmoji, unicode) =>
               handleEmojiSelect(reply.id, currentEmoji, unicode)
             }
@@ -257,7 +253,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         </View>
       );
     },
-    [onAddReactionPress, onReplyPress, handleEmojiSelect],
+    [handleEmojiSelect],
   );
 
   const renderHeader = useCallback(() => {
@@ -300,14 +296,13 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           reactionCount={reactionCount}
           replyCount={0}
           showReplyButton={false}
-          onAddReactionPress={() => onAddReactionPress?.(originalComment.id)}
           onEmojiSelect={(currentEmoji, unicode) =>
             handleEmojiSelect(originalComment.id, currentEmoji, unicode)
           }
         />
       </View>
     );
-  }, [originalComment, onAddReactionPress, handleEmojiSelect]);
+  }, [originalComment, handleEmojiSelect]);
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
