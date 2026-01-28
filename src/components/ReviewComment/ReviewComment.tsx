@@ -23,7 +23,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   onCommentPress,
   showReplyButton = true,
   onEmojiSelect,
-  disableAddReactionButton = true,
+  disableAddReactionButton = false,
   showAddReactionButton = true,
   selectedEmoji,
 }) => {
