@@ -62,7 +62,6 @@ export const Conversation: React.FC<ConversationProps> = ({
           handleSelection(selectionData, messageItem.id)
         }
         multiline
-        editable={false}
       />
     );
   };
@@ -107,7 +106,7 @@ export const Conversation: React.FC<ConversationProps> = ({
       onPress={() => onThreadClick?.(item.id, item.id)}
       message={
         isSelectable
-          ? renderSelectableMessage(item)
+          ? renderSelectableMessageV2(item)
           : renderDefaultMessage(item)
       }
     />
