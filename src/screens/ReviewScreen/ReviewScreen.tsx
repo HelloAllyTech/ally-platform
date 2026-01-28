@@ -74,53 +74,60 @@ export const ReviewScreen: React.FC = () => {
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{t('Review.header.title')} </Text>
       </View>
-      <View style={styles.tabContainer}>
-        <TabView
-          tabs={REVIEW_FILTERS}
-          tabWidthMode="content"
-          activeTab={selectedFilter}
-          onTabChange={setSelectedFilter}
+      <View style={styles.contentContainer}>
+        <View style={styles.tabContainer}>
+          <TabView
+            tabs={REVIEW_FILTERS}
+            tabWidthMode="content"
+            activeTab={selectedFilter}
+            onTabChange={setSelectedFilter}
+          />
+        </View>
+
+        <FlatList
+          contentContainerStyle={styles.list}
+          data={reviews}
+          renderItem={({item}) => (
+            <ReviewCard
+              key={item.id}
+              id={item.id}
+              user={item.createdBy}
+              scenario={item.scenario}
+              createdAt={item.createdAt}
+              scenarioSession={item.scenarioSession}
+              commentsCount={item.commentsCount}
+              onReviewPress={() => handleReviewPress(item.id)}
+              onCommentPress={handleCommentPress}
+              reactions={item.reactions}
+              isExpanded={expandedReviewId === item.id}
+            />
+          )}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshing={isFetching}
+          onRefresh={refresh}
+          ListEmptyComponent={
+            !isLoading && !isFetching && reviews.length === 0 ? (
+              <EmptyState
+                title={t('Review.empty.title')}
+                description={t('Review.empty.description')}
+                icon={EmptyReviewIcon}
+              />
+            ) : null
+          }
+          ListFooterComponent={
+            isLoading || isFetching || hasMore ? (
+              <View style={styles.footerContainer}>
+                <ActivityIndicator
+                  size="small"
+                  color={colors.ds.theme.primary}
+                />
+              </View>
+            ) : null
+          }
+          ItemSeparatorComponent={SeparatorComponent}
         />
       </View>
-
-      <FlatList
-        contentContainerStyle={styles.list}
-        data={reviews}
-        renderItem={({item}) => (
-          <ReviewCard
-            key={item.id}
-            id={item.id}
-            user={item.createdBy}
-            scenario={item.scenario}
-            commentsCount={item.commentsCount}
-            onReviewPress={() => handleReviewPress(item.id)}
-            onCommentPress={handleCommentPress}
-            reactions={item.reactions}
-            isExpanded={expandedReviewId === item.id}
-          />
-        )}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        refreshing={isFetching}
-        onRefresh={refresh}
-        ListEmptyComponent={
-          !isLoading && !isFetching && reviews.length === 0 ? (
-            <EmptyState
-              title={t('Review.empty.title')}
-              description={t('Review.empty.description')}
-              icon={EmptyReviewIcon}
-            />
-          ) : null
-        }
-        ListFooterComponent={
-          isLoading || isFetching || hasMore ? (
-            <View style={styles.footerContainer}>
-              <ActivityIndicator size="small" color={colors.ds.theme.primary} />
-            </View>
-          ) : null
-        }
-        ItemSeparatorComponent={SeparatorComponent}
-      />
     </View>
   );
 };
@@ -140,16 +147,19 @@ const styles = ScaledSheet.create({
   },
   title: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    ...typography.display.small,
-    fontWeight: fontWeights.light,
     color: colors.ds.typography.highEmphasis,
+    ...typography.display.small,
+    fontWeight: fontWeights.medium,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: colors.lightGray9,
   },
   tabContainer: {
     marginTop: '16@ms',
     paddingHorizontal: '16@s',
   },
   list: {
-    backgroundColor: colors.lightGray9,
     paddingHorizontal: '16@s',
     paddingTop: '10@ms',
     paddingBottom: '360@ms',

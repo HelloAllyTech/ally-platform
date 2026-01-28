@@ -90,6 +90,7 @@ export const MessageThreadsBottomSheet: React.FC<
               reactionCount={reactionCount}
               replyCount={firstComment.replyCount}
               showReplyButton={false}
+              disableAddReactionButton
               onCommentPress={() => onThreadPress?.(thread.id, messageId)}
             />
             {remainingCount > 0 && (

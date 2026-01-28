@@ -22,12 +22,19 @@ import {
 } from '@/components';
 import {useTranslate} from '@/hooks';
 import {useUser} from '@/hooks/useUser';
-import {useAddReviewCommentMutation} from '@/services/reviewsApi';
+import {
+  useAddReactionToCommentMutation,
+  useAddReviewCommentMutation,
+} from '@/services';
 import {useLazyGetCommentRepliesQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
-import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
+import {
+  getReactionAction,
+  getReactionsArray,
+  getTotalReactionCount,
+} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {ReplyBottomSheetProps} from './types';
@@ -62,6 +69,8 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   } | null>(null);
   const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
+  const [addReaction, {isLoading: isAddingReaction}] =
+    useAddReactionToCommentMutation();
 
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
@@ -189,6 +198,39 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     ],
   );
 
+  const handleEmojiSelect = useCallback(
+    async (messageId: string, currentEmoji: string | null, unicode: string) => {
+      try {
+        await addReaction({
+          id: messageId,
+          reaction: unicode,
+          action: getReactionAction(currentEmoji, unicode),
+        }).unwrap();
+        // Refetch replies to get updated reaction data
+        if (commentId) {
+          offsetRef.current = 0;
+          const result = await getCommentReplies({
+            commentId,
+            offset: 0,
+            limit: LIMIT,
+          });
+          if (result.data) {
+            // Replace data completely when refetching from the beginning
+            setReplies(result.data);
+            if (result.data.data.length >= result.data.count) {
+              setHasMore(false);
+            } else {
+              setHasMore(true);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to add reaction:', error);
+      }
+    },
+    [addReaction, commentId, getCommentReplies],
+  );
+
   const renderReplyItem = useCallback(
     ({item: reply}: {item: MessageThreadComment}) => {
       const reactionsArray = getReactionsArray(reply.reactions);
@@ -207,11 +249,15 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             showReplyButton={false}
             onAddReactionPress={() => onAddReactionPress?.(reply.id)}
             onReplyPress={() => onReplyPress?.(reply.id)}
+            onEmojiSelect={(currentEmoji, unicode) =>
+              handleEmojiSelect(reply.id, currentEmoji, unicode)
+            }
+            selectedEmoji={reply.myReaction}
           />
         </View>
       );
     },
-    [onAddReactionPress, onReplyPress],
+    [onAddReactionPress, onReplyPress, handleEmojiSelect],
   );
 
   const renderHeader = useCallback(() => {
@@ -255,10 +301,13 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           replyCount={0}
           showReplyButton={false}
           onAddReactionPress={() => onAddReactionPress?.(originalComment.id)}
+          onEmojiSelect={(currentEmoji, unicode) =>
+            handleEmojiSelect(originalComment.id, currentEmoji, unicode)
+          }
         />
       </View>
     );
-  }, [originalComment, onAddReactionPress]);
+  }, [originalComment, onAddReactionPress, handleEmojiSelect]);
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;

@@ -1,8 +1,16 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, SafeAreaView, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {
+  ActivityIndicator,
+  Keyboard,
+  SafeAreaView,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrow} from '@/assets';
 import {
   CommentInput,
   CommentThreadBottomSheet,
@@ -12,10 +20,12 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
+import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {
   useAddReviewCommentMutation,
   useGetMessagesQuery,
+  useGetReviewByIdQuery,
 } from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {
@@ -33,6 +43,7 @@ const MESSAGES_PER_PAGE = 10;
 export const ReviewDetailsScreen: React.FC = () => {
   const isSelectable = true;
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
   const {reviewId: _reviewId} = route.params || {};
   const currentMessageIdRef = useRef<string | null>(null);
 
@@ -55,6 +66,14 @@ export const ReviewDetailsScreen: React.FC = () => {
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
+    // If comment input is visible, dismiss keyboard and hide it first
+    if (showCommentInput) {
+      Keyboard.dismiss();
+      resetCommentInput();
+      return true;
+    }
+
+    // Otherwise, close message threads and navigate back
     handleCloseMessageThreads();
     navigation.goBack();
     return true;
@@ -70,6 +89,10 @@ export const ReviewDetailsScreen: React.FC = () => {
     {reviewId: _reviewId, offset, limit: MESSAGES_PER_PAGE},
     {skip: !_reviewId},
   );
+
+  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery({
+    reviewId: _reviewId,
+  });
 
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
@@ -365,8 +388,20 @@ export const ReviewDetailsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, {paddingTop: insets.top}]}>
       {/* Main conversation/messages view */}
+      <View style={styles.titleContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <LeftArrow color={colors.black} width={ms(16)} height={ms(16)} />
+        </TouchableOpacity>
+        {reviewData && (
+          <ReviewTranscriptHeader
+            user={reviewData?.createdBy}
+            scenario={reviewData?.scenario}
+            scenarioSession={reviewData?.scenarioSession}
+          />
+        )}
+      </View>
       <Conversation
         messages={conversationMessages}
         isSelectable={isSelectable}
@@ -393,12 +428,15 @@ export const ReviewDetailsScreen: React.FC = () => {
       <View style={styles.interactionsBarContainer}>
         <InteractionsBar
           reviewId={_reviewId}
-          reactions={{}}
-          commentsCount={0}
+          reactions={reviewData?.reactions || {}}
+          commentsCount={reviewData?.commentsCount || 0}
           onCommentPress={showThreadsBottomSheet}
+          refreshReactions={() => {
+            refetchReviewData();
+          }}
+          myReaction={reviewData?.myReaction || null}
         />
       </View>
-
       <ThreadsBottomSheet
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
@@ -449,6 +487,15 @@ const styles = ScaledSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  titleContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray7,
+    // marginTop: '16@s',
+    paddingVertical: '8@s',
+    paddingHorizontal: '8@s',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   centered: {
     flex: 1,

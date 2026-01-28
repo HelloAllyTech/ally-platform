@@ -66,6 +66,12 @@ jest.mock('@/components', () => {
         <Text>{value || 'Select'}</Text>
       </TouchableOpacity>
     ),
+    NotificationModal: ({visible, onConfirm}: any) =>
+      visible ? (
+        <View testID="notification-modal">
+          <Text onPress={onConfirm}>Start Session</Text>
+        </View>
+      ) : null,
     IllustratedModal: () => null,
     useToast: () => ({showToast: jest.fn()}),
     VideoPreview: () => null,
@@ -140,8 +146,8 @@ describe('SimulationDetailsScreen', () => {
     expect(getByText('Description')).toBeTruthy();
   });
 
-  it('calls startSimulation when button is pressed', async () => {
-    const {getByTestId} = renderWithSafeArea(
+  it('calls startSimulation after notification confirmation', async () => {
+    const {getByTestId, getByText} = renderWithSafeArea(
       <SimulationDetailsScreen
         navigation={{} as any}
         route={{params: {scenario}} as any}
@@ -150,6 +156,11 @@ describe('SimulationDetailsScreen', () => {
 
     const button = getByTestId('primary-button');
     fireEvent.press(button);
+
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+
+    const notificationButton = getByText('Start Session');
+    fireEvent.press(notificationButton);
 
     await waitFor(() => {
       // startSimulation is called with (scenarioId, sessionId, pathId, languageId)
