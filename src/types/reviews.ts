@@ -61,7 +61,7 @@ export interface Message {
   createdAt: string;
   startSeconds: number;
   endSeconds: number;
-  senderId: string;
+  senderId: number;
   threads: MessageThread[];
 }
 
@@ -134,7 +134,7 @@ export interface MessageData {
   createdAt: string;
   startSeconds: number;
   endSeconds: number;
-  senderId: string;
+  senderId: number;
   messagePart: MessagePart[];
 }
 
