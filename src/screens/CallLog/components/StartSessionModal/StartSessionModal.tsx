@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 
 import {CloseIcon} from '@/assets';
-import {PrimaryButton, SecurityCarousel} from '@/components';
+import {NotificationModal, PrimaryButton, SecurityCarousel} from '@/components';
 import {useTranslate} from '@/hooks';
 
 import {styles} from './styles';
@@ -19,10 +19,20 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   onListenLive,
 }) => {
   const {t} = useTranslate();
+  const [showNotification, setShowNotification] = useState(false);
 
   const handleStart = () => {
+    setShowNotification(true);
+  };
+
+  const handleNotificationConfirm = () => {
+    setShowNotification(false);
     onListenLive();
     onClose();
+  };
+
+  const handleNotificationCancel = () => {
+    setShowNotification(false);
   };
 
   if (!visible) return null;
@@ -73,6 +83,11 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           <Text style={styles.consent}>{t('CallLogs.consentNotice')}</Text>
         </View>
       </View>
+      <NotificationModal
+        visible={showNotification}
+        onConfirm={handleNotificationConfirm}
+        onClose={handleNotificationCancel}
+      />
     </Modal>
   );
 };

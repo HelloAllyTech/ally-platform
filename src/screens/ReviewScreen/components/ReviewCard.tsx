@@ -25,7 +25,7 @@ import {
   theme,
   typography,
 } from '@/theme';
-import {ReviewScenario, User} from '@/types/reviews';
+import {ReviewScenario, ScenarioSessionData, User} from '@/types/reviews';
 import {
   formatDateTime,
   formatDurationFromSeconds,
@@ -42,6 +42,8 @@ interface ReviewCardProps {
   id: string;
   user: User;
   scenario: ReviewScenario;
+  createdAt: string;
+  scenarioSession: ScenarioSessionData;
   commentsCount?: number;
   reactions?: {
     [reaction_code: string]: number;
@@ -57,6 +59,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   id,
   user,
   scenario,
+  createdAt,
+  scenarioSession,
   commentsCount = 0,
   reactions = {},
   titleNumberOfLines = 1,
@@ -123,9 +127,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       </View>
       <View>
         <Text style={styles.userName}>{user.name}</Text>
-        <Text style={styles.timeAgoText}>
-          {formatRelativeTime(scenario.createdAt)}
-        </Text>
+        <Text style={styles.timeAgoText}>{formatRelativeTime(createdAt)}</Text>
       </View>
     </View>
   );
@@ -206,12 +208,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         </Text>
         {renderDetailRow(
           t('Review.card.dateAndTime'),
-          formatDateTime(scenario.createdAt),
+          formatDateTime(scenarioSession.createdAt),
         )}
-        {scenario.duration !== undefined &&
+        {scenarioSession.duration !== undefined &&
           renderDetailRow(
             t('Review.card.duration'),
-            formatDurationFromSeconds(scenario.duration),
+            formatDurationFromSeconds(scenarioSession.duration),
           )}
       </View>
 

@@ -21,6 +21,7 @@ import {
   ReviewComment,
 } from '@/components';
 import {useTranslate, useUser} from '@/hooks';
+import {useAddReactionToCommentMutation} from '@/services';
 import {
   useAddReviewCommentMutation,
   useLazyGetThreadCommentsQuery,
@@ -28,7 +29,11 @@ import {
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
-import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
+import {
+  getReactionAction,
+  getReactionsArray,
+  getTotalReactionCount,
+} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {CommentThreadBottomSheetProps} from './types';
@@ -70,6 +75,7 @@ export const CommentThreadBottomSheet: React.FC<
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
 
+  const [addReaction] = useAddReactionToCommentMutation();
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
     if (!visible) {
@@ -193,6 +199,40 @@ export const CommentThreadBottomSheet: React.FC<
     [addReviewComment, reviewId, threadId, userId, userName, userProfileImage],
   );
 
+  const handleEmojiSelect = useCallback(
+    async (commentId: string, currentEmoji: string | null, unicode: string) => {
+      try {
+        await addReaction({
+          id: commentId,
+          reaction: unicode,
+          action: getReactionAction(currentEmoji, unicode),
+        }).unwrap();
+        // Refetch comments to get updated reaction data
+        if (threadId) {
+          offsetRef.current = 0;
+          const result = await getThreadComments({
+            threadId,
+            offset: 0,
+            limit: LIMIT,
+          });
+          if (result.data) {
+            // Replace data completely when refetching from the beginning
+            setComments(result.data);
+            if (result.data.data.length >= result.data.count) {
+              setHasMore(false);
+            } else {
+              setHasMore(true);
+            }
+            setHasLoadedOnce(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to add reaction:', error);
+      }
+    },
+    [addReaction, threadId, getThreadComments],
+  );
+
   const renderCommentItem = useCallback(
     ({item: comment}: {item: MessageThreadComment}) => {
       const reactionsArray = getReactionsArray(comment.reactions);
@@ -213,11 +253,15 @@ export const CommentThreadBottomSheet: React.FC<
             showReplyButton
             onAddReactionPress={() => onAddReactionPress?.(comment.id)}
             onReplyPress={() => handleReplyPress(comment)}
+            onEmojiSelect={(currentEmoji, unicode) =>
+              handleEmojiSelect(comment.id, currentEmoji, unicode)
+            }
+            selectedEmoji={comment.myReaction}
           />
         </View>
       );
     },
-    [onAddReactionPress, handleReplyPress],
+    [onAddReactionPress, handleReplyPress, handleEmojiSelect],
   );
 
   const renderHeader = useCallback(() => {
