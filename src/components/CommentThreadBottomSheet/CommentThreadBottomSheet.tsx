@@ -206,12 +206,31 @@ export const CommentThreadBottomSheet: React.FC<
           id: commentId,
           reaction: unicode,
           action: getReactionAction(currentEmoji, unicode),
-        });
+        }).unwrap();
+        // Refetch comments to get updated reaction data
+        if (threadId) {
+          offsetRef.current = 0;
+          const result = await getThreadComments({
+            threadId,
+            offset: 0,
+            limit: LIMIT,
+          });
+          if (result.data) {
+            // Replace data completely when refetching from the beginning
+            setComments(result.data);
+            if (result.data.data.length >= result.data.count) {
+              setHasMore(false);
+            } else {
+              setHasMore(true);
+            }
+            setHasLoadedOnce(true);
+          }
+        }
       } catch (error) {
         console.error('Failed to add reaction:', error);
       }
     },
-    [addReaction],
+    [addReaction, threadId, getThreadComments],
   );
 
   const renderCommentItem = useCallback(

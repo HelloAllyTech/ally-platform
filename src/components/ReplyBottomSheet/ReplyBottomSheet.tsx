@@ -58,7 +58,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   } | null>(null);
   const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
-  const isLoadingRef = useRef(false);
   const [addReaction, {isLoading: isAddingReaction}] =
     useAddReactionToCommentMutation();
 
@@ -135,12 +134,30 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           id: messageId,
           reaction: unicode,
           action: getReactionAction(currentEmoji, unicode),
-        });
+        }).unwrap();
+        // Refetch replies to get updated reaction data
+        if (commentId) {
+          offsetRef.current = 0;
+          const result = await getCommentReplies({
+            commentId,
+            offset: 0,
+            limit: LIMIT,
+          });
+          if (result.data) {
+            // Replace data completely when refetching from the beginning
+            setReplies(result.data);
+            if (result.data.data.length >= result.data.count) {
+              setHasMore(false);
+            } else {
+              setHasMore(true);
+            }
+          }
+        }
       } catch (error) {
         console.error('Failed to add reaction:', error);
       }
     },
-    [addReaction],
+    [addReaction, commentId, getCommentReplies],
   );
 
   const renderReplyItem = useCallback(
