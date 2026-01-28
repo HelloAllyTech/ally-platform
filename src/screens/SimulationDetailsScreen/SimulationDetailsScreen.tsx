@@ -15,6 +15,7 @@ import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
 import {
   CustomDropdown,
   IllustratedModal,
+  NotificationModal,
   PrimaryButton,
   useToast,
   VideoPreview,
@@ -55,6 +56,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   } = useStartSimulation();
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
 
   // Use custom hook for language dropdown management
   const {
@@ -90,6 +92,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   const startSimulationPress = () => {
+    setShowNotification(true);
+  };
+
+  const handleConfirmSimulation = () => {
+    setShowNotification(false);
     const languageId = languageMap.get(selectedLanguage);
     startSimulation(scenario.id, undefined, undefined, languageId);
   };
@@ -231,6 +238,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           descriptionStyle={styles.lowCreditsDescription}
         />
       )}
+      <NotificationModal
+        visible={showNotification}
+        onConfirm={handleConfirmSimulation}
+        onClose={() => setShowNotification(false)}
+      />
     </View>
   );
 };

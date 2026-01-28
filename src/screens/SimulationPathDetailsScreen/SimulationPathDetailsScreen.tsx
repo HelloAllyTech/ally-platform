@@ -18,7 +18,12 @@ import {
   LeftArrowIcon,
   NoCreditsIcon,
 } from '@/assets';
-import {IllustratedModal, PrimaryButton, useToast} from '@/components';
+import {
+  IllustratedModal,
+  NotificationModal,
+  PrimaryButton,
+  useToast,
+} from '@/components';
 import {EmptyState} from '@/components/EmptyState/EmptyState';
 import {LOW_CREDITS_MODAL_DISPLAY_MS, SCREEN_NAMES} from '@/constants';
 import {
@@ -69,6 +74,7 @@ export const SimulationPathDetailsScreen: React.FC<
     useState<PathScenario | null>(null);
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
 
   // Use custom hook for language dropdown management
   const {
@@ -222,6 +228,13 @@ export const SimulationPathDetailsScreen: React.FC<
    */
   const handleStartSimulation = () => {
     if (selectedSimulation) {
+      setShowNotification(true);
+    }
+  };
+
+  const handleProceedWithSimulation = () => {
+    setShowNotification(false);
+    if (selectedSimulation) {
       const languageId = languageMap.get(selectedLanguage);
       startSimulation(
         selectedSimulation.scenarioId,
@@ -363,7 +376,7 @@ export const SimulationPathDetailsScreen: React.FC<
       )}
 
       <SimulationDetailsModal
-        visible={!!selectedSimulation?.sessionId}
+        visible={!!selectedSimulation?.sessionId && !showNotification}
         onClose={handleCloseModal}
         {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}
@@ -383,6 +396,12 @@ export const SimulationPathDetailsScreen: React.FC<
           scenarioSessionId={activeSimulationId}
         />
       )}
+
+      <NotificationModal
+        visible={showNotification}
+        onConfirm={handleProceedWithSimulation}
+        onClose={() => setShowNotification(false)}
+      />
 
       {/* Low Credits Modal */}
       {credits && getCreditsInfo && (

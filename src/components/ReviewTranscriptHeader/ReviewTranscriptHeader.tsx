@@ -6,29 +6,24 @@ import {HelpIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
-import {ReviewScenario, User} from '@/types/reviews';
+import {ReviewScenario, ScenarioSessionData, User} from '@/types/reviews';
 import {formatDateTime, formatDurationFromSeconds} from '@/utils';
 
 interface ReviewTranscriptHeaderProps {
   scenario?: ReviewScenario;
+  scenarioSession?: ScenarioSessionData;
   user: User;
 }
 export const ReviewTranscriptHeader = ({
   scenario,
+  scenarioSession,
   user,
 }: ReviewTranscriptHeaderProps) => {
   const [showSimulationDetailsModal, setShowSimulationDetailsModal] =
     useState<boolean>(false);
   const {t} = useTranslate();
 
-  const {
-    title,
-    createdAt,
-    duration,
-    description,
-    coverImageUrl,
-    coverVideoUrl,
-  } = scenario || {};
+  const {title, description, coverImageUrl, coverVideoUrl} = scenario || {};
 
   const renderSubtitleItem = (
     isSeparatorRequired: boolean,
@@ -36,6 +31,7 @@ export const ReviewTranscriptHeader = ({
     value?: string,
   ) => (
     <View style={styles.subtitleContainer}>
+      {isSeparatorRequired && <Text style={styles.separator}>•</Text>}
       <Text style={styles.subtitle}>{label}</Text>
       {value && (
         <Text style={styles.subtitle}>
@@ -43,7 +39,6 @@ export const ReviewTranscriptHeader = ({
           {value}
         </Text>
       )}
-      {isSeparatorRequired && <Text style={styles.separator}>•</Text>}
     </View>
   );
 
@@ -51,7 +46,9 @@ export const ReviewTranscriptHeader = ({
     <>
       <View style={styles.container}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
+          <Text numberOfLines={1} style={styles.title}>
+            {title}
+          </Text>
           <TouchableOpacity
             onPress={() => {
               setShowSimulationDetailsModal(true);
@@ -71,13 +68,17 @@ export const ReviewTranscriptHeader = ({
               />
             )}
           </View>
-          {user?.name && renderSubtitleItem(true, user?.name)}
-          {createdAt && renderSubtitleItem(true, formatDateTime(createdAt))}
-          {duration &&
+          {user?.name && renderSubtitleItem(false, user?.name)}
+          {scenarioSession?.createdAt &&
             renderSubtitleItem(
-              false,
+              true,
+              formatDateTime(scenarioSession?.createdAt),
+            )}
+          {scenarioSession?.duration &&
+            renderSubtitleItem(
+              true,
               t('Review.card.duration'),
-              formatDurationFromSeconds(duration),
+              formatDurationFromSeconds(scenarioSession?.duration),
             )}
         </ScrollView>
       </View>
@@ -97,13 +98,16 @@ export const ReviewTranscriptHeader = ({
 
 const styles = ScaledSheet.create({
   container: {
+    paddingHorizontal: '8@s',
     gap: '8@s',
+    flex: 1,
   },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.ds.typography.highEmphasis,
     ...typography.body.medium,
     fontWeight: fontWeights.medium,
+    maxWidth: '80%',
   },
   subtitleContainer: {
     flexDirection: 'row',

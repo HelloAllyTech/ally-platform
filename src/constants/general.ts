@@ -159,6 +159,7 @@ export const API_ROUTES = {
   REVIEWS: {
     REVIEWS: '/reviews',
     CREATE_REVIEW: '/reviews',
+    REVIEW_BY_ID: (reviewId: string) => `/reviews/${reviewId}`,
     UPDATE_REVIEW_STATUS: (reviewId: string) => `/reviews/${reviewId}`,
     ADD_REVIEW_COMMENT: (reviewId: string) => `/reviews/${reviewId}/comments`,
     GET_MESSAGES: (reviewId: string) => `/reviews/${reviewId}/messages`,
@@ -170,6 +171,10 @@ export const API_ROUTES = {
       `/reviews/threads/${threadId}/comments`,
     GET_COMMENT_REPLIES: (commentId: string) =>
       `/reviews/comments/${commentId}/replies`,
+    ADD_REACTION_TO_COMMENT: (commentId: string) =>
+      `/reviews/comments/${commentId}/reactions`,
+    ADD_REACTION_TO_REVIEW: (reviewId: string) =>
+      `/reviews/${reviewId}/reactions`,
   },
   BADGES: {
     AVAILABLE: '/badges/me/available',
@@ -193,6 +198,13 @@ export const API_METHODS = {
 
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
 export const PRIVACY_POLICY_URL = 'https://helloally.ai/policy';
+
+export const SIMULATION_START_NOTIFICATION = {
+  TITLE: 'Before you get started',
+  DESCRIPTION:
+    'At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!',
+  START_SESSION: 'Start Session',
+};
 
 export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
   {image: carousel1, textKey: 'Carousel.slide1'},
