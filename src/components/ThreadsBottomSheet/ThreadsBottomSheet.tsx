@@ -198,7 +198,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   }, [hasMore, reviewId, isFetching, isLoading]);
 
   const renderEmpty = useCallback(() => {
-    if (isLoading) {
+    if (isLoading || isFetching || (visible && !commentsData)) {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.ds.theme.primary} />
@@ -212,7 +212,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         </Text>
       </View>
     );
-  }, [isLoading, t]);
+  }, [isLoading, isFetching, visible, commentsData, t]);
 
   return (
     <BottomSheet
@@ -226,7 +226,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       enableOverDrag
       enableHandlePanningGesture>
       <View style={styles.container}>
-        {isLoading && !commentsData ? (
+        {(isLoading || isFetching) && !commentsData ? (
           <>
             {renderHeader()}
             {renderEmpty()}
