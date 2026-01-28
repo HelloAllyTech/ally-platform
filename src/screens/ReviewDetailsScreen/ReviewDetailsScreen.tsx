@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, SafeAreaView, View} from 'react-native';
+import {ActivityIndicator, Keyboard, SafeAreaView, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {
@@ -55,6 +55,14 @@ export const ReviewDetailsScreen: React.FC = () => {
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
+    // If comment input is visible, dismiss keyboard and hide it first
+    if (showCommentInput) {
+      Keyboard.dismiss();
+      resetCommentInput();
+      return true;
+    }
+
+    // Otherwise, close message threads and navigate back
     handleCloseMessageThreads();
     navigation.goBack();
     return true;

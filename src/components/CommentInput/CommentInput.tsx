@@ -1,7 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
+  Platform,
   TextInput,
   TouchableOpacity,
 } from 'react-native';
@@ -41,6 +43,21 @@ export const CommentInput: React.FC<CommentInputProps> = ({
     }
   }, [autoFocus]);
 
+  // Listen to keyboard events to update focus state when keyboard is dismissed
+  useEffect(() => {
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsFocused(false);
+        inputRef.current?.blur();
+      },
+    );
+
+    return () => {
+      keyboardWillHide.remove();
+    };
+  }, []);
+
   const onInputFocus = () => {
     setIsFocused(true);
     onFocus?.();
@@ -53,7 +70,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
 
   return (
     <KeyboardAvoidingView
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[
         styles.inputContainer,
         isFocused && styles.inputContainerFocused,
@@ -66,6 +83,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onFocus={onInputFocus}
         onBlur={onInputBlur}
         ref={inputRef}
+        autoFocus
       />
       <TouchableOpacity
         activeOpacity={isSendButtonDisabled ? 0 : 0.7}
@@ -93,6 +111,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
 const styles = ScaledSheet.create({
   inputContainerFocused: {
     backgroundColor: colors.ds.surface.background,
+    paddingBottom: Platform.OS === 'ios' ? 0 : 300,
   },
   inputContainer: {
     backgroundColor: 'transparent',
