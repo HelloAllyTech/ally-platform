@@ -68,7 +68,7 @@ export const ReactionFilterTabs: React.FC<ReactionFilterTabsProps> = ({
           <View style={styles.filterContent}>
             <View style={styles.emojiBubble}>
               <Text style={styles.tabEmoji}>
-                {EMOJI_UNICODE_MAP[item.reaction]}
+                {EMOJI_UNICODE_MAP[item.reaction.toLowerCase()]}
               </Text>
             </View>
             <Text style={styles.tabCount}>{item.label}</Text>

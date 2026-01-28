@@ -106,6 +106,13 @@ jest.mock('@/components', () => {
       </TouchableOpacity>
     ),
     EmptyState: ({title}: any) => <Text testID="empty-state">{title}</Text>,
+    NotificationModal: ({visible, title, message}: any) =>
+      visible ? (
+        <View testID="notification-modal">
+          <Text>{title}</Text>
+          <Text>{message}</Text>
+        </View>
+      ) : null,
     useToast: jest.fn(() => ({
       showToast: mockShowToast,
     })),

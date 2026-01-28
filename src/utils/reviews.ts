@@ -1,4 +1,5 @@
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
+import {ReactionAction} from '@/services';
 
 type CommentRange = {id: string; start: number; end: number};
 type Segment = {text: string; commentIds: string[]; start: number; end: number};
@@ -71,12 +72,6 @@ export function splitByCommentRanges(
   return segments;
 }
 
-/**
- * Sorts reactions by count in descending order and returns the top N reaction codes
- * @param reactions - Object mapping reaction codes to their counts
- * @param limit - Maximum number of reactions to return (default: all)
- * @returns Array of reaction codes sorted by count (highest first)
- */
 export const getTopReactions = (
   reactions: Record<string, number>,
   limit?: number,
@@ -93,7 +88,7 @@ export const getReactionsArray = (
   return reactions
     ? Object.keys(reactions)
         .filter(key => reactions[key] > 0)
-        .map(key => EMOJI_UNICODE_MAP[key] || '❤')
+        .map(key => EMOJI_UNICODE_MAP[key.toLowerCase()] || '❤')
     : [];
 };
 
@@ -103,4 +98,17 @@ export const getTotalReactionCount = (
   return reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
     : 0;
+};
+
+export const getReactionAction = (
+  currentEmoji: string | null,
+  unicode: string,
+): ReactionAction => {
+  if (!currentEmoji) {
+    return ReactionAction.ADD;
+  } else if (currentEmoji !== unicode) {
+    return ReactionAction.UPDATE;
+  } else {
+    return ReactionAction.REMOVE;
+  }
 };

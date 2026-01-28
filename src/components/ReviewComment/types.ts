@@ -40,6 +40,10 @@ export interface ReviewCommentProps {
    */
   onCommentPress?: () => void;
   /**
+   * Callback when emoji is selected
+   */
+  onEmojiSelect?: (currentEmoji: string | null, unicode: string) => void;
+  /**
    * Whether to show the reply button
    */
   showReplyButton?: boolean;
@@ -47,4 +51,12 @@ export interface ReviewCommentProps {
    * Whether to show the add reaction button (emoji picker)
    */
   showAddReactionButton?: boolean;
+  /**
+   * Whether to disable the add reaction button
+   */
+  disableAddReactionButton?: boolean;
+  /**
+   * Selected emoji
+   */
+  selectedEmoji?: string | null;
 }
