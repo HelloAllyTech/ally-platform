@@ -32,10 +32,13 @@ export interface SelectableTextInputProps {
   value?: string;
   parts?: string[];
   separator?: string;
+  prefixText?: string;
+  prefixSeparator?: string;
   onAddComment?: (selection: SelectionData) => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   partTextStyle?: StyleProp<TextStyle>;
+  prefixTextStyle?: StyleProp<TextStyle>;
   highlightStyle?: StyleProp<TextStyle>;
   highlightedPartIndices?: number[];
   placeholder?: string;
@@ -46,10 +49,13 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   value,
   parts,
   separator = '',
+  prefixText,
+  prefixSeparator = ' ',
   onAddComment,
   style,
   textStyle,
   partTextStyle,
+  prefixTextStyle,
   highlightStyle,
   highlightedPartIndices = [],
   placeholder,
@@ -60,10 +66,16 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({x: 0, y: 0});
   const [selectedText, setSelectedText] = useState('');
-  const displayText = useMemo(() => {
+  const mainText = useMemo(() => {
     if (parts && parts.length > 0) return parts.join(separator);
     return value ?? '';
   }, [parts, separator, value]);
+  const prefix = useMemo(
+    () => (prefixText ? `${prefixText}${prefixSeparator}` : ''),
+    [prefixText, prefixSeparator],
+  );
+  const prefixLength = prefix.length;
+  const displayText = `${prefix}${mainText}`;
 
   // Hide default context menu on iOS
   useEffect(() => {
@@ -76,12 +88,19 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   const handleSelectionChange = useCallback(
     (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       const {start, end} = event.nativeEvent.selection;
-      const hasSelection = start !== end;
+      const clampedStart = Math.max(start, prefixLength);
+      const clampedEnd = Math.max(end, prefixLength);
+      const hasSelection = clampedStart !== clampedEnd;
+      if (clampedStart !== start || clampedEnd !== end) {
+        setSelection({start: clampedStart, end: clampedEnd});
+        return;
+      }
+
+      setSelection({start: clampedStart, end: clampedEnd});
 
       if (hasSelection && displayText) {
-        const text = displayText.substring(start, end).trim();
+        const text = displayText.substring(clampedStart, clampedEnd).trim();
         if (text.length > 0) {
-          setSelection({start, end});
           setSelectedText(text);
 
           // Get input position to show menu
@@ -91,7 +110,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
               // For multiline text, estimate line position
               const lineHeight = multiline ? 24 : 20; // Approximate line height
               const charsPerLine = Math.max(1, Math.floor(width / 10)); // Approximate chars per line
-              const lineNumber = Math.floor(start / charsPerLine);
+              const lineNumber = Math.floor(clampedStart / charsPerLine);
               const menuY =
                 y + Math.min(lineNumber * lineHeight, height - 60) - 50; // Position above selection
 
@@ -110,7 +129,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         setSelectedText('');
       }
     },
-    [displayText, multiline],
+    [displayText, multiline, prefixLength],
   );
 
   const handleAddComment = useCallback(() => {
@@ -135,27 +154,34 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      {parts && parts.length > 0 ? (
+      {prefixText || (parts && parts.length > 0) ? (
         <View pointerEvents="none" style={styles.overlay}>
           <Text style={[styles.text, textStyle]}>
-            {parts.map((part, index) => {
-              const isHighlighted = highlightedPartIndices.includes(index);
-              const suffix = index < parts.length - 1 ? separator : '';
-              return (
-                <Text
-                  key={`${index}-${part}`}
-                  style={[
-                    styles.text,
-                    textStyle,
-                    partTextStyle,
-                    isHighlighted && styles.highlightedText,
-                    isHighlighted && highlightStyle,
-                  ]}>
-                  {part}
-                  {suffix}
-                </Text>
-              );
-            })}
+            {prefixText ? (
+              <Text style={[styles.text, textStyle, prefixTextStyle]}>
+                {prefix}
+              </Text>
+            ) : null}
+            {parts && parts.length > 0
+              ? parts.map((part, index) => {
+                  const isHighlighted = highlightedPartIndices.includes(index);
+                  const suffix = index < parts.length - 1 ? separator : '';
+                  return (
+                    <Text
+                      key={`${index}-${part}`}
+                      style={[
+                        styles.text,
+                        textStyle,
+                        partTextStyle,
+                        isHighlighted && styles.highlightedText,
+                        isHighlighted && highlightStyle,
+                      ]}>
+                      {part}
+                      {suffix}
+                    </Text>
+                  );
+                })
+              : mainText}
           </Text>
         </View>
       ) : null}
@@ -170,12 +196,13 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         style={[
           styles.textInput,
           textStyle,
-          parts && parts.length > 0 && styles.transparentText,
+          (prefixText || (parts && parts.length > 0)) && styles.transparentText,
         ]}
         placeholder={placeholder}
         placeholderTextColor={colors.ds.typography.lowEmphasis}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
+        selection={selection}
         // @ts-ignore - contextMenuHidden works on iOS to hide default menu
         contextMenuHidden={isIOS ? true : undefined}
         // @ts-ignore - importantForAutofill to prevent Android menu
