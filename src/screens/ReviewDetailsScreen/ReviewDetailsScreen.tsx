@@ -478,7 +478,7 @@ const styles = ScaledSheet.create({
     borderBottomColor: colors.lightGray7,
     // marginTop: '16@s',
     paddingVertical: '8@s',
-    paddingHorizontal: '8@s',
+    paddingHorizontal: '20@ms',
     flexDirection: 'row',
     alignItems: 'center',
   },
