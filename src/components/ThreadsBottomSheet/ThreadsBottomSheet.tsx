@@ -8,7 +8,7 @@ import {ms} from 'react-native-size-matters';
 
 import {ChevronRight} from '@/assets/icons';
 import {BottomSheet, ReviewComment} from '@/components';
-import {useTranslate} from '@/hooks';
+import {useTranslate, useUser} from '@/hooks';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {ThreadsResponse} from '@/types/reviews';
@@ -24,9 +24,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
   onClose,
   reviewId,
+  reviewOwnerId,
   onThreadPress,
 }) => {
   const {t} = useTranslate();
+  const {userData} = useUser();
   const insets = useSafeAreaInsets();
   const [getThreads, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreadsQuery();
@@ -81,7 +83,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       }
 
       const firstComment = thread.comments[0];
-      const remainingCount = thread.commentCount - 1;
+      const remainingCount = thread.comments.length - 1;
       const reactionsArray = getReactionsArray(firstComment.reactions);
       const reactionCount = getTotalReactionCount(firstComment.reactions);
 
@@ -120,6 +122,10 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
               showReplyButton={false}
               disableAddReactionButton
               onCommentPress={() => onThreadPress?.(thread.id)}
+              hidden={firstComment.hidden}
+              currentUserId={userData?.id}
+              commentOwnerId={firstComment.createdBy.id}
+              commentId={firstComment.id}
             />
             {remainingCount > 0 && (
               <LinearGradient
@@ -160,7 +166,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         </TouchableOpacity>
       );
     },
-    [onThreadPress, t],
+    [onThreadPress, t, userData],
   );
 
   const renderHeader = useCallback(() => {

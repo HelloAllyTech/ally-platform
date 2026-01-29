@@ -261,3 +261,23 @@ export const formatMinutesToDuration = (minutes: number): string => {
     return `${remainingMinutes} min`;
   }
 };
+
+/**
+ * Checks if a specified number of minutes have passed since a given date
+ * @param dateString - ISO date string or Date object
+ * @param minutes - Number of minutes to check (default: 10)
+ * @returns true if the specified minutes have passed, false otherwise
+ * @example
+ * isMinutesPassed("2025-01-27T10:00:00Z", 10) // returns true if 10+ minutes have passed
+ */
+export const isMinutesPassed = (
+  dateString: string,
+  minutes: number = 10,
+): boolean => {
+  if (!dateString || dateString.trim() === '') return true;
+  const date = new Date(dateString);
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffMinutes = diffMs / (1000 * 60);
+  return diffMinutes >= minutes;
+};

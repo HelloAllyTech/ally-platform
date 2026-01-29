@@ -178,7 +178,7 @@ export const ReviewDetailsScreen: React.FC = () => {
       },
       comments: [],
       createdBy: {
-        id: '',
+        id: 0,
         name: '',
         profileImage: null,
       },
@@ -451,6 +451,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         onClose={closeCommentThreadBottomSheet}
         reviewId={_reviewId}
         threadId={selectedThreadId || ''}
+        reviewOwnerId={reviewData?.createdBy?.id}
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
@@ -461,6 +462,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         originalComment={selectedComment || null}
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
+        reviewOwnerId={reviewData?.createdBy?.id}
       />
     </SafeAreaView>
   );
