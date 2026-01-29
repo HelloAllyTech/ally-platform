@@ -408,15 +408,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         isRefreshing={isFetching && offset === 0}
       />
       {/* Comment input bottom sheet */}
-      <CommentInput
-        visible={showCommentInput}
-        onClose={resetCommentInput}
-        onChangeText={handleChangeComment}
-        onSend={handleSendComment}
-        comment={comment}
-        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
-        isLoading={isAddingComment}
-      />
+
       <View style={styles.interactionsBarContainer}>
         <InteractionsBar
           reviewId={_reviewId}
@@ -429,6 +421,15 @@ export const ReviewDetailsScreen: React.FC = () => {
           myReaction={reviewData?.myReaction || null}
         />
       </View>
+      <CommentInput
+        visible={showCommentInput}
+        onClose={resetCommentInput}
+        onChangeText={handleChangeComment}
+        onSend={handleSendComment}
+        comment={comment}
+        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
+        isLoading={isAddingComment}
+      />
       <ThreadsBottomSheet
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
