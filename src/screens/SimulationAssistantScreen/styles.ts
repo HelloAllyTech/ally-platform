@@ -96,4 +96,12 @@ export const styles = ScaledSheet.create({
     backgroundColor: colors.coralRed,
     borderRadius: '2@ms',
   },
+  checklistWrapper: {
+    marginVertical: '10@mvs',
+    width: '100%',
+    flex: 1, // Allow it to expanded if needed, or adjust based on layout
+  },
+  participantsCompact: {
+    height: '180@ms',
+  },
 });

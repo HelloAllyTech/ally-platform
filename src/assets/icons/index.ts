@@ -22,6 +22,7 @@ import ChangeImageIcon from './changeImage.svg';
 import ChatAddOnIcon from './chatAddOn.svg';
 import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
+import ChecklistIcon from './checklist.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import ChevronRight from './chevronRight.svg';
@@ -254,4 +255,5 @@ export {
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
+  ChecklistIcon,
 };

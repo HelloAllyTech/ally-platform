@@ -51,6 +51,9 @@ export interface Scenario {
   terminationEvent?: unknown;
   timerMode?: boolean;
   maxTimeValue?: string;
+  checklistType?: ChecklistType;
+  experienceMode?: string;
+  checklistEvents?: ChecklistItem[];
 }
 
 export interface ScenariosResponse {
@@ -244,6 +247,7 @@ export type LiveEventPayload = {
     score?: number | null;
     emoji?: string | null;
     message?: string | null;
+    detected_event_ids?: string[];
   } | null;
   timestamp?: string;
 } | null;
@@ -295,4 +299,23 @@ export interface SimulationPath {
 export interface SimulationPathsResponse {
   data: SimulationPath[];
   count: number;
+}
+
+export enum ChecklistType {
+  OFF = 'OFF',
+  GUIDED = 'GUIDED',
+  UNGUIDED = 'UNGUIDED',
+}
+
+export enum ExperienceMode {
+  FEEDBACK = 'FEEDBACK',
+  CHECKLIST = 'CHECKLIST',
+}
+
+export interface ChecklistItem {
+  id: string;
+  name: string;
+  rank?: number;
+  score?: number;
+  message?: string;
 }
