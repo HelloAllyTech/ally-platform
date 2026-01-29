@@ -31,7 +31,12 @@ import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors} from '@/theme';
-import {Feedback, LiveEventPayload} from '@/types';
+import {
+  ChecklistType,
+  ExperienceMode,
+  Feedback,
+  LiveEventPayload,
+} from '@/types';
 import {
   decodeFeedbackPayloadToJson,
   getTriggerWarningNames,
@@ -42,6 +47,7 @@ import {
 import {
   EndingSoonModal,
   LiveFeedback,
+  SessionChecklist,
   SessionGoalTimer,
   SessionScoreMeter,
   SimulationControls,
@@ -59,6 +65,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
   const {sessionData, scenario, pathId} = route.params;
+  const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const startTime = useMemo(
     () =>
@@ -90,6 +97,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
+  const [detectedEvents, setDetectedEvents] = useState<string[]>([]);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isControlButtonMaximized, setIsControlButtonMaximized] =
@@ -197,7 +205,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
       if (!eventObj?.data) return;
 
-      const {score, emoji, message} = eventObj.data;
+      const {score, emoji, message, detected_event_ids} = eventObj.data;
+      console.log(eventObj, 'eventObj');
 
       if (typeof score === 'number' && !Number.isNaN(score)) {
         setAccumulatedScore(prev => clamp(prev + score, -100, 100));
@@ -208,6 +217,18 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         const next = {id, text: message, emoji: emoji ?? undefined};
         setFeedback(next);
         setFeedbackKey(next.id);
+      }
+
+      if (
+        detected_event_ids &&
+        Array.isArray(detected_event_ids) &&
+        detected_event_ids.length > 0
+      ) {
+        setDetectedEvents(prev => {
+          // Merge unique events
+          const newEvents = new Set([...prev, ...detected_event_ids]);
+          return Array.from(newEvents);
+        });
       }
     };
     room
@@ -339,21 +360,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             />
           )}
           <>
-            {!isSimulationInProgress ? (
-              renderLoader()
-            ) : (
-              <>
+            {isSimulationInProgress &&
+              isChecklistMode &&
+              scenario?.checklistEvents &&
+              scenario?.checklistEvents.length > 0 && (
                 <View style={styles.participantsContent}>
                   <View
                     style={[
                       styles.participantsContainer,
-                      isFocusMode
-                        ? styles.participantsVertical
-                        : isControlButtonMaximized
-                          ? feedback
-                            ? styles.participantsHorizontal
-                            : styles.participantsVertical
-                          : styles.participantsVertical,
+                      styles.participantsHorizontal,
+                      styles.participantsCompact,
                     ]}>
                     <View
                       style={[
@@ -392,21 +408,89 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       />
                     </View>
                   </View>
-                </View>
-                {!isFocusMode && feedback && (
-                  <View style={styles.liveFeedbackWrapper}>
-                    <LiveFeedback
-                      key={feedbackKey}
-                      message={feedback.text}
-                      emoji={feedback.emoji}
+                  <View style={styles.checklistWrapper}>
+                    <SessionChecklist
+                      mode={
+                        scenario.checklistType
+                          ? scenario.checklistType
+                          : ChecklistType.OFF
+                      }
+                      items={scenario.checklistEvents}
+                      triggeredEvents={detectedEvents}
                     />
                   </View>
+                </View>
+              )}
+          </>
+          <>
+            {!isSimulationInProgress
+              ? renderLoader()
+              : !isChecklistMode && (
+                  <>
+                    <View style={styles.participantsContent}>
+                      <View
+                        style={[
+                          styles.participantsContainer,
+                          isFocusMode
+                            ? styles.participantsVertical
+                            : isControlButtonMaximized
+                              ? feedback
+                                ? styles.participantsHorizontal
+                                : styles.participantsVertical
+                              : styles.participantsVertical,
+                        ]}>
+                        <View
+                          style={[
+                            styles.participantWrapper,
+                            styles.participantWrapperWithOverlay,
+                          ]}>
+                          <ParticipantTile
+                            participant={remoteParticipant}
+                            publication={remoteAudioPub}
+                            avatarUrl={scenario?.coverImageUrl ?? null}
+                            name={scenario?.metadata?.name || scenario?.title}
+                            {...(scenario?.title
+                              ? {
+                                  topLeftOverlay: (
+                                    <ScenarioInfoOverlay
+                                      ref={scenarioInfoRef}
+                                      title={scenario?.title}
+                                      triggerWarnings={getTriggerWarningNames(
+                                        scenario?.triggerWarnings,
+                                      )}
+                                    />
+                                  ),
+                                  overlayRef:
+                                    scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                                }
+                              : {})}
+                          />
+                        </View>
+                        <View style={styles.participantWrapper}>
+                          <ParticipantTile
+                            participant={localParticipant}
+                            publication={localAudioPub}
+                            avatarUrl={userData?.profileImageUrl ?? null}
+                            name={userData?.name}
+                            isMicEnabled={isMicEnabled}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                    {!isFocusMode && feedback && (
+                      <View style={styles.liveFeedbackWrapper}>
+                        <LiveFeedback
+                          key={feedbackKey}
+                          message={feedback.text}
+                          emoji={feedback.emoji}
+                        />
+                      </View>
+                    )}
+                  </>
                 )}
-              </>
-            )}
           </>
 
-          {isSimulationInProgress && (
+          {isSimulationInProgress && !isChecklistMode && (
             <View style={styles.scoreMeterContainer}>
               <SessionScoreMeter score={accumulatedScore} />
             </View>
