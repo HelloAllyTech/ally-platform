@@ -7,7 +7,7 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     gap: '10@s',
     alignSelf: 'stretch',
-    width: '80%',
+    width: '100%',
   },
   avatarContainer: {
     width: '32@ms',
@@ -37,6 +37,7 @@ export const styles = ScaledSheet.create({
   },
   contentContainer: {
     flex: 1,
+    width: '100%',
     flexDirection: 'column',
   },
   headerRow: {
@@ -152,5 +153,35 @@ export const styles = ScaledSheet.create({
     lineHeight: '18@ms',
     color: colors.ds.typography.mediumEmphasis,
     textAlign: 'right',
+  },
+  actionsMenuContainer: {
+    marginLeft: 'auto',
+  },
+  hiddenContainer: {
+    padding: '12@s',
+    backgroundColor: colors.lightGray,
+    borderRadius: '8@s',
+    marginVertical: '4@s',
+  },
+  hiddenText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '16@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    fontStyle: 'italic',
+  },
+  hiddenBadge: {
+    backgroundColor: colors.lightGray,
+    paddingHorizontal: '8@s',
+    paddingVertical: '2@s',
+    borderRadius: '4@s',
+    alignSelf: 'flex-start',
+  },
+  hiddenBadgeText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    lineHeight: '14@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    textTransform: 'uppercase',
   },
 });

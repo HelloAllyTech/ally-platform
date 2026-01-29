@@ -3,6 +3,7 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ms} from 'react-native-size-matters';
 
 import {AddReactionIcon} from '@/assets';
+import {ActionsMenu} from '@/components/ActionsMenu/ActionsMenu';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
@@ -26,6 +27,16 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   disableAddReactionButton = false,
   showAddReactionButton = true,
   selectedEmoji,
+  hidden = false,
+  hiddenByName,
+  currentUserId,
+  commentOwnerId,
+  reviewOwnerId,
+  commentId,
+  onEdit,
+  onDelete,
+  onHide,
+  showActionsMenu = false,
 }) => {
   const {t} = useTranslate();
   const initials = name ? name.charAt(0).toUpperCase() : '';
@@ -36,6 +47,58 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
     }
     return t('ReviewComment.replies', {count: replyCount});
   };
+
+  const getMenuOptions = (): Array<{label: string; onPress: () => void}> => {
+    const options: Array<{label: string; onPress: () => void}> = [];
+
+    // Edit - only if user owns the comment
+    if (
+      currentUserId &&
+      commentOwnerId &&
+      currentUserId === commentOwnerId &&
+      onEdit
+    ) {
+      options.push({
+        label: t('ReviewComment.edit'),
+        onPress: () => onEdit(commentId || '', comment || ''),
+      });
+    }
+
+    // Delete - only if user owns the comment
+    if (currentUserId && commentOwnerId && currentUserId === commentOwnerId) {
+      options.push({
+        label: t('ReviewComment.delete'),
+        onPress: () => onDelete?.(commentId || ''),
+      });
+    }
+
+    // Hide - only if user is the review owner
+    if (currentUserId && reviewOwnerId && currentUserId === reviewOwnerId) {
+      options.push({
+        label: hidden ? t('ReviewComment.unhide') : t('ReviewComment.hide'),
+        onPress: () => onHide?.(commentId || '', !hidden),
+      });
+    }
+
+    return options;
+  };
+
+  const menuOptions = getMenuOptions();
+
+  // Check if current user is the review owner (can see hidden comments)
+  const isReviewOwner =
+    currentUserId && reviewOwnerId && currentUserId === reviewOwnerId;
+
+  // If comment is hidden and user is NOT the review owner, show minimal hidden state
+  if (hidden && !isReviewOwner) {
+    return (
+      <View style={styles.hiddenContainer}>
+        <Text style={styles.hiddenText}>
+          {t('ReviewComment.hiddenBy', {name: hiddenByName || name})}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -66,7 +129,21 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
               {name}
             </Text>
             <Text style={styles.timeAgo}>{time}</Text>
+            {/* Hidden Badge - only visible to review owner */}
+            {hidden && isReviewOwner && (
+              <View style={styles.hiddenBadge}>
+                <Text style={styles.hiddenBadgeText}>
+                  {t('ReviewComment.hidden')}
+                </Text>
+              </View>
+            )}
           </View>
+          {/* Actions Menu */}
+          {showActionsMenu && menuOptions.length > 0 && (
+            <View style={styles.actionsMenuContainer}>
+              <ActionsMenu options={menuOptions} iconSize={18} />
+            </View>
+          )}
         </View>
 
         {/* Comment Text */}
