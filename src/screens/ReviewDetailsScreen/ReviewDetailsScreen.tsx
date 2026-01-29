@@ -2,7 +2,6 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRoute} from '@react-navigation/native';
 import {
   ActivityIndicator,
-  Keyboard,
   SafeAreaView,
   TouchableOpacity,
   View,
@@ -66,13 +65,6 @@ export const ReviewDetailsScreen: React.FC = () => {
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
-    // If comment input is visible, dismiss keyboard and hide it first
-    if (showCommentInput) {
-      Keyboard.dismiss();
-      resetCommentInput();
-      return true;
-    }
-
     // Otherwise, close message threads and navigate back
     handleCloseMessageThreads();
     navigation.goBack();
@@ -186,7 +178,7 @@ export const ReviewDetailsScreen: React.FC = () => {
       },
       comments: [],
       createdBy: {
-        id: '',
+        id: 0,
         name: '',
         profileImage: null,
       },
@@ -360,6 +352,8 @@ export const ReviewDetailsScreen: React.FC = () => {
       setIsMessageThreadsVisible(true);
       setSelectedMessageForThreads(currentMessageIdRef.current);
       closeCommentBottomSheet();
+    } else {
+      hideCommentThreadBottomSheet();
     }
   };
 
@@ -413,18 +407,16 @@ export const ReviewDetailsScreen: React.FC = () => {
         onRefresh={refreshMessages}
         isRefreshing={isFetching && offset === 0}
       />
-      {/* Floating input at the bottom */}
-      {showCommentInput && (
-        <CommentInput
-          onChangeText={handleChangeComment}
-          onSend={handleSendComment}
-          comment={comment}
-          autoFocus
-          onBlur={() => setShowCommentInput(false)}
-          isSendButtonDisabled={comment.length === 0 || !comment.trim()}
-          isLoading={isAddingComment}
-        />
-      )}
+      {/* Comment input bottom sheet */}
+      <CommentInput
+        visible={showCommentInput}
+        onClose={resetCommentInput}
+        onChangeText={handleChangeComment}
+        onSend={handleSendComment}
+        comment={comment}
+        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
+        isLoading={isAddingComment}
+      />
       <View style={styles.interactionsBarContainer}>
         <InteractionsBar
           reviewId={_reviewId}
@@ -459,6 +451,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         onClose={closeCommentThreadBottomSheet}
         reviewId={_reviewId}
         threadId={selectedThreadId || ''}
+        reviewOwnerId={reviewData?.createdBy?.id}
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
       />
@@ -469,6 +462,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         originalComment={selectedComment || null}
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
+        reviewOwnerId={reviewData?.createdBy?.id}
       />
     </SafeAreaView>
   );

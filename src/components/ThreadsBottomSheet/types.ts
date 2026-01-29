@@ -12,6 +12,10 @@ export interface ThreadsBottomSheetProps {
    */
   reviewId: string;
   /**
+   * Review owner ID
+   */
+  reviewOwnerId?: number;
+  /**
    * Callback when a comment is pressed
    */
   onThreadPress?: (threadId: string) => void;

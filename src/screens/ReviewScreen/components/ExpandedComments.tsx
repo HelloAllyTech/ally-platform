@@ -66,6 +66,7 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
                   showReplyButton={false}
                   showAddReactionButton={false}
                   onCommentPress={() => onCommentPress(reviewId)}
+                  hidden={firstComment.hidden}
                 />
               </View>
             );
