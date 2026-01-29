@@ -33,7 +33,7 @@ export interface MessageThreadComment {
   content?: string;
   createdAt?: string;
   createdBy: {
-    id?: string;
+    id?: number;
     name?: string;
     profileImage?: string | null;
   };
@@ -42,6 +42,7 @@ export interface MessageThreadComment {
   };
   replyCount?: number;
   myReaction?: string | null;
+  hidden?: boolean;
 }
 
 export interface MessageThread {
@@ -49,7 +50,7 @@ export interface MessageThread {
   comments: MessageThreadComment[];
   selection: Record<string, unknown>;
   createdBy: {
-    id: string;
+    id: number;
     name: string;
     profileImage: string | null;
   };
@@ -67,12 +68,15 @@ export interface Message {
 
 export interface GetMessagesResponse {
   data: Message[];
+  count?: number;
 }
 
 export interface GetMessagesRequest {
   reviewId: string;
   offset?: number;
   limit?: number;
+  sortOrder?: string;
+  sortBy?: string;
 }
 
 export interface GetThreadCommentsRequest {
@@ -97,7 +101,7 @@ export interface ReviewScenario {
   coverVideoUrl?: string;
 }
 export interface User {
-  id: string;
+  id: number;
   name: string;
   profileImage: string;
 }
@@ -152,7 +156,12 @@ export interface ThreadsResponse {
 export interface Thread {
   id: string;
   comments: MessageThreadComment[];
-  commentCount: number;
+  selection: Record<string, unknown>;
+  createdBy: {
+    id: number;
+    name: string;
+    profileImage: string | null;
+  };
   message?: MessageData;
 }
 
@@ -187,4 +196,20 @@ export interface UpdateReviewStatusResponse {
   id: string;
   status: ReviewStatus;
   updatedAt: string;
+}
+
+export interface GetReviewResponse {
+  id: string;
+  commentCount: number;
+  scenario: ReviewScenario;
+  scenarioSession: {
+    createdAt: string;
+    duration: number;
+    id: string;
+  };
+  createdBy: User;
+  reactions: {
+    [reaction_code: string]: number;
+  };
+  myReaction?: string;
 }

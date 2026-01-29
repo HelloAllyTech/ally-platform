@@ -37,7 +37,8 @@ export const InteractionsBar = ({
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
     : 0;
 
-  const [addReactionToReview] = useAddReactionToReviewMutation();
+  const [addReactionToReview, {isLoading: isAddingReaction}] =
+    useAddReactionToReviewMutation();
 
   const handleAddReactionToReview = async (
     currentEmoji: string | null,
@@ -71,6 +72,7 @@ export const InteractionsBar = ({
         <EmojiPicker
           onEmojiSelect={handleAddReactionToReview}
           selectedEmoji={myReaction}
+          disabled={isAddingReaction}
         />
       </TouchableOpacity>
 
