@@ -337,6 +337,11 @@
     "sessionTimer": "Session Timer",
     "timeRemaining": "Time Remaining"
   },
+  "SimulationChecklist": {
+    "sessionChecklist": "Session Checklist",
+    "progress":"Progress",
+    "completed":"completed"
+  },
   "NetworkLogs": {
     "logs": "Logs"
   },
