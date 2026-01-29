@@ -57,9 +57,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     const isAiClient = messageItem.senderId === -1;
     return (
       <SelectableTextInput
-        prefixText={
-          isAiClient ? 'AI Client' : userName || t('CallTranscript.you')
-        }
+        prefixText={`${isAiClient ? 'AI Client' : userName || t('CallTranscript.you')}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart.map(part => part.text)}
         highlightedPartIndices={highlightedPartIndices}

@@ -99,7 +99,7 @@ export const ReviewTranscriptHeader = ({
 const styles = ScaledSheet.create({
   container: {
     paddingHorizontal: '8@s',
-    gap: '8@s',
+    gap: '4@s',
     flex: 1,
   },
   title: {

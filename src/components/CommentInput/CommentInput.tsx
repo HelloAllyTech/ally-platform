@@ -109,7 +109,8 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: '24@ms',
-    paddingVertical: '12@mvs',
+    paddingTop: '12@mvs',
+    paddingBottom: '30@mvs',
     gap: '8@ms',
   },
   input: {
