@@ -11,4 +11,8 @@ export interface EmojiPickerProps {
   emojiSize?: number;
   /** Test ID for testing */
   testID?: string;
+  /** Whether to disable the emoji picker */
+  disabled?: boolean;
+  /** Whether to show an error message */
+  error?: string;
 }

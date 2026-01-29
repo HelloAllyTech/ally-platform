@@ -541,7 +541,13 @@
     "like": "Like",
     "reply": "Reply",
     "replies": "{{count}} replies",
-    "repliesOne": "1 reply"
+    "repliesOne": "1 reply",
+    "edit": "Edit",
+    "delete": "Delete",
+    "hide": "Hide",
+    "unhide": "Unhide",
+    "hidden": "Hidden",
+    "hiddenBy": "Comment hidden"
   },
   "ThreadsBottomSheet": {
     "title": "Comments",
