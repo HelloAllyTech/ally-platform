@@ -20,15 +20,19 @@ import {
   CommentBottomSheetFooter,
   ReviewComment,
 } from '@/components';
+import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useTranslate, useUser} from '@/hooks';
 import {useAddReactionToCommentMutation} from '@/services';
 import {
   useAddReviewCommentMutation,
+  useDeleteCommentMutation,
   useLazyGetThreadCommentsQuery,
+  useUpdateCommentMutation,
+  useUpdateCommentVisibilityMutation,
 } from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
-import {formatRelativeTime} from '@/utils/date';
+import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
 import {
   getReactionAction,
   getReactionsArray,
@@ -47,6 +51,7 @@ export const CommentThreadBottomSheet: React.FC<
   onClose,
   reviewId,
   threadId,
+  reviewOwnerId,
   onAddReactionPress,
   onReplyPress,
   hideCommentThreadBottomSheet,
@@ -61,6 +66,12 @@ export const CommentThreadBottomSheet: React.FC<
     profileImageUrl: userProfileImage,
   } = userData || {};
 
+  // Mutations for comment actions
+  const [updateCommentVisibility] = useUpdateCommentVisibilityMutation();
+  const [updateComment, {isLoading: isUpdatingComment}] =
+    useUpdateCommentMutation();
+  const [deleteComment] = useDeleteCommentMutation();
+
   const [comments, setComments] = React.useState<{
     data: MessageThreadComment[];
     count: number;
@@ -68,6 +79,7 @@ export const CommentThreadBottomSheet: React.FC<
   const [hasMore, setHasMore] = React.useState(false);
   const [commentText, setCommentText] = useState('');
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   const [getThreadComments, {isLoading, isFetching}] =
     useLazyGetThreadCommentsQuery();
@@ -76,11 +88,65 @@ export const CommentThreadBottomSheet: React.FC<
     useAddReviewCommentMutation();
 
   const [addReaction] = useAddReactionToCommentMutation();
+
+  const handleEditComment = useCallback(
+    (commentId: string, commentContent: string) => {
+      // Find the comment being edited
+      setEditingCommentId(commentId);
+      setCommentText(commentContent);
+    },
+    [],
+  );
+
+  const handleDeleteComment = useCallback(
+    async (commentId: string) => {
+      try {
+        await deleteComment({commentId}).unwrap();
+        // Refetch thread comments
+        offsetRef.current = 0;
+        const response = await getThreadComments({
+          threadId,
+          offset: 0,
+          limit: LIMIT,
+        });
+        if (response.data) {
+          setComments({data: response.data.data, count: response.data.count});
+          setHasMore(response.data.data.length < response.data.count);
+        }
+      } catch (error) {
+        console.error('Failed to delete comment:', error);
+      }
+    },
+    [deleteComment, getThreadComments, threadId],
+  );
+
+  const handleHideComment = useCallback(
+    async (commentId: string, hidden: boolean) => {
+      try {
+        await updateCommentVisibility({commentId, hidden}).unwrap();
+        // Refetch thread comments
+        offsetRef.current = 0;
+        const response = await getThreadComments({
+          threadId,
+          offset: 0,
+          limit: LIMIT,
+        });
+        if (response.data) {
+          setComments({data: response.data.data, count: response.data.count});
+          setHasMore(response.data.data.length < response.data.count);
+        }
+      } catch (error) {
+        console.error('Failed to hide/unhide comment:', error);
+      }
+    },
+    [updateCommentVisibility, getThreadComments, threadId],
+  );
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
     if (!visible) {
       Keyboard.dismiss();
       setCommentText('');
+      setEditingCommentId(null);
     }
   }, [visible]);
 
@@ -156,47 +222,86 @@ export const CommentThreadBottomSheet: React.FC<
       }
 
       try {
-        const payload = {
-          reviewId: reviewId,
-          content: comment,
-          threadId: threadId,
-        };
+        // If editing, update the comment
+        if (editingCommentId) {
+          await updateComment({
+            commentId: editingCommentId,
+            content: comment,
+          }).unwrap();
 
-        const newCommentObj: MessageThreadComment = {
-          id: '',
-          content: comment,
-          createdBy: {
-            id: userId?.toString(),
-            name: userName,
-            profileImage: userProfileImage,
-          },
-          reactions: {},
-          replyCount: 0,
-        };
-
-        const response = await addReviewComment(payload);
-
-        if (response.data?.comment?.id) {
-          newCommentObj.id = response.data?.comment?.id;
-          newCommentObj.createdAt = response.data?.comment?.createdAt;
-          setComments(prev => {
-            if (prev) {
-              return {
-                data: [...prev.data, newCommentObj],
-                count: prev.count + 1,
-              };
-            }
-            return {data: [newCommentObj], count: 1};
+          // Refetch comments to get updated data
+          offsetRef.current = 0;
+          const response = await getThreadComments({
+            threadId,
+            offset: 0,
+            limit: LIMIT,
           });
+          if (response.data) {
+            setComments({data: response.data.data, count: response.data.count});
+            setHasMore(response.data.data.length < response.data.count);
+            setHasLoadedOnce(true);
+          }
+          setEditingCommentId(null);
+        } else {
+          // Adding new comment
+          const payload = {
+            reviewId: reviewId,
+            content: comment,
+            threadId: threadId,
+          };
+
+          const newCommentObj: MessageThreadComment = {
+            id: '',
+            content: comment,
+            createdBy: {
+              id: userId,
+              name: userName,
+              profileImage: userProfileImage,
+            },
+            reactions: {},
+            replyCount: 0,
+          };
+
+          const response = await addReviewComment(payload);
+
+          if (response.data?.comment?.id) {
+            newCommentObj.id = response.data?.comment?.id;
+            newCommentObj.createdAt = response.data?.comment?.createdAt;
+            setComments(prev => {
+              if (prev) {
+                return {
+                  data: [...prev.data, newCommentObj],
+                  count: prev.count + 1,
+                };
+              }
+              return {data: [newCommentObj], count: 1};
+            });
+          }
         }
       } catch (error) {
-        console.error('Failed to add comment:', error);
+        console.error(
+          editingCommentId
+            ? 'Failed to update comment:'
+            : 'Failed to add comment:',
+          error,
+        );
       } finally {
         setCommentText('');
+        setEditingCommentId(null);
         Keyboard.dismiss();
       }
     },
-    [addReviewComment, reviewId, threadId, userId, userName, userProfileImage],
+    [
+      editingCommentId,
+      updateComment,
+      getThreadComments,
+      threadId,
+      addReviewComment,
+      reviewId,
+      userId,
+      userName,
+      userProfileImage,
+    ],
   );
 
   const handleEmojiSelect = useCallback(
@@ -257,11 +362,34 @@ export const CommentThreadBottomSheet: React.FC<
               handleEmojiSelect(comment.id, currentEmoji, unicode)
             }
             selectedEmoji={comment.myReaction}
+            hidden={comment.hidden}
+            currentUserId={userId}
+            commentOwnerId={comment.createdBy.id}
+            reviewOwnerId={reviewOwnerId}
+            commentId={comment.id}
+            {...(!isMinutesPassed(
+              comment.createdAt || '',
+              EDIT_COMMENT_TIME_LIMIT_MINUTES,
+            ) && {
+              onEdit: handleEditComment,
+            })}
+            onDelete={handleDeleteComment}
+            onHide={handleHideComment}
+            showActionsMenu
           />
         </View>
       );
     },
-    [onAddReactionPress, handleReplyPress, handleEmojiSelect],
+    [
+      onAddReactionPress,
+      handleReplyPress,
+      handleEmojiSelect,
+      userId,
+      reviewOwnerId,
+      handleEditComment,
+      handleDeleteComment,
+      handleHideComment,
+    ],
   );
 
   const renderHeader = useCallback(() => {
@@ -349,7 +477,7 @@ export const CommentThreadBottomSheet: React.FC<
     onSubmitComment,
     placeholderText,
     insetsBottom: insets.bottom,
-    isLoading: isAddingComment,
+    isLoading: isAddingComment || isUpdatingComment,
   });
 
   // Update ref synchronously (not in useEffect) to ensure current values
@@ -359,7 +487,7 @@ export const CommentThreadBottomSheet: React.FC<
     onSubmitComment,
     placeholderText,
     insetsBottom: insets.bottom,
-    isLoading: isAddingComment,
+    isLoading: isAddingComment || isUpdatingComment,
   };
 
   // Completely stable callback - reference never changes

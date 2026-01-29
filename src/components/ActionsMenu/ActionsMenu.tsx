@@ -1,5 +1,5 @@
-import {useState} from 'react';
-import {Text, TouchableOpacity, View} from 'react-native';
+import {useRef, useState} from 'react';
+import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ThreeDotsIcon} from '@/assets';
@@ -22,29 +22,53 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
   iconSize = 24,
 }) => {
   const [openMenu, setOpenMenu] = useState<boolean>(false);
+  const [menuPosition, setMenuPosition] = useState({x: 0, y: 0});
+  const buttonRef = useRef<View>(null);
+
   const TriggerIcon = icon || (
-    <ThreeDotsIcon width={iconSize} height={iconSize} />
+    <ThreeDotsIcon
+      width={iconSize}
+      height={iconSize}
+      color={colors.ds.icon.default}
+    />
   );
+
+  const handleOpenMenu = () => {
+    buttonRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuPosition({
+        x: x + width - 160, // Align menu to the right of the button
+        y: y + height + 4, // Position below the button with small gap
+      });
+      setOpenMenu(true);
+    });
+  };
 
   return (
     <>
-      <TouchableOpacity
-        onPress={() => {
-          setOpenMenu(prev => !prev);
-        }}>
-        {TriggerIcon}
-      </TouchableOpacity>
-      {openMenu && (
-        <>
-          <View style={styles.overlayContainer}>
-            <TouchableOpacity
-              style={styles.overlayTouchable}
-              activeOpacity={1}
-              // onPress={() => setOpenMenu(false)}
-            />
-          </View>
+      <View ref={buttonRef} collapsable={false}>
+        <TouchableOpacity onPress={handleOpenMenu}>
+          {TriggerIcon}
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.menu}>
+      <Modal
+        visible={openMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpenMenu(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOpenMenu(false)}>
+          <View
+            style={[
+              styles.menu,
+              {
+                position: 'absolute',
+                left: menuPosition.x,
+                top: menuPosition.y,
+              },
+            ]}>
             {options.map((option, index) => (
               <TouchableOpacity
                 key={index}
@@ -57,34 +81,22 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
               </TouchableOpacity>
             ))}
           </View>
-        </>
-      )}
+        </TouchableOpacity>
+      </Modal>
     </>
   );
 };
 
 const styles = ScaledSheet.create({
-  overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9998,
-  },
-  overlayTouchable: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0)',
   },
   menu: {
-    position: 'absolute',
-    right: '8@s',
-    bottom: '32@s',
     backgroundColor: colors.white,
     borderRadius: radius.lg,
     paddingVertical: '8@s',
     minWidth: '160@s',
-    zIndex: 9999,
     shadowColor: colors.lightGray11,
     shadowOffset: {
       width: 2,

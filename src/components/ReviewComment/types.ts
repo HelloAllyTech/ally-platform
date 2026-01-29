@@ -59,4 +59,44 @@ export interface ReviewCommentProps {
    * Selected emoji
    */
   selectedEmoji?: string | null;
+  /**
+   * Whether the comment is hidden
+   */
+  hidden?: boolean;
+  /**
+   * Name of the person who hid the comment
+   */
+  hiddenByName?: string;
+  /**
+   * Current user ID
+   */
+  currentUserId?: number;
+  /**
+   * Comment owner ID
+   */
+  commentOwnerId?: number;
+  /**
+   * Review owner ID
+   */
+  reviewOwnerId?: number;
+  /**
+   * Comment ID
+   */
+  commentId?: string;
+  /**
+   * Callback when edit is pressed
+   */
+  onEdit?: (commentId: string, commentContent: string) => void;
+  /**
+   * Callback when delete is pressed
+   */
+  onDelete?: (commentId: string) => void;
+  /**
+   * Callback when hide/unhide is pressed
+   */
+  onHide?: (commentId: string, hidden: boolean) => void;
+  /**
+   * Whether to show the actions menu
+   */
+  showActionsMenu?: boolean;
 }
