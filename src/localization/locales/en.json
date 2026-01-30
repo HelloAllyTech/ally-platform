@@ -520,7 +520,7 @@
     "card": {
       "sharedSimulationForReview": "Shared simulation for review",
       "dateAndTime": "Date & time:",
-      "duration": "Duration:",
+      "duration": "Duration",
       "reviewTranscript": "Review transcript",
       "reaction": "Reaction",
       "comment": "Comment",
