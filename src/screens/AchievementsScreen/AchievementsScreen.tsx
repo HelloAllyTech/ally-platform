@@ -4,16 +4,15 @@ import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon} from '@/assets/icons';
+import {LeftArrowIcon} from '@/assets';
 import {TabView} from '@/components';
-import {LockStatus} from '@/constants/badges';
+import {LockStatus} from '@/constants';
 import {useAppNavigation} from '@/hooks';
-// import {useGetAvailableBadgesQuery} from '@/services';
+import {useGetAvailableBadgesQuery} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
-import {BadgeCategoryGroup} from '@/types/badges';
+import {BadgeCategoryGroup} from '@/types';
 
 import {AchievementCard} from './components';
-import {mockBadgesData} from './mockData';
 
 type FilterType = 'all' | 'unlocked';
 
@@ -23,9 +22,7 @@ export const AchievementsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
 
-  // TODO: Replace with API call when ready
-  // const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
-  const badgesResponse = mockBadgesData;
+  const {data: badgesResponse} = useGetAvailableBadgesQuery();
 
   // Memoize tab configuration
   const tabs = useMemo(
