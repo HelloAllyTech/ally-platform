@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Modal,
   NativeSyntheticEvent,
   StyleProp,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
   TextLayoutEventData,
   TextStyle,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   ViewStyle,
 } from 'react-native';
@@ -33,6 +35,7 @@ export interface SelectableTextInputProps {
   isActive?: boolean;
   requestCloseSignal?: number;
   onRequestActivate?: (messageId: string) => void;
+  onRequestClose?: () => void;
   value?: string;
   parts?: MessagePart[];
   separator?: string;
@@ -48,7 +51,6 @@ export interface SelectableTextInputProps {
   highlightedPartIndices?: number[];
   placeholder?: string;
   multiline?: boolean;
-  onMenuVisibilityChange?: (visible: boolean) => void;
 }
 
 type Sel = {start: number; end: number};
@@ -58,13 +60,12 @@ const MENU_H = 44;
 const MENU_MARGIN = 8;
 
 export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
-  // new
   messageId,
   isActive = true,
   requestCloseSignal,
   onRequestActivate,
+  onRequestClose,
 
-  // existing
   value,
   parts,
   separator = '',
@@ -80,24 +81,24 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   highlightedPartIndices = [],
   placeholder,
   multiline = false,
-  onMenuVisibilityChange,
 }) => {
   const inputRef = useRef<TextInput>(null);
+  const containerRef = useRef<View>(null);
 
   const [containerW, setContainerW] = useState(0);
   const [lines, setLines] = useState<TextLayoutEventData['lines']>([]);
   const [forcedSelection, setForcedSelection] = useState<Sel | null>(null);
-
   const selectionRef = useRef<Sel>({start: 0, end: 0});
 
   const [showMenu, setShowMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState({x: 0, y: 0});
   const [selectedText, setSelectedText] = useState('');
 
+  // menu position in SCREEN coordinates (for Modal)
+  const [menuAbsPos, setMenuAbsPos] = useState({x: 0, y: 0});
+
   const mainText = useMemo(() => {
-    if (parts && parts.length > 0) {
-      return parts.map(part => part.text).join(separator);
-    }
+    if (parts && parts.length > 0)
+      return parts.map(p => p.text).join(separator);
     return value ?? '';
   }, [parts, separator, value]);
 
@@ -109,11 +110,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   const prefixLength = prefix.length;
   const displayText = `${prefix}${mainText}`;
 
-  useEffect(() => {
-    onMenuVisibilityChange?.(showMenu && isActive);
-  }, [showMenu, isActive, onMenuVisibilityChange]);
-
-  // Reset when text changes
+  // Reset on text change
   useEffect(() => {
     const s = {start: prefixLength, end: prefixLength};
     selectionRef.current = s;
@@ -125,6 +122,8 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
     return () => clearTimeout(t);
   }, [displayText, prefixLength]);
 
+  const contextMenuHidden = isIOS ? true : undefined;
+
   const clearSelection = useCallback(() => {
     const s = {start: prefixLength, end: prefixLength};
     selectionRef.current = s;
@@ -134,23 +133,24 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
     requestAnimationFrame(() => setForcedSelection(null));
   }, [prefixLength]);
 
-  // ✅ Close when parent requests (global dismiss)
+  // Close when parent requests
   useEffect(() => {
-    if (!requestCloseSignal) return;
-    if (showMenu) clearSelection();
+    if (requestCloseSignal === undefined) return;
+    if (showMenu) {
+      clearSelection();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestCloseSignal]); // intentionally not depending on clearSelection/showMenu to avoid re-close loops
+  }, [requestCloseSignal]);
 
-  const contextMenuHidden = isIOS ? true : undefined;
-
-  const computeAnchorFromLines = useCallback(
+  const computeMenuAbsPosition = useCallback(
     (startIndex: number) => {
+      // First compute Y within the text block using lines
       let anchorY = 0;
       let anchorH = 20;
 
       if (lines.length > 0) {
         let count = 0;
-        let chosen = lines[lines.length - 1]; // safer default
+        let chosen = lines[lines.length - 1];
 
         for (const line of lines) {
           count += line.text.length;
@@ -169,15 +169,22 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         anchorH = approxLineH;
       }
 
-      let y = anchorY - MENU_H - MENU_MARGIN;
-      if (y < 0) y = anchorY + anchorH + MENU_MARGIN;
+      // menu position relative to container
+      let relY = anchorY - MENU_H - MENU_MARGIN;
+      if (relY < 0) relY = anchorY + anchorH + MENU_MARGIN;
 
-      let x = Math.max(8, Math.floor(containerW / 2 - MENU_W / 2));
+      let relX = Math.max(8, Math.floor(containerW / 2 - MENU_W / 2));
       if (containerW > 0) {
-        x = Math.max(8, Math.min(x, containerW - MENU_W - 8));
+        relX = Math.max(8, Math.min(relX, containerW - MENU_W - 8));
       }
 
-      setMenuPos({x, y});
+      // Convert to screen coords
+      containerRef.current?.measureInWindow((x, y) => {
+        setMenuAbsPos({
+          x: x + relX,
+          y: y + relY,
+        });
+      });
     },
     [containerW, lines, multiline],
   );
@@ -186,6 +193,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
     (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       const {start, end} = event.nativeEvent.selection;
 
+      // clamp prefix
       const clampedStart = Math.max(start, prefixLength);
       const clampedEnd = Math.max(end, prefixLength);
 
@@ -201,6 +209,8 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
       selectionRef.current = s;
 
       const hasSelection = clampedStart !== clampedEnd;
+
+      // collapsed selection: maybe tap on a commented part
       if (!hasSelection) {
         const currentIndex = clampedStart - prefixLength;
         const selectedPart = parts?.find(
@@ -222,15 +232,15 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         return;
       }
 
-      // ✅ Activate this message in parent so it becomes the only active menu
+      // make this row active
       onRequestActivate?.(messageId);
 
       setSelectedText(text);
-      computeAnchorFromLines(clampedStart);
+      computeMenuAbsPosition(clampedStart);
       setShowMenu(true);
     },
     [
-      computeAnchorFromLines,
+      computeMenuAbsPosition,
       displayText,
       messageId,
       onCommentIdsPress,
@@ -242,6 +252,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
 
   const handleAddComment = useCallback(() => {
     if (!onAddComment) return;
+
     const s = selectionRef.current;
     const text = selectedText;
     if (!text) return;
@@ -252,14 +263,30 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
       selectedText: text,
     });
 
-    setShowMenu(false);
-  }, [onAddComment, selectedText, prefixLength]);
+    // close menu (keep selection if you want, but you said close)
+    clearSelection();
+    onRequestClose?.();
+  }, [
+    onAddComment,
+    selectedText,
+    prefixLength,
+    clearSelection,
+    onRequestClose,
+  ]);
+
+  const handleDismissMenu = useCallback(() => {
+    clearSelection();
+    onRequestClose?.();
+  }, [clearSelection, onRequestClose]);
+
+  const shouldShowModal = showMenu && isActive;
 
   return (
     <View
+      ref={containerRef}
       style={[styles.container, style]}
       onLayout={e => setContainerW(e.nativeEvent.layout.width)}>
-      {/* Overlay text for visual rendering + highlighting */}
+      {/* Overlay (highlight rendering) */}
       {prefixText || (parts && parts.length > 0) ? (
         <View pointerEvents="none" style={styles.overlay}>
           <Text
@@ -322,26 +349,38 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         ]}
       />
 
-      {/* ✅ Tooltip only (no full overlay). Outside dismiss is handled by Conversation overlay */}
-      {showMenu && isActive ? (
-        <View
-          style={[
-            styles.menuContainer,
-            {
-              top: menuPos.y,
-              left: menuPos.x,
-              width: MENU_W,
-              height: MENU_H,
-            },
-          ]}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleAddComment}
-            activeOpacity={0.7}>
-            <Text style={styles.menuItemText}>Add comment</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+      {/* Tooltip rendered in a transparent Modal so it is ALWAYS clickable */}
+      <Modal
+        visible={shouldShowModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleDismissMenu}>
+        {/* Backdrop: tap anywhere outside menu closes */}
+        <TouchableWithoutFeedback onPress={handleDismissMenu}>
+          <View style={styles.modalOverlay}>
+            {/* Stop propagation inside menu */}
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.menuContainer,
+                  {
+                    top: menuAbsPos.y,
+                    left: menuAbsPos.x,
+                    width: MENU_W,
+                    height: MENU_H,
+                  },
+                ]}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleAddComment}
+                  activeOpacity={0.7}>
+                  <Text style={styles.menuItemText}>Add comment</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };
@@ -374,6 +413,13 @@ const styles = ScaledSheet.create({
   highlightedText: {
     backgroundColor: colors.ds.theme.primary,
   },
+
+  // Modal overlay catches outside taps
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
   menuContainer: {
     position: 'absolute',
     backgroundColor: colors.ds.surface.background,
@@ -383,7 +429,7 @@ const styles = ScaledSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 8,
+    elevation: 20,
     zIndex: 9999,
   },
   menuItem: {
