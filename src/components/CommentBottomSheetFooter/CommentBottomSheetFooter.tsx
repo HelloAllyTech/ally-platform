@@ -33,7 +33,7 @@ export const CommentBottomSheetFooter =
       isLoading = false,
     }) => {
       return (
-        <View style={[styles.container, {paddingBottom: bottomInset}]}>
+        <View style={[styles.container, {paddingBottom: bottomInset + 16}]}>
           <View style={styles.inputContainer}>
             <BottomSheetTextInput
               style={styles.input}

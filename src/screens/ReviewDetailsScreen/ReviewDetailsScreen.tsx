@@ -65,8 +65,28 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
-    // Otherwise, close message threads and navigate back
-    handleCloseMessageThreads();
+    // Check if any bottom sheet is open and dismiss it first
+    if (isReplyBottomSheetVisible) {
+      closeReplyBottomSheet();
+      return true;
+    }
+    if (isCommentThreadBottomSheetVisible) {
+      closeCommentThreadBottomSheet();
+      return true;
+    }
+    if (isMessageThreadsVisible) {
+      handleCloseMessageThreads();
+      return true;
+    }
+    if (isThreadsBottomSheetVisible) {
+      closeThreadsBottomSheet();
+      return true;
+    }
+    if (showCommentInput) {
+      resetCommentInput();
+      return true;
+    }
+    // Otherwise, navigate back
     navigation.goBack();
     return true;
   });
