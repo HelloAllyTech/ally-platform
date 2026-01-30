@@ -27,7 +27,7 @@ export type RootStackParamList = {
   Achievements: undefined;
   ProfileSettings: undefined;
   Reactions: {reviewId: string | number};
-  ReviewDetails: {reviewId: string};
+  ReviewDetails: {reviewId: string; isPrivate?: boolean};
 };
 
 export type DrawerParamList = {

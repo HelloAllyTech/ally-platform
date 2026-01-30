@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {useRoute} from '@react-navigation/native';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -21,6 +20,7 @@ import {
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
   useGetMessagesQuery,
@@ -39,11 +39,11 @@ import {useReviewComments} from './hooks/useReviewComments';
 
 const MESSAGES_PER_PAGE = 10;
 
-export const ReviewDetailsScreen: React.FC = () => {
-  const isSelectable = true;
-  const route = useRoute<any>();
+type Props = RootStackScreenProps<'ReviewDetails'>;
+
+export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {reviewId: _reviewId} = route.params || {};
+  const {reviewId: _reviewId, isPrivate} = route.params || {};
   const currentMessageIdRef = useRef<string | null>(null);
 
   // State management
@@ -398,7 +398,7 @@ export const ReviewDetailsScreen: React.FC = () => {
       </View>
       <Conversation
         messages={conversationMessages}
-        isSelectable={isSelectable}
+        isSelectable={!isPrivate}
         onSelection={handleSelection}
         onThreadClick={handleThreadClick}
         onLoadMore={loadMoreMessages}
@@ -419,6 +419,7 @@ export const ReviewDetailsScreen: React.FC = () => {
             refetchReviewData();
           }}
           myReaction={reviewData?.myReaction || null}
+          isPrivate={isPrivate}
         />
       </View>
       <CommentInput
@@ -455,6 +456,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         reviewOwnerId={reviewData?.createdBy?.id}
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
+        isPrivate={isPrivate}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
@@ -464,6 +466,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
         reviewOwnerId={reviewData?.createdBy?.id}
+        isPrivate={isPrivate}
       />
     </SafeAreaView>
   );
