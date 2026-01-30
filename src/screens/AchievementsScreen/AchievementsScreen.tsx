@@ -1,35 +1,52 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
 import {TabView} from '@/components';
 import {LockStatus} from '@/constants';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetAvailableBadgesQuery} from '@/services';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors} from '@/theme';
 import {BadgeCategoryGroup} from '@/types';
+import {BADGE_CATEGORY_MAP} from '@/utils';
 
 import {AchievementCard} from './components';
+import {styles} from './styles';
 
-type FilterType = 'all' | 'unlocked';
+enum FilterType {
+  ALL = 'all',
+  UNLOCKED = 'unlocked',
+}
 
 export const AchievementsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>(
+    FilterType.ALL,
+  );
 
-  const {data: badgesResponse} = useGetAvailableBadgesQuery();
+  const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
+
+  useHardwareBackPressHandler(() => {
+    handleGoBack();
+    return true;
+  });
 
   // Memoize tab configuration
   const tabs = useMemo(
     () => [
-      {key: 'all' as FilterType, label: t('Achievements.all', 'All')},
+      {key: FilterType.ALL, label: t('Achievements.all', 'All')},
       {
-        key: 'unlocked' as FilterType,
+        key: FilterType.UNLOCKED,
         label: t('Achievements.unlocked', 'Unlocked'),
       },
     ],
@@ -41,7 +58,7 @@ export const AchievementsScreen: React.FC = () => {
       return [];
     }
 
-    if (selectedFilter === 'all') {
+    if (selectedFilter === FilterType.ALL) {
       return badgesResponse;
     }
 
@@ -64,7 +81,9 @@ export const AchievementsScreen: React.FC = () => {
     (categoryGroup: BadgeCategoryGroup, index: number) => (
       <View key={`${categoryGroup.category}-${index}`} style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{categoryGroup.category}</Text>
+          <Text style={styles.sectionTitle}>
+            {BADGE_CATEGORY_MAP[categoryGroup.category]}
+          </Text>
           <View style={styles.sectionLine} />
         </View>
         {categoryGroup.badges.map(badge => (
@@ -85,6 +104,32 @@ export const AchievementsScreen: React.FC = () => {
     ),
     [t],
   );
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>
+            {t('Achievements.error', 'Failed to load achievements')}
+          </Text>
+        </View>
+      );
+    }
+
+    if (filteredCategories.length === 0) {
+      return renderEmptyState();
+    }
+
+    return filteredCategories.map(renderCategorySection);
+  };
 
   return (
     <View
@@ -121,91 +166,8 @@ export const AchievementsScreen: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {filteredCategories.length === 0
-          ? renderEmptyState()
-          : filteredCategories.map(renderCategorySection)}
+        {renderContent()}
       </ScrollView>
     </View>
   );
 };
-
-const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.ds.neutral.white,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: '21@ms',
-    paddingVertical: '16@ms',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.primary,
-  },
-  backButton: {
-    marginRight: '16@ms',
-  },
-  title: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    ...typography.display.small,
-    color: colors.ds.typography.highEmphasis,
-    fontWeight: '400',
-  },
-  filterContainer: {
-    marginHorizontal: '24@ms',
-    marginTop: '16@ms',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  badgesLabel: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
-    lineHeight: '24@ms',
-    color: colors.ds.typography.highEmphasis,
-  },
-  tabViewWrapper: {
-    width: '65%',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: '24@ms',
-    paddingVertical: '16@ms',
-  },
-  section: {
-    marginBottom: '24@ms',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: '12@ms',
-  },
-  sectionTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
-    color: colors.ds.typography.lowEmphasis,
-    marginRight: '16@ms',
-  },
-  sectionLine: {
-    flex: 1,
-    height: '0.5@ms',
-    backgroundColor: colors.ds.stroke.primary,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: '24@ms',
-    paddingVertical: '48@ms',
-  },
-  emptyText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.ds.typography.mediumEmphasis,
-    textAlign: 'center',
-  },
-});

@@ -57,6 +57,18 @@ jest.mock('@/hooks', () => ({
     closeActiveSimulationModal: jest.fn(),
     setShowActiveSimulationModal: jest.fn(),
   })),
+  useLanguageDropdown: jest.fn(() => ({
+    selectedLanguage: 'English',
+    setSelectedLanguage: jest.fn(),
+    isLanguageDropdownOpen: false,
+    setIsLanguageDropdownOpen: jest.fn(),
+    languageOptions: ['English', 'Spanish'],
+    languageMap: new Map([
+      ['English', 1],
+      ['Spanish', 2],
+    ]),
+    isLoading: false,
+  })),
 }));
 
 jest.mock('../components/PathSimulationCard', () => {
@@ -94,6 +106,13 @@ jest.mock('@/components', () => {
       </TouchableOpacity>
     ),
     EmptyState: ({title}: any) => <Text testID="empty-state">{title}</Text>,
+    NotificationModal: ({visible, title, message}: any) =>
+      visible ? (
+        <View testID="notification-modal">
+          <Text>{title}</Text>
+          <Text>{message}</Text>
+        </View>
+      ) : null,
     useToast: jest.fn(() => ({
       showToast: mockShowToast,
     })),
@@ -104,46 +123,15 @@ const mockShowToast = jest.fn();
 const mockCreatePathSession = jest.fn();
 const mockGetScenarioSessionByPathItem = jest.fn();
 
-// Define language data outside the mock to ensure it's the same reference
-const mockLanguagesData = [
-  {
-    language_id: 1,
-    label: 'English',
-    active: true,
-    translationCode: 'en',
-    value: 'en-IN',
-  },
-  {
-    language_id: 2,
-    label: 'Spanish',
-    active: true,
-    translationCode: 'es',
-    value: 'es-ES',
-  },
-];
-
-const mockPreferencesData = {data: {default_language_id: 1}};
-
 jest.mock('@/services', () => {
   return {
     useGetSimulationPathDetailsQuery: jest.fn(),
     useCreatePathSessionMutation: jest.fn(() => [
-    mockCreatePathSession,
-    {isLoading: false},
-  ]),
-  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
-    mockGetScenarioSessionByPathItem,
-  ]),
-    useGetAvailableLanguagesQuery: jest.fn(() => ({
-      data: mockLanguagesData,
-    })),
-    useGetUserPreferencesQuery: jest.fn(() => ({
-      data: mockPreferencesData,
-      refetch: jest.fn().mockResolvedValue({data: mockPreferencesData}),
-    })),
-    useLazyGetUserPreferencesQuery: jest.fn(() => [
-      jest.fn().mockResolvedValue({data: mockPreferencesData}),
-      {data: mockPreferencesData},
+      mockCreatePathSession,
+      {isLoading: false},
+    ]),
+    useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [
+      mockGetScenarioSessionByPathItem,
     ]),
   };
 });

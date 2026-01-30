@@ -21,6 +21,7 @@ import {useSelector} from 'react-redux';
 
 import {BoltIcon, DrawerMenuIcon} from '@/assets';
 import {
+  BadgePopup,
   CircularProgress,
   SimulationCard,
   SimulationsSkeleton,
@@ -299,6 +300,7 @@ export const SimulationsScreen: React.FC = () => {
         </View>
         {renderTabContent()}
       </View>
+      <BadgePopup />
     </View>
   );
 };

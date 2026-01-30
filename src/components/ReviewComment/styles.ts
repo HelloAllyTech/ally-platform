@@ -7,7 +7,7 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     gap: '10@s',
     alignSelf: 'stretch',
-    width: '80%',
+    width: '100%',
   },
   avatarContainer: {
     width: '32@ms',
@@ -37,6 +37,7 @@ export const styles = ScaledSheet.create({
   },
   contentContainer: {
     flex: 1,
+    width: '100%',
     flexDirection: 'column',
   },
   headerRow: {
@@ -50,6 +51,7 @@ export const styles = ScaledSheet.create({
     gap: '6@s',
   },
   name: {
+    maxWidth: '80%',
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
     lineHeight: '18@ms',
@@ -69,11 +71,17 @@ export const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     alignSelf: 'stretch',
   },
+  hiddenCommentText: {
+    opacity: 0.8,
+  },
   footerRow: {
     marginTop: '8@mvs',
     flexDirection: 'row',
     alignItems: 'center',
     gap: '4@ms',
+  },
+  hiddenFooterRow: {
+    opacity: 0.6,
   },
   footerRowLeft: {
     flexDirection: 'row',
@@ -151,5 +159,38 @@ export const styles = ScaledSheet.create({
     lineHeight: '18@ms',
     color: colors.ds.typography.mediumEmphasis,
     textAlign: 'right',
+  },
+  actionsMenuContainer: {
+    marginLeft: 'auto',
+  },
+  hiddenContainer: {
+    padding: '12@s',
+    backgroundColor: colors.lightGray,
+    borderRadius: '8@s',
+    marginVertical: '4@s',
+  },
+  hiddenText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '16@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    fontStyle: 'italic',
+  },
+  hiddenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@s',
+    backgroundColor: colors.lightGray,
+    paddingHorizontal: '4@s',
+    paddingVertical: '2@s',
+    borderRadius: '100@s',
+    alignSelf: 'flex-start',
+  },
+  hiddenBadgeText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    lineHeight: '14@ms',
+    color: colors.black,
+    opacity: 0.8,
   },
 });

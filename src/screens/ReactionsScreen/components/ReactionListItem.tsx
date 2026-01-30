@@ -9,7 +9,8 @@ import {ReactionListItemProps} from '../types';
 
 export const ReactionListItem: React.FC<ReactionListItemProps> = memo(
   ({item}) => {
-    const emoji = EMOJI_UNICODE_MAP[item.reaction] || item.reaction;
+    const emoji =
+      EMOJI_UNICODE_MAP[item.reaction.toLowerCase()] || item.reaction;
     const initials = item.createdBy.name.charAt(0).toUpperCase();
 
     return (

@@ -21,7 +21,7 @@ export const reviewThreadsApi = api.injectEndpoints({
           url: API_ROUTES.REVIEWS.THREADS(reviewId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
-            ? {params: {offset, limit}}
+            ? {params: {offset, limit, includeMessage: true}}
             : {}),
         });
 

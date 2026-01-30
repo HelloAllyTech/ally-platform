@@ -1,4 +1,5 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -14,15 +15,12 @@ import {LeftArrowIcon} from '@/assets/icons';
 import {CustomDropdown, CustomModal, PrimaryButton} from '@/components';
 import {
   useAppNavigation,
+  useLanguageDropdown,
   useProfileImage,
   useTranslate,
   useUser,
 } from '@/hooks';
-import {
-  useGetAvailableLanguagesQuery,
-  useGetUserPreferencesQuery,
-  useUpdateUserPreferencesMutation,
-} from '@/services';
+import {useUpdateUserPreferencesMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ProfileImageBottomSheet} from './components/ProfileImageBottomSheet';
@@ -32,55 +30,27 @@ const isIOS = Platform.OS === 'ios';
 export const ProfileSettingsScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const {userData} = useUser();
   const {t} = useTranslate();
   const {name, email, profileImageUrl} = userData ?? {};
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
-  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
-  const [languageOptions, setLanguageOptions] = useState<string[]>([]);
-  const [languageMap, setLanguageMap] = useState<Map<string, number>>(
-    new Map(),
-  );
 
-  // Fetch available languages
-  const {data: languagesData} = useGetAvailableLanguagesQuery({
-    active: true,
-    hasVoices: true,
-  });
-
-  // Fetch user preferences
-  const {data: preferencesData} = useGetUserPreferencesQuery();
+  // Use custom hook for language dropdown management
+  const {
+    selectedLanguage,
+    setSelectedLanguage,
+    isLanguageDropdownOpen,
+    setIsLanguageDropdownOpen,
+    languageOptions,
+    languageMap,
+  } = useLanguageDropdown({isFocused});
 
   // Update user preferences mutation
   const [updateUserPreferences, {isLoading: isUpdatingPreferences}] =
     useUpdateUserPreferencesMutation();
-
-  // Initialize languages
-  useEffect(() => {
-    if (languagesData && Array.isArray(languagesData)) {
-      const options = languagesData.map(lang => lang.label);
-      const map = new Map(
-        languagesData.map(lang => [lang.label, lang.language_id]),
-      );
-      setLanguageOptions(options);
-      setLanguageMap(map);
-    }
-  }, [languagesData]);
-
-  // Set selected language from preferences
-  useEffect(() => {
-    if (preferencesData?.data?.default_language_id && languagesData) {
-      const selectedLang = languagesData.find(
-        lang => lang.language_id === preferencesData.data.default_language_id,
-      );
-      if (selectedLang) {
-        setSelectedLanguage(selectedLang.label);
-      }
-    }
-  }, [preferencesData, languagesData]);
 
   const {
     previewImageUri,

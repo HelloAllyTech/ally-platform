@@ -1,4 +1,4 @@
-import {Text, TouchableOpacity, View} from 'react-native';
+import {Text, TextStyle, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily, typography} from '@/theme';
@@ -21,6 +21,14 @@ export interface TabViewProps<T extends string = string> {
    * @default 'equal'
    */
   tabWidthMode?: TabWidthMode;
+  /**
+   * Custom text style for tab labels
+   */
+  labelTextStyle?: TextStyle;
+  /**
+   * Custom text style for active tab label
+   */
+  activeLabelTextStyle?: TextStyle;
 }
 
 /**
@@ -33,6 +41,8 @@ export const TabView = <T extends string = string>({
   activeTab,
   onTabChange,
   tabWidthMode = 'equal',
+  labelTextStyle,
+  activeLabelTextStyle,
 }: TabViewProps<T>) => {
   const isContentBased = tabWidthMode === 'content';
 
@@ -51,7 +61,9 @@ export const TabView = <T extends string = string>({
           <Text
             style={[
               styles.tabText,
+              labelTextStyle,
               activeTab === tab.key && styles.activeTabText,
+              activeTab === tab.key && activeLabelTextStyle,
             ]}>
             {tab.label}
           </Text>

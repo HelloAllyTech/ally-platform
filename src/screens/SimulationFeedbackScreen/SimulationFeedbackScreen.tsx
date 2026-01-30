@@ -28,9 +28,11 @@ import {
   useAddSimulationFeedbackMutation,
   useCreateReviewMutation,
   useGetUpcomingScenarioQuery,
+  useLazyGetReactionsCountQuery,
   useLazyGetSimulationDetailsQuery,
   useUpdateReviewStatusMutation,
 } from '@/services';
+import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
 import {ReviewStatus, SessionItemStatus} from '@/types';
@@ -72,6 +74,7 @@ export const SimulationFeedbackScreen: React.FC<
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const [isPrivate, setIsPrivate] = useState(true);
   const [reviewId, setReviewId] = useState<string | null>(null);
+  const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(false);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -88,6 +91,10 @@ export const SimulationFeedbackScreen: React.FC<
       pollingInterval,
     },
   );
+
+  const [getReviewThreadComments] = useLazyGetThreadsQuery();
+  const [getReactionsCount] = useLazyGetReactionsCountQuery();
+
   const {showToast} = useToast();
 
   useEffect(() => {
@@ -112,6 +119,39 @@ export const SimulationFeedbackScreen: React.FC<
       showToast(simulationDetails.details.summary.errorMessage, 'error');
     }
   }, [showToast, simulationDetails?.details?.summary?.errorMessage]);
+
+  useEffect(() => {
+    const fetchReviewThreadComments = async () => {
+      if (!reviewId) return;
+      if (!isPrivate) {
+        setHideReviewDetails(false);
+        return;
+      }
+      try {
+        const threads = await getReviewThreadComments({
+          reviewId: reviewId,
+          offset: 0,
+          limit: 1,
+        });
+        if (threads.data && threads.data.data.length === 0) {
+          const reactionsCount = await getReactionsCount(reviewId);
+          if (
+            reactionsCount.data &&
+            Object.keys(reactionsCount.data.reactions).length === 0
+          ) {
+            setHideReviewDetails(true);
+          } else {
+            setHideReviewDetails(false);
+          }
+        } else {
+          setHideReviewDetails(false);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchReviewThreadComments();
+  }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
 
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
@@ -259,6 +299,7 @@ export const SimulationFeedbackScreen: React.FC<
   const handleViewReview = () => {
     navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {
       reviewId: reviewId || '',
+      isPrivate,
     });
   };
 
@@ -463,7 +504,7 @@ export const SimulationFeedbackScreen: React.FC<
               </Text>
             )}
           </View>
-          {!!reviewId && !showSummary && (
+          {!!reviewId && !showSummary && !hideReviewDetails && (
             <TouchableOpacity
               onPress={handleViewReview}
               style={styles.reviewIconButton}

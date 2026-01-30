@@ -101,8 +101,19 @@ jest.mock('@/services', () => {
       fulfilledTimeStamp: 0,
     })),
     useLazyGetUpcomingScenarioQuery,
+    useLazyGetReactionsCountQuery: () => [
+      jest.fn().mockResolvedValue({data: {reactions: {}}}),
+      {isLoading: false},
+    ],
   };
 });
+
+jest.mock('@/services/reviewThreadsApi', () => ({
+  useLazyGetThreadsQuery: () => [
+    jest.fn().mockResolvedValue({data: {data: []}}),
+    {isLoading: false},
+  ],
+}));
 
 jest.mock('../components', () => {
   const React = require('react');

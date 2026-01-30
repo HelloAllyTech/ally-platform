@@ -37,7 +37,7 @@ export const useReactions = (reviewId: string | number | null) => {
     const countResult = await getReactionsCount(reviewId);
 
     if (countResult.data) {
-      const reactionCounts = countResult.data;
+      const reactionCounts = countResult.data.reactions;
 
       // Calculate total count (sum of all reaction counts)
       const total = Object.values(reactionCounts).reduce(

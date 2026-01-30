@@ -1,56 +1,55 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 
-import {getMockBadgesResponse} from '@/components/BadgePopup/mockData';
-import {ViewedStatus} from '@/constants';
+import {
+  BADGE_AUTO_CLOSE_DELAY,
+  BADGE_CLOSE_ANIMATION_DELAY,
+  BADGE_INITIAL_SHOW_DELAY,
+  BADGE_NEXT_BADGE_DELAY,
+  BADGE_POLLING_INTERVAL,
+  ViewedStatus,
+} from '@/constants';
 import {useGetBadgesQuery, useMarkBadgeAsViewedMutation} from '@/services';
-import {GetBadgesResponse, UserBadge} from '@/types';
+import {UserBadge} from '@/types';
+import {logger} from '@/utils';
 
-const USE_MOCK_DATA = true;
-
-export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
+export const useBadgePopup = (
+  autoCloseDelay: number | null = BADGE_AUTO_CLOSE_DELAY,
+) => {
   const [currentBadge, setCurrentBadge] = useState<UserBadge | null>(null);
   const [badgeQueue, setBadgeQueue] = useState<UserBadge[]>([]);
   const [isFirstBadge, setIsFirstBadge] = useState(false);
+  const isProcessingQueueRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const clearBadgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstBadgeRef = useRef(false);
 
-  const apiResult = useGetBadgesQuery(ViewedStatus.UNVIEWED, {
-    skip: USE_MOCK_DATA,
-  });
+  const {data: badges, isLoading: isBadgesLoading} = useGetBadgesQuery(
+    ViewedStatus.UNVIEWED,
+    {
+      pollingInterval: BADGE_POLLING_INTERVAL,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
   const [markBadgeAsViewed] = useMarkBadgeAsViewedMutation();
 
-  // Memoize mock badges to prevent recreating on every render
-  const mockBadges = useMemo(
-    () =>
-      USE_MOCK_DATA ? getMockBadgesResponse(ViewedStatus.UNVIEWED) : undefined,
-    [],
-  );
-
-  // Get badges from mock or API
-  const badges: GetBadgesResponse | undefined = USE_MOCK_DATA
-    ? mockBadges
-    : apiResult.data;
-
-  const isBadgesLoading = USE_MOCK_DATA ? false : apiResult.isLoading;
-
+  // Initial badge queue setup
   useEffect(() => {
-    if (badges?.data && !currentBadge) {
-      const [firstBadge, ...rest] = badges?.data;
+    if (badges?.data?.length && !currentBadge) {
+      const [firstBadge, ...rest] = badges.data;
       const timeoutId = setTimeout(() => {
         setCurrentBadge(firstBadge);
         const isFirstEver = !hasShownFirstBadgeRef.current;
         setIsFirstBadge(isFirstEver);
         hasShownFirstBadgeRef.current = true;
         setBadgeQueue(rest);
-      }, 1000);
+      }, BADGE_INITIAL_SHOW_DELAY);
 
       return () => {
         clearTimeout(timeoutId);
       };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [badges?.data]);
+  }, [badges?.data, currentBadge]);
 
   // Clear timers on unmount
   useEffect(() => {
@@ -65,6 +64,32 @@ export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
   }, []);
 
   // Process the next badge in queue when current badge closes
+  const processNextBadge = useCallback(() => {
+    if (isProcessingQueueRef.current) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+
+    setBadgeQueue(currentQueue => {
+      if (currentQueue.length === 0) {
+        isProcessingQueueRef.current = false;
+        return currentQueue;
+      }
+
+      const [nextBadge, ...rest] = currentQueue;
+
+      // Small delay to ensure previous badge close animation completes
+      setTimeout(() => {
+        setCurrentBadge(nextBadge);
+        setIsFirstBadge(false);
+        isProcessingQueueRef.current = false;
+      }, BADGE_NEXT_BADGE_DELAY);
+
+      return rest;
+    });
+  }, []);
+
   useEffect(() => {
     if (!currentBadge && badgeQueue.length > 0) {
       // Clear any pending clearBadge timeout to prevent it from clearing the next badge
@@ -73,23 +98,9 @@ export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
         clearBadgeTimeoutRef.current = null;
       }
 
-      // Small delay to ensure previous badge close animation completes
-      const timeoutId = setTimeout(() => {
-        // Double-check that we're still not visible and have badges in queue
-        if (badgeQueue.length > 0) {
-          const nextBadge = badgeQueue[0];
-          setBadgeQueue(prev => prev.slice(1));
-          setCurrentBadge(nextBadge);
-          setIsFirstBadge(false);
-        }
-      }, 350); // Slightly longer than the 300ms delay in handleClose
-
-      return () => {
-        clearTimeout(timeoutId);
-      };
+      processNextBadge();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBadge]);
+  }, [currentBadge, badgeQueue.length, processNextBadge]);
 
   const handleClose = useCallback(async () => {
     // Clear auto-close timer
@@ -105,18 +116,19 @@ export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
     }
 
     // Mark badge as viewed before clearing
-    if (currentBadge && !USE_MOCK_DATA) {
+    if (currentBadge) {
       try {
-        await markBadgeAsViewed(currentBadge.id).unwrap();
+        await markBadgeAsViewed(currentBadge.badgeId).unwrap();
       } catch (error) {
-        console.error('Failed to mark badge as viewed:', error);
+        logger.error(`Failed to mark badge as viewed: ${error}`);
       }
     }
-    // Clear badge after animation completes (optional delay)
+
+    // Clear badge after animation completes
     clearBadgeTimeoutRef.current = setTimeout(() => {
       setCurrentBadge(null);
       clearBadgeTimeoutRef.current = null;
-    }, 300);
+    }, BADGE_CLOSE_ANIMATION_DELAY);
   }, [currentBadge, markBadgeAsViewed]);
 
   // Handle auto-close timer
@@ -141,7 +153,7 @@ export const useBadgePopup = (autoCloseDelay: number | null = 5000) => {
       timerRef.current = null;
     }
 
-    // Set new timer with a small delay to ensure state is stable
+    // Set new timer
     timerRef.current = setTimeout(() => {
       handleClose();
     }, autoCloseDelay);

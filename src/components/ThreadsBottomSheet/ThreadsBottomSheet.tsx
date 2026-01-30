@@ -8,7 +8,7 @@ import {ms} from 'react-native-size-matters';
 
 import {ChevronRight} from '@/assets/icons';
 import {BottomSheet, ReviewComment} from '@/components';
-import {useTranslate} from '@/hooks';
+import {useTranslate, useUser} from '@/hooks';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {ThreadsResponse} from '@/types/reviews';
@@ -24,9 +24,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
   onClose,
   reviewId,
+  reviewOwnerId,
   onThreadPress,
 }) => {
   const {t} = useTranslate();
+  const {userData} = useUser();
   const insets = useSafeAreaInsets();
   const [getThreads, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreadsQuery();
@@ -81,7 +83,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       }
 
       const firstComment = thread.comments[0];
-      const remainingCount = thread.commentCount - 1;
+      const remainingCount = thread.comments.length - 1;
       const reactionsArray = getReactionsArray(firstComment.reactions);
       const reactionCount = getTotalReactionCount(firstComment.reactions);
 
@@ -91,13 +93,14 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
           onPress={() => onThreadPress?.(thread.id)}
           activeOpacity={0.7}>
           {/* Selected Text Section - if available */}
-          {thread.selectedText && (
+          {thread.message?.content && (
             <View style={styles.selectedTextContainer}>
               <Text
                 style={styles.selectedText}
                 numberOfLines={1}
                 ellipsizeMode="tail">
-                {t('ThreadsBottomSheet.selectedText')} "{thread.selectedText}"
+                {t('ThreadsBottomSheet.selectedText')} "
+                {thread.message?.content}"
               </Text>
             </View>
           )}
@@ -117,7 +120,12 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
               reactionCount={reactionCount}
               replyCount={firstComment.replyCount}
               showReplyButton={false}
+              disableAddReactionButton
               onCommentPress={() => onThreadPress?.(thread.id)}
+              hidden={firstComment.hidden}
+              currentUserId={userData?.id}
+              commentOwnerId={firstComment.createdBy.id}
+              commentId={firstComment.id}
             />
             {remainingCount > 0 && (
               <LinearGradient
@@ -158,7 +166,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         </TouchableOpacity>
       );
     },
-    [onThreadPress, t],
+    [onThreadPress, t, userData],
   );
 
   const renderHeader = useCallback(() => {
@@ -196,7 +204,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   }, [hasMore, reviewId, isFetching, isLoading]);
 
   const renderEmpty = useCallback(() => {
-    if (isLoading) {
+    if (isLoading || isFetching || (visible && !commentsData)) {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.ds.theme.primary} />
@@ -210,7 +218,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         </Text>
       </View>
     );
-  }, [isLoading, t]);
+  }, [isLoading, isFetching, visible, commentsData, t]);
 
   return (
     <BottomSheet
@@ -224,7 +232,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       enableOverDrag
       enableHandlePanningGesture>
       <View style={styles.container}>
-        {isLoading && !commentsData ? (
+        {(isLoading || isFetching) && !commentsData ? (
           <>
             {renderHeader()}
             {renderEmpty()}

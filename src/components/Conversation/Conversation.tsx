@@ -3,6 +3,9 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {Message as MessageComponent} from '@/components/Message';
 import {SelectableTextArea} from '@/components/SelectableTextArea/SelectableTextArea';
+import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
+import {useTranslate} from '@/hooks';
+import {useAppSelector} from '@/store/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -35,6 +38,8 @@ export const Conversation: React.FC<ConversationProps> = ({
   onRefresh,
   isRefreshing = false,
 }) => {
+  const {t} = useTranslate();
+  const userName = useAppSelector(state => state.user.user?.name);
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
       <Text>No messages found.</Text>
@@ -43,6 +48,29 @@ export const Conversation: React.FC<ConversationProps> = ({
 
   const handleSelection = (selection: TextSelection, messageId: string) => {
     onSelection?.(selection, messageId);
+  };
+
+  const renderSelectableMessageV2 = (messageItem: MessageData) => {
+    const highlightedPartIndices = messageItem.messagePart
+      .map((part, index) => (part.commentIds.length > 0 ? index : -1))
+      .filter(index => index !== -1);
+    const isAiClient = messageItem.senderId === -1;
+    return (
+      <SelectableTextInput
+        prefixText={`${isAiClient ? 'AI Client' : userName || t('CallTranscript.you')}:`}
+        prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
+        parts={messageItem.messagePart.map(part => part.text)}
+        highlightedPartIndices={highlightedPartIndices}
+        highlightStyle={styles.highlightedText}
+        partTextStyle={styles.messageContent}
+        separator=""
+        key={`${messageItem.id}`}
+        onAddComment={selectionData =>
+          handleSelection(selectionData, messageItem.id)
+        }
+        multiline
+      />
+    );
   };
 
   const renderSelectableMessage = (messageItem: MessageData) => (
@@ -81,11 +109,10 @@ export const Conversation: React.FC<ConversationProps> = ({
   const renderItem = ({item}: {item: MessageData}) => (
     <MessageComponent
       timestamp={formatTimestamp(item.startSeconds)}
-      senderId={Number(item.senderId)}
       onPress={() => onThreadClick?.(item.id, item.id)}
       message={
         isSelectable
-          ? renderSelectableMessage(item)
+          ? renderSelectableMessageV2(item)
           : renderDefaultMessage(item)
       }
     />
@@ -136,7 +163,9 @@ const styles = ScaledSheet.create({
     ...typography.body.medium,
   },
   clientAgentText: {
-    color: colors.ds.theme.primary,
+    color: colors.black,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
   },
   highlightedText: {
     backgroundColor: colors.ds.amber[50],

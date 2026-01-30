@@ -151,6 +151,7 @@ jest.mock('../components', () => {
     EndingSoonModal: () => null,
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
+    SessionChecklist: () => <View testID="session-checklist" />,
     SimulationTimer: () => <Text testID="timer">timer</Text>,
     SimulationControls: ({
       isMicEnabled,
@@ -475,6 +476,37 @@ describe('SimulationAssistantScreen', () => {
     // Control buttons component should be present when connected
     // Note: buttons are only visible when maximized (default is collapsed)
     expect(getByTestId('simulation-control-buttons')).toBeDefined();
+  });
+
+  it('renders SessionChecklist and hides score meter when experienceMode is CHECKLIST', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const checklistParams = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'Checklist Scenario',
+        experienceMode: 'CHECKLIST',
+        checklistEvents: [{id: '1', text: 'Step 1'}],
+        checklistType: 'GUIDED',
+      },
+    };
+
+    const {getByTestId, queryByTestId} = renderWithProviders(
+      <SimulationAssistantScreen route={{params: checklistParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Verify SessionChecklist is rendered
+    expect(getByTestId('session-checklist')).toBeDefined();
+
+    // Verify SessionScoreMeter is NOT rendered
+    expect(queryByTestId('score')).toBeNull();
   });
 });
 

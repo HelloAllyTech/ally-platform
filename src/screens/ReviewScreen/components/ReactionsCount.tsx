@@ -28,6 +28,7 @@ export const ReactionsCount = ({
 }: ReactionsCountProps) => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
+
   const renderReactionBubble = (
     reaction_code: string,
     index: number,
@@ -40,7 +41,7 @@ export const ReactionsCount = ({
         index < total - 1 && styles.reactionBubbleOverlap,
         {zIndex: total - index},
       ]}>
-      <Text>{EMOJI_UNICODE_MAP[reaction_code]}</Text>
+      <Text>{EMOJI_UNICODE_MAP[reaction_code.toLowerCase()]}</Text>
     </View>
   );
 
@@ -49,20 +50,20 @@ export const ReactionsCount = ({
   };
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.reactionCountContainer}
-        onPress={handleReactionsCountPress}>
+    <TouchableOpacity
+      style={styles.reactionCountContainer}
+      onPress={handleReactionsCountPress}>
+      {reactions && (
         <View style={styles.emojisContainer}>
           {getTopReactions(reactions, 3).map((reaction_code, index, array) =>
             renderReactionBubble(reaction_code, index, array.length),
           )}
         </View>
-        <Text style={styles.reactionText}>
-          {pluralize(totalReactions, t('Review.card.reaction'))}
-        </Text>
-      </TouchableOpacity>
-    </>
+      )}
+      <Text style={styles.reactionText}>
+        {pluralize(totalReactions, t('Review.card.reaction'))}
+      </Text>
+    </TouchableOpacity>
   );
 };
 
