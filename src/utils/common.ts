@@ -3,7 +3,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking, Platform} from 'react-native';
 import SoundPlayer from 'react-native-sound-player';
 
-import {APP_STORE_URLS, isIOS} from '@/constants';
+import {APP_STORE_URLS, BadgeCategory, isIOS} from '@/constants';
 
 import {logger} from './logger';
 
@@ -67,18 +67,9 @@ export const playNotificationSound = async (soundFile: number) => {
   }
 };
 
-/**
- * Converts a snake_case string to Title Case
- * @param text - The snake_case string to convert
- * @returns The Title Case string
- * @example
- * snakeCaseToTitleCase('simulation_minutes') // 'Simulation Minutes'
- * snakeCaseToTitleCase('ACTIVE_DAY_STREAK') // 'Active Day Streak'
- */
-export const snakeCaseToTitleCase = (text: string): string => {
-  return text
-    .toLowerCase()
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+export const BADGE_CATEGORY_MAP: Record<BadgeCategory, string> = {
+  [BadgeCategory.SIMULATION_MINUTES]: 'Journey',
+  [BadgeCategory.ACTIVE_DAY_STREAK]: 'Momentum',
+  [BadgeCategory.COMMENTS_REACTIONS_GIVEN]: 'Contribution',
+  [BadgeCategory.COMMENTS_REACTIONS_RECEIVED]: 'Resonance',
 };

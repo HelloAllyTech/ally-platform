@@ -16,7 +16,7 @@ import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetAvailableBadgesQuery} from '@/services';
 import {colors} from '@/theme';
 import {BadgeCategoryGroup} from '@/types/badges';
-import {snakeCaseToTitleCase} from '@/utils/common';
+import {BADGE_CATEGORY_MAP} from '@/utils/common';
 
 import {AchievementCard} from './components';
 import {styles} from './styles';
@@ -82,7 +82,7 @@ export const AchievementsScreen: React.FC = () => {
       <View key={`${categoryGroup.category}-${index}`} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {snakeCaseToTitleCase(categoryGroup.category)}
+            {BADGE_CATEGORY_MAP[categoryGroup.category]}
           </Text>
           <View style={styles.sectionLine} />
         </View>

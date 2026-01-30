@@ -71,11 +71,17 @@ export const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     alignSelf: 'stretch',
   },
+  hiddenCommentText: {
+    opacity: 0.8,
+  },
   footerRow: {
     marginTop: '8@mvs',
     flexDirection: 'row',
     alignItems: 'center',
     gap: '4@ms',
+  },
+  hiddenFooterRow: {
+    opacity: 0.6,
   },
   footerRowLeft: {
     flexDirection: 'row',
@@ -171,17 +177,20 @@ export const styles = ScaledSheet.create({
     fontStyle: 'italic',
   },
   hiddenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@s',
     backgroundColor: colors.lightGray,
-    paddingHorizontal: '8@s',
+    paddingHorizontal: '4@s',
     paddingVertical: '2@s',
-    borderRadius: '4@s',
+    borderRadius: '100@s',
     alignSelf: 'flex-start',
   },
   hiddenBadgeText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '11@ms',
     lineHeight: '14@ms',
-    color: colors.ds.typography.mediumEmphasis,
-    textTransform: 'uppercase',
+    color: colors.black,
+    opacity: 0.8,
   },
 });
