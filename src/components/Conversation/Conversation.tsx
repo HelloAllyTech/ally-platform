@@ -1,12 +1,5 @@
 import React, {useCallback, useState} from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Message as MessageComponent} from '@/components/Message';
@@ -49,11 +42,11 @@ export const Conversation: React.FC<ConversationProps> = ({
   const {t} = useTranslate();
   const userName = useAppSelector(state => state.user.user?.name);
 
-  // ✅ One active menu across the whole list
+  // only one active menu across list
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(
     null,
   );
-  // ✅ Bump this to force close currently-open menu (even if same id)
+  // bump to force-close currently-open menu
   const [closeSignal, setCloseSignal] = useState(0);
 
   const dismissAnyMenu = useCallback(() => {
@@ -80,15 +73,14 @@ export const Conversation: React.FC<ConversationProps> = ({
 
     return (
       <SelectableTextInput
-        // ✅ new props
         messageId={messageItem.id}
         isActive={activeMenuMessageId === messageItem.id}
         requestCloseSignal={closeSignal}
         onRequestActivate={id => {
-          // close any previously active menu and activate this one
+          // close any previously open menu and activate this one
           setActiveMenuMessageId(id);
         }}
-        // existing props
+        onRequestClose={dismissAnyMenu}
         prefixText={
           isAiClient ? 'AI Client' : userName || t('CallTranscript.you')
         }
@@ -148,31 +140,20 @@ export const Conversation: React.FC<ConversationProps> = ({
   };
 
   return (
-    <View style={{flex: 1}}>
-      <FlatList
-        data={messages}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        renderItem={renderItem}
-        ListEmptyComponent={renderEmptyComponent}
-        ListFooterComponent={renderFooter}
-        onEndReached={hasMore ? onLoadMore : undefined}
-        onEndReachedThreshold={0.5}
-        refreshing={isRefreshing}
-        onRefresh={onRefresh}
-        // ✅ close open menu when user starts scrolling
-        onScrollBeginDrag={dismissAnyMenu}
-        // ✅ helps tap handling when keyboard might be involved
-        keyboardShouldPersistTaps="handled"
-      />
-
-      {/* ✅ Global outside-tap dismiss overlay */}
-      {activeMenuMessageId ? (
-        <TouchableWithoutFeedback onPress={dismissAnyMenu}>
-          <View style={StyleSheet.absoluteFillObject} />
-        </TouchableWithoutFeedback>
-      ) : null}
-    </View>
+    <FlatList
+      data={messages}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.listContainer}
+      renderItem={renderItem}
+      ListEmptyComponent={renderEmptyComponent}
+      ListFooterComponent={renderFooter}
+      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReachedThreshold={0.5}
+      refreshing={isRefreshing}
+      onRefresh={onRefresh}
+      onScrollBeginDrag={dismissAnyMenu}
+      keyboardShouldPersistTaps="handled"
+    />
   );
 };
 

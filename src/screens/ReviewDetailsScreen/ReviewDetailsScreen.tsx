@@ -323,7 +323,7 @@ export const ReviewDetailsScreen: React.FC = () => {
   ]);
 
   const handleThreadClick = useCallback(
-    (threadId: string, messageId: string) => {
+    (_commentIds: string[], messageId: string) => {
       if (!showCommentInput) {
         setSelectedMessageForThreads(messageId);
         setIsMessageThreadsVisible(true);
