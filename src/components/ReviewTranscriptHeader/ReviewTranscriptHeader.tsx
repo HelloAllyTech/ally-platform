@@ -1,8 +1,9 @@
 import {useState} from 'react';
-import {Image, ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {HelpIcon, ProfileIcon} from '@/assets';
+import {HelpIcon} from '@/assets';
+import {UserProfileImage} from '@/components';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -61,18 +62,18 @@ export const ReviewTranscriptHeader = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subtitleContainer}>
           <View style={styles.userContainer}>
-            {user?.profileImage ? (
-              <Image
-                source={{uri: user?.profileImage}}
-                style={styles.userImage}
-              />
-            ) : (
-              <ProfileIcon
-                width={ms(16)}
-                height={ms(16)}
-                color={colors.lightGray15}
-              />
-            )}
+            <UserProfileImage
+              {...(user.profileImage
+                ? {
+                    profileImageUri: user?.profileImage,
+                    size: ms(16),
+                  }
+                : {
+                    name: user?.name,
+                    size: ms(16),
+                    textSize: 'micro',
+                  })}
+            />
           </View>
           {user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
           {scenarioSession?.createdAt &&

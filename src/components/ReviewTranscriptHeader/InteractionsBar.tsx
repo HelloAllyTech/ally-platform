@@ -65,7 +65,7 @@ export const InteractionsBar = ({
         {!!commentsCount && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {commentsCount > 99 ? '99+' : commentsCount}
+              {commentsCount > 99 ? '99+' : `${commentsCount}`}
             </Text>
           </View>
         )}
@@ -134,14 +134,13 @@ const styles = ScaledSheet.create({
     borderRadius: radius.full,
     minWidth: '16@s',
     height: '16@s',
-    paddingHorizontal: '3@s',
     justifyContent: 'center',
     alignItems: 'center',
   },
   badgeText: {
     ...fontFamily.ROBOTO.REGULAR,
     color: colors.ds.neutral.white,
-    ...typography.body.micro,
+    ...typography.body.nano,
     fontWeight: fontWeights.medium,
   },
   divider: {
