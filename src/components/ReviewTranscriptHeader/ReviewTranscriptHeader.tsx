@@ -1,8 +1,8 @@
 import {useState} from 'react';
 import {Image, ScrollView, Text, TouchableOpacity, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {HelpIcon} from '@/assets';
+import {HelpIcon, ProfileIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -61,10 +61,16 @@ export const ReviewTranscriptHeader = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subtitleContainer}>
           <View style={styles.userContainer}>
-            {user?.profileImage && (
+            {user?.profileImage ? (
               <Image
                 source={{uri: user?.profileImage}}
                 style={styles.userImage}
+              />
+            ) : (
+              <ProfileIcon
+                width={ms(16)}
+                height={ms(16)}
+                color={colors.lightGray15}
               />
             )}
           </View>

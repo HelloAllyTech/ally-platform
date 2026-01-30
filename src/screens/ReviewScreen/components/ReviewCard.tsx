@@ -11,9 +11,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ChatAddOnIcon} from '@/assets';
+import {ChatAddOnIcon, ProfileIcon} from '@/assets';
 import {VideoPreview} from '@/components';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {
@@ -122,9 +122,17 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderUserInfo = () => (
     <View style={styles.userInfoContainer}>
-      <View style={styles.userImageContainer}>
+      {/* <View style={styles.userImageContainer}> */}
+      {user.profileImage ? (
         <Image source={{uri: user.profileImage}} style={styles.userImage} />
-      </View>
+      ) : (
+        <ProfileIcon
+          width={ms(36)}
+          height={ms(36)}
+          color={colors.lightGray15}
+        />
+      )}
+      {/* </View> */}
       <View>
         <Text style={styles.userName}>{user.name}</Text>
         <Text style={styles.timeAgoText}>{formatRelativeTime(createdAt)}</Text>

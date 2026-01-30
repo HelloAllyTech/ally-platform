@@ -10,4 +10,5 @@ export interface CommentThreadBottomSheetProps {
   onReplyPress?: (comment: MessageThreadComment) => void;
   hideCommentThreadBottomSheet: () => void;
   footerComponent?: React.ReactNode;
+  isPrivate?: boolean;
 }
