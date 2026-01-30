@@ -9,14 +9,14 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {LeftArrowIcon} from '@/assets/icons';
+import {LeftArrowIcon} from '@/assets';
 import {TabView} from '@/components';
-import {LockStatus} from '@/constants/badges';
+import {LockStatus} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetAvailableBadgesQuery} from '@/services';
 import {colors} from '@/theme';
-import {BadgeCategoryGroup} from '@/types/badges';
-import {BADGE_CATEGORY_MAP} from '@/utils/common';
+import {BadgeCategoryGroup} from '@/types';
+import {BADGE_CATEGORY_MAP} from '@/utils';
 
 import {AchievementCard} from './components';
 import {styles} from './styles';

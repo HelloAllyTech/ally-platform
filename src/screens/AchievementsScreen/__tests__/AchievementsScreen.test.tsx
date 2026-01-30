@@ -144,6 +144,157 @@ jest.mock('@/services', () => ({
   }),
 }));
 
+// Mock the API before importing anything else
+jest.mock('@/services/api', () => ({
+  api: {
+    reducerPath: 'api',
+    reducer: jest.fn(),
+    middleware: jest.fn(() => (next: any) => (action: any) => next(action)),
+    endpoints: {},
+    injectEndpoints: jest.fn(() => ({
+      useGenerateOtpMutation: jest.fn(),
+      useVerifyOtpMutation: jest.fn(),
+      useLoginWithGoogleMutation: jest.fn(),
+      useLazyGetUserQuery: jest.fn(),
+      useGetUserQuery: jest.fn(),
+      useUpdateUserMutation: jest.fn(),
+      useGetBadgesQuery: jest.fn(),
+      useGetLeaderboardQuery: jest.fn(),
+      useGetScenariosQuery: jest.fn(),
+      useGetScenarioByIdQuery: jest.fn(),
+      useGetCallLogsQuery: jest.fn(),
+      useGetCallLogByIdQuery: jest.fn(),
+      useGetCreditsQuery: jest.fn(),
+      useGetThreadsQuery: jest.fn(),
+      useLazyGetThreadsQuery: jest.fn(),
+      useGetThreadCommentsQuery: jest.fn(),
+      useLazyGetThreadCommentsQuery: jest.fn(),
+      useGetMessagesQuery: jest.fn(),
+      useAddReviewCommentMutation: jest.fn(),
+      useLazyGetReviewsQuery: jest.fn(),
+      useCreateReviewMutation: jest.fn(),
+      useUpdateReviewStatusMutation: jest.fn(),
+    })),
+  },
+}));
+
+// Mock all API services
+jest.mock('@/services/analyticsApi', () => ({
+  useGetBadgesQuery: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  })),
+}));
+
+jest.mock('@/services/authApi', () => ({
+  useGenerateOtpMutation: jest.fn(),
+  useVerifyOtpMutation: jest.fn(),
+  useLoginWithGoogleMutation: jest.fn(),
+  useLazyGetUserQuery: jest.fn(),
+  useGetUserQuery: jest.fn(),
+  useUpdateUserMutation: jest.fn(),
+}));
+
+// Mock the BADGE_CATEGORY_MAP
+jest.mock('@/utils/common', () => ({
+  BADGE_CATEGORY_MAP: {
+    SIMULATION_MINUTES: 'Journey',
+    ACTIVE_DAY_STREAK: 'Momentum',
+    COMMENTS_REACTIONS_GIVEN: 'Contribution',
+    COMMENTS_REACTIONS_RECEIVED: 'Resonance',
+  },
+}));
+
+jest.mock('@/services', () => ({
+  useGetAvailableBadgesQuery: jest.fn(() => ({
+    data: [
+      {
+        category: 'SIMULATION_MINUTES',
+        badges: [
+          {
+            id: 'badge-1',
+            name: 'First Steps',
+            description: 'Complete your first session',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon1.png',
+          },
+          {
+            id: 'badge-2',
+            name: 'Consistent Start',
+            description: 'Start 5 sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon2.png',
+          },
+          {
+            id: 'badge-3',
+            name: 'Milestone Hunter',
+            description: 'Reach a milestone',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon3.png',
+          },
+        ],
+      },
+      {
+        category: 'ACTIVE_DAY_STREAK',
+        badges: [
+          {
+            id: 'badge-8',
+            name: 'Week Warrior',
+            description: 'Complete a week of sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon8.png',
+          },
+          {
+            id: 'badge-9',
+            name: '365 Champion',
+            description: 'Complete 365 sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon9.png',
+          },
+          {
+            id: 'badge-10',
+            name: 'Locked Badge',
+            description: 'This is locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon10.png',
+          },
+          {
+            id: 'badge-11',
+            name: 'Another Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon11.png',
+          },
+          {
+            id: 'badge-12',
+            name: 'Yet Another Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon12.png',
+          },
+          {
+            id: 'badge-13',
+            name: 'More Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon13.png',
+          },
+          {
+            id: 'badge-14',
+            name: 'Final Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon14.png',
+          },
+        ],
+      },
+    ],
+    isLoading: false,
+    isError: false,
+  })),
+}));
+
 import {AchievementsScreen} from '../AchievementsScreen';
 
 // Mock react-i18next
