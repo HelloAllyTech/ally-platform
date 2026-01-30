@@ -67,6 +67,7 @@ const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: '16@ms',
+    overflow: 'hidden',
   },
   lockedIconContainer: {
     backgroundColor: 'transparent',
@@ -74,6 +75,7 @@ const styles = ScaledSheet.create({
   badgeImage: {
     width: '60@ms',
     height: '60@ms',
+    overflow: 'hidden',
   },
   textContainer: {
     flex: 1,
