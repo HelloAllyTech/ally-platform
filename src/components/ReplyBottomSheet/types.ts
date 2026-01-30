@@ -11,4 +11,5 @@ export interface ReplyBottomSheetProps {
   onSubmitReplyPress?: (replyText: string) => void;
   hideReplyBottomSheet: () => void;
   reviewId: string;
+  isPrivate?: boolean;
 }

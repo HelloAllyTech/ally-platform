@@ -224,7 +224,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      initialSnapPoint={80}
       allowFullExpand
       skipBottomSheetView
       enableContentPanningGesture

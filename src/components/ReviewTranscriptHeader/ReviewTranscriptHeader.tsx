@@ -1,8 +1,9 @@
 import {useState} from 'react';
-import {Image, ScrollView, Text, TouchableOpacity, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {HelpIcon} from '@/assets';
+import {UserProfileImage} from '@/components';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -61,14 +62,20 @@ export const ReviewTranscriptHeader = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subtitleContainer}>
           <View style={styles.userContainer}>
-            {user?.profileImage && (
-              <Image
-                source={{uri: user?.profileImage}}
-                style={styles.userImage}
-              />
-            )}
+            <UserProfileImage
+              {...(user.profileImage
+                ? {
+                    profileImageUri: user?.profileImage,
+                    size: ms(16),
+                  }
+                : {
+                    name: user?.name,
+                    size: ms(16),
+                    textSize: 'micro',
+                  })}
+            />
           </View>
-          {user?.name && renderSubtitleItem(false, user?.name)}
+          {user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
           {scenarioSession?.createdAt &&
             renderSubtitleItem(
               true,
@@ -99,7 +106,7 @@ export const ReviewTranscriptHeader = ({
 const styles = ScaledSheet.create({
   container: {
     paddingHorizontal: '8@s',
-    gap: '8@s',
+    gap: '4@s',
     flex: 1,
   },
   title: {

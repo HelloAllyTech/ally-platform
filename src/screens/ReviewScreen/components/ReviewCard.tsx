@@ -11,10 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ChatAddOnIcon} from '@/assets';
-import {VideoPreview} from '@/components';
+import {UserProfileImage, VideoPreview} from '@/components';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {
   colors,
@@ -122,9 +122,18 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderUserInfo = () => (
     <View style={styles.userInfoContainer}>
-      <View style={styles.userImageContainer}>
-        <Image source={{uri: user.profileImage}} style={styles.userImage} />
-      </View>
+      <UserProfileImage
+        {...(user.profileImage
+          ? {
+              profileImageUri: user?.profileImage,
+              size: ms(36),
+            }
+          : {
+              name: user?.name,
+              size: ms(36),
+              textSize: 'large',
+            })}
+      />
       <View>
         <Text style={styles.userName}>{user.name}</Text>
         <Text style={styles.timeAgoText}>{formatRelativeTime(createdAt)}</Text>

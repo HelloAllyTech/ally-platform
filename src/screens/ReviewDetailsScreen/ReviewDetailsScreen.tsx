@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {useRoute} from '@react-navigation/native';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -21,6 +20,7 @@ import {
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
   useGetMessagesQuery,
@@ -39,11 +39,11 @@ import {useReviewComments} from './hooks/useReviewComments';
 
 const MESSAGES_PER_PAGE = 10;
 
-export const ReviewDetailsScreen: React.FC = () => {
-  const isSelectable = true;
-  const route = useRoute<any>();
+type Props = RootStackScreenProps<'ReviewDetails'>;
+
+export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {reviewId: _reviewId} = route.params || {};
+  const {reviewId: _reviewId, isPrivate} = route.params || {};
   const currentMessageIdRef = useRef<string | null>(null);
 
   // State management
@@ -65,8 +65,28 @@ export const ReviewDetailsScreen: React.FC = () => {
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
-    // Otherwise, close message threads and navigate back
-    handleCloseMessageThreads();
+    // Check if any bottom sheet is open and dismiss it first
+    if (isReplyBottomSheetVisible) {
+      closeReplyBottomSheet();
+      return true;
+    }
+    if (isCommentThreadBottomSheetVisible) {
+      closeCommentThreadBottomSheet();
+      return true;
+    }
+    if (isMessageThreadsVisible) {
+      handleCloseMessageThreads();
+      return true;
+    }
+    if (isThreadsBottomSheetVisible) {
+      closeThreadsBottomSheet();
+      return true;
+    }
+    if (showCommentInput) {
+      resetCommentInput();
+      return true;
+    }
+    // Otherwise, navigate back
     navigation.goBack();
     return true;
   });
@@ -398,7 +418,7 @@ export const ReviewDetailsScreen: React.FC = () => {
       </View>
       <Conversation
         messages={conversationMessages}
-        isSelectable={isSelectable}
+        isSelectable={!isPrivate}
         onSelection={handleSelection}
         onThreadClick={handleThreadClick}
         onLoadMore={loadMoreMessages}
@@ -408,15 +428,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         isRefreshing={isFetching && offset === 0}
       />
       {/* Comment input bottom sheet */}
-      <CommentInput
-        visible={showCommentInput}
-        onClose={resetCommentInput}
-        onChangeText={handleChangeComment}
-        onSend={handleSendComment}
-        comment={comment}
-        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
-        isLoading={isAddingComment}
-      />
+
       <View style={styles.interactionsBarContainer}>
         <InteractionsBar
           reviewId={_reviewId}
@@ -427,8 +439,18 @@ export const ReviewDetailsScreen: React.FC = () => {
             refetchReviewData();
           }}
           myReaction={reviewData?.myReaction || null}
+          isPrivate={isPrivate}
         />
       </View>
+      <CommentInput
+        visible={showCommentInput}
+        onClose={resetCommentInput}
+        onChangeText={handleChangeComment}
+        onSend={handleSendComment}
+        comment={comment}
+        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
+        isLoading={isAddingComment}
+      />
       <ThreadsBottomSheet
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
@@ -454,6 +476,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         reviewOwnerId={reviewData?.createdBy?.id}
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
+        isPrivate={isPrivate}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
@@ -463,6 +486,7 @@ export const ReviewDetailsScreen: React.FC = () => {
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
         reviewOwnerId={reviewData?.createdBy?.id}
+        isPrivate={isPrivate}
       />
     </SafeAreaView>
   );
@@ -478,7 +502,7 @@ const styles = ScaledSheet.create({
     borderBottomColor: colors.lightGray7,
     // marginTop: '16@s',
     paddingVertical: '8@s',
-    paddingHorizontal: '8@s',
+    paddingHorizontal: '20@ms',
     flexDirection: 'row',
     alignItems: 'center',
   },

@@ -21,7 +21,7 @@ export const Message: React.FC<MessageProps> = ({
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={[styles.timestamp, timestampStyle]}>({timestamp})</Text>
+      <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text>
       <View style={[styles.messageContainer, styles.message]}>{message}</View>
     </View>
   );
@@ -32,12 +32,12 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     paddingHorizontal: '16@ms',
     paddingVertical: '6@mvs',
+    gap: '16@ms',
   },
   timestamp: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: 'rgba(0, 0, 0, 0.6)',
-    marginRight: '8@ms',
   },
   message: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

@@ -13,6 +13,7 @@ import {UserBadge} from '@/types';
 import {logger} from '@/utils';
 
 export const useBadgePopup = (
+  isLayoutReady: boolean = false,
   autoCloseDelay: number | null = BADGE_AUTO_CLOSE_DELAY,
 ) => {
   const [currentBadge, setCurrentBadge] = useState<UserBadge | null>(null);
@@ -154,9 +155,11 @@ export const useBadgePopup = (
     }
 
     // Set new timer
-    timerRef.current = setTimeout(() => {
-      handleClose();
-    }, autoCloseDelay);
+    if (isLayoutReady) {
+      timerRef.current = setTimeout(() => {
+        handleClose();
+      }, autoCloseDelay);
+    }
 
     return () => {
       if (timerRef.current) {
@@ -164,7 +167,7 @@ export const useBadgePopup = (
         timerRef.current = null;
       }
     };
-  }, [currentBadge, autoCloseDelay, handleClose]);
+  }, [currentBadge, autoCloseDelay, handleClose, isLayoutReady]);
 
   return {
     isBadgesLoading,

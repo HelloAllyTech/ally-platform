@@ -1,13 +1,14 @@
 import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {BadgeCategory, LockStatus, ViewedStatus} from '@/constants/badges';
 
 // Mock services before importing the component
 jest.mock('@/services', () => ({
   useGetAvailableBadgesQuery: () => ({
     data: [
       {
-        category: 'Journey',
+        category: 'SIMULATION_MINUTES',
         badges: [
           {
             id: 'badge-1',
@@ -15,6 +16,11 @@ jest.mock('@/services', () => ({
             description: 'Complete your first session',
             lockStatus: 'UNLOCKED',
             iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'FIRST_STEPS',
+            imageUrl: '',
+            achievementParams: {count: 1},
+            viewedStatus: 'VIEWED',
           },
           {
             id: 'badge-2',
@@ -22,6 +28,11 @@ jest.mock('@/services', () => ({
             description: 'Start 5 sessions',
             lockStatus: 'UNLOCKED',
             iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'CONSISTENT_START',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'VIEWED',
           },
           {
             id: 'badge-3',
@@ -29,6 +40,11 @@ jest.mock('@/services', () => ({
             description: 'Reach a milestone',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'MILESTONE_HUNTER',
+            imageUrl: '',
+            achievementParams: {count: 1},
+            viewedStatus: 'UNVIEWED',
           },
           {
             id: 'badge-4',
@@ -36,11 +52,16 @@ jest.mock('@/services', () => ({
             description: 'Complete 365 sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: '365_CHAMPION',
+            imageUrl: '',
+            achievementParams: {count: 365},
+            viewedStatus: 'UNVIEWED',
           },
         ],
       },
       {
-        category: 'Momentum',
+        category: 'ACTIVE_DAY_STREAK',
         badges: [
           {
             id: 'badge-5',
@@ -48,6 +69,11 @@ jest.mock('@/services', () => ({
             description: 'Complete a week of sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'WEEK_WARRIOR',
+            imageUrl: '',
+            achievementParams: {count: 7},
+            viewedStatus: 'UNVIEWED',
           },
           {
             id: 'badge-6',
@@ -55,6 +81,11 @@ jest.mock('@/services', () => ({
             description: 'Complete a month of sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'MONTH_MASTER',
+            imageUrl: '',
+            achievementParams: {count: 30},
+            viewedStatus: 'UNVIEWED',
           },
           {
             id: 'badge-7',
@@ -62,6 +93,11 @@ jest.mock('@/services', () => ({
             description: 'Complete a year of sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'YEAR_CHAMPION',
+            imageUrl: '',
+            achievementParams: {count: 365},
+            viewedStatus: 'UNVIEWED',
           },
           {
             id: 'badge-8',
@@ -69,6 +105,11 @@ jest.mock('@/services', () => ({
             description: 'Maintain a 7-day streak',
             lockStatus: 'UNLOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'STREAK_KEEPER',
+            imageUrl: '',
+            achievementParams: {count: 7},
+            viewedStatus: 'VIEWED',
           },
           {
             id: 'badge-9',
@@ -76,6 +117,11 @@ jest.mock('@/services', () => ({
             description: 'Complete 5 morning sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'EARLY_BIRD',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'UNVIEWED',
           },
           {
             id: 'badge-10',
@@ -83,6 +129,11 @@ jest.mock('@/services', () => ({
             description: 'Complete 5 evening sessions',
             lockStatus: 'LOCKED',
             iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'NIGHT_OWL',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'UNVIEWED',
           },
         ],
       },
@@ -91,6 +142,157 @@ jest.mock('@/services', () => ({
     isError: false,
     error: null,
   }),
+}));
+
+// Mock the API before importing anything else
+jest.mock('@/services/api', () => ({
+  api: {
+    reducerPath: 'api',
+    reducer: jest.fn(),
+    middleware: jest.fn(() => (next: any) => (action: any) => next(action)),
+    endpoints: {},
+    injectEndpoints: jest.fn(() => ({
+      useGenerateOtpMutation: jest.fn(),
+      useVerifyOtpMutation: jest.fn(),
+      useLoginWithGoogleMutation: jest.fn(),
+      useLazyGetUserQuery: jest.fn(),
+      useGetUserQuery: jest.fn(),
+      useUpdateUserMutation: jest.fn(),
+      useGetBadgesQuery: jest.fn(),
+      useGetLeaderboardQuery: jest.fn(),
+      useGetScenariosQuery: jest.fn(),
+      useGetScenarioByIdQuery: jest.fn(),
+      useGetCallLogsQuery: jest.fn(),
+      useGetCallLogByIdQuery: jest.fn(),
+      useGetCreditsQuery: jest.fn(),
+      useGetThreadsQuery: jest.fn(),
+      useLazyGetThreadsQuery: jest.fn(),
+      useGetThreadCommentsQuery: jest.fn(),
+      useLazyGetThreadCommentsQuery: jest.fn(),
+      useGetMessagesQuery: jest.fn(),
+      useAddReviewCommentMutation: jest.fn(),
+      useLazyGetReviewsQuery: jest.fn(),
+      useCreateReviewMutation: jest.fn(),
+      useUpdateReviewStatusMutation: jest.fn(),
+    })),
+  },
+}));
+
+// Mock all API services
+jest.mock('@/services/analyticsApi', () => ({
+  useGetBadgesQuery: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  })),
+}));
+
+jest.mock('@/services/authApi', () => ({
+  useGenerateOtpMutation: jest.fn(),
+  useVerifyOtpMutation: jest.fn(),
+  useLoginWithGoogleMutation: jest.fn(),
+  useLazyGetUserQuery: jest.fn(),
+  useGetUserQuery: jest.fn(),
+  useUpdateUserMutation: jest.fn(),
+}));
+
+// Mock the BADGE_CATEGORY_MAP
+jest.mock('@/utils/common', () => ({
+  BADGE_CATEGORY_MAP: {
+    SIMULATION_MINUTES: 'Journey',
+    ACTIVE_DAY_STREAK: 'Momentum',
+    COMMENTS_REACTIONS_GIVEN: 'Contribution',
+    COMMENTS_REACTIONS_RECEIVED: 'Resonance',
+  },
+}));
+
+jest.mock('@/services', () => ({
+  useGetAvailableBadgesQuery: jest.fn(() => ({
+    data: [
+      {
+        category: 'SIMULATION_MINUTES',
+        badges: [
+          {
+            id: 'badge-1',
+            name: 'First Steps',
+            description: 'Complete your first session',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon1.png',
+          },
+          {
+            id: 'badge-2',
+            name: 'Consistent Start',
+            description: 'Start 5 sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon2.png',
+          },
+          {
+            id: 'badge-3',
+            name: 'Milestone Hunter',
+            description: 'Reach a milestone',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon3.png',
+          },
+        ],
+      },
+      {
+        category: 'ACTIVE_DAY_STREAK',
+        badges: [
+          {
+            id: 'badge-8',
+            name: 'Week Warrior',
+            description: 'Complete a week of sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: 'https://example.com/icon8.png',
+          },
+          {
+            id: 'badge-9',
+            name: '365 Champion',
+            description: 'Complete 365 sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon9.png',
+          },
+          {
+            id: 'badge-10',
+            name: 'Locked Badge',
+            description: 'This is locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon10.png',
+          },
+          {
+            id: 'badge-11',
+            name: 'Another Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon11.png',
+          },
+          {
+            id: 'badge-12',
+            name: 'Yet Another Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon12.png',
+          },
+          {
+            id: 'badge-13',
+            name: 'More Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon13.png',
+          },
+          {
+            id: 'badge-14',
+            name: 'Final Locked',
+            description: 'This is also locked',
+            lockStatus: 'LOCKED',
+            iconUrl: 'https://example.com/icon14.png',
+          },
+        ],
+      },
+    ],
+    isLoading: false,
+    isError: false,
+  })),
 }));
 
 import {AchievementsScreen} from '../AchievementsScreen';
