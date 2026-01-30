@@ -550,8 +550,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         onClose={onClose}
         allowFullExpand
         skipBottomSheetView
-        enableContentPanningGesture
-        enableDynamicSizing
+        enableContentPanningGesture={false}
         enableOverDrag
         enableHandlePanningGesture
         footerComponent={isPrivate ? undefined : renderFooterComponent}>

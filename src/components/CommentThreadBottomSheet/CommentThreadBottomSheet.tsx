@@ -522,9 +522,8 @@ export const CommentThreadBottomSheet: React.FC<
         visible={visible}
         onClose={onClose}
         allowFullExpand
-        snapPoints={['80%']}
         skipBottomSheetView
-        enableContentPanningGesture
+        enableContentPanningGesture={false}
         enableDynamicSizing
         enableOverDrag
         enableHandlePanningGesture
