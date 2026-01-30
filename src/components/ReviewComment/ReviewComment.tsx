@@ -2,7 +2,7 @@ import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ms} from 'react-native-size-matters';
 
-import {AddReactionIcon} from '@/assets';
+import {AddReactionIcon, EyeClosedIcon} from '@/assets';
 import {ActionsMenu} from '@/components/ActionsMenu/ActionsMenu';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
@@ -85,21 +85,6 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
 
   const menuOptions = getMenuOptions();
 
-  // Check if current user is the review owner (can see hidden comments)
-  const isReviewOwner =
-    currentUserId && reviewOwnerId && currentUserId === reviewOwnerId;
-
-  // If comment is hidden and user is NOT the review owner, show minimal hidden state
-  if (hidden && !isReviewOwner) {
-    return (
-      <View style={styles.hiddenContainer}>
-        <Text style={styles.hiddenText}>
-          {t('ReviewComment.hiddenBy', {name: hiddenByName || name})}
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <TouchableOpacity
       style={styles.container}
@@ -129,9 +114,9 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
               {name}
             </Text>
             <Text style={styles.timeAgo}>{time}</Text>
-            {/* Hidden Badge - only visible to review owner */}
-            {hidden && isReviewOwner && (
+            {hidden && (
               <View style={styles.hiddenBadge}>
+                <EyeClosedIcon width={ms(16)} height={ms(16)} />
                 <Text style={styles.hiddenBadgeText}>
                   {t('ReviewComment.hidden')}
                 </Text>
@@ -147,10 +132,15 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         </View>
 
         {/* Comment Text */}
-        <Text style={styles.commentText}>{comment}</Text>
+        {
+          <Text
+            style={[styles.commentText, hidden && styles.hiddenCommentText]}>
+            {comment}
+          </Text>
+        }
 
         {/* Footer: Like, Reactions, Replies */}
-        <View style={styles.footerRow}>
+        <View style={[styles.footerRow, hidden && styles.hiddenFooterRow]}>
           <View style={styles.footerRowLeft}>
             {showAddReactionButton && (
               <>

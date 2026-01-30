@@ -1,14 +1,14 @@
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
 import {Image, Text, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {
   AllyLogoIcon,
   BoltIcon,
   LogoutIcon,
-  ProfileIcon,
   ProfileSettingsIcon,
 } from '@/assets';
+import {UserProfileImage} from '@/components';
 import {env} from '@/config/env';
 import {SCREEN_NAMES} from '@/constants';
 import {
@@ -58,17 +58,19 @@ export const DrawerContent = ({
         </>
       )}
       <View style={styles.profileContainer}>
-        <View style={styles.profileIconContainer}>
-          {profileImageUrl ? (
-            <Image
-              source={{uri: profileImageUrl}}
-              style={styles.profileImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <ProfileIcon />
-          )}
-        </View>
+        <UserProfileImage
+          {...(profileImageUrl
+            ? {
+                profileImageUri: profileImageUrl,
+                size: ms(32),
+              }
+            : {
+                name: name,
+                size: ms(32),
+                textSize: 'large',
+              })}
+        />
+
         <View style={styles.textContainer}>
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
             {name}
@@ -168,18 +170,6 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '8@ms',
-  },
-  profileIconContainer: {
-    width: '32@ms',
-    height: '32@ms',
-    borderRadius: '20@ms',
-    overflow: 'hidden',
-  },
-  profileImage: {
-    width: '28@ms',
-    height: '28@ms',
-    borderRadius: radius.full,
-    marginTop: '4@mvs',
   },
   textContainer: {
     flex: 1,

@@ -210,15 +210,6 @@ export const formatRelativeTime = (dateString: string): string => {
   return 'Just now';
 };
 
-/**
- * Formats duration in seconds to a human-readable string (hours and minutes)
- * @param seconds - Duration in seconds
- * @returns Formatted duration string (e.g., "1 hour 30 mins", "45 mins", "2 hours")
- * @example
- * formatDurationFromSeconds(5400) // returns "1 hour 30 mins"
- * formatDurationFromSeconds(2700) // returns "45 mins"
- * formatDurationFromSeconds(7200) // returns "2 hours"
- */
 export const formatDurationFromSeconds = (seconds: string): string => {
   const totalSeconds =
     typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
@@ -227,18 +218,24 @@ export const formatDurationFromSeconds = (seconds: string): string => {
     return '-';
   }
 
+  // Under 1 minute
+  if (totalSeconds < 60) {
+    return `${totalSeconds} sec`;
+  }
+
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
 
-  if (hours > 0 && minutes > 0) {
-    return `${pluralize(hours, 'hour')} ${pluralize(minutes, 'min')}`;
-  } else if (hours > 0) {
-    return pluralize(hours, 'hour');
-  } else if (minutes > 0) {
-    return pluralize(minutes, 'min');
-  } else {
-    return pluralize(totalSeconds, 'sec');
+  // 1 hour or more
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds
+      .toString()
+      .padStart(2, '0')} hr`;
   }
+
+  // 1 minute to < 1 hour
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')} min`;
 };
 
 /**

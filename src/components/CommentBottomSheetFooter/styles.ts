@@ -5,8 +5,7 @@ import {colors, fontFamily} from '@/theme';
 export const styles = ScaledSheet.create({
   container: {
     paddingHorizontal: '24@s',
-    paddingTop: '16@vs',
-    paddingBottom: 0,
+    paddingVertical: '16@vs',
     backgroundColor: colors.white,
   },
   inputContainer: {

@@ -13,7 +13,7 @@ import {MessageData, TextSelection} from '@/types/reviews';
 const formatTimestamp = (startSeconds: number) => {
   const minutes = Math.floor(startSeconds / 60);
   const seconds = Math.floor(startSeconds % 60);
-  return `0${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
 export interface ConversationProps {
@@ -81,9 +81,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           setActiveMenuMessageId(id);
         }}
         onRequestClose={dismissAnyMenu}
-        prefixText={
-          isAiClient ? 'AI Client' : userName || t('CallTranscript.you')
-        }
+        prefixText={`${isAiClient ? 'AI Client:' : userName || t('CallTranscript.you')}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}

@@ -24,6 +24,7 @@ interface InteractionsBarProps {
   myReaction?: string | null;
   onCommentPress?: () => void;
   refreshReactions?: () => void;
+  isPrivate?: boolean;
 }
 export const InteractionsBar = ({
   reviewId,
@@ -32,6 +33,7 @@ export const InteractionsBar = ({
   myReaction,
   onCommentPress,
   refreshReactions,
+  isPrivate = false,
 }: InteractionsBarProps) => {
   const totalReactions = reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
@@ -63,18 +65,18 @@ export const InteractionsBar = ({
         {!!commentsCount && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {commentsCount > 99 ? '99+' : commentsCount}
+              {commentsCount > 99 ? '99+' : `${commentsCount}`}
             </Text>
           </View>
         )}
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconContainer}>
+      <View style={styles.iconContainer}>
         <EmojiPicker
           onEmojiSelect={handleAddReactionToReview}
           selectedEmoji={myReaction}
-          disabled={isAddingReaction}
+          disabled={isAddingReaction || isPrivate}
         />
-      </TouchableOpacity>
+      </View>
 
       <React.Fragment>
         <View style={styles.divider} />
@@ -126,20 +128,19 @@ const styles = ScaledSheet.create({
 
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: '3@s',
+    right: '3@s',
     backgroundColor: colors.ds.theme.primary,
     borderRadius: radius.full,
-    minWidth: '14@s',
-    height: '14@s',
-    paddingHorizontal: '3@s',
+    minWidth: '16@s',
+    height: '16@s',
     justifyContent: 'center',
     alignItems: 'center',
   },
   badgeText: {
     ...fontFamily.ROBOTO.REGULAR,
     color: colors.ds.neutral.white,
-    ...typography.body.micro,
+    ...typography.body.nano,
     fontWeight: fontWeights.medium,
   },
   divider: {
