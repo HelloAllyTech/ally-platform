@@ -42,6 +42,7 @@ jest.mock('@/components', () => {
   const {View, Text} = require('react-native');
   return {
     __esModule: true,
+    UserProfileImage: () => <View testID="profile-icon" />,
   };
 });
 
@@ -93,6 +94,7 @@ jest.mock('@/theme', () => ({
   },
   radius: {
     full: 999,
+    lg: 12,
   },
   fontFamily: {
     REPLAY_PRO: {

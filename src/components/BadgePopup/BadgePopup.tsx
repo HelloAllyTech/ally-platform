@@ -16,11 +16,11 @@ import {useBadgePopup} from '@/hooks/useBadgePopup';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export const BadgePopup = () => {
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
   const {currentBadge, isFirstBadge, isBadgesLoading, closeBadge} =
-    useBadgePopup();
+    useBadgePopup(isLayoutReady);
 
   const {t} = useTranslation();
-  const [isLayoutReady, setIsLayoutReady] = useState(false);
 
   useEffect(() => {
     if (currentBadge) {
