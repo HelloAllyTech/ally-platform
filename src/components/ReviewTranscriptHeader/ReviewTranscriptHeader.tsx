@@ -74,7 +74,7 @@ export const ReviewTranscriptHeader = ({
               />
             )}
           </View>
-          {user?.name && renderSubtitleItem(false, user?.name)}
+          {user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
           {scenarioSession?.createdAt &&
             renderSubtitleItem(
               true,
