@@ -233,7 +233,7 @@ const styles = ScaledSheet.create({
     elevation: 2,
   },
   emojiButtonSelected: {
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.ds.grey[200],
   },
   emoji: {
     fontSize: '20@ms',

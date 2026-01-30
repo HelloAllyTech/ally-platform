@@ -54,6 +54,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   reviewOwnerId,
   reviewId,
   hideReplyBottomSheet,
+  isPrivate = false,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -81,9 +82,12 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const [addReaction, {isLoading: isAddingReaction}] =
     useAddReactionToCommentMutation();
 
+  const handleGoback = useCallback(() => {
+    hideReplyBottomSheet();
+  }, [hideReplyBottomSheet]);
+
   const handleEditComment = useCallback(
     async (replyId: string, replyContent: string) => {
-      // TODO: Implement edit comment UI
       setEditingReplyId(replyId);
       setReplyText(replyContent);
     },
@@ -91,7 +95,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   );
 
   const handleDeleteComment = useCallback(
-    async (replyId: string) => {
+    async (replyId: string, goback?: () => void) => {
       try {
         await deleteComment({commentId: replyId}).unwrap();
         // Refetch replies
@@ -107,6 +111,8 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         }
       } catch (error) {
         console.error('Failed to delete reply:', error);
+      } finally {
+        goback?.();
       }
     },
     [deleteComment, getCommentReplies, commentId],
@@ -351,7 +357,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             commentId={reply.id}
             onDelete={handleDeleteComment}
             onHide={handleHideComment}
-            showActionsMenu
+            showActionsMenu={!isPrivate}
             {...(!isMinutesPassed(
               reply.createdAt || '',
               EDIT_COMMENT_TIME_LIMIT_MINUTES,
@@ -363,6 +369,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       );
     },
     [
+      isPrivate,
       handleEmojiSelect,
       userData,
       reviewOwnerId,
@@ -420,7 +427,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           commentOwnerId={originalComment.createdBy.id}
           reviewOwnerId={reviewOwnerId}
           commentId={originalComment.id}
-          onDelete={handleDeleteComment}
+          onDelete={() => handleDeleteComment(originalComment.id, handleGoback)}
           onHide={handleHideComment}
           {...(!isMinutesPassed(
             originalComment.createdAt || '',
@@ -428,11 +435,13 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           ) && {
             onEdit: handleEditComment,
           })}
-          showActionsMenu
+          showActionsMenu={!isPrivate}
+          disableAddReactionButton={isPrivate}
         />
       </View>
     );
   }, [
+    isPrivate,
     originalComment,
     handleEmojiSelect,
     userData,
@@ -440,6 +449,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     handleEditComment,
     handleDeleteComment,
     handleHideComment,
+    handleGoback,
   ]);
 
   const renderFooter = useCallback(() => {
@@ -544,7 +554,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         enableDynamicSizing
         enableOverDrag
         enableHandlePanningGesture
-        footerComponent={renderFooterComponent}>
+        footerComponent={isPrivate ? undefined : renderFooterComponent}>
         <View style={styles.container}>
           {isLoading && !replies ? (
             <>

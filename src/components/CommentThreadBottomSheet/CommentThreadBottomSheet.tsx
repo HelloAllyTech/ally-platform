@@ -55,6 +55,7 @@ export const CommentThreadBottomSheet: React.FC<
   onAddReactionPress,
   onReplyPress,
   hideCommentThreadBottomSheet,
+  isPrivate = false,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -375,12 +376,13 @@ export const CommentThreadBottomSheet: React.FC<
             })}
             onDelete={handleDeleteComment}
             onHide={handleHideComment}
-            showActionsMenu
+            showActionsMenu={!isPrivate}
           />
         </View>
       );
     },
     [
+      isPrivate,
       onAddReactionPress,
       handleReplyPress,
       handleEmojiSelect,
@@ -526,7 +528,7 @@ export const CommentThreadBottomSheet: React.FC<
         enableDynamicSizing
         enableOverDrag
         enableHandlePanningGesture
-        footerComponent={renderFooterComponent}>
+        footerComponent={isPrivate ? undefined : renderFooterComponent}>
         <View style={styles.container}>
           {isLoading && !comments ? (
             <>
