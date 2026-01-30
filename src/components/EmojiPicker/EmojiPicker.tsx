@@ -12,15 +12,26 @@ import {EMOJI_UNICODE_MAP, getAvailableUnicodeValues} from './utils';
 const EMOJI_UNICODE_LIST = getAvailableUnicodeValues();
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({
-  selectedEmojis = [],
+  selectedEmoji,
   onEmojiSelect,
   containerOffsetX = 0,
   icon,
   emojiSize = ms(20),
   testID,
+  disabled = false,
+  error = '',
 }) => {
   const [visible, setVisible] = useState(false);
+  const [currentEmoji, setCurrentEmoji] = useState<string | null>(
+    selectedEmoji || null,
+  );
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (disabled && visible) {
+      setVisible(false);
+    }
+  }, [disabled, visible]);
 
   useEffect(() => {
     const animation = Animated.timing(fadeAnim, {
@@ -37,8 +48,16 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   };
 
   const handleEmojiPress = (unicode: string) => {
-    const isSelected = selectedEmojis.includes(unicode);
-    onEmojiSelect(unicode, !isSelected);
+    onEmojiSelect(currentEmoji, unicode);
+    if (error) {
+      return;
+    }
+    const isSelected = currentEmoji === unicode;
+    if (!isSelected) {
+      setCurrentEmoji(unicode);
+    } else {
+      setCurrentEmoji(null);
+    }
     setVisible(false);
   };
 
@@ -84,7 +103,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     <AddReactionIcon
       width={ms(19)}
       height={ms(19)}
-      color={colors.ds.grey[900]}
+      color={colors.ds.icon.default}
     />
   );
 
@@ -94,15 +113,20 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         <TouchableOpacity
           onPress={togglePicker}
           activeOpacity={0.7}
-          style={styles.iconButton}
+          style={[styles.iconButton, disabled && styles.iconButtonDisabled]}
+          disabled={disabled}
           testID={testID ? `${testID}-button` : undefined}>
-          {IconComponent}
+          {currentEmoji ? (
+            <Text>{EMOJI_UNICODE_MAP[currentEmoji]}</Text>
+          ) : (
+            IconComponent
+          )}
         </TouchableOpacity>
 
         {visible && (
           <Animated.View style={emojiContainerStyle}>
             {EMOJI_UNICODE_LIST.map((unicode, idx) => {
-              const isSelected = selectedEmojis.includes(unicode);
+              const isSelected = currentEmoji === unicode;
               const emojiChar = EMOJI_UNICODE_MAP[unicode];
               return (
                 <TouchableOpacity
@@ -147,7 +171,6 @@ const styles = ScaledSheet.create({
     width: '100%',
   },
   iconButton: {
-    padding: '4@ms',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -210,9 +233,12 @@ const styles = ScaledSheet.create({
     elevation: 2,
   },
   emojiButtonSelected: {
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.ds.grey[200],
   },
   emoji: {
     fontSize: '20@ms',
+  },
+  iconButtonDisabled: {
+    opacity: 0.5,
   },
 });

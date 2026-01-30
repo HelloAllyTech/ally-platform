@@ -28,6 +28,7 @@ import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   CallLogScreen,
   CommunityScreen,
+  LeaderboardScreen,
   ReviewScreen,
   SearchScreen,
   SimulationsScreen,
@@ -60,11 +61,11 @@ const ALL_TABS = [
     component: UserAnalyticsScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_ANALYTICS_DASHBOARD],
   },
-  // {
-  //   name: SCREEN_NAMES.LEADERBOARD,
-  //   component: LeaderboardScreen,
-  //   requiredPermissions: [], // TODO: Add permission check later if needed
-  // },
+  {
+    name: SCREEN_NAMES.LEADERBOARD,
+    component: LeaderboardScreen,
+    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD],
+  },
   {
     name: SCREEN_NAMES.SEARCH,
     component: SearchScreen,

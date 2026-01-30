@@ -1,8 +1,10 @@
+import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CommentIcon} from '@/assets';
 import {ReactionsCount} from '@/screens/ReviewScreen/components';
+import {useAddReactionToReviewMutation} from '@/services';
 import {
   colors,
   fontFamily,
@@ -11,6 +13,7 @@ import {
   stroke,
   typography,
 } from '@/theme';
+import {getReactionAction} from '@/utils/reviews';
 
 import {EmojiPicker} from '../EmojiPicker';
 
@@ -18,17 +21,42 @@ interface InteractionsBarProps {
   reviewId: string;
   reactions: Record<string, number>;
   commentsCount: number;
+  myReaction?: string | null;
   onCommentPress?: () => void;
+  refreshReactions?: () => void;
+  isPrivate?: boolean;
 }
 export const InteractionsBar = ({
   reviewId,
   reactions,
   commentsCount,
+  myReaction,
   onCommentPress,
+  refreshReactions,
+  isPrivate = false,
 }: InteractionsBarProps) => {
   const totalReactions = reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
     : 0;
+
+  const [addReactionToReview, {isLoading: isAddingReaction}] =
+    useAddReactionToReviewMutation();
+
+  const handleAddReactionToReview = async (
+    currentEmoji: string | null,
+    unicode: string,
+  ) => {
+    try {
+      await addReactionToReview({
+        id: reviewId,
+        reaction: unicode,
+        action: getReactionAction(currentEmoji, unicode),
+      }).unwrap();
+      refreshReactions?.();
+    } catch (error) {
+      console.error('Failed to add reaction:', error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -42,19 +70,22 @@ export const InteractionsBar = ({
           </View>
         )}
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconContainer}>
-        <EmojiPicker onEmojiSelect={() => {}} />
-      </TouchableOpacity>
-      {!!totalReactions && (
-        <>
-          <View style={styles.divider} />
-          <ReactionsCount
-            reviewId={reviewId}
-            reactions={reactions}
-            totalReactions={totalReactions}
-          />
-        </>
-      )}
+      <View style={styles.iconContainer}>
+        <EmojiPicker
+          onEmojiSelect={handleAddReactionToReview}
+          selectedEmoji={myReaction}
+          disabled={isAddingReaction || isPrivate}
+        />
+      </View>
+
+      <React.Fragment>
+        <View style={styles.divider} />
+        <ReactionsCount
+          reviewId={reviewId}
+          reactions={reactions}
+          totalReactions={totalReactions}
+        />
+      </React.Fragment>
     </View>
   );
 };
@@ -97,12 +128,12 @@ const styles = ScaledSheet.create({
 
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: '3@s',
+    right: '3@s',
     backgroundColor: colors.ds.theme.primary,
     borderRadius: radius.full,
-    minWidth: '14@s',
-    height: '14@s',
+    minWidth: '16@s',
+    height: '16@s',
     paddingHorizontal: '3@s',
     justifyContent: 'center',
     alignItems: 'center',

@@ -15,6 +15,7 @@ jest.mock('react-i18next', () => ({
         'Leaderboard.tableHeaders.user': 'User',
         'Leaderboard.tableHeaders.totalDuration': 'Duration',
         'Leaderboard.tableHeaders.badges': 'Badges',
+        'Leaderboard.period.days': 'days',
         'Leaderboard.period.last': 'Last',
         'Leaderboard.period.week': 'Week',
         'Leaderboard.period.month': 'Month',
@@ -35,7 +36,7 @@ jest.mock('@/hooks', () => ({
     t: (key: string) => key,
   }),
   useLeaderboard: () => ({
-    leaderboardData: [
+    data: [
       {
         userId: 1,
         rank: 1,
@@ -66,9 +67,13 @@ jest.mock('@/hooks', () => ({
       isCurrentUser: true,
     },
     isLoading: false,
+    isRefreshing: false,
+    isLoadingMore: false,
     isError: false,
     error: null,
-    totalCount: 50,
+    hasMore: false,
+    loadMore: jest.fn(),
+    refresh: jest.fn(),
   }),
 }));
 
@@ -124,9 +129,9 @@ describe('LeaderboardScreen', () => {
 
   it('renders period tabs', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Last Week')).toBeTruthy();
-    expect(getByText('Last Month')).toBeTruthy();
-    expect(getByText('Last Year')).toBeTruthy();
+    expect(getByText('7 days')).toBeTruthy();
+    expect(getByText('28 days')).toBeTruthy();
+    expect(getByText('365 days')).toBeTruthy();
     expect(getByText('All Time')).toBeTruthy();
   });
 
@@ -150,7 +155,7 @@ describe('LeaderboardScreen', () => {
 
   it('changes active period when tab is pressed', () => {
     const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthTab = getByText('Last Month');
+    const monthTab = getByText('28 days');
 
     fireEvent.press(monthTab);
 
@@ -166,7 +171,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Tab should still be visible
-    expect(getByText('Last Month')).toBeTruthy();
+    expect(getByText('28 days')).toBeTruthy();
   });
 
   it('renders rank badges for all entries', () => {

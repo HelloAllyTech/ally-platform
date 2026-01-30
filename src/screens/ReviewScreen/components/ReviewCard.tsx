@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -11,10 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ChatAddOnIcon} from '@/assets';
+import {ChatAddOnIcon, ProfileIcon} from '@/assets';
 import {VideoPreview} from '@/components';
+import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {
   colors,
   fontFamily,
@@ -24,7 +25,7 @@ import {
   theme,
   typography,
 } from '@/theme';
-import {ReviewScenario, User} from '@/types/reviews';
+import {ReviewScenario, ScenarioSessionData, User} from '@/types/reviews';
 import {
   formatDateTime,
   formatDurationFromSeconds,
@@ -32,6 +33,7 @@ import {
   pluralize,
 } from '@/utils';
 
+import {ExpandedComments} from './ExpandedComments';
 import {ReactionsCount} from './ReactionsCount';
 
 dayjs.extend(relativeTime);
@@ -40,6 +42,8 @@ interface ReviewCardProps {
   id: string;
   user: User;
   scenario: ReviewScenario;
+  createdAt: string;
+  scenarioSession: ScenarioSessionData;
   commentsCount?: number;
   reactions?: {
     [reaction_code: string]: number;
@@ -47,22 +51,38 @@ interface ReviewCardProps {
   titleNumberOfLines?: number;
   descriptionNumberOfLines?: number;
   onReviewPress: (reviewId?: string) => void;
+  onCommentPress?: (reviewId: string) => void;
+  isExpanded?: boolean;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
   id,
   user,
   scenario,
+  createdAt,
+  scenarioSession,
   commentsCount = 0,
   reactions = {},
   titleNumberOfLines = 1,
   descriptionNumberOfLines = 2,
   onReviewPress,
+  onCommentPress,
+  isExpanded = false,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const isFocused = useIsFocused();
   const {t} = useTranslation();
+
+  // Fetch threads when expanded
+  const [getThreads, {data: threadsData, isLoading: isLoadingThreads}] =
+    useLazyGetThreadsQuery();
+
+  useEffect(() => {
+    if (isExpanded && !threadsData) {
+      getThreads({reviewId: id, offset: 0, limit: 2});
+    }
+  }, [isExpanded, id, getThreads, threadsData]);
 
   const totalReactions = Object.values(reactions).reduce(
     (sum, count) => sum + count,
@@ -102,14 +122,20 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderUserInfo = () => (
     <View style={styles.userInfoContainer}>
-      <View style={styles.userImageContainer}>
+      {/* <View style={styles.userImageContainer}> */}
+      {user.profileImage ? (
         <Image source={{uri: user.profileImage}} style={styles.userImage} />
-      </View>
+      ) : (
+        <ProfileIcon
+          width={ms(36)}
+          height={ms(36)}
+          color={colors.lightGray15}
+        />
+      )}
+      {/* </View> */}
       <View>
         <Text style={styles.userName}>{user.name}</Text>
-        <Text style={styles.timeAgoText}>
-          {formatRelativeTime(scenario.createdAt)}
-        </Text>
+        <Text style={styles.timeAgoText}>{formatRelativeTime(createdAt)}</Text>
       </View>
     </View>
   );
@@ -168,7 +194,9 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         reactions={reactions}
         totalReactions={totalReactions}
       />
-      <TouchableOpacity style={styles.commentCountContainer}>
+      <TouchableOpacity
+        style={styles.commentCountContainer}
+        onPress={() => onCommentPress?.(id)}>
         <Text style={styles.commentText}>
           {pluralize(commentsCount, t('Review.card.comment'))}
         </Text>
@@ -188,12 +216,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         </Text>
         {renderDetailRow(
           t('Review.card.dateAndTime'),
-          formatDateTime(scenario.createdAt),
+          formatDateTime(scenarioSession.createdAt),
         )}
-        {scenario.duration !== undefined &&
+        {scenarioSession.duration !== undefined &&
           renderDetailRow(
             t('Review.card.duration'),
-            formatDurationFromSeconds(scenario.duration),
+            formatDurationFromSeconds(scenarioSession.duration),
           )}
       </View>
 
@@ -211,6 +239,16 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       <View style={styles.separator} />
 
       {renderReactionsAndComments()}
+
+      <ExpandedComments
+        isExpanded={isExpanded}
+        isLoading={isLoadingThreads}
+        threadsData={threadsData}
+        reviewId={id}
+        onCollapsePress={() => onCommentPress?.(id)}
+        onCommentPress={onReviewPress}
+        t={t}
+      />
     </View>
   );
 };

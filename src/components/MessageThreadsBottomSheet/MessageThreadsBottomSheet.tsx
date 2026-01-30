@@ -1,9 +1,12 @@
-import React, {useCallback} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
-import {ActivityIndicator, Text, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import {ms} from 'react-native-size-matters';
 
+import {ChevronRight} from '@/assets/icons';
 import {BottomSheet, ReviewComment} from '@/components';
+import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 import {MessageThread} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
@@ -11,55 +14,125 @@ import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
 
+type Threads = MessageThread & {
+  selectedText?: string;
+};
+
 export interface MessageThreadsBottomSheetProps {
   visible: boolean;
   onClose: () => void;
+  message: string;
   messageId: string;
-  reviewId: string;
   threads: MessageThread[];
-  onThreadPress?: (threadId: string) => void;
+  onThreadPress?: (threadId: string, messageId: string) => void;
 }
 
 export const MessageThreadsBottomSheet: React.FC<
   MessageThreadsBottomSheetProps
-> = ({visible, onClose, messageId, reviewId, threads = [], onThreadPress}) => {
-  const insets = useSafeAreaInsets();
+> = ({visible, onClose, message, messageId, threads = [], onThreadPress}) => {
+  const {t} = useTranslate();
+  const [messageThreads, setMessageThreads] = useState<Threads[]>([]);
   const isLoading = false;
 
-  const renderThreadItem = useCallback(
-    ({item}: {item: MessageThread}) => {
-      const selectedText = (item.selection as any)?.selectedText || '';
-      const commentsCount = item.comments?.length || 0;
-      const firstComment = item.comments?.[0];
-      const reactionsArray = getReactionsArray(firstComment?.reactions);
-      const reactionCount = getTotalReactionCount(firstComment?.reactions);
+  useEffect(() => {
+    const mappedThreads = threads.map(thread => ({
+      ...thread,
+      selectedText: message.trim()
+        ? message.substring(
+            thread.selection?.startIndex as number,
+            thread.selection?.endIndex as number,
+          )
+        : '',
+    }));
+    setMessageThreads(mappedThreads);
+  }, [threads, message]);
 
-      // Build comment text with selected text context
-      const commentText = selectedText
-        ? `"${selectedText}"\n\n${firstComment?.content || ''}`
-        : firstComment?.content || '';
+  const renderThreadItem = useCallback(
+    ({item: thread}: {item: Threads}) => {
+      if (!thread.comments || thread.comments.length === 0) {
+        return null;
+      }
+
+      const firstComment = thread.comments[0];
+      const remainingCount = thread.comments.length;
+      const reactionsArray = getReactionsArray(firstComment.reactions);
+      const reactionCount = getTotalReactionCount(firstComment.reactions);
 
       return (
-        <View style={styles.commentItemContainer}>
-          <ReviewComment
-            name={item.createdBy?.name || 'Unknown User'}
-            time={
-              firstComment?.createdAt
-                ? formatRelativeTime(firstComment.createdAt)
-                : ''
-            }
-            comment={commentText}
-            profileImageUrl={item.createdBy?.profileImage}
-            reactions={reactionsArray}
-            reactionCount={reactionCount}
-            replyCount={commentsCount > 1 ? commentsCount - 1 : 0}
-            showReplyButton={false}
-            onCommentPress={() => onThreadPress?.(item.id)}
-          />
-        </View>
+        <TouchableOpacity
+          style={styles.threadContainer}
+          onPress={() => onThreadPress?.(thread.id, messageId)}
+          activeOpacity={0.7}>
+          {/* Selected Text Section - if available */}
+          {thread.selectedText && (
+            <View style={styles.selectedTextContainer}>
+              <Text
+                style={styles.selectedText}
+                numberOfLines={1}
+                ellipsizeMode="tail">
+                {t('ThreadsBottomSheet.selectedText')} "{thread.selectedText}"
+              </Text>
+            </View>
+          )}
+
+          {/* First Comment */}
+          <View style={styles.commentWrapper}>
+            <ReviewComment
+              name={firstComment.createdBy.name}
+              time={
+                firstComment.createdAt
+                  ? formatRelativeTime(firstComment.createdAt)
+                  : ''
+              }
+              comment={firstComment.content}
+              profileImageUrl={firstComment.createdBy.profileImage}
+              reactions={reactionsArray}
+              reactionCount={reactionCount}
+              replyCount={firstComment.replyCount}
+              showReplyButton={false}
+              disableAddReactionButton
+              onCommentPress={() => onThreadPress?.(thread.id, messageId)}
+            />
+            {remainingCount > 0 && (
+              <LinearGradient
+                colors={[
+                  colors.whiteTransparent0,
+                  colors.whiteTransparent40,
+                  colors.whiteTransparent60,
+                ]}
+                start={{x: 0, y: 0}}
+                end={{x: 0, y: 1}}
+                locations={[0, 0.4, 0.7]}
+                style={styles.gradientOverlay}
+                pointerEvents="none"
+              />
+            )}
+          </View>
+
+          {/* More Comments Indicator */}
+          {remainingCount > 0 && (
+            <>
+              <View style={styles.separatorLine} />
+              <View style={styles.moreCommentsContainer}>
+                <Text style={styles.moreCommentsText}>
+                  {remainingCount === 1
+                    ? t('ThreadsBottomSheet.moreThreadsOne')
+                    : t('ThreadsBottomSheet.moreThreads', {
+                        count: remainingCount,
+                      })}
+                </Text>
+                <ChevronRight
+                  width={ms(20)}
+                  height={ms(20)}
+                  color={colors.ds.typography.mediumEmphasis}
+                />
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
       );
     },
-    [onThreadPress],
+    [onThreadPress, t, messageId],
   );
 
   const renderEmpty = useCallback(() => {
@@ -78,6 +151,14 @@ export const MessageThreadsBottomSheet: React.FC<
     );
   }, [isLoading]);
 
+  const renderHeader = useCallback(() => {
+    return (
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{t('ThreadsBottomSheet.title')}</Text>
+      </View>
+    );
+  }, [t]);
+
   const keyExtractor = useCallback(
     (item: MessageThread, index: number) => `${item.id}-${index}`,
     [],
@@ -92,24 +173,26 @@ export const MessageThreadsBottomSheet: React.FC<
       enablePanDownToClose
       showHandle
       skipBottomSheetView>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Message Threads</Text>
-        <Text style={styles.headerSubtitle}>
-          Tap a thread to view all comments
-        </Text>
+      <View style={styles.container}>
+        {isLoading && !messageThreads ? (
+          <>
+            {renderHeader()}
+            {renderEmpty()}
+          </>
+        ) : (
+          <BottomSheetFlatList
+            data={messageThreads}
+            renderItem={renderThreadItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmpty}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            style={styles.listStyle}
+            removeClippedSubviews={false}
+          />
+        )}
       </View>
-
-      <BottomSheetFlatList
-        data={threads}
-        renderItem={renderThreadItem}
-        keyExtractor={keyExtractor}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {paddingBottom: insets.bottom},
-        ]}
-        showsVerticalScrollIndicator={false}
-      />
     </BottomSheet>
   );
 };

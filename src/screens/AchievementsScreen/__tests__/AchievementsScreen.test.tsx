@@ -1,6 +1,148 @@
 import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {BadgeCategory, LockStatus, ViewedStatus} from '@/constants/badges';
+
+// Mock services before importing the component
+jest.mock('@/services', () => ({
+  useGetAvailableBadgesQuery: () => ({
+    data: [
+      {
+        category: 'SIMULATION_MINUTES',
+        badges: [
+          {
+            id: 'badge-1',
+            name: 'First Steps',
+            description: 'Complete your first session',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'FIRST_STEPS',
+            imageUrl: '',
+            achievementParams: {count: 1},
+            viewedStatus: 'VIEWED',
+          },
+          {
+            id: 'badge-2',
+            name: 'Consistent Start',
+            description: 'Start 5 sessions',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'CONSISTENT_START',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'VIEWED',
+          },
+          {
+            id: 'badge-3',
+            name: 'Milestone Hunter',
+            description: 'Reach a milestone',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: 'MILESTONE_HUNTER',
+            imageUrl: '',
+            achievementParams: {count: 1},
+            viewedStatus: 'UNVIEWED',
+          },
+          {
+            id: 'badge-4',
+            name: '365 Champion',
+            description: 'Complete 365 sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'SIMULATION_MINUTES',
+            code: '365_CHAMPION',
+            imageUrl: '',
+            achievementParams: {count: 365},
+            viewedStatus: 'UNVIEWED',
+          },
+        ],
+      },
+      {
+        category: 'ACTIVE_DAY_STREAK',
+        badges: [
+          {
+            id: 'badge-5',
+            name: 'Week Warrior',
+            description: 'Complete a week of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'WEEK_WARRIOR',
+            imageUrl: '',
+            achievementParams: {count: 7},
+            viewedStatus: 'UNVIEWED',
+          },
+          {
+            id: 'badge-6',
+            name: 'Month Master',
+            description: 'Complete a month of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'MONTH_MASTER',
+            imageUrl: '',
+            achievementParams: {count: 30},
+            viewedStatus: 'UNVIEWED',
+          },
+          {
+            id: 'badge-7',
+            name: 'Year Champion',
+            description: 'Complete a year of sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'YEAR_CHAMPION',
+            imageUrl: '',
+            achievementParams: {count: 365},
+            viewedStatus: 'UNVIEWED',
+          },
+          {
+            id: 'badge-8',
+            name: 'Streak Keeper',
+            description: 'Maintain a 7-day streak',
+            lockStatus: 'UNLOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'STREAK_KEEPER',
+            imageUrl: '',
+            achievementParams: {count: 7},
+            viewedStatus: 'VIEWED',
+          },
+          {
+            id: 'badge-9',
+            name: 'Early Bird',
+            description: 'Complete 5 morning sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'EARLY_BIRD',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'UNVIEWED',
+          },
+          {
+            id: 'badge-10',
+            name: 'Night Owl',
+            description: 'Complete 5 evening sessions',
+            lockStatus: 'LOCKED',
+            iconUrl: '',
+            category: 'ACTIVE_DAY_STREAK',
+            code: 'NIGHT_OWL',
+            imageUrl: '',
+            achievementParams: {count: 5},
+            viewedStatus: 'UNVIEWED',
+          },
+        ],
+      },
+    ],
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+}));
 
 // Mock the API before importing anything else
 jest.mock('@/services/api', () => ({
@@ -54,11 +196,21 @@ jest.mock('@/services/authApi', () => ({
   useUpdateUserMutation: jest.fn(),
 }));
 
+// Mock the BADGE_CATEGORY_MAP
+jest.mock('@/utils/common', () => ({
+  BADGE_CATEGORY_MAP: {
+    SIMULATION_MINUTES: 'Journey',
+    ACTIVE_DAY_STREAK: 'Momentum',
+    COMMENTS_REACTIONS_GIVEN: 'Contribution',
+    COMMENTS_REACTIONS_RECEIVED: 'Resonance',
+  },
+}));
+
 jest.mock('@/services', () => ({
   useGetAvailableBadgesQuery: jest.fn(() => ({
     data: [
       {
-        category: 'Journey',
+        category: 'SIMULATION_MINUTES',
         badges: [
           {
             id: 'badge-1',
@@ -84,7 +236,7 @@ jest.mock('@/services', () => ({
         ],
       },
       {
-        category: 'Momentum',
+        category: 'ACTIVE_DAY_STREAK',
         badges: [
           {
             id: 'badge-8',
@@ -177,6 +329,7 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string) => key,
   }),
+  useHardwareBackPressHandler: jest.fn(),
 }));
 
 // Mock LeftArrowIcon

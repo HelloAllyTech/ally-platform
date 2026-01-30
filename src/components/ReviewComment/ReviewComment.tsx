@@ -1,10 +1,13 @@
 import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
+import {ms} from 'react-native-size-matters';
 
-import {AddReactionIcon} from '@/assets/icons';
+import {AddReactionIcon, EyeClosedIcon} from '@/assets';
+import {ActionsMenu} from '@/components/ActionsMenu/ActionsMenu';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
+import {EmojiPicker} from '../EmojiPicker';
 import {styles} from './styles';
 import {ReviewCommentProps} from './types';
 
@@ -16,10 +19,24 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   reactions = [],
   reactionCount = 0,
   replyCount = 0,
-  onAddReactionPress,
+  onAddReactionPress: _onAddReactionPress,
   onReplyPress,
   onCommentPress,
   showReplyButton = true,
+  onEmojiSelect,
+  disableAddReactionButton = false,
+  showAddReactionButton = true,
+  selectedEmoji,
+  hidden = false,
+  hiddenByName,
+  currentUserId,
+  commentOwnerId,
+  reviewOwnerId,
+  commentId,
+  onEdit,
+  onDelete,
+  onHide,
+  showActionsMenu = false,
 }) => {
   const {t} = useTranslate();
   const initials = name ? name.charAt(0).toUpperCase() : '';
@@ -30,6 +47,43 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
     }
     return t('ReviewComment.replies', {count: replyCount});
   };
+
+  const getMenuOptions = (): Array<{label: string; onPress: () => void}> => {
+    const options: Array<{label: string; onPress: () => void}> = [];
+
+    // Edit - only if user owns the comment
+    if (
+      currentUserId &&
+      commentOwnerId &&
+      currentUserId === commentOwnerId &&
+      onEdit
+    ) {
+      options.push({
+        label: t('ReviewComment.edit'),
+        onPress: () => onEdit(commentId || '', comment || ''),
+      });
+    }
+
+    // Delete - only if user owns the comment
+    if (currentUserId && commentOwnerId && currentUserId === commentOwnerId) {
+      options.push({
+        label: t('ReviewComment.delete'),
+        onPress: () => onDelete?.(commentId || ''),
+      });
+    }
+
+    // Hide - only if user is the review owner
+    if (currentUserId && reviewOwnerId && currentUserId === reviewOwnerId) {
+      options.push({
+        label: hidden ? t('ReviewComment.unhide') : t('ReviewComment.hide'),
+        onPress: () => onHide?.(commentId || '', !hidden),
+      });
+    }
+
+    return options;
+  };
+
+  const menuOptions = getMenuOptions();
 
   return (
     <TouchableOpacity
@@ -56,27 +110,59 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         {/* Header: Name and Time */}
         <View style={styles.headerRow}>
           <View style={styles.nameTimeRow}>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+              {name}
+            </Text>
             <Text style={styles.timeAgo}>{time}</Text>
+            {hidden && (
+              <View style={styles.hiddenBadge}>
+                <EyeClosedIcon width={ms(16)} height={ms(16)} />
+                <Text style={styles.hiddenBadgeText}>
+                  {t('ReviewComment.hidden')}
+                </Text>
+              </View>
+            )}
           </View>
+          {/* Actions Menu */}
+          {showActionsMenu && menuOptions.length > 0 && (
+            <View style={styles.actionsMenuContainer}>
+              <ActionsMenu options={menuOptions} iconSize={18} />
+            </View>
+          )}
         </View>
 
         {/* Comment Text */}
-        <Text style={styles.commentText}>{comment}</Text>
+        {
+          <Text
+            style={[styles.commentText, hidden && styles.hiddenCommentText]}>
+            {comment}
+          </Text>
+        }
 
         {/* Footer: Like, Reactions, Replies */}
-        <View style={styles.footerRow}>
+        <View style={[styles.footerRow, hidden && styles.hiddenFooterRow]}>
           <View style={styles.footerRowLeft}>
-            <TouchableOpacity
-              style={styles.likeButton}
-              onPress={onAddReactionPress}
-              activeOpacity={0.7}>
-              <AddReactionIcon
-                width={20}
-                height={20}
-                color={colors.ds.icon.default}
-              />
-            </TouchableOpacity>
+            {showAddReactionButton && (
+              <>
+                {disableAddReactionButton ? (
+                  <View style={styles.likeButton}>
+                    <AddReactionIcon
+                      width={ms(16)}
+                      height={ms(16)}
+                      color={colors.ds.icon.default}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.likeButton}>
+                    <EmojiPicker
+                      containerOffsetX={ms(70)}
+                      onEmojiSelect={onEmojiSelect || (() => {})}
+                      selectedEmoji={selectedEmoji}
+                    />
+                  </View>
+                )}
+              </>
+            )}
             {/* Reactions */}
             {reactions.length > 0 && (
               <View style={styles.reactionsContainer}>
@@ -110,7 +196,8 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
             <TouchableOpacity
               style={styles.repliesButton}
               onPress={onReplyPress}
-              activeOpacity={0.7}>
+              activeOpacity={0.7}
+              hitSlop={10}>
               <Text style={styles.likeText}>{t('ReviewComment.reply')}</Text>
             </TouchableOpacity>
           )}
@@ -120,7 +207,8 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
             <TouchableOpacity
               style={styles.repliesButton}
               onPress={onReplyPress}
-              activeOpacity={0.7}>
+              activeOpacity={0.7}
+              hitSlop={10}>
               <Text style={styles.repliesText}>{getRepliesText()}</Text>
             </TouchableOpacity>
           )}

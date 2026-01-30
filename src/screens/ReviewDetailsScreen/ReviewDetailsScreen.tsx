@@ -1,8 +1,14 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
-import {useRoute} from '@react-navigation/native';
-import {ActivityIndicator, SafeAreaView, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
+import {LeftArrow} from '@/assets';
 import {
   CommentInput,
   CommentThreadBottomSheet,
@@ -12,9 +18,13 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
+import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
   useGetMessagesQuery,
+  useGetReviewByIdQuery,
 } from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {
@@ -29,10 +39,12 @@ import {useReviewComments} from './hooks/useReviewComments';
 
 const MESSAGES_PER_PAGE = 10;
 
-export const ReviewDetailsScreen: React.FC = () => {
-  const isSelectable = true;
-  const route = useRoute<any>();
-  const {reviewId: _reviewId} = route.params || {};
+type Props = RootStackScreenProps<'ReviewDetails'>;
+
+export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
+  const insets = useSafeAreaInsets();
+  const {reviewId: _reviewId, isPrivate} = route.params || {};
+  const currentMessageIdRef = useRef<string | null>(null);
 
   // State management
   const [offset, setOffset] = useState(0);
@@ -50,6 +62,14 @@ export const ReviewDetailsScreen: React.FC = () => {
   const [selectedMessageForThreads, setSelectedMessageForThreads] = useState<
     string | null
   >(null);
+  const navigation = useAppNavigation();
+
+  useHardwareBackPressHandler(() => {
+    // Otherwise, close message threads and navigate back
+    handleCloseMessageThreads();
+    navigation.goBack();
+    return true;
+  });
 
   // API hooks
   const {
@@ -61,6 +81,10 @@ export const ReviewDetailsScreen: React.FC = () => {
     {reviewId: _reviewId, offset, limit: MESSAGES_PER_PAGE},
     {skip: !_reviewId},
   );
+
+  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery({
+    reviewId: _reviewId,
+  });
 
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
@@ -80,6 +104,7 @@ export const ReviewDetailsScreen: React.FC = () => {
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,
+    closeCommentBottomSheet,
   } = useReviewComments();
 
   // Helper to map message threads to comment ranges
@@ -153,7 +178,7 @@ export const ReviewDetailsScreen: React.FC = () => {
       },
       comments: [],
       createdBy: {
-        id: '',
+        id: 0,
         name: '',
         profileImage: null,
       },
@@ -273,10 +298,10 @@ export const ReviewDetailsScreen: React.FC = () => {
 
       const response = await addReviewComment(payload);
 
-      if (response.data?.commentId) {
+      if (response.data?.thread?.id) {
         updateMessage({
           selection: currentHighlightedText,
-          commentId: response.data.commentId,
+          commentId: response.data.thread.id,
           messageId: selectedMessageId,
         });
       }
@@ -313,13 +338,24 @@ export const ReviewDetailsScreen: React.FC = () => {
   }, []);
 
   const handleMessageThreadPress = useCallback(
-    (threadId: string) => {
+    (threadId: string, messageId: string) => {
       // Close message threads bottom sheet and open comment thread bottom sheet
+      currentMessageIdRef.current = messageId;
       setIsMessageThreadsVisible(false);
       onThreadPress(threadId);
     },
     [onThreadPress],
   );
+
+  const handleHideCommentThreadBottomSheet = () => {
+    if (currentMessageIdRef.current) {
+      setIsMessageThreadsVisible(true);
+      setSelectedMessageForThreads(currentMessageIdRef.current);
+      closeCommentBottomSheet();
+    } else {
+      hideCommentThreadBottomSheet();
+    }
+  };
 
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
@@ -346,11 +382,23 @@ export const ReviewDetailsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, {paddingTop: insets.top}]}>
       {/* Main conversation/messages view */}
+      <View style={styles.titleContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <LeftArrow color={colors.black} width={ms(16)} height={ms(16)} />
+        </TouchableOpacity>
+        {reviewData && (
+          <ReviewTranscriptHeader
+            user={reviewData?.createdBy}
+            scenario={reviewData?.scenario}
+            scenarioSession={reviewData?.scenarioSession}
+          />
+        )}
+      </View>
       <Conversation
         messages={conversationMessages}
-        isSelectable={isSelectable}
+        isSelectable={!isPrivate}
         onSelection={handleSelection}
         onThreadClick={handleThreadClick}
         onLoadMore={loadMoreMessages}
@@ -359,27 +407,30 @@ export const ReviewDetailsScreen: React.FC = () => {
         onRefresh={refreshMessages}
         isRefreshing={isFetching && offset === 0}
       />
-      {/* Floating input at the bottom */}
-      {showCommentInput && (
-        <CommentInput
-          onChangeText={handleChangeComment}
-          onSend={handleSendComment}
-          comment={comment}
-          autoFocus
-          onBlur={() => setShowCommentInput(false)}
-          isSendButtonDisabled={comment.length === 0 || !comment.trim()}
-          isLoading={isAddingComment}
-        />
-      )}
+      {/* Comment input bottom sheet */}
+
       <View style={styles.interactionsBarContainer}>
         <InteractionsBar
           reviewId={_reviewId}
-          reactions={{}}
-          commentsCount={0}
+          reactions={reviewData?.reactions || {}}
+          commentsCount={reviewData?.commentsCount || 0}
           onCommentPress={showThreadsBottomSheet}
+          refreshReactions={() => {
+            refetchReviewData();
+          }}
+          myReaction={reviewData?.myReaction || null}
+          isPrivate={isPrivate}
         />
       </View>
-
+      <CommentInput
+        visible={showCommentInput}
+        onClose={resetCommentInput}
+        onChangeText={handleChangeComment}
+        onSend={handleSendComment}
+        comment={comment}
+        isSendButtonDisabled={comment.length === 0 || !comment.trim()}
+        isLoading={isAddingComment}
+      />
       <ThreadsBottomSheet
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
@@ -390,38 +441,32 @@ export const ReviewDetailsScreen: React.FC = () => {
         visible={isMessageThreadsVisible}
         onClose={handleCloseMessageThreads}
         messageId={selectedMessageForThreads || ''}
-        reviewId={_reviewId}
+        message={
+          conversationMessages.find(m => m.id === selectedMessageForThreads)
+            ?.content || ''
+        }
         threads={selectedMessageThreads}
         onThreadPress={handleMessageThreadPress}
       />
       <CommentThreadBottomSheet
         visible={isCommentThreadBottomSheetVisible}
         onClose={closeCommentThreadBottomSheet}
+        reviewId={_reviewId}
         threadId={selectedThreadId || ''}
-        onAddReactionPress={_commentId => {
-          // Handle add reaction press
-        }}
+        reviewOwnerId={reviewData?.createdBy?.id}
         onReplyPress={onReplyPress}
-        onSubmitComment={_commentText => {
-          // Handle add comment press
-        }}
-        hideCommentThreadBottomSheet={hideCommentThreadBottomSheet}
+        hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
+        isPrivate={isPrivate}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
         onClose={closeReplyBottomSheet}
         commentId={selectedComment?.id || ''}
         originalComment={selectedComment || null}
-        onAddReactionPress={_commentId => {
-          // Handle add reaction press
-        }}
-        onReplyPress={_commentId => {
-          // Handle reply press
-        }}
-        onSubmitReplyPress={_commentText => {
-          // Handle add comment press
-        }}
         hideReplyBottomSheet={hideReplyBottomSheet}
+        reviewId={_reviewId}
+        reviewOwnerId={reviewData?.createdBy?.id}
+        isPrivate={isPrivate}
       />
     </SafeAreaView>
   );
@@ -431,6 +476,15 @@ const styles = ScaledSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  titleContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray7,
+    // marginTop: '16@s',
+    paddingVertical: '8@s',
+    paddingHorizontal: '20@ms',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   centered: {
     flex: 1,

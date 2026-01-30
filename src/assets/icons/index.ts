@@ -22,6 +22,7 @@ import ChangeImageIcon from './changeImage.svg';
 import ChatAddOnIcon from './chatAddOn.svg';
 import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
+import ChecklistIcon from './checklist.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
 import ChevronRight from './chevronRight.svg';
@@ -45,6 +46,7 @@ import EmptyTranscriptIcon from './emptyTranscript.svg';
 import EndSessionIcon from './endSession.svg';
 import ExportIcon from './export.svg';
 import EyeIcon from './eye.svg';
+import EyeClosedIcon from './eyeClosed.svg';
 import FileIcon from './file.svg';
 import FilterIcon from './filter.svg';
 import FlowIcon from './flow.svg';
@@ -254,4 +256,6 @@ export {
   VolumeIcon,
   VolumeOffIcon,
   WandStarsIcon,
+  ChecklistIcon,
+  EyeClosedIcon,
 };

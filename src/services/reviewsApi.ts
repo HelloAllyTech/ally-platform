@@ -6,12 +6,14 @@ import {
   CreateReviewResponse,
   GetMessagesRequest,
   GetMessagesResponse,
+  GetReviewByIdResponse,
+  GetReviewResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
   ReviewsResponse,
   UpdateReviewStatusRequest,
   UpdateReviewStatusResponse,
-} from '@/types/reviews';
+} from '@/types';
 
 import {api} from './api';
 
@@ -30,6 +32,12 @@ export const reviewsApi = api.injectEndpoints({
         url: API_ROUTES.REVIEWS.CREATE_REVIEW,
         method: API_METHODS.POST,
         body,
+      }),
+    }),
+    getReview: builder.query<GetReviewResponse, {reviewId: string}>({
+      query: ({reviewId}) => ({
+        url: API_ROUTES.REVIEWS.GET_REVIEW(reviewId),
+        method: API_METHODS.GET,
       }),
     }),
     updateReviewStatus: builder.mutation<
@@ -66,11 +74,16 @@ export const reviewsApi = api.injectEndpoints({
       }),
     }),
     getMessages: builder.query<GetMessagesResponse, GetMessagesRequest>({
-      query: ({reviewId, offset, limit}) => {
+      query: ({reviewId, offset, limit, sortOrder, sortBy}) => {
         return {
           url: API_ROUTES.REVIEWS.GET_MESSAGES(reviewId),
           method: API_METHODS.GET,
-          params: {offset, limit},
+          params: {
+            offset,
+            limit,
+            ...(sortOrder && {sortOrder}),
+            ...(sortBy && {sortBy}),
+          },
         };
       },
     }),
@@ -98,14 +111,52 @@ export const reviewsApi = api.injectEndpoints({
         params: {sortBy, limit, offset, order: SortOrder.DESC},
       }),
     }),
+    getReviewById: builder.query<GetReviewByIdResponse, {reviewId: string}>({
+      query: ({reviewId}) => ({
+        url: API_ROUTES.REVIEWS.REVIEW_BY_ID(reviewId),
+        method: API_METHODS.GET,
+      }),
+    }),
+    updateCommentVisibility: builder.mutation<
+      {success: boolean},
+      {commentId: string; hidden: boolean}
+    >({
+      query: ({commentId, hidden}) => ({
+        url: API_ROUTES.REVIEWS.UPDATE_COMMENT_VISIBILITY(commentId),
+        method: API_METHODS.PATCH,
+        body: {hidden},
+      }),
+    }),
+    updateComment: builder.mutation<
+      {success: boolean},
+      {commentId: string; content: string}
+    >({
+      query: ({commentId, content}) => ({
+        url: API_ROUTES.REVIEWS.UPDATE_COMMENT(commentId),
+        method: API_METHODS.PATCH,
+        body: {content},
+      }),
+    }),
+    deleteComment: builder.mutation<{success: boolean}, {commentId: string}>({
+      query: ({commentId}) => ({
+        url: API_ROUTES.REVIEWS.DELETE_COMMENT(commentId),
+        method: API_METHODS.DELETE,
+      }),
+    }),
   }),
 });
 
 export const {
   useCreateReviewMutation,
+  useGetReviewQuery,
   useUpdateReviewStatusMutation,
   useGetMessagesQuery,
   useAddReviewCommentMutation,
   useLazyGetThreadCommentsQuery,
+  useGetReviewsQuery,
   useLazyGetReviewsQuery,
+  useGetReviewByIdQuery,
+  useUpdateCommentVisibilityMutation,
+  useUpdateCommentMutation,
+  useDeleteCommentMutation,
 } = reviewsApi;

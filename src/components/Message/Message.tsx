@@ -1,4 +1,4 @@
-import {useRef} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {Text, TextStyle, View, ViewStyle} from 'react-native';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {runOnJS} from 'react-native-reanimated';
@@ -6,10 +6,11 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily, typography} from '@/theme';
 
+import {SelectableTextInputProps} from '../SelectableTextInput/SelectableTextInput';
+
 export interface MessageProps {
   timestamp: string;
-  senderId: number;
-  message: React.ReactNode;
+  message: React.ReactElement<SelectableTextInputProps>;
   containerStyle?: ViewStyle;
   timestampStyle?: TextStyle;
   messageStyle?: TextStyle;
@@ -21,27 +22,38 @@ export const Message: React.FC<MessageProps> = ({
   message,
   containerStyle,
   timestampStyle,
-  senderId,
   onPress = () => {},
 }) => {
   const longPressRef = useRef<any>(null);
 
-  const tapGesture = Gesture.Tap()
-    .onEnd(() => {
-      runOnJS(onPress)();
-    })
-    .requireExternalGestureToFail(longPressRef);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const tapGesture = useMemo(() => {
+    return Gesture.Tap()
+      .enabled(!menuOpen) // ✅ disable tap while menu is visible
+      .onEnd(() => {
+        runOnJS(onPress)();
+      })
+      .requireExternalGestureToFail(longPressRef);
+  }, [menuOpen, onPress, longPressRef]);
+
+  // ✅ Inject visibility callback into the message element
+  const messageWithCallback = useMemo(() => {
+    if (!React.isValidElement(message)) return message;
+
+    return React.cloneElement(message, {
+      // this prop will be received by SelectableTextInput
+      onMenuVisibilityChange: setMenuOpen,
+    });
+  }, [message]);
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={[styles.timestamp, timestampStyle]}>
-        <Text style={styles.userName}>
-          {senderId === -1 ? 'AI Client' : 'User'}
-        </Text>{' '}
-        ({timestamp})
-      </Text>
+      <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text>
       <GestureDetector gesture={tapGesture}>
-        <View style={[styles.messageContainer, styles.message]}>{message}</View>
+        <View style={[styles.messageContainer, styles.message]}>
+          {messageWithCallback}
+        </View>
       </GestureDetector>
     </View>
   );
@@ -49,9 +61,10 @@ export const Message: React.FC<MessageProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     paddingHorizontal: '16@ms',
     paddingVertical: '6@mvs',
+    gap: '16@ms',
   },
   timestamp: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

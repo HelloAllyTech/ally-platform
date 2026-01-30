@@ -333,6 +333,15 @@
     "endSimulation": "End Simulation",
     "endSimulationConfirmation": "Are you sure you want to end this simulation?"
   },
+  "SimulationTimer": {
+    "sessionTimer": "Session Timer",
+    "timeRemaining": "Time Remaining"
+  },
+  "SimulationChecklist": {
+    "sessionChecklist": "Session Checklist",
+    "progress":"Progress",
+    "completed":"completed"
+  },
   "NetworkLogs": {
     "logs": "Logs"
   },
@@ -451,7 +460,7 @@
     "submitButton": "Submit"
   },
   "Leaderboard": {
-    "title": "Leaderboard",
+    "title": "Community",
     "badges": "Badges",
     "tableHeaders": {
       "rank": "Rank",
@@ -460,11 +469,12 @@
       "badges": "Badges"
     },
     "period": {
-      "last": "Last",
-      "week": "week",
-      "month": "month",
-      "year": "year",
+      "days": "days",
       "allTime": "All time"
+    },
+    "emptyState": {
+      "title": "No leaderboard data yet",
+      "description": "Start practicing to see your progress and compete with others"
     }
   },
   "Reactions": {
@@ -510,13 +520,15 @@
     "card": {
       "sharedSimulationForReview": "Shared simulation for review",
       "dateAndTime": "Date & time:",
-      "duration": "Duration:",
+      "duration": "Duration",
       "reviewTranscript": "Review transcript",
       "reaction": "Reaction",
       "comment": "Comment",
       "viewLess": "View less",
       "viewMore": "View more" ,
-      "simulationDetails": "Simulation Details"
+      "simulationDetails": "Simulation Details",
+      "collapse": "Collapse",
+      "noComments": "No comments yet"
     },
     "filters": {
       "all": "All",
@@ -534,7 +546,13 @@
     "like": "Like",
     "reply": "Reply",
     "replies": "{{count}} replies",
-    "repliesOne": "1 reply"
+    "repliesOne": "1 reply",
+    "edit": "Edit",
+    "delete": "Delete",
+    "hide": "Hide",
+    "unhide": "Unhide",
+    "hidden": "Hidden",
+    "hiddenBy": "Comment hidden"
   },
   "ThreadsBottomSheet": {
     "title": "Comments",

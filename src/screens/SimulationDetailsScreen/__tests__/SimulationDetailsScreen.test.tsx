@@ -13,18 +13,6 @@ jest.mock('@react-navigation/native', () => ({
 const mockStartSimulation = jest.fn();
 const mockCloseActiveSimulationModal = jest.fn();
 
-// Define mock data outside mocks to ensure consistent references
-const mockLanguagesData = [
-  {
-    language_id: 1,
-    label: 'English',
-    active: true,
-    translationCode: 'en',
-    value: 'en-IN',
-  },
-];
-
-const mockPreferencesData = {data: {default_language_id: 1}};
 
 jest.mock('@/hooks', () => {
   const mockNavigate = jest.fn();
@@ -45,6 +33,15 @@ jest.mock('@/hooks', () => {
       startSimulation: mockStartSimulation,
       closeActiveSimulationModal: mockCloseActiveSimulationModal,
       setShowActiveSimulationModal: jest.fn(),
+    }),
+    useLanguageDropdown: () => ({
+      selectedLanguage: 'English',
+      setSelectedLanguage: jest.fn(),
+      isLanguageDropdownOpen: false,
+      setIsLanguageDropdownOpen: jest.fn(),
+      languageOptions: ['English'],
+      languageMap: new Map([['English', 1]]),
+      isLoading: false,
     }),
   };
 });
@@ -69,6 +66,12 @@ jest.mock('@/components', () => {
         <Text>{value || 'Select'}</Text>
       </TouchableOpacity>
     ),
+    NotificationModal: ({visible, onConfirm}: any) =>
+      visible ? (
+        <View testID="notification-modal">
+          <Text onPress={onConfirm}>Start Session</Text>
+        </View>
+      ) : null,
     IllustratedModal: () => null,
     useToast: () => ({showToast: jest.fn()}),
     VideoPreview: () => null,
@@ -105,18 +108,6 @@ jest.mock('@/services', () => ({
     data: undefined,
     isLoading: false,
   })),
-  useGetAvailableLanguagesQuery: jest.fn(() => ({
-    data: mockLanguagesData,
-  })),
-  useGetUserPreferencesQuery: jest.fn(() => ({
-    data: mockPreferencesData,
-    refetch: jest.fn().mockResolvedValue({data: mockPreferencesData}),
-  })),
-  useLazyGetUserPreferencesQuery: jest.fn(() => [
-    jest.fn().mockResolvedValue({data: mockPreferencesData}),
-    {data: mockPreferencesData},
-  ]),
-  useLazyGetScenarioSessionByPathItemQuery: jest.fn(() => [jest.fn()]),
 }));
 
 describe('SimulationDetailsScreen', () => {
@@ -155,8 +146,8 @@ describe('SimulationDetailsScreen', () => {
     expect(getByText('Description')).toBeTruthy();
   });
 
-  it('calls startSimulation when button is pressed', async () => {
-    const {getByTestId} = renderWithSafeArea(
+  it('calls startSimulation after notification confirmation', async () => {
+    const {getByTestId, getByText} = renderWithSafeArea(
       <SimulationDetailsScreen
         navigation={{} as any}
         route={{params: {scenario}} as any}
@@ -165,6 +156,11 @@ describe('SimulationDetailsScreen', () => {
 
     const button = getByTestId('primary-button');
     fireEvent.press(button);
+
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+
+    const notificationButton = getByText('Start Session');
+    fireEvent.press(notificationButton);
 
     await waitFor(() => {
       // startSimulation is called with (scenarioId, sessionId, pathId, languageId)
