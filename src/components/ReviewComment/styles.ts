@@ -72,7 +72,7 @@ export const styles = ScaledSheet.create({
     alignSelf: 'stretch',
   },
   hiddenCommentText: {
-    opacity: 0.8,
+    color: 'rgba(0, 0, 0, 0.38)',
   },
   footerRow: {
     marginTop: '8@mvs',

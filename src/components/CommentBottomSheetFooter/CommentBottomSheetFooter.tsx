@@ -24,16 +24,9 @@ export interface CommentBottomSheetFooterProps {
 // Memoized footer content to prevent remounting while allowing re-renders
 export const CommentBottomSheetFooter =
   React.memo<CommentBottomSheetFooterProps>(
-    ({
-      text,
-      setText,
-      onSubmit,
-      placeholder,
-      bottomInset,
-      isLoading = false,
-    }) => {
+    ({text, setText, onSubmit, placeholder, isLoading = false}) => {
       return (
-        <View style={[styles.container, {paddingBottom: bottomInset + 16}]}>
+        <View style={styles.container}>
           <View style={styles.inputContainer}>
             <BottomSheetTextInput
               style={styles.input}
