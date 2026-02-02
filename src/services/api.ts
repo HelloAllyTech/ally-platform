@@ -149,6 +149,8 @@ export const api = createApi({
     'User',
     'Badges',
     'UserPreferences',
+    'ReviewMessages',
+    'ReviewDetails',
   ],
   endpoints: () => ({}),
 });
