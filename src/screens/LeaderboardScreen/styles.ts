@@ -1,7 +1,7 @@
 import {StyleSheet} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -244,5 +244,11 @@ export const styles = ScaledSheet.create({
   },
   marginL21: {
     marginLeft: '21@ms',
+  },
+  tooltipText: {
+    color: colors.ds.neutral.white,
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.regular,
   },
 });

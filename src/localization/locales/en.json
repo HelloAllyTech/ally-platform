@@ -574,5 +574,29 @@
     "title": "Replies",
     "addReply": "Add reply",
     "noReplies": "No replies yet"
+  },
+  "BadgeTooltip": {
+    "Journey": {
+      "title": "Journey Badges",
+      "description":"Earned by completing simulation minutes. Only completed simulation time is counted."
+    },
+    "Momentum": {
+      "title": "Momentum Badges",
+      "description":"Earned by maintaining a 3-day practice streak. Only completed simulation time is counted."
+    },
+    "Contribution": {
+      "title": "Contribution Badges",
+      "description":"Earned by providing comments and reactions. Only completed simulation time is counted."
+    },
+    "Resonance": {
+      "title": "Resonance Badges",
+      "description":"Earned by receiving comments and reactions. Only completed simulation time is counted."
+    },
+    "Badge": "Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.",
+    "Community": {
+      "title": "Community",
+      "description":"This view reflects overall activity in the selected time period, including practice time, badges earned, and community participation. If a comment or reaction is removed by you or a reviewer, the leaderboard updates accordingly."
+    }
   }
 }
+
