@@ -73,12 +73,12 @@ const styles = ScaledSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: '24@ms',
-    paddingVertical: '8@ms',
+    paddingVertical: '12@ms',
     marginTop: '16@ms',
   },
   border: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray7,
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.primary,
   },
   leftGroup: {
     flexDirection: 'row',
