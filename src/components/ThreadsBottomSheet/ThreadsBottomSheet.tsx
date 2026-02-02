@@ -11,7 +11,7 @@ import {BottomSheet, ReviewComment} from '@/components';
 import {useTranslate, useUser} from '@/hooks';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
-import {ThreadsResponse} from '@/types/reviews';
+import {Thread, ThreadsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
@@ -20,11 +20,32 @@ import {ThreadsBottomSheetProps} from './types';
 
 const LIMIT = 20;
 
+// Gradient colors constant to avoid recreating on every render
+const GRADIENT_COLORS = [
+  colors.whiteTransparent0,
+  colors.whiteTransparent40,
+  colors.whiteTransparent60,
+];
+
+// Helper to compute selected text from thread
+const getSelectedText = (thread: Thread): string | null => {
+  if (
+    !thread.message?.content ||
+    thread.selection?.startIndex === undefined ||
+    thread.selection?.endIndex === undefined
+  ) {
+    return null;
+  }
+  return thread.message.content.slice(
+    thread.selection.startIndex as number,
+    thread.selection.endIndex as number,
+  );
+};
+
 export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
   onClose,
   reviewId,
-  reviewOwnerId,
   onThreadPress,
 }) => {
   const {t} = useTranslate();
@@ -93,17 +114,19 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
           onPress={() => onThreadPress?.(thread.id)}
           activeOpacity={0.7}>
           {/* Selected Text Section - if available */}
-          {thread.message?.content && (
-            <View style={styles.selectedTextContainer}>
-              <Text
-                style={styles.selectedText}
-                numberOfLines={1}
-                ellipsizeMode="tail">
-                {t('ThreadsBottomSheet.selectedText')} "
-                {thread.message?.content}"
-              </Text>
-            </View>
-          )}
+          {thread.message?.content &&
+            thread.selection?.startIndex !== undefined &&
+            thread.selection?.endIndex !== undefined && (
+              <View style={styles.selectedTextContainer}>
+                <Text
+                  style={styles.selectedText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {t('ThreadsBottomSheet.selectedText')} "
+                  {getSelectedText(thread) || ''}"
+                </Text>
+              </View>
+            )}
 
           {/* First Comment */}
           <View style={styles.commentWrapper}>
@@ -129,11 +152,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
             />
             {remainingCount > 0 && (
               <LinearGradient
-                colors={[
-                  colors.whiteTransparent0,
-                  colors.whiteTransparent40,
-                  colors.whiteTransparent60,
-                ]}
+                colors={GRADIENT_COLORS}
                 start={{x: 0, y: 0}}
                 end={{x: 0, y: 1}}
                 locations={[0, 0.4, 0.7]}

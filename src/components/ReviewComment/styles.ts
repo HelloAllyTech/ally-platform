@@ -46,12 +46,17 @@ export const styles = ScaledSheet.create({
     gap: '6@s',
   },
   nameTimeRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: '6@s',
+    minWidth: 0,
+  },
+  nameContainer: {
+    flex: 1,
+    minWidth: 0,
   },
   name: {
-    maxWidth: '80%',
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '14@ms',
     lineHeight: '18@ms',
@@ -62,6 +67,7 @@ export const styles = ScaledSheet.create({
     fontSize: '12@ms',
     lineHeight: '15@ms',
     color: colors.ds.typography.mediumEmphasis,
+    flexShrink: 0,
   },
   commentText: {
     marginTop: '4@mvs',
@@ -185,6 +191,7 @@ export const styles = ScaledSheet.create({
     paddingVertical: '2@s',
     borderRadius: '100@s',
     alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   hiddenBadgeText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
