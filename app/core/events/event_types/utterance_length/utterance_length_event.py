@@ -19,7 +19,7 @@ class UtteranceLengthEvent(BaseEvent):
     """
 
     detection_type: DetectionType = DetectionType.HELPER_UTTERANCE_LENGTH
-    data: UtteranceLengthData = UtteranceLengthData(min_length=0)
+    data: UtteranceLengthData = UtteranceLengthData(min_utterance_length=0)
 
     @classmethod
     def create(
@@ -36,7 +36,8 @@ class UtteranceLengthEvent(BaseEvent):
 
         Args:
             event_id: Event identifier
-            data: UtteranceLengthData instance with min_length and/or max_length
+            data: UtteranceLengthData instance with
+            minUtteranceLength and/or maxUtteranceLength
             visibility_type: Visibility type (optional)
             detection_type: Detection type (defaults to HELPER_UTTERANCE_LENGTH)
             **kwargs: Other BaseEvent fields (score, emoji, show_feedback, etc.)
@@ -79,9 +80,16 @@ class UtteranceLengthEvent(BaseEvent):
         message_length = len(last_message.content) if last_message.content else 0
 
         # Check if length is within the specified range
-        min_len = self.data.min_length if self.data.min_length is not None else 0
+        min_len = (
+            self.data.min_utterance_length
+            if self.data.min_utterance_length is not None
+            else 0
+        )
         if message_length < min_len:
             return False
-        if self.data.max_length is not None and message_length > self.data.max_length:
+        if (
+            self.data.max_utterance_length is not None
+            and message_length > self.data.max_utterance_length
+        ):
             return False
         return True

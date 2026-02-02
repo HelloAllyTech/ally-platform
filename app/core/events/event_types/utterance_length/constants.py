@@ -8,21 +8,27 @@ from pydantic import BaseModel, ConfigDict, Field
 class UtteranceLengthData(BaseModel):
     """Data structure for HELPER_UTTERANCE_LENGTH detection type."""
 
-    min_length: Optional[int] = Field(
-        0, alias="minLength", description="Minimum character count (inclusive)"
+    min_utterance_length: Optional[int] = Field(
+        alias="minUtteranceLength",
+        default=0,
+        description="Minimum character count (inclusive)",
     )
-    max_length: Optional[int] = Field(
-        None, alias="maxLength", description="Maximum character count (inclusive)"
+    max_utterance_length: Optional[int] = Field(
+        alias="maxUtteranceLength",
+        default=None,
+        description="Maximum character count (inclusive)",
     )
 
     def __init__(self, **data):
         super().__init__(**data)
-        # Validate that min_length <= max_length if both are provided
+        # Validate that minUtteranceLength <= maxUtteranceLength if both are provided
         if (
-            self.min_length is not None
-            and self.max_length is not None
-            and self.min_length > self.max_length
+            self.min_utterance_length is not None
+            and self.max_utterance_length is not None
+            and self.min_utterance_length > self.max_utterance_length
         ):
-            raise ValueError("min_length must be less than or equal to max_length")
+            raise ValueError(
+                "minUtteranceLength must be less than or equal to maxUtteranceLength"
+            )
 
     model_config = ConfigDict(populate_by_name=True)

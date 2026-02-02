@@ -45,46 +45,47 @@ class TestUtteranceLengthData:
 
     def test_valid_range(self):
         """Test that valid min/max ranges are accepted."""
-        data = UtteranceLengthData(min_length=1, max_length=25)
-        assert data.min_length == 1
-        assert data.max_length == 25
+        data = UtteranceLengthData(min_utterance_length=1, max_utterance_length=25)
+        assert data.min_utterance_length == 1
+        assert data.max_utterance_length == 25
 
     def test_valid_min_only(self):
-        """Test that min_length only (greater than) is valid."""
-        data = UtteranceLengthData(min_length=200)
-        assert data.min_length == 200
-        assert data.max_length is None
+        """Test that minUtteranceLength only (greater than) is valid."""
+        data = UtteranceLengthData(min_utterance_length=200)
+        assert data.min_utterance_length == 200
+        assert data.max_utterance_length is None
 
     def test_valid_max_only(self):
-        """Test that max_length only (less than) is valid."""
-        data = UtteranceLengthData(max_length=50)
-        assert data.min_length == 0
-        assert data.max_length == 50
+        """Test that maxUtteranceLength only (less than) is valid."""
+        data = UtteranceLengthData(max_utterance_length=50)
+        assert data.min_utterance_length == 0
+        assert data.max_utterance_length == 50
 
     def test_valid_no_limits_with_defaults(self):
         """Test that no limits provided uses defaults (min=0, max=None)."""
         data = UtteranceLengthData()
-        assert data.min_length == 0
-        assert data.max_length is None
+        assert data.min_utterance_length == 0
+        assert data.max_utterance_length is None
 
     def test_valid_explicit_none_values(self):
         """Test that explicit None values are supported for both min and max."""
-        data = UtteranceLengthData(min_length=None, max_length=None)
-        assert data.min_length is None
-        assert data.max_length is None
+        data = UtteranceLengthData(min_utterance_length=None, max_utterance_length=None)
+        assert data.min_utterance_length is None
+        assert data.max_utterance_length is None
 
     def test_invalid_min_greater_than_max(self):
-        """Test that min_length cannot be greater than max_length."""
+        """Test that minUtteranceLength cannot be greater than maxUtteranceLength."""
         with pytest.raises(
-            ValueError, match="min_length must be less than or equal to max_length"
+            ValueError,
+            match="minUtteranceLength must be less than or equal to maxUtteranceLength",
         ):
-            UtteranceLengthData(min_length=100, max_length=50)
+            UtteranceLengthData(min_utterance_length=100, max_utterance_length=50)
 
     def test_valid_equal_min_max(self):
-        """Test that min_length can equal max_length."""
-        data = UtteranceLengthData(min_length=50, max_length=50)
-        assert data.min_length == 50
-        assert data.max_length == 50
+        """Test that minUtteranceLength can equal maxUtteranceLength."""
+        data = UtteranceLengthData(min_utterance_length=50, max_utterance_length=50)
+        assert data.min_utterance_length == 50
+        assert data.max_utterance_length == 50
 
 
 class TestUtteranceLengthEvent:
@@ -95,7 +96,7 @@ class TestUtteranceLengthEvent:
         """Test detection when message length is within range."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Message with 15 characters (within range)
@@ -110,7 +111,7 @@ class TestUtteranceLengthEvent:
         """Test detection at minimum boundary."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Message with exactly 1 character
@@ -123,7 +124,7 @@ class TestUtteranceLengthEvent:
         """Test detection at maximum boundary."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Message with exactly 25 characters
@@ -136,7 +137,7 @@ class TestUtteranceLengthEvent:
         """Test detection when message is below minimum."""
         event = UtteranceLengthEvent.create(
             event_id="test-26-50",
-            data=UtteranceLengthData(min_length=26, max_length=50),
+            data=UtteranceLengthData(min_utterance_length=26, max_utterance_length=50),
         )
 
         # Message with 25 characters (below min)
@@ -149,7 +150,7 @@ class TestUtteranceLengthEvent:
         """Test detection when message is above maximum."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Message with 26 characters (above max)
@@ -159,10 +160,10 @@ class TestUtteranceLengthEvent:
 
     @pytest.mark.asyncio
     async def test_detect_min_only_greater_than(self):
-        """Test detection with only min_length (greater than)."""
+        """Test detection with only minUtteranceLength (greater than)."""
         event = UtteranceLengthEvent.create(
             event_id="test-gt-200",
-            data=UtteranceLengthData(min_length=201),
+            data=UtteranceLengthData(min_utterance_length=201),
         )
 
         # Message with 250 characters (>= 201)
@@ -182,10 +183,10 @@ class TestUtteranceLengthEvent:
 
     @pytest.mark.asyncio
     async def test_detect_max_only_less_than(self):
-        """Test detection with only max_length (less than)."""
+        """Test detection with only maxUtteranceLength (less than)."""
         event = UtteranceLengthEvent.create(
             event_id="test-lt-50",
-            data=UtteranceLengthData(max_length=50),
+            data=UtteranceLengthData(max_utterance_length=50),
         )
 
         # Message with 49 characters (<= 50)
@@ -208,7 +209,7 @@ class TestUtteranceLengthEvent:
         """Test that client messages are ignored."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Client message (should be ignored)
@@ -221,7 +222,7 @@ class TestUtteranceLengthEvent:
         """Test that role matching is case-insensitive."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Test various case combinations
@@ -235,7 +236,7 @@ class TestUtteranceLengthEvent:
         """Test detection with empty message."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Empty message (0 characters)
@@ -248,7 +249,7 @@ class TestUtteranceLengthEvent:
         """Test that the detection logic handles None content gracefully."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         # Note: ChatMessage doesn't allow None content, but the detection
@@ -263,7 +264,7 @@ class TestUtteranceLengthEvent:
         """Test detection with empty conversation list."""
         event = UtteranceLengthEvent.create(
             event_id="test-1-25",
-            data=UtteranceLengthData(min_length=1, max_length=25),
+            data=UtteranceLengthData(min_utterance_length=1, max_utterance_length=25),
         )
 
         messages = []
@@ -275,7 +276,9 @@ class TestUtteranceLengthEvent:
         """Test that only the most recent message is checked."""
         event = UtteranceLengthEvent.create(
             event_id="test-151-200",
-            data=UtteranceLengthData(min_length=151, max_length=200),
+            data=UtteranceLengthData(
+                min_utterance_length=151, max_utterance_length=200
+            ),
         )
 
         # First message: 50 chars (doesn't match)
@@ -302,9 +305,11 @@ class TestUtteranceLengthEvent:
 
         for min_len, max_len, test_len in ranges:
             if max_len is None:
-                data = UtteranceLengthData(min_length=min_len)
+                data = UtteranceLengthData(min_utterance_length=min_len)
             else:
-                data = UtteranceLengthData(min_length=min_len, max_length=max_len)
+                data = UtteranceLengthData(
+                    min_utterance_length=min_len, max_utterance_length=max_len
+                )
 
             event = UtteranceLengthEvent.create(
                 event_id=f"test-{min_len}-{max_len or 'gt'}",
@@ -329,7 +334,7 @@ class TestUtteranceLengthEventFactory:
                     "id": "utterance-length-1-25",
                     "name": "Short Utterance",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": 1, "max_length": 25},
+                    "data": {"minUtteranceLength": 1, "maxUtteranceLength": 25},
                     "score": 2,
                     "emoji": "💬",
                     "message": "Your response was brief.",
@@ -344,8 +349,8 @@ class TestUtteranceLengthEventFactory:
         assert isinstance(events[0], UtteranceLengthEvent)
         assert events[0].event_id == "utterance-length-1-25"
         assert events[0].detection_type == DetectionType.HELPER_UTTERANCE_LENGTH
-        assert events[0].data.min_length == 1
-        assert events[0].data.max_length == 25
+        assert events[0].data.min_utterance_length == 1
+        assert events[0].data.max_utterance_length == 25
         assert events[0].score == 2
         assert events[0].emoji == "💬"
         assert events[0].emoji_message == "Your response was brief."
@@ -353,13 +358,13 @@ class TestUtteranceLengthEventFactory:
         assert events[0].show_feedback is True
 
     def test_build_utterance_length_event_min_only(self):
-        """Test building event with only min_length."""
+        """Test building event with only minUtteranceLength."""
         metadata = {
             "events": [
                 {
                     "id": "utterance-length-gt-200",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": 201},
+                    "data": {"minUtteranceLength": 201},
                     "score": 7,
                 }
             ]
@@ -367,17 +372,17 @@ class TestUtteranceLengthEventFactory:
 
         events = build_events_from_metadata(metadata)
         assert len(events) == 1
-        assert events[0].data.min_length == 201
-        assert events[0].data.max_length is None
+        assert events[0].data.min_utterance_length == 201
+        assert events[0].data.max_utterance_length is None
 
     def test_build_utterance_length_event_max_only(self):
-        """Test building event with only max_length."""
+        """Test building event with only maxUtteranceLength."""
         metadata = {
             "events": [
                 {
                     "id": "utterance-length-lt-50",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"max_length": 50},
+                    "data": {"maxUtteranceLength": 50},
                     "score": 3,
                 }
             ]
@@ -385,8 +390,8 @@ class TestUtteranceLengthEventFactory:
 
         events = build_events_from_metadata(metadata)
         assert len(events) == 1
-        assert events[0].data.min_length == 0
-        assert events[0].data.max_length == 50
+        assert events[0].data.min_utterance_length == 0
+        assert events[0].data.max_utterance_length == 50
 
     def test_build_utterance_length_event_missing_data_warns(self):
         """Test that missing data field warns and skips event."""
@@ -415,7 +420,7 @@ class TestUtteranceLengthEventFactory:
                 {
                     "id": "utterance-length-1",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": "not-a-number"},  # invalid
+                    "data": {"minUtteranceLength": "not-a-number"},  # invalid
                 }
             ]
         }
@@ -432,7 +437,10 @@ class TestUtteranceLengthEventFactory:
                 {
                     "id": "utterance-length-1",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": 100, "max_length": 50},  # invalid
+                    "data": {
+                        "minUtteranceLength": 100,
+                        "maxUtteranceLength": 50,
+                    },  # invalid
                 }
             ]
         }
@@ -455,8 +463,8 @@ class TestUtteranceLengthEventFactory:
 
         events = build_events_from_metadata(metadata)
         assert len(events) == 1
-        assert events[0].data.min_length == 0
-        assert events[0].data.max_length is None
+        assert events[0].data.min_utterance_length == 0
+        assert events[0].data.max_utterance_length is None
 
     def test_build_mixed_event_types_including_utterance_length(self):
         """Test building multiple event types including utterance length."""
@@ -470,7 +478,7 @@ class TestUtteranceLengthEventFactory:
                 {
                     "id": "utterance-length-1",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": 1, "max_length": 25},
+                    "data": {"minUtteranceLength": 1, "maxUtteranceLength": 25},
                 },
                 {
                     "id": "time-1",

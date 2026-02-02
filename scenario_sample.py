@@ -12,7 +12,7 @@ SCENARIO_SAMPLE = {
             "name": "Ahana",
             "tone": "Anxious, overwhelmed, defeated",
             "gender": "female",
-            "context": "Ahana just received her 10th grade pre-board exam results and performed poorly despite studying hard. She feels her self-worth is tied to academic success and is terrified of telling her parents, who have threatened to send her to boarding school if she doesn't perform well.",
+            "context": "Say something from <Negative response>",
             "agentGoal": "Help Ahana process her disappointment, reduce anxiety, and develop strategies for communicating with her parents about her results.",
             "profession": "Student",
             "lifeHistory": "Ahana is the oldest of three siblings living with her parents in Kolkata. She has always been a dedicated student who studied to her full capacity. Her parents have high expectations and have linked her academic performance to her future opportunities.",
@@ -28,6 +28,10 @@ SCENARIO_SAMPLE = {
             "customFields": [
                 {"field": "favourite colour", "value": "Sky Blue"},
                 {"field": "occupation", "value": "Engineer"},
+                {
+                    "field": "Negative response",
+                    "value": "I am not sure if you understand what I am feeling.",
+                },
             ],
         },
         "events": [
@@ -65,8 +69,7 @@ SCENARIO_SAMPLE = {
                 "emoji": "🔼",
                 "message": "Good greetings",
                 "detectionType": "SEMANTIC_SIMILARITY",
-                "branchInstruction": "speak about your favourite colour <favourite colour> "
-                "and occupation as <occupation> and <last_helper_utterance> and <chat_summary>",
+                "branchInstruction": "<Negative response>",
                 "feedbackStatus": "True",
             },
             {
@@ -136,6 +139,38 @@ SCENARIO_SAMPLE = {
                     ],
                 },
             },
+            {
+                "id": "utterance-length-1-25",
+                "name": "Very Short Response",
+                "description": "Triggers when counselor's response is very short (1-25 characters)",
+                "score": 2,
+                "emoji": "💬",
+                "message": "Your response was very brief. Consider providing more context.",
+                "branchInstruction": "I wish you could elaborate more on that.",
+                "visibilityType": "ACTIVE",
+                "detectionType": "HELPER_UTTERANCE_LENGTH",
+                "feedbackStatus": True,
+                "data": {
+                    "minUtteranceLength": 1,
+                    "maxUtteranceLength": 25,
+                },
+            },
+            {
+                "id": "utterance-length-51-100",
+                "name": "Medium-Short Response",
+                "description": "Triggers when counselor's response is medium-short (51-100 characters)",
+                "score": 5,
+                "emoji": "✅",
+                "message": "Good response length! You're providing adequate detail.",
+                "branchInstruction": "That makes sense, tell me more.",
+                "visibilityType": "ACTIVE",
+                "detectionType": "HELPER_UTTERANCE_LENGTH",
+                "feedbackStatus": True,
+                "data": {
+                    "minUtteranceLength": 51,
+                    "maxUtteranceLength": 100,
+                },
+            },
         ],
         "triggerEvents": [
             "open-ended-question",
@@ -143,6 +178,8 @@ SCENARIO_SAMPLE = {
             "comb-score-lte-0_and_open-ended-question",
             "warm-greeting",
             "time-based-event-10s",
+            "utterance-length-1-25",
+            "utterance-length-51-100",
         ],
         "autoTerminationEvents": [
             {

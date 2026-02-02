@@ -210,7 +210,7 @@ class TestInterruptionEventFactory:
                 {
                     "id": "utterance-length-1",
                     "detectionType": "HELPER_UTTERANCE_LENGTH",
-                    "data": {"min_length": 1, "max_length": 25},
+                    "data": {"minUtteranceLength": 1, "maxUtteranceLength": 25},
                 },
             ]
         }
