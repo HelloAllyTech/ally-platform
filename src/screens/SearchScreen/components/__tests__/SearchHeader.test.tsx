@@ -13,6 +13,10 @@ jest.mock('@/hooks', () => ({
   }),
 }));
 
+jest.mock('@/components', () => ({
+  TabScreenHeader: jest.fn(({rightContent}) => rightContent),
+}));
+
 describe('SearchHeader', () => {
   it('renders title and subtitle with translations', () => {
     const {getByText} = render(<SearchHeader isFocused={false} />);

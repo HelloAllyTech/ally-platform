@@ -187,8 +187,6 @@ export const SimulationsScreen: React.FC = () => {
         subtitle={t('Simulations.header.subtitle')}
         italicSubtitle
         rightContent={renderCreditsDisplay()}
-        containerStyle={styles.brandHeader}
-        showBorder={false}
       />
     );
   };
@@ -332,12 +330,6 @@ const styles = ScaledSheet.create({
     ...fontFamily.REPLAY_PRO.BOLD,
     fontWeight: fontWeights.medium,
     color: colors.azureBlue,
-  },
-  brandHeader: {
-    paddingTop: '18@ms',
-    paddingBottom: '8@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
   },
   creditDisplay: {
     flexDirection: 'row',
