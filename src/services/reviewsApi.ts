@@ -72,6 +72,7 @@ export const reviewsApi = api.injectEndpoints({
           content,
         },
       }),
+      invalidatesTags: ['ReviewDetails', 'ReviewMessages'],
     }),
     getMessages: builder.query<GetMessagesResponse, GetMessagesRequest>({
       query: ({reviewId, offset, limit, sortOrder, sortBy}) => {
@@ -86,6 +87,7 @@ export const reviewsApi = api.injectEndpoints({
           },
         };
       },
+      providesTags: ['ReviewMessages'],
     }),
     getThreadComments: builder.query<
       GetThreadCommentsResponse,
@@ -116,6 +118,7 @@ export const reviewsApi = api.injectEndpoints({
         url: API_ROUTES.REVIEWS.REVIEW_BY_ID(reviewId),
         method: API_METHODS.GET,
       }),
+      providesTags: ['ReviewDetails'],
     }),
     updateCommentVisibility: builder.mutation<
       {success: boolean},
