@@ -7,6 +7,10 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string) => key,
   }),
+  useTabScreenHeader: () => ({
+    showHamburger: false,
+    handleOpenDrawer: jest.fn(),
+  }),
 }));
 
 describe('SearchHeader', () => {

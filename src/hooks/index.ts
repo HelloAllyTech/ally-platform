@@ -25,6 +25,7 @@ export * from './useStartSimulation';
 export * from './useStoragePermissions';
 export * from './useSummaryState';
 export * from './useTabBackToHomeHandler';
+export * from './useTabScreenHeader';
 export * from './useTranslate';
 export * from './useUser';
 export * from './useProfileImage';

@@ -101,6 +101,13 @@ jest.mock('@/components', () => {
       </TouchableOpacity>
     ),
     BadgePopup: () => <View testID="badge-popup" />,
+    TabScreenHeader: ({title, subtitle, rightContent}: any) => (
+      <View testID="tab-screen-header">
+        <Text>{title}</Text>
+        {subtitle && <Text>{subtitle}</Text>}
+        {rightContent}
+      </View>
+    ),
   };
 });
 

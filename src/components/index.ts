@@ -44,6 +44,7 @@ export {DropdownMenu} from './DropdownMenu';
 export {EmptyState} from './EmptyState';
 export {FeedbackPopup} from './FeedbackPopup';
 export {TabView} from './TabView';
+export {TabScreenHeader} from './TabScreenHeader';
 export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';

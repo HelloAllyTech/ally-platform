@@ -1,15 +1,15 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
-import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyReviewIcon} from '@/assets';
-import {EmptyState, TabView, useToast} from '@/components';
+import {EmptyState, TabScreenHeader, TabView, useToast} from '@/components';
 import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {colors} from '@/theme';
 
 import {ReviewCard} from './components';
 
@@ -71,9 +71,7 @@ export const ReviewScreen: React.FC = () => {
         styles.container,
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>{t('Review.header.title')} </Text>
-      </View>
+      <TabScreenHeader title={t('Review.header.title')} />
       <View style={styles.contentContainer}>
         <View style={styles.tabContainer}>
           <TabView
@@ -137,20 +135,6 @@ const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-  titleContainer: {
-    width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray7,
-    marginTop: '16@s',
-    paddingVertical: '8@s',
-    paddingHorizontal: '24@s',
-  },
-  title: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.ds.typography.highEmphasis,
-    ...typography.display.small,
-    fontWeight: fontWeights.medium,
-  },
   contentContainer: {
     flex: 1,
     backgroundColor: colors.lightGray9,
@@ -168,15 +152,6 @@ const styles = ScaledSheet.create({
 
   itemSeparator: {
     height: '8@s',
-  },
-  tabMargin: {
-    marginVertical: '16@ms',
-  },
-  emptyText: {
-    ...fontFamily.REPLAY_PRO.BOLD,
-    color: colors.ds.typography.lowEmphasis,
-    ...typography.body.medium,
-    fontWeight: fontWeights.medium,
   },
   footerContainer: {
     paddingVertical: '16@s',

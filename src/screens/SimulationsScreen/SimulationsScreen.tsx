@@ -7,30 +7,23 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import {Trans, useTranslation} from 'react-i18next';
-import {
-  BackHandler,
-  FlatList,
-  RefreshControl,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {BackHandler, FlatList, RefreshControl, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
-import {BoltIcon, DrawerMenuIcon} from '@/assets';
+import {BoltIcon} from '@/assets';
 import {
   BadgePopup,
   CircularProgress,
   SimulationCard,
   SimulationsSkeleton,
+  TabScreenHeader,
   TabView,
 } from '@/components';
 import {isIOS, SCREEN_NAMES, SimulationTabs} from '@/constants';
 import {
   useAppNavigation,
-  useDrawerNavigation,
   useHardwareBackPressHandler,
   useSimulationCredits,
 } from '@/hooks';
@@ -44,7 +37,6 @@ import {getTriggerWarningNames} from '@/utils';
 export const SimulationsScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
-  const drawerNavigation = useDrawerNavigation();
   const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
   const route = useRoute();
   const isFocused = useIsFocused();
@@ -91,10 +83,6 @@ export const SimulationsScreen: React.FC = () => {
       return false;
     }, [isFocused, isFirstTab, permissions, tabNavigation]),
   );
-
-  const handleOpenDrawer = useCallback(() => {
-    drawerNavigation.openDrawer();
-  }, [drawerNavigation]);
 
   const handleScenarioPress = (scenario: Scenario) => {
     navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario});
@@ -174,42 +162,34 @@ export const SimulationsScreen: React.FC = () => {
     [activeTab],
   );
 
+  const renderCreditsDisplay = () => {
+    if (!credits || !getCreditsInfo) return null;
+
+    return (
+      <View style={styles.creditDisplay}>
+        <BoltIcon width={14} height={14} />
+        <Text
+          style={[
+            styles.creditText,
+            getCreditsInfo.isLow && styles.creditTextLow,
+          ]}>
+          {credits.consumedCredits}
+          <Text style={styles.creditLimitText}>/{credits.creditLimit}</Text>
+        </Text>
+      </View>
+    );
+  };
+
   const renderHeader = () => {
     return (
-      <>
-        <View style={styles.brandHeader}>
-          <View style={styles.leftGroup}>
-            {isFirstTab && (
-              <TouchableOpacity
-                style={styles.hamburgerButton}
-                onPress={handleOpenDrawer}>
-                <DrawerMenuIcon />
-              </TouchableOpacity>
-            )}
-            <Text style={styles.brandTitle}>
-              {t('Simulations.header.title')}{' '}
-              <Text style={styles.brandTitleItalic}>
-                {t('Simulations.header.subtitle')}
-              </Text>
-            </Text>
-          </View>
-          {credits && getCreditsInfo && (
-            <View style={styles.creditDisplay}>
-              <BoltIcon width={14} height={14} />
-              <Text
-                style={[
-                  styles.creditText,
-                  getCreditsInfo.isLow && styles.creditTextLow,
-                ]}>
-                {credits.consumedCredits}
-                <Text style={styles.creditLimitText}>
-                  /{credits.creditLimit}
-                </Text>
-              </Text>
-            </View>
-          )}
-        </View>
-      </>
+      <TabScreenHeader
+        title={t('Simulations.header.title')}
+        subtitle={t('Simulations.header.subtitle')}
+        italicSubtitle
+        rightContent={renderCreditsDisplay()}
+        containerStyle={styles.brandHeader}
+        showBorder={false}
+      />
     );
   };
 
@@ -354,35 +334,10 @@ const styles = ScaledSheet.create({
     color: colors.azureBlue,
   },
   brandHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     paddingTop: '18@ms',
     paddingBottom: '8@ms',
-    paddingHorizontal: '24@ms',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.lightGray5,
-  },
-  leftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: '12@ms',
-  },
-  hamburgerButton: {
-    padding: '8@ms',
-  },
-  brandTitle: {
-    flex: 1,
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    ...typography.display.small,
-    fontWeight: fontWeights.light,
-    color: colors.darkGray2,
-  },
-  brandTitleItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontWeight: fontWeights.light,
-    fontStyle: isIOS ? 'italic' : 'normal',
   },
   creditDisplay: {
     flexDirection: 'row',

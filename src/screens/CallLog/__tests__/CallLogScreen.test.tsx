@@ -8,8 +8,19 @@ jest.mock('@/store/slices/summarySlice', () => ({
 // Constants mock
 jest.mock('@/constants', () => ({
   START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
+  TAB_PERMISSIONS: [
+    'view:call:logs',
+    'view:scenario-session',
+    'edit:scenario-session',
+    'view:reviews',
+    'view:analytics-dashboard',
+    'view:community-leaderboard',
+    'view:reference-document',
+    'view:community',
+  ],
+  MICROPHONE_PERMISSION: 'android.permission.RECORD_AUDIO',
   LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
-  SCREEN_NAMES: { LISTENING: 'Listening' },
+  SCREEN_NAMES: { LISTENING: 'Listening', CALL_LOG: 'CallLog', SEARCH: 'Search' },
   CHAT_TYPES: { 
     EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
     MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
@@ -129,23 +140,6 @@ jest.mock('react-native-permissions', () => ({
 
 // Linking
 jest.mock('react-native/Libraries/Linking/Linking', () => ({ openURL: jest.fn() }));
-
-// Constants
-jest.mock('@/constants', () => ({
-  START_CALL_PERMISSIONS: ['start:microphone-chat', 'start:cloud-telephony-chat'],
-  LogType: { REAL: 'REAL', SIMULATION: 'SIMULATION' },
-  SCREEN_NAMES: { LISTENING: 'Listening' },
-  CHAT_TYPES: { 
-    EXOTEL_CONFERENCE_CHAT: 'EXOTEL_CONFERENCE_CHAT', 
-    MICROPHONE_CHAT: 'MICROPHONE_CHAT' 
-  },
-  USER_PERMISSIONS: {
-    VIEW_CALL_LOGS: 'view:call:logs',
-    VIEW_SCENARIO_SESSION: 'view:scenario-session',
-    START_MICROPHONE_CHAT: 'start:microphone-chat',
-    START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat'
-  },
-}));
 
 describe('CallLogScreen', () => {
   it('renders empty state when no logs', () => {

@@ -28,6 +28,7 @@ import {
   MICROPHONE_PERMISSION,
   SCREEN_NAMES,
   START_CALL_PERMISSIONS,
+  TAB_PERMISSIONS,
   USER_PERMISSIONS,
 } from '@/constants';
 import {
@@ -117,10 +118,7 @@ export const CallLogScreen: React.FC = () => {
   const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
   const showFeatureUnavailable = useMemo(() => {
     return !permissions?.some(permission =>
-      [
-        USER_PERMISSIONS.VIEW_CALL_LOGS,
-        USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
-      ].includes(permission as USER_PERMISSIONS),
+      TAB_PERMISSIONS.includes(permission as USER_PERMISSIONS),
     );
   }, [permissions]);
 
@@ -430,7 +428,6 @@ export const CallLogScreen: React.FC = () => {
           search={search}
           onSearchChange={setSearch}
           showTitle={false}
-          showHamburger={isFirstTab}
           isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         />
         <FeatureNotAvailable
@@ -449,7 +446,6 @@ export const CallLogScreen: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
-        showHamburger={isFirstTab}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (

@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {BadgeIcon} from '@/assets/icons';
-import {TabView} from '@/components';
+import {BadgeIcon, DrawerMenuIcon} from '@/assets/icons';
+import {CustomDropdown} from '@/components';
 import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
 import {
   LEADERBOARD_FETCH_LIMIT,
@@ -25,8 +25,9 @@ import {
   LeaderboardEntryWithCurrentUser,
   useAppNavigation,
   useLeaderboard,
+  useTabScreenHeader,
 } from '@/hooks';
-import {colors, typography} from '@/theme';
+import {colors} from '@/theme';
 import {formatMinutesToDuration} from '@/utils';
 
 import {styles} from './styles';
@@ -35,13 +36,12 @@ export const LeaderboardScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-
-  // TODO: Replace with actual feature flag
-  const showRankColumn = true;
+  const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
 
   const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>(
     LeaderboardPeriod.LAST_WEEK,
   );
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Fetch leaderboard data using the hook
   const {
@@ -57,16 +57,18 @@ export const LeaderboardScreen: React.FC = () => {
     limit: LEADERBOARD_FETCH_LIMIT,
   });
 
+  const showRankColumn = !currentUserEntry?.hideRankInCommunity;
+
   const currentScrollOffsetY = useRef(0);
-  const flatListViewportHeight = useRef(0);
-  const leaderboardRowHeight = useRef(0);
+  const [flatListViewportHeight, setFlatListViewportHeight] = useState(0);
+  const [leaderboardRowHeight, setLeaderboardRowHeight] = useState(0);
 
   // Controls visibility of sticky footer showing current user's row
   const [shouldShowStickyFooter, setShouldShowStickyFooter] = useState(false);
 
   // Calculate current user position based on index in the list
   const currentUserPosition = useMemo(() => {
-    if (!currentUserEntry || !leaderboardRowHeight.current) {
+    if (!currentUserEntry || !leaderboardRowHeight) {
       return 0;
     }
     // Find the index of current user in leaderboardData
@@ -74,8 +76,8 @@ export const LeaderboardScreen: React.FC = () => {
       entry => entry.userId === currentUserEntry.userId,
     );
     if (currentUserIndex === -1) return 0;
-    return currentUserIndex * leaderboardRowHeight.current;
-  }, [currentUserEntry, leaderboardData]);
+    return currentUserIndex * leaderboardRowHeight;
+  }, [currentUserEntry, leaderboardData, leaderboardRowHeight]);
 
   const handleBadgePress = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.ACHIEVEMENTS);
@@ -86,23 +88,28 @@ export const LeaderboardScreen: React.FC = () => {
     (scrollOffsetY: number) => {
       if (
         !currentUserEntry ||
-        !leaderboardRowHeight.current ||
-        !flatListViewportHeight.current
+        !leaderboardRowHeight ||
+        !flatListViewportHeight
       ) {
         return false;
       }
 
-      const viewportBottom = scrollOffsetY + flatListViewportHeight.current;
+      const viewportBottom = scrollOffsetY + flatListViewportHeight;
       const currentUserRowTop = currentUserPosition;
 
       // Show sticky footer ONLY if current user row is below the viewport
       // (not yet scrolled to, still ahead)
       return currentUserRowTop > viewportBottom;
     },
-    [currentUserEntry, currentUserPosition],
+    [
+      currentUserEntry,
+      currentUserPosition,
+      leaderboardRowHeight,
+      flatListViewportHeight,
+    ],
   );
 
-  // Calculate initial sticky footer visibility when data loads
+  // Calculate initial sticky footer visibility when data loads or measurements become ready
   useEffect(() => {
     const isRowBelowViewport = calculateStickyFooterVisibility(
       currentScrollOffsetY.current,
@@ -143,8 +150,8 @@ export const LeaderboardScreen: React.FC = () => {
           const rowHeight = e.nativeEvent.layout.height;
 
           // Measure full row height (including separator) for scroll calculations
-          if (!leaderboardRowHeight.current && !isHighlighted) {
-            leaderboardRowHeight.current = rowHeight;
+          if (!leaderboardRowHeight && !isHighlighted) {
+            setLeaderboardRowHeight(rowHeight);
           }
         }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
@@ -208,22 +215,96 @@ export const LeaderboardScreen: React.FC = () => {
     );
   };
 
+  // Map period to display label
+  const getPeriodLabel = useCallback(
+    (period: LeaderboardPeriod): string => {
+      switch (period) {
+        case LeaderboardPeriod.LAST_WEEK:
+          return t('Leaderboard.period.last7Days');
+        case LeaderboardPeriod.LAST_MONTH:
+          return t('Leaderboard.period.last28Days');
+        case LeaderboardPeriod.LAST_YEAR:
+          return t('Leaderboard.period.last364Days');
+        case LeaderboardPeriod.ALL_TIME:
+          return t('Leaderboard.period.allTime');
+        default:
+          return '';
+      }
+    },
+    [t],
+  );
+
+  const periodOptions = useMemo(
+    () => [
+      LeaderboardPeriod.LAST_WEEK,
+      LeaderboardPeriod.LAST_MONTH,
+      LeaderboardPeriod.LAST_YEAR,
+      LeaderboardPeriod.ALL_TIME,
+    ],
+    [],
+  );
+
+  const handlePeriodSelect = useCallback((value: string) => {
+    setActivePeriod(value as LeaderboardPeriod);
+  }, []);
+
+  const handleDropdownSelect = useCallback(
+    (label: string) => {
+      const period = periodOptions.find(p => getPeriodLabel(p) === label);
+      if (period) {
+        handlePeriodSelect(period);
+      }
+    },
+    [periodOptions, getPeriodLabel, handlePeriodSelect],
+  );
+
+  const dropdownOptions = useMemo(
+    () => periodOptions.map(getPeriodLabel),
+    [periodOptions, getPeriodLabel],
+  );
+
   const renderHeader = () => {
     return (
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.title}>{t('Leaderboard.title')}</Text>
+      <>
+        {/* Top row: Community title + Badges button */}
+        <View style={styles.topHeader}>
+          <View style={styles.topHeaderLeft}>
+            {showHamburger && (
+              <TouchableOpacity
+                style={styles.hamburgerButton}
+                onPress={handleOpenDrawer}>
+                <DrawerMenuIcon />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.communityTitle}>{t('Common.community')}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.badgeButton}
+            onPress={handleBadgePress}
+            hitSlop={DEFAULT_HIT_SLOP}>
+            <BadgeIcon width={20} height={20} />
+            <Text style={styles.badgeCount}>
+              {currentUserEntry?.badgeCount ?? ''} {t('Leaderboard.badges')}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.badgeButton}
-          onPress={handleBadgePress}
-          hitSlop={DEFAULT_HIT_SLOP}>
-          <BadgeIcon width={16} height={16} />
-          <Text style={styles.badgeCount}>
-            {currentUserEntry?.badgeCount ?? 0} {t('Leaderboard.badges')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+
+        {/* Second row: Leaderboard title + Dropdown */}
+        <View style={styles.leaderboardHeader}>
+          <Text style={styles.title}>{t('Leaderboard.title')}</Text>
+          <View style={styles.dropdownWrapper}>
+            <CustomDropdown
+              value={getPeriodLabel(activePeriod)}
+              options={dropdownOptions}
+              onSelect={handleDropdownSelect}
+              isOpen={isDropdownOpen}
+              setIsOpen={setIsDropdownOpen}
+              customHeaderStyle={styles.dropdownHeader}
+              customTextStyle={styles.dropdownText}
+            />
+          </View>
+        </View>
+      </>
     );
   };
 
@@ -280,31 +361,6 @@ export const LeaderboardScreen: React.FC = () => {
     <View style={[styles.container, {paddingTop: insets.top}]}>
       {renderHeader()}
       <View style={styles.listContainer}>
-        <View style={styles.tabContainer}>
-          <TabView
-            tabs={[
-              {
-                key: LeaderboardPeriod.LAST_WEEK,
-                label: `7 ${t('Leaderboard.period.days')}`,
-              },
-              {
-                key: LeaderboardPeriod.LAST_MONTH,
-                label: `28 ${t('Leaderboard.period.days')}`,
-              },
-              {
-                key: LeaderboardPeriod.LAST_YEAR,
-                label: `365 ${t('Leaderboard.period.days')}`,
-              },
-              {
-                key: LeaderboardPeriod.ALL_TIME,
-                label: t('Leaderboard.period.allTime'),
-              },
-            ]}
-            activeTab={activePeriod}
-            onTabChange={setActivePeriod}
-            labelTextStyle={typography.body.tiny}
-          />
-        </View>
         {renderTableHeader()}
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -325,7 +381,7 @@ export const LeaderboardScreen: React.FC = () => {
               onScroll={handleScroll}
               scrollEventThrottle={16}
               onLayout={e => {
-                flatListViewportHeight.current = e.nativeEvent.layout.height;
+                setFlatListViewportHeight(e.nativeEvent.layout.height);
               }}
               refreshControl={
                 <RefreshControl
@@ -349,7 +405,8 @@ export const LeaderboardScreen: React.FC = () => {
               }
             />
 
-            {shouldShowStickyFooter &&
+            {showRankColumn &&
+              shouldShowStickyFooter &&
               !!leaderboardData.length &&
               !!currentUserEntry?.rank && (
                 <View style={styles.stickyFooter}>
