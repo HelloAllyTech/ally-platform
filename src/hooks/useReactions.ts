@@ -1,9 +1,6 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 
-import {
-  EMOJI_UNICODE_MAP,
-  getAvailableUnicodeValues,
-} from '@/components/EmojiPicker/utils';
+import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
 import {
   Reaction,
   useLazyGetReactionsCountQuery,
@@ -29,8 +26,6 @@ export const useReactions = (reviewId: string | number | null) => {
   const [getReactions, {isLoading, isFetching}] = useLazyGetReactionsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
 
-  const availableReactions = useMemo(() => getAvailableUnicodeValues(), []);
-
   const fetchReactionsCount = useCallback(async () => {
     if (!reviewId) return;
 
@@ -47,18 +42,19 @@ export const useReactions = (reviewId: string | number | null) => {
       setTotalCount(total);
 
       // Build summary from count API response
-      const summaryList: ReactionSummary[] = availableReactions
+      // Include ALL reactions from backend (including legacy ones like popper)
+      const summaryList: ReactionSummary[] = Object.keys(reactionCounts)
+        .filter(unicode => reactionCounts[unicode] > 0)
         .map(unicode => ({
           reaction: unicode,
-          count: reactionCounts[unicode] || 0,
-          emoji: EMOJI_UNICODE_MAP[unicode],
+          count: reactionCounts[unicode],
+          emoji: EMOJI_UNICODE_MAP[unicode.toLowerCase()] || unicode,
         }))
-        .filter(item => item.count > 0)
         .sort((a, b) => b.count - a.count);
 
       setSummary(summaryList);
     }
-  }, [reviewId, getReactionsCount, availableReactions]);
+  }, [reviewId, getReactionsCount]);
 
   const fetchReactions = useCallback(
     async (currentOffset: number, reactionFilter?: string | null) => {
