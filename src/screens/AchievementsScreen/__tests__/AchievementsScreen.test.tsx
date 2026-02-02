@@ -1,7 +1,11 @@
 import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
+import {Provider} from 'react-redux';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {configureStore} from '@reduxjs/toolkit';
 import {BadgeCategory, LockStatus, ViewedStatus} from '@/constants/badges';
+import {USER_PERMISSIONS} from '@/constants/permissions';
+import userReducer from '@/store/slices/userSlice';
 
 // Mock services before importing the component
 jest.mock('@/services', () => ({
@@ -399,17 +403,38 @@ jest.mock('@/components', () => ({
   },
 }));
 
-// Mock safe area context
-const renderWithSafeArea = (ui: React.ReactElement) =>
-  render(
-    <SafeAreaProvider
-      initialMetrics={{
-        frame: {x: 0, y: 0, width: 375, height: 812},
-        insets: {top: 0, bottom: 0, left: 0, right: 0},
-      }}>
-      {ui}
-    </SafeAreaProvider>,
+// Create a mock store with permissions
+const createMockStore = (permissions: string[] = [USER_PERMISSIONS.VIEW_USER_BADGES]) => {
+  return configureStore({
+    reducer: {
+      user: userReducer,
+    },
+    preloadedState: {
+      user: {
+        isAuthenticated: true,
+        user: null,
+        loading: false,
+        permissions,
+      },
+    },
+  });
+};
+
+// Mock safe area context with Redux Provider
+const renderWithSafeArea = (ui: React.ReactElement, permissions?: string[]) => {
+  const store = createMockStore(permissions);
+  return render(
+    <Provider store={store}>
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: {x: 0, y: 0, width: 375, height: 812},
+          insets: {top: 0, bottom: 0, left: 0, right: 0},
+        }}>
+        {ui}
+      </SafeAreaProvider>
+    </Provider>,
   );
+};
 
 describe('AchievementsScreen', () => {
   beforeEach(() => {
