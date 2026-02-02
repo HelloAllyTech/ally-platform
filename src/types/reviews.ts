@@ -156,6 +156,7 @@ export interface ThreadsResponse {
 export interface Thread {
   id: string;
   comments: MessageThreadComment[];
+  commentCount: number;
   selection: Record<string, unknown>;
   createdBy: {
     id: number;
