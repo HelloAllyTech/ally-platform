@@ -83,7 +83,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       }
 
       const firstComment = thread.comments[0];
-      const remainingCount = thread.comments.length - 1;
+      const remainingCount = thread.commentCount - 1 || 0;
       const reactionsArray = getReactionsArray(firstComment.reactions);
       const reactionCount = getTotalReactionCount(firstComment.reactions);
 
