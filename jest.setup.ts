@@ -322,3 +322,12 @@ jest.mock('@react-native-community/netinfo', () => ({
   addEventListener: jest.fn(),
   removeEventListener: jest.fn(),
 }));
+
+// Mock drawer navigation for useTabScreenHeader
+jest.mock('@/hooks/useDrawerNavigation', () => ({
+  useDrawerNavigation: jest.fn(() => ({
+    openDrawer: jest.fn(),
+    closeDrawer: jest.fn(),
+    toggleDrawer: jest.fn(),
+  })),
+}));

@@ -9,13 +9,17 @@ jest.mock('@/hooks', () => ({
     tVariable: (key: string) => key,
   }),
   useTabBackToHomeHandler: () => {},
-  useUser: () => ({ userData: { id: 1 }, isAuthenticated: true }),
+  useUser: () => ({userData: {id: 1}, isAuthenticated: true}),
+  useTabScreenHeader: () => ({
+    showHamburger: false,
+    handleOpenDrawer: jest.fn(),
+  }),
 }));
 
 // Mock components used inside the screen to isolate behavior
 jest.mock('@/components', () => {
   const React = require('react');
-  const {View} = require('react-native');
+  const {View, Text} = require('react-native');
   return {
     DateSelector: ({dateRange}: any) => (
       <View testID="date-selector" accessibilityLabel={JSON.stringify(dateRange)} />
@@ -23,6 +27,12 @@ jest.mock('@/components', () => {
     LoadingSkeleton: () => <View testID="loading-skeleton" />,
     EmptyState: () => <View testID="empty-state" />,
     TabView: () => <View testID="tab-view" />,
+    TabScreenHeader: ({title, subtitle}: any) => (
+      <View testID="tab-screen-header">
+        <Text>{title}</Text>
+        {subtitle && <Text>{subtitle}</Text>}
+      </View>
+    ),
   };
 });
 
