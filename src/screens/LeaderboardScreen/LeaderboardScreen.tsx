@@ -61,15 +61,15 @@ export const LeaderboardScreen: React.FC = () => {
   });
 
   const currentScrollOffsetY = useRef(0);
-  const flatListViewportHeight = useRef(0);
-  const leaderboardRowHeight = useRef(0);
+  const [flatListViewportHeight, setFlatListViewportHeight] = useState(0);
+  const [leaderboardRowHeight, setLeaderboardRowHeight] = useState(0);
 
   // Controls visibility of sticky footer showing current user's row
   const [shouldShowStickyFooter, setShouldShowStickyFooter] = useState(false);
 
   // Calculate current user position based on index in the list
   const currentUserPosition = useMemo(() => {
-    if (!currentUserEntry || !leaderboardRowHeight.current) {
+    if (!currentUserEntry || !leaderboardRowHeight) {
       return 0;
     }
     // Find the index of current user in leaderboardData
@@ -77,8 +77,8 @@ export const LeaderboardScreen: React.FC = () => {
       entry => entry.userId === currentUserEntry.userId,
     );
     if (currentUserIndex === -1) return 0;
-    return currentUserIndex * leaderboardRowHeight.current;
-  }, [currentUserEntry, leaderboardData]);
+    return currentUserIndex * leaderboardRowHeight;
+  }, [currentUserEntry, leaderboardData, leaderboardRowHeight]);
 
   const handleBadgePress = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.ACHIEVEMENTS);
@@ -89,23 +89,28 @@ export const LeaderboardScreen: React.FC = () => {
     (scrollOffsetY: number) => {
       if (
         !currentUserEntry ||
-        !leaderboardRowHeight.current ||
-        !flatListViewportHeight.current
+        !leaderboardRowHeight ||
+        !flatListViewportHeight
       ) {
         return false;
       }
 
-      const viewportBottom = scrollOffsetY + flatListViewportHeight.current;
+      const viewportBottom = scrollOffsetY + flatListViewportHeight;
       const currentUserRowTop = currentUserPosition;
 
       // Show sticky footer ONLY if current user row is below the viewport
       // (not yet scrolled to, still ahead)
       return currentUserRowTop > viewportBottom;
     },
-    [currentUserEntry, currentUserPosition],
+    [
+      currentUserEntry,
+      currentUserPosition,
+      leaderboardRowHeight,
+      flatListViewportHeight,
+    ],
   );
 
-  // Calculate initial sticky footer visibility when data loads
+  // Calculate initial sticky footer visibility when data loads or measurements become ready
   useEffect(() => {
     const isRowBelowViewport = calculateStickyFooterVisibility(
       currentScrollOffsetY.current,
@@ -146,8 +151,8 @@ export const LeaderboardScreen: React.FC = () => {
           const rowHeight = e.nativeEvent.layout.height;
 
           // Measure full row height (including separator) for scroll calculations
-          if (!leaderboardRowHeight.current && !isHighlighted) {
-            leaderboardRowHeight.current = rowHeight;
+          if (!leaderboardRowHeight && !isHighlighted) {
+            setLeaderboardRowHeight(rowHeight);
           }
         }}
         style={[styles.leaderboardRow, isHighlighted && styles.highlightedRow]}>
@@ -379,7 +384,7 @@ export const LeaderboardScreen: React.FC = () => {
               onScroll={handleScroll}
               scrollEventThrottle={16}
               onLayout={e => {
-                flatListViewportHeight.current = e.nativeEvent.layout.height;
+                setFlatListViewportHeight(e.nativeEvent.layout.height);
               }}
               refreshControl={
                 <RefreshControl
