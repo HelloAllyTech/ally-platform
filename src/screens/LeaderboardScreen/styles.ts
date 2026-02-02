@@ -17,6 +17,14 @@ export const styles = ScaledSheet.create({
     borderBottomWidth: '0.5@ms',
     borderBottomColor: colors.ds.stroke.primary,
   },
+  topHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '12@ms',
+  },
+  hamburgerButton: {
+    padding: '4@ms',
+  },
   communityTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
     fontSize: '18@ms',

@@ -1,42 +1,79 @@
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
-import {TouchableOpacity} from 'react-native';
+import {Text, View} from 'react-native';
 
 import {CallLogHeader} from '@/screens/CallLog/components/CallLogHeader/CallLogHeader';
 
-jest.mock('@/assets/icons', () => ({ DrawerMenuIcon: () => null, ReplayIcon: () => null }));
-jest.mock('@/constants/general', () => ({ isIOS: false }));
+jest.mock('@/assets/icons', () => ({ReplayIcon: () => null}));
 
-jest.mock('@/hooks', () => {
-  const mockOpenDrawer = jest.fn();
+jest.mock('@/hooks', () => ({
+  useTranslate: () => ({t: (k: string) => k}),
+}));
+
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {View, Text, TouchableOpacity} = require('react-native');
   return {
-    useTranslate: () => ({ t: (k: string) => k }),
-    useDrawerNavigation: () => ({ openDrawer: mockOpenDrawer }),
-    mockOpenDrawer,
+    TabScreenHeader: ({
+      title,
+      subtitle,
+      rightContent,
+    }: {
+      title: string;
+      subtitle?: string;
+      rightContent?: React.ReactNode;
+    }) => (
+      <View testID="tab-screen-header">
+        <TouchableOpacity testID="hamburger-button">
+          <Text>Menu</Text>
+        </TouchableOpacity>
+        <Text>{title}</Text>
+        {subtitle && <Text>{subtitle}</Text>}
+        {rightContent}
+      </View>
+    ),
   };
 });
 
 describe('CallLogHeader', () => {
-  it('opens drawer on hamburger press', () => {
-    const {UNSAFE_getAllByType} = render(
-      <CallLogHeader
-        search=""
-        onSearchChange={() => {}}
-        showHamburger={true}
-      />,
+  it('renders with title and subtitle', () => {
+    const {getByText} = render(
+      <CallLogHeader search="" onSearchChange={() => {}} />,
     );
-    const buttons = UNSAFE_getAllByType(TouchableOpacity);
-    fireEvent.press(buttons[0]);
-    const {mockOpenDrawer} = require('@/hooks');
-    expect(mockOpenDrawer).toHaveBeenCalled();
+    expect(getByText('CallLogs.header.title')).toBeTruthy();
+    expect(getByText('CallLogs.header.subtitle')).toBeTruthy();
+  });
+
+  it('renders TabScreenHeader component', () => {
+    const {getByTestId} = render(
+      <CallLogHeader search="" onSearchChange={() => {}} />,
+    );
+    expect(getByTestId('tab-screen-header')).toBeTruthy();
   });
 
   it('calls onRefresh when refresh is pressed', () => {
     const onRefresh = jest.fn();
     const {getByLabelText} = render(
-      <CallLogHeader search="" onSearchChange={() => {}} onRefresh={onRefresh} isFetching={false} />,
+      <CallLogHeader
+        search=""
+        onSearchChange={() => {}}
+        onRefresh={onRefresh}
+        isFetching={false}
+      />,
     );
     fireEvent.press(getByLabelText('Refresh'));
     expect(onRefresh).toHaveBeenCalled();
+  });
+
+  it('renders without title when showTitle is false', () => {
+    const {getByTestId, queryByText} = render(
+      <CallLogHeader
+        search=""
+        onSearchChange={() => {}}
+        showTitle={false}
+      />,
+    );
+    expect(getByTestId('tab-screen-header')).toBeTruthy();
+    expect(queryByText('CallLogs.header.title')).toBeNull();
   });
 });

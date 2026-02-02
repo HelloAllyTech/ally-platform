@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {BadgeIcon} from '@/assets/icons';
+import {BadgeIcon, DrawerMenuIcon} from '@/assets/icons';
 import {CustomDropdown} from '@/components';
 import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
 import {
@@ -25,6 +25,7 @@ import {
   LeaderboardEntryWithCurrentUser,
   useAppNavigation,
   useLeaderboard,
+  useTabScreenHeader,
 } from '@/hooks';
 import {colors} from '@/theme';
 import {formatMinutesToDuration} from '@/utils';
@@ -35,6 +36,7 @@ export const LeaderboardScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
+  const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
 
   // TODO: Replace with actual feature flag
   const showRankColumn = true;
@@ -262,7 +264,16 @@ export const LeaderboardScreen: React.FC = () => {
       <>
         {/* Top row: Community title + Badges button */}
         <View style={styles.topHeader}>
-          <Text style={styles.communityTitle}>{t('Common.community')}</Text>
+          <View style={styles.topHeaderLeft}>
+            {showHamburger && (
+              <TouchableOpacity
+                style={styles.hamburgerButton}
+                onPress={handleOpenDrawer}>
+                <DrawerMenuIcon />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.communityTitle}>{t('Common.community')}</Text>
+          </View>
           {!!currentUserEntry?.badgeCount && (
             <TouchableOpacity
               style={styles.badgeButton}

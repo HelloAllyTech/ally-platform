@@ -428,7 +428,6 @@ export const CallLogScreen: React.FC = () => {
           search={search}
           onSearchChange={setSearch}
           showTitle={false}
-          showHamburger={isFirstTab}
           isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         />
         <FeatureNotAvailable
@@ -447,7 +446,6 @@ export const CallLogScreen: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
-        showHamburger={isFirstTab}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
       />
       {availableLogTypes.length > 1 && (
