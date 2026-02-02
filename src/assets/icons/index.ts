@@ -7,6 +7,8 @@ import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BadgeIcon from './badgeIcon.svg';
+import BadgeActiveIcon from './badgesActive.svg';
+import BadgeInactiveIcon from './badgesInactive.svg';
 import BarsIcon from './bars.svg';
 import BlueWarningIcon from './blueWarning.svg';
 import BoltIcon from './bolt.svg';
@@ -142,7 +144,9 @@ export {
   ChevronRight,
   AssessmentIcon,
   BarsIcon,
+  BadgeActiveIcon,
   BadgeIcon,
+  BadgeInactiveIcon,
   BlueWarningIcon,
   BoltIcon,
   BrightnessAlertIcon,
