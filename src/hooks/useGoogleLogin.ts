@@ -9,7 +9,12 @@ import {showToast} from '@/components/Toast/ToastProvider';
 import {SCREEN_NAMES} from '@/constants/navigation';
 import {useAppNavigation} from '@/hooks';
 import {AuthResponse, useLoginWithGoogleMutation} from '@/services/authApi';
-import {isBackendApiError, isSuspendedUserError, logger} from '@/utils';
+import {
+  getErrorDetails,
+  isBackendApiError,
+  isSuspendedUserError,
+  logger,
+} from '@/utils';
 
 interface UseGoogleLoginProps {
   onLoginSuccess: (tokens: AuthResponse) => void;
@@ -36,7 +41,10 @@ export const useGoogleLogin = ({onLoginSuccess}: UseGoogleLoginProps) => {
           navigation.replace(SCREEN_NAMES.SUSPENDED_ACCOUNT);
           return;
         }
-        // Other backend API errors - silently fail for security reasons
+        const errorDetails = getErrorDetails(error);
+        const errorMessage =
+          errorDetails.message || 'Failed to sign in with Google';
+        showToast(errorMessage, 'error');
         logger.error(`Google Sign-In Backend Error: ${error}`);
         return;
       }
