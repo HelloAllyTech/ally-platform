@@ -11,6 +11,7 @@
     "back": "Back",
     "next": "Next",
     "finish": "Finish",
+    "community": "Community",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",
@@ -460,7 +461,7 @@
     "submitButton": "Submit"
   },
   "Leaderboard": {
-    "title": "Community",
+    "title": "Leaderboard",
     "badges": "Badges",
     "tableHeaders": {
       "rank": "Rank",
@@ -470,7 +471,10 @@
     },
     "period": {
       "days": "days",
-      "allTime": "All time"
+      "allTime": "All time",
+      "last7Days": "Last 7 days",
+      "last28Days": "Last 28 days",
+      "last364Days": "Last 364 days"
     },
     "emptyState": {
       "title": "No leaderboard data yet",
