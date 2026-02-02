@@ -23,6 +23,7 @@ export interface MyRankResponse {
   minutesPlayed: number;
   badgeCount: number;
   window: string;
+  hideRankInCommunity: boolean;
 }
 
 export interface LeaderboardQueryParams {
