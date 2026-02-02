@@ -5,7 +5,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {Message as MessageComponent} from '@/components/Message';
 import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {useTranslate} from '@/hooks';
-import {useAppSelector} from '@/store/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -26,6 +25,7 @@ export interface ConversationProps {
   hasMore?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  reviewOwnerName?: string;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -38,9 +38,9 @@ export const Conversation: React.FC<ConversationProps> = ({
   hasMore = false,
   onRefresh,
   isRefreshing = false,
+  reviewOwnerName,
 }) => {
   const {t} = useTranslate();
-  const userName = useAppSelector(state => state.user.user?.name);
 
   // only one active menu across list
   const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(
@@ -81,7 +81,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           setActiveMenuMessageId(id);
         }}
         onRequestClose={dismissAnyMenu}
-        prefixText={`${isAiClient ? 'AI Client:' : userName || t('CallTranscript.you')}:`}
+        prefixText={`${isAiClient ? 'AI Client:' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}
