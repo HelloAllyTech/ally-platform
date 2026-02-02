@@ -8,12 +8,15 @@ import {
   View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useSelector} from 'react-redux';
 
 import {InfoIcon, LeftArrowIcon} from '@/assets';
 import {InfoTooltip, TabView} from '@/components';
 import {BadgeCategory, LockStatus} from '@/constants';
+import {USER_PERMISSIONS} from '@/constants/permissions';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {useGetAvailableBadgesQuery} from '@/services';
+import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {BadgeCategoryGroup} from '@/types';
 import {BADGE_CATEGORY_MAP} from '@/utils';
@@ -38,7 +41,20 @@ export const AchievementsScreen: React.FC = () => {
   );
   const [showBadgesTooltip, setShowBadgesTooltip] = useState(false);
 
-  const {data: badgesResponse, isLoading, error} = useGetAvailableBadgesQuery();
+  const permissions = useSelector(
+    (state: AppRootState) => state.user.permissions,
+  );
+  const hasViewBadgesPermission = permissions.includes(
+    USER_PERMISSIONS.VIEW_USER_BADGES,
+  );
+
+  const {
+    data: badgesResponse,
+    isLoading,
+    error,
+  } = useGetAvailableBadgesQuery(undefined, {
+    skip: !hasViewBadgesPermission,
+  });
 
   useHardwareBackPressHandler(() => {
     handleGoBack();
