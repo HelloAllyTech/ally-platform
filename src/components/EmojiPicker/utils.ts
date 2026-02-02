@@ -6,18 +6,29 @@
  * - Multiple code points: '2764-FE0F' (for ❤️)
  */
 
+/**
+ * Complete emoji map including legacy emojis
+ * This map is used for displaying all reactions, including old ones
+ */
 export const EMOJI_UNICODE_MAP: Record<string, string> = {
   '1f44d': '👍',
   '2764-fe0f': '❤️',
   '1f604': '👏',
   '1f44f': '😄',
   '1f4a1': '💡',
-  '1f389': '🎉',
+  '1f44e': '👎',
+  '1f389': '🎉', // Legacy emoji - kept for displaying old reactions
 };
 
 /**
- * Get all available Unicode values
+ * Current platform emojis shown in the picker
+ * This excludes legacy emojis like the party popper
  */
-export const getAvailableUnicodeValues = (): string[] => {
-  return Object.keys(EMOJI_UNICODE_MAP);
-};
+export const PLATFORM_EMOJIS = [
+  '1f44d',
+  '2764-fe0f',
+  '1f604',
+  '1f44f',
+  '1f4a1',
+  '1f44e',
+];

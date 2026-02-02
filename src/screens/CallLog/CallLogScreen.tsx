@@ -526,7 +526,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   tabMargin: {
-    marginHorizontal: '20@ms',
+    marginHorizontal: '24@ms',
     marginVertical: '16@ms',
   },
   listContainer: {

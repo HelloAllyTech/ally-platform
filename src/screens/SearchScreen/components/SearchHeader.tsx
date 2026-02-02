@@ -1,4 +1,4 @@
-import {TouchableOpacity, View} from 'react-native';
+import {View} from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -6,14 +6,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {AllyLogoIcon, DrawerMenuIcon} from '@/assets/icons';
-import {isIOS} from '@/constants/general';
-import {useTabScreenHeader, useTranslate} from '@/hooks';
+import {AllyLogoIcon} from '@/assets/icons';
+import {TabScreenHeader} from '@/components';
+import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 
 export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
   const {t} = useTranslate();
-  const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
   const subHeaderStyle = useAnimatedStyle(() => {
     const opacity = interpolate(isFocused ? 1 : 0, [0, 1], [1, 0]);
     const translateY = interpolate(isFocused ? 1 : 0, [0, 1], [0, -10]);
@@ -28,47 +27,37 @@ export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
     };
   });
 
+  const renderCenterContent = () => (
+    <View style={styles.logoContainer}>
+      <AllyLogoIcon />
+      <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
+        {t('SearchScreen.header.subTitle')}
+      </Animated.Text>
+    </View>
+  );
+
   return (
     <View style={styles.headerContainer}>
-      {showHamburger && (
-        <TouchableOpacity
-          style={styles.hamburgerButton}
-          onPress={handleOpenDrawer}>
-          <DrawerMenuIcon />
-        </TouchableOpacity>
-      )}
-      <View style={styles.logoContainer}>
-        <AllyLogoIcon />
-        <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
-          {t('SearchScreen.header.subTitle')}
-        </Animated.Text>
-      </View>
+      <TabScreenHeader
+        title=""
+        rightContent={renderCenterContent()}
+        containerStyle={styles.tabHeaderContainer}
+        showBorder={false}
+      />
     </View>
   );
 };
 const styles = ScaledSheet.create({
   headerContainer: {
-    alignItems: 'center',
-    paddingHorizontal: '32@ms',
     marginTop: '80@mvs',
-    position: 'relative',
   },
-  hamburgerButton: {
-    position: 'absolute',
-    left: '16@ms',
-    top: 0,
-    padding: '4@ms',
-    zIndex: 1,
+  tabHeaderContainer: {
+    justifyContent: 'center',
+    paddingHorizontal: '32@ms',
   },
   logoContainer: {
     alignItems: 'center',
-  },
-  header: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontSize: '48@ms',
-    color: colors.black,
-    marginBottom: '12@vs',
-    fontStyle: isIOS ? 'italic' : 'normal',
+    flex: 1,
   },
   subHeader: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

@@ -1,36 +1,12 @@
 import {StyleSheet} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
-  },
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: '24@ms',
-    paddingVertical: '8@ms',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.primary,
-  },
-  topHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '12@ms',
-  },
-  hamburgerButton: {
-    padding: '4@ms',
-  },
-  communityTitle: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    fontSize: '18@ms',
-    lineHeight: '32@ms',
-    color: colors.ds.typography.highEmphasis,
-    fontWeight: '400',
   },
   badgeButton: {
     flexDirection: 'row',
@@ -194,7 +170,7 @@ export const styles = ScaledSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: '20@ms',
-    backgroundColor: colors.ds.grey[100],
+    backgroundColor: colors.ds.blue[50],
     justifyContent: 'center',
     alignItems: 'center',
     borderColor: colors.ds.stroke.primary,
@@ -268,5 +244,11 @@ export const styles = ScaledSheet.create({
   },
   marginL21: {
     marginLeft: '21@ms',
+  },
+  tooltipText: {
+    color: colors.ds.neutral.white,
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.regular,
   },
 });
