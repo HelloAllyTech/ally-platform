@@ -247,6 +247,7 @@ const styles = ScaledSheet.create({
     marginHorizontal: '24@s',
   },
   tabMargin: {
+    alignSelf: 'stretch',
     marginHorizontal: '24@ms',
     marginVertical: '16@ms',
   },
