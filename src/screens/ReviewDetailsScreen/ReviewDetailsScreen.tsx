@@ -426,6 +426,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         hasMore={hasMore}
         onRefresh={refreshMessages}
         isRefreshing={isFetching && offset === 0}
+        reviewOwnerName={reviewData?.createdBy?.name}
       />
       {/* Comment input bottom sheet */}
 
