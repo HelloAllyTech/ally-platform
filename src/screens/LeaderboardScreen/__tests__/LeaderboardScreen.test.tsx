@@ -16,11 +16,10 @@ jest.mock('react-i18next', () => ({
         'Leaderboard.tableHeaders.totalDuration': 'Duration',
         'Leaderboard.tableHeaders.badges': 'Badges',
         'Leaderboard.period.days': 'days',
-        'Leaderboard.period.last': 'Last',
-        'Leaderboard.period.week': 'Week',
-        'Leaderboard.period.month': 'Month',
-        'Leaderboard.period.year': 'Year',
-        'Leaderboard.period.allTime': 'All Time',
+        'Leaderboard.period.last7Days': 'Last 7 days',
+        'Leaderboard.period.last28Days': 'Last 28 days',
+        'Leaderboard.period.last364Days': 'Last 364 days',
+        'Leaderboard.period.allTime': 'All time',
       };
       return translations[key] || key;
     },
@@ -34,6 +33,10 @@ jest.mock('@/hooks', () => ({
   }),
   useTranslate: () => ({
     t: (key: string) => key,
+  }),
+  useTabScreenHeader: () => ({
+    showHamburger: false,
+    handleOpenDrawer: jest.fn(),
   }),
   useLeaderboard: () => ({
     data: [
@@ -77,19 +80,20 @@ jest.mock('@/hooks', () => ({
   }),
 }));
 
-// Mock TabView component
+// Mock CustomDropdown component
 jest.mock('@/components', () => {
   const React = require('react');
   const {View, Text, TouchableOpacity} = require('react-native');
   return {
-    TabView: ({tabs, activeTab, onTabChange}: any) => (
-      <View testID="tab-view">
-        {tabs.map((tab: any, index: number) => (
+    CustomDropdown: ({value, options, onSelect}: any) => (
+      <View testID="custom-dropdown">
+        <Text testID="dropdown-value">{value}</Text>
+        {options.map((option: string, index: number) => (
           <TouchableOpacity
-            key={tab.key}
-            testID={`tab-${tab.key}`}
-            onPress={() => onTabChange(tab.key)}>
-            <Text>{tab.label}</Text>
+            key={index}
+            testID={`dropdown-option-${index}`}
+            onPress={() => onSelect(option)}>
+            <Text>{option}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -127,12 +131,12 @@ describe('LeaderboardScreen', () => {
     expect(getByText('Badges')).toBeTruthy();
   });
 
-  it('renders period tabs', () => {
-    const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('7 days')).toBeTruthy();
-    expect(getByText('28 days')).toBeTruthy();
-    expect(getByText('365 days')).toBeTruthy();
-    expect(getByText('All Time')).toBeTruthy();
+  it('renders period dropdown', () => {
+    const {getAllByText} = renderWithSafeArea(<LeaderboardScreen />);
+    expect(getAllByText('Last 7 days').length).toBeGreaterThan(0);
+    expect(getAllByText('Last 28 days').length).toBeGreaterThan(0);
+    expect(getAllByText('Last 364 days').length).toBeGreaterThan(0);
+    expect(getAllByText('All time').length).toBeGreaterThan(0);
   });
 
   it('renders leaderboard entries', () => {
@@ -150,14 +154,15 @@ describe('LeaderboardScreen', () => {
 
   it('displays badge count in header', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText(/12 badges/)).toBeTruthy();
+    expect(getByText('12')).toBeTruthy();
   });
 
-  it('changes active period when tab is pressed', () => {
-    const {getByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthTab = getByText('28 days');
+  it('changes active period when dropdown option is selected', () => {
+    const {getAllByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
+    const monthOptions = getAllByText('Last 28 days');
+    const monthOption = monthOptions[0];
 
-    fireEvent.press(monthTab);
+    fireEvent.press(monthOption);
 
     // Re-render to see updated state
     rerender(
@@ -170,8 +175,8 @@ describe('LeaderboardScreen', () => {
       </SafeAreaProvider>,
     );
 
-    // Tab should still be visible
-    expect(getByText('28 days')).toBeTruthy();
+    // Option should still be visible
+    expect(getAllByText('Last 28 days').length).toBeGreaterThan(0);
   });
 
   it('renders rank badges for all entries', () => {

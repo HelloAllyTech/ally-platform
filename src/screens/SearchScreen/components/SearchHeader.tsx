@@ -1,4 +1,4 @@
-import {View} from 'react-native';
+import {TouchableOpacity, View} from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -6,13 +6,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {AllyLogoIcon} from '@/assets/icons';
+import {AllyLogoIcon, DrawerMenuIcon} from '@/assets/icons';
 import {isIOS} from '@/constants/general';
-import {useTranslate} from '@/hooks';
+import {useTabScreenHeader, useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 
 export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
   const {t} = useTranslate();
+  const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
   const subHeaderStyle = useAnimatedStyle(() => {
     const opacity = interpolate(isFocused ? 1 : 0, [0, 1], [1, 0]);
     const translateY = interpolate(isFocused ? 1 : 0, [0, 1], [0, -10]);
@@ -29,10 +30,19 @@ export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
 
   return (
     <View style={styles.headerContainer}>
-      <AllyLogoIcon />
-      <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
-        {t('SearchScreen.header.subTitle')}
-      </Animated.Text>
+      {showHamburger && (
+        <TouchableOpacity
+          style={styles.hamburgerButton}
+          onPress={handleOpenDrawer}>
+          <DrawerMenuIcon />
+        </TouchableOpacity>
+      )}
+      <View style={styles.logoContainer}>
+        <AllyLogoIcon />
+        <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
+          {t('SearchScreen.header.subTitle')}
+        </Animated.Text>
+      </View>
     </View>
   );
 };
@@ -41,6 +51,17 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     paddingHorizontal: '32@ms',
     marginTop: '80@mvs',
+    position: 'relative',
+  },
+  hamburgerButton: {
+    position: 'absolute',
+    left: '16@ms',
+    top: 0,
+    padding: '4@ms',
+    zIndex: 1,
+  },
+  logoContainer: {
+    alignItems: 'center',
   },
   header: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,

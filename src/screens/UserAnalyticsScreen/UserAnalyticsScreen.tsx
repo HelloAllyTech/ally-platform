@@ -5,17 +5,15 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import WebView from 'react-native-webview';
 
 import {DataUnavailableIcon} from '@/assets/icons';
-import {EmptyState, TabView} from '@/components';
+import {EmptyState, TabScreenHeader, TabView} from '@/components';
 import {AnalyticsType} from '@/constants/analytics';
-import {isIOS, SCREEN_WIDTH} from '@/constants/general';
+import {SCREEN_WIDTH} from '@/constants/general';
 import {useTabBackToHomeHandler, useTranslate, useUser} from '@/hooks';
 import {
   useGetDashboardsQuery,
   useLazyGetDashboardUrlQuery,
 } from '@/services/analyticsApi';
-import {colors} from '@/theme/colors';
-import {fontFamily} from '@/theme/fonts';
-import {fontWeights, typography} from '@/theme/typography';
+import {colors, fontFamily, typography} from '@/theme';
 
 export const UserAnalyticsScreen: React.FC = () => {
   const {t} = useTranslate();
@@ -119,14 +117,11 @@ export const UserAnalyticsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Show tabs only if both analytics types are present */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>
-          {t('Analytics.header.title')}{' '}
-          <Text style={styles.boldItalic}>
-            {t('Analytics.header.subtitle')}
-          </Text>
-        </Text>
-      </View>
+      <TabScreenHeader
+        title={t('Analytics.header.title')}
+        subtitle={t('Analytics.header.subtitle')}
+        containerStyle={styles.headerContainer}
+      />
       {!isLoadingDashboards && !dashboards?.length && (
         <View style={styles.emptyStateContainer}>
           <EmptyState
@@ -205,25 +200,8 @@ const styles = ScaledSheet.create({
     paddingBottom: '40@s',
     backgroundColor: colors.white,
   },
-  titleContainer: {
-    width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray7,
-    marginTop: '16@s',
+  headerContainer: {
     paddingBottom: '16@s',
-  },
-  title: {
-    ...fontFamily.REPLAY_PRO.HEADLINE,
-    color: colors.ds.typography.highEmphasis,
-    ...typography.display.small,
-    fontWeight: fontWeights.light,
-    marginLeft: '16@s',
-    textAlign: 'left',
-  },
-  boldItalic: {
-    ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
-    fontWeight: fontWeights.light,
-    fontStyle: isIOS ? 'italic' : 'normal',
   },
   content: {
     flex: 1,
