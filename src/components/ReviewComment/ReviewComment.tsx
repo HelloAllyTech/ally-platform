@@ -110,9 +110,11 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
         {/* Header: Name and Time */}
         <View style={styles.headerRow}>
           <View style={styles.nameTimeRow}>
-            <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
-              {name}
-            </Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+                {name}
+              </Text>
+            </View>
             <Text style={styles.timeAgo}>{time}</Text>
             {hidden && (
               <View style={styles.hiddenBadge}>
