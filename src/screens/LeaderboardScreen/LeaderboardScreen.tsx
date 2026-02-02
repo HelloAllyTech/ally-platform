@@ -38,9 +38,6 @@ export const LeaderboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
 
-  // TODO: Replace with actual feature flag
-  const showRankColumn = true;
-
   const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>(
     LeaderboardPeriod.LAST_WEEK,
   );
@@ -59,6 +56,8 @@ export const LeaderboardScreen: React.FC = () => {
     window: activePeriod,
     limit: LEADERBOARD_FETCH_LIMIT,
   });
+
+  const showRankColumn = !currentUserEntry?.hideRankInCommunity;
 
   const currentScrollOffsetY = useRef(0);
   const [flatListViewportHeight, setFlatListViewportHeight] = useState(0);
@@ -279,17 +278,15 @@ export const LeaderboardScreen: React.FC = () => {
             )}
             <Text style={styles.communityTitle}>{t('Common.community')}</Text>
           </View>
-          {!!currentUserEntry?.badgeCount && (
-            <TouchableOpacity
-              style={styles.badgeButton}
-              onPress={handleBadgePress}
-              hitSlop={DEFAULT_HIT_SLOP}>
-              <BadgeIcon width={20} height={20} />
-              <Text style={styles.badgeCount}>
-                {currentUserEntry.badgeCount} {t('Leaderboard.badges')}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.badgeButton}
+            onPress={handleBadgePress}
+            hitSlop={DEFAULT_HIT_SLOP}>
+            <BadgeIcon width={20} height={20} />
+            <Text style={styles.badgeCount}>
+              {currentUserEntry?.badgeCount ?? ''} {t('Leaderboard.badges')}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Second row: Leaderboard title + Dropdown */}
@@ -408,7 +405,8 @@ export const LeaderboardScreen: React.FC = () => {
               }
             />
 
-            {shouldShowStickyFooter &&
+            {showRankColumn &&
+              shouldShowStickyFooter &&
               !!leaderboardData.length &&
               !!currentUserEntry?.rank && (
                 <View style={styles.stickyFooter}>
