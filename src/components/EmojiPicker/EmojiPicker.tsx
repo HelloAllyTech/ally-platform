@@ -6,10 +6,7 @@ import {AddReactionIcon} from '@/assets/icons';
 import {colors} from '@/theme';
 
 import {EmojiPickerProps} from './types';
-import {EMOJI_UNICODE_MAP, getAvailableUnicodeValues} from './utils';
-
-// List of Unicode values
-const EMOJI_UNICODE_LIST = getAvailableUnicodeValues();
+import {EMOJI_UNICODE_MAP, PLATFORM_EMOJIS} from './utils';
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   selectedEmoji,
@@ -65,8 +62,8 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     const emojiButtonWidth = ms(36);
     const gap = ms(4);
     const totalWidth =
-      EMOJI_UNICODE_LIST.length * emojiButtonWidth +
-      (EMOJI_UNICODE_LIST.length - 1) * gap;
+      PLATFORM_EMOJIS.length * emojiButtonWidth +
+      (PLATFORM_EMOJIS.length - 1) * gap;
     const centerOffset = -totalWidth / 2;
 
     return [
@@ -125,7 +122,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
 
         {visible && (
           <Animated.View style={emojiContainerStyle}>
-            {EMOJI_UNICODE_LIST.map((unicode, idx) => {
+            {PLATFORM_EMOJIS.map((unicode, idx) => {
               const isSelected = currentEmoji === unicode;
               const emojiChar = EMOJI_UNICODE_MAP[unicode];
               return (
