@@ -98,6 +98,12 @@ jest.mock('@/components', () => {
         ))}
       </View>
     ),
+    TabScreenHeader: ({title, rightContent}: any) => (
+      <View testID="tab-screen-header">
+        <Text testID="header-title">{title}</Text>
+        {rightContent}
+      </View>
+    ),
   };
 });
 

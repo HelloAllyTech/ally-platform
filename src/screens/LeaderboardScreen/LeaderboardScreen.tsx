@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {BadgeIcon, DrawerMenuIcon} from '@/assets/icons';
-import {CustomDropdown} from '@/components';
+import {BadgeIcon} from '@/assets/icons';
+import {CustomDropdown, TabScreenHeader} from '@/components';
 import {DEFAULT_HIT_SLOP, SCREEN_NAMES} from '@/constants';
 import {
   LEADERBOARD_FETCH_LIMIT,
@@ -25,7 +25,6 @@ import {
   LeaderboardEntryWithCurrentUser,
   useAppNavigation,
   useLeaderboard,
-  useTabScreenHeader,
 } from '@/hooks';
 import {colors} from '@/theme';
 import {formatMinutesToDuration} from '@/utils';
@@ -36,7 +35,6 @@ export const LeaderboardScreen: React.FC = () => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
 
   const [activePeriod, setActivePeriod] = useState<LeaderboardPeriod>(
     LeaderboardPeriod.LAST_WEEK,
@@ -263,48 +261,36 @@ export const LeaderboardScreen: React.FC = () => {
     [periodOptions, getPeriodLabel],
   );
 
-  const renderHeader = () => {
+  const renderBadgesButton = () => {
     return (
-      <>
-        {/* Top row: Community title + Badges button */}
-        <View style={styles.topHeader}>
-          <View style={styles.topHeaderLeft}>
-            {showHamburger && (
-              <TouchableOpacity
-                style={styles.hamburgerButton}
-                onPress={handleOpenDrawer}>
-                <DrawerMenuIcon />
-              </TouchableOpacity>
-            )}
-            <Text style={styles.communityTitle}>{t('Common.community')}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.badgeButton}
-            onPress={handleBadgePress}
-            hitSlop={DEFAULT_HIT_SLOP}>
-            <BadgeIcon width={20} height={20} />
-            <Text style={styles.badgeCount}>
-              {currentUserEntry?.badgeCount ?? ''} {t('Leaderboard.badges')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <TouchableOpacity
+        style={styles.badgeButton}
+        onPress={handleBadgePress}
+        hitSlop={DEFAULT_HIT_SLOP}>
+        <BadgeIcon width={20} height={20} />
+        <Text style={styles.badgeCount}>
+          {currentUserEntry?.badgeCount ?? ''} {t('Leaderboard.badges')}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
-        {/* Second row: Leaderboard title + Dropdown */}
-        <View style={styles.leaderboardHeader}>
-          <Text style={styles.title}>{t('Leaderboard.title')}</Text>
-          <View style={styles.dropdownWrapper}>
-            <CustomDropdown
-              value={getPeriodLabel(activePeriod)}
-              options={dropdownOptions}
-              onSelect={handleDropdownSelect}
-              isOpen={isDropdownOpen}
-              setIsOpen={setIsDropdownOpen}
-              customHeaderStyle={styles.dropdownHeader}
-              customTextStyle={styles.dropdownText}
-            />
-          </View>
+  const renderLeaderboardHeader = () => {
+    return (
+      <View style={styles.leaderboardHeader}>
+        <Text style={styles.title}>{t('Leaderboard.title')}</Text>
+        <View style={styles.dropdownWrapper}>
+          <CustomDropdown
+            value={getPeriodLabel(activePeriod)}
+            options={dropdownOptions}
+            onSelect={handleDropdownSelect}
+            isOpen={isDropdownOpen}
+            setIsOpen={setIsDropdownOpen}
+            customHeaderStyle={styles.dropdownHeader}
+            customTextStyle={styles.dropdownText}
+          />
         </View>
-      </>
+      </View>
     );
   };
 
@@ -359,7 +345,11 @@ export const LeaderboardScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
-      {renderHeader()}
+      <TabScreenHeader
+        title={t('Common.community')}
+        rightContent={renderBadgesButton()}
+      />
+      {renderLeaderboardHeader()}
       <View style={styles.listContainer}>
         {renderTableHeader()}
         {isLoading ? (

@@ -120,7 +120,6 @@ export const UserAnalyticsScreen: React.FC = () => {
       <TabScreenHeader
         title={t('Analytics.header.title')}
         subtitle={t('Analytics.header.subtitle')}
-        containerStyle={styles.headerContainer}
       />
       {!isLoadingDashboards && !dashboards?.length && (
         <View style={styles.emptyStateContainer}>
@@ -200,9 +199,6 @@ const styles = ScaledSheet.create({
     paddingBottom: '40@s',
     backgroundColor: colors.white,
   },
-  headerContainer: {
-    paddingBottom: '16@s',
-  },
   content: {
     flex: 1,
     padding: '16@s',
@@ -251,7 +247,7 @@ const styles = ScaledSheet.create({
     marginHorizontal: '24@s',
   },
   tabMargin: {
-    width: '90%',
+    marginHorizontal: '24@ms',
     marginVertical: '16@ms',
   },
 });

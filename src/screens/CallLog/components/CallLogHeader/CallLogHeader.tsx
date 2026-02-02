@@ -5,7 +5,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {ReplayIcon} from '@/assets/icons';
 import {TabScreenHeader} from '@/components';
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme';
 
 interface CallLogHeaderProps {
   search: string;
@@ -58,14 +57,7 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   };
 
   if (!showTitle) {
-    return (
-      <TabScreenHeader
-        title=""
-        rightContent={renderRefreshButton()}
-        containerStyle={styles.headerRow}
-        showBorder={false}
-      />
-    );
+    return <TabScreenHeader title="" rightContent={renderRefreshButton()} />;
   }
 
   return (
@@ -74,20 +66,11 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
       subtitle={t('CallLogs.header.subtitle')}
       italicSubtitle
       rightContent={renderRefreshButton()}
-      containerStyle={styles.headerRow}
-      showBorder={false}
     />
   );
 };
 
 const styles = ScaledSheet.create({
-  headerRow: {
-    marginTop: '16@mvs',
-    paddingHorizontal: '20@ms',
-    paddingBottom: '16@ms',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.lightGray5,
-  },
   iconContainer: {
     width: 16,
     height: 16,
