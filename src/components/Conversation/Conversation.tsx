@@ -158,6 +158,7 @@ export const Conversation: React.FC<ConversationProps> = ({
 const styles = ScaledSheet.create({
   listContainer: {
     padding: '16@ms',
+    paddingBottom: '80@ms',
   },
   centered: {
     flex: 1,
