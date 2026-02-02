@@ -1,6 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -61,7 +61,11 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.small,
     color: colors.ds.typography.lowEmphasis,
-    marginRight: '16@ms',
+    marginRight: '8@ms',
+    alignItems: 'center',
+  },
+  tooltipIcon: {
+    marginRight: '12@ms',
   },
   sectionLine: {
     flex: 1,
@@ -92,5 +96,16 @@ export const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.feedback.error,
     textAlign: 'center',
+  },
+  tooltipText: {
+    color: colors.ds.neutral.white,
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.regular,
+  },
+  badgesLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
   },
 });
