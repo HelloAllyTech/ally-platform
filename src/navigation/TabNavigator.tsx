@@ -11,6 +11,8 @@ import {useSelector} from 'react-redux';
 import {
   AnalyticsActiveIcon,
   AnalyticsInactiveIcon,
+  BadgeActiveIcon,
+  BadgeInactiveIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
   CommunityActiveIcon,
@@ -26,6 +28,7 @@ import {
 } from '@/assets';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
+  AchievementsScreen,
   CallLogScreen,
   CommunityScreen,
   LeaderboardScreen,
@@ -36,6 +39,7 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
+import {UserRole} from '@/types';
 
 const Tab = createBottomTabNavigator();
 
@@ -67,6 +71,14 @@ const ALL_TABS = [
     name: SCREEN_NAMES.LEADERBOARD,
     component: LeaderboardScreen,
     requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD],
+  },
+  {
+    name: SCREEN_NAMES.ACHIEVEMENTS,
+    component: AchievementsScreen,
+    requiredPermissions: [
+      USER_PERMISSIONS.VIEW_USER_BADGES,
+      USER_PERMISSIONS.EDIT_USER_BADGES,
+    ],
   },
   {
     name: SCREEN_NAMES.SEARCH,
@@ -118,6 +130,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
       ),
       [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
       [SCREEN_NAMES.REVIEW]: <ReviewActiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
@@ -134,6 +147,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
       [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
       [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
       [SCREEN_NAMES.REVIEW]: <ReviewInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeInactiveIcon width={20} height={20} />,
     };
 
     return focused
@@ -171,18 +185,29 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
 
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
   const permissions = useSelector((s: AppRootState) => s.user.permissions);
+  const userRole = useSelector((s: AppRootState) => s.user.user?.role);
 
   if (userLoading) {
     return null;
   }
 
-  const visibleTabs = ALL_TABS.filter(
-    tab =>
-      tab?.requiredPermissions?.length === 0 ||
-      tab?.requiredPermissions?.some(permission =>
+  const visibleTabs = ALL_TABS.filter(tab => {
+    const hasPermission =
+      !tab.requiredPermissions?.length ||
+      tab.requiredPermissions.some(permission =>
         permissions.includes(permission),
-      ),
-  );
+      );
+
+    if (tab.name === SCREEN_NAMES.ACHIEVEMENTS) {
+      return (
+        userRole === UserRole.REVIEWER &&
+        !permissions.includes(USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD)
+      );
+    }
+
+    return hasPermission;
+  });
+
   const initial = getFirstVisibleTab(permissions);
 
   return (
