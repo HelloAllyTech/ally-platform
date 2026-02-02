@@ -49,7 +49,9 @@ export const Message: React.FC<MessageProps> = ({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text>
+      <Text style={[styles.timestamp, timestampStyle]} numberOfLines={1}>
+        {timestamp}
+      </Text>
       <GestureDetector gesture={tapGesture}>
         <View style={[styles.messageContainer, styles.message]}>
           {messageWithCallback}
@@ -70,6 +72,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: 'rgba(0, 0, 0, 0.6)',
+    flexShrink: 0,
   },
   message: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
