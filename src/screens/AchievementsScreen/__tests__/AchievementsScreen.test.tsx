@@ -332,12 +332,17 @@ jest.mock('@/hooks', () => ({
   useHardwareBackPressHandler: jest.fn(),
 }));
 
-// Mock LeftArrowIcon
+// Mock assets/icons (screen imports InfoIcon, LeftArrowIcon from @/assets which re-exports icons)
 jest.mock('@/assets/icons', () => ({
   LeftArrowIcon: ({color}: {color: string}) => {
     const React = require('react');
     const {View} = require('react-native');
     return <View testID="left-arrow-icon" style={{color}} />;
+  },
+  InfoIcon: () => {
+    const React = require('react');
+    const {View} = require('react-native');
+    return <View testID="info-icon" />;
   },
   AchievementLockedIcon: ({width, height}: {width: number; height: number}) => {
     const React = require('react');
@@ -360,7 +365,7 @@ jest.mock('../components/AchievementCard', () => ({
   },
 }));
 
-// Mock TabView component
+// Mock TabView and InfoTooltip (screen imports both from @/components)
 jest.mock('@/components', () => ({
   TabView: ({tabs, activeTab, onTabChange}: any) => {
     const React = require('react');
@@ -375,6 +380,20 @@ jest.mock('@/components', () => ({
             <Text>{tab.label}</Text>
           </TouchableOpacity>
         ))}
+      </View>
+    );
+  },
+  InfoTooltip: ({children, onClose, isVisible}: any) => {
+    const React = require('react');
+    const {View, TouchableOpacity} = require('react-native');
+    return (
+      <View testID="info-tooltip">
+        <TouchableOpacity
+          testID="info-tooltip-trigger"
+          onPress={onClose}
+          accessible={!!isVisible}>
+          {children}
+        </TouchableOpacity>
       </View>
     );
   },

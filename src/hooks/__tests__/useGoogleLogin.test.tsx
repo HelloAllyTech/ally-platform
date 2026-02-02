@@ -310,7 +310,7 @@ describe('useGoogleLogin', () => {
     expect(mockOnLoginSuccess).not.toHaveBeenCalled();
   });
 
-  it('silently handles backend API errors (user not found, etc.)', async () => {
+  it('shows toast for backend API errors (user not found, etc.)', async () => {
     const mockIdToken = 'test-id-token';
     const mockUserInfo = {
       data: {
@@ -319,7 +319,7 @@ describe('useGoogleLogin', () => {
     };
     const backendError = {
       status: 404,
-      data: {message: 'User not found'},
+      data: {message: 'No account found associated with this email'},
     };
 
     (GoogleSignin.signIn as jest.Mock).mockResolvedValue(mockUserInfo);
@@ -335,8 +335,11 @@ describe('useGoogleLogin', () => {
       await result.current.signIn();
     });
 
-    // Backend errors should be silently ignored (no error toast for security)
-    expect(showToast).not.toHaveBeenCalled();
+    // Backend errors should show error toast with the message
+    expect(showToast).toHaveBeenCalledWith(
+      'No account found associated with this email',
+      'error',
+    );
     expect(mockOnLoginSuccess).not.toHaveBeenCalled();
     // Logger is mocked, verify it was called
     const {logger: mockLogger} = require('@/utils');

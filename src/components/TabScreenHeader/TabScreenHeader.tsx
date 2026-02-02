@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {ReactElement, useCallback, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   Platform,
   StyleProp,
@@ -9,9 +10,11 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {DrawerMenuIcon} from '@/assets/icons';
+import {DrawerMenuIcon, InfoIcon} from '@/assets/icons';
 import {useTabScreenHeader} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
+
+import {InfoTooltip} from '../InfoTooltip';
 
 interface TabScreenHeaderProps {
   title: string;
@@ -20,6 +23,8 @@ interface TabScreenHeaderProps {
   rightContent?: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
   showBorder?: boolean;
+  tooltipContent?: ReactElement;
+  isTooltipRequired?: boolean;
 }
 
 /**
@@ -33,8 +38,15 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
   rightContent,
   containerStyle,
   showBorder = true,
+  isTooltipRequired = false,
+  tooltipContent,
 }) => {
   const {showHamburger, handleOpenDrawer} = useTabScreenHeader();
+  const {t} = useTranslation();
+  const [showTooltip, setShowTooltip] = useState(false);
+  const handleShowTooltip = useCallback(() => {
+    setShowTooltip(prev => !prev);
+  }, []);
 
   return (
     <View
@@ -61,6 +73,19 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
             </Text>
           )}
         </Text>
+        {isTooltipRequired && (
+          <InfoTooltip
+            content={tooltipContent || <View />}
+            placement="bottom"
+            isVisible={showTooltip}
+            onClose={handleShowTooltip}>
+            <TouchableOpacity
+              style={styles.tooltipIcon}
+              onPress={handleShowTooltip}>
+              <InfoIcon width={16} height={16} color={colors.ds.icon.default} />
+            </TouchableOpacity>
+          </InfoTooltip>
+        )}
       </View>
       {rightContent && <View style={styles.rightContent}>{rightContent}</View>}
     </View>
@@ -94,7 +119,6 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     ...typography.display.small,
     fontWeight: fontWeights.medium,
-    flex: 1,
   },
   subtitle: {
     fontWeight: fontWeights.light,
@@ -106,5 +130,8 @@ const styles = ScaledSheet.create({
   },
   rightContent: {
     flexShrink: 0,
+  },
+  tooltipIcon: {
+    marginRight: '12@ms',
   },
 });

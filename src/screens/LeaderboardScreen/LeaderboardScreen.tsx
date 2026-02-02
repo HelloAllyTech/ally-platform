@@ -348,6 +348,17 @@ export const LeaderboardScreen: React.FC = () => {
       <TabScreenHeader
         title={t('Common.community')}
         rightContent={renderBadgesButton()}
+        isTooltipRequired
+        tooltipContent={
+          <View>
+            <Text style={styles.tooltipText}>
+              {t(`BadgeTooltip.Community.title`)}
+            </Text>
+            <Text style={styles.tooltipText}>
+              {t(`BadgeTooltip.Community.description`)}
+            </Text>
+          </View>
+        }
       />
       {renderLeaderboardHeader()}
       <View style={styles.listContainer}>
