@@ -8,35 +8,59 @@ export const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-  header: {
+  topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: '21@ms',
-    paddingVertical: '16@ms',
+    paddingHorizontal: '24@ms',
+    paddingVertical: '8@ms',
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.primary,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  title: {
+  communityTitle: {
     ...fontFamily.REPLAY_PRO.HEADLINE,
-    ...typography.display.small,
+    fontSize: '18@ms',
+    lineHeight: '32@ms',
     color: colors.ds.typography.highEmphasis,
     fontWeight: '400',
   },
   badgeButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: '4@ms',
+  },
+  leaderboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: '24@ms',
+    paddingVertical: '10@ms',
     gap: '8@ms',
   },
-  badgeIcon: {
-    width: '20@ms',
-    height: '20@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeIconText: {
+  title: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '16@ms',
+    lineHeight: '27@ms',
+    color: colors.ds.typography.highEmphasis,
+    fontWeight: '500',
+    flex: 1,
+  },
+  dropdownWrapper: {
+    flexShrink: 1,
+    minWidth: '120@ms',
+    maxWidth: '160@ms',
+  },
+  dropdownHeader: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.stroke.primary,
+    paddingVertical: '6@ms',
+    paddingHorizontal: '8@ms',
+  },
+  dropdownText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    lineHeight: '20@ms',
+    color: colors.ds.typography.highEmphasis,
   },
   badgeCount: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

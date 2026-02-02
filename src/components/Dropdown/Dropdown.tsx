@@ -24,6 +24,8 @@ interface DropdownProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onDropdownToggle?: (isOpen: boolean) => void;
+  customHeaderStyle?: object;
+  customTextStyle?: object;
 }
 
 export const CustomDropdown: React.FC<DropdownProps> = ({
@@ -36,6 +38,8 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
   isOpen,
   setIsOpen,
   onDropdownToggle,
+  customHeaderStyle,
+  customTextStyle,
 }) => {
   const [dropdownWidth, setDropdownWidth] = useState<number>(0);
   const [headerLayout, setHeaderLayout] = useState({
@@ -99,10 +103,18 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
         <TouchableOpacity
           ref={headerRef}
           onPress={toggleDropdown}
-          style={[styles.header, disabled && styles.disabled]}
+          style={[
+            styles.header,
+            disabled && styles.disabled,
+            customHeaderStyle,
+          ]}
           disabled={disabled}>
           <Text
-            style={[commonStyles.fieldValueText, !value && styles.placeholder]}>
+            style={[
+              commonStyles.fieldValueText,
+              !value && styles.placeholder,
+              customTextStyle,
+            ]}>
             {value || placeholder}
           </Text>
           <View style={[styles.arrow, isOpen && styles.arrowUp]}>
