@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Modal,
   NativeSyntheticEvent,
   StyleProp,
   StyleSheet,
@@ -17,6 +18,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants';
 import {colors, fontFamily, typography} from '@/theme';
+import type {MessagePart} from '@/types/reviews';
 
 export interface SelectionData {
   startIndex: number;
@@ -29,12 +31,18 @@ export interface SelectionData {
 }
 
 export interface SelectableTextInputProps {
+  messageId: string;
+  isActive?: boolean;
+  requestCloseSignal?: number;
+  onRequestActivate?: (messageId: string) => void;
+  onRequestClose?: () => void;
   value?: string;
-  parts?: string[];
+  parts?: MessagePart[];
   separator?: string;
   prefixText?: string;
   prefixSeparator?: string;
   onAddComment?: (selection: SelectionData) => void;
+  onCommentIdsPress?: (commentIds: string[], part: MessagePart) => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   partTextStyle?: StyleProp<TextStyle>;
@@ -43,7 +51,6 @@ export interface SelectableTextInputProps {
   highlightedPartIndices?: number[];
   placeholder?: string;
   multiline?: boolean;
-  onMenuVisibilityChange?: (visible: boolean) => void;
 }
 
 type Sel = {start: number; end: number};
@@ -53,12 +60,19 @@ const MENU_H = 44;
 const MENU_MARGIN = 8;
 
 export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
+  messageId,
+  isActive = true,
+  requestCloseSignal,
+  onRequestActivate,
+  onRequestClose,
+
   value,
   parts,
   separator = '',
   prefixText,
   prefixSeparator = ' ',
   onAddComment,
+  onCommentIdsPress,
   style,
   textStyle,
   partTextStyle,
@@ -67,26 +81,24 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   highlightedPartIndices = [],
   placeholder,
   multiline = false,
-  onMenuVisibilityChange,
 }) => {
   const inputRef = useRef<TextInput>(null);
+  const containerRef = useRef<View>(null);
 
-  // Container measurement (relative positioning basis)
   const [containerW, setContainerW] = useState(0);
-
-  // Accurate line data from overlay text
   const [lines, setLines] = useState<TextLayoutEventData['lines']>([]);
-
-  // selection forcing only when needed (clamp/reset), otherwise let native manage
   const [forcedSelection, setForcedSelection] = useState<Sel | null>(null);
   const selectionRef = useRef<Sel>({start: 0, end: 0});
 
   const [showMenu, setShowMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState({x: 0, y: 0});
   const [selectedText, setSelectedText] = useState('');
 
+  // menu position in SCREEN coordinates (for Modal)
+  const [menuAbsPos, setMenuAbsPos] = useState({x: 0, y: 0});
+
   const mainText = useMemo(() => {
-    if (parts && parts.length > 0) return parts.join(separator);
+    if (parts && parts.length > 0)
+      return parts.map(p => p.text).join(separator);
     return value ?? '';
   }, [parts, separator, value]);
 
@@ -98,11 +110,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
   const prefixLength = prefix.length;
   const displayText = `${prefix}${mainText}`;
 
-  useEffect(() => {
-    onMenuVisibilityChange?.(showMenu);
-  }, [showMenu, onMenuVisibilityChange]);
-
-  // Keep selection baseline at prefix start when text changes
+  // Reset on text change
   useEffect(() => {
     const s = {start: prefixLength, end: prefixLength};
     selectionRef.current = s;
@@ -110,28 +118,39 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
     setSelectedText('');
     setShowMenu(false);
 
-    // release forcing next tick so user can select smoothly
     const t = setTimeout(() => setForcedSelection(null), 0);
     return () => clearTimeout(t);
   }, [displayText, prefixLength]);
 
-  // Hide native menu on iOS
-  // NOTE: Android cannot reliably hide the OS selection menu without native code.
-  // This still keeps selection functionality.
   const contextMenuHidden = isIOS ? true : undefined;
 
-  const computeAnchorFromLines = useCallback(
+  const clearSelection = useCallback(() => {
+    const s = {start: prefixLength, end: prefixLength};
+    selectionRef.current = s;
+    setForcedSelection(s);
+    setSelectedText('');
+    setShowMenu(false);
+    requestAnimationFrame(() => setForcedSelection(null));
+  }, [prefixLength]);
+
+  // Close when parent requests
+  useEffect(() => {
+    if (requestCloseSignal === undefined) return;
+    if (showMenu) {
+      clearSelection();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestCloseSignal]);
+
+  const computeMenuAbsPosition = useCallback(
     (startIndex: number) => {
-      // Default anchor near top if we can't compute
+      // First compute Y within the text block using lines
       let anchorY = 0;
       let anchorH = 20;
 
       if (lines.length > 0) {
-        // Map selection start to the correct line by accumulating line text lengths.
-        // NOTE: line.text is what RN lays out; this is still an approximation for index mapping
-        // but far better than charsPerLine and works well visually.
         let count = 0;
-        let chosen = lines[0];
+        let chosen = lines[lines.length - 1];
 
         for (const line of lines) {
           count += line.text.length;
@@ -144,53 +163,44 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         anchorY = chosen.y;
         anchorH = chosen.height || 20;
       } else {
-        // fallback: approximate by line height only
         const approxLineH = multiline ? 22 : 20;
         const lineNumber = Math.max(0, Math.floor(startIndex / 40));
         anchorY = lineNumber * approxLineH;
         anchorH = approxLineH;
       }
 
-      // Position menu above the line (or below if not enough space)
-      let y = anchorY - MENU_H - MENU_MARGIN;
-      if (y < 0) y = anchorY + anchorH + MENU_MARGIN;
+      // menu position relative to container
+      let relY = anchorY - MENU_H - MENU_MARGIN;
+      if (relY < 0) relY = anchorY + anchorH + MENU_MARGIN;
 
-      // Center horizontally within container
-      let x = Math.max(8, Math.floor(containerW / 2 - MENU_W / 2));
+      let relX = Math.max(8, Math.floor(containerW / 2 - MENU_W / 2));
       if (containerW > 0) {
-        x = Math.max(8, Math.min(x, containerW - MENU_W - 8));
+        relX = Math.max(8, Math.min(relX, containerW - MENU_W - 8));
       }
 
-      setMenuPos({x, y});
+      // Convert to screen coords
+      containerRef.current?.measureInWindow((x, y) => {
+        setMenuAbsPos({
+          x: x + relX,
+          y: y + relY,
+        });
+      });
     },
     [containerW, lines, multiline],
   );
-
-  const clearSelection = useCallback(() => {
-    const s = {start: prefixLength, end: prefixLength};
-    selectionRef.current = s;
-    setForcedSelection(s);
-    setSelectedText('');
-    setShowMenu(false);
-
-    // clear forcing quickly so selection feels native
-    requestAnimationFrame(() => setForcedSelection(null));
-  }, [prefixLength]);
 
   const handleSelectionChange = useCallback(
     (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       const {start, end} = event.nativeEvent.selection;
 
-      // clamp so prefix can't be selected
+      // clamp prefix
       const clampedStart = Math.max(start, prefixLength);
       const clampedEnd = Math.max(end, prefixLength);
 
-      // If clamp was needed, force selection once and return
       if (clampedStart !== start || clampedEnd !== end) {
         const s = {start: clampedStart, end: clampedEnd};
         selectionRef.current = s;
         setForcedSelection(s);
-        // release forcing next frame
         requestAnimationFrame(() => setForcedSelection(null));
         return;
       }
@@ -199,7 +209,17 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
       selectionRef.current = s;
 
       const hasSelection = clampedStart !== clampedEnd;
+
+      // collapsed selection: maybe tap on a commented part
       if (!hasSelection) {
+        const currentIndex = clampedStart - prefixLength;
+        const selectedPart = parts?.find(
+          part => currentIndex >= part.start && currentIndex <= part.end,
+        );
+        if (selectedPart?.commentIds?.length) {
+          onCommentIdsPress?.(selectedPart.commentIds, selectedPart);
+          return;
+        }
         setShowMenu(false);
         setSelectedText('');
         return;
@@ -212,18 +232,29 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         return;
       }
 
+      // make this row active
+      onRequestActivate?.(messageId);
+
       setSelectedText(text);
-      computeAnchorFromLines(clampedStart);
+      computeMenuAbsPosition(clampedStart);
       setShowMenu(true);
     },
-    [computeAnchorFromLines, displayText, prefixLength],
+    [
+      computeMenuAbsPosition,
+      displayText,
+      messageId,
+      onCommentIdsPress,
+      onRequestActivate,
+      parts,
+      prefixLength,
+    ],
   );
 
   const handleAddComment = useCallback(() => {
     if (!onAddComment) return;
+
     const s = selectionRef.current;
     const text = selectedText;
-
     if (!text) return;
 
     onAddComment({
@@ -232,20 +263,30 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
       selectedText: text,
     });
 
-    // hide menu but keep selection
-    setShowMenu(false);
-  }, [onAddComment, selectedText, prefixLength]);
+    // close menu (keep selection if you want, but you said close)
+    clearSelection();
+    onRequestClose?.();
+  }, [
+    onAddComment,
+    selectedText,
+    prefixLength,
+    clearSelection,
+    onRequestClose,
+  ]);
 
   const handleDismissMenu = useCallback(() => {
-    // hide menu and clear selection (or you can choose to keep selection)
     clearSelection();
-  }, [clearSelection]);
+    onRequestClose?.();
+  }, [clearSelection, onRequestClose]);
+
+  const shouldShowModal = showMenu && isActive;
 
   return (
     <View
+      ref={containerRef}
       style={[styles.container, style]}
       onLayout={e => setContainerW(e.nativeEvent.layout.width)}>
-      {/* Overlay text for visual rendering + highlighting (pointerEvents none so input gets selection) */}
+      {/* Overlay (highlight rendering) */}
       {prefixText || (parts && parts.length > 0) ? (
         <View pointerEvents="none" style={styles.overlay}>
           <Text
@@ -263,15 +304,16 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
                   const suffix = index < parts.length - 1 ? separator : '';
                   return (
                     <Text
-                      key={`${index}-${part}`}
+                      key={`${index}-${part.text}`}
                       style={[
                         styles.text,
                         textStyle,
                         partTextStyle,
                         isHighlighted && styles.highlightedText,
                         isHighlighted && highlightStyle,
-                      ]}>
-                      {part}
+                      ]}
+                      suppressHighlighting>
+                      {part.text}
                       {suffix}
                     </Text>
                   );
@@ -294,14 +336,11 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         placeholder={placeholder}
         placeholderTextColor={colors.ds.typography.lowEmphasis}
         selectionColor="rgba(173, 216, 230, 0.5)"
-        // Force selection only when needed
         selection={forcedSelection ?? undefined}
-        // Hide iOS native menu
         // @ts-ignore
         contextMenuHidden={contextMenuHidden}
         // @ts-ignore
         importantForAutofill="no"
-        // Hide caret/cursor visuals (selection handles may still appear on Android)
         caretHidden
         style={[
           styles.textInput,
@@ -310,17 +349,23 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
         ]}
       />
 
-      {/* Custom menu anchored INSIDE this row container */}
-      {showMenu ? (
+      {/* Tooltip rendered in a transparent Modal so it is ALWAYS clickable */}
+      <Modal
+        visible={shouldShowModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleDismissMenu}>
+        {/* Backdrop: tap anywhere outside menu closes */}
         <TouchableWithoutFeedback onPress={handleDismissMenu}>
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.modalOverlay}>
+            {/* Stop propagation inside menu */}
             <TouchableWithoutFeedback>
               <View
                 style={[
                   styles.menuContainer,
                   {
-                    top: menuPos.y,
-                    left: menuPos.x,
+                    top: menuAbsPos.y,
+                    left: menuAbsPos.x,
                     width: MENU_W,
                     height: MENU_H,
                   },
@@ -335,7 +380,7 @@ export const SelectableTextInput: React.FC<SelectableTextInputProps> = ({
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-      ) : null}
+      </Modal>
     </View>
   );
 };
@@ -346,8 +391,8 @@ const styles = ScaledSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    // IMPORTANT: use flex-start so line y matches input rendering
     justifyContent: 'flex-start',
+    zIndex: 1,
   },
   text: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -360,6 +405,7 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     padding: 0,
     margin: 0,
+    zIndex: 0,
   },
   transparentText: {
     color: 'transparent',
@@ -367,6 +413,13 @@ const styles = ScaledSheet.create({
   highlightedText: {
     backgroundColor: colors.ds.theme.primary,
   },
+
+  // Modal overlay catches outside taps
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
   menuContainer: {
     position: 'absolute',
     backgroundColor: colors.ds.surface.background,
@@ -376,7 +429,7 @@ const styles = ScaledSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 8,
+    elevation: 20,
     zIndex: 9999,
   },
   menuItem: {

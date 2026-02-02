@@ -1,11 +1,10 @@
+import React, {useCallback, useState} from 'react';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Message as MessageComponent} from '@/components/Message';
-import {SelectableTextArea} from '@/components/SelectableTextArea/SelectableTextArea';
 import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {useTranslate} from '@/hooks';
-import {useAppSelector} from '@/store/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -15,16 +14,18 @@ const formatTimestamp = (startSeconds: number) => {
   const seconds = Math.floor(startSeconds % 60);
   return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
+
 export interface ConversationProps {
   messages: MessageData[];
   isSelectable?: boolean;
   onSelection?: (selection: TextSelection, messageId: string) => void;
-  onThreadClick?: (threadId: string, messageId: string) => void;
+  onThreadClick?: (commentIds: string[], messageId: string) => void;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  reviewOwnerName?: string;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -37,9 +38,22 @@ export const Conversation: React.FC<ConversationProps> = ({
   hasMore = false,
   onRefresh,
   isRefreshing = false,
+  reviewOwnerName,
 }) => {
   const {t} = useTranslate();
-  const userName = useAppSelector(state => state.user.user?.name);
+
+  // only one active menu across list
+  const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(
+    null,
+  );
+  // bump to force-close currently-open menu
+  const [closeSignal, setCloseSignal] = useState(0);
+
+  const dismissAnyMenu = useCallback(() => {
+    setActiveMenuMessageId(null);
+    setCloseSignal(s => s + 1);
+  }, []);
+
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
       <Text>No messages found.</Text>
@@ -54,12 +68,22 @@ export const Conversation: React.FC<ConversationProps> = ({
     const highlightedPartIndices = messageItem.messagePart
       .map((part, index) => (part.commentIds.length > 0 ? index : -1))
       .filter(index => index !== -1);
+
     const isAiClient = messageItem.senderId === -1;
+
     return (
       <SelectableTextInput
-        prefixText={`${isAiClient ? 'AI Client' : userName || t('CallTranscript.you')}:`}
+        messageId={messageItem.id}
+        isActive={activeMenuMessageId === messageItem.id}
+        requestCloseSignal={closeSignal}
+        onRequestActivate={id => {
+          // close any previously open menu and activate this one
+          setActiveMenuMessageId(id);
+        }}
+        onRequestClose={dismissAnyMenu}
+        prefixText={`${isAiClient ? 'AI Client:' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
-        parts={messageItem.messagePart.map(part => part.text)}
+        parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}
         highlightStyle={styles.highlightedText}
         partTextStyle={styles.messageContent}
@@ -68,27 +92,13 @@ export const Conversation: React.FC<ConversationProps> = ({
         onAddComment={selectionData =>
           handleSelection(selectionData, messageItem.id)
         }
+        onCommentIdsPress={commentIds =>
+          onThreadClick?.(commentIds, messageItem.id)
+        }
         multiline
       />
     );
   };
-
-  const renderSelectableMessage = (messageItem: MessageData) => (
-    <SelectableTextArea
-      menuOptions={['Add Comment']}
-      onSelection={selection => handleSelection(selection, messageItem.id)}>
-      <Text style={styles.messageContent}>
-        {messageItem.messagePart.map((part, index) => (
-          <Text
-            disabled={part.commentIds.length === 0}
-            key={`${messageItem.id}-${index}`}
-            style={[part.commentIds.length > 0 && styles.highlightedText]}>
-            {part.text}
-          </Text>
-        ))}
-      </Text>
-    </SelectableTextArea>
-  );
 
   const renderDefaultMessage = (messageItem: MessageData) => (
     <Text>
@@ -109,7 +119,7 @@ export const Conversation: React.FC<ConversationProps> = ({
   const renderItem = ({item}: {item: MessageData}) => (
     <MessageComponent
       timestamp={formatTimestamp(item.startSeconds)}
-      onPress={() => onThreadClick?.(item.id, item.id)}
+      onPress={isSelectable ? undefined : () => onThreadClick?.([], item.id)}
       message={
         isSelectable
           ? renderSelectableMessageV2(item)
@@ -139,6 +149,8 @@ export const Conversation: React.FC<ConversationProps> = ({
       onEndReachedThreshold={0.5}
       refreshing={isRefreshing}
       onRefresh={onRefresh}
+      onScrollBeginDrag={dismissAnyMenu}
+      keyboardShouldPersistTaps="handled"
     />
   );
 };
