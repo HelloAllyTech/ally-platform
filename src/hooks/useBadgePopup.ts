@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useSelector} from 'react-redux';
 
 import {
   BADGE_AUTO_CLOSE_DELAY,
@@ -8,7 +9,9 @@ import {
   BADGE_POLLING_INTERVAL,
   ViewedStatus,
 } from '@/constants';
+import {USER_PERMISSIONS} from '@/constants/permissions';
 import {useGetBadgesQuery, useMarkBadgeAsViewedMutation} from '@/services';
+import {AppRootState} from '@/store/store';
 import {UserBadge} from '@/types';
 import {logger} from '@/utils';
 
@@ -24,12 +27,20 @@ export const useBadgePopup = (
   const clearBadgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstBadgeRef = useRef(false);
 
+  const permissions = useSelector(
+    (state: AppRootState) => state.user.permissions,
+  );
+  const hasViewBadgesPermission = permissions.includes(
+    USER_PERMISSIONS.VIEW_USER_BADGES,
+  );
+
   const {data: badges, isLoading: isBadgesLoading} = useGetBadgesQuery(
     ViewedStatus.UNVIEWED,
     {
       pollingInterval: BADGE_POLLING_INTERVAL,
       refetchOnFocus: true,
       refetchOnReconnect: true,
+      skip: !hasViewBadgesPermission,
     },
   );
   const [markBadgeAsViewed] = useMarkBadgeAsViewedMutation();

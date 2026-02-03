@@ -13,8 +13,8 @@
 export const EMOJI_UNICODE_MAP: Record<string, string> = {
   '1f44d': '👍',
   '2764-fe0f': '❤️',
-  '1f604': '👏',
-  '1f44f': '😄',
+  '1f604': '😄',
+  '1f44f': '👏',
   '1f4a1': '💡',
   '1f44e': '👎',
   '1f389': '🎉', // Legacy emoji - kept for displaying old reactions

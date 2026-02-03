@@ -40,11 +40,11 @@ export const InfoTooltip = ({
 
 const styles = ScaledSheet.create({
   tooltipContent: {
+    maxWidth: '260@ms',
+    paddingHorizontal: '12@ms',
+    paddingVertical: '8@ms',
     borderRadius: '8@ms',
     backgroundColor: colors.darkGray17,
-    color: colors.ds.neutral.white,
-    minWidth: 'auto',
-    minHeight: 'auto',
   },
   tooltipBackground: {
     backgroundColor: 'transparent',
