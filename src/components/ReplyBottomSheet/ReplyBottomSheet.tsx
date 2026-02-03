@@ -98,24 +98,26 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     async (replyId: string, goback?: () => void) => {
       try {
         await deleteComment({commentId: replyId}).unwrap();
-        // Refetch replies
-        offsetRef.current = 0;
-        const response = await getCommentReplies({
-          commentId,
-          offset: 0,
-          limit: LIMIT,
+        // Remove deleted item from local state to preserve scroll position
+        // This avoids resetting scroll by not replacing the entire data array
+        setReplies(prev => {
+          if (!prev) return null;
+          const filteredData = prev.data.filter(reply => reply.id !== replyId);
+          const newCount = Math.max(0, prev.count - 1);
+          // Update hasMore based on remaining items
+          setHasMore(filteredData.length < newCount);
+          return {
+            data: filteredData,
+            count: newCount,
+          };
         });
-        if (response.data) {
-          setReplies({data: response.data.data, count: response.data.count});
-          setHasMore(response.data.data.length < response.data.count);
-        }
       } catch (error) {
         console.error('Failed to delete reply:', error);
       } finally {
         goback?.();
       }
     },
-    [deleteComment, getCommentReplies, commentId],
+    [deleteComment],
   );
 
   const handleHideComment = useCallback(
@@ -224,17 +226,19 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             content: comment,
           }).unwrap();
 
-          // Refetch comments to get updated data
-          offsetRef.current = 0;
-          const response = await getCommentReplies({
-            commentId,
-            offset: 0,
-            limit: LIMIT,
+          // Update comment in local state to preserve scroll position
+          setReplies(prev => {
+            if (!prev) return null;
+            const updatedData = prev.data.map(reply =>
+              reply.id === editingReplyId
+                ? {...reply, content: comment}
+                : reply,
+            );
+            return {
+              data: updatedData,
+              count: prev.count,
+            };
           });
-          if (response.data) {
-            setReplies({data: response.data.data, count: response.data.count});
-            setHasMore(response.data.data.length < response.data.count);
-          }
           setEditingReplyId(null);
         } else {
           const payload = {
@@ -286,8 +290,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     [
       editingReplyId,
       updateComment,
-      getCommentReplies,
-      commentId,
       addReviewComment,
       reviewId,
       parentCommentId,
