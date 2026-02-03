@@ -23,10 +23,11 @@ import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
-  useGetMessagesQuery,
   useGetReviewByIdQuery,
+  useLazyGetMessagesQuery,
 } from '@/services/reviewsApi';
 import {colors} from '@/theme';
+import {GetMessagesResponse} from '@/types';
 import {
   Message,
   MessageData,
@@ -50,9 +51,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [rawMessages, setRawMessages] = useState<Message[]>([]);
-  const [conversationMessages, setConversationMessages] = useState<
-    MessageData[]
-  >([]);
+  const previousOffsetRef = useRef<number>(0);
+  const isInitialMountRef = useRef(true);
   const [comment, setComment] = useState('');
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [currentHighlightedText, setCurrentHighlightedText] =
@@ -91,16 +91,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     return true;
   });
 
-  // API hooks
-  const {
-    data: messagesData,
-    isLoading,
-    isFetching,
-    isError,
-  } = useGetMessagesQuery(
-    {reviewId: _reviewId, offset, limit: MESSAGES_PER_PAGE},
-    {skip: !_reviewId},
-  );
+  const [fetchMessages, {isLoading, isFetching, isError}] =
+    useLazyGetMessagesQuery();
 
   const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery({
     reviewId: _reviewId,
@@ -165,27 +157,71 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     [],
   );
 
-  // Update messages when new data is fetched
+  // Process messages response and update state
+  const processMessagesResponse = useCallback(
+    (responseData: GetMessagesResponse | undefined, currentOffset: number) => {
+      if (!responseData?.data) {
+        return;
+      }
+
+      const newMessages = responseData.data;
+      const isInitialLoad = currentOffset === 0;
+      const isOffsetReset = previousOffsetRef.current > currentOffset;
+
+      // Update raw messages - reset on initial load or when offset decreases (refresh)
+      setRawMessages(prev => {
+        if (isInitialLoad || isOffsetReset) {
+          return newMessages;
+        }
+        return mergeMessages(prev, newMessages);
+      });
+
+      // Update pagination state
+      setHasMore(newMessages.length >= MESSAGES_PER_PAGE);
+
+      // Track previous offset
+      previousOffsetRef.current = currentOffset;
+    },
+    [mergeMessages],
+  );
+
+  // Fetch messages when offset changes or on initial mount
   useEffect(() => {
-    if (!messagesData?.data) return;
+    if (!_reviewId) return;
 
-    const newMessages = messagesData.data;
-    const isInitialLoad = offset === 0;
+    const fetchData = async () => {
+      try {
+        const result = await fetchMessages({
+          reviewId: _reviewId,
+          offset,
+          limit: MESSAGES_PER_PAGE,
+        });
+        // Process the response directly
+        if (result.data) {
+          processMessagesResponse(result.data, offset);
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
 
-    // Update raw messages
-    setRawMessages(prev =>
-      isInitialLoad ? newMessages : mergeMessages(prev, newMessages),
-    );
+    // Fetch on initial mount
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      fetchData();
+      return;
+    }
 
-    // Map and update conversation messages
-    const mappedMessages = newMessages.map(mapMessageToConversation);
-    setConversationMessages(prev =>
-      isInitialLoad ? mappedMessages : mergeMessages(prev, mappedMessages),
-    );
+    // Fetch when offset changes
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset]);
 
-    // Update pagination state
-    setHasMore(newMessages.length >= MESSAGES_PER_PAGE);
-  }, [messagesData, offset, mapMessageToConversation, mergeMessages]);
+  // Derive conversation messages from raw messages using useMemo
+  // This ensures conversationMessages is always in sync with rawMessages
+  const conversationMessages = useMemo(() => {
+    return rawMessages.map(mapMessageToConversation);
+  }, [rawMessages, mapMessageToConversation]);
 
   // Create a new thread object
   const createNewThread = useCallback(
@@ -230,36 +266,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
         return updatedMessages;
       });
-
-      // Update conversation messages with new message parts
-      setConversationMessages(prev => {
-        const messageIndex = prev.findIndex(m => m.id === messageId);
-        if (messageIndex === -1) return prev;
-
-        const updatedMessages = [...prev];
-        const currentMessage = updatedMessages[messageIndex];
-        const rawMessage = rawMessages.find(m => m.id === messageId);
-
-        if (!rawMessage) return prev;
-
-        // Recalculate message parts with all threads
-        const allThreadRanges = [
-          ...mapMessageThreads(rawMessage.threads),
-          {id: commentId, start: selection.startIndex, end: selection.endIndex},
-        ];
-
-        updatedMessages[messageIndex] = {
-          ...currentMessage,
-          messagePart: splitByCommentRanges(
-            currentMessage.content,
-            allThreadRanges,
-          ),
-        };
-
-        return updatedMessages;
-      });
     },
-    [rawMessages, createNewThread, mapMessageThreads],
+    [createNewThread],
   );
 
   // Pagination callbacks
@@ -269,12 +277,26 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     }
   }, [isFetching, hasMore]);
 
-  const refreshMessages = useCallback(() => {
+  const refreshMessages = useCallback(async () => {
+    if (!_reviewId) return;
     setOffset(0);
     setHasMore(true);
     setRawMessages([]);
-    setConversationMessages([]);
-  }, []);
+    previousOffsetRef.current = 0;
+
+    try {
+      const result = await fetchMessages({
+        reviewId: _reviewId,
+        offset: 0,
+        limit: MESSAGES_PER_PAGE,
+      });
+      if (result.data) {
+        processMessagesResponse(result.data, 0);
+      }
+    } catch (error) {
+      console.error('Error refreshing messages:', error);
+    }
+  }, [_reviewId, fetchMessages, processMessagesResponse]);
 
   // Comment input handlers - MUST be before early returns
   const handleChangeComment = useCallback((text: string) => {

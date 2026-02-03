@@ -151,6 +151,7 @@ export const {
   useGetReviewQuery,
   useUpdateReviewStatusMutation,
   useGetMessagesQuery,
+  useLazyGetMessagesQuery,
   useAddReviewCommentMutation,
   useLazyGetThreadCommentsQuery,
   useGetReviewsQuery,
