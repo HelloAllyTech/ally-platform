@@ -563,7 +563,8 @@
     "moreThreads": "{{count}} more comments",
     "moreThreadsOne": "1 more comment",
     "noThreads": "No comments yet",
-    "selectedText": "Selected text:"
+    "selectedText": "Selected text:",
+    "viewMoreComments": "View more comments"
   },
   "CommentThreadBottomSheet": {
     "title": "Comment thread",
