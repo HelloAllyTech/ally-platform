@@ -2,8 +2,8 @@ import React, {useCallback, useState} from 'react';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {CommentableTextInput} from '@/components/CommentableTextInput/CommentableTextInput';
 import {Message as MessageComponent} from '@/components/Message';
-import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {useTranslate} from '@/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
@@ -72,7 +72,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     const isAiClient = messageItem.senderId === -1;
 
     return (
-      <SelectableTextInput
+      <CommentableTextInput
         messageId={messageItem.id}
         isActive={activeMenuMessageId === messageItem.id}
         requestCloseSignal={closeSignal}
