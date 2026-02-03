@@ -54,7 +54,7 @@ export const MessageThreadsBottomSheet: React.FC<
       }
 
       const firstComment = thread.comments[0];
-      const remainingCount = thread.comments.length;
+      const showMoreCommentsIndicator = thread.comments.length > 1;
       const reactionsArray = getReactionsArray(firstComment.reactions);
       const reactionCount = getTotalReactionCount(firstComment.reactions);
 
@@ -93,7 +93,7 @@ export const MessageThreadsBottomSheet: React.FC<
               disableAddReactionButton
               onCommentPress={() => onThreadPress?.(thread.id, messageId)}
             />
-            {remainingCount > 0 && (
+            {showMoreCommentsIndicator && (
               <LinearGradient
                 colors={[
                   colors.whiteTransparent0,
@@ -110,16 +110,12 @@ export const MessageThreadsBottomSheet: React.FC<
           </View>
 
           {/* More Comments Indicator */}
-          {remainingCount > 0 && (
+          {showMoreCommentsIndicator && (
             <>
               <View style={styles.separatorLine} />
               <View style={styles.moreCommentsContainer}>
                 <Text style={styles.moreCommentsText}>
-                  {remainingCount === 1
-                    ? t('ThreadsBottomSheet.moreThreadsOne')
-                    : t('ThreadsBottomSheet.moreThreads', {
-                        count: remainingCount,
-                      })}
+                  {t('ThreadsBottomSheet.viewMoreComments')}
                 </Text>
                 <ChevronRight
                   width={ms(20)}
