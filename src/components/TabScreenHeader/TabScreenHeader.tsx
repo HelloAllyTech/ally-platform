@@ -108,7 +108,7 @@ const styles = ScaledSheet.create({
   leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: '12@ms',
+    gap: '6@ms',
     flex: 1,
   },
   hamburgerButton: {
