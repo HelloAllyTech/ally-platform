@@ -23,6 +23,7 @@ import {
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useTranslate, useUser} from '@/hooks';
 import {
+  ReactionAction,
   useAddReactionToCommentMutation,
   useAddReviewCommentMutation,
 } from '@/services';
@@ -98,46 +99,48 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     async (replyId: string, goback?: () => void) => {
       try {
         await deleteComment({commentId: replyId}).unwrap();
-        // Refetch replies
-        offsetRef.current = 0;
-        const response = await getCommentReplies({
-          commentId,
-          offset: 0,
-          limit: LIMIT,
+        // Remove deleted item from local state to preserve scroll position
+        // This avoids resetting scroll by not replacing the entire data array
+        setReplies(prev => {
+          if (!prev) return null;
+          const filteredData = prev.data.filter(reply => reply.id !== replyId);
+          const newCount = Math.max(0, prev.count - 1);
+          // Update hasMore based on remaining items
+          setHasMore(filteredData.length < newCount);
+          return {
+            data: filteredData,
+            count: newCount,
+          };
         });
-        if (response.data) {
-          setReplies({data: response.data.data, count: response.data.count});
-          setHasMore(response.data.data.length < response.data.count);
-        }
       } catch (error) {
         console.error('Failed to delete reply:', error);
       } finally {
         goback?.();
       }
     },
-    [deleteComment, getCommentReplies, commentId],
+    [deleteComment],
   );
 
   const handleHideComment = useCallback(
     async (replyId: string, hidden: boolean) => {
       try {
         await updateCommentVisibility({commentId: replyId, hidden}).unwrap();
-        // Refetch replies
-        offsetRef.current = 0;
-        const response = await getCommentReplies({
-          commentId,
-          offset: 0,
-          limit: LIMIT,
+        // Update reply visibility in local state to preserve scroll position
+        setReplies(prev => {
+          if (!prev) return null;
+          const updatedData = prev.data.map(reply =>
+            reply.id === replyId ? {...reply, hidden} : reply,
+          );
+          return {
+            data: updatedData,
+            count: prev.count,
+          };
         });
-        if (response.data) {
-          setReplies({data: response.data.data, count: response.data.count});
-          setHasMore(response.data.data.length < response.data.count);
-        }
       } catch (error) {
         console.error('Failed to hide/unhide reply:', error);
       }
     },
-    [updateCommentVisibility, getCommentReplies, commentId],
+    [updateCommentVisibility],
   );
 
   // Dismiss keyboard when bottom sheet closes
@@ -224,17 +227,19 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             content: comment,
           }).unwrap();
 
-          // Refetch comments to get updated data
-          offsetRef.current = 0;
-          const response = await getCommentReplies({
-            commentId,
-            offset: 0,
-            limit: LIMIT,
+          // Update comment in local state to preserve scroll position
+          setReplies(prev => {
+            if (!prev) return null;
+            const updatedData = prev.data.map(reply =>
+              reply.id === editingReplyId
+                ? {...reply, content: comment}
+                : reply,
+            );
+            return {
+              data: updatedData,
+              count: prev.count,
+            };
           });
-          if (response.data) {
-            setReplies({data: response.data.data, count: response.data.count});
-            setHasMore(response.data.data.length < response.data.count);
-          }
           setEditingReplyId(null);
         } else {
           const payload = {
@@ -286,8 +291,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     [
       editingReplyId,
       updateComment,
-      getCommentReplies,
-      commentId,
       addReviewComment,
       reviewId,
       parentCommentId,
@@ -300,34 +303,77 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const handleEmojiSelect = useCallback(
     async (messageId: string, currentEmoji: string | null, unicode: string) => {
       try {
+        const action = getReactionAction(currentEmoji, unicode);
         await addReaction({
           id: messageId,
           reaction: unicode,
-          action: getReactionAction(currentEmoji, unicode),
+          action,
         }).unwrap();
-        // Refetch replies to get updated reaction data
-        if (commentId) {
-          offsetRef.current = 0;
-          const result = await getCommentReplies({
-            commentId,
-            offset: 0,
-            limit: LIMIT,
-          });
-          if (result.data) {
-            // Replace data completely when refetching from the beginning
-            setReplies(result.data);
-            if (result.data.data.length >= result.data.count) {
-              setHasMore(false);
-            } else {
-              setHasMore(true);
+        setReplies(prev => {
+          if (!prev) return null;
+          const updatedData = prev.data.map(reply => {
+            if (reply.id !== messageId) return reply;
+
+            const currentReactions = reply.reactions || {};
+            const newReactions = {...currentReactions};
+
+            if (action === ReactionAction.ADD) {
+              // Add reaction
+              const currentCount = newReactions[unicode] || 0;
+              newReactions[unicode] = currentCount + 1;
+              // Remove previous reaction if exists
+              if (currentEmoji && currentEmoji !== unicode) {
+                const prevCount = newReactions[currentEmoji] || 0;
+                if (prevCount > 1) {
+                  newReactions[currentEmoji] = prevCount - 1;
+                } else {
+                  delete newReactions[currentEmoji];
+                }
+              }
+            } else if (action === ReactionAction.UPDATE) {
+              // Update reaction (switch from one emoji to another)
+              // Remove previous reaction
+              if (currentEmoji) {
+                const prevCount = newReactions[currentEmoji] || 0;
+                if (prevCount > 1) {
+                  newReactions[currentEmoji] = prevCount - 1;
+                } else {
+                  delete newReactions[currentEmoji];
+                }
+              }
+              // Add new reaction
+              const currentCount = newReactions[unicode] || 0;
+              newReactions[unicode] = currentCount + 1;
+            } else if (action === ReactionAction.REMOVE) {
+              // Remove reaction
+              const currentCount = newReactions[unicode] || 0;
+              if (currentCount > 1) {
+                newReactions[unicode] = currentCount - 1;
+              } else {
+                delete newReactions[unicode];
+              }
             }
-          }
-        }
+
+            return {
+              ...reply,
+              reactions: newReactions,
+              myReaction:
+                action === ReactionAction.ADD ||
+                action === ReactionAction.UPDATE
+                  ? unicode
+                  : null,
+            };
+          });
+          return {
+            data: updatedData,
+            count: prev.count,
+          };
+        });
       } catch (error) {
         console.error('Failed to add reaction:', error);
       }
     },
-    [addReaction, commentId, getCommentReplies],
+    [addReaction],
   );
 
   const renderReplyItem = useCallback(
