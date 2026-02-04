@@ -196,35 +196,6 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
       }));
   }, [computedParts, highlightedPartIndices, prefixLength]);
 
-  const findWordRange = useCallback((text: string, index: number) => {
-    if (!text.length) return null;
-    const isWordChar = (ch: string) => /[A-Za-z0-9]/.test(ch);
-    let i = Math.min(Math.max(index, 0), text.length - 1);
-    if (!isWordChar(text[i])) {
-      let left = i - 1;
-      let right = i + 1;
-      while (left >= 0 || right < text.length) {
-        if (left >= 0 && isWordChar(text[left])) {
-          i = left;
-          break;
-        }
-        if (right < text.length && isWordChar(text[right])) {
-          i = right;
-          break;
-        }
-        left -= 1;
-        right += 1;
-      }
-      if (!isWordChar(text[i])) return null;
-    }
-    let start = i;
-    let end = i + 1;
-    while (start > 0 && isWordChar(text[start - 1])) start -= 1;
-    while (end < text.length && isWordChar(text[end])) end += 1;
-    if (start === end) return null;
-    return {start, end};
-  }, []);
-
   const handleTextLayout = useCallback(
     (event: NativeSyntheticEvent<TextLayoutEventData>) => {
       const lines = event.nativeEvent.lines;
@@ -325,32 +296,6 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
 
       const hasSelection = clampedStart !== clampedEnd;
       if (!hasSelection) {
-        const wordRange = findWordRange(displayText, clampedStart);
-        if (wordRange && wordRange.end > prefixLength) {
-          const nextStart = Math.max(wordRange.start, prefixLength);
-          const nextEnd = Math.max(wordRange.end, nextStart);
-          if (nextEnd > nextStart) {
-            const nextSelection = {start: nextStart, end: nextEnd};
-            ignoreNextSelectionEvent.current = true;
-            forcedSelectionRef.current = nextSelection;
-            selectionRef.current = nextSelection;
-            setForcedSelection(nextSelection);
-            requestAnimationFrame(() => setForcedSelection(null));
-            const wordText = displayText.substring(nextStart, nextEnd);
-            onRequestActivate?.(messageId);
-            setSelectedText(wordText);
-            if (!positionMenuFromRect(selectionRect)) {
-              containerRef.current?.measureInWindow((x, y, w) => {
-                setMenuAbsPos({
-                  x: x + Math.max(8, Math.floor(w / 2 - MENU_W / 2)),
-                  y: y + MENU_MARGIN,
-                });
-              });
-            }
-            setShowMenu(true);
-            return;
-          }
-        }
         setShowMenu(false);
         setSelectedText('');
         return;
@@ -377,7 +322,6 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     },
     [
       displayText,
-      findWordRange,
       messageId,
       onRequestActivate,
       positionMenuFromRect,
