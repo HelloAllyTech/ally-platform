@@ -1,9 +1,10 @@
 import React, {useCallback, useState} from 'react';
-import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList, Platform, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CommentableTextInput} from '@/components/CommentableTextInput/CommentableTextInput';
 import {Message as MessageComponent} from '@/components/Message';
+import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {useTranslate} from '@/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
@@ -64,13 +65,45 @@ export const Conversation: React.FC<ConversationProps> = ({
     onSelection?.(selection, messageId);
   };
 
-  const renderSelectableMessageV2 = (messageItem: MessageData) => {
-    const highlightedPartIndices = messageItem.messagePart
-      .map((part, index) => (part.commentIds.length > 0 ? index : -1))
-      .filter(index => index !== -1);
+  const selectionTextAndroidComponent = (
+    messageItem,
+    isAiClient,
+    highlightedPartIndices,
+  ) => {
+    return (
+      <SelectableTextInput
+        messageId={messageItem.id}
+        isActive={activeMenuMessageId === messageItem.id}
+        requestCloseSignal={closeSignal}
+        onRequestActivate={id => {
+          // close any previously open menu and activate this one
+          setActiveMenuMessageId(id);
+        }}
+        onRequestClose={dismissAnyMenu}
+        prefixText={`${isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
+        prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
+        parts={messageItem.messagePart}
+        highlightedPartIndices={highlightedPartIndices}
+        highlightStyle={styles.highlightedText}
+        partTextStyle={styles.messageContent}
+        separator=""
+        key={`${messageItem.id}`}
+        onAddComment={selectionData =>
+          handleSelection(selectionData, messageItem.id)
+        }
+        onCommentIdsPress={commentIds =>
+          onThreadClick?.(commentIds, messageItem.id)
+        }
+        multiline
+      />
+    );
+  };
 
-    const isAiClient = messageItem.senderId === -1;
-
+  const selectionTextIOSComponent = (
+    messageItem,
+    isAiClient,
+    highlightedPartIndices,
+  ) => {
     return (
       <CommentableTextInput
         messageId={messageItem.id}
@@ -98,6 +131,30 @@ export const Conversation: React.FC<ConversationProps> = ({
         multiline
       />
     );
+  };
+
+  const renderSelectableMessageV2 = (messageItem: MessageData) => {
+    const highlightedPartIndices = messageItem.messagePart
+      .map((part, index) => (part.commentIds.length > 0 ? index : -1))
+      .filter(index => index !== -1);
+
+    const isAiClient = messageItem.senderId === -1;
+
+    const isIOS = Platform.OS === 'ios';
+
+    if (isIOS) {
+      return selectionTextIOSComponent(
+        messageItem,
+        isAiClient,
+        highlightedPartIndices,
+      );
+    } else {
+      return selectionTextAndroidComponent(
+        messageItem,
+        isAiClient,
+        highlightedPartIndices,
+      );
+    }
   };
 
   const renderDefaultMessage = (messageItem: MessageData) => (

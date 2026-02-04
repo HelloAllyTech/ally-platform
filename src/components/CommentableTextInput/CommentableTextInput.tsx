@@ -144,6 +144,7 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
   const containerRef = useRef<View>(null);
   const selectionRef = useRef<Sel>({start: 0, end: 0});
   const ignoreNextSelectionEvent = useRef(false);
+  const forcedSelectionRef = useRef<Sel | null>(null);
 
   const [forcedSelection, setForcedSelection] = useState<Sel | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -194,6 +195,35 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
         highlighted: highlightedPartIndices.includes(index),
       }));
   }, [computedParts, highlightedPartIndices, prefixLength]);
+
+  const findWordRange = useCallback((text: string, index: number) => {
+    if (!text.length) return null;
+    const isWordChar = (ch: string) => /[A-Za-z0-9]/.test(ch);
+    let i = Math.min(Math.max(index, 0), text.length - 1);
+    if (!isWordChar(text[i])) {
+      let left = i - 1;
+      let right = i + 1;
+      while (left >= 0 || right < text.length) {
+        if (left >= 0 && isWordChar(text[left])) {
+          i = left;
+          break;
+        }
+        if (right < text.length && isWordChar(text[right])) {
+          i = right;
+          break;
+        }
+        left -= 1;
+        right += 1;
+      }
+      if (!isWordChar(text[i])) return null;
+    }
+    let start = i;
+    let end = i + 1;
+    while (start > 0 && isWordChar(text[start - 1])) start -= 1;
+    while (end < text.length && isWordChar(text[end])) end += 1;
+    if (start === end) return null;
+    return {start, end};
+  }, []);
 
   const handleTextLayout = useCallback(
     (event: NativeSyntheticEvent<TextLayoutEventData>) => {
@@ -263,25 +293,70 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
   const handleSelectionChange = useCallback(
     (event: NativeSyntheticEvent<NativeSelectionEvent>) => {
       if (ignoreNextSelectionEvent.current) {
+        const {start: evtStart, end: evtEnd} = event.nativeEvent;
+        const forced = forcedSelectionRef.current;
         ignoreNextSelectionEvent.current = false;
-        return;
+        forcedSelectionRef.current = null;
+        if (forced && evtStart === forced.start && evtEnd === forced.end) {
+          return;
+        }
       }
 
       const {start, end, selectionRect} = event.nativeEvent;
       const clampedStart = Math.max(start, prefixLength);
       const clampedEnd = Math.max(end, prefixLength);
 
+      if (clampedStart !== start || clampedEnd !== end) {
+        const s = {start: clampedStart, end: clampedEnd};
+        selectionRef.current = s;
+        ignoreNextSelectionEvent.current = true;
+        forcedSelectionRef.current = s;
+        setForcedSelection(s);
+        requestAnimationFrame(() => setForcedSelection(null));
+        if (clampedStart === clampedEnd) {
+          setShowMenu(false);
+          setSelectedText('');
+          return;
+        }
+      }
+
       const s = {start: clampedStart, end: clampedEnd};
       selectionRef.current = s;
 
       const hasSelection = clampedStart !== clampedEnd;
       if (!hasSelection) {
+        const wordRange = findWordRange(displayText, clampedStart);
+        if (wordRange && wordRange.end > prefixLength) {
+          const nextStart = Math.max(wordRange.start, prefixLength);
+          const nextEnd = Math.max(wordRange.end, nextStart);
+          if (nextEnd > nextStart) {
+            const nextSelection = {start: nextStart, end: nextEnd};
+            ignoreNextSelectionEvent.current = true;
+            forcedSelectionRef.current = nextSelection;
+            selectionRef.current = nextSelection;
+            setForcedSelection(nextSelection);
+            requestAnimationFrame(() => setForcedSelection(null));
+            const wordText = displayText.substring(nextStart, nextEnd);
+            onRequestActivate?.(messageId);
+            setSelectedText(wordText);
+            if (!positionMenuFromRect(selectionRect)) {
+              containerRef.current?.measureInWindow((x, y, w) => {
+                setMenuAbsPos({
+                  x: x + Math.max(8, Math.floor(w / 2 - MENU_W / 2)),
+                  y: y + MENU_MARGIN,
+                });
+              });
+            }
+            setShowMenu(true);
+            return;
+          }
+        }
         setShowMenu(false);
         setSelectedText('');
         return;
       }
 
-      const text = displayText.substring(clampedStart, clampedEnd).trim();
+      const text = displayText.substring(clampedStart, clampedEnd);
       if (!text) {
         setShowMenu(false);
         setSelectedText('');
@@ -302,6 +377,7 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     },
     [
       displayText,
+      findWordRange,
       messageId,
       onRequestActivate,
       positionMenuFromRect,
