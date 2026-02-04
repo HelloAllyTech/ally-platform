@@ -19,7 +19,7 @@ import {
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
-import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
@@ -63,6 +63,13 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     string | null
   >(null);
   const navigation = useAppNavigation();
+
+  const {userData} = useUser();
+  const {
+    id: userId,
+    name: userName,
+    profileImageUrl: userProfileImage,
+  } = userData || {};
 
   useHardwareBackPressHandler(() => {
     // Check if any bottom sheet is open and dismiss it first
@@ -239,14 +246,25 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         endIndex: selection.endIndex,
         selectedText: selection.selectedText,
       },
-      comments: [],
+      comments: [
+        {
+          id: commentId,
+          content: selection.selectedText,
+          createdAt: new Date().toISOString(),
+          createdBy: {
+            id: userId,
+            name: userName,
+            profileImage: userProfileImage,
+          },
+        },
+      ],
       createdBy: {
-        id: 0,
-        name: '',
-        profileImage: null,
+        id: userId || 0,
+        name: userName || '',
+        profileImage: userProfileImage || null,
       },
     }),
-    [],
+    [userId, userName, userProfileImage],
   );
 
   // Update message with new comment thread
