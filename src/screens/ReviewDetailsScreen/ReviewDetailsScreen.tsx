@@ -239,8 +239,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
   // Create a new thread object
   const createNewThread = useCallback(
-    (commentId: string, selection: TextSelection): MessageThread => ({
-      id: commentId,
+    (
+      newComment: {id: string; createdAt: string},
+      selection: TextSelection,
+    ): MessageThread => ({
+      id: newComment.id,
       selection: {
         startIndex: selection.startIndex,
         endIndex: selection.endIndex,
@@ -248,9 +251,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
       },
       comments: [
         {
-          id: commentId,
+          id: newComment.id,
           content: selection.selectedText,
-          createdAt: new Date().toISOString(),
+          createdAt: newComment.createdAt,
           createdBy: {
             id: userId,
             name: userName,
@@ -271,10 +274,10 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const updateMessage = useCallback(
     (payload: {
       selection: TextSelection;
-      commentId: string;
+      newComment: {id: string; createdAt: string};
       messageId: string;
     }) => {
-      const {selection, commentId, messageId} = payload;
+      const {selection, newComment, messageId} = payload;
 
       // Update raw messages with new thread
       setRawMessages(prev => {
@@ -282,7 +285,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
-        const newThread = createNewThread(commentId, selection);
+        const newThread = createNewThread(newComment, selection);
 
         updatedMessages[messageIndex] = {
           ...updatedMessages[messageIndex],
@@ -366,10 +369,10 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
       const response = await addReviewComment(payload);
 
-      if (response.data?.thread?.id) {
+      if (response.data?.thread?.id && response.data?.comment) {
         updateMessage({
           selection: currentHighlightedText,
-          commentId: response.data.thread.id,
+          newComment: response.data.comment,
           messageId: selectedMessageId,
         });
       }
