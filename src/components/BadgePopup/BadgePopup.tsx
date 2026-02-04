@@ -2,7 +2,6 @@ import {useCallback, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Text,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
+import {BadgeImage} from '@/components/BadgeImage';
 import {useBadgePopup} from '@/hooks/useBadgePopup';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
@@ -60,9 +60,9 @@ export const BadgePopup = () => {
                   style={styles.imageContainer}
                   onLayout={handleImageContainerLayout}>
                   {isLayoutReady ? (
-                    <Image
+                    <BadgeImage
                       key={currentBadge.id}
-                      source={{uri: currentBadge.imageUrl}}
+                      imageUrl={currentBadge.imageUrl}
                       style={styles.badgeImage}
                       resizeMode="contain"
                     />

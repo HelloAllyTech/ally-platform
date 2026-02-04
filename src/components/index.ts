@@ -72,6 +72,7 @@ export type {CommentInputProps} from './CommentInput';
 export {Conversation} from './Conversation';
 export type {ConversationProps} from './Conversation';
 export {BadgePopup} from './BadgePopup';
+export {BadgeImage} from './BadgeImage';
 export {NotificationModal} from './NotificationModal';
 export type {NotificationModalProps} from './NotificationModal';
 export {UserProfileImage} from './UserProfileImage';
