@@ -94,9 +94,16 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const [fetchMessages, {isLoading, isFetching, isError}] =
     useLazyGetMessagesQuery();
 
-  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery({
-    reviewId: _reviewId,
-  });
+  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery(
+    {
+      reviewId: _reviewId,
+    },
+    {
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
 
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
@@ -285,6 +292,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     previousOffsetRef.current = 0;
 
     try {
+      refetchReviewData();
       const result = await fetchMessages({
         reviewId: _reviewId,
         offset: 0,
@@ -296,7 +304,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     } catch (error) {
       console.error('Error refreshing messages:', error);
     }
-  }, [_reviewId, fetchMessages, processMessagesResponse]);
+  }, [_reviewId, fetchMessages, processMessagesResponse, refetchReviewData]);
 
   // Comment input handlers - MUST be before early returns
   const handleChangeComment = useCallback((text: string) => {
