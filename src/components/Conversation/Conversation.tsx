@@ -114,7 +114,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           setActiveMenuMessageId(id);
         }}
         onRequestClose={dismissAnyMenu}
-        prefixText={`${isAiClient ? 'AI Client:' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
+        prefixText={`${isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}
