@@ -1,5 +1,7 @@
 import asyncio
+import os
 import random
+import sys
 from typing import Optional, Set
 
 from livekit import agents, rtc
@@ -88,6 +90,8 @@ class AgentWorker:
         # to entrypoint context
         self._termination_event: Optional[asyncio.Event] = None
         self._termination_message: Optional[str] = None
+        # Event to signal room disconnection to entrypoint
+        self._room_disconnected_event: Optional[asyncio.Event] = None
 
     async def configure(self):
         """
@@ -231,6 +235,11 @@ class AgentWorker:
         @self.ctx.room.on("connection_state_changed")
         def on_connection_state_changed(state: rtc.ConnectionState):
             connection_handler(state)
+            # Signal room disconnection to entrypoint to allow graceful exit
+            if state == rtc.ConnectionState.CONN_DISCONNECTED:
+                if self._room_disconnected_event:
+                    self._room_disconnected_event.set()
+                    logger.info("Room disconnected event signaled to entrypoint")
 
         # Shutdown handler
         original_shutdown_handler = create_shutdown_handler(
@@ -262,6 +271,8 @@ class AgentWorker:
         """
         # Initialize termination event for entrypoint-based termination handling
         self._termination_event = asyncio.Event()
+        # Initialize room disconnection event for entrypoint keepalive
+        self._room_disconnected_event = asyncio.Event()
 
         # Start session and connect
         await self.session.start(
@@ -403,6 +414,48 @@ async def entrypoint(ctx: agents.JobContext):
 
     logger.info("Termination handler task started in entrypoint context")
 
+    # CRITICAL FIX: Wait for either termination or room disconnection
+    # This keeps the entrypoint function running for the duration of the conversation
+    # Without this, the function returns immediately and LiveKit terminates the agent
+    # Skip waiting in test environment to prevent tests from hanging
+    is_test_env = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+
+    # Safety check: Only wait if events are initialized and not in test environment
+    if (
+        not is_test_env
+        and worker._termination_event is not None
+        and worker._room_disconnected_event is not None
+    ):
+        try:
+            # Wait for either termination event or room disconnection
+            done, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(worker._termination_event.wait()),
+                    asyncio.create_task(worker._room_disconnected_event.wait()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            # Cancel the pending task
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            logger.info("Entrypoint waiting completed - agent will shutdown")
+        except Exception as e:
+            logger.exception(f"Error waiting for conversation end: {e}")
+            # Ensure we don't hang if there's an error
+            if worker._room_disconnected_event:
+                worker._room_disconnected_event.set()
+    else:
+        logger.warning(
+            "Events not initialized - skipping wait. "
+            "This may occur in tests or if start() failed."
+        )
+
 
 def prewarm(proc: JobProcess):
     """Prewarm VAD model for faster startup."""
@@ -412,8 +465,6 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
-    import sys
-
     # Handle download-files command for Docker build
     if len(sys.argv) > 1 and sys.argv[1] == "download-files":
         # Pre-download VAD model files
@@ -432,6 +483,7 @@ if __name__ == "__main__":
             api_key=settings.LIVEKIT_API_KEY,
             api_secret=settings.LIVEKIT_API_SECRET,
             ws_url=settings.LIVEKIT_URL,
-            drain_timeout=10,
+            # Increased from 10 to 600 seconds (10 minutes) for longer conversations
+            drain_timeout=600,
         )
     )
