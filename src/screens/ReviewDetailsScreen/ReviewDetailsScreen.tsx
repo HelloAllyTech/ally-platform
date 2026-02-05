@@ -365,11 +365,6 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         messageId: selectedMessageId,
         selection: currentHighlightedText,
         content: comment.trim(),
-        ...(selectedComment?.id && {parentCommentId: selectedComment.id}),
-        ...(selectedThreadId &&
-        (isCommentThreadBottomSheetVisible || isMessageThreadsVisible)
-          ? {threadId: selectedThreadId}
-          : {}),
       };
 
       const response = await addReviewComment(payload);
@@ -392,13 +387,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     comment,
     currentHighlightedText,
     _reviewId,
-    selectedComment,
-    selectedThreadId,
     addReviewComment,
     updateMessage,
     resetCommentInput,
-    isCommentThreadBottomSheetVisible,
-    isMessageThreadsVisible,
   ]);
 
   const handleThreadClick = useCallback(
