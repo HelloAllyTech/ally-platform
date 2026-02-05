@@ -240,10 +240,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   // Create a new thread object
   const createNewThread = useCallback(
     (
-      newComment: {id: string; createdAt: string},
+      newComment: {id: string; createdAt: string; content: string},
+      newThread: {id: string; createdAt: string},
       selection: TextSelection,
     ): MessageThread => ({
-      id: newComment.id,
+      id: newThread.id,
       selection: {
         startIndex: selection.startIndex,
         endIndex: selection.endIndex,
@@ -252,7 +253,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
       comments: [
         {
           id: newComment.id,
-          content: selection.selectedText,
+          content: newComment.content,
           createdAt: newComment.createdAt,
           createdBy: {
             id: userId,
@@ -274,10 +275,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const updateMessage = useCallback(
     (payload: {
       selection: TextSelection;
-      newComment: {id: string; createdAt: string};
+      newComment: {id: string; createdAt: string; content: string};
+      newThread: {id: string; createdAt: string};
       messageId: string;
     }) => {
-      const {selection, newComment, messageId} = payload;
+      const {selection, newComment, newThread, messageId} = payload;
 
       // Update raw messages with new thread
       setRawMessages(prev => {
@@ -285,11 +287,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
-        const newThread = createNewThread(newComment, selection);
+        const updatedThread = createNewThread(newComment, newThread, selection);
 
         updatedMessages[messageIndex] = {
           ...updatedMessages[messageIndex],
-          threads: [...updatedMessages[messageIndex].threads, newThread],
+          threads: [...updatedMessages[messageIndex].threads, updatedThread],
         };
 
         return updatedMessages;
@@ -364,7 +366,10 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         selection: currentHighlightedText,
         content: comment.trim(),
         ...(selectedComment?.id && {parentCommentId: selectedComment.id}),
-        ...(selectedThreadId && {threadId: selectedThreadId}),
+        ...(selectedThreadId &&
+        (isCommentThreadBottomSheetVisible || isMessageThreadsVisible)
+          ? {threadId: selectedThreadId}
+          : {}),
       };
 
       const response = await addReviewComment(payload);
@@ -372,7 +377,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
       if (response.data?.thread?.id && response.data?.comment) {
         updateMessage({
           selection: currentHighlightedText,
-          newComment: response.data.comment,
+          newComment: {...response.data.comment, content: comment.trim()},
+          newThread: response.data.thread,
           messageId: selectedMessageId,
         });
       }
@@ -391,6 +397,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     addReviewComment,
     updateMessage,
     resetCommentInput,
+    isCommentThreadBottomSheetVisible,
+    isMessageThreadsVisible,
   ]);
 
   const handleThreadClick = useCallback(
