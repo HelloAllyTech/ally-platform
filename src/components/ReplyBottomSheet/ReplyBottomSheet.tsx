@@ -80,8 +80,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
-  const [addReaction, {isLoading: isAddingReaction}] =
-    useAddReactionToCommentMutation();
+  const [addReaction] = useAddReactionToCommentMutation();
 
   const handleGoback = useCallback(() => {
     hideReplyBottomSheet();
