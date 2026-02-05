@@ -97,8 +97,6 @@ export const SimulationFeedbackScreen: React.FC<
 
   const {showToast} = useToast();
 
-  const canEditReview = permissions?.includes(USER_PERMISSIONS.EDIT_REVIEW);
-
   useEffect(() => {
     if (
       upcomingData?.currentSession?.eventStatus ===
@@ -584,14 +582,12 @@ export const SimulationFeedbackScreen: React.FC<
             // onSeek={setSeekTime}
             agentName={simulationDetails?.scenario?.metadata?.name}
           />
-          {canEditReview && (
-            <View style={styles.privacyToggleContainer}>
-              <PrivacyToggle
-                isPrivate={isPrivate}
-                onToggle={handlePrivacyToggle}
-              />
-            </View>
-          )}
+          <View style={styles.privacyToggleContainer}>
+            <PrivacyToggle
+              isPrivate={isPrivate}
+              onToggle={handlePrivacyToggle}
+            />
+          </View>
         </>
       )}
       <FeedbackDropdown
