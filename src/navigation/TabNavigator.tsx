@@ -39,7 +39,6 @@ import {
 } from '@/screens';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
-import {UserRole} from '@/types';
 
 const Tab = createBottomTabNavigator();
 
@@ -75,10 +74,7 @@ const ALL_TABS = [
   {
     name: SCREEN_NAMES.ACHIEVEMENTS,
     component: AchievementsScreen,
-    requiredPermissions: [
-      USER_PERMISSIONS.VIEW_USER_BADGES,
-      USER_PERMISSIONS.EDIT_USER_BADGES,
-    ],
+    requiredPermissions: [USER_PERMISSIONS.VIEW_USER_BADGES],
   },
   {
     name: SCREEN_NAMES.SEARCH,
@@ -185,27 +181,35 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
 
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
   const permissions = useSelector((s: AppRootState) => s.user.permissions);
-  const userRole = useSelector((s: AppRootState) => s.user.user?.role);
 
   if (userLoading) {
     return null;
   }
 
   const visibleTabs = ALL_TABS.filter(tab => {
+    // Check if user has permission for this tab
     const hasPermission =
       !tab.requiredPermissions?.length ||
       tab.requiredPermissions.some(permission =>
         permissions.includes(permission),
       );
 
+    if (!hasPermission) return false;
+
+    // If this is the Achievements tab, check if Leaderboard is also permitted
     if (tab.name === SCREEN_NAMES.ACHIEVEMENTS) {
-      return (
-        userRole === UserRole.REVIEWER &&
-        !permissions.includes(USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD)
+      const hasLeaderboardPermission = ALL_TABS.some(
+        t =>
+          t.name === SCREEN_NAMES.LEADERBOARD &&
+          (!t.requiredPermissions?.length ||
+            t.requiredPermissions.some(permission =>
+              permissions.includes(permission),
+            )),
       );
+      return !hasLeaderboardPermission;
     }
 
-    return hasPermission;
+    return true;
   });
 
   const initial = getFirstVisibleTab(permissions);
