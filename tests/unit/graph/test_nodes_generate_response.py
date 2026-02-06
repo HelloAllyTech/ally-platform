@@ -86,6 +86,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -184,6 +185,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -262,6 +264,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -334,6 +337,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -425,6 +429,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -484,6 +489,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -566,6 +572,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -654,6 +661,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 
@@ -723,6 +731,7 @@ class TestGenerateResponse:
                 "response_length": None,
                 "agent_dialogues": None,
                 "prompt": None,
+                "previous_memory": None,
             },
         )()
 

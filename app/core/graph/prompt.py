@@ -185,6 +185,10 @@ def generate_system_message(
     gender_details_block = _get_gender_details(prompt_data)
     profession_block = _get_optional_block("Your profession", prompt_data.profession)
     guidelines_block = _get_behavioral_guidelines(prompt_data)
+    previous_memory_block = _get_optional_block(
+        "Summary from your previous session",
+        prompt_data.previous_memory,
+    )
     core_memories_block = _get_optional_block(
         "Your core memories influencing your beliefs & actions",
         prompt_data.core_memories,
@@ -240,6 +244,8 @@ def generate_system_message(
     {prompt_data.context}
 
     {guidelines_block}
+
+    {previous_memory_block}
 
     {life_history}
 

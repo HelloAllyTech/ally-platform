@@ -22,6 +22,7 @@ def make_prompt_data(**overrides):
         opening_statements=["Hi"],
         agent_goal=None,
         custom_fields=[],
+        previous_memory=None,
     )
     base.update(overrides)
     return PromptData(**base)
@@ -132,3 +133,22 @@ class TestPrompt:
         content = msg.content
         # Should not crash and should work normally
         assert "Your name" in content
+
+    def test_generate_system_message_with_previous_memory(self):
+        """Test that previous_memory is included when provided."""
+        previous_session_summary = (
+            "In our last session, we discussed anxiety management "
+            "techniques and you mentioned making progress with breathing exercises."
+        )
+        pd = make_prompt_data(previous_memory=previous_session_summary)
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Summary from your previous session" in content
+        assert previous_session_summary in content
+
+    def test_generate_system_message_without_previous_memory(self):
+        """Test that previous_memory section is excluded when not provided."""
+        pd = make_prompt_data(previous_memory=None)
+        msg = generate_system_message(prompt_data=pd)
+        content = msg.content
+        assert "Summary from your previous session" not in content

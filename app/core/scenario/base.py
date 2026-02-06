@@ -57,6 +57,10 @@ class PromptData(BaseModel):
     prompt: Optional[str] = Field(default=None)
     response_length: Optional[ScenarioResponseLength] = Field(default=None)
     agent_dialogues: Optional[List[str]] = Field(default=None)
+    previous_memory: Optional[str] = Field(
+        default=None,
+        description="Summary from previous session for continuity",
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -257,6 +261,7 @@ class Scenario(BaseModel):
                 "prompt": prompt_data_dict.get("prompt"),
                 "response_length": prompt_data_dict.get("responseLength"),
                 "agent_dialogues": prompt_data_dict.get("agentDialogues"),
+                "previous_memory": prompt_data_dict.get("previousMemory", None),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

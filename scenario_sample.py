@@ -25,6 +25,7 @@ SCENARIO_SAMPLE = {
             "openingStatements": ["Hi, I need some help."],
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
+            "previousMemory": "In our last session, we discussed your fear of disappointing your parents and you mentioned feeling trapped between meeting their expectations and being true to yourself. You were working on building confidence to have an honest conversation with them.",
             "customFields": [
                 {"field": "favourite colour", "value": "Sky Blue"},
                 {"field": "occupation", "value": "Engineer"},
@@ -155,22 +156,6 @@ SCENARIO_SAMPLE = {
                     "maxUtteranceLength": 25,
                 },
             },
-            {
-                "id": "utterance-length-51-100",
-                "name": "Medium-Short Response",
-                "description": "Triggers when counselor's response is medium-short (51-100 characters)",
-                "score": 5,
-                "emoji": "✅",
-                "message": "Good response length! You're providing adequate detail.",
-                "branchInstruction": "That makes sense, tell me more.",
-                "visibilityType": "ACTIVE",
-                "detectionType": "HELPER_UTTERANCE_LENGTH",
-                "feedbackStatus": True,
-                "data": {
-                    "minUtteranceLength": 51,
-                    "maxUtteranceLength": 100,
-                },
-            },
         ],
         "triggerEvents": [
             "open-ended-question",
@@ -179,7 +164,6 @@ SCENARIO_SAMPLE = {
             "warm-greeting",
             "time-based-event-10s",
             "utterance-length-1-25",
-            "utterance-length-51-100",
         ],
         "autoTerminationEvents": [
             {
@@ -188,7 +172,7 @@ SCENARIO_SAMPLE = {
             }
         ],
         "voice": {
-            "name": "priya-adult-female",
+            "name": "anushka",
             "provider": "sarvam",
             "config": {
                 "model": "bulbul:v2",
