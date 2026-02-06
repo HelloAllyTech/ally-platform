@@ -106,9 +106,7 @@ export function renderField(
                     ]}
                     value={value?.toString() || ''}
                     onChangeText={onChange}
-                    placeholder={
-                      t?.('CallSummary.enterDetail') || 'Enter detail'
-                    }
+                    placeholder={field.placeholder || 'Enter detail'}
                     placeholderTextColor={colors.lightGray3}
                     autoCapitalize="words"
                     returnKeyType="done"
@@ -201,8 +199,10 @@ const styles = ScaledSheet.create({
     flex: 1,
     color: colors.ds.typography.highEmphasis,
     marginRight: '10@ms',
+    maxWidth: '200@ms',
   },
   dropdownContainer: {
     flex: 1,
+    maxWidth: '200@ms',
   },
 });
