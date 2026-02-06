@@ -10,8 +10,8 @@ import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors, fontFamily} from '@/theme';
 import {EditableFieldKey, SectionItem} from '@/types';
 
-import {SectionContent} from '../CallSummaryDetails/SectionContent';
 import {SectionHeader} from '../CallSummaryDetails/SectionHeader';
+import {GenericSectionContent} from '../GenericSectionContent';
 
 interface SectionWrapperProps {
   label: string;
@@ -91,10 +91,13 @@ const SectionWrapperComponent = ({
   };
 
   const renderSection = () => {
+    const sectionFields = summaryFields.filter(
+      field => field.sectionKey === sectionConfig.key,
+    );
+
     return (
-      <SectionContent
-        section={sectionConfig}
-        canEdit={sectionConfig.canEdit}
+      <GenericSectionContent
+        fields={sectionFields}
         isEditing={isEditing}
         isEnhancing={isEnhancing}
       />

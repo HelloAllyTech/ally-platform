@@ -17,8 +17,50 @@ import {
   TagIcon,
 } from '@/assets/icons';
 import {colors} from '@/theme';
-import type {SectionItem, SummaryField} from '@/types/callSummary';
+import type {
+  FieldDataContext,
+  SectionItem,
+  SummaryField,
+} from '@/types/callSummary';
 import {FieldType} from '@/types/fields';
+import {formatAsPercentage, formatAsStringOrDash} from '@/utils/common';
+import {
+  formatDateWithOrdinal,
+  formatDurationFromSeconds,
+  formatTimeHHmm,
+} from '@/utils/date';
+
+import {LanguageMap} from './general';
+
+// Helper functions for computeValue and formatDisplay specific to call summary
+const computeFromCallDetailsOrSummary =
+  (fieldKey: SummaryFieldKey) =>
+  ({summary, callDetails}: FieldDataContext) =>
+    callDetails?.[fieldKey] || summary?.[fieldKey];
+
+const formatTimeRange = (value: unknown) => {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('startTime' in value) ||
+    !('endTime' in value) ||
+    !value.startTime ||
+    !value.endTime
+  ) {
+    return '-';
+  }
+  return `${formatTimeHHmm(value.startTime as string)}-${formatTimeHHmm(value.endTime as string)}`;
+};
+
+const formatLanguages = (value: unknown) => {
+  if (!value || !Array.isArray(value) || !value.length) return '-';
+  return value
+    .map(
+      (lang: {language: string; percentage: number}) =>
+        `${LanguageMap[lang.language as keyof typeof LanguageMap] || lang.language} (${lang.percentage}%)`,
+    )
+    .join(', ');
+};
 
 export enum ChatSummaryStatus {
   PENDING = 'PENDING',
@@ -308,6 +350,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Call ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => callDetails?.chatId,
   },
   {
     isEditable: false,
@@ -315,6 +358,13 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Duration',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: computeFromCallDetailsOrSummary(SUMMARY_FIELDS.CALL_DURATION),
+    formatDisplay: (value, t) =>
+      formatDurationFromSeconds(value as number, {
+        t,
+        includeSeconds: false,
+        format: 'long',
+      }),
   },
   {
     isEditable: false,
@@ -322,6 +372,9 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Date',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => callDetails?.startTime,
+    formatDisplay: value =>
+      value && typeof value === 'string' ? formatDateWithOrdinal(value) : '-',
   },
   {
     isEditable: false,
@@ -329,6 +382,11 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Time',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => ({
+      startTime: callDetails?.startTime,
+      endTime: callDetails?.endTime,
+    }),
+    formatDisplay: formatTimeRange,
   },
   {
     isEditable: false,
@@ -336,6 +394,9 @@ export const summaryFields: SummaryField[] = [
     label: 'Caller ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({summary, callDetails}) =>
+      callDetails?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID],
+    formatDisplay: formatAsStringOrDash,
   },
   {
     isEditable: false,
@@ -382,11 +443,12 @@ export const summaryFields: SummaryField[] = [
     type: FieldType.InlineTextInput,
   },
   {
-    isEditable: true,
+    isEditable: false,
     key: SUMMARY_FIELDS.LANGUAGES,
     label: 'Languages',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    formatDisplay: formatLanguages,
   },
   {
     isEditable: true,
@@ -492,7 +554,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.TAGS,
     label: 'Tags',
     sectionKey: SectionKey.Tags,
-    type: FieldType.Text,
+    type: FieldType.MultilineTextInput,
   },
 
   // Metrics section
@@ -502,6 +564,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Listening Share',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
+    formatDisplay: formatAsPercentage,
   },
   {
     isEditable: false,
@@ -509,6 +572,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Reflective Questions Asked',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
+    formatDisplay: formatAsStringOrDash,
   },
   {
     isEditable: false,
@@ -525,6 +589,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Additional Notes',
     sectionKey: SectionKey.AdditionalNotes,
     type: FieldType.MultilineTextInput,
+    computeValue: ({callDetails}) => callDetails?.callInfo?.notes,
   },
 ];
 
