@@ -2,10 +2,13 @@ import {SvgProps} from 'react-native-svg';
 
 import {
   AGE_RANGE_OPTIONS,
+  ASSESSMENT_AFFECT_OPTIONS,
+  ASSESSMENT_SPEECH_OPTIONS,
   GENDER_OPTIONS,
   SectionKey,
   SUMMARY_FIELDS,
   SummaryFieldKey,
+  YES_NO_OPTIONS,
 } from '@/constants/summary';
 import {AgeRange, CallDetails, SummaryDetails} from '@/services/callSummaryApi';
 
@@ -41,7 +44,13 @@ export interface SummaryField {
   isEditable: boolean;
   key: SummaryFieldKey;
   label: string;
-  options?: typeof GENDER_OPTIONS | typeof AGE_RANGE_OPTIONS;
+  options?:
+    | typeof GENDER_OPTIONS
+    | typeof AGE_RANGE_OPTIONS
+    | typeof YES_NO_OPTIONS
+    | typeof ASSESSMENT_AFFECT_OPTIONS
+    | typeof ASSESSMENT_SPEECH_OPTIONS;
+  placeholder?: string;
   sectionKey: SectionKey;
   type: FieldType;
 
@@ -96,4 +105,40 @@ export type SummaryFormData = {
   [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: string | null;
   [SUMMARY_FIELDS.TAGS]: string | null;
   [SUMMARY_FIELDS.ADDITIONAL_NOTES]: string | null;
+
+  // Intake section - all editable
+  [SUMMARY_FIELDS.INTAKE_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SELF_HARM]: string | null;
+  [SUMMARY_FIELDS.RISK_SELF_HARM_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_PLAN]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_ACTION]: string | null;
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY]: string | null;
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_NEGLECT]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES]:
+    | string
+    | null;
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_AFFECT]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_SPEECH]: string | null;
+
+  // Ongoing Risks section - all editable
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES]: string | null;
 };

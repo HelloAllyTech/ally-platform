@@ -6,7 +6,10 @@ import {SECTION_LIST, SectionKey, summaryFields} from '@/constants';
 import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
-import {selectCallInfo} from '@/store/slices/summarySlice';
+import {
+  selectCallInfo,
+  selectSummaryVisibleFields,
+} from '@/store/slices/summarySlice';
 import {colors, fontFamily} from '@/theme';
 import {EditableFieldKey, SectionItem} from '@/types';
 
@@ -41,6 +44,7 @@ const SectionWrapperComponent = ({
   const {handleSectionFieldsReset, handleFieldChange, formData} =
     useCallSummaryForm();
   const {chatId} = useAppSelector(selectCallInfo);
+  const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
     useEnhanceCallSummaryMutation();
 
@@ -91,9 +95,20 @@ const SectionWrapperComponent = ({
   };
 
   const renderSection = () => {
-    const sectionFields = summaryFields.filter(
-      field => field.sectionKey === sectionConfig.key,
-    );
+    const sectionFields = summaryFields.filter(field => {
+      // Filter by section
+      if (field.sectionKey !== sectionConfig.key) {
+        return false;
+      }
+
+      // If visibleFields is empty or not set, show all fields
+      if (!visibleFields || visibleFields.length === 0) {
+        return true;
+      }
+
+      // Otherwise, only show fields that are in visibleFields
+      return visibleFields.includes(field.key);
+    });
 
     return (
       <GenericSectionContent
