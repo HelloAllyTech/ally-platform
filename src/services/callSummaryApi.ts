@@ -4,7 +4,7 @@ import {ChatProvider} from '@/types';
 
 import {api} from './api';
 
-interface CallInfo {
+export interface CallInfo {
   summaryName: string;
   isSummaryFeedbackAdded: boolean;
   clientTalkingTime: number;
@@ -107,7 +107,7 @@ export interface SummaryDetails {
   additionalNotes: string | null;
 }
 
-interface CallDetails {
+export interface CallDetails {
   createdAt: string;
   updatedAt: string;
   tenantId: string;

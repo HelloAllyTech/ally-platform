@@ -7,9 +7,35 @@ import {
   SUMMARY_FIELDS,
   SummaryFieldKey,
 } from '@/constants/summary';
-import {AgeRange, Language} from '@/services/callSummaryApi';
+import {AgeRange, CallDetails, SummaryDetails} from '@/services/callSummaryApi';
 
 import {FieldType} from './fields';
+
+/**
+ * Call details data structure (returned by selector)
+ * Extends the API CallDetails type with optional clientId override
+ */
+export interface CallDetailsData extends Partial<CallDetails> {
+  clientId?: number | string | null;
+}
+
+/**
+ * Data context passed to field computation and formatting functions
+ */
+export interface FieldDataContext {
+  summary: SummaryDetails | null;
+  formData: SummaryFormData | null;
+  callDetails: CallDetailsData | null;
+  // callInfo selector returns a custom shape with specific fields from different sources
+  callInfo: {
+    chatId?: number;
+    callDuration?: number;
+    startTime?: string;
+    endTime?: string | null;
+    clientId?: number;
+    summaryName?: string;
+  } | null;
+}
 
 export interface SummaryField {
   isEditable: boolean;
@@ -18,19 +44,21 @@ export interface SummaryField {
   options?: typeof GENDER_OPTIONS | typeof AGE_RANGE_OPTIONS;
   sectionKey: SectionKey;
   type: FieldType;
-}
 
-export interface FieldConfig {
-  field: SummaryFieldKey;
-  value: SummaryFieldValueTypes;
+  // Optional: For fields that need computed values (e.g., callDuration from callDetails)
+  computeValue?: (data: FieldDataContext) => unknown;
+
+  // Optional: For fields that need special display formatting (e.g., percentage, dates)
+  formatDisplay?: (
+    value: unknown,
+    t?: (key: string, params?: any) => string,
+  ) => string;
 }
 
 // Current configuration - can be moved to API later
 export type VisibleFields = {
   [K in keyof typeof SUMMARY_FIELDS]: boolean;
 };
-
-export type SummaryFieldValueTypes = string | number | Language[];
 
 // Type utility for editable field keys
 export type EditableFieldKey = keyof SummaryFormData;

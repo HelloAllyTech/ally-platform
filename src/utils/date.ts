@@ -210,32 +210,109 @@ export const formatRelativeTime = (dateString: string): string => {
   return 'Just now';
 };
 
-export const formatDurationFromSeconds = (seconds: string): string => {
+/**
+ * Helper to get pluralized unit label
+ * @private
+ */
+const getUnitLabel = (
+  value: number,
+  unit: 'day' | 'hour' | 'minute' | 'second',
+  t?: (key: string) => string,
+): string => {
+  const key = `CallSummary.${unit}s`;
+  if (t) return t(key);
+  return value === 1 ? unit : `${unit}s`;
+};
+
+/**
+ * Formats duration in long format (e.g., "1 day 2 hours 30 minutes")
+ * @private
+ */
+const formatLongDuration = (
+  days: number,
+  hours: number,
+  minutes: number,
+  seconds: number,
+  includeSeconds: boolean,
+  t?: (key: string) => string,
+): string => {
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days} ${getUnitLabel(days, 'day', t)}`);
+  if (hours > 0) parts.push(`${hours} ${getUnitLabel(hours, 'hour', t)}`);
+  if (minutes > 0)
+    parts.push(`${minutes} ${getUnitLabel(minutes, 'minute', t)}`);
+  if (includeSeconds && seconds > 0 && days === 0 && hours === 0) {
+    parts.push(`${seconds} ${getUnitLabel(seconds, 'second', t)}`);
+  }
+
+  return parts.length > 0 ? parts.join(' ') : '0 seconds';
+};
+
+/**
+ * Formats duration in short format (e.g., "1d 2h 30m" or "1:30 min")
+ * @private
+ */
+const formatShortDuration = (
+  days: number,
+  hours: number,
+  minutes: number,
+  seconds: number,
+  includeSeconds: boolean,
+  t?: (key: string) => string,
+): string => {
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} hr`;
+  }
+
+  if (minutes > 0) {
+    return includeSeconds
+      ? `${minutes}:${seconds.toString().padStart(2, '0')} min`
+      : `${minutes} ${t?.('CallSummary.minutes') || 'min'}`;
+  }
+
+  return `${seconds} sec`;
+};
+
+export const formatDurationFromSeconds = (
+  seconds: string | number,
+  options?: {
+    t?: (key: string) => string;
+    includeSeconds?: boolean;
+    format?: 'short' | 'long';
+  },
+): string => {
   const totalSeconds =
     typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
 
-  if (isNaN(totalSeconds) || totalSeconds < 0) {
-    return '-';
-  }
+  if (isNaN(totalSeconds) || totalSeconds < 0) return '-';
 
-  // Under 1 minute
-  if (totalSeconds < 60) {
-    return `${totalSeconds} sec`;
-  }
+  const {t, includeSeconds = true, format = 'short'} = options || {};
 
-  const hours = Math.floor(totalSeconds / 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const remainingSeconds = totalSeconds % 60;
 
-  // 1 hour or more
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds
-      .toString()
-      .padStart(2, '0')} hr`;
-  }
-
-  // 1 minute to < 1 hour
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')} min`;
+  return format === 'long'
+    ? formatLongDuration(
+        days,
+        hours,
+        minutes,
+        remainingSeconds,
+        includeSeconds,
+        t,
+      )
+    : formatShortDuration(
+        days,
+        hours,
+        minutes,
+        remainingSeconds,
+        includeSeconds,
+        t,
+      );
 };
 
 /**
