@@ -18,6 +18,7 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
+import {env} from '@/config/env';
 import {colors} from '@/theme';
 import type {
   FieldDataContext,
@@ -394,20 +395,24 @@ export const SECTION_LIST: SectionItem[] = [
     canEdit: false,
     canEnhance: false,
   },
-  {
-    key: SectionKey.Intake,
-    label: 'Intake',
-    icon: IntakeIcon,
-    canEdit: true,
-    canEnhance: false,
-  },
-  {
-    key: SectionKey.OngoingRisks,
-    label: 'Ongoing Risks',
-    icon: OngoingRisksIcon,
-    canEdit: true,
-    canEnhance: false,
-  },
+  ...(env.SCRIBE_SETTINGS_FLAG
+    ? [
+        {
+          key: SectionKey.Intake,
+          label: 'Intake',
+          icon: IntakeIcon,
+          canEdit: true,
+          canEnhance: false,
+        },
+        {
+          key: SectionKey.OngoingRisks,
+          label: 'Ongoing Risks',
+          icon: OngoingRisksIcon,
+          canEdit: true,
+          canEnhance: false,
+        },
+      ]
+    : []),
   {
     key: SectionKey.AdditionalNotes,
     label: 'Additional Notes',
