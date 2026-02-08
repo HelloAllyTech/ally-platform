@@ -2,9 +2,12 @@ import React, {useCallback, useState} from 'react';
 import {ActivityIndicator, FlatList, Platform, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {
+  AndroidCommentMessageRow,
+  SelectionChangeEvent,
+} from '@/components/AndroidCommentMessageRow';
 import {CommentableTextInput} from '@/components/CommentableTextInput/CommentableTextInput';
 import {Message as MessageComponent} from '@/components/Message';
-import {SelectableTextInput} from '@/components/SelectableTextInput/SelectableTextInput';
 import {useTranslate} from '@/hooks';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
@@ -15,6 +18,8 @@ const formatTimestamp = (startSeconds: number) => {
   const seconds = Math.floor(startSeconds % 60);
   return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
+
+const isAndroid = Platform.OS === 'android';
 
 export interface ConversationProps {
   messages: MessageData[];
@@ -65,44 +70,32 @@ export const Conversation: React.FC<ConversationProps> = ({
     onSelection?.(selection, messageId);
   };
 
-  const selectionTextAndroidComponent = (
-    messageItem,
-    isAiClient,
-    highlightedPartIndices,
-  ) => {
-    return (
-      <SelectableTextInput
-        messageId={messageItem.id}
-        isActive={activeMenuMessageId === messageItem.id}
-        requestCloseSignal={closeSignal}
-        onRequestActivate={id => {
-          // close any previously open menu and activate this one
-          setActiveMenuMessageId(id);
-        }}
-        onRequestClose={dismissAnyMenu}
-        prefixText={`${isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
-        prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
-        parts={messageItem.messagePart}
-        highlightedPartIndices={highlightedPartIndices}
-        highlightStyle={styles.highlightedText}
-        partTextStyle={styles.messageContent}
-        separator=""
-        key={`${messageItem.id}`}
-        onAddComment={selectionData =>
-          handleSelection(selectionData, messageItem.id)
-        }
-        onCommentIdsPress={commentIds =>
-          onThreadClick?.(commentIds, messageItem.id)
-        }
-        multiline
-      />
-    );
-  };
+  // ── Android native row handler ──────────────────────────────────
+  const handleAndroidSelectionChange = useCallback(
+    (event: SelectionChangeEvent) => {
+      onSelection?.(
+        {
+          startIndex: event.start,
+          endIndex: event.end,
+          selectedText: event.selectedText,
+        },
+        event.messageId,
+      );
+    },
+    [onSelection],
+  );
 
+  const getSenderName = useCallback(
+    (isAiClient: boolean) =>
+      isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you')),
+    [reviewOwnerName, t],
+  );
+
+  // ── iOS component (unchanged) ─────────────────────────────────
   const selectionTextIOSComponent = (
-    messageItem,
-    isAiClient,
-    highlightedPartIndices,
+    messageItem: MessageData,
+    isAiClient: boolean,
+    highlightedPartIndices: number[],
   ) => {
     return (
       <CommentableTextInput
@@ -114,7 +107,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           setActiveMenuMessageId(id);
         }}
         onRequestClose={dismissAnyMenu}
-        prefixText={`${isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you'))}:`}
+        prefixText={`${getSenderName(isAiClient)}:`}
         prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}
@@ -133,28 +126,19 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
-  const renderSelectableMessageV2 = (messageItem: MessageData) => {
+  // ── Selectable message renderer (iOS only now) ────────────────
+  const renderSelectableMessageIOS = (messageItem: MessageData) => {
     const highlightedPartIndices = messageItem.messagePart
       .map((part, index) => (part.commentIds.length > 0 ? index : -1))
       .filter(index => index !== -1);
 
     const isAiClient = messageItem.senderId === -1;
 
-    const isIOS = Platform.OS === 'ios';
-
-    if (isIOS) {
-      return selectionTextIOSComponent(
-        messageItem,
-        isAiClient,
-        highlightedPartIndices,
-      );
-    } else {
-      return selectionTextAndroidComponent(
-        messageItem,
-        isAiClient,
-        highlightedPartIndices,
-      );
-    }
+    return selectionTextIOSComponent(
+      messageItem,
+      isAiClient,
+      highlightedPartIndices,
+    );
   };
 
   const renderDefaultMessage = (messageItem: MessageData) => (
@@ -173,17 +157,60 @@ export const Conversation: React.FC<ConversationProps> = ({
     </Text>
   );
 
-  const renderItem = ({item}: {item: MessageData}) => (
-    <MessageComponent
-      timestamp={formatTimestamp(item.startSeconds)}
-      onPress={isSelectable ? undefined : () => onThreadClick?.([], item.id)}
-      message={
-        isSelectable
-          ? renderSelectableMessageV2(item)
-          : renderDefaultMessage(item)
-      }
-    />
-  );
+  const renderItem = ({item}: {item: MessageData}) => {
+    const isAiClient = item.senderId === -1;
+
+    // ── Android + selectable → native selection wrapper around RN <Text> ──
+    if (isAndroid && isSelectable) {
+      return (
+        <MessageComponent
+          timestamp={formatTimestamp(item.startSeconds)}
+          message={
+            <AndroidCommentMessageRow
+              messageId={String(item.id)}
+              onSelectionChange={handleAndroidSelectionChange}
+              style={{flex: 1}}>
+              <Text style={styles.messageContent}>
+                <Text
+                  style={isAiClient ? styles.clientAgentText : styles.userName}>
+                  {getSenderName(isAiClient)}:{' '}
+                </Text>
+                {item.messagePart.map((part, index) => {
+                  const hasThread = part.commentIds.length > 0;
+                  return (
+                    <Text
+                      key={`${item.id}-${index}`}
+                      style={hasThread ? styles.highlightedText : undefined}
+                      onPress={
+                        hasThread
+                          ? () =>
+                              onThreadClick?.(part.commentIds, String(item.id))
+                          : undefined
+                      }>
+                      {part.text}
+                    </Text>
+                  );
+                })}
+              </Text>
+            </AndroidCommentMessageRow>
+          }
+        />
+      );
+    }
+
+    // ── iOS selectable or non-selectable fallback ───────────────
+    return (
+      <MessageComponent
+        timestamp={formatTimestamp(item.startSeconds)}
+        onPress={isSelectable ? undefined : () => onThreadClick?.([], item.id)}
+        message={
+          isSelectable
+            ? renderSelectableMessageIOS(item)
+            : renderDefaultMessage(item)
+        }
+      />
+    );
+  };
 
   const renderFooter = () => {
     if (!isLoadingMore) return null;
