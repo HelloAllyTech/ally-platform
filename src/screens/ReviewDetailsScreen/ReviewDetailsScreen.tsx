@@ -253,7 +253,10 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
       // Update raw messages with new thread
       setRawMessages(prev => {
-        const messageIndex = prev.findIndex(m => m.id === messageId);
+        // TODO_M: Check he string conversion works for ios
+        const messageIndex = prev.findIndex(
+          m => m.id?.toString() === messageId,
+        );
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
@@ -449,6 +452,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onRefresh={refreshMessages}
         isRefreshing={isFetching && offset === 0}
         reviewOwnerName={reviewData?.createdBy?.name}
+        onDismissSelection={resetCommentInput}
       />
       {/* Comment input bottom sheet */}
 

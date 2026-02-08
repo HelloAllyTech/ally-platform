@@ -38,6 +38,23 @@ class AndroidCommentMessageRowView : FrameLayout {
     var messageId: String = ""
     var onSelectionChangeListener: ((String, Int, Int, String) -> Unit)? = null
 
+    // =====================================================================
+    //  CLEAR SELECTION  (dismiss native ActionMode from JS)
+    // =====================================================================
+
+    /**
+     * Programmatically clear the text selection on the found ReactTextView.
+     * This also dismisses the native ActionMode ("Add comment" toolbar).
+     */
+    fun clearSelection() {
+        textView?.let { tv ->
+            val text = tv.text
+            if (text is android.text.Spannable) {
+                android.text.Selection.removeSelection(text)
+            }
+        }
+    }
+
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)
     constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : super(

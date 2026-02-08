@@ -69,6 +69,18 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
         }
     }
 
+    /**
+     * When this value changes (increments), clear any active text selection
+     * on the underlying ReactTextView.  This also dismisses the native
+     * ActionMode floating toolbar ("Add comment").
+     */
+    @ReactProp(name = "clearSelectionSignal", defaultInt = 0)
+    fun setClearSelectionSignal(view: AndroidCommentMessageRowView, signal: Int) {
+        if (signal > 0) {
+            view.clearSelection()
+        }
+    }
+
     @ReactProp(name = "menuOptions")
     fun setMenuOptions(view: AndroidCommentMessageRowView, menuOptions: ReadableArray?) {
         if (menuOptions != null) {

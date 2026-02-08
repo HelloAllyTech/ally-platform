@@ -1,5 +1,12 @@
 import React, {useCallback, useState} from 'react';
-import {ActivityIndicator, FlatList, Platform, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {
@@ -32,6 +39,8 @@ export interface ConversationProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   reviewOwnerName?: string;
+  /** Called when the user taps outside selectable text (e.g. timestamp, empty space) or scrolls */
+  onDismissSelection?: () => void;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -45,6 +54,7 @@ export const Conversation: React.FC<ConversationProps> = ({
   onRefresh,
   isRefreshing = false,
   reviewOwnerName,
+  onDismissSelection,
 }) => {
   const {t} = useTranslate();
 
@@ -59,6 +69,15 @@ export const Conversation: React.FC<ConversationProps> = ({
     setActiveMenuMessageId(null);
     setCloseSignal(s => s + 1);
   }, []);
+
+  // Bump to tell ALL native AndroidCommentMessageRow views to clear their
+  // text selection (which also dismisses the native ActionMode toolbar).
+  const [clearSelectionSignal, setClearSelectionSignal] = useState(0);
+
+  const dismissNativeSelection = useCallback(() => {
+    setClearSelectionSignal(s => s + 1);
+    onDismissSelection?.();
+  }, [onDismissSelection]);
 
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
@@ -161,20 +180,33 @@ export const Conversation: React.FC<ConversationProps> = ({
     const isAiClient = item.senderId === -1;
 
     // ── Android + selectable → native selection wrapper around RN <Text> ──
+    // Layout is built manually (not using MessageComponent) so that only
+    // the timestamp and sender name are wrapped in Pressable for dismiss.
+    // Wrapping the *entire* row in Pressable steals touches from the
+    // native selection view and breaks text selection.
     if (isAndroid && isSelectable) {
       return (
-        <MessageComponent
-          timestamp={formatTimestamp(item.startSeconds)}
-          message={
+        <View style={styles.androidRow}>
+          <Pressable
+            onPress={dismissNativeSelection}
+            style={styles.androidTimestampColumn}>
+            <Text style={styles.androidTimestamp} numberOfLines={1}>
+              {formatTimestamp(item.startSeconds)}
+            </Text>
+          </Pressable>
+          <View style={styles.androidMessageColumn}>
+            <Pressable onPress={dismissNativeSelection}>
+              <Text
+                style={isAiClient ? styles.clientAgentText : styles.userName}>
+                {getSenderName(isAiClient)}:
+              </Text>
+            </Pressable>
             <AndroidCommentMessageRow
               messageId={String(item.id)}
               onSelectionChange={handleAndroidSelectionChange}
-              style={{flex: 1}}>
+              clearSelectionSignal={clearSelectionSignal}
+              style={styles.selectableWrapper}>
               <Text style={styles.messageContent}>
-                <Text
-                  style={isAiClient ? styles.clientAgentText : styles.userName}>
-                  {getSenderName(isAiClient)}:{' '}
-                </Text>
                 {item.messagePart.map((part, index) => {
                   const hasThread = part.commentIds.length > 0;
                   return (
@@ -193,8 +225,8 @@ export const Conversation: React.FC<ConversationProps> = ({
                 })}
               </Text>
             </AndroidCommentMessageRow>
-          }
-        />
+          </View>
+        </View>
       );
     }
 
@@ -233,7 +265,10 @@ export const Conversation: React.FC<ConversationProps> = ({
       onEndReachedThreshold={0.5}
       refreshing={isRefreshing}
       onRefresh={onRefresh}
-      onScrollBeginDrag={dismissAnyMenu}
+      onScrollBeginDrag={() => {
+        dismissAnyMenu();
+        dismissNativeSelection();
+      }}
       keyboardShouldPersistTaps="handled"
     />
   );
@@ -263,6 +298,27 @@ const styles = ScaledSheet.create({
     color: colors.black,
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
+  },
+  androidRow: {
+    flexDirection: 'row',
+    paddingHorizontal: '16@ms',
+    paddingVertical: '6@mvs',
+    gap: '16@ms',
+  },
+  androidTimestampColumn: {
+    flexShrink: 0,
+    alignSelf: 'stretch',
+  },
+  androidTimestamp: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  androidMessageColumn: {
+    flex: 1,
+  },
+  selectableWrapper: {
+    flex: 1,
   },
   highlightedText: {
     backgroundColor: colors.ds.amber[50],
