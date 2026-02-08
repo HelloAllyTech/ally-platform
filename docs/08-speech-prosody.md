@@ -1,0 +1,128 @@
+# Speech Prosody
+
+**Purpose.** This document describes the speech prosody system: how voice expression parameters are generated, validated, and applied to TTS providers, and how text enhancement works.
+
+---
+
+## Overview
+
+The speech prosody system generates voice expression parameters (speed, pitch, tone, etc.) and enhanced text (SSML tags, etc.) to make the AI client sound natural and emotionally appropriate. It operates in two phases:
+
+1. **Default generation** -- at session start, generates baseline parameters from the persona description
+2. **Runtime generation** -- for each response, generates parameters and enhanced text based on conversation context
+
+Both phases use an LLM to determine appropriate voice expression.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph "Phase 1: Session Start"
+        A[Scenario + Persona] --> B[generate_default_parameters]
+        B --> C[LLM generates baseline params]
+        C --> D[Validate against PARAMETER_METADATA]
+        D --> E[Apply to TTS via update_options]
+    end
+
+    subgraph "Phase 2: Each Response"
+        F[Response text + History] --> G[generate_runtime_parameters]
+        G --> H[LLM generates params + enhanced text]
+        H --> I[Validate params]
+        I --> J[Apply params to TTS]
+        H --> K[Return enhanced text to graph]
+    end
+```
+
+## SpeechProsodyService
+
+**File:** `app/speech_prosody/service.py`
+
+The main orchestrator for prosody generation:
+
+```python
+class SpeechProsodyService:
+    def __init__(self, tts_client: BaseTTSClient): ...
+
+    async def generate_and_set_defaults(self, scenario, llm_client): ...
+    async def generate_and_apply_runtime(self, response_text, llm_client, ...): ...
+    def get_current_parameters(self) -> Dict[str, Any]: ...
+    def get_default_parameters(self) -> Dict[str, Any]: ...
+```
+
+### generate_and_set_defaults()
+
+Called once during `AgentWorker.configure()`:
+
+1. Gets `PARAMETER_METADATA` from TTS provider
+2. If provider has no metadata, skips (e.g., Deepgram)
+3. Calls `generate_default_parameters()` with scenario and metadata
+4. Validates the LLM-generated dict against metadata
+5. Stores as `_default_params` and `_current_params`
+6. Applies to TTS via `_apply_parameters_dict()`
+7. On failure, falls back to safe defaults from metadata
+
+### generate_and_apply_runtime()
+
+Called for each response in the `apply_voice_expressions` graph node:
+
+1. Gets `PARAMETER_METADATA` and `TEXT_ENHANCEMENT_METADATA` from TTS provider
+2. Calls `generate_runtime_parameters()` with response text, conversation history, persona context, and current parameters
+3. The LLM returns both parameters and enhanced text in a single call
+4. Validates parameters, applies to TTS
+5. Returns enhanced text (or `None` if provider does not support text enhancement)
+
+## Parameter Validation
+
+`BaseTTSClient._validate_parameters_dict()` validates LLM-generated parameters:
+
+- **Unknown parameters** are skipped with a warning
+- **Type validation** ensures floats are actually numeric
+- **Range clamping** clamps values to `[min, max]` range from metadata
+- **None values** are skipped
+
+## Text Enhancement
+
+Some providers support markup in the response text for expressive speech:
+
+| Provider | Enhancement Type | Example |
+|----------|-----------------|---------|
+| ElevenLabs | Custom tags | Emphasis, pauses, breaks |
+| Google Cloud | SSML | `<prosody rate="slow">...</prosody>`, `<break time="500ms"/>` |
+| Hume | None | Parameters only (description-based) |
+| Deepgram | None | No prosody support |
+| Sarvam | None | No prosody support |
+
+When text enhancement is supported, the `apply_voice_expressions` node replaces the message content with the enhanced text before it reaches TTS.
+
+## Convenience Function
+
+`generate_and_apply_prosody_for_message()` is a standalone function used for one-off messages (e.g., termination messages):
+
+1. Creates a temporary `SpeechProsodyService`
+2. Extracts persona context from scenario
+3. Generates and applies prosody
+4. Returns enhanced text or original on failure
+
+This is used in `AgentWorker._handle_termination_in_entrypoint_context()` to apply prosody to the termination message.
+
+## Parameter Flow
+
+```mermaid
+flowchart LR
+    LLM["LLM generates params"] --> Validate["_validate_parameters_dict()"]
+    Validate --> Store["Store in _current_params"]
+    Store --> Apply["_apply_parameters_dict()"]
+    Apply --> TTS["tts_instance.update_options()"]
+```
+
+Parameters go **only** to `update_options()`. They never appear in message content. The message content receives only the enhanced text (if supported).
+
+---
+
+## Key Source Files
+
+- `app/speech_prosody/service.py` -- `SpeechProsodyService`, `generate_and_apply_prosody_for_message()`
+- `app/speech_prosody/generator.py` -- `generate_default_parameters()`, `generate_runtime_parameters()`
+- `app/speech_prosody/constants.py` -- `DEFAULT_CONVERSATION_HISTORY_LIMIT`
+- `app/speech_prosody/utils.py` -- `extract_persona_context_from_prompt_data()`
+- `app/tts/base.py` -- `BaseTTSClient._validate_parameters_dict()`, `_apply_parameters_dict()`

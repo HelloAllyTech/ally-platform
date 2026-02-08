@@ -1,0 +1,181 @@
+# Graph Pipeline
+
+**Purpose.** This document describes the LangGraph pipeline: the `SimulationState` model, the four graph nodes, subgraph design, and data flow.
+
+---
+
+## Overview
+
+The conversation pipeline is a LangGraph `StateGraph` with four nodes connected in a linear chain:
+
+```mermaid
+flowchart LR
+    START --> process_events
+    process_events --> resolve_branching_instruction
+    resolve_branching_instruction --> generate_response
+    generate_response --> apply_voice_expressions
+    apply_voice_expressions --> END
+```
+
+Two of the four nodes (`resolve_branching_instruction` and `apply_voice_expressions`) are wrapped in **subgraphs** to prevent their internal LLM calls from being streamed to the user. See [Architecture](architecture.md) for the rationale.
+
+## SimulationState
+
+`SimulationState` is a Pydantic `BaseModel` that serves as the typed state for the graph. Each field has an associated **reducer** that controls how updates are merged.
+
+| Field | Type | Reducer | Description |
+|-------|------|---------|-------------|
+| `messages` | `List[AnyMessage]` | `add_messages` (LangGraph built-in) | Conversation messages |
+| `permitted_events` | `List[BaseEvent]` | `add_permitted_events` | Events allowed for detection (deduplicated by event_id) |
+| `events_accumulator` | `List[Tuple[str, BaseEvent]]` | `add_events_accumulator` | Historical detected events with timestamps (deduplicated) |
+| `new_events` | `List[BaseEvent]` | `add_new_events` | Events detected in the current turn (replaced each turn) |
+| `current_score` | `int` | `add_scores` | Cumulative score (replaced each turn) |
+| `branching_and_feedback_data` | `List[BranchingAndFeedbackData]` | `add_branching_and_feedback_data` | Branching events for sequential processing |
+| `non_branching_feedback_data` | `List[BranchingAndFeedbackData]` | `add_non_branching_feedback_data` | Non-branching events (async, no blocking) |
+| `next_instruction` | `Optional[str]` | `replace_next_instruction` | Resolved branching instruction text for the LLM |
+| `feedback_to_send` | `Optional[EventFeedback]` | `replace_feedback_to_send` | Feedback selected for UI delivery |
+
+### Key Data Classes
+
+**`EventFeedback`** -- UI feedback payload:
+- `emoji`: display emoji
+- `message`: feedback text
+- `show_feedback`: visibility flag
+
+**`BranchingAndFeedbackData`** -- unified event data:
+- `branching_instruction`: `BranchingInstruction` object (for LLM guidance)
+- `feedback`: `EventFeedback` object (for UI display)
+- `score`: event score (for priority selection)
+- `event_id`: event identifier
+
+## Node 1: process_events
+
+**File:** `app/core/graph/nodes.py:process_events`
+
+This node detects events and updates the registry. Steps:
+
+1. **Prepare context** -- convert messages to `ChatMessage` list, calculate elapsed time and live score
+2. **Detect events** -- run `detect_event()` on all eligible events **in parallel** using `asyncio.create_task()`, with a 10-second timeout per event
+3. **Orchestrate** -- call `EventOrchestrator.orchestrate_events()` which updates the registry, evaluates combination expressions, sends events to Core (SQS), and handles termination
+4. **Split events** -- separate detected events into branching (have `branching_instruction`) and non-branching (feedback only)
+5. **Calculate score** -- sum direct event scores and additional scores from triggered events
+6. **Build state update** -- return updated state dict
+
+### Event Eligibility
+
+Before detection, each event is checked against:
+- **Time window**: `start_time` <= elapsed <= `end_time`
+- **Score window**: `min_score` <= current_score <= `max_score`
+- **Cooldown**: time since last occurrence >= `min_gap_time`
+- **Max occurrences**: occurrence count < `max_occurrences`
+
+## Node 2: resolve_branching_instruction (subgraph)
+
+**File:** `app/core/graph/nodes.py:resolve_branching_instruction`
+
+This node resolves branching instructions that guide the LLM response. Steps:
+
+1. **Select highest-score branching event** from `branching_and_feedback_data`
+2. **Resolve LLM response tags** -- if the instruction contains `<llm_response(...)>` tags, call the LLM to generate content (blocking)
+3. **Resolve dynamic tags** -- substitute `<last_helper_utterance>` and `<chat_summary>` from conversation history
+4. **Select feedback** -- pick the selected branching event's feedback for UI
+
+Returns `next_instruction` (resolved instruction text) and `feedback_to_send`.
+
+## Node 3: generate_response
+
+**File:** `app/core/graph/nodes.py:generate_response`
+
+This node generates the AI client response. Steps:
+
+1. **Merge feedback** -- if no branching feedback was selected, fall back to highest-score non-branching event feedback
+2. **Build system message** -- `generate_system_message()` creates the system prompt from scenario `PromptData` and the resolved `next_instruction`
+3. **Get LLM client** -- from config or create dynamically
+4. **Generate response** -- `llm_instance.ainvoke(messages)` with system message prepended
+5. **Send UI feedback** -- calculate cumulative score from all ACTIVE events, send feedback to UI via LiveKit data channel
+6. **Clear state** -- reset `branching_and_feedback_data`, `non_branching_feedback_data`, `next_instruction`, and `feedback_to_send`
+
+### System Prompt Modes
+
+The system prompt has two modes:
+
+- **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
+- **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, etc.)
+
+## Node 4: apply_voice_expressions (subgraph)
+
+**File:** `app/core/graph/nodes.py:apply_voice_expressions`
+
+This node applies voice expression parameters to the generated response. Steps:
+
+1. **Check support** -- skip if TTS provider has no `PARAMETER_METADATA`
+2. **Extract context** -- get last 10 conversation messages for context
+3. **Generate prosody** -- `generate_and_apply_prosody_for_message()` makes a single LLM call that produces both voice parameters (speed, tone, etc.) and enhanced text (SSML tags, etc.)
+4. **Apply parameters** -- parameters are applied to TTS via `update_options()`
+5. **Update message** -- if the provider supports text enhancement, replace the message content with the enhanced text
+
+## Data Flow Diagram
+
+```mermaid
+flowchart TD
+    subgraph process_events
+        PE1[Eligible events] --> PE2[Parallel detection]
+        PE2 --> PE3[Orchestrate]
+        PE3 --> PE4[Split branching / non-branching]
+    end
+
+    subgraph resolve_branching_instruction
+        RB1[Select highest-score branching event]
+        RB1 --> RB2[Resolve LLM tags]
+        RB2 --> RB3[Resolve dynamic tags]
+        RB3 --> RB4[Set next_instruction + feedback_to_send]
+    end
+
+    subgraph generate_response
+        GR1[Merge feedback from branching + non-branching]
+        GR1 --> GR2[Build system message]
+        GR2 --> GR3[LLM ainvoke]
+        GR3 --> GR4[Send UI feedback]
+        GR4 --> GR5[Clear state]
+    end
+
+    subgraph apply_voice_expressions
+        VE1[Generate prosody parameters + enhanced text]
+        VE1 --> VE2[Apply parameters to TTS]
+        VE2 --> VE3[Update message content if enhanced]
+    end
+
+    process_events --> resolve_branching_instruction
+    resolve_branching_instruction --> generate_response
+    generate_response --> apply_voice_expressions
+```
+
+## Graph Construction
+
+The graph is built in `app/core/graph/graph_builder.py`:
+
+```python
+def build_graph() -> StateGraph[SimulationState]:
+    graph = StateGraph(SimulationState)
+    graph.add_node("process_events", process_events)
+    graph.add_node("resolve_branching_instruction", build_resolve_branching_subgraph())
+    graph.add_node("generate_response", generate_response)
+    graph.add_node("apply_voice_expressions", build_voice_expressions_subgraph())
+
+    graph.add_edge(START, "process_events")
+    graph.add_edge("process_events", "resolve_branching_instruction")
+    graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("generate_response", "apply_voice_expressions")
+    graph.add_edge("apply_voice_expressions", END)
+    return graph
+```
+
+---
+
+## Key Source Files
+
+- `app/core/graph/graph_builder.py` -- `build_graph()`, subgraph builders
+- `app/core/graph/nodes.py` -- `process_events`, `resolve_branching_instruction`, `generate_response`, `apply_voice_expressions`
+- `app/core/graph/state.py` -- `SimulationState`, reducers, data classes
+- `app/core/graph/prompt.py` -- `generate_system_message()`
+- `app/core/graph/utils.py` -- `is_event_eligible()`, `convert_messages_to_chat_messages()`
