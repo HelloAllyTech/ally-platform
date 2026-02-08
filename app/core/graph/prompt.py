@@ -33,6 +33,10 @@ unless explicitly instructed.
 - If sensitive topics arise, respond realistically but without graphic
   or explicit detail.
 - Keep each reply under ~120 words to simulate session pacing.
+- Do NOT include stage directions, action descriptions, or expressions in
+  brackets or parentheses (e.g., "(sighs)", "(pausing)", "(shaking head)").
+  Your response will be spoken aloud via text-to-speech, so output only
+  the words the client would actually say.
 """
 
 

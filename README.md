@@ -396,6 +396,73 @@ LLM_TEMPERATURE=0.7  # Optional, defaults to 0.7
 
 If not specified in metadata, the system uses the default OpenAI configuration from environment settings (model and temperature from `OPENAI_API_KEY` and `LLM_TEMPERATURE`).
 
+**Open-Source Models (Ollama / vLLM):**
+
+For local development or dev server testing, you can use open-source models (Llama, Mistral, etc.) via Ollama or vLLM. Both expose OpenAI-compatible APIs.
+
+**Important:** `OPENAI_API_KEY` is still required even when using Ollama/vLLM, because binary classifiers and embeddings always run on OpenAI regardless of the conversation LLM provider.
+
+*Ollama (local):*
+
+Ollama must be installed and running separately on your host machine. It is not bundled with the app or started automatically by docker-compose.
+
+```bash
+# 1. Install Ollama (https://ollama.com)
+# macOS:
+brew install ollama
+
+# 2. Start Ollama and pull a model
+ollama serve
+ollama pull llama3.2
+```
+
+Set environment variables in your `.env` file:
+```env
+# If running the app in Docker (use host.docker.internal to reach host Ollama):
+OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+
+# If running the app without Docker (locally):
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+
+# Optional: default model fallback if not specified in scenario metadata
+LOCAL_LLM_MODEL=llama3.2
+```
+
+Configure the scenario metadata to use Ollama:
+```json
+{
+  "llm": {
+    "provider": "ollama",
+    "config": {
+      "model": "llama3.2"
+    }
+  }
+}
+```
+
+*vLLM (GPU server):*
+
+vLLM runs on a separate GPU server and exposes an OpenAI-compatible API.
+
+```env
+VLLM_BASE_URL=http://your-gpu-server:8000/v1
+LOCAL_LLM_MODEL=meta-llama/Llama-3.2-8B-Instruct
+```
+
+Configure the scenario metadata to use vLLM:
+```json
+{
+  "llm": {
+    "provider": "vllm",
+    "config": {
+      "model": "meta-llama/Llama-3.2-8B-Instruct"
+    }
+  }
+}
+```
+
+Scenarios that do not specify `"provider": "ollama"` or `"provider": "vllm"` in their metadata will continue to use OpenAI as the LLM provider.
+
 ### Logging
 
 Configure logging levels:

@@ -42,6 +42,8 @@ class STTProvider(str, Enum):
 class LLMProvider(str, Enum):
     OPENAI = "openai"
     GEMINI = "gemini"
+    OLLAMA = "ollama"
+    VLLM = "vllm"
 
 
 class VisibilityType(str, Enum):

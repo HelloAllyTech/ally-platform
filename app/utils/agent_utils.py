@@ -149,13 +149,26 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
         else DEFAULT_LANGUAGE_CODE
     )
 
+    # Log LLM config for debugging
+    if llm_config_from_metadata:
+        logger.info(
+            f"Using LLM config from scenario metadata: "
+            f"provider={llm_config_from_metadata.get('provider')}, "
+            f"config={llm_config_from_metadata.get('config')}"
+        )
+    else:
+        logger.info("No LLM config in scenario metadata, using defaults")
+
     try:
-        return create_llm_client(
+        llm_client = create_llm_client(
             llm_config=llm_config_from_metadata,
             language_code=language_code,
         )
+        logger.info(f"Successfully created LLM client: {type(llm_client).__name__}")
+        return llm_client
     except Exception as e:
         logger.warning(f"LLM config failed, using default: {e}")
+        logger.info("Falling back to default LLM configuration")
         return create_llm_client(language_code=language_code)
 
 

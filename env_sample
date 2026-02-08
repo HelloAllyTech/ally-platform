@@ -35,6 +35,20 @@ DEFAULT_MALE_VOICE_MODEL=<MALE_FALLBACK_VOICE>
 DEFAULT_FEMALE_VOICE_MODEL=<FEMALE_FALLBACK_VOICE>
 DEFAULT_NON_BINARY_VOICE_MODEL=<NON_BINARY_FALLBACK_VOICE>
 
+# Open-source LLM settings (Ollama / vLLM)
+#
+# Ollama setup: Install and run natively on your machine
+# Install: brew install ollama && ollama serve && ollama pull llama3.2
+#
+# If running the app in Docker, use host.docker.internal to reach host Ollama:
+# OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+#
+# If running the app without Docker (locally):
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+#
+# VLLM_BASE_URL=http://your-gpu-server:8000/v1
+# LOCAL_LLM_MODEL=llama3.2
+
 # Multilingual text generation settings
 MULTILINGUAL_METHOD=none
 EVALUATION_LOG_DIR=evaluation_logs

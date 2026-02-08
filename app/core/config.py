@@ -46,6 +46,20 @@ class Settings(BaseSettings):
         description="OpenAI model to use for embeddings",
     )
 
+    # Open-source LLM settings (Ollama / vLLM)
+    OLLAMA_BASE_URL: Optional[str] = Field(
+        default="http://host.docker.internal:11434/v1",
+        description="Base URL for Ollama's OpenAI-compatible API",
+    )
+    VLLM_BASE_URL: Optional[str] = Field(
+        default=None,
+        description="Base URL for vLLM's OpenAI-compatible API",
+    )
+    LOCAL_LLM_MODEL: Optional[str] = Field(
+        default=None,
+        description="Default model for local LLM providers (e.g., llama3.2)",
+    )
+
     GOOGLE_API_KEY: Optional[str] = Field(
         default=None,
         description=(

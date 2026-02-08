@@ -37,6 +37,7 @@ class OpenAILLMClient(BaseLLMClient):
         language_code: str,  # BCP 47 format
         temperature: Optional[float] = None,
         api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
     ) -> None:
         if not model:
             raise ValueError("OpenAI LLM requires 'model' parameter")
@@ -46,6 +47,7 @@ class OpenAILLMClient(BaseLLMClient):
 
         self._model = model
         self._language_code = language_code
+        self._base_url = base_url
 
         # Use provided temperature or fall back to settings
         self._temperature = (
@@ -53,23 +55,32 @@ class OpenAILLMClient(BaseLLMClient):
         )
 
         # Use provided API key or fall back to settings
+        # When base_url is set (e.g. Ollama/vLLM), use a placeholder if no real key
         self._api_key = api_key or settings.OPENAI_API_KEY
-
         if not self._api_key:
-            raise ValueError(
-                "OpenAI LLM requires 'api_key' parameter or OPENAI_API_KEY in settings"
-            )
+            if base_url:
+                self._api_key = "not-needed"
+            else:
+                raise ValueError(
+                    "OpenAI LLM requires 'api_key' parameter "
+                    "or OPENAI_API_KEY in settings"
+                )
 
         logger.debug(
             f"Creating OpenAI LLM with model: {model}, language: {language_code}"
+            + (f", base_url: {base_url}" if base_url else "")
         )
 
         # Create the underlying LLM instance
-        self._llm_instance = ChatOpenAI(
-            model=self._model,
-            temperature=self._temperature,
-            api_key=self._api_key,
-        )
+        chat_kwargs: Dict[str, Any] = {
+            "model": self._model,
+            "temperature": self._temperature,
+            "api_key": self._api_key,
+        }
+        if self._base_url:
+            chat_kwargs["base_url"] = self._base_url
+
+        self._llm_instance = ChatOpenAI(**chat_kwargs)
 
     @classmethod
     def from_config(
@@ -101,12 +112,14 @@ class OpenAILLMClient(BaseLLMClient):
 
         model = config_dict.get("model", DEFAULT_LLM_CONFIG["model"])
         temperature = config_dict.get("temperature")
+        base_url = config_dict.get("base_url")
 
         return cls(
             model=model,
             language_code=language_code,
             temperature=temperature,
             api_key=settings.OPENAI_API_KEY,
+            base_url=base_url,
         )
 
     @property

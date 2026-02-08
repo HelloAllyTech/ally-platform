@@ -251,6 +251,207 @@ class TestLLMFactory:
             create_llm_client(llm_config=llm_config, language_code="en-IN")
 
 
+class TestOpenAILLMClientBaseUrl:
+    """Test cases for OpenAILLMClient base_url support."""
+
+    @pytest.mark.unit
+    @patch("app.llms.openai.ChatOpenAI")
+    @patch("app.llms.openai.settings")
+    def test_base_url_passed_to_chat_openai(
+        self, mock_settings, mock_chat_openai_class
+    ):
+        """Test that base_url is passed through to ChatOpenAI."""
+        mock_settings.OPENAI_API_KEY = "test-api-key"
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_chat_openai_class.return_value = Mock()
+
+        OpenAILLMClient(
+            model="llama3.2",
+            language_code="en-IN",
+            base_url="http://localhost:11434/v1",
+        )
+
+        mock_chat_openai_class.assert_called_once_with(
+            model="llama3.2",
+            temperature=0.7,
+            api_key="test-api-key",
+            base_url="http://localhost:11434/v1",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.openai.ChatOpenAI")
+    @patch("app.llms.openai.settings")
+    def test_base_url_with_no_api_key_uses_placeholder(
+        self, mock_settings, mock_chat_openai_class
+    ):
+        """Test that base_url with no API key uses placeholder."""
+        mock_settings.OPENAI_API_KEY = None
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_chat_openai_class.return_value = Mock()
+
+        client = OpenAILLMClient(
+            model="llama3.2",
+            language_code="en-IN",
+            base_url="http://localhost:11434/v1",
+        )
+
+        mock_chat_openai_class.assert_called_once_with(
+            model="llama3.2",
+            temperature=0.7,
+            api_key="not-needed",
+            base_url="http://localhost:11434/v1",
+        )
+        assert client.llm_instance is not None
+
+    @pytest.mark.unit
+    @patch("app.llms.openai.ChatOpenAI")
+    @patch("app.llms.openai.settings")
+    def test_no_base_url_omits_it_from_chat_openai(
+        self, mock_settings, mock_chat_openai_class
+    ):
+        """Test that when base_url is None it is not passed to ChatOpenAI."""
+        mock_settings.OPENAI_API_KEY = "test-api-key"
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_chat_openai_class.return_value = Mock()
+
+        OpenAILLMClient(model="gpt-4o-mini", language_code="en-IN")
+
+        mock_chat_openai_class.assert_called_once_with(
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-api-key",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.openai.ChatOpenAI")
+    @patch("app.llms.openai.settings")
+    def test_from_config_extracts_base_url(self, mock_settings, mock_chat_openai_class):
+        """Test that from_config extracts base_url from config dict."""
+        mock_settings.OPENAI_API_KEY = "test-api-key"
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_chat_openai_class.return_value = Mock()
+
+        config = {
+            "model": "llama3.2",
+            "base_url": "http://localhost:11434/v1",
+        }
+        OpenAILLMClient.from_config(config=config, language_code="en-IN")
+
+        mock_chat_openai_class.assert_called_once_with(
+            model="llama3.2",
+            temperature=0.7,
+            api_key="test-api-key",
+            base_url="http://localhost:11434/v1",
+        )
+
+
+class TestLLMFactoryOllamaVllm:
+    """Test cases for Ollama and vLLM factory routing."""
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.settings")
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_ollama_provider_creates_client_with_correct_base_url(
+        self, mock_llm_class, mock_settings
+    ):
+        """Test factory with provider 'ollama' uses OLLAMA_BASE_URL."""
+        mock_client = Mock()
+        mock_llm_class.from_config.return_value = mock_client
+        mock_settings.OLLAMA_BASE_URL = "http://localhost:11434/v1"
+        mock_settings.LOCAL_LLM_MODEL = None
+
+        llm_config = {
+            "provider": "ollama",
+            "config": {"model": "llama3.2"},
+        }
+        result = create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        call_config = mock_llm_class.from_config.call_args[1]["config"]
+        assert call_config["base_url"] == "http://localhost:11434/v1"
+        assert call_config["model"] == "llama3.2"
+        assert result == mock_client
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.settings")
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_ollama_provider_uses_local_llm_model_default(
+        self, mock_llm_class, mock_settings
+    ):
+        """Test factory with provider 'ollama' defaults model to LOCAL_LLM_MODEL."""
+        mock_client = Mock()
+        mock_llm_class.from_config.return_value = mock_client
+        mock_settings.OLLAMA_BASE_URL = "http://localhost:11434/v1"
+        mock_settings.LOCAL_LLM_MODEL = "mistral"
+
+        llm_config = {"provider": "ollama", "config": {}}
+        create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        call_config = mock_llm_class.from_config.call_args[1]["config"]
+        assert call_config["model"] == "mistral"
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.settings")
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_vllm_provider_creates_client_with_correct_base_url(
+        self, mock_llm_class, mock_settings
+    ):
+        """Test factory with provider 'vllm' uses VLLM_BASE_URL."""
+        mock_client = Mock()
+        mock_llm_class.from_config.return_value = mock_client
+        mock_settings.VLLM_BASE_URL = "http://gpu-server:8000/v1"
+        mock_settings.LOCAL_LLM_MODEL = None
+
+        llm_config = {
+            "provider": "vllm",
+            "config": {"model": "meta-llama/Llama-3.2-8B-Instruct"},
+        }
+        result = create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        call_config = mock_llm_class.from_config.call_args[1]["config"]
+        assert call_config["base_url"] == "http://gpu-server:8000/v1"
+        assert call_config["model"] == "meta-llama/Llama-3.2-8B-Instruct"
+        assert result == mock_client
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.settings")
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_vllm_provider_no_base_url_raises_error(
+        self, mock_llm_class, mock_settings
+    ):
+        """Test factory with provider 'vllm' and no VLLM_BASE_URL raises ValueError."""
+        mock_settings.VLLM_BASE_URL = None
+        mock_settings.LOCAL_LLM_MODEL = None
+
+        llm_config = {
+            "provider": "vllm",
+            "config": {"model": "meta-llama/Llama-3.2-8B-Instruct"},
+        }
+        with pytest.raises(ValueError, match="vLLM provider requires VLLM_BASE_URL"):
+            create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.settings")
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_config_base_url_overrides_env_default(self, mock_llm_class, mock_settings):
+        """Test that base_url in config overrides environment variable default."""
+        mock_client = Mock()
+        mock_llm_class.from_config.return_value = mock_client
+        mock_settings.OLLAMA_BASE_URL = "http://localhost:11434/v1"
+        mock_settings.LOCAL_LLM_MODEL = None
+
+        llm_config = {
+            "provider": "ollama",
+            "config": {
+                "model": "llama3.2",
+                "base_url": "http://remote-ollama:11434/v1",
+            },
+        }
+        create_llm_client(llm_config=llm_config, language_code="en-IN")
+
+        call_config = mock_llm_class.from_config.call_args[1]["config"]
+        assert call_config["base_url"] == "http://remote-ollama:11434/v1"
+
+
 class TestLLMAbstractionIntegration:
     """Integration tests for LLM abstraction."""
 
