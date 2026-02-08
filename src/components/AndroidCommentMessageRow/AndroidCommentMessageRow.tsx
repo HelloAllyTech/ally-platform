@@ -32,6 +32,8 @@ export interface AndroidCommentMessageRowProps {
   menuOptions?: string[];
   /** Fired when the user selects text and taps a menu option */
   onSelectionChange?: (event: SelectionChangeEvent) => void;
+  /** Increment to clear native selection & dismiss the ActionMode toolbar */
+  clearSelectionSignal?: number;
   /** React Native children – typically a <Text> with highlighted spans */
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -42,6 +44,7 @@ export interface AndroidCommentMessageRowProps {
 interface NativeProps {
   messageId: string;
   menuOptions?: string[];
+  clearSelectionSignal?: number;
   onSelectionChange?: (
     event: NativeSyntheticEvent<SelectionChangeEvent>,
   ) => void;
@@ -86,6 +89,7 @@ export const AndroidCommentMessageRow: React.FC<
   messageId,
   menuOptions = ['Add comment'],
   onSelectionChange,
+  clearSelectionSignal,
   children,
   style,
 }) => {
@@ -105,6 +109,7 @@ export const AndroidCommentMessageRow: React.FC<
     <NativeAndroidCommentMessageRow
       messageId={messageId}
       menuOptions={menuOptions}
+      clearSelectionSignal={clearSelectionSignal}
       onSelectionChange={handleSelectionChange}
       style={style}>
       {children}
