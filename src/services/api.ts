@@ -146,6 +146,8 @@ export const api = createApi({
     'SimulationCredits',
     'SimulationPaths',
     'SimulationPathDetails',
+    'Cases',
+    'CaseDetails',
     'User',
     'Badges',
     'UserPreferences',

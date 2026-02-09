@@ -1,6 +1,7 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
+import {LearningPathType} from '@/constants';
 import {Scenario, SessionData} from '@/types/simulations';
 
 export type RootStackParamList = {
@@ -14,15 +15,18 @@ export type RootStackParamList = {
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
   SimulationPathDetails: {pathId: string};
+  CaseDetails: {caseId: string};
   SimulationAssistant: {
     sessionData: SessionData;
     scenario?: Scenario;
     pathId?: string;
+    contextType?: LearningPathType;
   };
   SimulationFeedback: {
     scenarioSessionId?: string;
     fromLogs?: boolean;
     pathId?: string;
+    contextType?: LearningPathType;
   };
   Achievements: undefined;
   ProfileSettings: undefined;
