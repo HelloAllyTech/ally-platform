@@ -1,10 +1,12 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
+  StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -14,7 +16,11 @@ import {
   SelectionChangeEvent,
   SingleTapEvent,
 } from '@/components/AndroidCommentMessageRow';
-import {CommentableTextInput} from '@/components/CommentableTextInput/CommentableTextInput';
+import {
+  CommentableTextInput,
+  type AddCommentMenuData,
+  type SelectionData,
+} from '@/components/CommentableTextInput/CommentableTextInput';
 import {Message as MessageComponent} from '@/components/Message';
 import {useTranslate} from '@/hooks';
 import {fontFamily, typography} from '@/theme';
@@ -28,6 +34,17 @@ const formatTimestamp = (startSeconds: number) => {
 };
 
 const isAndroid = Platform.OS === 'android';
+const isIOS = Platform.OS === 'ios';
+
+// iOS floating "Add comment" menu dimensions
+const IOS_MENU_W = 140;
+const IOS_MENU_H = 44;
+
+type FloatingMenuData = {
+  position: {x: number; y: number};
+  messageId: string;
+  selectionData: SelectionData;
+};
 
 export interface ConversationProps {
   messages: MessageData[];
@@ -66,9 +83,23 @@ export const Conversation: React.FC<ConversationProps> = ({
   // bump to force-close currently-open menu
   const [closeSignal, setCloseSignal] = useState(0);
 
+  // ── iOS floating "Add comment" menu ─────────────────────────
+  const [floatingMenu, setFloatingMenu] = useState<FloatingMenuData | null>(
+    null,
+  );
+  const conversationRef = useRef<View>(null);
+  const conversationOffsetRef = useRef({x: 0, y: 0});
+
+  const measureConversationOffset = useCallback(() => {
+    conversationRef.current?.measureInWindow((x, y) => {
+      conversationOffsetRef.current = {x, y};
+    });
+  }, []);
+
   const dismissAnyMenu = useCallback(() => {
     setActiveMenuMessageId(null);
     setCloseSignal(s => s + 1);
+    setFloatingMenu(null);
   }, []);
 
   // Bump to tell ALL native AndroidCommentMessageRow views to clear their
@@ -79,6 +110,45 @@ export const Conversation: React.FC<ConversationProps> = ({
     setClearSelectionSignal(s => s + 1);
     onDismissSelection?.();
   }, [onDismissSelection]);
+
+  // Timer used to debounce "dismiss on touch" — cancelled if a selection
+  // event fires shortly after (meaning the user touched text, not empty space).
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── iOS floating menu callbacks ──────────────────────────────
+  const handleShowAddCommentMenu = useCallback((data: AddCommentMenuData) => {
+    // Cancel any pending dismiss — the user is interacting with text.
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+    // Re-measure offset for accurate positioning
+    conversationRef.current?.measureInWindow((x, y) => {
+      conversationOffsetRef.current = {x, y};
+      setFloatingMenu(data);
+    });
+  }, []);
+
+  const handleHideAddCommentMenu = useCallback((msgId: string) => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+    setFloatingMenu(prev => (prev && prev.messageId === msgId ? null : prev));
+  }, []);
+
+  const handleFloatingMenuAddComment = useCallback(() => {
+    if (!floatingMenu) return;
+    onSelection?.(
+      {
+        startIndex: floatingMenu.selectionData.startIndex,
+        endIndex: floatingMenu.selectionData.endIndex,
+        selectedText: floatingMenu.selectionData.selectedText,
+      },
+      floatingMenu.messageId,
+    );
+    dismissAnyMenu();
+  }, [floatingMenu, onSelection, dismissAnyMenu]);
 
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
@@ -164,6 +234,8 @@ export const Conversation: React.FC<ConversationProps> = ({
         onCommentIdsPress={commentIds =>
           onThreadClick?.(commentIds, messageItem.id)
         }
+        onShowAddCommentMenu={handleShowAddCommentMenu}
+        onHideAddCommentMenu={handleHideAddCommentMenu}
         multiline
       />
     );
@@ -272,27 +344,74 @@ export const Conversation: React.FC<ConversationProps> = ({
   };
 
   return (
-    <FlatList
-      data={messages}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styles.listContainer}
-      renderItem={renderItem}
-      ListEmptyComponent={renderEmptyComponent}
-      ListFooterComponent={renderFooter}
-      onEndReached={hasMore ? onLoadMore : undefined}
-      onEndReachedThreshold={0.5}
-      refreshing={isRefreshing}
-      onRefresh={onRefresh}
-      onScrollBeginDrag={() => {
-        dismissAnyMenu();
-        dismissNativeSelection();
-      }}
-      keyboardShouldPersistTaps="handled"
-    />
+    <View
+      ref={conversationRef}
+      style={styles.flex1}
+      onLayout={measureConversationOffset}>
+      <FlatList
+        data={messages}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        renderItem={renderItem}
+        ListEmptyComponent={renderEmptyComponent}
+        ListFooterComponent={renderFooter}
+        onEndReached={hasMore ? onLoadMore : undefined}
+        onEndReachedThreshold={0.5}
+        refreshing={isRefreshing}
+        onRefresh={onRefresh}
+        onScrollBeginDrag={() => {
+          dismissAnyMenu();
+          dismissNativeSelection();
+        }}
+        onTouchStart={() => {
+          // When the floating menu is visible, schedule a dismiss.
+          // If a selection-change event fires within 150ms (meaning the
+          // touch landed on text / selection handles), the timer is
+          // cancelled in handleShowAddCommentMenu so the menu stays.
+          if (floatingMenu) {
+            if (dismissTimerRef.current) {
+              clearTimeout(dismissTimerRef.current);
+            }
+            dismissTimerRef.current = setTimeout(() => {
+              dismissTimerRef.current = null;
+              dismissAnyMenu();
+            }, 150);
+          }
+        }}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      {/* iOS floating "Add comment" menu — rendered OUTSIDE the FlatList
+          so it doesn't interfere with native selection handles. */}
+      {isIOS && floatingMenu && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <View
+            style={[
+              styles.iosMenuContainer,
+              {
+                top: floatingMenu.position.y - conversationOffsetRef.current.y,
+                left: floatingMenu.position.x - conversationOffsetRef.current.x,
+                width: IOS_MENU_W,
+                height: IOS_MENU_H,
+              },
+            ]}>
+            <TouchableOpacity
+              style={styles.iosMenuItem}
+              onPress={handleFloatingMenuAddComment}
+              activeOpacity={0.7}>
+              <Text style={styles.iosMenuItemText}>Add comment</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
   );
 };
 
 const styles = ScaledSheet.create({
+  flex1: {
+    flex: 1,
+  },
   listContainer: {
     padding: '16@ms',
     paddingBottom: '100@ms',
@@ -347,5 +466,28 @@ const styles = ScaledSheet.create({
     paddingVertical: '16@ms',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // ── iOS floating "Add comment" menu ──
+  iosMenuContainer: {
+    position: 'absolute',
+    backgroundColor: colors.ds.surface.background,
+    borderRadius: 8,
+    justifyContent: 'center',
+    shadowColor: colors.black,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 20,
+    zIndex: 9999,
+  },
+  iosMenuItem: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  iosMenuItemText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
 });
