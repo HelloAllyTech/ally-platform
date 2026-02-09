@@ -169,6 +169,7 @@ export interface CallSummaryResponse {
   status: string;
   startedAt: string;
   endedAt: string;
+  archivedAt: string;
   details: CallDetails;
   summaryStatus: ChatSummaryStatus;
 }

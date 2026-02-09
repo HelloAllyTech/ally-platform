@@ -45,3 +45,5 @@ export const env: Env = {
   ),
   SCRIBE_SETTINGS_FLAG: Config.SCRIBE_SETTINGS_FLAG === 'true',
 };
+
+export const ARCHIVE_CALL_LOGS_FLAG = false;

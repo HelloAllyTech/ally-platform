@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
 
 import {useErrorToast, useToast} from '@/components';
+import {useArchiveCallLogMutation} from '@/services';
 import {
   useAddSummaryFeedbackMutation,
   useLazyExportCallSummaryQuery,
@@ -29,6 +30,7 @@ export const useCallSummaryActions = ({
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [addSummaryFeedback] = useAddSummaryFeedbackMutation();
+  const [archiveCallLog] = useArchiveCallLogMutation();
 
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
@@ -99,6 +101,28 @@ export const useCallSummaryActions = ({
       setIsMenuVisible(false);
     } catch (error) {
       showErrorToast(error, 'CallSummary.info.fileExportFailed');
+    }
+  };
+
+  // Archive call summary
+  const handleArchive = async (archive: boolean) => {
+    try {
+      await archiveCallLog({callLogId: chatId, archive}).unwrap();
+      showToast(
+        archive
+          ? t('CallSummary.archiveActionModal.archive.success')
+          : t('CallSummary.archiveActionModal.unarchive.success'),
+        'success',
+      );
+    } catch (error) {
+      showErrorToast(
+        error,
+        archive
+          ? t('CallSummary.archiveActionModal.archive.failed')
+          : t('CallSummary.archiveActionModal.unarchive.failed'),
+      );
+    } finally {
+      setIsMenuVisible(false);
     }
   };
 
@@ -185,6 +209,7 @@ export const useCallSummaryActions = ({
     hideMenu,
     showMenu,
     handleExport,
+    handleArchive,
     handleDelete,
     handleGoBack,
     summaryName,
