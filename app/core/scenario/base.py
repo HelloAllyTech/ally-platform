@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import BaseEmbeddingClient
@@ -31,6 +31,58 @@ class ScenarioResponseLength(str, Enum):
     BRIEF = "BRIEF"
     MEDIUM = "MEDIUM"
     ELABORATE = "ELABORATE"
+
+
+class SimulationBehaviorCategory(str, Enum):
+    """Category of helper behavior in the simulation."""
+
+    SHOULD_DO = "SHOULD_DO"
+    SHOULD_NOT_DO = "SHOULD_NOT_DO"
+
+
+class SimulationBehaviorInstruction(BaseModel):
+    """Describes what the helper should or should not do, and the actor's response."""
+
+    category: SimulationBehaviorCategory = Field(
+        ...,
+        description="Whether the helper should or should not exhibit these behaviors",
+    )
+    behaviors: List[str] = Field(
+        ..., description="List of behavior labels (e.g. 'Validated experience')"
+    )
+    score: int = Field(..., description="Score assigned to this behavior instruction")
+    actors_responses: Optional[List[str]] = Field(
+        default=None,
+        alias="actorsResponses",
+        description="The actor's responses when these behaviors are exhibited",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SimulationStateInstruction(BaseModel):
+    """Describes an ordered agent state with instruction and optional dialogues."""
+
+    state_id: str = Field(
+        ..., alias="stateId", description="State identifier (e.g. '1')"
+    )
+    instruction: str = Field(..., description="What the agent should do in this state")
+    score_lower: Optional[int] = Field(
+        default=None,
+        alias="scoreLower",
+        description="Lower score limit for this state (None represents -infinity)",
+    )
+    score_upper: Optional[int] = Field(
+        default=None,
+        alias="scoreUpper",
+        description="Upper score limit for this state (None represents +infinity)",
+    )
+    dialogues: Optional[List[str]] = Field(
+        default=None,
+        description="Specific dialogue lines the agent can use in this state",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class PromptData(BaseModel):
@@ -120,6 +172,14 @@ class Scenario(BaseModel):
     voice: Optional[ScenarioVoice] = Field(default=None)
     prompt_data: PromptData = Field(default_factory=PromptData)
     language_config: Optional[LanguageConfig] = Field(default=None)
+    behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = Field(
+        default=None,
+        description="Behavior guidelines for what helper should/shouldn't do",
+    )
+    state_instructions: Optional[List[SimulationStateInstruction]] = Field(
+        default=None,
+        description="Ordered agent states with instructions and dialogues",
+    )
 
     model_config = {
         "populate_by_name": True,  # allow both alias and field name on input
@@ -169,6 +229,10 @@ class Scenario(BaseModel):
         # Extract termination event configuration (supports both old and new keys)
         termination_events = cls._build_termination_events(raw)
 
+        # Parse simulation instructions (same level as events)
+        behavior_instructions = raw.get("behaviorInstructions")
+        state_instructions = raw.get("stateInstructions")
+
         return cls(
             scenarioName=normalized["scenarioName"],
             metadata=normalized.get("metadata", {}),
@@ -178,6 +242,8 @@ class Scenario(BaseModel):
             voice=voice_obj,
             prompt_data=prompt_data,
             language_config=language_config,
+            behavior_instructions=behavior_instructions,
+            state_instructions=state_instructions,
         )
 
     # ---------------------------

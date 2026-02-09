@@ -35,6 +35,74 @@ SCENARIO_SAMPLE = {
                 },
             ],
         },
+        "behaviorInstructions": [
+            {
+                "category": "SHOULD_DO",
+                "behaviors": [
+                    "Introduced self",
+                    "Validated experience",
+                    "Normalised feelings",
+                    "Explained how therapy works",
+                    "Explained confidentiality",
+                ],
+                "score": 10,
+                "actorsResponses": ["I am open to exploring therapy..."],
+            },
+            {
+                "category": "SHOULD_NOT_DO",
+                "behaviors": [
+                    "Invalidated feelings",
+                    "Asked closed ended questions",
+                ],
+                "score": -10,
+                "actorsResponses": ["I am open to exploring therapy..."],
+            },
+            {
+                "category": "SHOULD_NOT_DO",
+                "behaviors": [
+                    "Was rude",
+                    "Was disrespectful",
+                    "Rushed client",
+                ],
+                "score": -10,
+                "actorsResponses": ["Why are you talking to me like that?"],
+            },
+        ],
+        "stateInstructions": [
+            {
+                "stateId": "1",
+                "instruction": "Become shut down",
+                "scoreLower": None,
+                "scoreUpper": -1,
+                "dialogues": [
+                    "Uh... I don't really get how just talking is supposed to... help.",
+                    "I mean... I'm saying things, but I don't know what this is doing.",
+                    "Maybe I'm missing something, but... I don't see how this works.",
+                    "I thought there'd be, um... more than just me talking.",
+                ],
+            },
+            {
+                "stateId": "2",
+                "instruction": "Express mild doubt about if talking is helping",
+                "scoreLower": 0,
+                "scoreUpper": 4,
+                "dialogues": [],
+            },
+            {
+                "stateId": "3",
+                "instruction": "Express mild willingness to disclose and give talk therapy a shot",
+                "scoreLower": 5,
+                "scoreUpper": 9,
+                "dialogues": [],
+            },
+            {
+                "stateId": "4",
+                "instruction": "Express strong commitment towards continuing therapy for long term improvement",
+                "scoreLower": 10,
+                "scoreUpper": None,
+                "dialogues": [],
+            },
+        ],
         "events": [
             {
                 "id": "superficial-hope",
