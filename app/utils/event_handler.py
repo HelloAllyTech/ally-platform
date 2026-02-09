@@ -423,11 +423,28 @@ def create_termination_handler(
             f"Signaling entrypoint context for termination handling."
         )
 
-        # Get termination message
+        # Get termination message with validation
         termination_config = orchestrator_ref[0].get_termination_config(event.event_id)
-        termination_message = (
-            termination_config.termination_message if termination_config else ""
-        )
+
+        if termination_config is None:
+            termination_ids = list(orchestrator_ref[0].termination_event_ids)
+            logger.error(
+                f"Termination config not found for event '{event.event_id}'. "
+                f"Available termination event IDs: {termination_ids}. "
+                f"Cannot proceed with termination without a valid config."
+            )
+            return
+
+        termination_message = termination_config.termination_message
+
+        # Validate termination message is not None and not empty
+        if not termination_message or not termination_message.strip():
+            logger.error(
+                f"Termination message is empty or None for event '{event.event_id}'. "
+                f"Termination config: {termination_config}. "
+                f"Cannot proceed with termination without a valid message."
+            )
+            return
 
         # If worker is provided, signal termination to entrypoint context
         # This allows audio to play reliably (runs in main async context)

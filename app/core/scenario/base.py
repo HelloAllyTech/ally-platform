@@ -374,29 +374,86 @@ class Scenario(BaseModel):
                 normalized_data = Scenario._normalize_termination_event_data(
                     termination_event_data
                 )
-                event = TerminationEvent(**normalized_data)
-                termination_events.append(event)
+
+                # Validate required fields before creating TerminationEvent
+                if not normalized_data.get("id"):
+                    logger.error(
+                        f"autoTerminationEvent is missing required 'id' field. "
+                        f"Event data: {termination_event_data}"
+                    )
+                elif not normalized_data.get("termination_message"):
+                    logger.error(
+                        f"autoTerminationEvent '{normalized_data.get('id')}' "
+                        f"is missing required 'terminationMessage' field. "
+                        f"Event data: {termination_event_data}"
+                    )
+                else:
+                    event = TerminationEvent(**normalized_data)
+                    termination_events.append(event)
+                    logger.debug(
+                        f"Successfully parsed termination event '{event.id}' "
+                        f"with message length: {len(event.termination_message)}"
+                    )
             except Exception as e:
+                normalized_data_str = (
+                    normalized_data if "normalized_data" in locals() else "N/A"
+                )
                 logger.error(
                     f"Error instantiating TerminationEvent from "
-                    f"autoTerminationEvent: {e}"
+                    f"autoTerminationEvent: {e}. "
+                    f"Event data: {termination_event_data}. "
+                    f"Normalized data: {normalized_data_str}"
                 )
 
         # Handle new autoTerminationEvents (list of events)
         termination_events_data = raw.get("autoTerminationEvents", [])
         if termination_events_data and isinstance(termination_events_data, list):
-            for event_data in termination_events_data:
+            for idx, event_data in enumerate(termination_events_data):
+                normalized_data = None
                 try:
                     normalized_data = Scenario._normalize_termination_event_data(
                         event_data
                     )
+
+                    # Validate required fields before creating TerminationEvent
+                    if not normalized_data.get("id"):
+                        logger.error(
+                            f"Termination event at index {idx} is missing "
+                            f"required 'id' field. Event data: {event_data}"
+                        )
+                        continue
+
+                    if not normalized_data.get("termination_message"):
+                        logger.error(
+                            f"Termination event '{normalized_data.get('id')}' "
+                            f"is missing required 'terminationMessage' field. "
+                            f"Event data: {event_data}"
+                        )
+                        continue
+
                     event = TerminationEvent(**normalized_data)
                     termination_events.append(event)
+                    logger.debug(
+                        f"Successfully parsed termination event '{event.id}' "
+                        f"with message length: {len(event.termination_message)}"
+                    )
                 except Exception as e:
+                    normalized_data_str = normalized_data if normalized_data else "N/A"
                     logger.error(
                         f"Error instantiating TerminationEvent from "
-                        f"autoTerminationEvents: {e}"
+                        f"autoTerminationEvents at index {idx}: {e}. "
+                        f"Event data: {event_data}. "
+                        f"Normalized data: {normalized_data_str}"
                     )
+
+        # Log summary of parsed termination events
+        if termination_events:
+            logger.info(
+                f"Successfully parsed {len(termination_events)} termination event(s): "
+                f"{[te.id for te in termination_events]}"
+            )
+        else:
+            logger.debug("No termination events configured in scenario")
 
         return termination_events
 

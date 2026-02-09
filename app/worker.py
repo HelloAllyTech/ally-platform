@@ -315,11 +315,16 @@ class AgentWorker:
             # Wait for termination event to be set
             await self._termination_event.wait()
 
-            if not self._termination_message:
-                logger.warning(
-                    "Termination event set but no message - proceeding with shutdown"
+            # Validate termination message exists and is not empty
+            if not self._termination_message or not self._termination_message.strip():
+                logger.error(
+                    f"Termination event triggered but no valid message found. "
+                    f"Message value: '{self._termination_message}'. "
+                    f"This indicates a configuration error - termination should "
+                    f"not proceed without a valid termination message. "
+                    f"Aborting termination to prevent silent shutdown."
                 )
-                self.ctx.shutdown(SESSION_TERMINATED_MESSAGE)
+                # Don't shutdown - this is a configuration error that should be fixed
                 return
 
             # Step 1: Generate new prosody parameters for termination message
