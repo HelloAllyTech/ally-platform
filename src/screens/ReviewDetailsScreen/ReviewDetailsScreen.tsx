@@ -19,7 +19,7 @@ import {
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
-import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
@@ -67,6 +67,13 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   >([]);
   const navigation = useAppNavigation();
 
+  const {userData} = useUser();
+  const {
+    id: userId,
+    name: userName,
+    profileImageUrl: userProfileImage,
+  } = userData || {};
+
   useHardwareBackPressHandler(() => {
     // Check if any bottom sheet is open and dismiss it first
     if (isReplyBottomSheetVisible) {
@@ -97,9 +104,16 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const [fetchMessages, {isLoading, isFetching, isError}] =
     useLazyGetMessagesQuery();
 
-  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery({
-    reviewId: _reviewId,
-  });
+  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery(
+    {
+      reviewId: _reviewId,
+    },
+    {
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
 
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
@@ -228,31 +242,47 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
   // Create a new thread object
   const createNewThread = useCallback(
-    (commentId: string, selection: TextSelection): MessageThread => ({
-      id: commentId,
+    (
+      newComment: {id: string; createdAt: string; content: string},
+      newThread: {id: string; createdAt: string},
+      selection: TextSelection,
+    ): MessageThread => ({
+      id: newThread.id,
       selection: {
         startIndex: selection.startIndex,
         endIndex: selection.endIndex,
         selectedText: selection.selectedText,
       },
-      comments: [],
+      comments: [
+        {
+          id: newComment.id,
+          content: newComment.content,
+          createdAt: newComment.createdAt,
+          createdBy: {
+            id: userId,
+            name: userName,
+            profileImage: userProfileImage,
+          },
+        },
+      ],
       createdBy: {
-        id: 0,
-        name: '',
-        profileImage: null,
+        id: userId || 0,
+        name: userName || '',
+        profileImage: userProfileImage || null,
       },
     }),
-    [],
+    [userId, userName, userProfileImage],
   );
 
   // Update message with new comment thread
   const updateMessage = useCallback(
     (payload: {
       selection: TextSelection;
-      commentId: string;
+      newComment: {id: string; createdAt: string; content: string};
+      newThread: {id: string; createdAt: string};
       messageId: string;
     }) => {
-      const {selection, commentId, messageId} = payload;
+      const {selection, newComment, newThread, messageId} = payload;
 
       // Update raw messages with new thread
       setRawMessages(prev => {
@@ -262,11 +292,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
-        const newThread = createNewThread(commentId, selection);
+        const updatedThread = createNewThread(newComment, newThread, selection);
 
         updatedMessages[messageIndex] = {
           ...updatedMessages[messageIndex],
-          threads: [...updatedMessages[messageIndex].threads, newThread],
+          threads: [...updatedMessages[messageIndex].threads, updatedThread],
         };
 
         return updatedMessages;
@@ -290,6 +320,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     previousOffsetRef.current = 0;
 
     try {
+      refetchReviewData();
       const result = await fetchMessages({
         reviewId: _reviewId,
         offset: 0,
@@ -301,7 +332,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     } catch (error) {
       console.error('Error refreshing messages:', error);
     }
-  }, [_reviewId, fetchMessages, processMessagesResponse]);
+  }, [_reviewId, fetchMessages, processMessagesResponse, refetchReviewData]);
 
   // Comment input handlers - MUST be before early returns
   const handleChangeComment = useCallback((text: string) => {
@@ -339,16 +370,15 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         messageId: selectedMessageId,
         selection: currentHighlightedText,
         content: comment.trim(),
-        ...(selectedComment?.id && {parentCommentId: selectedComment.id}),
-        ...(selectedThreadId && {threadId: selectedThreadId}),
       };
 
       const response = await addReviewComment(payload);
 
-      if (response.data?.thread?.id) {
+      if (response.data?.thread?.id && response.data?.comment) {
         updateMessage({
           selection: currentHighlightedText,
-          commentId: response.data.thread.id,
+          newComment: {...response.data.comment, content: comment.trim()},
+          newThread: response.data.thread,
           messageId: selectedMessageId,
         });
       }
@@ -362,8 +392,6 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     comment,
     currentHighlightedText,
     _reviewId,
-    selectedComment,
-    selectedThreadId,
     addReviewComment,
     updateMessage,
     resetCommentInput,

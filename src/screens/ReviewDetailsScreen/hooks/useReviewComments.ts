@@ -35,6 +35,7 @@ export const useReviewComments = () => {
 
   const closeReplyBottomSheet = () => {
     setIsReplyBottomSheetVisible(false);
+    setSelectedComment(null);
   };
 
   const onReplyPress = (comment: MessageThreadComment) => {
@@ -46,11 +47,13 @@ export const useReviewComments = () => {
   const hideReplyBottomSheet = () => {
     setIsReplyBottomSheetVisible(false);
     setIsCommentThreadBottomSheetVisible(true);
+    setSelectedComment(null);
   };
 
   const hideCommentThreadBottomSheet = () => {
     setIsCommentThreadBottomSheetVisible(false);
     setIsThreadsBottomSheetVisible(true);
+    setSelectedThreadId(null);
   };
 
   const closeCommentBottomSheet = () => {

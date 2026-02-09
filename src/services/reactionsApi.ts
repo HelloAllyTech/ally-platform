@@ -75,6 +75,7 @@ export const reactionsApi = api.injectEndpoints({
         method: API_METHODS.POST,
         body: {reaction, action},
       }),
+      invalidatesTags: ['Badges'],
     }),
   }),
 });

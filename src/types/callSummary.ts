@@ -2,35 +2,72 @@ import {SvgProps} from 'react-native-svg';
 
 import {
   AGE_RANGE_OPTIONS,
+  ASSESSMENT_AFFECT_OPTIONS,
+  ASSESSMENT_SPEECH_OPTIONS,
   GENDER_OPTIONS,
   SectionKey,
   SUMMARY_FIELDS,
   SummaryFieldKey,
+  YES_NO_OPTIONS,
 } from '@/constants/summary';
-import {AgeRange, Language} from '@/services/callSummaryApi';
+import {AgeRange, CallDetails, SummaryDetails} from '@/services/callSummaryApi';
 
 import {FieldType} from './fields';
+
+/**
+ * Call details data structure (returned by selector)
+ * Extends the API CallDetails type with optional clientId override
+ */
+export interface CallDetailsData extends Partial<CallDetails> {
+  clientId?: number | string | null;
+}
+
+/**
+ * Data context passed to field computation and formatting functions
+ */
+export interface FieldDataContext {
+  summary: SummaryDetails | null;
+  formData: SummaryFormData | null;
+  callDetails: CallDetailsData | null;
+  // callInfo selector returns a custom shape with specific fields from different sources
+  callInfo: {
+    chatId?: number;
+    callDuration?: number;
+    startTime?: string;
+    endTime?: string | null;
+    clientId?: number;
+    summaryName?: string;
+  } | null;
+}
 
 export interface SummaryField {
   isEditable: boolean;
   key: SummaryFieldKey;
   label: string;
-  options?: typeof GENDER_OPTIONS | typeof AGE_RANGE_OPTIONS;
+  options?:
+    | typeof GENDER_OPTIONS
+    | typeof AGE_RANGE_OPTIONS
+    | typeof YES_NO_OPTIONS
+    | typeof ASSESSMENT_AFFECT_OPTIONS
+    | typeof ASSESSMENT_SPEECH_OPTIONS;
+  placeholder?: string;
   sectionKey: SectionKey;
   type: FieldType;
-}
 
-export interface FieldConfig {
-  field: SummaryFieldKey;
-  value: SummaryFieldValueTypes;
+  // Optional: For fields that need computed values (e.g., callDuration from callDetails)
+  computeValue?: (data: FieldDataContext) => unknown;
+
+  // Optional: For fields that need special display formatting (e.g., percentage, dates)
+  formatDisplay?: (
+    value: unknown,
+    t?: (key: string, params?: any) => string,
+  ) => string;
 }
 
 // Current configuration - can be moved to API later
 export type VisibleFields = {
   [K in keyof typeof SUMMARY_FIELDS]: boolean;
 };
-
-export type SummaryFieldValueTypes = string | number | Language[];
 
 // Type utility for editable field keys
 export type EditableFieldKey = keyof SummaryFormData;
@@ -68,4 +105,40 @@ export type SummaryFormData = {
   [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: string | null;
   [SUMMARY_FIELDS.TAGS]: string | null;
   [SUMMARY_FIELDS.ADDITIONAL_NOTES]: string | null;
+
+  // Intake section - all editable
+  [SUMMARY_FIELDS.INTAKE_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SELF_HARM]: string | null;
+  [SUMMARY_FIELDS.RISK_SELF_HARM_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_PLAN]: string | null;
+  [SUMMARY_FIELDS.RISK_SUICIDAL_ACTION]: string | null;
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY]: string | null;
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_NEGLECT]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE]: string | null;
+  [SUMMARY_FIELDS.TRAUMA_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES]:
+    | string
+    | null;
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_AFFECT]: string | null;
+  [SUMMARY_FIELDS.ASSESSMENT_SPEECH]: string | null;
+
+  // Ongoing Risks section - all editable
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION]: string | null;
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES]: string | null;
 };

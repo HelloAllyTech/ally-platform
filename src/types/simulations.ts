@@ -191,6 +191,22 @@ export interface UpcomingScenarioResponse {
   currentSession?: CurrentSessionInfo;
 }
 
+export interface SimulationDetails {
+  createdAt?: string;
+  updatedAt?: string;
+  tenantId?: string;
+  id?: string;
+  scenarioSessionId?: string;
+  callDuration?: number;
+  summary?: {
+    feedback?: {
+      positives?: string[];
+      improvements?: string[];
+    };
+    errorMessage?: string;
+  };
+}
+
 export interface SimulationSummaryData {
   events?: SimulationEvent[];
   whatWentWell?: string[];
@@ -215,21 +231,7 @@ export interface SimulationSummaryData {
     title?: string;
     metadata?: ScenarioMetadata;
   };
-  details?: {
-    createdAt?: string;
-    updatedAt?: string;
-    tenantId?: string;
-    id?: string;
-    scenarioSessionId?: string;
-    callDuration?: number;
-    summary?: {
-      feedback?: {
-        positives?: string[];
-        improvements?: string[];
-      };
-      errorMessage?: string;
-    };
-  };
+  details?: SimulationDetails;
 }
 
 export type SessionData = {

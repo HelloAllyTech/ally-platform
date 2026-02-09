@@ -7,19 +7,23 @@ import {colors, fontFamily, typography} from '@/theme';
 
 interface FieldRowProps {
   label: string;
-  value: string | number | ReactNode;
+  value: string | number | ReactNode; // Keep for backward compatibility
   showSeparator?: boolean;
+  renderEdit?: () => ReactNode; // New: Optional render prop for edit mode
 }
 
 export const FieldRow: React.FC<FieldRowProps> = ({
   label,
   value,
   showSeparator = false,
+  renderEdit,
 }) => (
   <>
     <View style={styles.fieldContainer}>
       <Text style={styles.label}>{label}:</Text>
-      {typeof value === 'string' || typeof value === 'number' ? (
+      {renderEdit ? (
+        renderEdit() // Use custom edit renderer if provided
+      ) : typeof value === 'string' || typeof value === 'number' ? (
         <Text style={[styles.value, commonStyles.fieldValueText]}>{value}</Text>
       ) : (
         value
