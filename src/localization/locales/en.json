@@ -421,7 +421,16 @@
     "keepItPrivate": "Keep it private",
     "shareForReview": "Share for review",
     "privacyUpdated": "Privacy setting updated",
-    "sharedForReview": "Transcript shared for review"
+    "sharedForReview": "Transcript shared for review",
+    "tabs": {
+      "summary": "Summary",
+      "askAI": "Ask AI",
+      "transcription": "Transcription",
+      "checklist": "Checklist",
+      "skills": "Skills",
+      "reflection": "Reflection"
+    },
+    "sessionFeedback": "Session Feedback"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",
