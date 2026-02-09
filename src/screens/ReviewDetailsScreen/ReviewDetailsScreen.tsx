@@ -253,9 +253,8 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
       // Update raw messages with new thread
       setRawMessages(prev => {
-        // TODO_M: Check he string conversion works for ios
         const messageIndex = prev.findIndex(
-          m => m.id?.toString() === messageId,
+          m => m.id?.toString() === messageId.toString(),
         );
         if (messageIndex === -1) return prev;
 
@@ -405,7 +404,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
     if (!selectedMessageForThreads) return [];
-    const message = rawMessages.find(m => m.id === selectedMessageForThreads);
+    const message = rawMessages.find(
+      m => m.id?.toString() === selectedMessageForThreads.toString(),
+    );
     return message?.threads || [];
   }, [selectedMessageForThreads, rawMessages]);
 
@@ -489,8 +490,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onClose={handleCloseMessageThreads}
         messageId={selectedMessageForThreads || ''}
         message={
-          conversationMessages.find(m => m.id === selectedMessageForThreads)
-            ?.content || ''
+          conversationMessages.find(
+            m => m.id?.toString() === selectedMessageForThreads?.toString(),
+          )?.content || ''
         }
         threads={selectedMessageThreads}
         onThreadPress={handleMessageThreadPress}

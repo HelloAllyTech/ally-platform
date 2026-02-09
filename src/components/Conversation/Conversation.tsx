@@ -110,7 +110,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     [reviewOwnerName, t],
   );
 
-  // ── iOS component (unchanged) ─────────────────────────────────
+  // ── iOS selection component ─────────────────────────────────
   const selectionTextIOSComponent = (
     messageItem: MessageData,
     isAiClient: boolean,
@@ -216,7 +216,10 @@ export const Conversation: React.FC<ConversationProps> = ({
                       onPress={
                         hasThread
                           ? () =>
-                              onThreadClick?.(part.commentIds, String(item.id))
+                              onThreadClick?.(
+                                part.commentIds,
+                                item.id.toString(),
+                              )
                           : undefined
                       }>
                       {part.text}
@@ -230,7 +233,7 @@ export const Conversation: React.FC<ConversationProps> = ({
       );
     }
 
-    // ── iOS selectable or non-selectable fallback ───────────────
+    // ── iOS selectable or non-selectable ───────────────
     return (
       <MessageComponent
         timestamp={formatTimestamp(item.startSeconds)}
