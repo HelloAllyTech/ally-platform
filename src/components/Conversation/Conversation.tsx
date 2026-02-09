@@ -195,18 +195,17 @@ export const Conversation: React.FC<ConversationProps> = ({
             </Text>
           </Pressable>
           <View style={styles.androidMessageColumn}>
-            <Pressable onPress={dismissNativeSelection}>
-              <Text
-                style={isAiClient ? styles.clientAgentText : styles.userName}>
-                {getSenderName(isAiClient)}:
-              </Text>
-            </Pressable>
             <AndroidCommentMessageRow
               messageId={String(item.id)}
               onSelectionChange={handleAndroidSelectionChange}
               clearSelectionSignal={clearSelectionSignal}
+              prefixLength={`${getSenderName(isAiClient)}: `.length}
               style={styles.selectableWrapper}>
               <Text style={styles.messageContent}>
+                <Text
+                  style={isAiClient ? styles.clientAgentText : styles.userName}>
+                  {getSenderName(isAiClient)}:{' '}
+                </Text>
                 {item.messagePart.map((part, index) => {
                   const hasThread = part.commentIds.length > 0;
                   return (
