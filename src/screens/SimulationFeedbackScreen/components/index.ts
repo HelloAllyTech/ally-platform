@@ -5,3 +5,4 @@ export {FeedbackDropdown} from './FeedbackDropdown';
 export {UpNextSimulationCard} from './UpNextSimulationCard';
 export {SimulationAudioPlayer} from './SimulationAudioPlayer/SimulationAudioPlayer';
 export {PrivacyToggle} from './PrivacyToggle/PrivacyToggle';
+export {AskAI} from './AskAI/AskAI';

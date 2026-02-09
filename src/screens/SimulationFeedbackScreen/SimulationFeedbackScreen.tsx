@@ -39,6 +39,7 @@ import {ReviewStatus, SessionItemStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
+  AskAI,
   PrivacyToggle,
   SimulationSummary,
   SimulationSummarySkeleton,
@@ -463,11 +464,109 @@ export const SimulationFeedbackScreen: React.FC<
       </Text>
     );
   };
-  const showSummary = activeTab === 0;
-  const showTranscript = !isSimulationDetailsLoading && activeTab === 2;
   const hasScenarioMessagesPermission = permissions?.includes(
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
   );
+
+  const renderTabContent = () => {
+    if (!hasScenarioMessagesPermission) {
+      return null;
+    }
+
+    switch (activeTab) {
+      case 0: // Summary
+        return (
+          <KeyboardAwareScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            extraScrollHeight={100}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}>
+            {!simulationDetails?.details && !retryLimitReached ? (
+              <SimulationSummarySkeleton />
+            ) : (
+              <>
+                <SimulationSummary data={simulationDetails ?? null} />
+                {isEventCompleted && (
+                  <>
+                    {/* Transition message section */}
+                    {(currentSession?.transitionMessageTitle ||
+                      currentSession?.transitionMessageContent) && (
+                      <View style={styles.transitionMessageContainer}>
+                        {currentSession?.transitionMessageTitle && (
+                          <Text style={styles.transitionMessageTitle}>
+                            {currentSession.transitionMessageTitle}
+                          </Text>
+                        )}
+                        {currentSession?.transitionMessageContent && (
+                          <Text style={styles.transitionMessageContent}>
+                            {currentSession.transitionMessageContent}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                    {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
+                      <>
+                        <Text style={styles.transitionMessageTitle}>
+                          {t('SimulationFeedback.almostThereTitle')}
+                        </Text>
+                        <Text style={styles.transitionMessageContent}>
+                          {t('SimulationFeedback.almostThereDescription')}
+                        </Text>
+                      </>
+                    )}
+                    {isCurrentSessionCompleted && !!upcomingScenario && (
+                      <UpNextSimulationCard upNext={upcomingScenario} />
+                    )}
+                  </>
+                )}
+                {simulationDetails && renderButtonContainer()}
+              </>
+            )}
+          </KeyboardAwareScrollView>
+        );
+
+      case 1: // Ask AI
+        return <AskAI />;
+
+      case 2: // Transcription
+        if (scenarioSessionId) {
+          return (
+            <>
+              <SimulationTranscript
+                sessionId={scenarioSessionId}
+                startedAt={simulationDetails?.startedAt}
+                // currentTime={currentPlaybackTime}
+                // onSeek={setSeekTime}
+                agentName={simulationDetails?.scenario?.metadata?.name}
+              />
+              <View style={styles.privacyToggleContainer}>
+                <PrivacyToggle
+                  isPrivate={isPrivate}
+                  onToggle={handlePrivacyToggle}
+                />
+              </View>
+            </>
+          );
+        }
+        return null;
+
+      case 3: // Checklist
+        return null; // TODO: Implement checklist tab
+
+      case 4: // Skills
+        return null; // TODO: Implement skills tab
+
+      case 5: // Reflection
+        return null; // TODO: Implement reflection tab
+
+      default:
+        return null;
+    }
+  };
 
   const tabs = useMemo(
     () => [
@@ -545,82 +644,7 @@ export const SimulationFeedbackScreen: React.FC<
           />
         </View>
       )}
-      {showSummary && (
-        <KeyboardAwareScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          extraScrollHeight={100}
-          automaticallyAdjustKeyboardInsets
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={16}>
-          {!simulationDetails?.details && !retryLimitReached ? (
-            <SimulationSummarySkeleton />
-          ) : (
-            <>
-              <SimulationSummary data={simulationDetails ?? null} />
-              {isEventCompleted && (
-                <>
-                  {/* Transition message section */}
-                  {(currentSession?.transitionMessageTitle ||
-                    currentSession?.transitionMessageContent) && (
-                    <View style={styles.transitionMessageContainer}>
-                      {currentSession?.transitionMessageTitle && (
-                        <Text style={styles.transitionMessageTitle}>
-                          {currentSession.transitionMessageTitle}
-                        </Text>
-                      )}
-                      {currentSession?.transitionMessageContent && (
-                        <Text style={styles.transitionMessageContent}>
-                          {currentSession.transitionMessageContent}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                  {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
-                    <>
-                      <Text style={styles.transitionMessageTitle}>
-                        {t('SimulationFeedback.almostThereTitle')}
-                      </Text>
-                      <Text style={styles.transitionMessageContent}>
-                        {t('SimulationFeedback.almostThereDescription')}
-                      </Text>
-                    </>
-                  )}
-                  {isCurrentSessionCompleted && !!upcomingScenario && (
-                    <UpNextSimulationCard upNext={upcomingScenario} />
-                  )}
-                </>
-              )}
-              {simulationDetails && renderButtonContainer()}
-            </>
-          )}
-        </KeyboardAwareScrollView>
-      )}
-      {showTranscript && scenarioSessionId && (
-        <>
-          {/* TODO: Replace with actual audio url */}
-          {/* <SimulationAudioPlayer
-            audioUrl="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-            onProgress={setCurrentPlaybackTime}
-            externalSeekTime={seekTime}
-          /> */}
-          <SimulationTranscript
-            sessionId={scenarioSessionId}
-            startedAt={simulationDetails?.startedAt}
-            // currentTime={currentPlaybackTime}
-            // onSeek={setSeekTime}
-            agentName={simulationDetails?.scenario?.metadata?.name}
-          />
-          <View style={styles.privacyToggleContainer}>
-            <PrivacyToggle
-              isPrivate={isPrivate}
-              onToggle={handlePrivacyToggle}
-            />
-          </View>
-        </>
-      )}
+      {renderTabContent()}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}

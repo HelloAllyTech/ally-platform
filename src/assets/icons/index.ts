@@ -99,6 +99,7 @@ import ProfileSettingsIcon from './profileSettings.svg';
 import Rank1Icon from './rank1.svg';
 import Rank2Icon from './rank2.svg';
 import Rank3Icon from './rank3.svg';
+import RankBadgeIcon from './rankBadge.svg';
 import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import Replay10Icon from './replay10.svg';
@@ -127,6 +128,7 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UpArrowIcon from './up_arrow.svg';
 import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
@@ -178,6 +180,7 @@ export {
   DoubleRightArrowIcon,
   DownArrowIcon,
   DrawerMenuIcon,
+  UpArrowIcon,
   EditIcon,
   EditSquareIcon,
   EmptyReviewIcon,
@@ -232,6 +235,7 @@ export {
   Rank1Icon,
   Rank2Icon,
   Rank3Icon,
+  RankBadgeIcon,
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
