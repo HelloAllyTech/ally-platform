@@ -70,6 +70,16 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
     }
 
     /**
+     * Number of characters at the start of the text that are a prefix
+     * (e.g. sender name). Selection indices emitted to JS are adjusted
+     * so they are relative to the message content only.
+     */
+    @ReactProp(name = "prefixLength", defaultInt = 0)
+    fun setPrefixLength(view: AndroidCommentMessageRowView, length: Int) {
+        view.prefixLength = length
+    }
+
+    /**
      * When this value changes (increments), clear any active text selection
      * on the underlying ReactTextView.  This also dismisses the native
      * ActionMode floating toolbar ("Add comment").

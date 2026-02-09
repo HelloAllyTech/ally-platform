@@ -2,10 +2,15 @@ package com.helloally.app.commentabletext
 
 import android.content.Context
 import android.graphics.Color
+import android.text.Selection
+import android.text.Spannable
+import android.text.SpanWatcher
+import android.text.Spanned
 import android.util.AttributeSet
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -36,6 +41,10 @@ class AndroidCommentMessageRowView : FrameLayout {
 
     // ── Public state (set by ViewManager) ──────────────────────────
     var messageId: String = ""
+    /** Number of characters at the start of the text that are a non-selectable
+     *  prefix (e.g. sender name).  Selection indices emitted to JS are offset
+     *  by this amount so they are relative to the message content only. */
+    var prefixLength: Int = 0
     var onSelectionChangeListener: ((String, Int, Int, String) -> Unit)? = null
 
     // =====================================================================
@@ -49,8 +58,8 @@ class AndroidCommentMessageRowView : FrameLayout {
     fun clearSelection() {
         textView?.let { tv ->
             val text = tv.text
-            if (text is android.text.Spannable) {
-                android.text.Selection.removeSelection(text)
+            if (text is Spannable) {
+                Selection.removeSelection(text)
             }
         }
     }
@@ -124,6 +133,15 @@ class AndroidCommentMessageRowView : FrameLayout {
 
         tv.customSelectionActionModeCallback = object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+                // If selection is entirely within the non-selectable prefix,
+                // reject the ActionMode so "Add comment" never appears.
+                if (prefixLength > 0) {
+                    val s = tv.selectionStart
+                    val e = tv.selectionEnd
+                    if (s < prefixLength && e <= prefixLength) {
+                        return false
+                    }
+                }
                 return true
             }
 
@@ -136,13 +154,23 @@ class AndroidCommentMessageRowView : FrameLayout {
             }
 
             override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
-                val selectionStart = tv.selectionStart
-                val selectionEnd = tv.selectionEnd
-                val selectedText = tv.text.toString().substring(selectionStart, selectionEnd)
+                // Clamp to exclude the non-selectable prefix (sender name)
+                val rawStart = maxOf(tv.selectionStart, prefixLength)
+                val rawEnd   = maxOf(tv.selectionEnd,   prefixLength)
 
-                // Emit selection event with indices (the addition over the library)
+                // If user only selected within the prefix, ignore
+                if (rawStart >= rawEnd) {
+                    mode?.finish()
+                    return true
+                }
+
+                // Adjust indices so they are relative to message content only
+                val adjustedStart = rawStart - prefixLength
+                val adjustedEnd   = rawEnd   - prefixLength
+                val selectedText  = tv.text.toString().substring(rawStart, rawEnd)
+
                 onSelectionChangeListener?.invoke(
-                    messageId, selectionStart, selectionEnd, selectedText
+                    messageId, adjustedStart, adjustedEnd, selectedText
                 )
 
                 mode?.finish()
@@ -151,6 +179,73 @@ class AndroidCommentMessageRowView : FrameLayout {
 
             override fun onDestroyActionMode(mode: ActionMode?) {}
         }
+    }
+
+    // =====================================================================
+    //  SELECTION CLAMPING – prevent handles from entering the prefix
+    // =====================================================================
+
+    private var isClampingSelection = false
+    /** The Spannable instance we last attached the SpanWatcher to. */
+    private var watchedSpannable: Spannable? = null
+
+    /**
+     * Attach a [SpanWatcher] to the current Spannable of the found TextView.
+     * The watcher fires **synchronously** every time the selection start/end
+     * span changes (long-press, double-tap, handle drag) and clamps it so
+     * the handles can never enter the prefix area.
+     *
+     * Called on every ACTION_DOWN to survive React text re-renders (which
+     * replace the entire Spannable).
+     */
+    private fun ensureSelectionClamp() {
+        val tv = textView ?: return
+        val text = tv.text as? Spannable ?: return
+        // Already watching this exact object – nothing to do
+        if (text === watchedSpannable) return
+        watchedSpannable = text
+
+        text.setSpan(object : SpanWatcher {
+            override fun onSpanChanged(
+                buf: Spannable, what: Any,
+                ostart: Int, oend: Int, nstart: Int, nend: Int
+            ) {
+                if (isClampingSelection || prefixLength <= 0) return
+                // Only react to the two selection-position spans
+                if (what !== Selection.SELECTION_START && what !== Selection.SELECTION_END) return
+
+                val selStart = Selection.getSelectionStart(buf)
+                val selEnd = Selection.getSelectionEnd(buf)
+                if (selStart < 0 || selEnd < 0) return
+
+                if (selStart < prefixLength || selEnd < prefixLength) {
+                    isClampingSelection = true
+                    val cs = maxOf(selStart, prefixLength)
+                    val ce = maxOf(selEnd, prefixLength)
+                    if (cs >= ce) {
+                        // Entire selection is within the prefix → clear it
+                        Selection.removeSelection(buf)
+                    } else {
+                        Selection.setSelection(buf, cs, ce)
+                    }
+                    isClampingSelection = false
+                }
+            }
+
+            override fun onSpanAdded(text: Spannable, what: Any, start: Int, end: Int) {}
+            override fun onSpanRemoved(text: Spannable, what: Any, start: Int, end: Int) {}
+        }, 0, text.length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
+    }
+
+    /**
+     * On every ACTION_DOWN make sure the SpanWatcher is on the current
+     * Spannable (React may have replaced the text since the last gesture).
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (prefixLength > 0 && event.action == MotionEvent.ACTION_DOWN) {
+            ensureSelectionClamp()
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     // =====================================================================
