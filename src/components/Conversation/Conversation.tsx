@@ -12,6 +12,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {
   AndroidCommentMessageRow,
   SelectionChangeEvent,
+  SingleTapEvent,
 } from '@/components/AndroidCommentMessageRow';
 import {CommentableTextInput} from '@/components/CommentableTextInput/CommentableTextInput';
 import {Message as MessageComponent} from '@/components/Message';
@@ -102,6 +103,29 @@ export const Conversation: React.FC<ConversationProps> = ({
       );
     },
     [onSelection],
+  );
+
+  // ── Android single-tap → thread handler ────────────────────────
+  // Maps the character offset from native to the correct message part,
+  // and if that part has threads, opens the threads bottom sheet.
+  const handleAndroidSingleTap = useCallback(
+    (event: SingleTapEvent) => {
+      const msg = messages.find(m => String(m.id) === event.messageId);
+      if (!msg) return;
+
+      let charCount = 0;
+      for (const part of msg.messagePart) {
+        const partEnd = charCount + part.text.length;
+        if (event.offset >= charCount && event.offset < partEnd) {
+          if (part.commentIds.length > 0) {
+            onThreadClick?.(part.commentIds, event.messageId);
+          }
+          return;
+        }
+        charCount = partEnd;
+      }
+    },
+    [messages, onThreadClick],
   );
 
   const getSenderName = useCallback(
@@ -198,6 +222,7 @@ export const Conversation: React.FC<ConversationProps> = ({
             <AndroidCommentMessageRow
               messageId={String(item.id)}
               onSelectionChange={handleAndroidSelectionChange}
+              onSingleTap={handleAndroidSingleTap}
               clearSelectionSignal={clearSelectionSignal}
               prefixLength={`${getSenderName(isAiClient)}: `.length}
               style={styles.selectableWrapper}>
@@ -211,16 +236,7 @@ export const Conversation: React.FC<ConversationProps> = ({
                   return (
                     <Text
                       key={`${item.id}-${index}`}
-                      style={hasThread ? styles.highlightedText : undefined}
-                      onPress={
-                        hasThread
-                          ? () =>
-                              onThreadClick?.(
-                                part.commentIds,
-                                item.id.toString(),
-                              )
-                          : undefined
-                      }>
+                      style={hasThread ? styles.highlightedText : undefined}>
                       {part.text}
                     </Text>
                   );

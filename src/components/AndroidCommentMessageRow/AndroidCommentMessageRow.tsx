@@ -17,6 +17,12 @@ export interface SelectionChangeEvent {
   selectedText: string;
 }
 
+export interface SingleTapEvent {
+  messageId: string;
+  /** Character offset relative to message content (prefix excluded) */
+  offset: number;
+}
+
 /** Kept for backward compatibility even though thread taps are now handled in JS */
 export interface ThreadPressEvent {
   messageId: string;
@@ -32,6 +38,8 @@ export interface AndroidCommentMessageRowProps {
   menuOptions?: string[];
   /** Fired when the user selects text and taps a menu option */
   onSelectionChange?: (event: SelectionChangeEvent) => void;
+  /** Fired on genuine single tap (not long-press / double-tap) with character offset */
+  onSingleTap?: (event: SingleTapEvent) => void;
   /** Increment to clear native selection & dismiss the ActionMode toolbar */
   clearSelectionSignal?: number;
   /** Number of prefix characters (e.g. sender name) to exclude from selection indices */
@@ -51,6 +59,7 @@ interface NativeProps {
   onSelectionChange?: (
     event: NativeSyntheticEvent<SelectionChangeEvent>,
   ) => void;
+  onSingleTap?: (event: NativeSyntheticEvent<SingleTapEvent>) => void;
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
@@ -92,6 +101,7 @@ export const AndroidCommentMessageRow: React.FC<
   messageId,
   menuOptions = ['Add comment'],
   onSelectionChange,
+  onSingleTap,
   clearSelectionSignal,
   prefixLength,
   children,
@@ -102,6 +112,13 @@ export const AndroidCommentMessageRow: React.FC<
       onSelectionChange?.(event.nativeEvent);
     },
     [onSelectionChange],
+  );
+
+  const handleSingleTap = useCallback(
+    (event: NativeSyntheticEvent<SingleTapEvent>) => {
+      onSingleTap?.(event.nativeEvent);
+    },
+    [onSingleTap],
   );
 
   // Guard: render passthrough on iOS
@@ -116,6 +133,7 @@ export const AndroidCommentMessageRow: React.FC<
       clearSelectionSignal={clearSelectionSignal}
       prefixLength={prefixLength}
       onSelectionChange={handleSelectionChange}
+      onSingleTap={handleSingleTap}
       style={style}>
       {children}
     </NativeAndroidCommentMessageRow>

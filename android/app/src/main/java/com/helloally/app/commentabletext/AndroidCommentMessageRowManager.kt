@@ -52,6 +52,17 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
                 ?.receiveEvent(view.id, "onSelectionChange", event)
         }
 
+        // Wire single-tap callback → JS event
+        view.onSingleTapListener = { messageId, offset ->
+            val event = Arguments.createMap().apply {
+                putString("messageId", messageId)
+                putInt("offset", offset)
+            }
+            val ctx = view.context as? ReactContext
+            ctx?.getJSModule(RCTEventEmitter::class.java)
+                ?.receiveEvent(view.id, "onSingleTap", event)
+        }
+
         return view
     }
 
@@ -106,6 +117,7 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
     override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any>? {
         return MapBuilder.builder<String, Any>()
             .put("onSelectionChange", MapBuilder.of("registrationName", "onSelectionChange"))
+            .put("onSingleTap", MapBuilder.of("registrationName", "onSingleTap"))
             .build()
     }
 }
