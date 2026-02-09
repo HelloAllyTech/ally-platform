@@ -101,6 +101,8 @@ jest.mock('react-native-svg', () => {
     LinearGradient: (props: any) =>
       React.createElement('LinearGradient', props, props.children),
     Stop: (props: any) => React.createElement('Stop', props),
+    SvgXml: (props: any) => React.createElement('SvgXml', props),
+    SvgUri: (props: any) => React.createElement('SvgUri', props),
   };
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

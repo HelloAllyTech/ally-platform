@@ -25,6 +25,10 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    setCurrentEmoji(selectedEmoji || null);
+  }, [selectedEmoji]);
+
+  useEffect(() => {
     if (disabled && visible) {
       setVisible(false);
     }

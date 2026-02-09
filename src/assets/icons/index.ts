@@ -64,6 +64,7 @@ import HexagonCloseIcon from './hexagonClose.svg';
 import HourGlassIcon from './hourGlass.svg';
 import InfoIcon from './info.svg';
 import InfoBlackCircleIcon from './infoBlackCircle.svg';
+import IntakeIcon from './intake.svg';
 import KeyConcernIcon from './keyConcern.svg';
 import KeyEventsIcon from './keyEvents.svg';
 import LeaderboardInactiveIcon from './leaderboard.svg';
@@ -85,6 +86,7 @@ import NewsStandIcon from './newsStand.svg';
 import NoCallLogsIcon from './noCallRecords.svg';
 import NoCreditsIcon from './noCredits.svg';
 import NotesIcon from './notes.svg';
+import OngoingRisksIcon from './ongoingRisks.svg';
 import PageIcon from './page.svg';
 import PauseIcon from './pause.svg';
 import PausePlayerIcon from './pausePlayer.svg';
@@ -196,6 +198,7 @@ export {
   HourGlassIcon,
   InfoBlackCircleIcon,
   InfoIcon,
+  IntakeIcon,
   KeyConcernIcon,
   KeyEventsIcon,
   LearnActiveIcon,
@@ -217,6 +220,7 @@ export {
   NoCallLogsIcon,
   NoCreditsIcon,
   NotesIcon,
+  OngoingRisksIcon,
   PageIcon,
   PauseIcon,
   PauseWhiteIcon,

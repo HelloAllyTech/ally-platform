@@ -20,6 +20,7 @@ export enum USER_PERMISSIONS {
   VIEW_MESSAGES = 'view:messages',
   EDIT_MESSAGE_FEEDBACK = 'edit:message:feedback',
   VIEW_REVIEWS = 'view:reviews',
+  EDIT_REVIEW = 'edit:review',
   VIEW_COMMUNITY_LEADERBOARD = 'view:community:leaderboard',
   VIEW_USER_BADGES = 'view:user:badges',
   EDIT_USER_BADGES = 'edit:user:badges',

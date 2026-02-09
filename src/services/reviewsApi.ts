@@ -119,6 +119,7 @@ export const reviewsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
       providesTags: ['ReviewDetails'],
+      keepUnusedDataFor: 0,
     }),
     updateCommentVisibility: builder.mutation<
       {success: boolean},
