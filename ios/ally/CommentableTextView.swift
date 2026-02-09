@@ -2,7 +2,7 @@ import UIKit
 import React
 
 @objc(CommentableTextView)
-class CommentableTextView: UITextView, UITextViewDelegate {
+class CommentableTextView: UITextView, UITextViewDelegate, UIGestureRecognizerDelegate {
   @objc var commentRanges: NSArray = [] {
     didSet { updateAttributedText() }
   }
@@ -73,8 +73,12 @@ class CommentableTextView: UITextView, UITextViewDelegate {
 
     // Double-tap recognizer — UITextView handles word selection natively;
     // this exists so the single-tap can use require(toFail:).
+    // cancelsTouchesInView = false + delegate allows it to coexist with
+    // UITextView's built-in double-tap-to-select-word recognizer.
     let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
     doubleTap.numberOfTapsRequired = 2
+    doubleTap.cancelsTouchesInView = false
+    doubleTap.delegate = self
     addGestureRecognizer(doubleTap)
 
     let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
@@ -278,6 +282,17 @@ class CommentableTextView: UITextView, UITextViewDelegate {
     }
 
     onSelectionChange?(payload)
+  }
+
+  // MARK: - UIGestureRecognizerDelegate
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+  ) -> Bool {
+    // Allow our double-tap recognizer to coexist with UITextView's
+    // built-in double-tap-to-select-word recognizer so both fire.
+    return true
   }
 
   @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
