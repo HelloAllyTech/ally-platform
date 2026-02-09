@@ -44,11 +44,13 @@ class CommentableTextView: UITextView, UITextViewDelegate {
 
   @objc var onSelectionChange: RCTBubblingEventBlock?
   @objc var onCommentPress: RCTBubblingEventBlock?
+  @objc var onContentSizeChange: RCTBubblingEventBlock?
 
   private let commentKey = NSAttributedString.Key("CommentIds")
   private var isUpdatingText = false
   private var isApplyingSelection = false
   private var lastKnownWidth: CGFloat = 0
+  private var lastEmittedHeight: CGFloat = 0
 
   override init(frame: CGRect, textContainer: NSTextContainer?) {
     super.init(frame: frame, textContainer: textContainer)
@@ -69,8 +71,15 @@ class CommentableTextView: UITextView, UITextViewDelegate {
     textContainer.lineFragmentPadding = 0
     delegate = self
 
+    // Double-tap recognizer — UITextView handles word selection natively;
+    // this exists so the single-tap can use require(toFail:).
+    let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+    doubleTap.numberOfTapsRequired = 2
+    addGestureRecognizer(doubleTap)
+
     let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
     tap.cancelsTouchesInView = false
+    tap.require(toFail: doubleTap)
     addGestureRecognizer(tap)
   }
 
@@ -79,6 +88,18 @@ class CommentableTextView: UITextView, UITextViewDelegate {
     if bounds.width != lastKnownWidth {
       lastKnownWidth = bounds.width
       invalidateIntrinsicContentSize()
+    }
+
+    // Emit current content height to JS so it can set an explicit
+    // height on the native view, removing the need for a hidden
+    // measurement overlay.
+    let width = bounds.width > 0 ? bounds.width : UIScreen.main.bounds.width
+    let fittingSize = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+    let fitted = sizeThatFits(fittingSize)
+    let height = ceil(fitted.height)
+    if height > 0 && height != lastEmittedHeight {
+      lastEmittedHeight = height
+      onContentSizeChange?(["height": height])
     }
   }
 
@@ -257,6 +278,12 @@ class CommentableTextView: UITextView, UITextViewDelegate {
     }
 
     onSelectionChange?(payload)
+  }
+
+  @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+    // Intentionally empty. UITextView handles double-tap for word
+    // selection natively. This recognizer exists only so the single-tap
+    // can use require(toFail:).
   }
 
   @objc private func handleTap(_ gesture: UITapGestureRecognizer) {

@@ -13,5 +13,6 @@ RCT_EXPORT_VIEW_PROPERTY(prefixTextStyle, NSDictionary)
 RCT_EXPORT_VIEW_PROPERTY(highlightStyle, NSDictionary)
 RCT_EXPORT_VIEW_PROPERTY(onSelectionChange, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onCommentPress, RCTBubblingEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onContentSizeChange, RCTBubblingEventBlock)
 @end
 
