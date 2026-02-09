@@ -93,6 +93,13 @@ export const blue = {
 } as const;
 
 /**
+ * Blue Alpha (transparency variations)
+ */
+export const blueAlpha = {
+  25: 'rgba(226, 242, 255, 0.25)',
+} as const;
+
+/**
  * Light Blue color scale (50-900 + A100-A700)
  */
 export const lightBlue = {
@@ -313,6 +320,7 @@ export const deepPurple = {
  * Deep Purple Alpha (transparency variations)
  */
 export const deepPurpleAlpha = {
+  25: 'rgba(237, 231, 246, 0.25)',
   50: 'rgba(237, 231, 246, 0.5)',
 } as const;
 
@@ -455,6 +463,7 @@ export const dsColors = {
   grey,
   blackAlpha,
   whiteAlpha,
+  blueAlpha,
   deepPurple,
   deepPurpleAlpha,
 
