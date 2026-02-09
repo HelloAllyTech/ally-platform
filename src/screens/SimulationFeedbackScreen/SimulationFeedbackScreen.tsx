@@ -14,6 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
 import {
+  LearningPathType,
   SCREEN_NAMES,
   SimulationEventStatus,
   USER_PERMISSIONS,
@@ -55,7 +56,13 @@ const FEEDBACK_THRESHOLD = 30 * 1000;
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId} = route.params;
+  const {
+    fromLogs,
+    scenarioSessionId,
+    pathId,
+    contextType = LearningPathType.TRACK,
+  } = route.params;
+  const isCase = contextType === LearningPathType.CASE;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();

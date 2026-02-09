@@ -49,6 +49,12 @@ export enum ScenarioStatus {
 export enum SimulationTabs {
   SIMULATIONS = 'SIMULATIONS',
   PATHS = 'PATHS',
+  CASES = 'CASES',
+}
+
+export enum LearningPathType {
+  TRACK = 'track',
+  CASE = 'case',
 }
 
 export enum SimulationEventStatus {

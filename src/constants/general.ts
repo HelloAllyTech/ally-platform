@@ -159,6 +159,16 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
+    // ============================================
+    // CASES - Placeholder routes
+    // TODO: Update with actual routes when API contract is available
+    // ============================================
+    CASES: '/learn/cases',
+    CASE_DETAILS: (caseId: string) => `/learn/cases/${caseId}`,
+    CREATE_CASE_SESSION: (caseId: string) =>
+      `/learn/cases/${caseId}/create-session`,
+    SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
+      `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',

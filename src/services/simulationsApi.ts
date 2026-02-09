@@ -1,6 +1,8 @@
 import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
+  Case,
+  CaseDetails,
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
@@ -195,6 +197,93 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
     }),
+
+    // ============================================
+    // CASES API - Mock endpoints until backend is ready
+    // TODO: Replace with actual endpoints when API contract is available
+    // ============================================
+
+    /**
+     * Get all cases
+     * @deprecated Mock endpoint - Returns empty array until backend is ready
+     */
+    getCases: builder.query<Case[], void>({
+      queryFn: async () => {
+        // Mock: Return empty array until API is ready
+        return {data: []};
+
+        // TODO: When API is ready, replace with:
+        // query: () => ({
+        //   url: API_ROUTES.LEARN.CASES,
+        //   method: API_METHODS.GET,
+        // }),
+        // transformResponse: (response: CasesResponse) => response.data,
+      },
+      providesTags: ['Cases'],
+    }),
+
+    /**
+     * Get case details
+     * @deprecated Mock endpoint - Returns null until backend is ready
+     */
+    getCaseDetails: builder.query<CaseDetails, {caseId: string}>({
+      queryFn: async () => {
+        // Mock: Return null until API is ready
+        return {data: null as any};
+
+        // TODO: When API is ready, replace with:
+        // query: ({caseId}) => ({
+        //   url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
+        //   method: API_METHODS.GET,
+        // }),
+        // transformResponse: (response: CaseDetails) => ({
+        //   ...response,
+        //   scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+        // }),
+      },
+      providesTags: ['CaseDetails'],
+    }),
+
+    /**
+     * Create case session
+     * @deprecated Mock endpoint - No-op until backend is ready
+     */
+    createCaseSession: builder.mutation<
+      {caseSessionItemId: string},
+      {caseId: string}
+    >({
+      queryFn: async () => {
+        // Mock: Return empty response until API is ready
+        return {data: {caseSessionItemId: ''}};
+
+        // TODO: When API is ready, replace with:
+        // query: ({caseId}) => ({
+        //   url: API_ROUTES.LEARN.CREATE_CASE_SESSION(caseId),
+        //   method: API_METHODS.POST,
+        // }),
+      },
+      invalidatesTags: ['CaseDetails', 'Cases'],
+    }),
+
+    /**
+     * Get scenario session by case item
+     * @deprecated Mock endpoint - Returns null until backend is ready
+     */
+    getScenarioSessionByCaseItem: builder.query<
+      {id: string},
+      {caseSessionItemId: string}
+    >({
+      queryFn: async () => {
+        // Mock: Return null until API is ready
+        return {data: null as any};
+
+        // TODO: When API is ready, replace with:
+        // query: ({caseSessionItemId}) => ({
+        //   url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_CASE_ITEM(caseSessionItemId),
+        //   method: API_METHODS.GET,
+        // }),
+      },
+    }),
   }),
 });
 
@@ -215,4 +304,8 @@ export const {
   useGetUpcomingScenarioQuery,
   useLazyGetUpcomingScenarioQuery,
   useLazyGetScenarioSessionByPathItemQuery,
+  useGetCasesQuery,
+  useGetCaseDetailsQuery,
+  useCreateCaseSessionMutation,
+  useLazyGetScenarioSessionByCaseItemQuery,
 } = simulationsApi;
