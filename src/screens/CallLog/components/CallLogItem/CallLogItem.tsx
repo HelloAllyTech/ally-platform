@@ -105,7 +105,7 @@ export const CallLogItem = ({
               </View>
             </View>
           </View>
-          {logType === LogType.REAL ? (
+          {logType === LogType.REAL || logType === LogType.ARCHIVED_REAL ? (
             <Text style={styles.logDate}>
               {formatDate(item.startedAt)} • {formatTime(item.startedAt)}
             </Text>

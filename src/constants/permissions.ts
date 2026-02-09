@@ -24,6 +24,7 @@ export enum USER_PERMISSIONS {
   VIEW_COMMUNITY_LEADERBOARD = 'view:community:leaderboard',
   VIEW_USER_BADGES = 'view:user:badges',
   EDIT_USER_BADGES = 'edit:user:badges',
+  ARCHIVE_CALL_LOG = 'archive:call-log',
 }
 
 export const MICROPHONE_PERMISSION =
