@@ -8,6 +8,7 @@ import android.text.SpanWatcher
 import android.text.Spanned
 import android.util.AttributeSet
 import android.view.ActionMode
+import android.view.GestureDetector
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -38,6 +39,7 @@ class AndroidCommentMessageRowView : FrameLayout {
     private var menuOptions: Array<String> = arrayOf("Add comment")
     private var textView: TextView? = null
     private var layoutObserver: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var gestureDetector: GestureDetector? = null
 
     // ── Public state (set by ViewManager) ──────────────────────────
     var messageId: String = ""
@@ -46,6 +48,9 @@ class AndroidCommentMessageRowView : FrameLayout {
      *  by this amount so they are relative to the message content only. */
     var prefixLength: Int = 0
     var onSelectionChangeListener: ((String, Int, Int, String) -> Unit)? = null
+    /** Fires on genuine single tap with (messageId, adjustedCharOffset).
+     *  Does NOT fire for long-press or double-tap. */
+    var onSingleTapListener: ((String, Int) -> Unit)? = null
 
     // =====================================================================
     //  CLEAR SELECTION  (dismiss native ActionMode from JS)
@@ -179,6 +184,37 @@ class AndroidCommentMessageRowView : FrameLayout {
 
             override fun onDestroyActionMode(mode: ActionMode?) {}
         }
+
+        // ── Single-tap detector for thread taps ──
+        // onSingleTapConfirmed fires ONLY for genuine single taps —
+        // never for long-press (selection) or double-tap (word select).
+        gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                val listener = onSingleTapListener ?: return false
+                val layout = tv.layout ?: return false
+
+                // Convert coordinates from FrameLayout space → TextView text space
+                val tvLoc = IntArray(2)
+                val myLoc = IntArray(2)
+                tv.getLocationOnScreen(tvLoc)
+                this@AndroidCommentMessageRowView.getLocationOnScreen(myLoc)
+
+                val textX = e.x + myLoc[0] - tvLoc[0] - tv.totalPaddingLeft + tv.scrollX
+                val textY = e.y + myLoc[1] - tvLoc[1] - tv.totalPaddingTop + tv.scrollY
+
+                val line = layout.getLineForVertical(textY.toInt())
+                val offset = layout.getOffsetForHorizontal(line, textX)
+
+                // Adjust for prefix so offset is relative to message content
+                val adjustedOffset = offset - prefixLength
+                if (adjustedOffset < 0) return false
+
+                listener.invoke(messageId, adjustedOffset)
+                return true
+            }
+        })
     }
 
     // =====================================================================
@@ -245,6 +281,9 @@ class AndroidCommentMessageRowView : FrameLayout {
         if (prefixLength > 0 && event.action == MotionEvent.ACTION_DOWN) {
             ensureSelectionClamp()
         }
+        // Feed ALL events to the gesture detector so it can distinguish
+        // single-tap from long-press and double-tap.
+        gestureDetector?.onTouchEvent(event)
         return super.dispatchTouchEvent(event)
     }
 
