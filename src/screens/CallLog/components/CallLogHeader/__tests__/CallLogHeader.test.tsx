@@ -38,7 +38,12 @@ jest.mock('@/components', () => {
 describe('CallLogHeader', () => {
   it('renders with title and subtitle', () => {
     const {getByText} = render(
-      <CallLogHeader search="" onSearchChange={() => {}} />,
+      <CallLogHeader
+        search=""
+        onSearchChange={() => {}}
+        title="CallLogs.header.title"
+        subtitle="CallLogs.header.subtitle"
+      />,
     );
     expect(getByText('CallLogs.header.title')).toBeTruthy();
     expect(getByText('CallLogs.header.subtitle')).toBeTruthy();
@@ -46,7 +51,11 @@ describe('CallLogHeader', () => {
 
   it('renders TabScreenHeader component', () => {
     const {getByTestId} = render(
-      <CallLogHeader search="" onSearchChange={() => {}} />,
+      <CallLogHeader
+        search=""
+        onSearchChange={() => {}}
+        title="CallLogs.header.title"
+      />,
     );
     expect(getByTestId('tab-screen-header')).toBeTruthy();
   });
@@ -65,13 +74,9 @@ describe('CallLogHeader', () => {
     expect(onRefresh).toHaveBeenCalled();
   });
 
-  it('renders without title when showTitle is false', () => {
+  it('renders without title when title is not passed', () => {
     const {getByTestId, queryByText} = render(
-      <CallLogHeader
-        search=""
-        onSearchChange={() => {}}
-        showTitle={false}
-      />,
+      <CallLogHeader search="" onSearchChange={() => {}} />,
     );
     expect(getByTestId('tab-screen-header')).toBeTruthy();
     expect(queryByText('CallLogs.header.title')).toBeNull();
