@@ -4,6 +4,12 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SimulationFeedbackScreen} from '../SimulationFeedbackScreen';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
 let mockGoBack = jest.fn();
 jest.mock('@/hooks', () => ({
   useAppNavigation: () => ({
@@ -20,6 +26,10 @@ jest.mock('@/hooks', () => ({
     showActiveSimulationModal: false,
     closeActiveSimulationModal: jest.fn(),
     setShowActiveSimulationModal: jest.fn(),
+  }),
+  useTranslate: () => ({
+    t: (key: string) => key,
+    tVariable: (key: string) => key,
   }),
 }));
 
@@ -44,6 +54,9 @@ jest.mock('@/assets', () => {
     ChevronDown: () => <Text testID="chevron-down" />,
     LeftArrowIcon: () => <Text testID="left-arrow-icon" />,
     CommentIcon: () => <Text testID="comment-icon" />,
+    HelpIcon: () => <Text testID="help-icon" />,
+    LightBulbIcon: () => <Text testID="lightbulb-icon" />,
+    ThumbUpIcon: () => <Text testID="thumbup-icon" />,
   };
 });
 
@@ -59,6 +72,18 @@ jest.mock('@/components', () => {
     ),
     FeedbackPopup: ({visible, onClose}: any) => (
       visible ? <View testID="feedback-popup" onTouchEnd={onClose} /> : null
+    ),
+    CustomTabs: ({tabs, activeTab, onTabChange}: any) => (
+      <View testID="custom-tabs">
+        {tabs?.map((tab: any, index: number) => (
+          <TouchableOpacity
+            key={index}
+            testID={`tab-${index}`}
+            onPress={() => onTabChange?.(index)}>
+            <Text>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     ),
     useToast: () => ({showToast: showToastMock}),
     __mocks__: {showToastMock},
@@ -113,6 +138,30 @@ jest.mock('@/services/reviewThreadsApi', () => ({
     jest.fn().mockResolvedValue({data: {data: []}}),
     {isLoading: false},
   ],
+}));
+
+jest.mock('@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    SimulationDetailsModal: ({visible}: any) =>
+      visible ? <View testID="simulation-details-modal" /> : null,
+  };
+});
+
+jest.mock('@/utils', () => ({
+  formatDateTime: (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).replace(' at ', ' ');
+  },
+  navigateToLearnTab: jest.fn(),
 }));
 
 jest.mock('../components', () => {
@@ -192,14 +241,10 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Press arrow icon within header to open dropdown (bubbles to Touchable)
-    fireEvent.press(getByTestId('arrow-down'));
-    // Wait for dropdown to appear and click transcript option
-    await waitFor(() => {
-      expect(getByTestId('transcript-option')).toBeTruthy();
-    });
-    fireEvent.press(getByTestId('transcript-option'));
-    // Transcript should render after clicking the transcript option
+    // Switch to transcript tab by clicking on the transcription tab (index 2)
+    const transcriptionTab = getByTestId('tab-2');
+    fireEvent.press(transcriptionTab);
+    // Transcript should render after clicking the transcription tab
     await waitFor(() => {
       expect(getByTestId('transcript-comp')).toBeTruthy();
     });

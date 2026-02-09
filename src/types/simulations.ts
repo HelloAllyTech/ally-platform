@@ -213,6 +213,9 @@ export interface SimulationSummaryData {
   reviewStatus?: ReviewStatus | null;
   scenario?: {
     title?: string;
+    description?: string;
+    coverImageUrl?: string;
+    coverVideoUrl?: string;
     metadata?: ScenarioMetadata;
   };
   details?: {

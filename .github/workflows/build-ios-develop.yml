@@ -13,8 +13,8 @@ jobs:
     environment: development
 
     steps:
-      - name: Set up Xcode version
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - name: Verify Xcode version
+        run: xcodebuild -version
 
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -25,6 +25,7 @@ export {
   blackAlpha,
   whiteAlpha,
   deepPurple,
+  deepPurpleAlpha,
   theme,
   surface,
   feedback,

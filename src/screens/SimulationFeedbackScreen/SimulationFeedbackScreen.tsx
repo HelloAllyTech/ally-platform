@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   SafeAreaView,
@@ -11,8 +11,8 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
-import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
+import {CustomTabs, FeedbackPopup, PrimaryButton, useToast} from '@/components';
 import {
   SCREEN_NAMES,
   SimulationEventStatus,
@@ -39,7 +39,6 @@ import {ReviewStatus, SessionItemStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
-  FeedbackDropdown,
   PrivacyToggle,
   SimulationSummary,
   SimulationSummarySkeleton,
@@ -62,8 +61,7 @@ export const SimulationFeedbackScreen: React.FC<
 
   const [mountTime] = useState<number>(Date.now());
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
-  const [showSummary, setShowSummary] = useState<boolean>(true);
-  const [isDropdownVisible, setIsDropdownVisible] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<number>(0);
   const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
@@ -361,8 +359,9 @@ export const SimulationFeedbackScreen: React.FC<
     [],
   );
 
-  const onHeaderPress = () => setIsDropdownVisible(true);
-  const hideHeaderDropdown = () => setIsDropdownVisible(false);
+  const handleTabChange = (tabIndex: number) => {
+    setActiveTab(tabIndex);
+  };
 
   const handleRetrySimulation = () => {
     const current = currentSession;
@@ -450,6 +449,7 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const renderTitle = () => {
+    const showSummary = activeTab === 0;
     return (
       <Text style={styles.title}>
         {t('SimulationFeedback.title')}{' '}
@@ -463,9 +463,40 @@ export const SimulationFeedbackScreen: React.FC<
       </Text>
     );
   };
-  const showTranscript = !isSimulationDetailsLoading && !showSummary;
+  const showSummary = activeTab === 0;
+  const showTranscript = !isSimulationDetailsLoading && activeTab === 2;
   const hasScenarioMessagesPermission = permissions?.includes(
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+  );
+
+  const tabs = useMemo(
+    () => [
+      {
+        key: 'summary',
+        title: t('SimulationFeedback.tabs.summary'),
+      },
+      {
+        key: 'askAI',
+        title: t('SimulationFeedback.tabs.askAI'),
+      },
+      {
+        key: 'transcription',
+        title: t('SimulationFeedback.tabs.transcription'),
+      },
+      {
+        key: 'checklist',
+        title: t('SimulationFeedback.tabs.checklist'),
+      },
+      {
+        key: 'skills',
+        title: t('SimulationFeedback.tabs.skills'),
+      },
+      {
+        key: 'reflection',
+        title: t('SimulationFeedback.tabs.reflection'),
+      },
+    ],
+    [t],
   );
 
   return (
@@ -485,26 +516,17 @@ export const SimulationFeedbackScreen: React.FC<
           )}
           <View style={globalStyles.column}>
             {hasScenarioMessagesPermission && (
-              <TouchableOpacity
-                style={[
-                  globalStyles.rowCenter,
-                  !fromLogs && styles.titleExtraPadding,
-                ]}
-                onPress={onHeaderPress}
-                activeOpacity={0.8}>
+              <View style={!fromLogs && styles.titleExtraPadding}>
                 {renderTitle()}
-                <View style={styles.arrowDownContainer}>
-                  <ArrowDown width={9} height={5} />
-                </View>
-              </TouchableOpacity>
-            )}
-            {fromLogs && simulationDetails?.metadata?.sessionName && (
-              <Text style={styles.subTitle}>
-                {simulationDetails.metadata.sessionName}
-              </Text>
+                {fromLogs && simulationDetails?.metadata?.sessionName && (
+                  <Text style={styles.subTitle}>
+                    {simulationDetails.metadata.sessionName}
+                  </Text>
+                )}
+              </View>
             )}
           </View>
-          {!!reviewId && !showSummary && !hideReviewDetails && (
+          {!!reviewId && activeTab === 2 && !hideReviewDetails && (
             <TouchableOpacity
               onPress={handleViewReview}
               style={styles.reviewIconButton}
@@ -514,6 +536,15 @@ export const SimulationFeedbackScreen: React.FC<
           )}
         </View>
       </View>
+      {hasScenarioMessagesPermission && (
+        <View style={styles.tabsContainer}>
+          <CustomTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+          />
+        </View>
+      )}
       {showSummary && (
         <KeyboardAwareScrollView
           ref={scrollViewRef}
@@ -590,12 +621,6 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
         </>
       )}
-      <FeedbackDropdown
-        visible={isDropdownVisible}
-        onClose={hideHeaderDropdown}
-        showSummary={showSummary}
-        setShowSummary={setShowSummary}
-      />
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}

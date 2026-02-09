@@ -8,19 +8,19 @@ export const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  tabsContainer: {
+    marginHorizontal: '20@ms',
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: '20@ms',
+    paddingHorizontal: '10@ms',
     paddingBottom: '40@vs',
   },
   titleSection: {
-    marginBottom: '10@vs',
+    marginBottom: '8@vs',
     paddingRight: '20@ms',
     paddingLeft: '10@ms',
-    paddingBottom: '8@vs',
     marginTop: '8@vs',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
   },
   titleRow: {
     flexDirection: 'row',
