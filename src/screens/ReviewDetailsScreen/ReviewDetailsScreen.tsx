@@ -62,6 +62,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const [selectedMessageForThreads, setSelectedMessageForThreads] = useState<
     string | null
   >(null);
+  const [currentMessageThreadIds, setCurrentMessageThreadIds] = useState<
+    string[]
+  >([]);
   const navigation = useAppNavigation();
 
   useHardwareBackPressHandler(() => {
@@ -367,10 +370,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   ]);
 
   const handleThreadClick = useCallback(
-    (_commentIds: string[], messageId: string) => {
+    (threadIds: string[], messageId: string) => {
       if (!showCommentInput) {
         setSelectedMessageForThreads(messageId);
         setIsMessageThreadsVisible(true);
+        setCurrentMessageThreadIds(threadIds);
       }
     },
     [showCommentInput],
@@ -403,12 +407,17 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
-    if (!selectedMessageForThreads) return [];
+    if (!selectedMessageForThreads || currentMessageThreadIds.length === 0)
+      return [];
     const message = rawMessages.find(
       m => m.id?.toString() === selectedMessageForThreads.toString(),
     );
-    return message?.threads || [];
-  }, [selectedMessageForThreads, rawMessages]);
+    return (
+      message?.threads.filter(thread =>
+        currentMessageThreadIds.includes(thread.id),
+      ) || []
+    );
+  }, [selectedMessageForThreads, rawMessages, currentMessageThreadIds]);
 
   // Early returns after ALL hooks
   if (isLoading) {
