@@ -294,6 +294,9 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.mediumEmphasis,
   },
   coverContainer: {
+    minHeight: '180@ms',
+    backgroundColor: colors.ds.grey[100],
+    borderRadius: radius.lg,
     width: '100%',
   },
   cover: {
