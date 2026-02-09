@@ -6,6 +6,8 @@ import {ThreeDotsIcon} from '@/assets';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 
 interface ActionOption {
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   label: string;
   onPress: () => void;
 }
@@ -77,7 +79,15 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
                   option.onPress();
                   setOpenMenu(false);
                 }}>
-                <Text style={styles.menuItemText}>{option.label}</Text>
+                <View style={styles.menuItemContainer}>
+                  {option.leftIcon && (
+                    <View style={styles.menuItemIcon}>{option.leftIcon}</View>
+                  )}
+                  <Text style={styles.menuItemText}>{option.label}</Text>
+                  {option.rightIcon && (
+                    <View style={styles.menuItemIcon}>{option.rightIcon}</View>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -115,5 +125,13 @@ const styles = ScaledSheet.create({
     ...typography.body.small,
     fontWeight: fontWeights.medium,
     color: colors.black,
+  },
+  menuItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+  },
+  menuItemIcon: {
+    alignSelf: 'flex-start',
   },
 });
