@@ -73,3 +73,31 @@ export const BADGE_CATEGORY_MAP: Record<BadgeCategory, string> = {
   [BadgeCategory.COMMENTS_REACTIONS_GIVEN]: 'Contribution',
   [BadgeCategory.COMMENTS_REACTIONS_RECEIVED]: 'Resonance',
 };
+
+/**
+ * Formats a value as a percentage
+ * @param value - Numeric value (0-1 for decimal, or any number)
+ * @returns Formatted percentage string (e.g., "75%") or "-" if no value
+ * @example
+ * formatAsPercentage(0.75) // returns "75%"
+ * formatAsPercentage(null) // returns "-"
+ */
+export const formatAsPercentage = (value: unknown): string => {
+  if (!value) return '-';
+  return `${Math.round(Number(value) * 100)}%`;
+};
+
+/**
+ * Formats a value as a string, handling special cases
+ * @param value - Value to format
+ * @returns Formatted string, "N/A" for -1, "-" for falsy values, or string representation
+ * @example
+ * formatAsStringOrDash(-1) // returns "N/A"
+ * formatAsStringOrDash(null) // returns "-"
+ * formatAsStringOrDash(123) // returns "123"
+ */
+export const formatAsStringOrDash = (value: unknown): string => {
+  if (value === -1) return 'N/A';
+  if (!value) return '-';
+  return String(value);
+};

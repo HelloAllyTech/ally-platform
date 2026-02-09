@@ -4,10 +4,11 @@ export type {CircleConfig, AudioTrackRef, CircleProps} from './audio';
 // Call Summary types
 export type {
   SummaryField,
-  FieldConfig,
   EditableFieldKey,
   SectionItem,
   SummaryFormData,
+  FieldDataContext,
+  CallDetailsData,
 } from './callSummary';
 
 // General types

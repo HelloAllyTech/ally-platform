@@ -104,6 +104,10 @@ export const getFirstVisibleTab = (permissions: string[]) => {
   return visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
 };
 
+export const isReviewerOnly = (permissions: string[]): boolean =>
+  permissions.includes(USER_PERMISSIONS.VIEW_USER_BADGES) &&
+  !permissions.includes(USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD);
+
 interface BottomTabsProps {
   hideTabBar?: boolean;
 }
@@ -196,17 +200,9 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
 
     if (!hasPermission) return false;
 
-    // If this is the Achievements tab, check if Leaderboard is also permitted
+    // Show Achievements tab only for reviewer-only users (no Leaderboard access)
     if (tab.name === SCREEN_NAMES.ACHIEVEMENTS) {
-      const hasLeaderboardPermission = ALL_TABS.some(
-        t =>
-          t.name === SCREEN_NAMES.LEADERBOARD &&
-          (!t.requiredPermissions?.length ||
-            t.requiredPermissions.some(permission =>
-              permissions.includes(permission),
-            )),
-      );
-      return !hasLeaderboardPermission;
+      return isReviewerOnly(permissions);
     }
 
     return true;

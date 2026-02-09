@@ -32,6 +32,10 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 }) => {
   const {t} = useTranslate();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
+  console.log(
+    '🚀 ~ CallSummaryDetailsComponent ~ visibleFields:',
+    visibleFields,
+  );
   const {isUpdating, handleSubmit} = useCallSummaryForm();
 
   const [expanded, setExpanded] = useState(() =>

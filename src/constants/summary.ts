@@ -6,19 +6,64 @@ import {
   FlowIcon,
   HandShareIcon,
   HeadsetMicIcon,
+  IntakeIcon,
   KeyConcernIcon,
   MagnifyEyeIcon,
   NewsStandIcon,
   NotesIcon,
+  OngoingRisksIcon,
   PrescriptionsIcon,
   SessionSummaryIcon,
   SmileIcon,
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
+import {env} from '@/config/env';
 import {colors} from '@/theme';
-import type {SectionItem, SummaryField} from '@/types/callSummary';
+import type {
+  FieldDataContext,
+  SectionItem,
+  SummaryField,
+} from '@/types/callSummary';
 import {FieldType} from '@/types/fields';
+import {formatAsPercentage, formatAsStringOrDash} from '@/utils/common';
+import {
+  formatDateWithOrdinal,
+  formatDurationFromSeconds,
+  formatTimeHHmm,
+} from '@/utils/date';
+
+import {LanguageMap} from './general';
+
+// Helper functions for computeValue and formatDisplay specific to call summary
+const computeFromCallDetailsOrSummary =
+  (fieldKey: SummaryFieldKey) =>
+  ({summary, callDetails}: FieldDataContext) =>
+    callDetails?.[fieldKey] || summary?.[fieldKey];
+
+const formatTimeRange = (value: unknown) => {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('startTime' in value) ||
+    !('endTime' in value) ||
+    !value.startTime ||
+    !value.endTime
+  ) {
+    return '-';
+  }
+  return `${formatTimeHHmm(value.startTime as string)}-${formatTimeHHmm(value.endTime as string)}`;
+};
+
+const formatLanguages = (value: unknown) => {
+  if (!value || !Array.isArray(value) || !value.length) return '-';
+  return value
+    .map(
+      (lang: {language: string; percentage: number}) =>
+        `${LanguageMap[lang.language as keyof typeof LanguageMap] || lang.language} (${lang.percentage}%)`,
+    )
+    .join(', ');
+};
 
 export enum ChatSummaryStatus {
   PENDING = 'PENDING',
@@ -93,6 +138,8 @@ export enum SectionKey {
   PlanForNextCall = 'planForNextCall',
   Tags = 'tags',
   Metrics = 'metrics',
+  Intake = 'intake',
+  OngoingRisks = 'ongoingRisks',
   AdditionalNotes = 'additionalNotes',
 }
 
@@ -158,6 +205,44 @@ export const SUMMARY_FIELDS = {
   EMOTIONAL_LIFT: 'emotionalLift',
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked',
 
+  // Intake section
+  INTAKE_NOTES: 'intakeNotes',
+  RISK_SELF_HARM: 'riskSelfHarm',
+  RISK_SELF_HARM_NOTES: 'riskSelfHarmNotes',
+  RISK_SUICIDAL_THOUGHTS: 'riskSuicidalThoughts',
+  RISK_SUICIDAL_PLAN: 'riskSuicidalPlan',
+  RISK_SUICIDAL_ACTION: 'riskSuicidalAction',
+  RISK_SUICIDAL_THOUGHTS_NOTES: 'riskSuicidalThoughtsNotes',
+  RISK_RUNNING_AWAY: 'riskRunningAway',
+  RISK_RUNNING_AWAY_NOTES: 'riskRunningAwayNotes',
+  TRAUMA_PHYSICAL_ABUSE: 'traumaPhysicalAbuse',
+  TRAUMA_SEXUAL_ABUSE: 'traumaSexualAbuse',
+  TRAUMA_VERBAL_ABUSE: 'traumaVerbalAbuse',
+  TRAUMA_NEGLECT: 'traumaNeglect',
+  TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT:
+    'traumaSeparationFromCaregiverParent',
+  TRAUMA_WITNESSED_DOMESTIC_VIOLENCE: 'traumaWitnessedDomesticViolence',
+  TRAUMA_NOTES: 'traumaNotes',
+  ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS: 'assessmentPsychologicalDiagnosis',
+  ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES:
+    'assessmentPsychologicalDiagnosisNotes',
+  ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS:
+    'assessmentUseOfPsychotropicMedications',
+  ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES:
+    'assessmentUseOfPsychotropicMedicationsNotes',
+  ASSESSMENT_HALLUCINATIONS: 'assessmentHallucinations',
+  ASSESSMENT_HALLUCINATIONS_NOTES: 'assessmentHallucinationsNotes',
+  ASSESSMENT_AFFECT: 'assessmentAffect',
+  ASSESSMENT_SPEECH: 'assessmentSpeech',
+
+  // Ongoing Risks section
+  ONGOING_RISK_SELF_HARM: 'ongoingRiskSelfHarm',
+  ONGOING_RISK_SELF_HARM_NOTES: 'ongoingRiskSelfHarmNotes',
+  ONGOING_RISK_SUICIDAL_THOUGHTS: 'ongoingRiskSuicidalThoughts',
+  ONGOING_RISK_SUICIDAL_PLAN: 'ongoingRiskSuicidalPlan',
+  ONGOING_RISK_SUICIDAL_ACTION: 'ongoingRiskSuicidalAction',
+  ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES: 'ongoingRiskSuicidalThoughtsNotes',
+
   // Additional Notes
   ADDITIONAL_NOTES: 'additionalNotes',
 } as const;
@@ -182,6 +267,26 @@ export const AGE_RANGE_OPTIONS = [
   '45-54',
   '55-64',
   '65+',
+] as const;
+
+// Yes/No options for intake and ongoing risks
+export const YES_NO_OPTIONS = ['Yes', 'No'] as const;
+
+// Assessment Affect options
+export const ASSESSMENT_AFFECT_OPTIONS = [
+  'Congruent',
+  'Incongruent',
+  'Flat',
+  'Blunted',
+] as const;
+
+// Assessment Speech options
+export const ASSESSMENT_SPEECH_OPTIONS = [
+  'Clear & Coherent',
+  'Sluttering',
+  'Fast',
+  'Slow',
+  'Difficult to Understand',
 ] as const;
 
 export const SECTION_LIST: SectionItem[] = [
@@ -290,6 +395,24 @@ export const SECTION_LIST: SectionItem[] = [
     canEdit: false,
     canEnhance: false,
   },
+  ...(env.SCRIBE_SETTINGS_FLAG
+    ? [
+        {
+          key: SectionKey.Intake,
+          label: 'Intake',
+          icon: IntakeIcon,
+          canEdit: true,
+          canEnhance: false,
+        },
+        {
+          key: SectionKey.OngoingRisks,
+          label: 'Ongoing Risks',
+          icon: OngoingRisksIcon,
+          canEdit: true,
+          canEnhance: false,
+        },
+      ]
+    : []),
   {
     key: SectionKey.AdditionalNotes,
     label: 'Additional Notes',
@@ -308,6 +431,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Call ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => callDetails?.chatId,
   },
   {
     isEditable: false,
@@ -315,6 +439,13 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Duration',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: computeFromCallDetailsOrSummary(SUMMARY_FIELDS.CALL_DURATION),
+    formatDisplay: (value, t) =>
+      formatDurationFromSeconds(value as number, {
+        t,
+        includeSeconds: false,
+        format: 'long',
+      }),
   },
   {
     isEditable: false,
@@ -322,6 +453,9 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Date',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => callDetails?.startTime,
+    formatDisplay: value =>
+      value && typeof value === 'string' ? formatDateWithOrdinal(value) : '-',
   },
   {
     isEditable: false,
@@ -329,6 +463,11 @@ export const summaryFields: SummaryField[] = [
     label: 'Call Time',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({callDetails}) => ({
+      startTime: callDetails?.startTime,
+      endTime: callDetails?.endTime,
+    }),
+    formatDisplay: formatTimeRange,
   },
   {
     isEditable: false,
@@ -336,6 +475,9 @@ export const summaryFields: SummaryField[] = [
     label: 'Caller ID',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    computeValue: ({summary, callDetails}) =>
+      callDetails?.clientId || summary?.[SUMMARY_FIELDS.CALLER_ID],
+    formatDisplay: formatAsStringOrDash,
   },
   {
     isEditable: false,
@@ -382,11 +524,12 @@ export const summaryFields: SummaryField[] = [
     type: FieldType.InlineTextInput,
   },
   {
-    isEditable: true,
+    isEditable: false,
     key: SUMMARY_FIELDS.LANGUAGES,
     label: 'Languages',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+    formatDisplay: formatLanguages,
   },
   {
     isEditable: true,
@@ -492,7 +635,7 @@ export const summaryFields: SummaryField[] = [
     key: SUMMARY_FIELDS.TAGS,
     label: 'Tags',
     sectionKey: SectionKey.Tags,
-    type: FieldType.Text,
+    type: FieldType.MultilineTextInput,
   },
 
   // Metrics section
@@ -502,6 +645,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Listening Share',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
+    formatDisplay: formatAsPercentage,
   },
   {
     isEditable: false,
@@ -509,6 +653,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Reflective Questions Asked',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
+    formatDisplay: formatAsStringOrDash,
   },
   {
     isEditable: false,
@@ -518,6 +663,250 @@ export const summaryFields: SummaryField[] = [
     type: FieldType.Text,
   },
 
+  // Intake section
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.INTAKE_NOTES,
+    label: 'Intake Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SELF_HARM,
+    label: 'Risk, Self Harm',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SELF_HARM_NOTES,
+    label: 'Risk, Self\nHarm Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS,
+    label: 'Risk, Suicidal Thoughts',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES,
+    label: 'Risk, Suicidal\nThoughts Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SUICIDAL_PLAN,
+    label: 'Risk, Suicidal Plan',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_SUICIDAL_ACTION,
+    label: 'Risk, Suicidal Action',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_RUNNING_AWAY,
+    label: 'Risk, Running Away',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES,
+    label: 'Risk, Running\nAway Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE,
+    label: 'Trauma, Physical Abuse',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE,
+    label: 'Trauma, Sexual Abuse',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE,
+    label: 'Trauma, Verbal Abuse',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_NEGLECT,
+    label: 'Trauma, Neglect',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT,
+    label: 'Trauma, Separation from\nCaregiver/Parent',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE,
+    label: 'Trauma, Witnessed\nDomestic Violence',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.TRAUMA_NOTES,
+    label: 'Trauma Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS,
+    label: 'Assessment, Psychological Diagnosis',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES,
+    label: 'Assessment, Psychological\nDiagnosis Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS,
+    label: 'Assessment, Use of\nPsychotropic Medications',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES,
+    label: 'Assessment, Use of Psychotropic\nMedications Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS,
+    label: 'Assessment, Hallucinations',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES,
+    label: 'Assessment,\nHallucinations Notes',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_AFFECT,
+    label: 'Assessment, Affect',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: ASSESSMENT_AFFECT_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ASSESSMENT_SPEECH,
+    label: 'Assessment, Speech',
+    sectionKey: SectionKey.Intake,
+    type: FieldType.Dropdown,
+    options: ASSESSMENT_SPEECH_OPTIONS,
+  },
+
+  // Ongoing Risks section
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM,
+    label: 'Ongoing Risk, Self Harm',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES,
+    label: 'Ongoing Risk,\nSelf Harm Notes',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS,
+    label: 'Ongoing Risk, Suicidal Thoughts',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN,
+    label: 'Ongoing Risk, Suicidal Plan',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION,
+    label: 'Ongoing Risk, Suicidal Action',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.Dropdown,
+    options: YES_NO_OPTIONS,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES,
+    label: 'Ongoing Risk,\nSuicidal Thoughts Notes',
+    sectionKey: SectionKey.OngoingRisks,
+    type: FieldType.InlineTextInput,
+    placeholder: 'Add note',
+  },
+
   // Additional Notes section
   {
     isEditable: false,
@@ -525,6 +914,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Additional Notes',
     sectionKey: SectionKey.AdditionalNotes,
     type: FieldType.MultilineTextInput,
+    computeValue: ({callDetails}) => callDetails?.callInfo?.notes,
   },
 ];
 
