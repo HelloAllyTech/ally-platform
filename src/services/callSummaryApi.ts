@@ -4,7 +4,7 @@ import {ChatProvider} from '@/types';
 
 import {api} from './api';
 
-interface CallInfo {
+export interface CallInfo {
   summaryName: string;
   isSummaryFeedbackAdded: boolean;
   clientTalkingTime: number;
@@ -90,6 +90,40 @@ export interface SummaryDetails {
   reflectiveQuestionsAsked: number | null;
   emotionalLift: number | null;
 
+  // Intake section
+  intakeNotes: string | null;
+  riskSelfHarm: string | null;
+  riskSelfHarmNotes: string | null;
+  riskSuicidalThoughts: string | null;
+  riskSuicidalThoughtsNotes: string | null;
+  riskSuicidalPlan: string | null;
+  riskSuicidalAction: string | null;
+  riskRunningAway: string | null;
+  riskRunningAwayNotes: string | null;
+  traumaPhysicalAbuse: string | null;
+  traumaSexualAbuse: string | null;
+  traumaVerbalAbuse: string | null;
+  traumaNeglect: string | null;
+  traumaSeparationFromCaregiverParent: string | null;
+  traumaWitnessedDomesticViolence: string | null;
+  traumaNotes: string | null;
+  assessmentPsychologicalDiagnosis: string | null;
+  assessmentPsychologicalDiagnosisNotes: string | null;
+  assessmentUseOfPsychotropicMedications: string | null;
+  assessmentUseOfPsychotropicMedicationsNotes: string | null;
+  assessmentHallucinations: string | null;
+  assessmentHallucinationsNotes: string | null;
+  assessmentAffect: string | null;
+  assessmentSpeech: string | null;
+
+  // Ongoing Risks section
+  ongoingRiskSelfHarm: string | null;
+  ongoingRiskSelfHarmNotes: string | null;
+  ongoingRiskSuicidalThoughts: string | null;
+  ongoingRiskSuicidalPlan: string | null;
+  ongoingRiskSuicidalAction: string | null;
+  ongoingRiskSuicidalThoughtsNotes: string | null;
+
   // Additional fields from response
   workingStatus: string | null;
   newCallFollowUp: string | null;
@@ -107,7 +141,7 @@ export interface SummaryDetails {
   additionalNotes: string | null;
 }
 
-interface CallDetails {
+export interface CallDetails {
   createdAt: string;
   updatedAt: string;
   tenantId: string;

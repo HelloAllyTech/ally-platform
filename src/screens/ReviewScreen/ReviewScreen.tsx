@@ -3,12 +3,21 @@ import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
+import {useSelector} from 'react-redux';
 
 import {EmptyReviewIcon} from '@/assets';
-import {EmptyState, TabScreenHeader, TabView, useToast} from '@/components';
+import {
+  BadgePopup,
+  EmptyState,
+  TabScreenHeader,
+  TabView,
+  useToast,
+} from '@/components';
 import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
+import {isReviewerOnly} from '@/navigation/TabNavigator';
+import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 
 import {ReviewCard} from './components';
@@ -38,6 +47,9 @@ export const ReviewScreen: React.FC = () => {
 
   // State for expanded cards
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+  const permissions = useSelector(
+    (state: AppRootState) => state.user.permissions,
+  );
 
   // Refresh reviews when screen comes into focus (skip initial mount)
   useFocusEffect(
@@ -126,6 +138,7 @@ export const ReviewScreen: React.FC = () => {
           ItemSeparatorComponent={SeparatorComponent}
         />
       </View>
+      {isReviewerOnly(permissions) && <BadgePopup />}
     </View>
   );
 };

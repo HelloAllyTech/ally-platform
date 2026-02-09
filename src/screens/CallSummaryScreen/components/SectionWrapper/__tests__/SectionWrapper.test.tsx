@@ -48,11 +48,11 @@ jest.mock('../../CallSummaryDetails/SectionHeader', () => {
   return { SectionHeader };
 });
 
-jest.mock('../../CallSummaryDetails/SectionContent', () => {
+jest.mock('../../GenericSectionContent', () => {
   const React = require('react');
   const {Text} = require('react-native');
   return {
-    SectionContent: () => <Text>content</Text>,
+    GenericSectionContent: () => <Text>content</Text>,
   };
 });
 
