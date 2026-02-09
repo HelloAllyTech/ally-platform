@@ -24,6 +24,7 @@ export {
   grey,
   blackAlpha,
   whiteAlpha,
+  blueAlpha,
   deepPurple,
   deepPurpleAlpha,
   theme,

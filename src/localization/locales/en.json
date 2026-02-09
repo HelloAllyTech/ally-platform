@@ -430,7 +430,8 @@
       "skills": "Skills",
       "reflection": "Reflection"
     },
-    "sessionFeedback": "Session Feedback"
+    "sessionFeedback": "Session Feedback",
+    "annotatedTranscription": "Annotated Transcription"
   },
   "Errors": {
     "startSimulation": "Failed to start simulation",

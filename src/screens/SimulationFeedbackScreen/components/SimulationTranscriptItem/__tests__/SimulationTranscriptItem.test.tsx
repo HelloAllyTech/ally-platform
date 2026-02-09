@@ -1,5 +1,5 @@
 import React from 'react';
-import {render, fireEvent} from '@testing-library/react-native';
+import {render} from '@testing-library/react-native';
 
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
 
@@ -10,7 +10,9 @@ describe('SimulationTranscriptItem', () => {
   };
 
   it('renders time and message correctly', () => {
-    const {getByText} = render(<SimulationTranscriptItem {...defaultProps} />);
+    const {getByText} = render(
+      <SimulationTranscriptItem {...defaultProps} speakerLabel="Speaker" />,
+    );
     expect(getByText('00:01')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
@@ -19,17 +21,26 @@ describe('SimulationTranscriptItem', () => {
     const {getByText} = render(
       <SimulationTranscriptItem {...defaultProps} speakerLabel="You" />,
     );
-    expect(getByText('You: Hello, this is a test message')).toBeTruthy();
+    expect(getByText('You')).toBeTruthy();
+    expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
   it('does not render speaker label when not provided', () => {
-    const {queryByText} = render(<SimulationTranscriptItem {...defaultProps} />);
-    expect(queryByText(/You:/)).toBeNull();
+    const {queryByText, getByText} = render(
+      <SimulationTranscriptItem {...defaultProps} />,
+    );
+    expect(queryByText(/You/)).toBeNull();
+    // Message should still be rendered
+    expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
   it('shows active indicator when isActive is true', () => {
     const {getByText} = render(
-      <SimulationTranscriptItem {...defaultProps} isActive={true} />,
+      <SimulationTranscriptItem
+        {...defaultProps}
+        speakerLabel="Speaker"
+        isActive={true}
+      />,
     );
     // Component should still render correctly when active
     expect(getByText('00:01')).toBeTruthy();
@@ -37,49 +48,62 @@ describe('SimulationTranscriptItem', () => {
   });
 
   it('renders correctly without onPress prop', () => {
-    const {getByText} = render(<SimulationTranscriptItem {...defaultProps} />);
+    const {getByText} = render(
+      <SimulationTranscriptItem {...defaultProps} speakerLabel="Speaker" />,
+    );
     // Component should render correctly even without onPress
     expect(getByText('00:01')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
-  it('applies custom container style', () => {
-    const customStyle = {marginTop: 10};
+  it('renders correctly for learner messages', () => {
     const {getByText} = render(
-      <SimulationTranscriptItem {...defaultProps} containerStyle={customStyle} />,
+      <SimulationTranscriptItem
+        {...defaultProps}
+        speakerLabel="You"
+        isLearner={true}
+      />,
     );
     expect(getByText('00:01')).toBeTruthy();
+    expect(getByText('You')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
-  it('applies custom time style', () => {
-    const customStyle = {color: 'red'};
+  it('renders correctly for AI client messages', () => {
     const {getByText} = render(
-      <SimulationTranscriptItem {...defaultProps} timeStyle={customStyle} />,
+      <SimulationTranscriptItem
+        {...defaultProps}
+        speakerLabel="AI Client"
+        isLearner={false}
+      />,
     );
     expect(getByText('00:01')).toBeTruthy();
-  });
-
-  it('applies custom message style', () => {
-    const customStyle = {fontSize: 16};
-    const {getByText} = render(
-      <SimulationTranscriptItem {...defaultProps} messageStyle={customStyle} />,
-    );
+    expect(getByText('AI Client')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
   it('renders correctly with empty message', () => {
     const {getByText} = render(
-      <SimulationTranscriptItem time="00:00" message="" />,
+      <SimulationTranscriptItem
+        time="00:00"
+        message=""
+        speakerLabel="Speaker"
+      />,
     );
     expect(getByText('00:00')).toBeTruthy();
+    expect(getByText('Speaker')).toBeTruthy();
   });
 
   it('renders correctly with long message', () => {
     const longMessage = 'A'.repeat(200);
     const {getByText} = render(
-      <SimulationTranscriptItem time="00:01" message={longMessage} />,
+      <SimulationTranscriptItem
+        time="00:01"
+        message={longMessage}
+        speakerLabel="Speaker"
+      />,
     );
+    expect(getByText('00:01')).toBeTruthy();
     expect(getByText(longMessage)).toBeTruthy();
   });
 });
