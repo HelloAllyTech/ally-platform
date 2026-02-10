@@ -323,26 +323,32 @@ export interface ChecklistItem {
 }
 
 // ============================================
-// CASES - Temporary type aliases until API is ready
-// When Cases API is available, replace these with actual types
+// CASES - Currently using same types as Tracks/Pathways
+// Cases and Tracks share the same data model and backend API (scenario-paths)
+// Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/types/learn.ts)
+// TODO: Replace with dedicated Case types when backend provides /learn/scenario-cases endpoints
 // ============================================
 
 /**
- * @deprecated Temporary alias - Replace with actual Case type when API is ready
+ * Case list item type - currently aliases SimulationPath
+ * TODO: Replace with actual Case type when dedicated API is available
  */
 export type Case = SimulationPath;
 
 /**
- * @deprecated Temporary alias - Replace with actual CaseDetails type when API is ready
+ * Case detail type - currently aliases SimulationPathDetails
+ * TODO: Replace with actual CaseDetails type when dedicated API is available
  */
 export type CaseDetails = SimulationPathDetails;
 
 /**
- * @deprecated Temporary alias - Replace with actual CaseSimulation type when API is ready
+ * Individual scenario within a Case - currently aliases PathScenario
+ * TODO: Replace with actual CaseSimulation type when dedicated API is available
  */
 export type CaseSimulation = PathScenario;
 
 /**
- * @deprecated Temporary alias - Replace with actual CasesResponse type when API is ready
+ * Cases list response type - currently aliases SimulationPathsResponse
+ * TODO: Replace with actual CasesResponse type when dedicated API is available
  */
 export type CasesResponse = SimulationPathsResponse;
