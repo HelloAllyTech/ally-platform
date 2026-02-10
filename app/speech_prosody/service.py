@@ -6,11 +6,15 @@ from typing import Any, Dict, List, Optional
 
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
-from app.speech_prosody.constants import DEFAULT_CONVERSATION_HISTORY_LIMIT
+from app.speech_prosody.constants import (
+    DEFAULT_CONVERSATION_HISTORY_LIMIT,
+    MAX_TURN_DELTA_PERCENT,
+)
 from app.speech_prosody.generator import (
     generate_default_parameters,
     generate_runtime_parameters,
 )
+from app.speech_prosody.safety import clamp_value, sanitize_ssml
 from app.speech_prosody.utils import extract_persona_context_from_prompt_data
 from app.tts.base import BaseTTSClient
 from app.utils.logger import get_logger
@@ -196,6 +200,7 @@ class SpeechProsodyService:
             return enhanced_text
 
         # Validate parameters against metadata
+        # Validate parameters against metadata
         validated_dict = self.tts_client._validate_parameters_dict(params_dict)
 
         if validated_dict:
@@ -207,36 +212,115 @@ class SpeechProsodyService:
                     f"during validation: {rejected}"
                 )
 
-            # Trust LLM to generate smoothed parameters based on current parameters
-            # The LLM receives current_parameters in the prompt and is instructed
-            # to make smooth transitions, so we apply the LLM's values directly
-
             # Get current params from TTS client (persistent store) if available
+            # This is our baseline for smoothing
             if (
                 hasattr(self.tts_client, "_current_params")
                 and self.tts_client._current_params
             ):
                 self._current_params = self.tts_client._current_params.copy()
 
-            # Store and apply LLM-generated parameters directly
-            self._current_params.update(validated_dict)
+            # Smooth parameters to prevent dramatic changes
+            # This is the SAFETY LAYER that overrides LLM if it goes too far
+            smoothed_dict = self._smooth_parameters(
+                validated_dict, self._current_params, parameter_metadata
+            )
+
+            # Store and apply smoothed parameters
+            self._current_params.update(smoothed_dict)
 
             # Sync to TTS client for persistence across service instances
             self.tts_client._current_params = self._current_params.copy()
 
             # Apply parameters to TTS
-            self.tts_client._apply_parameters_dict(validated_dict)
+            self.tts_client._apply_parameters_dict(smoothed_dict)
 
             # Log successfully applied parameters
-            logger.info(f"[Speech Prosody] Applied parameters: {validated_dict}")
+            logger.info(f"[Speech Prosody] Applied parameters: {smoothed_dict}")
         else:
             logger.warning(
                 "[Speech Prosody] No valid prosody parameters "
                 "generated, using defaults"
             )
 
+        # Sanitize enhanced text
+        if enhanced_text:
+            enhanced_text = sanitize_ssml(enhanced_text)
+
         # Return enhanced text if text enhancement is supported, None otherwise
         return enhanced_text
+
+    def _smooth_parameters(
+        self,
+        new_params: Dict[str, Any],
+        current_params: Dict[str, Any],
+        parameter_metadata: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Smooth parameters to prevent dramatic changes.
+
+        Args:
+            new_params: New parameters from LLM
+            current_params: Current parameters
+            parameter_metadata: Parameter metadata from provider
+
+        Returns:
+            Smoothed parameters
+        """
+        smoothed = {}
+
+        for param_name, new_value in new_params.items():
+            # Get current value (default to 0.0 or provider default if not found)
+            current_value = current_params.get(param_name)
+
+            # If no current value, look for default in metadata
+            if current_value is None and param_name in parameter_metadata:
+                current_value = parameter_metadata[param_name].get("default")
+
+            # If still None, we can't smooth, just take new value
+            if current_value is None:
+                smoothed[param_name] = new_value
+                continue
+
+            # Check if parameter has range metadata
+            param_meta = parameter_metadata.get(param_name, {})
+            min_val = -100.0  # Default wide range
+            max_val = 100.0
+
+            if "range" in param_meta:
+                range_vals = param_meta["range"]
+                if len(range_vals) >= 2:
+                    min_val = float(range_vals[0])
+                    max_val = float(range_vals[1])
+
+            # Apply clamping
+            # Use MAX_TURN_DELTA_PERCENT (10%) as limit
+            try:
+                smoothed_val = clamp_value(
+                    float(new_value),
+                    float(current_value),
+                    min_val,
+                    max_val,
+                    MAX_TURN_DELTA_PERCENT,
+                )
+                smoothed[param_name] = smoothed_val
+
+                # Log if significant smoothing happened
+                if abs(smoothed_val - float(new_value)) > 0.01:
+                    logger.info(
+                        f"[Speech Prosody] Smoothed {param_name}: "
+                        f"{new_value} -> {smoothed_val} "
+                        f"(current: {current_value})"
+                    )
+            except (ValueError, TypeError) as e:
+                # If values aren't floats, can't smooth safely
+                logger.warning(
+                    f"Could not smooth parameter {param_name}: {e}. "
+                    f"Using new value {new_value}"
+                )
+                smoothed[param_name] = new_value
+
+        return smoothed
 
     def _get_safe_defaults(self, parameter_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """

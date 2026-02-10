@@ -112,25 +112,25 @@ Start with current parameters as baseline, then make MINIMAL adjustments
 1. EMOTIONAL MOMENTUM (apply as small adjustments to current parameters):
    - Is the character escalating (building tension) or de-escalating
      (releasing)?
-   - Escalating: Make SMALL increase to pitch/pace (1-3%), SMALL decrease
-     to stability (1-3%)
-   - De-escalating: Make SMALL decrease to pitch/pace (1-3%), SMALL
-     increase to stability (1-3%)
+   - Escalating: Make SMALL increase to pitch/pace (1-2%), SMALL decrease
+     to stability (1-2%)
+   - De-escalating: Make SMALL decrease to pitch/pace (1-2%), SMALL
+     increase to stability (1-2%)
    - These are ADJUSTMENTS to current values, not new absolute values
 
 2. COGNITIVE LOAD (apply as small adjustments to current parameters):
-   - Processing difficult emotions or trauma → SMALL decrease to pace (1-3%), add pauses
-   - Heavy topics → SMALL decrease to pace (1-3%), add pauses
+   - Processing difficult emotions or trauma → SMALL decrease to pace (1-2%), add pauses
+   - Heavy topics → SMALL decrease to pace (1-2%), add pauses
    - These are ADJUSTMENTS to current values, not new absolute values
 
 3. AUTONOMIC RESPONSE (apply as small adjustments to current parameters):
-   - Shame/Guilt → SMALL decrease to pitch/volume/pace (1-3% each)
-   - Fear/Anxiety → SMALL increase to pitch/pace (1-3% each), SMALL
-     decrease to stability (1-3%)
-   - Breakthrough/Relief → SMALL normalization adjustments (1-2% toward
+   - Shame/Guilt → SMALL decrease to pitch/volume/pace (1-2% each)
+   - Fear/Anxiety → SMALL increase to pitch/pace (1-2% each), SMALL
+     decrease to stability (1-2%)
+   - Breakthrough/Relief → SMALL normalization adjustments (1% toward
      moderate values)
-   - Anger → SMALL increase to pitch/pace (1-3% each), SMALL decrease to
-     stability (1-3%)
+   - Anger → SMALL increase to pitch/pace (1-2% each), SMALL decrease to
+     stability (1-2%)
    - These are ADJUSTMENTS to current values, not new absolute values
 
 4. MENTAL HEALTH PATIENT PROSODY PATTERNS (apply as small adjustments to
@@ -236,7 +236,7 @@ STEP 1: Start with current parameter values as your baseline
 STEP 2: Check conversation history and response text for CLEAR marked events
 
    WHAT ARE MARKED EVENTS?
-   Marked events are significant moments that warrant larger parameter changes (3-5%):
+   Marked events are significant moments that warrant larger parameter changes (2-3%):
    - Major topic shifts (e.g., suddenly discussing trauma, crisis, breakthrough)
    - Significant emotional state changes (e.g., calm → panic, sad → relief,
      anxious → breakthrough)
@@ -256,16 +256,16 @@ STEP 2: Check conversation history and response text for CLEAR marked events
    - If response text shows strong emotional intensity or major topic shift →
      MARKED EVENT
 
-   - If NO marked event found → Apply 1-2% natural variation based on
-     response text emotional tone (e.g., if current is X, range is X × 0.98
-     to X × 1.02)
-   - If marked event found → Apply 3-5% variation (pace/speed: 3%, pitch/loudness: 5%)
+   - If NO marked event found → Apply 1% natural variation based on
+     response text emotional tone (e.g., if current is X, range is X × 0.99
+     to X × 1.01)
+   - If marked event found → Apply 2-3% variation (pace/speed: 2%, pitch/loudness: 3%)
 
 STEP 3: If marked event found → Calculate new values using formula:
    - new_value = current_value ± (current_value × percentage_limit)
-   - Pace/Speed: current_value × 0.03 max (range: current × 0.97 to current × 1.03)
-   - Pitch: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
-   - Loudness/Volume: current_value × 0.05 max (range: current × 0.95 to current × 1.05)
+   - Pace/Speed: current_value × 0.02 max (range: current × 0.98 to current × 1.02)
+   - Pitch: current_value × 0.03 max (range: current × 0.97 to current × 1.03)
+   - Loudness/Volume: current_value × 0.03 max (range: current × 0.97 to current × 1.03)
    - Use actual parameter names from AVAILABLE PARAMETERS section
 
 STEP 4: VERIFY your calculated values:

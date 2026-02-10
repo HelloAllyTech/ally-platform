@@ -34,9 +34,7 @@ def _patch_sarvam_stt_url_builder() -> None:
         original_func = sarvam_stt_module._build_websocket_url
         sarvam_stt_module._original_build_websocket_url = original_func
 
-        def _patched_build_websocket_url(
-            base_url: str, language: str, model: str, prompt: str | None = None
-        ) -> str:
+        def _patched_build_websocket_url(base_url: str, opts: Any) -> str:
             """
             Patched version that preserves existing query params and adds
             sample_rate=16000.
@@ -46,6 +44,10 @@ def _patch_sarvam_stt_url_builder() -> None:
             SpeechStream uses sample_rate=16000 (hardcoded), so we add it to
             the URL here.
             """
+            # Extract values from opts (SarvamSTTOptions)
+            language = getattr(opts, "language", "en-IN")
+            model = getattr(opts, "model", "saarika:v2.5")
+
             # Parse base_url to preserve existing query parameters
             parsed = urlparse(base_url)
             existing_params = parse_qs(parsed.query, keep_blank_values=True)
@@ -78,7 +80,7 @@ def _patch_sarvam_stt_url_builder() -> None:
 
         # Apply the patch
         sarvam_stt_module._build_websocket_url = _patched_build_websocket_url
-        logger.debug("Patched _build_websocket_url to include sample_rate=16000")
+        logger.info("Patched _build_websocket_url to include sample_rate=16000")
 
     except Exception as e:
         # Log but don't fail - the plugin might work without the patch in some cases
@@ -86,7 +88,7 @@ def _patch_sarvam_stt_url_builder() -> None:
 
 
 # Apply patch once at module import time
-# _patch_sarvam_stt_url_builder()
+_patch_sarvam_stt_url_builder()
 
 
 class SarvamSTTClient(BaseSTTClient):

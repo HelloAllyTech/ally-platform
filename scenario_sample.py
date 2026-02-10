@@ -241,8 +241,11 @@ SCENARIO_SAMPLE = {
         ],
         "voice": {
             "name": "Meera 30 year old",
-            "model": "eleven_multilingual_v2",
-            "voiceId": "jqz1rTaQ0LwR55wGp1Z7",
+            "provider": "ELEVENLABS",
+            "config": {
+                "model": "eleven_multilingual_v2",
+                "voice_id": "jqz1rTaQ0LwR55wGp1Z7",
+            },
         },
         "languageCode": "en-IN",
         "stt": {
