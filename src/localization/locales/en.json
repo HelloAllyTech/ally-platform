@@ -473,6 +473,7 @@
     "askAIPlaceholder": "Ask a question about the session....",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
+    "checklistHeader": "Overall Score",
     "reflection": {
       "sectionTitle": "Self-Reflection Prompts",
       "placeholder": "Add response",
