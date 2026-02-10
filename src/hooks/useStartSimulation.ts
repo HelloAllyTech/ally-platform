@@ -109,7 +109,6 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
           sessionData: {
             id: startResp.scenarioSession.id,
-            createdAt: startResp.scenarioSession.createdAt,
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },

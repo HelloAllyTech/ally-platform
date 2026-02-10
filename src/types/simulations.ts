@@ -236,7 +236,6 @@ export interface SimulationSummaryData {
 
 export type SessionData = {
   id: string;
-  createdAt: string;
   accessToken: string;
   liveKitServerUrl: string;
 };

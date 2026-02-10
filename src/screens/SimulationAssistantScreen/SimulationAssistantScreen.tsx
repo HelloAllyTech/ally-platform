@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -14,6 +14,7 @@ import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
@@ -60,6 +61,8 @@ import {
 } from './components/ScenarioInfoOverlay';
 import {styles} from './styles';
 
+const RINGING_BELL_DELAY = 5000; // 5 seconds for ringing the bell before connecting
+
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
@@ -67,11 +70,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const {sessionData, scenario, pathId, contextType} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
-  const startTime = useMemo(
-    () =>
-      sessionData?.createdAt ? new Date(sessionData?.createdAt) : new Date(),
-    [sessionData?.createdAt],
-  );
+  const [startTime, setStartTime] = useState<Date | null>(null);
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const [endScenarioSession] = useEndScenarioSessionMutation();
@@ -112,7 +111,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => {
     if (accessToken) {
-      handleConnect();
+      setIsConnecting(true);
+      // Delay connection to allow ringtone to play (matching web behavior)
+      const connectionTimeout = setTimeout(() => {
+        handleConnect();
+        setStartTime(new Date());
+      }, RINGING_BELL_DELAY);
+
+      return () => {
+        clearTimeout(connectionTimeout);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -180,6 +188,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
       setIsConnecting(false);
+      // Stop the ringtone once the room is connected (matching web behavior)
+      try {
+        SoundPlayer.stop();
+      } catch {
+        // Ignore if sound already finished
+      }
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
@@ -285,7 +299,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const handleConnect = useCallback(async () => {
     try {
       await configureAudioSession();
-      setIsConnecting(true);
       await room.connect(liveKitServerUrl, accessToken);
     } catch (error) {
       showErrorToast(error, 'Errors.connect');
