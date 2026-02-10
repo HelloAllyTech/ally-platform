@@ -240,11 +240,10 @@ SCENARIO_SAMPLE = {
             }
         ],
         "voice": {
-            "name": "anushka",
-            "provider": "sarvam",
+            "name": "helena",
+            "provider": "deepgram",
             "config": {
-                "model": "bulbul:v2",
-                "speaker": "anushka",
+                "model": "aura-2-helena-en",
             },
         },
         "languageCode": "en-IN",
