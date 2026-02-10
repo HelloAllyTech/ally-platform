@@ -4,7 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArchiveIcon, ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
-import {ARCHIVE_CALL_LOGS_FLAG} from '@/config/env';
+import {env} from '@/config/env';
 import {isIOS, PRIVACY_POLICY_URL, SCREEN_WIDTH} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -112,7 +112,7 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           </Text>
           <ContractIcon width={16} height={16} />
         </TouchableOpacity>
-        {ARCHIVE_CALL_LOGS_FLAG && (
+        {env.ARCHIVE_CALL_LOGS_FLAG && (
           <>
             <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuItem} onPress={onArchive}>
