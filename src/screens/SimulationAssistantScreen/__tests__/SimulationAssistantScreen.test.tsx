@@ -261,8 +261,10 @@ const baseRouteParams = {
   scenario: {title: 'Persona', coverImageUrl: undefined},
 };
 
-const renderWithProviders = (ui: React.ReactElement) =>
-  render(
+const RINGING_BELL_DELAY = 5000;
+
+const renderWithProviders = async (ui: React.ReactElement) => {
+  const result = render(
     <SafeAreaProvider
       initialMetrics={{
         frame: {x: 0, y: 0, width: 375, height: 812},
@@ -271,6 +273,12 @@ const renderWithProviders = (ui: React.ReactElement) =>
       {ui}
     </SafeAreaProvider>,
   );
+  // Advance past the RINGING_BELL_DELAY so the room connection is triggered
+  await act(async () => {
+    jest.advanceTimersByTime(RINGING_BELL_DELAY);
+  });
+  return result;
+};
 
 describe('SimulationAssistantScreen', () => {
   const {SimulationAssistantScreen} = require('../SimulationAssistantScreen');
@@ -284,7 +292,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByLabelText, getByText} = renderWithProviders(
+    const {getByLabelText, getByText} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -303,7 +311,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByLabelText} = renderWithProviders(
+    const {getByLabelText} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -336,7 +344,7 @@ describe('SimulationAssistantScreen', () => {
        }
     });
 
-    const {getByTestId} = renderWithProviders(
+    const {getByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -374,7 +382,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByLabelText} = renderWithProviders(
+    const {getByLabelText} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -402,7 +410,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getAllByTestId, getByTestId} = renderWithProviders(
+    const {getAllByTestId, getByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -429,7 +437,7 @@ describe('SimulationAssistantScreen', () => {
       scenario: {title: 'Custom Scenario Title', coverImageUrl: undefined},
     };
 
-    const {getAllByText} = renderWithProviders(
+    const {getAllByText} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: customParams} as any} />,
     );
 
@@ -448,7 +456,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByTestId} = renderWithProviders(
+    const {getByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -466,7 +474,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByTestId} = renderWithProviders(
+    const {getByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -495,7 +503,7 @@ describe('SimulationAssistantScreen', () => {
       },
     };
 
-    const {getByTestId, queryByTestId} = renderWithProviders(
+    const {getByTestId, queryByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: checklistParams} as any} />,
     );
 
