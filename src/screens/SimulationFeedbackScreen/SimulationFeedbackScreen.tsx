@@ -212,15 +212,29 @@ export const SimulationFeedbackScreen: React.FC<
 
   const handleBack = () => {
     if (pathId) {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
-            params: {pathId},
-          },
-        ],
-      });
+      // Navigate back to the correct detail screen based on context type
+      // Cases go to CaseDetails, Tracks go to SimulationPathDetails
+      if (isCase) {
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: SCREEN_NAMES.CASE_DETAILS,
+              params: {caseId: pathId},
+            },
+          ],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+              params: {pathId},
+            },
+          ],
+        });
+      }
       return;
     }
 

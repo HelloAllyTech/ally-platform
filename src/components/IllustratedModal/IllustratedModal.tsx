@@ -164,5 +164,6 @@ const styles = ScaledSheet.create({
   actionButtonText: {
     ...typography.body.medium,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
