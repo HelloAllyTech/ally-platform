@@ -69,6 +69,16 @@ jest.mock('@/hooks', () => ({
     ]),
     isLoading: false,
   })),
+  useLearningPathDetails: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isRefreshing: false,
+    error: undefined,
+    refetch: jest.fn(),
+    createSession: jest.fn(),
+    isCreatingSession: false,
+    getSessionByItem: jest.fn(),
+  })),
 }));
 
 jest.mock('../components/PathSimulationCard', () => {
@@ -81,6 +91,24 @@ jest.mock('../components/PathSimulationCard', () => {
         {isNext && <Text testID="next-badge">Next</Text>}
       </View>
     ),
+  };
+});
+
+jest.mock('../components/SimulationDetailsModal', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    SimulationDetailsModal: ({visible}: any) =>
+      visible ? <View testID="simulation-details-modal" /> : null,
+  };
+});
+
+jest.mock('@/screens/SimulationDetailsScreen/components', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    ActiveSimulationModal: ({visible}: any) =>
+      visible ? <View testID="active-simulation-modal" /> : null,
   };
 });
 
@@ -113,6 +141,48 @@ jest.mock('@/components', () => {
           <Text>{message}</Text>
         </View>
       ) : null,
+    LearningPathHeader: ({title, description, coverImageUrl, onBackPress, credits}: any) => (
+      <View testID="learning-path-header">
+        <TouchableOpacity onPress={onBackPress}>
+          <Text>Back</Text>
+        </TouchableOpacity>
+        <Text>{title}</Text>
+        <Text>{description}</Text>
+        {credits && (
+          <Text>
+            {credits.consumed}
+            <Text>/{credits.limit}</Text>
+          </Text>
+        )}
+      </View>
+    ),
+    LearningPathListHeader: ({
+      title,
+      description,
+      completedScenarios,
+      totalScenarios,
+      isCompleted,
+      startButtonLabel,
+      onStartPress,
+      isStartDisabled,
+      isCreatingSession,
+    }: any) => (
+      <View testID="learning-path-list-header">
+        <Text>{title}</Text>
+        <Text>{description}</Text>
+        {completedScenarios !== undefined && totalScenarios > 0 && (
+          <Text>{`${completedScenarios} of ${totalScenarios} completed`}</Text>
+        )}
+        {!isCompleted && (
+          <TouchableOpacity
+            testID="primary-button"
+            onPress={onStartPress}
+            disabled={isStartDisabled || isCreatingSession}>
+            <Text>{isCreatingSession ? 'Loading...' : startButtonLabel}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    ),
     useToast: jest.fn(() => ({
       showToast: mockShowToast,
     })),
@@ -188,17 +258,22 @@ const mockPathData = {
 };
 
 describe('SimulationPathDetailsScreen', () => {
-  const {useGetSimulationPathDetailsQuery} = require('@/services');
+  const {useLearningPathDetails} = require('@/hooks');
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('should render loading state', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: undefined,
       isLoading: true,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByTestId} = render(
@@ -216,10 +291,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render error state', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: undefined,
       isLoading: false,
+      isRefreshing: false,
       error: new Error('Failed to load'),
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByTestId} = render(
@@ -238,10 +318,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render path details with simulations', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText} = render(
@@ -269,10 +354,15 @@ describe('SimulationPathDetailsScreen', () => {
       })),
     };
 
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: notStartedPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText} = render(
@@ -290,10 +380,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render "Continue" button when path is started', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText} = render(
@@ -311,10 +406,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render simulation cards with correct states', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getAllByText} = render(
@@ -335,10 +435,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render "Next" badge for the next simulation', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText} = render(
@@ -356,10 +461,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should call goBack when back button is pressed', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {root} = render(
@@ -387,10 +497,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should display credits information', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {root} = render(
@@ -417,10 +532,15 @@ describe('SimulationPathDetailsScreen', () => {
   });
 
   it('should render header with path title', () => {
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: mockPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText} = render(
@@ -448,10 +568,15 @@ describe('SimulationPathDetailsScreen', () => {
       })),
     };
 
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: allCompletedButNotMarkedPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {getByText, getByTestId} = render(
@@ -485,10 +610,15 @@ describe('SimulationPathDetailsScreen', () => {
       })),
     };
 
-    useGetSimulationPathDetailsQuery.mockReturnValue({
+    useLearningPathDetails.mockReturnValue({
       data: completedPathData,
       isLoading: false,
+      isRefreshing: false,
       error: undefined,
+      refetch: jest.fn(),
+      createSession: jest.fn(),
+      isCreatingSession: false,
+      getSessionByItem: jest.fn(),
     });
 
     const {queryByText} = render(

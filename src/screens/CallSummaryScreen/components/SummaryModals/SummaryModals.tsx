@@ -3,7 +3,12 @@ import {useTranslation} from 'react-i18next';
 
 import {FeedbackPopup} from '@/components';
 
-import {CustomMenuModal, DeleteRenameModal, SummaryDropdown} from '../index';
+import {
+  ArchiveActionModal,
+  CustomMenuModal,
+  DeleteRenameModal,
+  SummaryDropdown,
+} from '../index';
 
 type ModalType = 'rename' | 'delete' | null;
 
@@ -21,6 +26,11 @@ interface SummaryModalsProps {
   hideHeaderDropdown: () => void;
   showSummary: boolean;
   setShowSummary: (show: boolean) => void;
+  actionType: 'archive' | 'unarchive' | null;
+  setActionType: (actionType: 'archive' | 'unarchive' | null) => void;
+  showArchiveConfirmation: boolean;
+  setShowArchiveConfirmation: (show: boolean) => void;
+  onArchive: (archive: boolean) => void;
   showExportOption?: boolean;
   isSummaryFeedbackPopup?: boolean;
   hideSummaryFeedbackPopup: () => void;
@@ -44,6 +54,11 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   hideHeaderDropdown,
   showSummary,
   setShowSummary,
+  actionType,
+  setActionType,
+  showArchiveConfirmation,
+  setShowArchiveConfirmation,
+  onArchive,
   showExportOption = false,
   isSummaryFeedbackPopup = false,
   hideSummaryFeedbackPopup,
@@ -70,6 +85,8 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         visible={isMenuVisible}
         onClose={hideMenu}
         onExport={handleExport}
+        actionType={actionType}
+        onArchive={() => setShowArchiveConfirmation(true)}
         setModalType={setActiveModal}
         showExportOption={showExportOption}
       />
@@ -79,6 +96,15 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         onClose={hideSummaryFeedbackPopup}
         onSubmit={onSubmitSummaryFeedback}
       />
+      {actionType && (
+        <ArchiveActionModal
+          visible={showArchiveConfirmation}
+          onClose={() => setShowArchiveConfirmation(false)}
+          actionType={actionType}
+          setActionType={setActionType}
+          onArchive={onArchive}
+        />
+      )}
     </>
   );
 };

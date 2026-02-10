@@ -3,6 +3,7 @@ import AddReactionIcon from './addReaction.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
+import ArchiveIcon from './archive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
@@ -135,6 +136,7 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  ArchiveIcon,
   Forward10Icon,
   Replay10Icon,
   PausePlayerIcon,

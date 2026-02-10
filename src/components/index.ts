@@ -49,6 +49,11 @@ export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';
 export {SimulationCard} from './SimulationCard';
+export {
+  LearningPathHeader,
+  LearningPathListHeader,
+  ProgressBar,
+} from './LearningPathDetails';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
@@ -77,3 +82,4 @@ export {NotificationModal} from './NotificationModal';
 export type {NotificationModalProps} from './NotificationModal';
 export {UserProfileImage} from './UserProfileImage';
 export {InfoTooltip} from './InfoTooltip';
+export {ActionsMenu} from './ActionsMenu';
