@@ -41,6 +41,7 @@ import {navigateToLearnTab} from '@/utils';
 import {
   AskAI,
   PrivacyToggle,
+  Reflection,
   SimulationSummary,
   SimulationSummarySkeleton,
   SimulationTranscript,
@@ -561,7 +562,7 @@ export const SimulationFeedbackScreen: React.FC<
         return null; // TODO: Implement skills tab
 
       case 5: // Reflection
-        return null; // TODO: Implement reflection tab
+        return <Reflection />;
 
       default:
         return null;
@@ -653,7 +654,7 @@ export const SimulationFeedbackScreen: React.FC<
         placeholder={t('SimulationFeedback.placeholderText')}
         customTitle={t('SimulationFeedback.questionText')}
       />
-      {showScrollButton && !isSimulationDetailsLoading && (
+      {showScrollButton && !isSimulationDetailsLoading && activeTab === 0 && (
         <TouchableOpacity
           onPress={handleScrollToBottom}
           style={styles.scrollToBottomButton}>
