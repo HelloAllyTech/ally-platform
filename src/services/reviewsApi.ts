@@ -140,14 +140,14 @@ export const reviewsApi = api.injectEndpoints({
         method: API_METHODS.PATCH,
         body: {content},
       }),
-      invalidatesTags: ['Threads'],
+      invalidatesTags: ['ReviewThreads'],
     }),
     deleteComment: builder.mutation<{success: boolean}, {commentId: string}>({
       query: ({commentId}) => ({
         url: API_ROUTES.REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['Threads'],
+      invalidatesTags: ['ReviewThreads'],
     }),
   }),
 });

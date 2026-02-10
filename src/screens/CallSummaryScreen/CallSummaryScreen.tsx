@@ -78,7 +78,7 @@ export const CallSummaryScreen: React.FC<
     !isUnauthorized &&
     permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
-  const isArchived = summaryData?.archivedAt ? true : false;
+  const isArchived = !!summaryData?.archivedAt;
 
   const dispatch = useAppDispatch();
 

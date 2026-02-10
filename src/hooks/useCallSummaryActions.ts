@@ -109,17 +109,17 @@ export const useCallSummaryActions = ({
     try {
       await archiveCallLog({callLogId: chatId, archive}).unwrap();
       showToast(
-        archive
-          ? t('CallSummary.archiveActionModal.archive.success')
-          : t('CallSummary.archiveActionModal.unarchive.success'),
+        t(
+          `CallSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.success`,
+        ),
         'success',
       );
     } catch (error) {
       showErrorToast(
         error,
-        archive
-          ? t('CallSummary.archiveActionModal.archive.failed')
-          : t('CallSummary.archiveActionModal.unarchive.failed'),
+        t(
+          `CallSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.failed`,
+        ),
       );
     } finally {
       setIsMenuVisible(false);
