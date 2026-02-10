@@ -21,6 +21,7 @@ import {
   TabScreenHeader,
   TabView,
 } from '@/components';
+import {env} from '@/config/env';
 import {isIOS, SCREEN_NAMES, SimulationTabs} from '@/constants';
 import {
   useAppNavigation,
@@ -356,10 +357,16 @@ export const SimulationsScreen: React.FC = () => {
                 key: SimulationTabs.PATHS,
                 label: t('Simulations.tracks'),
               },
-              // {
-              //   key: SimulationTabs.CASES,
-              //   label: t('Simulations.cases'),
-              // },
+              // Cases tab - feature flagged, mirrors web's SIMULATION_CASES_FLAG
+              // TODO: Remove feature flag check when Cases feature is fully stable
+              ...(env.SIMULATION_CASES_FLAG
+                ? [
+                    {
+                      key: SimulationTabs.CASES,
+                      label: t('Simulations.cases'),
+                    },
+                  ]
+                : []),
             ]}
             activeTab={activeTab}
             onTabChange={setActiveTab}
