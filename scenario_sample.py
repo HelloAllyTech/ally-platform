@@ -240,14 +240,15 @@ SCENARIO_SAMPLE = {
             }
         ],
         "voice": {
-            "name": "helena",
-            "provider": "deepgram",
-            "config": {
-                "model": "aura-2-helena-en",
-            },
+            "name": "Meera 30 year old",
+            "model": "eleven_multilingual_v2",
+            "voiceId": "jqz1rTaQ0LwR55wGp1Z7",
         },
         "languageCode": "en-IN",
-        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "stt": {
+            "provider": "sarvam",
+            "config": {"model": "saarika:v2.5"},
+        },
         "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
         "metadata": {},
     },
@@ -450,7 +451,7 @@ SCENARIO_SAMPLE_OLLAMA = {
             },
         },
         "languageCode": "en-IN",
-        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "stt": {"config": {"model": "saarika:v2.5"}, "provider": "sarvam"},
         "llm": {"provider": "ollama", "config": {"model": "llama3.2"}},
         "metadata": {},
     },
@@ -679,13 +680,7 @@ SCENARIO_SAMPLE_MALAYALAM = {
             "config": {"model": "bulbul:v2", "speaker": "anushka"},
         },
         "languageCode": "ml-IN",
-        "stt": {
-            "provider": "google",
-            "config": {
-                "model": "chirp_2",
-                "location": "asia-southeast1",
-            },
-        },
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
         "llm": {"provider": "gemini", "config": {"model": "gemini-2.0-flash-exp"}},
         "metadata": {},
     },
@@ -779,13 +774,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "config": {"model": "bulbul:v2", "speaker": "anushka"},
         },
         "languageCode": "ml-IN",
-        "stt": {
-            "provider": "google",
-            "config": {
-                "model": "chirp_2",
-                "location": "asia-southeast1",
-            },
-        },
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
         "llm": {"provider": "google", "config": {"model": "gemini-2.0-flash-exp"}},
         "metadata": {},
     },

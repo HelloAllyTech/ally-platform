@@ -2345,18 +2345,18 @@ vcr = ["vcrpy (>=7.0.0)"]
 
 [[package]]
 name = "livekit"
-version = "1.0.23"
+version = "1.0.25"
 description = "Python Real-time SDK for LiveKit"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit-1.0.23-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:e2cdea92fad7d1ccf97ee93c13b1577ef2a2e6faaae2f5e6b753d628c33eb618"},
-    {file = "livekit-1.0.23-py3-none-macosx_11_0_arm64.whl", hash = "sha256:8a6638fc15025fc1fccb299ffaa4776f2bb5fa1accb749316e1d610a33086432"},
-    {file = "livekit-1.0.23-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:e195f9b6e3afb66d8ef304bb4931367a161372cc078deaef2ead90aa0b25adbe"},
-    {file = "livekit-1.0.23-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:9acb18617241a54a973bad2c1f22d097eb2254a7b0e7eed1d56b6e54face872b"},
-    {file = "livekit-1.0.23-py3-none-win_amd64.whl", hash = "sha256:68adfd55ad54eb439eb67c8299fc47ae137180c60445786180f85811d28877d0"},
-    {file = "livekit-1.0.23.tar.gz", hash = "sha256:890bf0b4062b1b6ea7213bef5c39a04c18cfa5021ca7171ce979219caf568f57"},
+    {file = "livekit-1.0.25-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:1ec9e16e30cc9831c447cdf05fcffc74453ae40a33ed7e2ef2178f98a3bb2de4"},
+    {file = "livekit-1.0.25-py3-none-macosx_11_0_arm64.whl", hash = "sha256:6237866efbbf033a3d174f15edc891cb793e9fbafe9432d1fd5bb62080704fbb"},
+    {file = "livekit-1.0.25-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:5a93e854744074fa37eb02f77b4dcdbafcefddc3763f28ec5b267059ddb0c65e"},
+    {file = "livekit-1.0.25-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:abe498700566e90c89dbbf73731f850f4b5f7d2185bac88be71a34657b51fd3a"},
+    {file = "livekit-1.0.25-py3-none-win_amd64.whl", hash = "sha256:6ef59cca92db6f207d40b4499b8d2338f8c7278e8cae9e24d8208d66a7d2b8b0"},
+    {file = "livekit-1.0.25.tar.gz", hash = "sha256:a28ef3a1f420616facfb36a92cd590e5510b9cfc5b8b9bd425587a159edfd57b"},
 ]
 
 [package.dependencies]
@@ -2367,14 +2367,14 @@ types-protobuf = ">=3"
 
 [[package]]
 name = "livekit-agents"
-version = "1.3.10"
+version = "1.4.1"
 description = "A powerful framework for building realtime voice AI agents"
 optional = false
-python-versions = "<3.14,>=3.9"
+python-versions = "<3.15,>=3.10"
 groups = ["main"]
 files = [
-    {file = "livekit_agents-1.3.10-py3-none-any.whl", hash = "sha256:9395a20b3f0267f814117d8eae702bdac001ee03e06163953229a476ca00d74d"},
-    {file = "livekit_agents-1.3.10.tar.gz", hash = "sha256:a5d49cd36122834b32f48d71e891b9f80c1c5f8a0860622e941eaf487a16ce6e"},
+    {file = "livekit_agents-1.4.1-py3-none-any.whl", hash = "sha256:781646da39e1ded6af814c434055f16e313b4b7b701281bdb179f18e6512e2b1"},
+    {file = "livekit_agents-1.4.1.tar.gz", hash = "sha256:e9cbfa5bff05784725c73f6cb425e73725cc60e17c2242d4dda197b4f3523a13"},
 ]
 
 [package.dependencies]
@@ -2386,19 +2386,19 @@ click = ">=8.1,<9.0"
 colorama = ">=0.4.6"
 docstring-parser = ">=0.16"
 eval-type-backport = "*"
-livekit = ">=1.0.23,<2"
+livekit = "1.0.25"
 livekit-api = ">=1.0.7,<2"
-livekit-blingfire = ">=1.0,<2.0"
-livekit-plugins-deepgram = {version = ">=1.3.10", optional = true, markers = "extra == \"deepgram\""}
-livekit-plugins-elevenlabs = {version = ">=1.3.10", optional = true, markers = "extra == \"elevenlabs\""}
-livekit-plugins-google = {version = ">=1.3.10", optional = true, markers = "extra == \"google\""}
-livekit-plugins-openai = {version = ">=1.3.10", optional = true, markers = "extra == \"openai\""}
-livekit-plugins-sarvam = {version = ">=1.3.10", optional = true, markers = "extra == \"sarvam\""}
-livekit-plugins-turn-detector = {version = ">=1.3.10", optional = true, markers = "extra == \"turn-detector\""}
+livekit-blingfire = ">=1.1,<2"
+livekit-plugins-deepgram = {version = ">=1.4.1", optional = true, markers = "extra == \"deepgram\""}
+livekit-plugins-elevenlabs = {version = ">=1.4.1", optional = true, markers = "extra == \"elevenlabs\""}
+livekit-plugins-google = {version = ">=1.4.1", optional = true, markers = "extra == \"google\""}
+livekit-plugins-openai = {version = ">=1.4.1", optional = true, markers = "extra == \"openai\""}
+livekit-plugins-sarvam = {version = ">=1.4.1", optional = true, markers = "extra == \"sarvam\""}
+livekit-plugins-turn-detector = {version = ">=1.4.1", optional = true, markers = "extra == \"turn-detector\""}
 livekit-protocol = ">=1.1,<2"
 nest-asyncio = ">=1.6.0"
 numpy = ">=1.26.0"
-openai = ">=1.99.2"
+openai = ">=2"
 opentelemetry-api = ">=1.39.0,<1.40.0"
 opentelemetry-exporter-otlp = ">=1.39.0,<1.40.0"
 opentelemetry-sdk = ">=1.39.0,<1.40.0"
@@ -2415,54 +2415,59 @@ typing-extensions = ">=4.12"
 watchfiles = ">=1.0"
 
 [package.extras]
-anam = ["livekit-plugins-anam (>=1.3.10)"]
-anthropic = ["livekit-plugins-anthropic (>=1.3.10)"]
-assemblyai = ["livekit-plugins-assemblyai (>=1.3.10)"]
-aws = ["livekit-plugins-aws (>=1.3.10)"]
-azure = ["livekit-plugins-azure (>=1.3.10)"]
-baseten = ["livekit-plugins-baseten (>=1.3.10)"]
-bey = ["livekit-plugins-bey (>=1.3.10)"]
-bithuman = ["livekit-plugins-bithuman (>=1.3.10)"]
-cartesia = ["livekit-plugins-cartesia (>=1.3.10)"]
-clova = ["livekit-plugins-clova (>=1.3.10)"]
+anam = ["livekit-plugins-anam (>=1.4.1)"]
+anthropic = ["livekit-plugins-anthropic (>=1.4.1)"]
+assemblyai = ["livekit-plugins-assemblyai (>=1.4.1)"]
+aws = ["livekit-plugins-aws (>=1.4.1)"]
+azure = ["livekit-plugins-azure (>=1.4.1)"]
+baseten = ["livekit-plugins-baseten (>=1.4.1)"]
+bey = ["livekit-plugins-bey (>=1.4.1)"]
+bithuman = ["livekit-plugins-bithuman (>=1.4.1)"]
+camb = ["livekit-plugins-camb (>=1.4.1)"]
+cartesia = ["livekit-plugins-cartesia (>=1.4.1)"]
+clova = ["livekit-plugins-clova (>=1.4.1)"]
 codecs = ["numpy (>=1.26.0)"]
-deepgram = ["livekit-plugins-deepgram (>=1.3.10)"]
-elevenlabs = ["livekit-plugins-elevenlabs (>=1.3.10)"]
-fal = ["livekit-plugins-fal (>=1.3.10)"]
-fireworksai = ["livekit-plugins-fireworksai (>=1.3.10)"]
-fishaudio = ["livekit-plugins-fishaudio (>=1.2.17) ; python_version >= \"3.10\""]
-gladia = ["livekit-plugins-gladia (>=1.3.10)"]
-google = ["livekit-plugins-google (>=1.3.10)"]
-gradium = ["livekit-plugins-gradium (>=1.3.10)"]
-groq = ["livekit-plugins-groq (>=1.3.10)"]
-hedra = ["livekit-plugins-hedra (>=1.3.10)"]
-hume = ["livekit-plugins-hume (>=1.3.10)"]
+deepgram = ["livekit-plugins-deepgram (>=1.4.1)"]
+elevenlabs = ["livekit-plugins-elevenlabs (>=1.4.1)"]
+fal = ["livekit-plugins-fal (>=1.4.1)"]
+fireworksai = ["livekit-plugins-fireworksai (>=1.4.1)"]
+fishaudio = ["livekit-plugins-fishaudio (>=1.4.1)"]
+gladia = ["livekit-plugins-gladia (>=1.4.1)"]
+google = ["livekit-plugins-google (>=1.4.1)"]
+gradium = ["livekit-plugins-gradium (>=1.4.1)"]
+groq = ["livekit-plugins-groq (>=1.4.1)"]
+hedra = ["livekit-plugins-hedra (>=1.4.1)"]
+hume = ["livekit-plugins-hume (>=1.4.1)"]
 images = ["pillow (>=10.3.0)"]
-inworld = ["livekit-plugins-inworld (>=1.3.10)"]
-langchain = ["livekit-plugins-langchain (>=1.3.10)"]
-lmnt = ["livekit-plugins-lmnt (>=1.3.10)"]
-mcp = ["mcp (>=1.10.0,<2) ; python_version >= \"3.10\""]
+inworld = ["livekit-plugins-inworld (>=1.4.1)"]
+langchain = ["livekit-plugins-langchain (>=1.4.1)"]
+lemonslice = ["livekit-plugins-lemonslice (>=1.4.1)"]
+liveavatar = ["livekit-plugins-liveavatar (>=1.4.1)"]
+lmnt = ["livekit-plugins-lmnt (>=1.4.1)"]
+mcp = ["mcp (>=1.10.0,<2)"]
 minimax = ["livekit-plugins-minimax-ai (>=1.2.15)"]
-mistralai = ["livekit-plugins-mistralai (>=1.3.10)"]
-neuphonic = ["livekit-plugins-neuphonic (>=1.3.10)"]
-nltk = ["livekit-plugins-nltk (>=1.3.10)"]
-nvidia = ["livekit-plugins-nvidia (>=1.3.10)"]
-openai = ["livekit-plugins-openai (>=1.3.10)"]
-resemble = ["livekit-plugins-resemble (>=1.3.10)"]
-rime = ["livekit-plugins-rime (>=1.3.10)"]
-sarvam = ["livekit-plugins-sarvam (>=1.3.10)"]
-silero = ["livekit-plugins-silero (>=1.3.10)"]
-simli = ["livekit-plugins-simli (>=1.3.10)"]
-smallestai = ["livekit-plugins-smallestai (>=1.3.10)"]
-soniox = ["livekit-plugins-soniox (>=1.3.10)"]
-speechify = ["livekit-plugins-speechify (>=1.3.10)"]
-speechmatics = ["livekit-plugins-speechmatics (>=1.3.10)"]
-spitch = ["livekit-plugins-spitch (>=1.3.10)"]
-tavus = ["livekit-plugins-tavus (>=1.3.10)"]
-turn-detector = ["livekit-plugins-turn-detector (>=1.3.10)"]
-ultravox = ["livekit-plugins-ultravox (>=1.3.10)"]
-upliftai = ["livekit-plugins-upliftai (>=1.3.10)"]
-xai = ["livekit-plugins-xai (>=1.3.10)"]
+mistralai = ["livekit-plugins-mistralai (>=1.4.1)"]
+neuphonic = ["livekit-plugins-neuphonic (>=1.4.1)"]
+nltk = ["livekit-plugins-nltk (>=1.4.1)"]
+nvidia = ["livekit-plugins-nvidia (>=1.4.1)"]
+openai = ["livekit-plugins-openai (>=1.4.1)"]
+resemble = ["livekit-plugins-resemble (>=1.4.1)"]
+rime = ["livekit-plugins-rime (>=1.4.1)"]
+rtzr = ["livekit-plugins-rtzr (>=1.4.1)"]
+sarvam = ["livekit-plugins-sarvam (>=1.4.1)"]
+silero = ["livekit-plugins-silero (>=1.4.1)"]
+simli = ["livekit-plugins-simli (>=1.4.1)"]
+simplismart = ["livekit-plugins-simplismart (>=1.4.1)"]
+smallestai = ["livekit-plugins-smallestai (>=1.4.1)"]
+soniox = ["livekit-plugins-soniox (>=1.4.1)"]
+speechify = ["livekit-plugins-speechify (>=1.4.1)"]
+speechmatics = ["livekit-plugins-speechmatics (>=1.4.1)"]
+spitch = ["livekit-plugins-spitch (>=1.4.1)"]
+tavus = ["livekit-plugins-tavus (>=1.4.1)"]
+turn-detector = ["livekit-plugins-turn-detector (>=1.4.1)"]
+ultravox = ["livekit-plugins-ultravox (>=1.4.1)"]
+upliftai = ["livekit-plugins-upliftai (>=1.4.1)"]
+xai = ["livekit-plugins-xai (>=1.4.1)"]
 
 [[package]]
 name = "livekit-api"
@@ -2485,80 +2490,90 @@ types-protobuf = ">=4"
 
 [[package]]
 name = "livekit-blingfire"
-version = "1.0.0"
+version = "1.1.0"
 description = "BlingFire bindings for livekit-agents"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_blingfire-1.0.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:afe7fd16af337980f04d46e938442a4009fd9709d281616aa53b9628b5ba9d41"},
-    {file = "livekit_blingfire-1.0.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:d34b1bc11bcddfe5c5c431c18cf6f2e79871f0952524613b988415de04ca4a00"},
-    {file = "livekit_blingfire-1.0.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b9db5aa50e1dd76bc71136cf5eee7f4a1492c3b705b03253d9aaa231ba9e1189"},
-    {file = "livekit_blingfire-1.0.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e7e1a2c31e33635cfc8db4427cfdb988402e5e19c9366bdc261189ff4500e4a8"},
-    {file = "livekit_blingfire-1.0.0-cp310-cp310-win_amd64.whl", hash = "sha256:2037e9207800aac2b952743e7be3d5084ef8b954b4e9733ecca75add8e1062ec"},
-    {file = "livekit_blingfire-1.0.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f5ab77957efde67747c2e4edbe2252ea319286dd29c8aa00d59fc67a61ffc5d3"},
-    {file = "livekit_blingfire-1.0.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:eb96b4bd2a0e7bb62c8834e13e9e74daaadde0bfc6f02fbc3c3d4dde8b9a15c9"},
-    {file = "livekit_blingfire-1.0.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:433099449f325a3bae53fade09fc810686d2fbbafb38df890e6852aa4f555cc3"},
-    {file = "livekit_blingfire-1.0.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2868510d14f9753aa97251f63449ee0718769291a4708d47f9acd74a456c6bae"},
-    {file = "livekit_blingfire-1.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:a1477d26bd042e849f9c09704737c70f7ab54473665c5ad7b8b24d4af6f19301"},
-    {file = "livekit_blingfire-1.0.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:fc216207ba0b88a49d25b2e8a195a29453283674e0d9cde1b0321b3ccaf90b20"},
-    {file = "livekit_blingfire-1.0.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:159c5aa73c34eb0a0242ee049d132984d5d3112b52d371b42c4364386e978cbf"},
-    {file = "livekit_blingfire-1.0.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:5e52d945d595b94f6eea414756725b48b767c75711ea3d9bc7f8bd4290c932ed"},
-    {file = "livekit_blingfire-1.0.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:79d1b098b134c2774dd47a9d382897b249d74ab73dfc1b87d1a61dfc285965bb"},
-    {file = "livekit_blingfire-1.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:dd41874c86ebb45eb87fb9d9a843d9c747d6b1a8ccec5806477cbc9d8e560cf2"},
-    {file = "livekit_blingfire-1.0.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:d9f72b7248cc55a59bb8eb96fcfe54b39dc1b6985de8385bd50440d7ef785c63"},
-    {file = "livekit_blingfire-1.0.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:948a7dcb2984ed65ad12f530e44120bb9b2631b42d53ae89be9b308eaab9119a"},
-    {file = "livekit_blingfire-1.0.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3c8d3a92a34925063ac05e70f6d4eebfeb9f9e29816868dece7159688b68cefe"},
-    {file = "livekit_blingfire-1.0.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:212ffef06b2e832758afcd1d19c709068207ad71f2fb5b426b6bb8e2773e9673"},
-    {file = "livekit_blingfire-1.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:f3f4df6a51171a88c6863cea01c607661d6d6bc0398976a37ba0e4b3e3283433"},
-    {file = "livekit_blingfire-1.0.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:a8d348711107c719b4fb9359b6599a697aab3b1fbd7fcd83c4e4018ebbded26a"},
-    {file = "livekit_blingfire-1.0.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:9e8ecac29e036e1be24fcfeb6e326ebf4551987d1e0321b85e0e2d55161af4cd"},
-    {file = "livekit_blingfire-1.0.0-cp39-cp39-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3702fc05085a4fe74a26ade714e9f95b68c14f25fe00e68a8e66027b5d4afeeb"},
-    {file = "livekit_blingfire-1.0.0-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5273c5da357e33ddc51c1c8959622f9d647834197e618d1a0148f919c3ba065c"},
-    {file = "livekit_blingfire-1.0.0-cp39-cp39-win_amd64.whl", hash = "sha256:ac10f9a6e3ad8585f002ad86f5b14d684107bef1fdd95e0b4f7edbf6ecdf709e"},
+    {file = "livekit_blingfire-1.1.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:fb8f6a9e69b0e58abd913e0b3b5f27bd79ae498887a9e6708c2255a6841a3f1b"},
+    {file = "livekit_blingfire-1.1.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:610a7ef7b1c81be587c41241cbdac474f8461345ee066330c69f7c460f81e7e0"},
+    {file = "livekit_blingfire-1.1.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4bf808159597d402415ae06cbb87e8cc8c2a58d2448e0fcd0ae3cf14b114f395"},
+    {file = "livekit_blingfire-1.1.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8e9fd97f49831c34065f8db3b1407e95c6c3353f0c35b6fff78547582d3d5278"},
+    {file = "livekit_blingfire-1.1.0-cp310-cp310-win_amd64.whl", hash = "sha256:e747443f3b21999ec1d6d96c2f128dc8375937795dc7bedd8fa7b2a7e54d341c"},
+    {file = "livekit_blingfire-1.1.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:0358058ba6cba59379d22a01acef6ff8a729b0facf880c0f75d13c26f1315c9d"},
+    {file = "livekit_blingfire-1.1.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a0741a8abcfaa1f3af2313271f15ac0f79777681a8e3ab9a782a68d8eb121c89"},
+    {file = "livekit_blingfire-1.1.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d99d7a34c9350da3a6ea738bc282a5f5b4ac4ffb7f8aa5251dfa96070ad845f6"},
+    {file = "livekit_blingfire-1.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:815aca6c2f823fa25d7a15d8d76ce18b0295aa5ce2c988ed64fdbd9c4d3ced0a"},
+    {file = "livekit_blingfire-1.1.0-cp311-cp311-win_amd64.whl", hash = "sha256:7ae045d44d8cb867fc449f44a95c0287f6e5d225e62e24f4574bac8f26ede845"},
+    {file = "livekit_blingfire-1.1.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:9d5fb6746263529b780dc8bf7a6e6a80ff5fa7fa729e403f2b925996d041e039"},
+    {file = "livekit_blingfire-1.1.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:d4d5642e36fc0a9f89a5154affbd12305ae008c34c7b32f00fe00127ab18d6bd"},
+    {file = "livekit_blingfire-1.1.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:502d7a41fed246ec9cc432646d523c488a05fb2e572187a754735532ba5d69b7"},
+    {file = "livekit_blingfire-1.1.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cdec36ea4d8b0dcda2791358ac9965e832539ecf13e651011197bab9960ea156"},
+    {file = "livekit_blingfire-1.1.0-cp312-cp312-win_amd64.whl", hash = "sha256:28d8c822616ca2ce53125040dfe09d06a6cc3e63c9055d39ca767a5c8f67ef84"},
+    {file = "livekit_blingfire-1.1.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:f5f6a40e498940f5b2e53d9753f5f7fb7f909e12a93a158844c9e3e99a5486b8"},
+    {file = "livekit_blingfire-1.1.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:945a672a224c9a686925e9af94c2660bacdbe190ccf693d6f17cea9359426c15"},
+    {file = "livekit_blingfire-1.1.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:8f3aac3207cdd88c62323e0b07c33a69aac79c544122a2ddfbecc6c721ca760c"},
+    {file = "livekit_blingfire-1.1.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:839feefa2910f99d794d3f3d696f95193ee8188cc6688a8d712bade2cede7951"},
+    {file = "livekit_blingfire-1.1.0-cp313-cp313-win_amd64.whl", hash = "sha256:1409d4c297260b60a37bfe6ba21e4fb59dd53cd929632c0a78a28d41fe424302"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:81a5942894944a5773dfa2ce800d016c5f5d8868cd01db1d4b099aa951df41aa"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:ed861a19759987314ae71f2315d9bef11a3d6cc11e9effd5b9a3f0c567a3ba8d"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b4cbcd68b2dea451be70e26cefa7cffb7a02aeacdbfa0efaa33cce7474e15983"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:db593c044a3aff38af0b4d4f3d739aad4b24c740c80255bffaca07af2f9e6721"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314-win_amd64.whl", hash = "sha256:bb23eb24d6a27df7205a562ce8c4d0a495d9d2a23aa3b5dec142d07401aeb342"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:a6c4d3ee6ef7c0597dc737837997082d7a1eb69aed6efb12688dd2bef0d5b282"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:b5f4076098363dc5b57d8c5a6781a48539ebb35d82c1fe9587c047167ccf844d"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:20b95b2c15c4a1af4e68c1aa7d885bf295f89ee6eb5c1a1fdfa315a51795b30d"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6c13ef26e5234674ac353b7cfaadeb23468e951eb07461b6b6c77f79cd5ff763"},
+    {file = "livekit_blingfire-1.1.0-cp314-cp314t-win_amd64.whl", hash = "sha256:c91b2315e0497383384304d33554d70b8a63dec5ad96cd43437c67f4172077cf"},
+    {file = "livekit_blingfire-1.1.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:adec7cd1577d060789b4bd2cd082e4b7a9eadf2f6cd1bf74bc4060468b305357"},
+    {file = "livekit_blingfire-1.1.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:a9a0d409b1dcd8928492a28580de2e37d85db6fca46c6b0de3807622847658e9"},
+    {file = "livekit_blingfire-1.1.0-cp39-cp39-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:986335930d7f33fbd98bd6269a818a08bb35d333ce99af82f0b1746bb6938992"},
+    {file = "livekit_blingfire-1.1.0-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5f27e13f3b1b59d832d637d92f6023b2b8f5d9b6021470d03f29f079be75c033"},
+    {file = "livekit_blingfire-1.1.0-cp39-cp39-win_amd64.whl", hash = "sha256:ee7208103634332b838c32ba61bd31903aba4dbde1b2b5d9eafbff95ea6e9286"},
 ]
 
 [[package]]
 name = "livekit-plugins-deepgram"
-version = "1.3.10"
+version = "1.4.1"
 description = "Agent Framework plugin for services using Deepgram's API."
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_deepgram-1.3.10-py3-none-any.whl", hash = "sha256:b42b561bbb02fe5d0e94ee9261f3d971b8ce3b72f53d0932a719fc13bc56301f"},
-    {file = "livekit_plugins_deepgram-1.3.10.tar.gz", hash = "sha256:cfe5417353cda742cbd9bec7a0673f4c77a6b8b861aa50050319cf635c385712"},
+    {file = "livekit_plugins_deepgram-1.4.1-py3-none-any.whl", hash = "sha256:c6368ea7357413baf2ce3fe1b5e524840d550a33a9fc2f8204b4816c64b4c6a5"},
+    {file = "livekit_plugins_deepgram-1.4.1.tar.gz", hash = "sha256:f2da1cee631f0f18dcd245caebcf00504ca974efda0df90a407a5343d756344d"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.3.10", extras = ["codecs"]}
+livekit-agents = {version = ">=1.4.1", extras = ["codecs"]}
 numpy = ">=1.26"
 
 [[package]]
 name = "livekit-plugins-elevenlabs"
-version = "1.3.10"
+version = "1.4.1"
 description = "Agent Framework plugin for voice synthesis with ElevenLabs' API."
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_elevenlabs-1.3.10-py3-none-any.whl", hash = "sha256:bcef42ac160014344349bfa1ad73ddc0ca426cafc8b961c647fc696dea9a8015"},
-    {file = "livekit_plugins_elevenlabs-1.3.10.tar.gz", hash = "sha256:412e3589850a3bf433d471dd864849b58aca68fe96c10e08c2c04fc63bb068ca"},
+    {file = "livekit_plugins_elevenlabs-1.4.1-py3-none-any.whl", hash = "sha256:bc79a04a3fe67d9269ee6b6244a8d55a7351bce86ba9ede1d993434ed82eb2b0"},
+    {file = "livekit_plugins_elevenlabs-1.4.1.tar.gz", hash = "sha256:9419ebf917e87cfc48c544ca4a45ddb12554271fcd8cb525b5d109712c6b5170"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.3.10", extras = ["codecs"]}
+livekit-agents = {version = ">=1.4.1", extras = ["codecs"]}
 
 [[package]]
 name = "livekit-plugins-google"
-version = "1.3.10"
+version = "1.4.1"
 description = "Agent Framework plugin for services from Google Cloud"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_google-1.3.10-py3-none-any.whl", hash = "sha256:361b7501108369b072ef1b901c9b568e3ecc0981f62a2777a9f4bd5153593049"},
-    {file = "livekit_plugins_google-1.3.10.tar.gz", hash = "sha256:d90db5cd2e514a9c1faf80603f77e3a4bcc07dd6106d58c790bdacb9dc6bc6c6"},
+    {file = "livekit_plugins_google-1.4.1-py3-none-any.whl", hash = "sha256:837425b2dd1fce95d7b32b0489682128e49b833eaa7dc98b732a15e6a00543e5"},
+    {file = "livekit_plugins_google-1.4.1.tar.gz", hash = "sha256:c1942a84ea8bd55b19a0dce0d4faf528bd0b25638cda22d725e20e8e129de7d0"},
 ]
 
 [package.dependencies]
@@ -2621,71 +2636,71 @@ livekit = ">=0.21.3"
 
 [[package]]
 name = "livekit-plugins-openai"
-version = "1.3.10"
+version = "1.4.1"
 description = "Agent Framework plugin for services from OpenAI"
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_openai-1.3.10-py3-none-any.whl", hash = "sha256:b080ed65d495fd09b79a0b542e27bdb717bf3682e2478e149e8d675172c60b19"},
-    {file = "livekit_plugins_openai-1.3.10.tar.gz", hash = "sha256:191413f7259d810645b1678668a5008fee41418691060170fa21e7cd8853a686"},
+    {file = "livekit_plugins_openai-1.4.1-py3-none-any.whl", hash = "sha256:3d294e7b846487ddc9034e4bf3f67a3d7a5661821d1ffa6297e965c0477b3020"},
+    {file = "livekit_plugins_openai-1.4.1.tar.gz", hash = "sha256:7a54440628f3936ea8e0b3ec3315efa10cbb6cadc67820eaf9523050a51a7c53"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.3.10", extras = ["codecs", "images"]}
-openai = {version = ">=1.107.2", extras = ["realtime"]}
+livekit-agents = {version = ">=1.4.1", extras = ["codecs", "images"]}
+openai = {version = ">=2", extras = ["realtime"]}
 
 [package.extras]
 vertex = ["google-auth (>=2.0.0)"]
 
 [[package]]
 name = "livekit-plugins-sarvam"
-version = "1.3.10"
+version = "1.4.1"
 description = "Agent Framework plugin for services using Sarvam.ai's API."
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_sarvam-1.3.10-py3-none-any.whl", hash = "sha256:ac5acf4307661847435fe8c0ebb9c7f07c695b86b731db05445ab9658bae0f7d"},
-    {file = "livekit_plugins_sarvam-1.3.10.tar.gz", hash = "sha256:c094fb9348d4def3a8eedefcdf5eeb9b915dba6f630684154e7ec14e4580a091"},
+    {file = "livekit_plugins_sarvam-1.4.1-py3-none-any.whl", hash = "sha256:c3b2ec330c883e1b914ac61df793e3de693dcd29c5f981dbf231726a07c8f7d3"},
+    {file = "livekit_plugins_sarvam-1.4.1.tar.gz", hash = "sha256:188d192fc1dcf14c76e97b85200b1b931bc2c52db76cd7e5836ee0fdbeb53deb"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.3.10", extras = ["codecs"]}
+livekit-agents = {version = ">=1.4.1", extras = ["codecs"]}
 numpy = ">=1.26"
 
 [[package]]
 name = "livekit-plugins-silero"
-version = "1.3.8"
+version = "1.4.1"
 description = "Agent Framework Plugin for Silero"
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_silero-1.3.8-py3-none-any.whl", hash = "sha256:72e839c67d35920af54f932fd921c1b210fbb6e1eb131698929b041c7fea87a6"},
-    {file = "livekit_plugins_silero-1.3.8.tar.gz", hash = "sha256:d0c4708516ab895492b294634afb03c9508aca3a12e0f411a7bda1a3e06e37ad"},
+    {file = "livekit_plugins_silero-1.4.1-py3-none-any.whl", hash = "sha256:0f5748f4037b6f31e1c12fa3cfb9416d36276f7a99994ad3f98926c6f2d7bfc9"},
+    {file = "livekit_plugins_silero-1.4.1.tar.gz", hash = "sha256:f82326e2c52363e3c38ce06ed67e9b422ccc27ce228328835c6784355a2b561c"},
 ]
 
 [package.dependencies]
-livekit-agents = ">=1.3.8"
+livekit-agents = ">=1.4.1"
 numpy = ">=1.26"
-onnxruntime = ">=1.18,<=1.23.1"
+onnxruntime = ">=1.18"
 
 [[package]]
 name = "livekit-plugins-turn-detector"
-version = "1.3.10"
+version = "1.4.1"
 description = "End of utterance detection for LiveKit Agents"
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.10.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_turn_detector-1.3.10-py3-none-any.whl", hash = "sha256:2c0ab927d97cfaec2729e7b1de36f7c2178934ffc2bb667829042976d6cdc1dd"},
-    {file = "livekit_plugins_turn_detector-1.3.10.tar.gz", hash = "sha256:ee6fa8616e2348ecda88d42c2f2c97f6a3b05bc808ea8f59cbbe84c7b84ef780"},
+    {file = "livekit_plugins_turn_detector-1.4.1-py3-none-any.whl", hash = "sha256:ae256578e0d655d028ba738c59931023e1198453f09d60078e31b5a7af9dab28"},
+    {file = "livekit_plugins_turn_detector-1.4.1.tar.gz", hash = "sha256:70f0c0c061f07f007aecb55a8dd3e79685c0d923e7c953aa58cb3614d31be1a7"},
 ]
 
 [package.dependencies]
 jinja2 = "*"
-livekit-agents = ">=1.3.10"
+livekit-agents = ">=1.4.1"
 numpy = ">=1.26"
 onnxruntime = ">=1.18"
 transformers = ">=4.47.1,<=4.57.1"
@@ -6515,4 +6530,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "405ebd4d0a14acf19e24da5961675296384ec177db57702eb574c65df857e34f"
+content-hash = "237c0a7ee93110b941dcd45f6d01e03134ebd7808d6b98486f74d5cf716271cd"
