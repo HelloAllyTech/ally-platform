@@ -10,6 +10,7 @@ export interface Env {
   GOOGLE_WEB_CLIENT_ID: string;
   GOOGLE_IOS_CLIENT_ID: string;
   SCRIBE_SETTINGS_FLAG: boolean;
+  ARCHIVE_CALL_LOGS_FLAG: boolean;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -44,6 +45,5 @@ export const env: Env = {
     'GOOGLE_IOS_CLIENT_ID',
   ),
   SCRIBE_SETTINGS_FLAG: Config.SCRIBE_SETTINGS_FLAG === 'true',
+  ARCHIVE_CALL_LOGS_FLAG: Config.ARCHIVE_CALL_LOGS_FLAG === 'true',
 };
-
-export const ARCHIVE_CALL_LOGS_FLAG = false;
