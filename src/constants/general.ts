@@ -112,7 +112,6 @@ export const API_ROUTES = {
     MESSAGES_FEEDBACK: (chatId: number) => `/chats/messages/${chatId}/feedback`,
     MESSAGES_FEEDBACK_BY_ID: (feedbackId: number) =>
       `/chats/messages/feedback/${feedbackId}`,
-    GET_ARCHIVED_CALL_LOGS: '/chats/call-logs?archive=true',
     ARCHIVE_CALL_LOG: (callLogId: number) =>
       `/chats/call-logs/${callLogId}/archive`,
   },

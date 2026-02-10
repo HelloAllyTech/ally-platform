@@ -40,10 +40,7 @@ import {
   useUser,
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
-import {
-  useLazyGetArchivedCallLogsQuery,
-  useLazyGetCallLogsQuery,
-} from '@/services/callsApi';
+import {useLazyGetCallLogsQuery} from '@/services/callsApi';
 import {
   useLazyGetSummaryFieldsQuery,
   useLazyGetVisibleChatTypesQuery,
@@ -113,8 +110,6 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getArchivedCallLogs, {isFetching: isFetchingArchivedRealLogs}] =
-    useLazyGetArchivedCallLogsQuery();
   const [getSummaryFields, {data: visibleFields}] =
     useLazyGetSummaryFieldsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
@@ -220,7 +215,11 @@ export const CallLogScreen: React.FC = () => {
    * Sets up the initial state for pagination
    */
   const fetchInitialRealLogs = useCallback(async () => {
-    const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
+    const result = await getCallLogs({
+      limit: ITEMS_PER_PAGE,
+      offset: 0,
+      archive: false,
+    });
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
       const filteredCallLogs = result.data.data.filter(
@@ -253,9 +252,10 @@ export const CallLogScreen: React.FC = () => {
    * Sets up the initial state for pagination
    */
   const fetchInitialArchivedRealLogs = useCallback(async () => {
-    const result = await getArchivedCallLogs({
+    const result = await getCallLogs({
       limit: ITEMS_PER_PAGE,
       offset: 0,
+      archive: true,
     });
     const logsResponse = result.data?.data;
     if (logsResponse) {
@@ -264,7 +264,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllArchivedRealLogs([]);
     }
-  }, [getArchivedCallLogs]);
+  }, [getCallLogs]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
@@ -305,9 +305,10 @@ export const CallLogScreen: React.FC = () => {
       if (!hasMoreArchivedRealLogs || isFetchingRealLogs) return;
 
       const newOffset = archivedRealLogsOffset + ITEMS_PER_PAGE;
-      const result = await getArchivedCallLogs({
+      const result = await getCallLogs({
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
+        archive: true,
       });
       if (result?.data?.data) {
         setAllArchivedRealLogs(prev => [
@@ -325,6 +326,7 @@ export const CallLogScreen: React.FC = () => {
         const result = await getCallLogs({
           limit: ITEMS_PER_PAGE,
           offset: newOffset,
+          archive: false,
         });
 
         if (result?.data?.data) {
@@ -499,7 +501,7 @@ export const CallLogScreen: React.FC = () => {
       ? allRealLogs
       : allSimulationLogs;
   const isFetching = isViewingArchivedRealLogs
-    ? isFetchingArchivedRealLogs
+    ? isFetchingRealLogs
     : activeTab === LogType.REAL
       ? isFetchingRealLogs
       : isFetchingSimulationLogs;

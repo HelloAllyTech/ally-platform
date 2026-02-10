@@ -92,11 +92,17 @@ export const ArchiveActionModal = React.memo(
                 label={cancel}
                 onPress={onClose}
                 customContainerStyle={styles.cancel}
+                customTextStyle={styles.cancelText}
               />
               <PrimaryButton
                 label={confirm}
                 onPress={onConfirm}
-                customContainerStyle={styles.confirm}
+                customContainerStyle={[
+                  styles.confirm,
+                  actionType === 'archive' && {
+                    backgroundColor: colors.ds.red[400],
+                  },
+                ]}
               />
             </View>
           </View>
@@ -152,6 +158,7 @@ const styles = ScaledSheet.create({
     ...typography.body.small,
     fontWeight: fontWeights.regular,
     textAlign: 'center',
+    marginBottom: '10@mvs',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -159,15 +166,15 @@ const styles = ScaledSheet.create({
     width: '100%',
   },
   confirm: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.white,
-    fontSize: '16@ms',
     flex: 1,
   },
   cancel: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray12,
-    fontSize: '16@ms',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.lightGray2,
     flex: 1,
+  },
+  cancelText: {
+    color: colors.darkGray12,
   },
 });
