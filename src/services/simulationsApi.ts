@@ -3,6 +3,7 @@ import {LogItem} from '@/screens/CallLog/types';
 import {
   Case,
   CaseDetails,
+  CasesResponse,
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
@@ -130,6 +131,8 @@ export const simulationsApi = api.injectEndpoints({
         'SimulationCredits',
         'SimulationPaths',
         'SimulationPathDetails',
+        'Cases',
+        'CaseDetails',
       ],
     }),
 
@@ -199,90 +202,71 @@ export const simulationsApi = api.injectEndpoints({
     }),
 
     // ============================================
-    // CASES API - Mock endpoints until backend is ready
-    // TODO: Replace with actual endpoints when API contract is available
+    // CASES API - Currently using scenario-paths endpoints (same as Tracks)
+    // TODO: Replace with dedicated /learn/scenario-cases endpoints when backend is ready
+    // Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/api/learn.ts)
     // ============================================
 
     /**
      * Get all cases
-     * @deprecated Mock endpoint - Returns empty array until backend is ready
+     * Currently fetches from scenario-paths endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
      */
     getCases: builder.query<Case[], void>({
-      queryFn: async () => {
-        // Mock: Return empty array until API is ready
-        return {data: []};
-
-        // TODO: When API is ready, replace with:
-        // query: () => ({
-        //   url: API_ROUTES.LEARN.CASES,
-        //   method: API_METHODS.GET,
-        // }),
-        // transformResponse: (response: CasesResponse) => response.data,
-      },
+      query: () => ({
+        url: API_ROUTES.LEARN.CASES,
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CasesResponse) => response.data,
       providesTags: ['Cases'],
     }),
 
     /**
-     * Get case details
-     * @deprecated Mock endpoint - Returns null until backend is ready
+     * Get case details by ID
+     * Currently fetches from scenario-paths endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
      */
     getCaseDetails: builder.query<CaseDetails, {caseId: string}>({
-      queryFn: async () => {
-        // Mock: Return null until API is ready
-        return {data: null as any};
-
-        // TODO: When API is ready, replace with:
-        // query: ({caseId}) => ({
-        //   url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
-        //   method: API_METHODS.GET,
-        // }),
-        // transformResponse: (response: CaseDetails) => ({
-        //   ...response,
-        //   scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
-        // }),
-      },
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CaseDetails) => ({
+        ...response,
+        scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+      }),
       providesTags: ['CaseDetails'],
     }),
 
     /**
-     * Create case session
-     * @deprecated Mock endpoint - No-op until backend is ready
+     * Create a case session to start a case
+     * Currently uses scenario-paths create-session endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
      */
     createCaseSession: builder.mutation<
       {caseSessionItemId: string},
       {caseId: string}
     >({
-      queryFn: async () => {
-        // Mock: Return empty response until API is ready
-        return {data: {caseSessionItemId: ''}};
-
-        // TODO: When API is ready, replace with:
-        // query: ({caseId}) => ({
-        //   url: API_ROUTES.LEARN.CREATE_CASE_SESSION(caseId),
-        //   method: API_METHODS.POST,
-        // }),
-      },
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CREATE_CASE_SESSION(caseId),
+        method: API_METHODS.POST,
+      }),
       invalidatesTags: ['CaseDetails', 'Cases'],
     }),
 
     /**
-     * Get scenario session by case item
-     * @deprecated Mock endpoint - Returns null until backend is ready
+     * Get scenario session by case session item ID
+     * Currently uses scenario-path-session-item endpoint (same as Tracks)
+     * TODO: Update to dedicated case-session-item endpoint when backend API is available
      */
     getScenarioSessionByCaseItem: builder.query<
       {id: string},
       {caseSessionItemId: string}
     >({
-      queryFn: async () => {
-        // Mock: Return null until API is ready
-        return {data: null as any};
-
-        // TODO: When API is ready, replace with:
-        // query: ({caseSessionItemId}) => ({
-        //   url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_CASE_ITEM(caseSessionItemId),
-        //   method: API_METHODS.GET,
-        // }),
-      },
+      query: ({caseSessionItemId}) => ({
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_CASE_ITEM(caseSessionItemId),
+        method: API_METHODS.GET,
+      }),
     }),
   }),
 });
