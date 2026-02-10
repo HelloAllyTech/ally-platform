@@ -21,7 +21,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
 import {CallLogSkeleton, EmptyState, TabView} from '@/components';
-import {ARCHIVE_CALL_LOGS_FLAG, env} from '@/config/env';
+import {env} from '@/config/env';
 import {
   CHAT_TYPES,
   LogType,
@@ -545,7 +545,9 @@ export const CallLogScreen: React.FC = () => {
         onGoBack={() => setIsViewingArchivedRealLogs(false)}
         onArchivePress={handleArchivePress}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
-        showActionsMenu={!isViewingArchivedRealLogs && ARCHIVE_CALL_LOGS_FLAG}
+        showActionsMenu={
+          !isViewingArchivedRealLogs && env.ARCHIVE_CALL_LOGS_FLAG
+        }
       />
       {availableLogTypes.length > 1 && !isViewingArchivedRealLogs && (
         <View style={styles.tabMargin}>
