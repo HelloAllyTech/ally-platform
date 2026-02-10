@@ -45,5 +45,5 @@ export const env: Env = {
     'GOOGLE_IOS_CLIENT_ID',
   ),
   SCRIBE_SETTINGS_FLAG: Config.SCRIBE_SETTINGS_FLAG === 'true',
-  ARCHIVE_CALL_LOGS_FLAG: Config.ARCHIVE_CALL_LOGS_FLAG === 'true',
+  ARCHIVE_CALL_LOGS_FLAG: Config.ARCHIVE_CALL_LOGS_FLAG === 'false',
 };
