@@ -2,7 +2,11 @@ import {useEffect, useState} from 'react';
 import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 
 import {useErrorToast} from '@/components';
-import {MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
+import {
+  LearningPathType,
+  MICROPHONE_PERMISSION,
+  SCREEN_NAMES,
+} from '@/constants';
 import {useStartScenarioSessionMutation} from '@/services';
 
 import {useAppNavigation} from './useAppNavigation';
@@ -19,6 +23,7 @@ interface UseStartSimulationReturn {
     scenarioPathSessionItemId?: string,
     pathId?: string,
     languageId?: number,
+    contextType?: LearningPathType,
   ) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
@@ -65,6 +70,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
     scenarioPathSessionItemId?: string,
     pathId?: string,
     languageId?: number,
+    contextType: LearningPathType = LearningPathType.TRACK,
   ) => {
     try {
       if (!isMicPermissionGranted) {
@@ -112,6 +118,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
             pathSessionItemId: scenarioPathSessionItemId,
           }),
           ...(pathId && {pathId}),
+          contextType,
         });
       }
     } catch (error) {

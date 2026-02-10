@@ -324,3 +324,28 @@ export interface ChecklistItem {
   score?: number;
   message?: string;
 }
+
+// ============================================
+// CASES - Temporary type aliases until API is ready
+// When Cases API is available, replace these with actual types
+// ============================================
+
+/**
+ * @deprecated Temporary alias - Replace with actual Case type when API is ready
+ */
+export type Case = SimulationPath;
+
+/**
+ * @deprecated Temporary alias - Replace with actual CaseDetails type when API is ready
+ */
+export type CaseDetails = SimulationPathDetails;
+
+/**
+ * @deprecated Temporary alias - Replace with actual CaseSimulation type when API is ready
+ */
+export type CaseSimulation = PathScenario;
+
+/**
+ * @deprecated Temporary alias - Replace with actual CasesResponse type when API is ready
+ */
+export type CasesResponse = SimulationPathsResponse;

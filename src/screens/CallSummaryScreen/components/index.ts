@@ -15,3 +15,4 @@ export {
 } from './SummaryGenerationProgress';
 export {SummaryModals} from './SummaryModals';
 export {SummaryUnauthorized} from './SummaryUnauthorized';
+export {ArchiveActionModal} from './ArchiveActionModal';

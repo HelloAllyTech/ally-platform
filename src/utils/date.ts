@@ -246,7 +246,9 @@ const formatLongDuration = (
     parts.push(`${seconds} ${getUnitLabel(seconds, 'second', t)}`);
   }
 
-  return parts.length > 0 ? parts.join(' ') : '0 seconds';
+  return parts.length > 0
+    ? parts.join(' ')
+    : `0 ${includeSeconds ? 'seconds' : 'minutes'}`;
 };
 
 /**

@@ -62,6 +62,7 @@ export enum AllyPlatforms {
 export enum LogType {
   REAL = 'real',
   SIMULATION = 'simulation',
+  ARCHIVED_REAL = 'archived_real',
 }
 
 export enum LanguageMap {
@@ -111,6 +112,9 @@ export const API_ROUTES = {
     MESSAGES_FEEDBACK: (chatId: number) => `/chats/messages/${chatId}/feedback`,
     MESSAGES_FEEDBACK_BY_ID: (feedbackId: number) =>
       `/chats/messages/feedback/${feedbackId}`,
+    GET_ARCHIVED_CALL_LOGS: '/chats/call-logs?archive=true',
+    ARCHIVE_CALL_LOG: (callLogId: number) =>
+      `/chats/call-logs/${callLogId}/archive`,
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
@@ -155,6 +159,16 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
+    // ============================================
+    // CASES - Placeholder routes
+    // TODO: Update with actual routes when API contract is available
+    // ============================================
+    CASES: '/learn/cases',
+    CASE_DETAILS: (caseId: string) => `/learn/cases/${caseId}`,
+    CREATE_CASE_SESSION: (caseId: string) =>
+      `/learn/cases/${caseId}/create-session`,
+    SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
+      `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',

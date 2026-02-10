@@ -10,6 +10,7 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('react-native/Libraries/Linking/Linking', () => ({ openURL: jest.fn() }));
 
 jest.mock('@/assets/icons', () => ({
+  ArchiveIcon: () => null,
   ContractIcon: () => null,
   EditIcon: () => null,
   ExportIcon: () => null,
@@ -23,6 +24,7 @@ describe('CallSummaryScreen/CustomMenuModal', () => {
   it('renders when visible and triggers rename/export', () => {
     const onClose = jest.fn();
     const onExport = jest.fn();
+    const onArchive = jest.fn();
     const setModalType = jest.fn();
 
     const {getByText} = render(
@@ -30,8 +32,10 @@ describe('CallSummaryScreen/CustomMenuModal', () => {
         visible
         onClose={onClose}
         onExport={onExport}
+        onArchive={onArchive}
         setModalType={setModalType}
         showExportOption
+        actionType="archive"
       />,
     );
 
