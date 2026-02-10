@@ -45,7 +45,7 @@ class ConversationLogger:
         Args:
             session_id: Unique session/room identifier
             language_code: Language code
-            method: Method used (e.g., "cotr", "rag", "default")
+            method: Method identifier (default: "default")
             metadata: Additional metadata
         """
         self._active_conversations[session_id] = {
@@ -162,7 +162,7 @@ class EvaluationLogger:
             input_text: User input
             output_text: LLM output
             language_code: Language code
-            method: Method used (e.g., "cotr", "rag", "default")
+            method: Method identifier (default: "default")
             metadata: Additional metadata
             session_id: Optional session/room identifier for conversation tracking
 

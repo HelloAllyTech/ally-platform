@@ -49,8 +49,7 @@ DEFAULT_NON_BINARY_VOICE_MODEL=<NON_BINARY_FALLBACK_VOICE>
 # VLLM_BASE_URL=http://your-gpu-server:8000/v1
 # LOCAL_LLM_MODEL=llama3.2
 
-# Multilingual text generation settings
-MULTILINGUAL_METHOD=none
+# Evaluation logging settings
 EVALUATION_LOG_DIR=evaluation_logs
 EVALUATION_LOGGING_ENABLED=false
 

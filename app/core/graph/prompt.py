@@ -3,7 +3,6 @@ from typing import Optional
 
 from langchain_core.messages import SystemMessage
 
-from app.core.config import settings
 from app.core.scenario.base import PromptData
 from app.utils.logger import get_logger
 
@@ -117,7 +116,7 @@ def generate_system_message(
         next_instruction: Optional conversation-specific directive
             (branching instruction).
                          If provided, triggers minimal prompt mode.
-        language_code: Optional language code for multilingual enhancements.
+        language_code: Optional language code.
 
     Returns:
         A SystemMessage object with the complete, formatted prompt.
@@ -149,38 +148,6 @@ def generate_system_message(
         ).strip()
 
         system_message = SystemMessage(content=minimal_prompt)
-
-        # Apply multilingual enhancements if CoTR method is selected
-        # Only apply for non-English languages
-        if (
-            settings.MULTILINGUAL_METHOD == "cotr"
-            and language_code
-            and isinstance(language_code, str)
-            and not language_code.startswith("en")
-        ):
-            from app.multilingual.cotr import enhance_system_message_with_cotr
-
-            logger.info(
-                f"Applying CoTR enhancement for language '{language_code}' "
-                f"(method: {settings.MULTILINGUAL_METHOD})"
-            )
-            system_message = enhance_system_message_with_cotr(
-                system_message=system_message,
-                language_code=language_code,
-                prompt_data=prompt_data,
-            )
-        elif settings.MULTILINGUAL_METHOD == "cotr":
-            # CoTR method selected but conditions not met
-            reason = (
-                "English language"
-                if language_code and language_code.startswith("en")
-                else "no language_code"
-            )
-            logger.info(
-                f"CoTR skipped: Method '{settings.MULTILINGUAL_METHOD}' selected "
-                f"but {reason} (language_code: {language_code})"
-            )
-
         return system_message
 
     # Otherwise, use the full detailed prompt (original behavior)
@@ -267,38 +234,6 @@ def generate_system_message(
     )
 
     system_message = SystemMessage(content=system_prompt.strip())
-
-    # Apply multilingual enhancements if CoTR method is selected
-    # Only apply for non-English languages
-    if (
-        settings.MULTILINGUAL_METHOD == "cotr"
-        and language_code
-        and isinstance(language_code, str)
-        and not language_code.startswith("en")
-    ):
-        from app.multilingual.cotr import enhance_system_message_with_cotr
-
-        logger.info(
-            f"Applying CoTR enhancement for language '{language_code}' "
-            f"(method: {settings.MULTILINGUAL_METHOD})"
-        )
-        system_message = enhance_system_message_with_cotr(
-            system_message=system_message,
-            language_code=language_code,
-            prompt_data=prompt_data,
-        )
-    elif settings.MULTILINGUAL_METHOD == "cotr":
-        # CoTR method selected but conditions not met
-        reason = (
-            "English language"
-            if language_code and language_code.startswith("en")
-            else "no language_code"
-        )
-        logger.info(
-            f"CoTR skipped: Method '{settings.MULTILINGUAL_METHOD}' selected "
-            f"but {reason} (language_code: {language_code})"
-        )
-
     return system_message
 
 
@@ -318,7 +253,7 @@ def generate_prompt_content(
         prompt_data: An instance of PromptData containing all client info.
         next_instruction: Optional conversation-specific directive
             (branching instruction).
-        language_code: Optional language code for multilingual enhancements.
+        language_code: Optional language code.
 
     Returns:
         The prompt content as a string.

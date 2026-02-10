@@ -105,14 +105,6 @@ class Settings(BaseSettings):
     DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)
     DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(...)
 
-    # Multilingual settings
-    MULTILINGUAL_METHOD: str = Field(
-        default="none",
-        description=(
-            "Method to use: 'cotr', 'rag', 'prompt_engineering', "
-            "'back_translation', 'none'"
-        ),
-    )
     EVALUATION_LOG_DIR: Optional[str] = Field(
         default="evaluation_logs",
         description="Directory to store evaluation logs",

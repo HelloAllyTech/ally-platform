@@ -1,1 +1,1 @@
-"""Evaluation and logging for multilingual text generation."""
+"""Evaluation and logging for text generation."""

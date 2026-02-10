@@ -514,19 +514,13 @@ async def generate_response(
         cast(Scenario, config["configurable"].get("scenario")) if config else None
     )
 
-    # Get language code for multilingual enhancements
+    # Get language code
     language_code = DEFAULT_LANGUAGE_CODE
     if scenario and scenario.language_config:
         language_code = scenario.language_config.language_code
-        logger.info(
-            f"Using language code '{language_code}' from scenario "
-            f"(multilingual method: {settings.MULTILINGUAL_METHOD})"
-        )
+        logger.info(f"Using language code '{language_code}' from scenario")
     else:
-        logger.info(
-            f"Using default language code '{language_code}' "
-            f"(multilingual method: {settings.MULTILINGUAL_METHOD})"
-        )
+        logger.info(f"Using default language code '{language_code}'")
 
     system_message = None
     if scenario is not None:
@@ -593,18 +587,11 @@ async def generate_response(
                     if isinstance(language_code, str) and language_code
                     else DEFAULT_LANGUAGE_CODE
                 )
-                # Ensure method is a string (fallback to "none" if invalid)
-                safe_method = (
-                    settings.MULTILINGUAL_METHOD
-                    if isinstance(settings.MULTILINGUAL_METHOD, str)
-                    else "none"
-                )
 
                 evaluation_logger.log_interaction(
                     input_text=last_user_message,
                     output_text=response.content,
                     language_code=safe_language_code,
-                    method=safe_method,
                     metadata={
                         "scenario_id": scenario.name if scenario else None,
                         "model": getattr(llm_instance, "model_name", None)
