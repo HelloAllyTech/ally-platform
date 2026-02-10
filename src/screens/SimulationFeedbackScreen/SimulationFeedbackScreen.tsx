@@ -12,7 +12,13 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
-import {CustomTabs, FeedbackPopup, PrimaryButton, useToast} from '@/components';
+import {
+  CustomTabs,
+  FeedbackPopup,
+  PrimaryButton,
+  SessionChecklist,
+  useToast,
+} from '@/components';
 import {
   LearningPathType,
   SCREEN_NAMES,
@@ -577,7 +583,30 @@ export const SimulationFeedbackScreen: React.FC<
         return null;
 
       case 3: // Checklist
-        return null; // TODO: Implement checklist tab
+        return (
+          <View style={styles.checklistContainer}>
+            <SessionChecklist
+              items={[
+                // TODO: Replace with actual checklist items
+                {
+                  id: '1',
+                  name: 'Item 1',
+                  completed: true,
+                },
+                {
+                  id: '2',
+                  name: 'Item 2',
+                  completed: true,
+                },
+                {
+                  id: '3',
+                  name: 'Item 3',
+                  completed: false,
+                },
+              ]}
+            />
+          </View>
+        );
 
       case 4: // Skills
         return null; // TODO: Implement skills tab

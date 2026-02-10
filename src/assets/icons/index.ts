@@ -21,10 +21,12 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import CancelIcon from './cancel.svg';
 import ChangeImageIcon from './changeImage.svg';
 import ChatAddOnIcon from './chatAddOn.svg';
 import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
+import CheckCircleIcon from './checkCircle.svg';
 import ChecklistIcon from './checklist.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -163,8 +165,10 @@ export {
   CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  CancelIcon,
   ChangeImageIcon,
   ChatAddOnIcon,
+  CheckCircleIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,

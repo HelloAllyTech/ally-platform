@@ -127,4 +127,8 @@ export const styles = ScaledSheet.create({
   reviewIconButton: {
     marginLeft: 'auto',
   },
+  checklistContainer: {
+    flex: 1,
+    padding: '10@ms',
+  },
 });
