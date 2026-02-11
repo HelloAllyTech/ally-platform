@@ -46,11 +46,8 @@ import {
   useLazyGetVisibleChatTypesQuery,
 } from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
-import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {
-  selectSummaryVisibleFields,
-  setSummaryVisibleFields,
-} from '@/store/slices/summarySlice';
+import {useAppSelector} from '@/store/hooks';
+import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {logger} from '@/utils/logger';
@@ -105,13 +102,11 @@ export const CallLogScreen: React.FC = () => {
   const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
-  const dispatch = useAppDispatch();
   const [getCallLogs, {isFetching: isFetchingRealLogs}] =
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getSummaryFields, {data: visibleFields}] =
-    useLazyGetSummaryFieldsQuery();
+  const [getSummaryFields] = useLazyGetSummaryFieldsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
@@ -137,12 +132,6 @@ export const CallLogScreen: React.FC = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]),
   );
-
-  useEffect(() => {
-    if (visibleFields) {
-      dispatch(setSummaryVisibleFields(visibleFields));
-    }
-  }, [visibleFields, dispatch]);
 
   useEffect(() => {
     if (!visibleFieldsState?.length) {
@@ -292,7 +281,6 @@ export const CallLogScreen: React.FC = () => {
       fetchInitialRealLogs,
       fetchInitialSimulationLogs,
       fetchInitialArchivedRealLogs,
-      dispatch,
     ]),
   );
 

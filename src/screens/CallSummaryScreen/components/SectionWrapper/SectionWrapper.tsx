@@ -2,7 +2,12 @@ import React, {memo, useEffect} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {SECTION_LIST, SectionKey, summaryFields} from '@/constants';
+import {
+  ALWAYS_VISIBLE_SECTIONS,
+  SECTION_LIST,
+  SectionKey,
+  summaryFields,
+} from '@/constants';
 import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
 import {useAppSelector} from '@/store/hooks';
@@ -99,6 +104,11 @@ const SectionWrapperComponent = ({
       // Filter by section
       if (field.sectionKey !== sectionConfig.key) {
         return false;
+      }
+
+      // Always show fields for always-visible sections
+      if (ALWAYS_VISIBLE_SECTIONS.includes(sectionConfig.key)) {
+        return true;
       }
 
       // If visibleFields is empty or not set, show all fields

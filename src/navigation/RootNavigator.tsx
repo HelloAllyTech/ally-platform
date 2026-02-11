@@ -33,8 +33,6 @@ import {
   SuspendedAccountScreen,
 } from '@/screens';
 import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
-import {useAppDispatch} from '@/store/hooks';
-import {setSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {SocketEvent} from '@/types';
 import {logger} from '@/utils';
 import {
@@ -68,20 +66,11 @@ const NavigationContent = ({
     }
   }, [isAuthenticated, getSummaryFields]);
 
-  const dispatch = useAppDispatch();
-
   const isDeepLinkInProgress = useMemo(
     () =>
       pendingItemIdRef.current !== undefined || deepLinkInProgressRef.current,
     [],
   );
-
-  // Ensure visible fields are available even on cold-start deep link
-  useEffect(() => {
-    if (summaryFields && Array.isArray(summaryFields)) {
-      dispatch(setSummaryVisibleFields(summaryFields));
-    }
-  }, [summaryFields, dispatch]);
 
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: () => {
