@@ -3,7 +3,13 @@ import {Animated, Linking, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ArchiveIcon, ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
+import {
+  ArchiveIcon,
+  ContractIcon,
+  EditIcon,
+  ExportIcon,
+  UnarchiveIcon,
+} from '@/assets/icons';
 import {isIOS, PRIVACY_POLICY_URL, SCREEN_WIDTH} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -118,7 +124,11 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
               ? t('CallSummary.customMenu.archive')
               : t('CallSummary.customMenu.unarchive')}
           </Text>
-          <ArchiveIcon width={16} height={16} />
+          {actionType === 'archive' ? (
+            <ArchiveIcon width={16} height={16} />
+          ) : (
+            <UnarchiveIcon width={16} height={16} />
+          )}
         </TouchableOpacity>
         {/* <View style={styles.menuDivider} /> */}
         {/* Hiding delete option for now */}

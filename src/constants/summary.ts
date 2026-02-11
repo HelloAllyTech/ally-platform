@@ -810,7 +810,7 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: true,
     key: SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS,
-    label: 'Assessment, Psychological Diagnosis',
+    label: 'Assessment,\nPsychological Diagnosis',
     sectionKey: SectionKey.Intake,
     type: FieldType.Dropdown,
     options: YES_NO_OPTIONS,
