@@ -31,21 +31,21 @@ class ElevenLabsTTSClient(BaseTTSClient):
     PARAMETER_METADATA = {
         "speed": {
             "type": "float",
-            "range": [0.7, 1.2],
+            "range": [0.85, 1.15],
             "default": 1.0,
             "description": (
                 "Speech speed multiplier. 1.0 is normal speed, >1.0 is faster, "
-                "<1.0 is slower. Range: 0.7 to 1.2."
+                "<1.0 is slower. Range: 0.85 to 1.15."
             ),
         },
         "stability": {
             "type": "float",
-            "range": [0.0, 1.0],
+            "range": [0.5, 1.0],
             "default": 0.71,
             "description": (
                 "Voice stability/consistency. Lower values (0.0-0.5) = more "
                 "expressive/emotional variation. Higher values (0.7-1.0) = more "
-                "stable/controlled voice. Range: 0.0 to 1.0."
+                "stable/controlled voice. Range: 0.5 to 1.0."
             ),
         },
         "similarity_boost": {
@@ -380,9 +380,7 @@ Examples:
             if not mp3_bytes:
                 raise ValueError("ElevenLabs returned empty audio")
 
-            logger.info(
-                f"[ElevenLabs] Preview generated: {len(mp3_bytes)} MP3 bytes"
-            )
+            logger.info(f"[ElevenLabs] Preview generated: {len(mp3_bytes)} MP3 bytes")
 
             return mp3_bytes
 
