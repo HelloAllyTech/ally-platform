@@ -9,8 +9,6 @@ export interface Env {
   CLOUD_TELEPHONY_PATH: string;
   GOOGLE_WEB_CLIENT_ID: string;
   GOOGLE_IOS_CLIENT_ID: string;
-  SCRIBE_SETTINGS_FLAG: boolean;
-  ARCHIVE_CALL_LOGS_FLAG: boolean;
   SIMULATION_CASES_FLAG: boolean;
 }
 
@@ -45,7 +43,5 @@ export const env: Env = {
     Config.GOOGLE_IOS_CLIENT_ID,
     'GOOGLE_IOS_CLIENT_ID',
   ),
-  SCRIBE_SETTINGS_FLAG: Config.SCRIBE_SETTINGS_FLAG === 'true',
-  ARCHIVE_CALL_LOGS_FLAG: Config.ARCHIVE_CALL_LOGS_FLAG === 'true',
   SIMULATION_CASES_FLAG: Config.SIMULATION_CASES_FLAG === 'true',
 };
