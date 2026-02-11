@@ -41,11 +41,6 @@ jest.mock('@/services/chatApi', () => ({
   useLazyGetCounsellorChatQuery: () => [mockGetCounsellorChat],
 }));
 
-const mockGetSummaryFields = jest.fn();
-jest.mock('@/services/settingsApi', () => ({
-  useLazyGetSummaryFieldsQuery: () => [mockGetSummaryFields],
-}));
-
 const mockDispatch = jest.fn();
 let mockState = {
   chat: {currentChat: {chatId: 123, provider: undefined}},

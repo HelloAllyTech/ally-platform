@@ -41,6 +41,15 @@ jest.mock('@/store/slices/summarySlice', () => ({
 // Utils
 jest.mock('@/utils', () => ({ navigateToCallLogTab: jest.fn() }));
 
+// Services
+jest.mock('@/services/settingsApi', () => ({
+  useGetSummaryFieldsQuery: () => ({ 
+    data: [], 
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+}));
+
 // Constants
 jest.mock('@/constants', () => ({ 
   ChatSummaryStatus: { FAILED: 'FAILED', NO_AUDIO: 'NO_AUDIO' },

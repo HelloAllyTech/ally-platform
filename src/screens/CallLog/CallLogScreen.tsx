@@ -41,13 +41,9 @@ import {
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
-import {
-  useLazyGetSummaryFieldsQuery,
-  useLazyGetVisibleChatTypesQuery,
-} from '@/services/settingsApi';
+import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppSelector} from '@/store/hooks';
-import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {logger} from '@/utils/logger';
@@ -106,7 +102,6 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getSummaryFields] = useLazyGetSummaryFieldsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
@@ -117,7 +112,6 @@ export const CallLogScreen: React.FC = () => {
     return route.name === firstTab;
   }, [permissions, route.name]);
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
-  const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
   const showFeatureUnavailable = useMemo(() => {
     return !permissions?.some(permission =>
       TAB_PERMISSIONS.includes(permission as USER_PERMISSIONS),
@@ -132,12 +126,6 @@ export const CallLogScreen: React.FC = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]),
   );
-
-  useEffect(() => {
-    if (!visibleFieldsState?.length) {
-      getSummaryFields();
-    }
-  }, [getSummaryFields, visibleFieldsState?.length]);
 
   const canStartCall = START_CALL_PERMISSIONS.some(permission =>
     permissions?.includes(permission),
