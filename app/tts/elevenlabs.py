@@ -339,3 +339,56 @@ Examples:
             logger.error(
                 f"[ElevenLabs] Failed to update TTS options: {e}", exc_info=True
             )
+
+    async def generate_preview(
+        self,
+        text: str = "Hello, this is a preview of how I sound.",
+    ) -> bytes:
+        """
+        Generate a preview audio for the given text using native ElevenLabs SDK.
+
+        Uses the same voice_id and model configuration that will be used for
+        LiveKit streaming, ensuring the preview sounds identical to production.
+
+        Args:
+            text: The text to generate a preview for
+
+        Returns:
+            Preview audio as MP3 bytes (browser-compatible)
+        """
+        logger.info(
+            f"[ElevenLabs] Generating preview with model='{self._model}', "
+            f"voice_id='{self._voice_id}'"
+        )
+
+        try:
+            # Use native ElevenLabs SDK (same as validation)
+            client = ElevenLabs(api_key=self._api_key)
+
+            # Generate audio - ElevenLabs returns MP3 directly
+            # output_format: mp3_44100_128 = MP3 at 44.1kHz, 128kbps
+            audio_generator = client.text_to_speech.convert(
+                voice_id=self._voice_id,
+                model_id=self._model,
+                text=text,
+                output_format="mp3_44100_128",
+            )
+
+            # Collect MP3 bytes from generator
+            mp3_bytes = b"".join(chunk for chunk in audio_generator)
+
+            if not mp3_bytes:
+                raise ValueError("ElevenLabs returned empty audio")
+
+            logger.info(
+                f"[ElevenLabs] Preview generated: {len(mp3_bytes)} MP3 bytes"
+            )
+
+            return mp3_bytes
+
+        except ElevenLabsApiError as api_err:
+            logger.error(f"[ElevenLabs] Preview failed | API error: {api_err}")
+            raise
+        except Exception as e:
+            logger.exception(f"[ElevenLabs] Preview generation error: {e}")
+            raise

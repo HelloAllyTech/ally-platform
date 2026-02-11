@@ -130,3 +130,71 @@ class DeepgramTTSClient(BaseTTSClient):
                 api_key=self._api_key,
             )
         return self._tts_instance
+
+
+    async def generate_preview(
+        self,
+        text: str = "Hello, this is a preview of how I sound.",
+    ) -> bytes:
+        """
+        Generate a preview audio for the given text using native Deepgram SDK.
+
+        Uses the same model configuration that will be used for LiveKit streaming,
+        ensuring the preview sounds identical to production.
+
+        Args:
+            text: The text to generate a preview for
+
+        Returns:
+            Preview audio as MP3 bytes (for browser compatibility)
+        """
+        import io
+        from pydub import AudioSegment
+
+        logger.info(f"Generating Deepgram preview with model='{self._model}'")
+
+        try:
+            # Use native Deepgram SDK (same as validate_voice)
+            client = DeepgramClient(api_key=self._api_key)
+
+            # Generate audio - returns linear16 PCM
+            audio_stream = client.speak.v1.audio.generate(
+                text=text,
+                model=self._model,
+                encoding="linear16",
+                sample_rate=24000,  # Match tts_instance sample_rate
+            )
+
+            # Collect PCM bytes from generator
+            pcm_bytes = b"".join(chunk for chunk in audio_stream)
+
+            if not pcm_bytes:
+                raise ValueError("Deepgram returned empty audio")
+
+            logger.debug(f"Generated {len(pcm_bytes)} bytes of PCM audio")
+
+            # Convert PCM (linear16) to MP3 for browser compatibility
+            audio = AudioSegment.from_raw(
+                io.BytesIO(pcm_bytes),
+                sample_width=2,      # 16-bit = 2 bytes
+                frame_rate=24000,
+                channels=1,          # mono
+            )
+
+            mp3_buffer = io.BytesIO()
+            audio.export(mp3_buffer, format="mp3", bitrate="128k")
+            mp3_bytes = mp3_buffer.getvalue()
+
+            logger.info(
+                f"Deepgram preview generated: {len(pcm_bytes)} PCM bytes -> "
+                f"{len(mp3_bytes)} MP3 bytes"
+            )
+
+            return mp3_bytes
+
+        except DeepgramApiError as api_err:
+            logger.error(f"Deepgram preview failed | API error: {api_err}")
+            raise
+        except Exception as e:
+            logger.exception(f"Deepgram preview generation error: {e}")
+            raise

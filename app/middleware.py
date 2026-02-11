@@ -10,6 +10,7 @@ from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.config import settings
 from app.utils.logger import logger, trace_id_var
 
 
@@ -41,14 +42,20 @@ def get_middlewares() -> List[Middleware]:
     """
     Create and configure middleware for the application.
     """
+    origins = [
+        origin.strip()
+        for origin in settings.ALLOWED_ORIGINS.split(",")
+        if origin.strip()
+    ]
+
     middlewares = [
         Middleware(LogRequestMiddleware),
         Middleware(
             CORSMiddleware,
-            allow_origins=[],
-            allow_credentials=False,
-            allow_methods=[],
-            allow_headers=[],
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
         ),
     ]
     return middlewares

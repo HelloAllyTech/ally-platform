@@ -37,6 +37,9 @@ numpy = "^2.3.5"
 stopwordsiso = "^0.6.1"
 advertools = "^0.15.0"
 setuptools = "^75.0.0"
+pydub = "^0.25.1"
+hume = "^0.13.6"
+httpx = "^0.28.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"

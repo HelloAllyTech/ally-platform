@@ -4,13 +4,21 @@ Base TTS client interface.
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-
+from dataclasses import dataclass
 from langchain_core.tools import BaseTool
+
 
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
+@dataclass
+class AudioResult:
+    audio_bytes: bytes
+    format: str  # "mp3", "wav", "pcm"
+    sample_rate: int
+    duration_ms: Optional[int] = None
 
 class BaseTTSClient(ABC):
     """
@@ -35,6 +43,18 @@ class BaseTTSClient(ABC):
             TTS instance (e.g., deepgram.TTS, elevenlabs.TTS, sarvam.TTS)
         """
         pass
+
+    @abstractmethod
+    async def generate_preview(self, text: str) -> bytes:
+        """
+        Generate a preview audio for the given text.
+
+        Args:
+            text: The text to generate a preview for
+
+        Returns:
+            Preview audio as bytes
+        """
 
     def get_parameter_metadata(self) -> Dict[str, Any]:
         """

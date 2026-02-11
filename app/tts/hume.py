@@ -251,3 +251,98 @@ class HumeTTSClient(BaseTTSClient):
     def get_tools(self) -> List[BaseTool]:
         """Get single tool for setting voice parameters."""
         return [self._create_set_voice_parameters_tool()]
+
+    async def generate_preview(
+        self,
+        text: str = "Hello, this is a preview of how I sound.",
+    ) -> bytes:
+        """
+        Generate a preview audio for the given text using native Hume SDK.
+
+        Uses the Hume SDK's synthesize_json() method for one-shot TTS generation.
+        Converts WAV to MP3 for browser compatibility.
+
+        Args:
+            text: The text to generate a preview for
+
+        Returns:
+            Preview audio as MP3 bytes
+        """
+        import base64
+        import io
+
+        from hume import AsyncHumeClient
+        from hume.tts import PostedUtterance, PostedUtteranceVoiceWithName
+        from pydub import AudioSegment
+
+        logger.info(
+            f"Generating Hume preview with voice_name='{self._voice_name}', "
+            f"provider='{self._voice_provider}'"
+        )
+
+        try:
+            client = AsyncHumeClient(api_key=self._api_key)
+
+            utterance = PostedUtterance(
+                text=text,
+                voice=PostedUtteranceVoiceWithName(
+                    name=self._voice_name,
+                    provider=self._voice_provider,
+                ),
+            )
+
+            result = await client.tts.synthesize_json(utterances=[utterance])
+
+            # Decode base64 audio from first generation
+            audio_bytes = base64.b64decode(result.generations[0].audio)
+
+            logger.debug(
+                f"Hume returned {len(audio_bytes)} bytes of audio "
+                f"(first bytes: {list(audio_bytes[:4])})"
+            )
+
+            # Detect audio format from magic bytes
+            is_wav = audio_bytes[:4] == b"RIFF"
+            is_mp3 = (
+                audio_bytes[:2] == b"\xff\xfb"
+                or audio_bytes[:2] == b"\xff\xf3"
+                or audio_bytes[:3] == b"ID3"
+            )
+
+            if is_mp3:
+                # Already MP3 — no conversion needed
+                logger.info(
+                    f"Hume preview generated: {len(audio_bytes)} bytes (already MP3)"
+                )
+                mp3_bytes = audio_bytes
+            elif is_wav:
+                # Convert WAV to MP3 for browser compatibility
+                audio = AudioSegment.from_wav(io.BytesIO(audio_bytes))
+                mp3_buffer = io.BytesIO()
+                audio.export(mp3_buffer, format="mp3", bitrate="128k")
+                mp3_bytes = mp3_buffer.getvalue()
+                logger.info(
+                    f"Hume preview generated: {len(audio_bytes)} WAV bytes -> "
+                    f"{len(mp3_bytes)} MP3 bytes"
+                )
+            else:
+                # Unknown format — try auto-detection via pydub
+                logger.warning(
+                    f"Hume returned unknown audio format "
+                    f"(first bytes: {list(audio_bytes[:4])}), "
+                    f"attempting auto-detection"
+                )
+                audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+                mp3_buffer = io.BytesIO()
+                audio.export(mp3_buffer, format="mp3", bitrate="128k")
+                mp3_bytes = mp3_buffer.getvalue()
+                logger.info(
+                    f"Hume preview generated: {len(audio_bytes)} bytes -> "
+                    f"{len(mp3_bytes)} MP3 bytes (auto-detected format)"
+                )
+
+            return mp3_bytes
+
+        except Exception as e:
+            logger.error(f"Hume preview generation failed: {e}")
+            raise

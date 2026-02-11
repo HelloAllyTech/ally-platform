@@ -105,6 +105,30 @@ class Settings(BaseSettings):
     DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)
     DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(...)
 
+    # Core service
+    CORE_SERVICE_BASE_URL: str = Field(
+        ...,
+        description="Base URL of the core backend service (e.g., https://api.dev.helloally.ai)",
+    )
+    CORE_SERVICE_API_KEY: str = Field(
+        ...,
+        description="API key sent as x-api-key header when calling the core service",
+    )
+
+    # CORS
+    ALLOWED_ORIGINS: str = Field(
+        default="*",
+        description="Comma-separated list of allowed CORS origins",
+    )
+
+    # Multilingual settings
+    MULTILINGUAL_METHOD: str = Field(
+        default="none",
+        description=(
+            "Method to use: 'cotr', 'rag', 'prompt_engineering', "
+            "'back_translation', 'none'"
+        ),
+    )
     EVALUATION_LOG_DIR: Optional[str] = Field(
         default="evaluation_logs",
         description="Directory to store evaluation logs",
