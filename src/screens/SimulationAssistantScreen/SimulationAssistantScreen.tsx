@@ -37,6 +37,7 @@ import {
   ExperienceMode,
   Feedback,
   LiveEventPayload,
+  RoomStatus,
 } from '@/types';
 import {
   decodeFeedbackPayloadToJson,
@@ -75,8 +76,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const {t} = useTranslation();
   const [endScenarioSession] = useEndScenarioSessionMutation();
   const {showErrorToast} = useErrorToast();
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
+  const [roomStatus, setRoomStatus] = useState<RoomStatus>(
+    RoomStatus.DISCONNECTED,
+  );
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
   const [room] = useState<Room>(() => new Room());
   const remoteParticipants = useRemoteParticipants({room});
@@ -103,7 +105,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     useState<boolean>(false);
   const [showBackPressConfirmation, setShowBackPressConfirmation] =
     useState<boolean>(false);
-  const isSimulationInProgress = !isConnecting && !isDisconnecting;
+  const isSimulationInProgress =
+    roomStatus === RoomStatus.AGENT_JOINED ||
+    roomStatus === RoomStatus.CONNECTED;
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -111,11 +115,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => {
     if (accessToken) {
-      setIsConnecting(true);
+      setRoomStatus(RoomStatus.CONNECTING);
       // Delay connection to allow ringtone to play (matching web behavior)
       const connectionTimeout = setTimeout(() => {
         handleConnect();
-        setStartTime(new Date());
       }, RINGING_BELL_DELAY);
 
       return () => {
@@ -160,7 +163,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       remainingModal,
     );
     const autoEndTimer = setTimeout(() => {
-      if (!isDisconnecting) handleDisconnect();
+      if (roomStatus !== RoomStatus.DISCONNECTING) handleDisconnect();
     }, remainingAutoEnd);
 
     return () => {
@@ -168,7 +171,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       clearTimeout(autoEndTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startTime, isDisconnecting]);
+  }, [startTime, roomStatus]);
 
   const ensureSpeakerOutput = useCallback(async () => {
     // Try a few times with small delays; OEM skins sometimes override routing during focus changes
@@ -187,13 +190,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
-      setIsConnecting(false);
-      // Stop the ringtone once the room is connected (matching web behavior)
-      try {
-        SoundPlayer.stop();
-      } catch {
-        // Ignore if sound already finished
-      }
+      setRoomStatus(RoomStatus.CONNECTED);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
@@ -202,18 +199,28 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         showErrorToast(error, 'Errors.attachListeners');
       }
     };
+
+    const onRemoteParticipantConnected = () => {
+      // Stop the ringtone once the agent joins (matching web behavior)
+      try {
+        SoundPlayer.stop();
+      } catch {
+        // Ignore if sound already finished
+      }
+      setStartTime(new Date());
+      setRoomStatus(RoomStatus.AGENT_JOINED);
+    };
+
     const onDisconnected = () => {
-      setIsConnecting(false);
-      if (!isDisconnecting) {
+      if (roomStatus !== RoomStatus.DISCONNECTING) {
         playNotificationSound(sounds.endSimulation);
-        setIsDisconnecting(true);
+        setRoomStatus(RoomStatus.DISCONNECTING);
         setIsMicEnabled(false);
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: sessionId,
           pathId,
           contextType, // Pass contextType so feedback screen knows if this is a case or track
         });
-        setIsDisconnecting(false);
       }
     };
     const onDataReceived = (payload: unknown) => {
@@ -248,18 +255,20 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
+      .on(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
       .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
+        .off(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
   }, [
     room,
     ensureSpeakerOutput,
     showErrorToast,
-    isDisconnecting,
+    roomStatus,
     navigation,
     sessionId,
     pathId,
@@ -307,7 +316,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const handleDisconnect = useCallback(async () => {
     try {
-      setIsDisconnecting(true);
+      setRoomStatus(RoomStatus.DISCONNECTING);
       playNotificationSound(sounds.endSimulation);
       await room.disconnect();
       await endScenarioSession({
@@ -320,7 +329,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         contextType, // Pass contextType so feedback screen knows if this is a case or track
       });
       setIsMicEnabled(false);
-      setIsDisconnecting(false);
+      setRoomStatus(RoomStatus.DISCONNECTED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, pathId, contextType]);
@@ -337,17 +346,25 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   }, [isMicEnabled]);
 
   const renderLoader = () => {
+    const getLoadingText = () => {
+      if (
+        roomStatus === RoomStatus.CONNECTED ||
+        roomStatus === RoomStatus.CONNECTING
+      ) {
+        return t('SimulationAssistant.waitingForAgent');
+      }
+      if (roomStatus === RoomStatus.DISCONNECTING) {
+        return t('SimulationAssistant.ending');
+      }
+      return t('SimulationAssistant.connectingToSession');
+    };
+
     return (
       <View style={styles.loadingWrapper}>
         <Text style={styles.loadingTitle}>
-          {t('SimulationAssistant.startingTitle')}
-          <Text style={styles.loadingItalic}>
-            {isDisconnecting
-              ? t('SimulationAssistant.endingEllipsis')
-              : t('SimulationAssistant.startingEllipsis')}
-          </Text>
+          <Text style={styles.loadingItalic}>{getLoadingText()}</Text>
         </Text>
-        {isConnecting && (
+        {roomStatus === RoomStatus.CONNECTING && (
           <Text style={styles.loadingDescription}>
             {t('SimulationAssistant.startingSubtitle')}
           </Text>

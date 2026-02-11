@@ -351,3 +351,14 @@ export type CaseSimulation = PathScenario;
  * TODO: Replace with actual CasesResponse type when dedicated API is available
  */
 export type CasesResponse = SimulationPathsResponse;
+
+/**
+ * Room connection status for LiveKit sessions
+ */
+export enum RoomStatus {
+  CONNECTED = 'connected',
+  CONNECTING = 'connecting',
+  DISCONNECTED = 'disconnected',
+  DISCONNECTING = 'disconnecting',
+  AGENT_JOINED = 'agent_joined',
+}
