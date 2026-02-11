@@ -78,6 +78,7 @@ jest.mock('livekit-client', () => {
       Connected: 'connected',
       Disconnected: 'disconnected',
       DataReceived: 'data',
+      ParticipantConnected: 'participantConnected',
     },
     Track: {Kind: {Audio: 'audio'}, Source: {Microphone: 'mic'}},
     ParticipantEvent: {IsSpeakingChanged: 'IsSpeakingChanged'},
@@ -451,8 +452,10 @@ describe('SimulationAssistantScreen', () => {
 
   it('shows simulation timer when connected', async () => {
     const connectedHandlers: Array<() => void> = [];
+    const participantConnectedHandlers: Array<() => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
       if (event === 'connected') connectedHandlers.push(cb);
+      if (event === 'participantConnected') participantConnectedHandlers.push(cb);
       return undefined;
     });
 
@@ -462,8 +465,10 @@ describe('SimulationAssistantScreen', () => {
 
     await waitFor(() => expect(mockConnect).toHaveBeenCalled());
     await act(async () => connectedHandlers.forEach(fn => fn()));
+    // Trigger remote participant joining so startTime is set
+    await act(async () => participantConnectedHandlers.forEach(fn => fn()));
 
-    // Should show timer when connected
+    // Should show timer when connected and agent has joined
     expect(getByTestId('timer')).toBeDefined();
   });
 
