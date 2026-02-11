@@ -31,6 +31,8 @@ export const transformSummaryToFormData = (
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: summary.relationshipStatus || null,
   [SUMMARY_FIELDS.LOCATION]: summary.location || null,
   [SUMMARY_FIELDS.CONCERN_CODE]: summary.codeOfConcern || null,
+  [SUMMARY_FIELDS.COUNSELLOR]: summary.counsellor || null,
+  [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]: summary.newCallFollowUp || null,
   [SUMMARY_FIELDS.ADDITIONAL_NOTES]: callInfo?.notes || null,
 
   // Intake section
@@ -98,6 +100,9 @@ export const transformFormDataForSubmission = (
     [SUMMARY_FIELDS.RELATIONSHIP_STATUS]:
       formData?.[SUMMARY_FIELDS.RELATIONSHIP_STATUS] ?? null,
     [SUMMARY_FIELDS.LOCATION]: formData?.[SUMMARY_FIELDS.LOCATION] ?? null,
+    [SUMMARY_FIELDS.COUNSELLOR]: formData?.[SUMMARY_FIELDS.COUNSELLOR] ?? null,
+    [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]:
+      formData?.[SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP] ?? null,
     [SUMMARY_FIELDS.SESSION_SUMMARY]:
       formData?.[SUMMARY_FIELDS.SESSION_SUMMARY] ?? null,
     [SUMMARY_FIELDS.FLOW]: formData?.[SUMMARY_FIELDS.FLOW] ?? null,

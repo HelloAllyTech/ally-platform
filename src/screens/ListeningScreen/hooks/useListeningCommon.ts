@@ -12,6 +12,7 @@ import {
   useEndCallMutation,
   useLazyGetCounsellorChatQuery,
 } from '@/services/chatApi';
+import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {ChatProvider, DisconnectedType, FeedbackResponse, Nudge} from '@/types';
@@ -33,6 +34,7 @@ export const useListeningCommon = ({
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
     useEndCallMutation();
+  const [getSummaryFields] = useLazyGetSummaryFieldsQuery();
 
   const chatData = useAppSelector(state => state.chat.currentChat);
   const permissions = useAppSelector(state => state.user.permissions);
@@ -60,9 +62,10 @@ export const useListeningCommon = ({
   // Navigation handlers
   const handleCallEndRedirection = useCallback(() => {
     if (isFocused) {
+      getSummaryFields();
       navigation.replace(SCREEN_NAMES.BREATHING);
     }
-  }, [navigation, isFocused]);
+  }, [navigation, isFocused, getSummaryFields]);
 
   const handleGoBack = useCallback(() => {
     dispatch(clearCurrentChat());
@@ -86,7 +89,10 @@ export const useListeningCommon = ({
 
   // Handle end call success/error
   useEffect(() => {
-    if (isEndCallSuccess || isEndCallError) {
+    if (isEndCallSuccess) {
+      handleCallEndRedirection();
+    }
+    if (isEndCallError) {
       handleCallEndRedirection();
     }
   }, [isEndCallSuccess, isEndCallError, handleCallEndRedirection]);
