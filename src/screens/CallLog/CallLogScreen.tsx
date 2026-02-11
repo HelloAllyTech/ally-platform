@@ -535,9 +535,7 @@ export const CallLogScreen: React.FC = () => {
         onGoBack={() => setIsViewingArchivedRealLogs(false)}
         onArchivePress={handleArchivePress}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
-        showActionsMenu={
-          !isViewingArchivedRealLogs && env.ARCHIVE_CALL_LOGS_FLAG
-        }
+        showActionsMenu={!isViewingArchivedRealLogs}
       />
       {availableLogTypes.length > 1 && !isViewingArchivedRealLogs && (
         <View style={styles.tabMargin}>
