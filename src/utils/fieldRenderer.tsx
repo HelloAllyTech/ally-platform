@@ -20,7 +20,6 @@ export function getFieldValue(
 ): unknown {
   // 1. If field has custom compute function, use it
   if (field.computeValue) {
-    console.log(field.key, 'field.computeValue', field.computeValue(data));
     return field.computeValue(data);
   }
 
