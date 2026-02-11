@@ -131,23 +131,11 @@ class AgentWorker:
             from app.speech_prosody.service import SpeechProsodyService
 
             prosody_service = SpeechProsodyService(self.tts_client)
-            # Add timeout to LLM-dependent prosody configuration
-            await asyncio.wait_for(
-                prosody_service.generate_and_set_defaults(
-                    scenario=self.scenario,
-                    llm_client=self.llm_client,
-                ),
-                timeout=15.0,
+            await prosody_service.generate_and_set_defaults(
+                scenario=self.scenario,
+                llm_client=self.llm_client,
             )
             logger.info("[AgentWorker] Phase 1: Prosody configuration complete.")
-        except asyncio.TimeoutError:
-            logger.warning(
-                "[Speech Prosody] Default generation timed out, using safe defaults"
-            )
-            logger.info(
-                "[AgentWorker] Phase 1: Prosody configuration timed out "
-                "(using defaults)."
-            )
         except Exception as e:
             logger.error(f"[AgentWorker] Failed to configure prosody: {e}")
             logger.info(f"[AgentWorker] Phase 1: Prosody configuration failed: {e}")
@@ -299,26 +287,19 @@ class AgentWorker:
         # Start session and connect
         try:
             logger.info("[AgentWorker] Phase 3: Connecting to room...")
-            await asyncio.wait_for(
-                self.session.start(
-                    # ... (rest of the args identical)
-                    room=self.ctx.room,
-                    agent=self.agent,
-                    room_input_options=RoomInputOptions(
-                        noise_cancellation=noise_cancellation.BVC(),
-                    ),
+            await self.session.start(
+                # ... (rest of the args identical)
+                room=self.ctx.room,
+                agent=self.agent,
+                room_input_options=RoomInputOptions(
+                    noise_cancellation=noise_cancellation.BVC(),
                 ),
-                timeout=15.0,
             )
 
             # Connect to room with timeout
             logger.info("[AgentWorker] Phase 3: Joining room...")
-            await asyncio.wait_for(self.ctx.connect(), timeout=15.0)
+            await self.ctx.connect()
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
-        except asyncio.TimeoutError:
-            logger.error("[AgentWorker] Connection timed out")
-            logger.info("[AgentWorker] Phase 3: CONNECTION TIMED OUT!")
-            raise
         except Exception as e:
             logger.exception(f"[AgentWorker] Failed to start/join room: {e}")
             logger.info(f"[AgentWorker] Phase 3: Failed to start/join room: {e}")
@@ -330,15 +311,16 @@ class AgentWorker:
         # Initialize event orchestrator (only after session is connected)
         await self.event_orchestrator.initialize()
 
-        # Say opening statement if scenario has opening statements
         if should_say_opening_statement(
             scenario=self.scenario,
             event_orchestrator=self.event_orchestrator,
         ):
-            handler = self.session.say(
-                random.choice(self.scenario.prompt_data.opening_statements)
-            )
+            statement = random.choice(self.scenario.prompt_data.opening_statements)
+            logger.info(f"[AgentWorker] Saying opening statement: {statement}")
+            handler = self.session.say(statement)
+            logger.info("[AgentWorker] Waiting for opening statement playout...")
             await handler.wait_for_playout()
+            logger.info("[AgentWorker] Opening statement playout complete.")
 
     async def shutdown(self):
         """

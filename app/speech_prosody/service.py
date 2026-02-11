@@ -2,6 +2,9 @@
 Speech prosody service for orchestrating parameter generation and application.
 """
 
+import hashlib
+import json
+import os
 from typing import Any, Dict, List, Optional
 
 from app.core.logger import get_logger
@@ -52,6 +55,75 @@ class SpeechProsodyService:
         else:
             self._default_params: Dict[str, Any] = {}
 
+    # Persistent cache configuration
+    _CACHE_FILE_PATH = "/tmp/speech_prosody_cache.json"
+    _DEFAULTS_CACHE: Dict[str, Dict[str, Any]] = {}
+    _CACHE_MAX_SIZE = 100
+
+    def _load_cache(self) -> None:
+        """Load cache from file system."""
+        if not os.path.exists(self._CACHE_FILE_PATH):
+            return
+
+        try:
+            with open(self._CACHE_FILE_PATH, "r") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    # Update class-level cache
+                    SpeechProsodyService._DEFAULTS_CACHE.update(loaded)
+                    logger.info(
+                        f"[Speech Prosody] Loaded {len(loaded)} items from "
+                        "persistent cache"
+                    )
+        except Exception as e:
+            logger.warning(f"[Speech Prosody] Failed to load persistent cache: {e}")
+
+    def _save_cache(self) -> None:
+        """Save cache to file system."""
+        try:
+            # Basic atomic-ish write
+            temp_path = f"{self._CACHE_FILE_PATH}.tmp"
+            with open(temp_path, "w") as f:
+                json.dump(SpeechProsodyService._DEFAULTS_CACHE, f)
+            os.rename(temp_path, self._CACHE_FILE_PATH)
+            logger.debug("[Speech Prosody] Saved persistent cache to disk")
+        except Exception as e:
+            logger.warning(f"[Speech Prosody] Failed to save persistent cache: {e}")
+
+    def _generate_cache_key(self, scenario: Scenario) -> str:
+        """
+        Generate a stable cache key based on scenario content that affects prosody.
+
+        Args:
+            scenario: The scenario to generate key for
+
+        Returns:
+            String hash of the relevant scenario data
+        """
+        # Extract fields that influence default prosody generation
+        pd = scenario.prompt_data
+
+        # Create a dict of relevant fields
+        relevant_data = {
+            "scenario_name": scenario.name,
+            "age": pd.age,
+            "gender": pd.gender,
+            "tone": pd.tone,
+            "emotional_needs": pd.emotional_needs,
+            "personality": pd.personality,
+            "opening_statements": pd.opening_statements,
+            "agent_goal": pd.agent_goal,
+            # Include minimal voice config identifying info
+            "voice_provider": scenario.voice.provider if scenario.voice else None,
+            "voice_name": scenario.voice.name if scenario.voice else None,
+        }
+
+        # Serialize to JSON with sorted keys for stability
+        json_str = json.dumps(relevant_data, sort_keys=True)
+
+        # Generate SHA-256 hash
+        return hashlib.sha256(json_str.encode()).hexdigest()
+
     async def generate_and_set_defaults(
         self,
         scenario: Scenario,
@@ -64,6 +136,7 @@ class SpeechProsodyService:
             scenario: Complete scenario with all prompt data
             llm_client: LLM client for generation
         """
+        logger.info("[Speech Prosody] generate_and_set_defaults entered")
         # Get parameter metadata from provider
         parameter_metadata = self.tts_client.get_parameter_metadata()
 
@@ -77,12 +150,35 @@ class SpeechProsodyService:
             return
 
         try:
-            # Generate defaults using LLM
-            params_dict = await generate_default_parameters(
-                scenario=scenario,
-                llm_client=llm_client,
-                parameter_metadata=parameter_metadata,
-            )
+            # Ensure class-level cache is populated from disk if empty
+            if not self._DEFAULTS_CACHE:
+                self._load_cache()
+
+            # Check cache first
+            cache_key = self._generate_cache_key(scenario)
+            if cache_key in self._DEFAULTS_CACHE:
+                logger.info("[Speech Prosody] Cache HIT for default parameters")
+                params_dict = self._DEFAULTS_CACHE[cache_key].copy()
+            else:
+                logger.info(
+                    "[Speech Prosody] Cache MISS for default parameters, generating..."
+                )
+                # Generate defaults using LLM
+                params_dict = await generate_default_parameters(
+                    scenario=scenario,
+                    llm_client=llm_client,
+                    parameter_metadata=parameter_metadata,
+                )
+
+                # Cache the result if valid
+                if params_dict:
+                    # Simple LRU-like eviction if cache full
+                    if len(self._DEFAULTS_CACHE) >= self._CACHE_MAX_SIZE:
+                        self._DEFAULTS_CACHE.pop(next(iter(self._DEFAULTS_CACHE)))
+
+                    self._DEFAULTS_CACHE[cache_key] = params_dict.copy()
+                    # Persist to disk
+                    self._save_cache()
 
             if not params_dict:
                 logger.warning(
