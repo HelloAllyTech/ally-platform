@@ -246,7 +246,8 @@ export const CallSummaryScreen: React.FC<
     }
 
     if (showSummary && isSummaryAvailable && canShowSummary) {
-      const shouldShowSaveButton = !callId || hasChanges;
+      const shouldShowSaveButton =
+        (!callId || hasChanges) && !isFeedbackPopupVisible;
       return (
         <CallSummaryDetails
           isLoading={isLoading}
@@ -280,7 +281,7 @@ export const CallSummaryScreen: React.FC<
               onNoteChange={handleNoteChange}
             />
           </KeyboardAwareScrollView>
-          {renderSummaryButtons()}
+          {!isFeedbackPopupVisible && renderSummaryButtons()}
         </>
       );
     }
