@@ -38,6 +38,9 @@ def _set_test_env_vars():
         "DEFAULT_MALE_VOICE_MODEL": "test-male-voice",
         "DEFAULT_FEMALE_VOICE_MODEL": "test-female-voice",
         "DEFAULT_NON_BINARY_VOICE_MODEL": "test-nonbinary-voice",
+        # Core service settings
+        "CORE_SERVICE_BASE_URL": "https://test.core-service.local",
+        "CORE_SERVICE_API_KEY": "test-core-service-api-key",
     }
 
     # Set environment variables and store originals
