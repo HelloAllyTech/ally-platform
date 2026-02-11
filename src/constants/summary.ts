@@ -929,10 +929,7 @@ export const summaryFields: SummaryField[] = [
     label: 'Additional Notes',
     sectionKey: SectionKey.AdditionalNotes,
     type: FieldType.MultilineTextInput,
-    computeValue: ({callDetails}) => {
-      console.log('callDetails', callDetails);
-      return callDetails?.callInfo?.notes;
-    },
+    computeValue: ({callDetails}) => callDetails?.callInfo?.notes,
   },
 ];
 

@@ -221,7 +221,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       if (!eventObj?.data) return;
 
       const {score, emoji, message, detected_event_ids} = eventObj.data;
-      console.log(eventObj, 'eventObj');
 
       if (typeof score === 'number' && !Number.isNaN(score)) {
         setAccumulatedScore(prev => clamp(prev + score, -100, 100));
