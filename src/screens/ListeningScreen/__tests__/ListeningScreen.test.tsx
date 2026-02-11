@@ -89,11 +89,6 @@ jest.mock('@/services/chatApi', () => ({
   useLazyGetCounsellorChatQuery: () => [jest.fn().mockResolvedValue({data: []})],
 }));
 
-jest.mock('@/services/settingsApi', () => ({
-  __esModule: true,
-  useLazyGetSummaryFieldsQuery: () => [jest.fn()],
-}));
-
 // Store selectors and dispatch
 const mockBuildFakeState = (overrides?: any) => ({
   chat: {currentChat: {chatId: 'chat-1', provider: undefined, platform: undefined}},
