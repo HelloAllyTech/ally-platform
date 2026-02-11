@@ -36,7 +36,7 @@ from app.core.events.event_types.utterance_length.utterance_length_event import 
     UtteranceLengthData,
     UtteranceLengthEvent,
 )
-from app.utils import get_logger
+from app.core.logger import get_logger
 
 
 class UnknownEventIdError(RuntimeError):

@@ -107,11 +107,14 @@ class Settings(BaseSettings):
 
     # Core service
     CORE_SERVICE_BASE_URL: str = Field(
-        ...,
-        description="Base URL of the core backend service (e.g., https://api.dev.helloally.ai)",
+        default="http://localhost:8000",
+        description=(
+            "Base URL of the core backend service "
+            "(e.g., https://api.dev.helloally.ai)"
+        ),
     )
     CORE_SERVICE_API_KEY: str = Field(
-        ...,
+        default="dummy-key",
         description="API key sent as x-api-key header when calling the core service",
     )
 

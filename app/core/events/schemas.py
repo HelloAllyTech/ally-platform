@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 from app.core.constants import DetectionType
 from app.core.events.base import ChatMessage
 from app.core.events.event_types.combination.constants import ExpressionNode
-from app.utils import get_current_iso_timestamp
-from app.utils.time_utils import get_current_iso_timestamp as get_iso_timestamp
+from app.core.time_utils import get_current_iso_timestamp
+from app.core.time_utils import get_current_iso_timestamp as get_iso_timestamp
 
 
 class EventRegistryEntry(BaseModel):

@@ -40,6 +40,7 @@ setuptools = "^75.0.0"
 pydub = "^0.25.1"
 hume = "^0.13.6"
 httpx = "^0.28.1"
+audioop-lts = {markers = "python_version >= \"3.13\"", version = "^0.2.2"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"

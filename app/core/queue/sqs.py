@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import boto3
 
 from app.core.config import settings
-from app.utils import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 
-from app.tts.constants import DEFAULT_SAMPLE_TEXT, LANGUAGE_SAMPLE_TEXT
 from app.api.dependencies import verify_token
+from app.core.logger import get_logger
+from app.tts.constants import DEFAULT_SAMPLE_TEXT, LANGUAGE_SAMPLE_TEXT
 from app.tts.factory import create_tts_client
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -44,21 +44,25 @@ class PreviewRequest(BaseModel):
     """Request body for voice preview generation."""
 
     provider: Literal["DEEPGRAM", "ELEVENLABS", "SARVAM", "GOOGLE", "HUME"] = Field(
-        ..., description="TTS provider name",
+        ...,
+        description="TTS provider name",
         examples=[
             "DEEPGRAM",
             "ELEVENLABS",
             "SARVAM",
             "GOOGLE",
             "HUME",
-        ]
+        ],
     )
     config: Dict[str, Any] = Field(
         ...,
         description="Provider-specific configuration (must be a non-empty dict)",
         examples=[
             {"model": "aura-asteria-en"},  # Deepgram
-            {"voice_id": "21m00Tcm4TlvDq8ikWAM", "model": "eleven_turbo_v2_5"},  # ElevenLabs
+            {
+                "voice_id": "21m00Tcm4TlvDq8ikWAM",
+                "model": "eleven_turbo_v2_5",
+            },  # ElevenLabs
             {"model": "bulbul:v2", "speaker": "meera"},  # Sarvam
             {"voice_name": "en-US-Neural2-A", "gender": "female"},  # Google
             {"voice_name": "Ava Song", "voice_provider": "HUME_AI"},  # Hume
@@ -72,6 +76,7 @@ class PreviewRequest(BaseModel):
         if not v:
             raise ValueError("config must be a non-empty dictionary")
         return v
+
     text: Optional[str] = Field(
         default=None,
         max_length=500,

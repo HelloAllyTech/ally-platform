@@ -7,7 +7,7 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
-from app.utils import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -20,8 +20,8 @@ from app.core.graph.utils import (
 )
 from app.core.logger import logger
 from app.core.scenario.base import Scenario
+from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
-from app.utils.time_utils import TimingContext, time_operation
 
 
 def _prepare_event_context(

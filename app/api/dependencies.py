@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.core.constants import AUTH_VERIFY_ENDPOINT
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -70,7 +70,9 @@ async def verify_token(
         raise HTTPException(
             status_code=response.status_code,
             detail=detail,
-            headers={"WWW-Authenticate": "Bearer"} if response.status_code == 401 else None,
+            headers=(
+                {"WWW-Authenticate": "Bearer"} if response.status_code == 401 else None
+            ),
         )
 
     except httpx.RequestError as e:
