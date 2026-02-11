@@ -26,6 +26,7 @@ interface DropdownProps {
   onDropdownToggle?: (isOpen: boolean) => void;
   customHeaderStyle?: object;
   customTextStyle?: object;
+  modalTranslateX?: `${number}%` | number; // Optional translateX transform for modal dropdown positioning (e.g., '-50%')
 }
 
 export const CustomDropdown: React.FC<DropdownProps> = ({
@@ -40,6 +41,7 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
   onDropdownToggle,
   customHeaderStyle,
   customTextStyle,
+  modalTranslateX,
 }) => {
   const [dropdownWidth, setDropdownWidth] = useState<number>(0);
   const [headerLayout, setHeaderLayout] = useState({
@@ -153,6 +155,11 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
                     minWidth: Math.max(dropdownWidth, headerLayout.width),
                     maxHeight: Math.min(200, options.length * 40),
                   },
+                  modalTranslateX
+                    ? {
+                        transform: [{translateX: modalTranslateX}],
+                      }
+                    : null,
                 ]}>
                 <ScrollView
                   ref={scrollViewRef}
