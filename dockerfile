@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    ffmpeg \
     libglib2.0-0 \
     libgobject-2.0-0 \
     && rm -rf /var/lib/apt/lists/*
