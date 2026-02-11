@@ -4,10 +4,10 @@ from typing import Any, Dict, Optional
 
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_LLM_CONFIG, LLMProvider
+from app.core.logger import get_logger
 from app.llms.base import BaseLLMClient
 from app.llms.gemini import GeminiLLMClient
 from app.llms.openai import OpenAILLMClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

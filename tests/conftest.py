@@ -162,7 +162,7 @@ def null_metadata() -> None:
 @pytest.fixture
 def mock_logger():
     """Mock logger for testing."""
-    with patch("app.utils.metadata_parser.logger") as mock_log:
+    with patch("app.core.agent.factory.logger") as mock_log:
         yield mock_log
 
 

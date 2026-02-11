@@ -7,10 +7,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from app.core.agent.factory import parse_room_metadata
 from app.core.config import settings
 from app.core.constants import Environment
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
-from app.utils.metadata_parser import parse_room_metadata
 from tests.utils.test_helpers import AssertionHelpers, DataBuilder
 
 # Deterministic SCENARIO_SAMPLE used for LOCAL fallback tests

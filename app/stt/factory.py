@@ -3,11 +3,11 @@
 from typing import Any, Dict, Optional
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG, STTProvider
+from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
 from app.stt.google import GoogleSTTClient
 from app.stt.sarvam import SarvamSTTClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 from app.core.branching_instructions.constants import ReservedBranchingVariable
 from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.core.logger import get_logger
 from app.llms import create_llm_client
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

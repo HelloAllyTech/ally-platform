@@ -1,28 +1,59 @@
 """
-Timing utilities for performance analysis and latency measurement.
-
-Provides context managers and decorators for easy timing instrumentation.
+Time utility functions for consistent timestamp handling and performance analysis.
 """
 
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from functools import wraps
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# ====================================================================
+# Datetime Utilities
+# ====================================================================
+
+
+def timestamp_to_iso_utc(timestamp: Union[int, float]) -> str:
+    """
+    Convert Unix timestamp to ISO 8601 UTC string with 'Z' suffix.
+
+    Args:
+        timestamp: Unix timestamp (seconds since epoch)
+
+    Returns:
+        ISO 8601 formatted UTC datetime string with 'Z' suffix
+    """
+    return (
+        datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def get_current_iso_timestamp() -> str:
+    """
+    Get current timestamp in ISO 8601 UTC format with 'Z' suffix.
+
+    Returns:
+        ISO 8601 formatted UTC datetime string with 'Z' suffix
+    """
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+# ====================================================================
+# Timing Utilities
+# ====================================================================
 
 
 @contextmanager
 def time_operation(operation_name: str, log_level: str = "info"):
     """
     Context manager for timing operations.
-
-    Usage:
-        with time_operation("Event orchestration"):
-            await orchestrator.orchestrate_events(...)
-        # Logs: "Event orchestration completed in 45.23ms"
 
     Args:
         operation_name: Name of the operation being timed
@@ -42,11 +73,6 @@ def timed_async(
 ):
     """
     Decorator for timing async functions.
-
-    Usage:
-        @timed_async(operation_name="Event detection")
-        async def detect_events(...):
-            ...
 
     Args:
         func: Function to decorate (if used as decorator)
@@ -71,16 +97,6 @@ def timed_async(
 class TimingContext:
     """
     Context manager for tracking multiple timing operations.
-
-    Useful for tracking nested operations and calculating total time.
-
-    Usage:
-        with TimingContext("Event processing") as timing:
-            with timing.operation("Detection"):
-                events = await detect_events(...)
-            with timing.operation("Orchestration"):
-                await orchestrate_events(...)
-        # Automatically logs summary on exit
     """
 
     def __init__(self, context_name: str, auto_log: bool = True):

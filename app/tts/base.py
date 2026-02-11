@@ -7,8 +7,7 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from langchain_core.tools import BaseTool
 
-
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

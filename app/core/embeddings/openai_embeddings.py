@@ -9,7 +9,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from app.core.config import settings
 from app.core.embeddings.base import BaseEmbeddingClient
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

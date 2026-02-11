@@ -6,8 +6,8 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 from app.core.constants import DEFAULT_LLM_CONFIG
+from app.core.logger import get_logger
 from app.llms.base import BaseLLMClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -3,11 +3,11 @@ from typing import Optional
 
 import pytest
 
+from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import (
     CustomUIEventMessageType,
     CustomUIEventMessageTypeData,
 )
-from app.utils.event_handler import send_event_to_ui
 
 
 class FakeParticipant:

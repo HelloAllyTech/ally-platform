@@ -8,8 +8,8 @@ from livekit.plugins import elevenlabs
 from livekit.plugins.elevenlabs import VoiceSettings
 
 from app.core.config import settings
+from app.core.logger import get_logger
 from app.tts.base import BaseTTSClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -5,7 +5,7 @@ from typing import List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage
 
 from app.core.branching_instructions.constants import ReservedBranchingVariable
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

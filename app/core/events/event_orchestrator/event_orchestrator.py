@@ -18,11 +18,11 @@ from app.core.events.event_types.combination.constants import (
 )
 from app.core.events.schedulers import TimeEventScheduler
 from app.core.events.schemas import EventRegistryEntry, ExpressionListEntry
+from app.core.events.utils import evaluate_expression, extract_event_ids_from_expression
 from app.core.graph.state import BranchingAndFeedbackData
 from app.core.graph.utils import is_event_eligible
+from app.core.logger import get_logger
 from app.core.scenario.base import Scenario, TerminationEvent
-from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

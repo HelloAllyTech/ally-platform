@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
-from app.utils.logger import logger, trace_id_var
+from app.core.logger import logger, trace_id_var
 
 
 class LogRequestMiddleware(BaseHTTPMiddleware):

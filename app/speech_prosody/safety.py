@@ -5,7 +5,7 @@ Safety utilities for speech prosody generation.
 import re
 from typing import Optional
 
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

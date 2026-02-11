@@ -8,10 +8,10 @@ if TYPE_CHECKING:
     from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 
 from app.core.events.schemas import CoreEventMessageType
+from app.core.events.utils import get_current_score_from_graph
 from app.core.graph.utils import serialize_event
+from app.core.logger import get_logger
 from app.core.queue import msg_event_queue
-from app.utils.event_utils import get_current_score_from_graph
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

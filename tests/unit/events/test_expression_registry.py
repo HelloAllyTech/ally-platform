@@ -10,8 +10,8 @@ from app.core.constants import DetectionType, ExpressionType
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.events.event_types.combination.constants import ExpressionNode
 from app.core.events.factory import build_events_from_metadata
+from app.core.events.utils import evaluate_expression, extract_event_ids_from_expression
 from app.core.scenario.base import Scenario
-from app.utils.event_utils import evaluate_expression, extract_event_ids_from_expression
 
 
 @pytest.fixture

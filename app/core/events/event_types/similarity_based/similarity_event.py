@@ -22,7 +22,7 @@ from app.core.events.event_types.similarity_based.text_processor import TextProc
 from app.core.events.event_types.similarity_based.text_processor_factory import (
     TextProcessorFactory,
 )
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

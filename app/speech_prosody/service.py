@@ -4,6 +4,7 @@ Speech prosody service for orchestrating parameter generation and application.
 
 from typing import Any, Dict, List, Optional
 
+from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
 from app.speech_prosody.constants import (
@@ -17,7 +18,6 @@ from app.speech_prosody.generator import (
 from app.speech_prosody.safety import clamp_value, sanitize_ssml
 from app.speech_prosody.utils import extract_persona_context_from_prompt_data
 from app.tts.base import BaseTTSClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

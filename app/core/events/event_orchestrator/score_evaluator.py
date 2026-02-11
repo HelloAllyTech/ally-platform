@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, List, Set, Tuple
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
+from app.core.events.utils import evaluate_condition
 from app.core.graph.utils import is_event_eligible
-from app.utils.event_utils import evaluate_condition
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 if TYPE_CHECKING:
     from app.core.events.schemas import EventRegistryEntry

@@ -5,6 +5,7 @@ LLM generation logic for speech prosody.
 import json
 from typing import Any, Dict, List, Optional
 
+from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
 from app.speech_prosody import prompts
@@ -15,7 +16,6 @@ from app.speech_prosody.utils import (
     invoke_llm_with_json_mode,
     parse_llm_json_response,
 )
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

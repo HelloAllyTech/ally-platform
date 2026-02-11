@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
+from app.core.logger import get_logger
 from app.llms.base import BaseLLMClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -14,9 +14,9 @@ from livekit import rtc
 from app.core.constants import ConditionOperator, DetectionType
 from app.core.events.base import BaseEvent
 from app.core.events.schemas import EventRegistryEntry
+from app.core.events.utils import get_current_score_from_graph
 from app.core.graph.utils import is_event_eligible
-from app.utils.event_utils import get_current_score_from_graph
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

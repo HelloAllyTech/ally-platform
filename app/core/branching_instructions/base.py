@@ -18,7 +18,7 @@ from app.core.branching_instructions.parser import (
     parse_instruction,
 )
 from app.core.constants import DEFAULT_LANGUAGE_CODE
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

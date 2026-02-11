@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.events.base import BaseEvent, ChatMessage
-from app.utils.logger import logger
+from app.core.logger import logger
 
 
 def convert_messages_to_chat_messages(messages) -> List[ChatMessage]:

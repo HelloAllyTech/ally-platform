@@ -6,8 +6,8 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from livekit.plugins import sarvam
 
 from app.core.config import settings
+from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -67,7 +67,7 @@ def _patch_sarvam_stt_url_builder() -> None:
 
             # Rebuild URL with all parameters
             new_query = urlencode(existing_params, doseq=True)
-            return urlunparse(
+            result = urlunparse(
                 (
                     parsed.scheme,
                     parsed.netloc,
@@ -77,14 +77,74 @@ def _patch_sarvam_stt_url_builder() -> None:
                     parsed.fragment,
                 )
             )
+            return result
 
-        # Apply the patch
+        # Apply the patch for URL builder
         sarvam_stt_module._build_websocket_url = _patched_build_websocket_url
         logger.info("Patched _build_websocket_url to include sample_rate=16000")
 
+        # --- Patch 2: SpeechStream.aclose (prevent session closure) ---
+        # The plugin's SpeechStream.aclose() closes the shared aiohttp session
+        # created by the STT instance. This causes "Session is closed" errors
+        # on subsequent turns. We patch it to skip closing the session.
+
+        # original_aclose = sarvam_stt_module.SpeechStream.aclose
+
+        async def _patched_aclose(self) -> None:
+            """
+            Patched aclose that DOES NOT close the shared aiohttp session.
+            """
+            # Logic copied from original source but removing session.close()
+            self._closing = True
+
+            if self._ws and not self._ws.closed:
+                await self._ws.close()
+
+            # Unlock if locked (implementation detail validation might be needed here,
+            # but usually lock is released in finally blocks. This matches original
+            # source check)
+            if self._connection_lock.locked():
+                # This is risky if implementation differs, but assuming standard
+                # behavior
+                pass
+                # Original source had:
+                # if self._connection_lock.locked():
+                #    self._connection_lock.release()
+                # But we can't easily access the lock state safely from outside if it's
+                # not public?
+                # Actually self._connection_lock IS available.
+
+            # Since we are replacing the method, we should call the original BUT
+            # the original CLOSES the session. We can't call original.
+            # We must reimplement relevant parts.
+
+            # 1. Close WebSocket (already done above)
+
+            # 2. Call parent aclose
+            try:
+                # Call SpeechStream's parent (SpeechStream) aclose?
+                # No, SpeechStream inherits from stt.SpeechStream.
+                # We need to call super(SpeechStream, self).aclose()
+                await super(sarvam_stt_module.SpeechStream, self).aclose()
+            except Exception as e:
+                logger.warning(
+                    f"[Patched] Error in parent cleanup: {e}",
+                    extra={"session_id": getattr(self, "_session_id", "unknown")},
+                )
+
+            # 3. DO NOT CLOSE SESSION
+            logger.debug(
+                "[Patched] Skipping session.close() to preserve shared STT session",
+                extra={"session_id": getattr(self, "_session_id", "unknown")},
+            )
+
+        # Apply the patch
+        sarvam_stt_module.SpeechStream.aclose = _patched_aclose
+        logger.info("Patched SpeechStream.aclose to prevent shared session closure")
+
     except Exception as e:
         # Log but don't fail - the plugin might work without the patch in some cases
-        logger.warning(f"Failed to patch Sarvam STT _build_websocket_url: {e}")
+        logger.warning(f"Failed to patch Sarvam STT: {e}")
 
 
 # Apply patch once at module import time

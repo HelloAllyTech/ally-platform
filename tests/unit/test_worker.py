@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 import app.worker as worker
+from app.core.agent import factory as agent_utils
+from app.core.events import handlers as event_handler
 from app.core.graph import agent_graph
-from app.utils import agent_utils, event_handler
 
 
 def _create_test_scenario(prompt_data, events=None):
@@ -198,10 +199,10 @@ class TestWorker:
             scenario=scenario,
         )
 
-        from app.utils import metadata_parser
+        from app.core.agent import factory as agent_utils
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -279,7 +280,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -346,7 +347,7 @@ class TestWorker:
         # Context
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -400,10 +401,10 @@ class TestWorker:
             scenario=scenario,
         )
 
-        from app.utils import metadata_parser
+        from app.core.agent import factory as agent_utils
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -486,7 +487,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -524,7 +525,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -596,10 +597,9 @@ class TestWorker:
         rm_md_envelope = _create_test_envelope(scenario)
 
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.utils import metadata_parser
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -684,7 +684,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -722,7 +722,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -758,10 +758,9 @@ class TestWorker:
         rm_md_envelope = _create_test_envelope(scenario)
 
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.utils import metadata_parser
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -859,7 +858,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -883,7 +882,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -920,10 +919,9 @@ class TestWorker:
         rm_md_envelope = _create_test_envelope(scenario)
 
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.utils import metadata_parser
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -998,7 +996,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -1022,7 +1020,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -1061,10 +1059,9 @@ class TestWorker:
         rm_md_envelope = _create_test_envelope(scenario)
 
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.utils import metadata_parser
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -1194,7 +1191,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -1213,7 +1210,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
@@ -1251,7 +1248,7 @@ class TestWorker:
         test_worker._termination_message = None
 
         # Create termination handler with worker (check actual signature)
-        from app.utils.event_handler import create_termination_handler
+        from app.core.events.handlers import create_termination_handler
 
         termination_handler = create_termination_handler(
             session=dummy_session, ctx=ctx, worker=test_worker
@@ -1301,10 +1298,9 @@ class TestWorker:
         rm_md_envelope = _create_test_envelope(scenario)
 
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.utils import metadata_parser
 
         monkeypatch.setattr(
-            metadata_parser,
+            agent_utils,
             "parse_room_metadata",
             lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
         )
@@ -1402,7 +1398,7 @@ class TestWorker:
         monkeypatch.setattr(
             agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
         )
-        monkeypatch.setattr("app.utils.agent_utils.Agent", self.DummyAgent)
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
         monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
         monkeypatch.setattr(
             event_handler,
@@ -1426,7 +1422,7 @@ class TestWorker:
 
         class Ctx:
             def __init__(self):
-                self.job = types.SimpleNamespace(metadata="{}")
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []

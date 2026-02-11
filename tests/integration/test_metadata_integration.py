@@ -5,9 +5,9 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from app.core.agent.factory import parse_room_metadata
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.core.scenario.base import PromptData, Scenario, ScenarioVoice
-from app.utils.metadata_parser import parse_room_metadata
 from tests.fixtures.scenario_fixtures import (
     COMPLEX_SCENARIO_PAYLOAD,
     MINIMAL_SCENARIO_PAYLOAD,

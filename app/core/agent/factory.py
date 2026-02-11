@@ -1,23 +1,68 @@
 """Agent setup and utility functions."""
 
 import asyncio
+import json
 from datetime import datetime, timezone
-from typing import Optional, Set
+from typing import Any, Dict, Optional, Set
 
 from livekit import rtc
 from livekit.agents import Agent
 from livekit.plugins.langchain import LLMAdapter
 
-from app.core.constants import DEFAULT_LANGUAGE_CODE
-from app.core.embeddings import OpenAIEmbeddingClient
+from app.core.config import settings
+from app.core.constants import DEFAULT_LANGUAGE_CODE, Environment
+from app.core.embeddings import BaseEmbeddingClient, OpenAIEmbeddingClient
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
+from app.core.livekit.livekit_models import RoomMetadataEnvelope
+from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient, create_llm_client
 from app.stt import BaseSTTClient, create_stt_client
 from app.tts import BaseTTSClient, Gender, create_tts_client
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# ====================================================================
+# Metadata Parsing
+# ====================================================================
+
+
+def parse_room_metadata(
+    metadata,
+    embedding_client: Optional[BaseEmbeddingClient] = None,
+    branching_llm_config: Optional[Dict[str, Any]] = None,
+) -> RoomMetadataEnvelope:
+    """
+    Parse room metadata JSON into RoomMetadataEnvelope.
+    Returns empty envelope on error.
+
+    Args:
+        metadata: JSON string containing room metadata
+        embedding_client: Optional shared embedding client for
+            semantic similarity events
+        branching_llm_config: Optional LLM config for branching instruction
+            resolution (structured output support)
+    """
+    try:
+        parsed = json.loads(metadata or "")
+    except json.JSONDecodeError:
+        parsed = None
+
+    if parsed is None:
+        if settings.ENV == Environment.LOCAL:
+            logger.warning("Missing/invalid metadata in local; using SCENARIO_SAMPLE.")
+            from scenario_sample import SCENARIO_SAMPLE
+
+            parsed = SCENARIO_SAMPLE
+        else:
+            raise ValueError("Metadata missing or invalid.")
+
+    return RoomMetadataEnvelope.create(
+        parsed,
+        embedding_client=embedding_client,
+        branching_llm_config=branching_llm_config,
+    )
 
 
 # ====================================================================

@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-from app.utils import event_handler as eh
+from app.core.events import handlers as eh
 
 
 class DummyItem:

@@ -19,9 +19,9 @@ from app.core.events.event_types.interruption.interruption_event import (
     set_interruption_detected,
 )
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
+from app.core.logger import get_logger
 from app.core.queue import msg_event_queue
-from app.utils.logger import get_logger
-from app.utils.queue_utils import (
+from app.core.queue.utils import (
     send_deferred_termination_event,
     send_final_score_to_core,
 )
@@ -238,7 +238,7 @@ def setup_interruption_detection(session) -> None:
 
         @session.output.audio.on("playback_finished")
         def on_playback_finished(event: PlaybackFinishedEvent):
-            logger.info(
+            logger.debug(
                 f"LiveKit playback_finished event received: "
                 f"interrupted={event.interrupted}"
             )

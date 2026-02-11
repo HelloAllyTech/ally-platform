@@ -3,7 +3,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.core.graph.graph_builder import build_graph
 from app.core.graph.state import SimulationState
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

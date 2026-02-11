@@ -12,9 +12,9 @@ from app.core.events.base import BaseEvent
 from app.core.events.schemas import CoreEventMessageType
 from app.core.graph.state import BranchingAndFeedbackData, EventFeedback
 from app.core.graph.utils import serialize_event
+from app.core.logger import get_logger
 from app.core.queue import msg_event_queue
 from app.core.scenario.base import TerminationEvent
-from app.utils.logger import get_logger
 
 if TYPE_CHECKING:
     pass

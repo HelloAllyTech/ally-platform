@@ -6,8 +6,8 @@ from livekit.plugins import deepgram
 
 from app.core.config import settings
 from app.core.constants import DEFAULT_STT_CONFIG
+from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -5,13 +5,13 @@ from typing import Any, Dict, Optional
 
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, TTSProvider
+from app.core.logger import get_logger
 from app.tts.base import BaseTTSClient
 from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
 from app.tts.google import GoogleTTSClient
 from app.tts.hume import HumeTTSClient
 from app.tts.sarvam import SarvamTTSClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

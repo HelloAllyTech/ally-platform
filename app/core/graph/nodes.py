@@ -8,6 +8,7 @@ from langchain_core.runnables import RunnableConfig
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
+from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CustomUIEventMessageType
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import BranchingAndFeedbackData, SimulationState
@@ -17,11 +18,10 @@ from app.core.graph.utils import (
     get_live_score,
     is_event_eligible,
 )
+from app.core.logger import logger
 from app.core.scenario.base import Scenario
 from app.llms import create_llm_client
-from app.utils.event_handler import send_event_to_ui
-from app.utils.logger import logger
-from app.utils.timing_utils import TimingContext, time_operation
+from app.utils.time_utils import TimingContext, time_operation
 
 
 def _prepare_event_context(

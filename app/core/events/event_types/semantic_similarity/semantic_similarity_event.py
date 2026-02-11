@@ -15,7 +15,7 @@ from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.semantic_similarity.constants import (
     SEMANTIC_SIMILARITY_THRESHOLD,
 )
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

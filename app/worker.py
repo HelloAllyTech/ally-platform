@@ -9,6 +9,16 @@ from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 
+from app.core.agent.factory import (
+    cleanup_background_tasks,
+    configure_llm_client,
+    configure_stt_client,
+    configure_tts_client,
+    create_agent_with_adapter,
+    initialize_agent_state,
+    parse_room_metadata,
+    should_say_opening_statement,
+)
 from app.core.config import settings
 from app.core.constants import (
     DEFAULT_BRANCHING_LLM_CONFIG,
@@ -18,28 +28,18 @@ from app.core.constants import (
 )
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.scenario.base import Scenario
-from app.llms import BaseLLMClient
-from app.stt import BaseSTTClient
-from app.tts import BaseTTSClient
-from app.utils.agent_utils import (
-    cleanup_background_tasks,
-    configure_llm_client,
-    configure_stt_client,
-    configure_tts_client,
-    create_agent_with_adapter,
-    initialize_agent_state,
-    should_say_opening_statement,
-)
-from app.utils.event_handler import (
+from app.core.events.handlers import (
     create_connection_state_handler,
     create_conversation_handler,
     create_shutdown_handler,
     create_termination_handler,
     setup_interruption_detection,
 )
-from app.utils.logger import get_logger
-from app.utils.metadata_parser import parse_room_metadata
+from app.core.logger import get_logger
+from app.core.scenario.base import Scenario
+from app.llms import BaseLLMClient
+from app.stt import BaseSTTClient
+from app.tts import BaseTTSClient
 
 logger = get_logger(__name__)
 setup_logging(
@@ -126,13 +126,33 @@ class AgentWorker:
         self.llm_client = configure_llm_client(self.scenario)
 
         # Generate and set default voice expression parameters
-        from app.speech_prosody.service import SpeechProsodyService
+        try:
+            logger.info("[AgentWorker] Phase 1: Configuring prosody service...")
+            from app.speech_prosody.service import SpeechProsodyService
 
-        prosody_service = SpeechProsodyService(self.tts_client)
-        await prosody_service.generate_and_set_defaults(
-            scenario=self.scenario,
-            llm_client=self.llm_client,
-        )
+            prosody_service = SpeechProsodyService(self.tts_client)
+            # Add timeout to LLM-dependent prosody configuration
+            await asyncio.wait_for(
+                prosody_service.generate_and_set_defaults(
+                    scenario=self.scenario,
+                    llm_client=self.llm_client,
+                ),
+                timeout=15.0,
+            )
+            logger.info("[AgentWorker] Phase 1: Prosody configuration complete.")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[Speech Prosody] Default generation timed out, using safe defaults"
+            )
+            logger.info(
+                "[AgentWorker] Phase 1: Prosody configuration timed out "
+                "(using defaults)."
+            )
+        except Exception as e:
+            logger.error(f"[AgentWorker] Failed to configure prosody: {e}")
+            logger.info(f"[AgentWorker] Phase 1: Prosody configuration failed: {e}")
+
+        logger.info("[AgentWorker] Configuration phase complete")
         # Get defaults from prosody service (single source of truth)
         defaults = prosody_service.get_default_parameters()
 
@@ -261,6 +281,8 @@ class AgentWorker:
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup
+        # Store for manual invocation in entrypoint
+        self._shutdown_handler = shutdown_handler
 
         self.ctx.add_shutdown_callback(shutdown_handler)
 
@@ -275,14 +297,32 @@ class AgentWorker:
         self._room_disconnected_event = asyncio.Event()
 
         # Start session and connect
-        await self.session.start(
-            room=self.ctx.room,
-            agent=self.agent,
-            room_input_options=RoomInputOptions(
-                noise_cancellation=noise_cancellation.BVC(),
-            ),
-        )
-        await self.ctx.connect()
+        try:
+            logger.info("[AgentWorker] Phase 3: Connecting to room...")
+            await asyncio.wait_for(
+                self.session.start(
+                    # ... (rest of the args identical)
+                    room=self.ctx.room,
+                    agent=self.agent,
+                    room_input_options=RoomInputOptions(
+                        noise_cancellation=noise_cancellation.BVC(),
+                    ),
+                ),
+                timeout=15.0,
+            )
+
+            # Connect to room with timeout
+            logger.info("[AgentWorker] Phase 3: Joining room...")
+            await asyncio.wait_for(self.ctx.connect(), timeout=15.0)
+            logger.info("[AgentWorker] Phase 3: Started and joined room.")
+        except asyncio.TimeoutError:
+            logger.error("[AgentWorker] Connection timed out")
+            logger.info("[AgentWorker] Phase 3: CONNECTION TIMED OUT!")
+            raise
+        except Exception as e:
+            logger.exception(f"[AgentWorker] Failed to start/join room: {e}")
+            logger.info(f"[AgentWorker] Phase 3: Failed to start/join room: {e}")
+            raise
 
         # Setup interruption detection
         setup_interruption_detection(self.session)
@@ -299,6 +339,21 @@ class AgentWorker:
                 random.choice(self.scenario.prompt_data.opening_statements)
             )
             await handler.wait_for_playout()
+
+    async def shutdown(self):
+        """
+        Manually trigger the shutdown sequence.
+
+        This calls the registered shutdown handler which ensures:
+        - Helper tasks are cleaned up
+        - Final scores are sent
+        - Conversation logging is ended
+        """
+        logger.info("[AgentWorker] Manual shutdown triggered")
+        if hasattr(self, "_shutdown_handler") and self._shutdown_handler:
+            await self._shutdown_handler()
+        else:
+            logger.warning("[AgentWorker] No shutdown handler registered!")
 
     async def _handle_termination_in_entrypoint_context(self):
         """
@@ -397,6 +452,7 @@ class AgentWorker:
 
 
 async def entrypoint(ctx: agents.JobContext):
+    logger.info(f"!!! ENTRYPOINT CALLED for job {ctx.job.id} !!!")
     """
     Main agent entrypoint
 
@@ -405,9 +461,13 @@ async def entrypoint(ctx: agents.JobContext):
         await agent.run_from_notebook(entrypoint)
     """
     worker = AgentWorker(ctx)
+    logger.info(f"[AgentWorker] Starting job {ctx.job.id}...")
     await worker.configure()  # Phase 1: Configure clients
+    logger.info(f"[AgentWorker] Job {ctx.job.id} configured.")
     await worker.initialize()  # Phase 2: Create session, agent, orchestrator
+    logger.info(f"[AgentWorker] Job {ctx.job.id} initialized.")
     await worker.start()  # Phase 3: Connect and start
+    logger.info(f"[AgentWorker] Job {ctx.job.id} started.")
 
     # Start background task to handle termination in entrypoint context
     # This allows termination audio to play reliably (runs in main async context)
@@ -433,6 +493,9 @@ async def entrypoint(ctx: agents.JobContext):
     ):
         try:
             # Wait for either termination event or room disconnection
+            logger.info(
+                "[AgentWorker] Waiting for termination or room disconnection..."
+            )
             done, pending = await asyncio.wait(
                 [
                     asyncio.create_task(worker._termination_event.wait()),
@@ -449,12 +512,18 @@ async def entrypoint(ctx: agents.JobContext):
                 except asyncio.CancelledError:
                     pass
 
+            logger.info(f"[AgentWorker] Waiting completed. Done count: {len(done)}")
             logger.info("Entrypoint waiting completed - agent will shutdown")
         except Exception as e:
             logger.exception(f"Error waiting for conversation end: {e}")
+            logger.info(f"[AgentWorker] Error in entrypoint: {e}")
             # Ensure we don't hang if there's an error
             if worker._room_disconnected_event:
                 worker._room_disconnected_event.set()
+        finally:
+            logger.info("[AgentWorker] Triggering shutdown callback...")
+            await worker.shutdown()
+            logger.info("[AgentWorker] Entrypoint returning. Job finished.")
     else:
         logger.warning(
             "Events not initialized - skipping wait. "
@@ -463,6 +532,7 @@ async def entrypoint(ctx: agents.JobContext):
 
 
 def prewarm(proc: JobProcess):
+    logger.info("!!! PREWARM CALLED !!!")
     """Prewarm VAD model for faster startup."""
     proc.userdata["vad"] = silero.VAD.load(
         activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD

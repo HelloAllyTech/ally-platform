@@ -399,7 +399,7 @@ For mocking problems:
 ```python
 # Use proper patch target (where it's imported, not where it's defined)
 @patch('app.utils.metadata_parser.logger')  # Correct
-# Not: @patch('app.utils.logger.get_logger')  # Incorrect
+# Not: @patch('app.core.logger.get_logger')  # Incorrect
 ```
 
 ### Database Test Issues

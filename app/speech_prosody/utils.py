@@ -5,7 +5,7 @@ Utility functions for speech prosody generation.
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.logger import get_logger
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

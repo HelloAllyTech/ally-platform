@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional
 from livekit.plugins import google
 
 from app.core.constants import GoogleSTTConfig
+from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
-from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
