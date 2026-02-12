@@ -13,3 +13,5 @@ export type {
   SkillCoverageItem,
 } from './SessionSkills/SessionSkills';
 export {Reflection} from './Reflection/Reflection';
+export {UpNext} from './UpNext';
+export {SessionGlimpse} from './SessionGlimpse';
