@@ -170,7 +170,7 @@ export const CaseDetailsScreen: React.FC<
       if (response?.id) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: response.id,
-          pathId: caseId,
+          caseId,
           fromLogs: true,
         });
       } else {
@@ -199,6 +199,7 @@ export const CaseDetailsScreen: React.FC<
         scenarioId: selectedSimulation.scenarioId,
         casesSessionItemId: selectedSimulation.sessionId || '',
         languageId,
+        caseId,
       }).finally(() => {
         handleCloseModal();
       });
