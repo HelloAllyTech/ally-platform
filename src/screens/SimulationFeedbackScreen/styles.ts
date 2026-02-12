@@ -34,11 +34,6 @@ export const styles = ScaledSheet.create({
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
   },
-  subTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    color: colors.ds.typography.mediumEmphasis,
-  },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: isIOS ? 'italic' : 'normal',

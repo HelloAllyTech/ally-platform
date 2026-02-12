@@ -24,7 +24,6 @@ import {
   useAppNavigation,
   useHardwareBackPressHandler,
   useSimulationTransition,
-  useStartSimulation,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
@@ -95,6 +94,9 @@ export const SimulationFeedbackScreen: React.FC<
     hasUpcoming,
     canRetryCurrentSession,
     isCurrentSessionCompleted,
+    retrySimulation,
+    startNextSimulation,
+    isStartingSimulation,
   } = useSimulationTransition({
     scenarioSessionId,
     pathId,
@@ -146,8 +148,6 @@ export const SimulationFeedbackScreen: React.FC<
     fetchReviewThreadComments();
   }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
 
-  const {startSimulation, isCreatingRoom: isStartingSimulation} =
-    useStartSimulation();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -360,30 +360,6 @@ export const SimulationFeedbackScreen: React.FC<
     setActiveTab(tabIndex);
   };
 
-  const handleRetrySimulation = () => {
-    const current = currentSession;
-    if (!current || !current.scenarioId || !current.scenarioPathSessionItemId) {
-      return;
-    }
-
-    startSimulation({
-      scenarioId: current.scenarioId,
-      scenarioPathSessionItemId: current.scenarioPathSessionItemId,
-      pathId,
-    });
-  };
-
-  const handleNextSimulation = () => {
-    const next = upcomingScenario;
-    if (next && next.scenarioPathSessionItemId && next.id) {
-      startSimulation({
-        scenarioId: next.id,
-        scenarioPathSessionItemId: next.scenarioPathSessionItemId,
-        pathId,
-      });
-    }
-  };
-
   const renderButtonContainer = () => {
     // For normal simulations (not paths/cases), show "Try Another" button
     if (!pathId && !caseId && !fromLogs) {
@@ -557,8 +533,8 @@ export const SimulationFeedbackScreen: React.FC<
               caseId={caseId}
               onFinish={handleFeedbackAndNavigate}
               onBack={handleFeedbackAndNavigate}
-              onRetry={handleRetrySimulation}
-              onNext={handleNextSimulation}
+              onRetry={retrySimulation}
+              onNext={startNextSimulation}
               isStartingSimulation={isStartingSimulation}
             />
           );
@@ -629,11 +605,6 @@ export const SimulationFeedbackScreen: React.FC<
             {hasScenarioMessagesPermission && (
               <View style={!fromLogs && styles.titleExtraPadding}>
                 {renderTitle()}
-                {fromLogs && simulationDetails?.metadata?.sessionName && (
-                  <Text style={styles.subTitle}>
-                    {simulationDetails.metadata.sessionName}
-                  </Text>
-                )}
               </View>
             )}
           </View>
