@@ -1,33 +1,37 @@
 import React, {useEffect, useState} from 'react';
-import {StyleProp, View, ViewStyle} from 'react-native';
+import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {useToast} from '@/components';
 import {useTranslate} from '@/hooks';
 import {
+  useCreateReviewMutation,
   useLazyGetSimulationDetailsQuery,
   useUpdateReviewStatusMutation,
 } from '@/services';
-import {colors} from '@/theme';
 import {ReviewStatus} from '@/types';
 
 import {PrivacyToggle, SimulationTranscript} from '../';
 
 interface TranscriptTabProps {
   scenarioSessionId?: string;
+  reviewId?: string;
+  setReviewId: (reviewId: string) => void;
 }
 
 export const TranscriptTab: React.FC<TranscriptTabProps> = ({
   scenarioSessionId,
+  reviewId,
+  setReviewId,
 }) => {
   const {t} = useTranslate();
   const {showToast} = useToast();
 
-  const [isPrivate, setIsPrivate] = useState<boolean>(false);
-  const [reviewId, setReviewId] = useState<string | null>(null);
+  const [isPrivate, setIsPrivate] = useState<boolean>(true);
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
+  const [createReview] = useCreateReviewMutation();
   const [updateReviewStatus] = useUpdateReviewStatusMutation();
 
   useEffect(() => {
@@ -45,19 +49,37 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
         setIsPrivate(true);
       }
     }
-  }, [simulationDetails?.reviewId, simulationDetails?.reviewStatus]);
+  }, [
+    setReviewId,
+    simulationDetails?.reviewId,
+    simulationDetails?.reviewStatus,
+  ]);
 
   const handlePrivacyToggle = async (isPrivateValue: boolean) => {
-    if (!reviewId) {
-      return;
-    }
-
     // Optimistically update the UI
     setIsPrivate(isPrivateValue);
 
     try {
+      let currentReviewId = reviewId;
+
+      // If no reviewId exists, create a review first
+      if (!currentReviewId && scenarioSessionId) {
+        const createReviewResponse = await createReview({
+          scenarioSessionId,
+        }).unwrap();
+        currentReviewId = createReviewResponse.id;
+        setReviewId(currentReviewId);
+        return;
+      }
+
+      // If we still don't have a reviewId, something went wrong
+      if (!currentReviewId) {
+        throw new Error('Failed to create or retrieve review ID');
+      }
+
+      // Update the review status
       await updateReviewStatus({
-        reviewId,
+        reviewId: currentReviewId,
         status: {
           status: isPrivateValue ? ReviewStatus.HIDDEN : ReviewStatus.IN_REVIEW,
         },
@@ -88,7 +110,7 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
         startedAt={simulationDetails?.startedAt}
         agentName={simulationDetails?.scenario?.metadata?.name}
       />
-      <View style={styles.privacyToggleContainer as StyleProp<ViewStyle>}>
+      <View style={styles.privacyToggleContainer}>
         <PrivacyToggle isPrivate={isPrivate} onToggle={handlePrivacyToggle} />
       </View>
     </>
@@ -98,19 +120,8 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
 const styles = ScaledSheet.create({
   privacyToggleContainer: {
     position: 'absolute',
-    bottom: '20@vs',
-    right: '20@ms',
-    zIndex: 1000,
-    backgroundColor: colors.white,
-    borderRadius: '24@ms',
-    padding: '4@ms',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    bottom: '30@vs',
+    left: 0,
+    right: 0,
   },
 });
