@@ -105,15 +105,22 @@ export const simulationsApi = api.injectEndpoints({
       {
         scenarioId: number;
         scenarioPathSessionItemId?: string;
+        caseSessionItemId?: string;
         languageId?: number;
       }
     >({
-      query: ({scenarioId, scenarioPathSessionItemId, languageId}) => ({
+      query: ({
+        scenarioId,
+        scenarioPathSessionItemId,
+        caseSessionItemId,
+        languageId,
+      }) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
         body: {
           scenarioId,
           ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
+          ...(caseSessionItemId && {caseSessionItemId}),
           ...(languageId && {languageId}),
         },
       }),

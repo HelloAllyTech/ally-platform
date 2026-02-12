@@ -19,21 +19,17 @@ import {
   SessionChecklist,
   useToast,
 } from '@/components';
-import {
-  SCREEN_NAMES,
-  SimulationEventStatus,
-  USER_PERMISSIONS,
-} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
+  useSimulationTransition,
   useStartSimulation,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
   useCreateReviewMutation,
-  useGetUpcomingScenarioQuery,
   useLazyGetReactionsCountQuery,
   useLazyGetSimulationDetailsQuery,
   useUpdateReviewStatusMutation,
@@ -41,7 +37,7 @@ import {
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
-import {ReviewStatus, SessionItemStatus} from '@/types';
+import {ReviewStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
@@ -74,8 +70,6 @@ export const SimulationFeedbackScreen: React.FC<
   const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
-  const [pollingInterval, setPollingInterval] = useState<number>(3000);
-  const nextSimulationPollingAttemptsRef = useRef<number>(0);
 
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
@@ -91,35 +85,27 @@ export const SimulationFeedbackScreen: React.FC<
     getSimulationDetails,
     {data: simulationDetails, isLoading: isSimulationDetailsLoading},
   ] = useLazyGetSimulationDetailsQuery();
-  const {data: upcomingData, fulfilledTimeStamp} = useGetUpcomingScenarioQuery(
-    {scenarioSessionId: scenarioSessionId || ''},
-    {
-      skip: !scenarioSessionId || !pathId,
-      pollingInterval,
-    },
-  );
+
+  // Use the simulation transition hook for upcoming scenario data
+  const {
+    currentSession,
+    upcomingScenario,
+    isEventCompleted,
+    isPathCompleted,
+    hasUpcoming,
+    canRetryCurrent,
+    isCurrentSessionCompleted,
+  } = useSimulationTransition({
+    scenarioSessionId,
+    pathId,
+    caseId,
+    enabled: !!(pathId || caseId),
+  });
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
 
   const {showToast} = useToast();
-
-  useEffect(() => {
-    if (
-      upcomingData?.currentSession?.eventStatus ===
-        SimulationEventStatus.COMPLETED ||
-      nextSimulationPollingAttemptsRef.current >= RETRY_COUNT_LIMIT
-    ) {
-      setPollingInterval(0);
-    } else {
-      nextSimulationPollingAttemptsRef.current += 1;
-    }
-  }, [upcomingData, fulfilledTimeStamp]);
-
-  useEffect(() => {
-    setPollingInterval(RETRY_DELAY);
-    nextSimulationPollingAttemptsRef.current = 0;
-  }, [scenarioSessionId]);
 
   useEffect(() => {
     if (simulationDetails?.details?.summary?.errorMessage) {
@@ -159,18 +145,6 @@ export const SimulationFeedbackScreen: React.FC<
     };
     fetchReviewThreadComments();
   }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
-
-  const upcomingScenario = upcomingData?.upcomingScenario;
-  const currentSession = upcomingData?.currentSession;
-  const hasUpcoming = !!upcomingScenario;
-  const isCurrentSessionCompleted =
-    currentSession?.scenarioPathSessionItemStatus ===
-    SessionItemStatus.COMPLETED;
-  const canRetryCurrent =
-    !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
-  const isPathCompleted = !!currentSession?.isScenarioPathSessionCompleted;
-  const isEventCompleted =
-    currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
 
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();

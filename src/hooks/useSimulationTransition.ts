@@ -109,12 +109,21 @@ export const useSimulationTransition = ({
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
+  // Support both path and case fields
+  const sessionItemStatus = isCase
+    ? currentSession?.caseSessionItemStatus
+    : currentSession?.scenarioPathSessionItemStatus;
+  const sessionItemId = isCase
+    ? currentSession?.caseSessionItemId
+    : currentSession?.scenarioPathSessionItemId;
+  const isSessionCompleted = isCase
+    ? currentSession?.isCaseSessionCompleted
+    : currentSession?.isScenarioPathSessionCompleted;
+
   const isCurrentSessionCompleted =
-    currentSession?.scenarioPathSessionItemStatus ===
-    SessionItemStatus.COMPLETED;
-  const canRetryCurrent =
-    !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
-  const isPathCompleted = !!currentSession?.isScenarioPathSessionCompleted;
+    sessionItemStatus === SessionItemStatus.COMPLETED;
+  const canRetryCurrent = !!sessionItemId && !isCurrentSessionCompleted;
+  const isPathCompleted = !!isSessionCompleted;
   const isEventCompleted =
     currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
 

@@ -168,8 +168,10 @@ export interface UpNextSimulation {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   scenarioPathSessionItemStatus?: SessionItemStatus;
+  caseSessionItemStatus?: SessionItemStatus;
   order?: number;
   scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
 }
 
 export interface CurrentSessionInfo {
@@ -179,11 +181,15 @@ export interface CurrentSessionInfo {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   scenarioPathSessionItemStatus?: SessionItemStatus;
+  caseSessionItemStatus?: SessionItemStatus;
   scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
   transitionMessageTitle?: string;
   transitionMessageContent?: string;
   isScenarioPathSessionCompleted?: boolean;
+  isCaseSessionCompleted?: boolean;
   eventStatus?: string;
+  sessionGlimpse?: string;
 }
 
 export interface UpcomingScenarioResponse {

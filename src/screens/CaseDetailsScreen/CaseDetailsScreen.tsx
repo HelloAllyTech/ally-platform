@@ -197,7 +197,7 @@ export const CaseDetailsScreen: React.FC<
       const languageId = languageMap.get(selectedLanguage);
       startSimulation({
         scenarioId: selectedSimulation.scenarioId,
-        casesSessionItemId: selectedSimulation.sessionId || '',
+        caseSessionItemId: selectedSimulation.sessionId || '',
         languageId,
         caseId,
       }).finally(() => {
