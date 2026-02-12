@@ -158,7 +158,7 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
-    CASES: '/learn/case-sessions',
+    CASES: '/learn/cases',
     CASE_DETAILS: (caseId: string) => `/learn/cases/${caseId}`,
     CREATE_CASE_SESSION: (caseId: string) =>
       `/learn/cases/${caseId}/create-session`,
