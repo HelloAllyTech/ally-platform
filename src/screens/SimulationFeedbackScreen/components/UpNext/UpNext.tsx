@@ -7,6 +7,7 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily, radius} from '@/theme';
 import {CurrentSessionInfo, UpNextSimulation} from '@/types';
 
+import {SessionGlimpse} from '../SessionGlimpse';
 import {SummaryCard} from '../SummaryCard';
 
 interface UpNextProps {
@@ -105,6 +106,11 @@ export const UpNext: React.FC<UpNextProps> = ({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
       <SummaryCard title={t('SimulationFeedback.tabs.upNext')}>
+        {/* Session Glimpse - only for cases */}
+        {caseId && currentSession?.sessionGlimpse && (
+          <SessionGlimpse content={currentSession.sessionGlimpse} />
+        )}
+
         <SimulationTransitionSection
           currentSession={currentSession}
           upcomingScenario={upcomingScenario}

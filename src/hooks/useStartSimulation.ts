@@ -12,7 +12,7 @@ import {useTranslate} from './useTranslate';
 interface StartSimulationParams {
   scenarioId: number;
   scenarioPathSessionItemId?: string;
-  casesSessionItemId?: string;
+  caseSessionItemId?: string;
   pathId?: string;
   caseId?: string;
   languageId?: number;
@@ -98,8 +98,8 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         ...(params.scenarioPathSessionItemId && {
           scenarioPathSessionItemId: params.scenarioPathSessionItemId,
         }),
-        ...(params.casesSessionItemId && {
-          casesSessionItemId: params.casesSessionItemId,
+        ...(params.caseSessionItemId && {
+          caseSessionItemId: params.caseSessionItemId,
         }),
         ...(params.languageId && {languageId: params.languageId}),
       }).unwrap();
