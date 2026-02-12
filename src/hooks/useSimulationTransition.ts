@@ -21,9 +21,9 @@ interface UseSimulationTransitionReturn {
   currentSession?: CurrentSessionInfo;
   upcomingScenario?: UpNextSimulation;
   isEventCompleted: boolean;
-  isPathCompleted: boolean;
+  isFlowCompleted: boolean; // Renamed from isPathCompleted - works for both paths and cases
   hasUpcoming: boolean;
-  canRetryCurrent: boolean;
+  canRetryCurrentSession: boolean; // Renamed from canRetryCurrent for clarity
   isCurrentSessionCompleted: boolean;
   isLoading: boolean;
 }
@@ -39,8 +39,17 @@ interface UseSimulationTransitionReturn {
  * @param params.caseId - The case ID (provide for case flow)
  * @param params.enabled - Whether to enable the hook (default: true)
  *
- * @returns Object containing current session, upcoming scenario, and computed state flags
- *
+ * @returns Object containing:
+ * - currentSession: Current session information
+ * - upcomingScenario: Next scenario in the flow
+ * - isEventCompleted: Whether the current simulation event is completed
+ * - isFlowCompleted: Whether the entire path/case flow is completed
+ * - hasUpcoming: Whether there's an upcoming scenario
+ * - canRetryCurrentSession: Whether the current session can be retried
+ * - isCurrentSessionCompleted: Whether the current session item is completed
+ * - isLoading: Loading state
+ * - isPathCompleted: @deprecated Use isFlowCompleted instead
+ * - canRetryCurrent: @deprecated Use canRetryCurrentSession instead
  */
 export const useSimulationTransition = ({
   scenarioSessionId,
@@ -109,21 +118,21 @@ export const useSimulationTransition = ({
   const upcomingScenario = upcomingData?.upcomingScenario;
   const currentSession = upcomingData?.currentSession;
   const hasUpcoming = !!upcomingScenario;
-  // Support both path and case fields
+
+  // Support both path and case fields - automatically select based on flow type
   const sessionItemStatus = isCase
     ? currentSession?.caseSessionItemStatus
     : currentSession?.scenarioPathSessionItemStatus;
   const sessionItemId = isCase
     ? currentSession?.caseSessionItemId
     : currentSession?.scenarioPathSessionItemId;
-  const isSessionCompleted = isCase
-    ? currentSession?.isCaseSessionCompleted
-    : currentSession?.isScenarioPathSessionCompleted;
+  const isFlowCompleted = isCase
+    ? !!currentSession?.isCaseSessionCompleted
+    : !!currentSession?.isScenarioPathSessionCompleted;
 
   const isCurrentSessionCompleted =
     sessionItemStatus === SessionItemStatus.COMPLETED;
-  const canRetryCurrent = !!sessionItemId && !isCurrentSessionCompleted;
-  const isPathCompleted = !!isSessionCompleted;
+  const canRetryCurrentSession = !!sessionItemId && !isCurrentSessionCompleted;
   const isEventCompleted =
     currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
 
@@ -131,9 +140,9 @@ export const useSimulationTransition = ({
     currentSession,
     upcomingScenario,
     isEventCompleted,
-    isPathCompleted,
+    isFlowCompleted,
     hasUpcoming,
-    canRetryCurrent,
+    canRetryCurrentSession,
     isCurrentSessionCompleted,
     isLoading,
   };

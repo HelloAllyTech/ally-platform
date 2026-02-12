@@ -5,7 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily, typography} from '@/theme';
 
 interface SummaryCardProps {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
 }
@@ -17,7 +17,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={styles.title}>{title}</Text>
+      {!!title && <Text style={styles.title}>{title}</Text>}
       {children}
     </View>
   );
@@ -47,6 +47,6 @@ const styles = ScaledSheet.create({
     letterSpacing: '0.25@ms',
     borderBottomWidth: '0.5@ms',
     borderBottomColor: colors.ds.stroke.primary,
-    paddingBottom: '16@vs',
+    paddingBottom: '14@vs',
   },
 });
