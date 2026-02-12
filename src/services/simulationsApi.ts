@@ -184,7 +184,7 @@ export const simulationsApi = api.injectEndpoints({
       {scenarioSessionId: string}
     >({
       query: ({scenarioSessionId}) => ({
-        url: API_ROUTES.LEARN.UPCOMING_SCENARIO(scenarioSessionId),
+        url: API_ROUTES.LEARN.UPCOMING_PATH_SCENARIO(scenarioSessionId),
         method: API_METHODS.GET,
       }),
     }),
