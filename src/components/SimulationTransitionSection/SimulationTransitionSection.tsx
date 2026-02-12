@@ -11,9 +11,9 @@ interface SimulationTransitionSectionProps {
   currentSession?: CurrentSessionInfo;
   upcomingScenario?: UpNextSimulation;
   isEventCompleted: boolean;
-  isPathCompleted: boolean;
+  isFlowCompleted: boolean;
   hasUpcoming: boolean;
-  canRetryCurrent: boolean;
+  canRetryCurrentSession: boolean;
   isCurrentSessionCompleted: boolean;
   almostThereTitle?: string;
   almostThereDescription?: string;
@@ -25,9 +25,9 @@ export const SimulationTransitionSection: React.FC<
   currentSession,
   upcomingScenario,
   isEventCompleted,
-  isPathCompleted,
+  isFlowCompleted,
   hasUpcoming,
-  canRetryCurrent,
+  canRetryCurrentSession,
   isCurrentSessionCompleted,
   almostThereTitle,
   almostThereDescription,
@@ -56,7 +56,7 @@ export const SimulationTransitionSection: React.FC<
       )}
 
       {/* Almost there retry message */}
-      {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
+      {!isFlowCompleted && !hasUpcoming && canRetryCurrentSession && (
         <>
           {almostThereTitle && (
             <Text style={styles.transitionMessageTitle}>

@@ -1,14 +1,14 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import type {ThemeMode} from '@/types';
 
 const lightTheme = {
   background: colors.white,
   borderColor: colors.lightGray14,
-  activeBorderColor: '#4F46E5', // Primary blue color for active tab
-  textColor: '#9CA3AF', // Light gray for inactive tabs
-  activeTextColor: '#4F46E5', // Primary blue for active tab text
+  activeBorderColor: colors.black,
+  textColor: colors.lightGray3,
+  activeTextColor: colors.darkSlate,
 };
 
 const darkTheme = {
@@ -53,15 +53,13 @@ export const getThemedStyles = (colorScheme: ThemeMode | null) => {
       borderBottomColor: theme.activeBorderColor,
     },
     tabText: {
-      ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-      fontSize: '14@ms',
-      lineHeight: '20@ms',
+      ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+      ...typography.body.small,
       color: theme.textColor,
       textAlign: 'center',
       fontWeight: '400',
     },
     activeTabText: {
-      ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
       color: theme.activeTextColor,
       fontWeight: '500',
     },

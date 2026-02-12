@@ -14,9 +14,9 @@ interface UpNextProps {
   currentSession?: CurrentSessionInfo;
   upcomingScenario?: UpNextSimulation;
   isEventCompleted: boolean;
-  isPathCompleted: boolean;
+  isFlowCompleted: boolean;
   hasUpcoming: boolean;
-  canRetryCurrent: boolean;
+  canRetryCurrentSession: boolean;
   isCurrentSessionCompleted: boolean;
   pathId?: string;
   caseId?: string;
@@ -31,9 +31,9 @@ export const UpNext: React.FC<UpNextProps> = ({
   currentSession,
   upcomingScenario,
   isEventCompleted,
-  isPathCompleted,
+  isFlowCompleted,
   hasUpcoming,
-  canRetryCurrent,
+  canRetryCurrentSession,
   isCurrentSessionCompleted,
   pathId,
   caseId,
@@ -56,7 +56,7 @@ export const UpNext: React.FC<UpNextProps> = ({
     }
 
     // Path/Case completed: show a single Finish button
-    if (isPathCompleted) {
+    if (isFlowCompleted) {
       return (
         <View style={styles.buttonContainer}>
           <PrimaryButton
@@ -79,7 +79,7 @@ export const UpNext: React.FC<UpNextProps> = ({
             <Text style={styles.backButtonText}>{t('Common.back')}</Text>
           </TouchableOpacity>
           {/* Show either Retry or Next, but never both */}
-          {!hasUpcoming && canRetryCurrent && (
+          {!hasUpcoming && canRetryCurrentSession && (
             <PrimaryButton
               label={t('CallSummaryProgress.retry')}
               onPress={onRetry}
@@ -115,9 +115,9 @@ export const UpNext: React.FC<UpNextProps> = ({
           currentSession={currentSession}
           upcomingScenario={upcomingScenario}
           isEventCompleted={isEventCompleted}
-          isPathCompleted={isPathCompleted}
+          isFlowCompleted={isFlowCompleted}
           hasUpcoming={hasUpcoming}
-          canRetryCurrent={canRetryCurrent}
+          canRetryCurrentSession={canRetryCurrentSession}
           isCurrentSessionCompleted={isCurrentSessionCompleted}
           almostThereTitle={t('SimulationFeedback.almostThereTitle')}
           almostThereDescription={t(

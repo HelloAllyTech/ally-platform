@@ -91,9 +91,9 @@ export const SimulationFeedbackScreen: React.FC<
     currentSession,
     upcomingScenario,
     isEventCompleted,
-    isPathCompleted,
+    isFlowCompleted,
     hasUpcoming,
-    canRetryCurrent,
+    canRetryCurrentSession,
     isCurrentSessionCompleted,
   } = useSimulationTransition({
     scenarioSessionId,
@@ -549,9 +549,9 @@ export const SimulationFeedbackScreen: React.FC<
               currentSession={currentSession}
               upcomingScenario={upcomingScenario}
               isEventCompleted={isEventCompleted}
-              isPathCompleted={isPathCompleted}
+              isFlowCompleted={isFlowCompleted}
               hasUpcoming={hasUpcoming}
-              canRetryCurrent={canRetryCurrent}
+              canRetryCurrentSession={canRetryCurrentSession}
               isCurrentSessionCompleted={isCurrentSessionCompleted}
               pathId={pathId}
               caseId={caseId}
@@ -653,6 +653,9 @@ export const SimulationFeedbackScreen: React.FC<
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={handleTabChange}
+            activeTabTextColor={colors.ds.theme.primary}
+            inactiveTabTextColor={colors.ds.typography.lowEmphasis}
+            activeTabBorderColor={colors.ds.theme.primary}
           />
         </View>
       )}

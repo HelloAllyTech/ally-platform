@@ -45,9 +45,9 @@ describe('useSimulationTransition', () => {
     expect(result.current.currentSession).toBeUndefined();
     expect(result.current.upcomingScenario).toBeUndefined();
     expect(result.current.isEventCompleted).toBe(false);
-    expect(result.current.isPathCompleted).toBe(false);
+    expect(result.current.isFlowCompleted).toBe(false);
     expect(result.current.hasUpcoming).toBe(false);
-    expect(result.current.canRetryCurrent).toBe(false);
+    expect(result.current.canRetryCurrentSession).toBe(false);
     expect(result.current.isCurrentSessionCompleted).toBe(false);
     expect(result.current.isLoading).toBe(true);
   });
@@ -85,9 +85,9 @@ describe('useSimulationTransition', () => {
     expect(result.current.currentSession).toEqual(mockData.currentSession);
     expect(result.current.upcomingScenario).toEqual(mockData.upcomingScenario);
     expect(result.current.isEventCompleted).toBe(true);
-    expect(result.current.isPathCompleted).toBe(false);
+    expect(result.current.isFlowCompleted).toBe(false);
     expect(result.current.hasUpcoming).toBe(true);
-    expect(result.current.canRetryCurrent).toBe(false);
+    expect(result.current.canRetryCurrentSession).toBe(false);
     expect(result.current.isCurrentSessionCompleted).toBe(true);
     expect(result.current.isLoading).toBe(false);
   });
@@ -117,7 +117,7 @@ describe('useSimulationTransition', () => {
       }),
     );
 
-    expect(result.current.canRetryCurrent).toBe(true);
+    expect(result.current.canRetryCurrentSession).toBe(true);
     expect(result.current.isCurrentSessionCompleted).toBe(false);
   });
 
@@ -146,7 +146,7 @@ describe('useSimulationTransition', () => {
       }),
     );
 
-    expect(result.current.isPathCompleted).toBe(true);
+    expect(result.current.isFlowCompleted).toBe(true);
   });
 
   it('should skip query when enabled is false', () => {
