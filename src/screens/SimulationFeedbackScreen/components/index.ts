@@ -6,3 +6,8 @@ export {UpNextSimulationCard} from './UpNextSimulationCard';
 export {SimulationAudioPlayer} from './SimulationAudioPlayer/SimulationAudioPlayer';
 export {PrivacyToggle} from './PrivacyToggle/PrivacyToggle';
 export {AskAI} from './AskAI/AskAI';
+export {SessionSkills} from './SessionSkills/SessionSkills';
+export type {
+  SessionSkillsProps,
+  SkillCoverageItem,
+} from './SessionSkills/SessionSkills';

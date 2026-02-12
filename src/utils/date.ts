@@ -125,6 +125,15 @@ export const formatTimeToMMSS = (ms: number): string => {
     .padStart(2, '0')}`;
 };
 
+export const formatSecondsToMMSS = (s: number): string => {
+  const minutes = Math.floor(s / 60);
+  const seconds = s % 60;
+
+  return `${minutes.toString().padStart(2, '0')}.${seconds
+    .toString()
+    .padStart(2, '0')}`;
+};
+
 const SECONDS_IN = {
   year: 31536000,
   month: 2592000,
