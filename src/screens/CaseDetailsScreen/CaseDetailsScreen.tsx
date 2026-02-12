@@ -145,7 +145,7 @@ export const CaseDetailsScreen: React.FC<
   };
 
   const handleSimulationPress = async (scenario: CaseSimulation) => {
-    if (!data || !data.scenarioPathSessionId) {
+    if (!data || !data.caseSessionId) {
       await checkAndCreateSession();
       return;
     }
