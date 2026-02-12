@@ -241,8 +241,8 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Switch to transcript tab by clicking on the transcription tab (index 2)
-    const transcriptionTab = getByTestId('tab-2');
+    // Switch to transcript tab by clicking on the transcription tab (index 1)
+    const transcriptionTab = getByTestId('tab-1');
     fireEvent.press(transcriptionTab);
     // Transcript should render after clicking the transcription tab
     await waitFor(() => {

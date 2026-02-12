@@ -46,7 +46,6 @@ import {ReviewStatus, SessionItemStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
 import {
-  AskAI,
   PrivacyToggle,
   Reflection,
   SessionSkills,
@@ -558,10 +557,11 @@ export const SimulationFeedbackScreen: React.FC<
           </KeyboardAwareScrollView>
         );
 
-      case 1: // Ask AI
-        return <AskAI />;
+      // TODO: Change the index of  Ask AI and Transcription after all the tabs are enabled
+      // case 1: // Ask AI
+      //   return <AskAI />;
 
-      case 2: // Transcription
+      case 1: // Transcription
         if (scenarioSessionId) {
           return (
             <>
@@ -657,32 +657,33 @@ export const SimulationFeedbackScreen: React.FC<
     }
   };
 
+  // TODO: Uncomment the tabs after all the tabs are enabled
   const tabs = useMemo(
     () => [
       {
         key: 'summary',
         title: t('SimulationFeedback.tabs.summary'),
       },
-      {
-        key: 'askAI',
-        title: t('SimulationFeedback.tabs.askAI'),
-      },
+      // {
+      //   key: 'askAI',
+      //   title: t('SimulationFeedback.tabs.askAI'),
+      // },
       {
         key: 'transcription',
         title: t('SimulationFeedback.tabs.transcription'),
       },
-      {
-        key: 'checklist',
-        title: t('SimulationFeedback.tabs.checklist'),
-      },
-      {
-        key: 'skills',
-        title: t('SimulationFeedback.tabs.skills'),
-      },
-      {
-        key: 'reflection',
-        title: t('SimulationFeedback.tabs.reflection'),
-      },
+      // {
+      //   key: 'checklist',
+      //   title: t('SimulationFeedback.tabs.checklist'),
+      // },
+      // {
+      //   key: 'skills',
+      //   title: t('SimulationFeedback.tabs.skills'),
+      // },
+      // {
+      //   key: 'reflection',
+      //   title: t('SimulationFeedback.tabs.reflection'),
+      // },
     ],
     [t],
   );
