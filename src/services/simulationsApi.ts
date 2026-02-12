@@ -201,17 +201,6 @@ export const simulationsApi = api.injectEndpoints({
       }),
     }),
 
-    // ============================================
-    // CASES API - Currently using scenario-paths endpoints (same as Tracks)
-    // TODO: Replace with dedicated /learn/scenario-cases endpoints when backend is ready
-    // Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/api/learn.ts)
-    // ============================================
-
-    /**
-     * Get all cases
-     * Currently fetches from scenario-paths endpoint (same as Tracks)
-     * TODO: Update to dedicated cases endpoint when backend API is available
-     */
     getCases: builder.query<Case[], void>({
       query: () => ({
         url: API_ROUTES.LEARN.CASES,
@@ -221,11 +210,6 @@ export const simulationsApi = api.injectEndpoints({
       providesTags: ['Cases'],
     }),
 
-    /**
-     * Get case details by ID
-     * Currently fetches from scenario-paths endpoint (same as Tracks)
-     * TODO: Update to dedicated cases endpoint when backend API is available
-     */
     getCaseDetails: builder.query<CaseDetails, {caseId: string}>({
       query: ({caseId}) => ({
         url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
@@ -238,11 +222,6 @@ export const simulationsApi = api.injectEndpoints({
       providesTags: ['CaseDetails'],
     }),
 
-    /**
-     * Create a case session to start a case
-     * Currently uses scenario-paths create-session endpoint (same as Tracks)
-     * TODO: Update to dedicated cases endpoint when backend API is available
-     */
     createCaseSession: builder.mutation<
       {caseSessionItemId: string},
       {caseId: string}
@@ -254,11 +233,16 @@ export const simulationsApi = api.injectEndpoints({
       invalidatesTags: ['CaseDetails', 'Cases'],
     }),
 
-    /**
-     * Get scenario session by case session item ID
-     * Currently uses scenario-path-session-item endpoint (same as Tracks)
-     * TODO: Update to dedicated case-session-item endpoint when backend API is available
-     */
+    getUpcomingCaseScenario: builder.query<
+      UpcomingScenarioResponse | null,
+      {scenarioSessionId: string}
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: API_ROUTES.LEARN.UPCOMING_CASE_SCENARIO(scenarioSessionId),
+        method: API_METHODS.GET,
+      }),
+    }),
+
     getScenarioSessionByCaseItem: builder.query<
       {id: string},
       {caseSessionItemId: string}
@@ -291,5 +275,7 @@ export const {
   useGetCasesQuery,
   useGetCaseDetailsQuery,
   useCreateCaseSessionMutation,
+  useGetUpcomingCaseScenarioQuery,
+  useLazyGetUpcomingCaseScenarioQuery,
   useLazyGetScenarioSessionByCaseItemQuery,
 } = simulationsApi;

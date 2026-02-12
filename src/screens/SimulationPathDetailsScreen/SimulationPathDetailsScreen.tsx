@@ -183,7 +183,6 @@ export const SimulationPathDetailsScreen: React.FC<
         navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: response.id,
           pathId,
-          contextType: LearningPathType.TRACK,
           fromLogs: true,
         });
       } else {
@@ -214,13 +213,12 @@ export const SimulationPathDetailsScreen: React.FC<
     setShowNotification(false);
     if (selectedSimulation) {
       const languageId = languageMap.get(selectedLanguage);
-      startSimulation(
-        selectedSimulation.scenarioId,
-        selectedSimulation.sessionId || undefined,
+      startSimulation({
+        scenarioId: selectedSimulation.scenarioId,
+        scenarioPathSessionItemId: selectedSimulation.sessionId || undefined,
         pathId,
         languageId,
-        LearningPathType.TRACK,
-      ).finally(() => {
+      }).finally(() => {
         handleCloseModal();
       });
     }
