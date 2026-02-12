@@ -9,6 +9,8 @@ import {colors, fontFamily, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
+import {SummaryCard} from '../SummaryCard';
+
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
 }
@@ -107,10 +109,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
     (data?.scenario as {coverImageUrl?: string})?.coverImageUrl || undefined;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.summaryTitle}>
-        {t('SimulationFeedback.sessionFeedback')}
-      </Text>
+    <SummaryCard title={t('SimulationFeedback.sessionFeedback')}>
       <View style={styles.headerContainer}>
         {coverImageUrl && (
           <Image
@@ -173,36 +172,11 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
         headerTitle={data?.scenario?.title}
         fitContent
       />
-    </View>
+    </SummaryCard>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    marginVertical: '10@vs',
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.stroke.primary,
-    padding: '16@ms',
-    borderRadius: '8@ms',
-    backgroundColor: colors.white,
-    shadowColor: colors.ds.grey[900],
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  summaryTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    fontSize: '14@ms',
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '16@vs',
-    letterSpacing: '0.25@ms',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.primary,
-    paddingBottom: '16@vs',
-  },
   section: {
     paddingBottom: '12@vs',
     marginBottom: '16@vs',

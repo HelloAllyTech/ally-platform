@@ -7,6 +7,7 @@ export {SimulationAudioPlayer} from './SimulationAudioPlayer/SimulationAudioPlay
 export {PrivacyToggle} from './PrivacyToggle/PrivacyToggle';
 export {AskAI} from './AskAI/AskAI';
 export {SessionSkills} from './SessionSkills/SessionSkills';
+export {SummaryCard} from './SummaryCard';
 export type {
   SessionSkillsProps,
   SkillCoverageItem,

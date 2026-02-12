@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, FlatList, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
@@ -10,6 +10,7 @@ import {colors, fontFamily} from '@/theme';
 import {SimulationTranscriptMessage} from '@/types';
 
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
+import {SummaryCard} from '../SummaryCard';
 
 export const SimulationTranscript: React.FC<{
   sessionId: string;
@@ -100,13 +101,9 @@ export const SimulationTranscript: React.FC<{
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>
-          {t('SimulationFeedback.annotatedTranscription')}
-        </Text>
-      </View>
-      <View style={styles.divider} />
+    <SummaryCard
+      title={t('SimulationFeedback.annotatedTranscription')}
+      containerStyle={styles.container}>
       <FlatList
         contentContainerStyle={styles.contentContainer}
         ref={listRef}
@@ -138,42 +135,13 @@ export const SimulationTranscript: React.FC<{
           }, 100);
         }}
       />
-    </View>
+    </SummaryCard>
   );
 };
 
 const styles = ScaledSheet.create({
   container: {
-    flex: 1,
-    marginVertical: '10@vs',
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.stroke.primary,
-    padding: '16@ms',
-    borderRadius: '8@ms',
-    backgroundColor: colors.white,
-    shadowColor: colors.ds.grey[900],
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
     marginHorizontal: '10@ms',
-  },
-  titleContainer: {
-    width: '100%',
-    marginBottom: '16@vs',
-  },
-  title: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.ds.typography.highEmphasis,
-    letterSpacing: '0.25@ms',
-    lineHeight: '20@vs',
-  },
-  divider: {
-    height: '0.5@ms',
-    backgroundColor: colors.ds.stroke.primary,
-    width: '100%',
-    marginBottom: '16@vs',
   },
   placeholder: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

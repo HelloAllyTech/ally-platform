@@ -6,6 +6,8 @@ import {ChartComponent, ProgressBar} from '@/components';
 import {colors, fontFamily, typography} from '@/theme';
 import {formatTimeToMMSS} from '@/utils/date';
 
+import {SummaryCard} from '../SummaryCard';
+
 const NUM_X_AXIS_INTERVALS = 5;
 
 /** Raw input dataset with {x, y} data points (before normalisation for the chart). */
@@ -195,11 +197,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
-      <View style={styles.container}>
-        {/* Section Title */}
-        <Text style={styles.sectionTitle}>Skills shown in this session</Text>
-        <View style={styles.divider} />
-
+      <SummaryCard title="Skills shown in this session">
         {/* Skill Coverage Card */}
         {skillCoverage.length > 0 && (
           <View style={styles.card}>
@@ -240,7 +238,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             </View>
           </View>
         )}
-      </View>
+      </SummaryCard>
     </ScrollView>
   );
 };
@@ -253,29 +251,6 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
     paddingHorizontal: '10@ms',
     paddingBottom: '40@vs',
-  },
-  container: {
-    marginVertical: '10@vs',
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.stroke.primary,
-    padding: '16@ms',
-    borderRadius: '8@ms',
-    backgroundColor: colors.white,
-    shadowColor: colors.ds.grey[900],
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  sectionTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.large,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '12@vs',
-  },
-  divider: {
-    height: '0.5@ms',
-    backgroundColor: colors.ds.stroke.primary,
-    marginBottom: '16@vs',
   },
   card: {
     borderWidth: '0.5@ms',
