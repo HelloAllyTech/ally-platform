@@ -54,6 +54,7 @@ export const SimulationFeedbackScreen: React.FC<
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
+
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
 
@@ -225,6 +226,8 @@ export const SimulationFeedbackScreen: React.FC<
       case TabKey.TRANSCRIPTION:
         return (
           <TranscriptTab
+            isPrivate={isPrivate}
+            setIsPrivate={setIsPrivate}
             reviewId={reviewId}
             setReviewId={setReviewId}
             scenarioSessionId={scenarioSessionId}
