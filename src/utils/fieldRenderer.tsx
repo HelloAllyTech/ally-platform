@@ -153,6 +153,7 @@ export function renderField(
                       setIsOpen={(open: boolean) =>
                         onDropdownToggle?.(field.key, open)
                       }
+                      modalTranslateX="-50%"
                     />
                   </View>
                 )

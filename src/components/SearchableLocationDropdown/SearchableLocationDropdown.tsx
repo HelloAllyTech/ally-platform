@@ -32,6 +32,7 @@ interface SearchableLocationDropdownProps {
   disabled?: boolean;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  modalTranslateX?: `${number}%` | number; // Optional translateX transform for modal dropdown positioning (e.g., '-50%')
 }
 
 export const SearchableLocationDropdown: React.FC<
@@ -45,6 +46,7 @@ export const SearchableLocationDropdown: React.FC<
     isOpen,
     setIsOpen,
     placeholder = t('LocationDropdown.placeholder'),
+    modalTranslateX,
   } = props;
   const [searchQuery, setSearchQuery] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
@@ -315,7 +317,16 @@ export const SearchableLocationDropdown: React.FC<
         <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.modalDropdown, getModalPositioning()]}>
+              <View
+                style={[
+                  styles.modalDropdown,
+                  getModalPositioning(),
+                  modalTranslateX
+                    ? {
+                        transform: [{translateX: modalTranslateX}],
+                      }
+                    : null,
+                ]}>
                 <View style={styles.searchContainer}>
                   <SearchIcon
                     width={16}

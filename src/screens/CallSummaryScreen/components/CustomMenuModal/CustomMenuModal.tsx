@@ -1,45 +1,30 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, Linking, Text, TouchableOpacity, View} from 'react-native';
+import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ArchiveIcon, ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
-import {env} from '@/config/env';
-import {isIOS, PRIVACY_POLICY_URL, SCREEN_WIDTH} from '@/constants/general';
-import {useTranslate} from '@/hooks';
+import {isIOS, SCREEN_WIDTH} from '@/constants/general';
 import {colors, fontFamily} from '@/theme';
+
+export interface CustomMenuModalOption {
+  label: string;
+  iconRight: React.ReactNode;
+  onPress: () => void;
+}
 
 interface CustomMenuModalProps {
   visible: boolean;
   onClose: () => void;
-  onExport: () => void;
-  onArchive: () => void;
-  setModalType: (type: 'rename' | 'delete' | null) => void;
-  showExportOption?: boolean;
-  actionType: 'archive' | 'unarchive' | null;
+  options: CustomMenuModalOption[];
 }
 
 export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   visible,
+  options,
   onClose,
-  onExport,
-  onArchive,
-  setModalType,
-  showExportOption = false,
-  actionType,
 }) => {
   const insets = useSafeAreaInsets();
-  const {t} = useTranslate();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  const onRename = () => {
-    setModalType('rename');
-    onClose();
-  };
-
-  const onDataPolicyPress = () => {
-    Linking.openURL(PRIVACY_POLICY_URL);
-  };
 
   useEffect(() => {
     if (visible) {
@@ -56,6 +41,24 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
       }).start();
     }
   }, [visible, fadeAnim]);
+
+  const renderCustomMenuOption = (
+    option: CustomMenuModalOption,
+    index: number,
+  ) => {
+    return (
+      <React.Fragment key={index}>
+        <TouchableOpacity
+          key={index}
+          style={styles.menuItem}
+          onPress={option.onPress}>
+          <Text style={styles.menuText}>{option.label}</Text>
+          {option.iconRight}
+        </TouchableOpacity>
+        {index < options.length - 1 && <View style={styles.menuDivider} />}
+      </React.Fragment>
+    );
+  };
 
   if (!visible) return null;
 
@@ -92,47 +95,7 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           },
           !isIOS && styles.androidShadow,
         ]}>
-        <TouchableOpacity style={styles.menuItem} onPress={onRename}>
-          <Text style={styles.menuText}>{t('CallSummary.info.rename')}</Text>
-          <EditIcon width={16} height={16} />
-        </TouchableOpacity>
-        <View style={styles.menuDivider} />
-        {showExportOption && (
-          <TouchableOpacity style={styles.menuItem} onPress={onExport}>
-            <Text style={styles.menuText}>
-              {t('CallSummary.customMenu.export')}
-            </Text>
-            <ExportIcon width={16} height={16} />
-          </TouchableOpacity>
-        )}
-        <View style={styles.menuDivider} />
-        <TouchableOpacity style={styles.menuItem} onPress={onDataPolicyPress}>
-          <Text style={styles.menuText}>
-            {t('CallSummary.customMenu.dataPolicy')}
-          </Text>
-          <ContractIcon width={16} height={16} />
-        </TouchableOpacity>
-        {env.ARCHIVE_CALL_LOGS_FLAG && (
-          <>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={onArchive}>
-              <Text style={styles.menuText}>
-                {actionType === 'archive'
-                  ? t('CallSummary.customMenu.archive')
-                  : t('CallSummary.customMenu.unarchive')}
-              </Text>
-              <ArchiveIcon width={16} height={16} />
-            </TouchableOpacity>
-          </>
-        )}
-        {/* <View style={styles.menuDivider} /> */}
-        {/* Hiding delete option for now */}
-        {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
-          <Text style={styles.menuText}>
-            {t('CallSummary.customMenu.delete')}
-          </Text>
-          <DeleteIcon width={16} height={16} />
-        </TouchableOpacity> */}
+        {options.map((option, index) => renderCustomMenuOption(option, index))}
       </Animated.View>
     </View>
   );

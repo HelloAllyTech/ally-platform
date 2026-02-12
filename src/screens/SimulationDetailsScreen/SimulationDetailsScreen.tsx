@@ -98,7 +98,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const handleConfirmSimulation = () => {
     setShowNotification(false);
     const languageId = languageMap.get(selectedLanguage);
-    startSimulation(scenario.id, undefined, undefined, languageId);
+    startSimulation({scenarioId: scenario.id, languageId});
   };
 
   const renderLoadingOverlay = () => {

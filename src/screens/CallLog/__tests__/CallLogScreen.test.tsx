@@ -106,21 +106,14 @@ jest.mock('@/store/hooks', () => ({
 
 // Services
 jest.mock('@/services/callsApi', () => ({
-  useLazyGetCallLogsQuery: () => [
-    jest.fn().mockResolvedValue({ data: { data: [] } }),
-    { isFetching: false },
-  ],
-  useLazyGetArchivedCallLogsQuery: () => [
-    jest.fn().mockResolvedValue({ data: { data: [] } }),
-    { isFetching: false },
-  ],
+  useLazyGetCallLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
 }));
 jest.mock('@/services/simulationsApi', () => ({
   useLazyGetSimulationLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
 }));
 jest.mock('@/services/settingsApi', () => ({
   useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],
-  useLazyGetSummaryFieldsQuery: () => [jest.fn(), { data: ['field1'] }],
+  useGetSummaryFieldsQuery: () => ({ data: ['field1'], isLoading: false }),
 }));
 
 // Utils (isAppFeatureEnabled removed)

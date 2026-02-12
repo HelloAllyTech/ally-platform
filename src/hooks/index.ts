@@ -20,6 +20,7 @@ export * from './usePermissionAlert';
 export * from './useSearch';
 export * from './useSimulationCredits';
 export * from './useSimulationTranscriptDetails';
+export * from './useSimulationTransition';
 export * from './useSocket';
 export * from './useSocketConnection';
 export * from './useStartSimulation';

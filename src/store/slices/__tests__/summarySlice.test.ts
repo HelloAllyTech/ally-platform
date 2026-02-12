@@ -56,7 +56,7 @@ const makeSummaryResponse = (): CallSummaryResponse => ({
       callDate: '2024-01-01',
       callTime: '00:00',
       clientId: 'c1',
-      counselorName: 'Counselor',
+      counsellor: 'Counselor',
       callType: 'Type',
       age: '25-34' as any,
       gender: 'Male',
@@ -83,7 +83,6 @@ const makeSummaryResponse = (): CallSummaryResponse => ({
       emotionalLift: 3,
       workingStatus: 'Working',
       newCallFollowUp: 'Yes',
-      counsellor: 'Counselor',
       followUpGoals: 'Goals',
       sessionNumber: '1',
       followUpStatus: 'Pending',
@@ -95,6 +94,7 @@ const makeSummaryResponse = (): CallSummaryResponse => ({
       therapeuticInterventions: 'Interventions',
       callQuality: 5,
       additionalNotes: 'Notes',
+      openEndedQuestionsAsked: 1,
 
       // Intake section
       intakeNotes: null,

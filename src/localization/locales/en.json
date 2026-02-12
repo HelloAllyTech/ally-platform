@@ -353,8 +353,10 @@
   },
   "SimulationAssistant": {
     "startingTitle": "Simulation ",
-    "startingEllipsis": "starting...",
-    "endingEllipsis": "ending...",
+    "starting": "starting...",
+    "ending": "ending...",
+    "waitingForAgent": "Waiting for agent to join...",
+    "connectingToSession": "Connecting to session...",
     "startingSubtitle": "To start the simulation, please allow us to use your microphone.",
     "sessionDuration": "Session Duration",
     "mute": "Mute",

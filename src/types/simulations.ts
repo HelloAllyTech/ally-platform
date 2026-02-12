@@ -239,7 +239,6 @@ export interface SimulationSummaryData {
 
 export type SessionData = {
   id: string;
-  createdAt: string;
   accessToken: string;
   liveKitServerUrl: string;
 };
@@ -289,6 +288,7 @@ export interface SimulationPathDetails {
   completedScenarios: number;
   completedAt: Date | null;
   scenarioPathSessionId: string | null;
+  caseSessionId?: string | null;
   scenarios: PathScenario[];
 }
 
@@ -325,33 +325,33 @@ export interface ChecklistItem {
   message?: string;
 }
 
-// ============================================
-// CASES - Currently using same types as Tracks/Pathways
-// Cases and Tracks share the same data model and backend API (scenario-paths)
-// Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/types/learn.ts)
-// TODO: Replace with dedicated Case types when backend provides /learn/scenario-cases endpoints
-// ============================================
-
 /**
- * Case list item type - currently aliases SimulationPath
- * TODO: Replace with actual Case type when dedicated API is available
+ * Case list item type - uses same structure as SimulationPath
  */
 export type Case = SimulationPath;
 
 /**
- * Case detail type - currently aliases SimulationPathDetails
- * TODO: Replace with actual CaseDetails type when dedicated API is available
+ * Case detail type - uses same structure as SimulationPathDetails
  */
 export type CaseDetails = SimulationPathDetails;
 
 /**
- * Individual scenario within a Case - currently aliases PathScenario
- * TODO: Replace with actual CaseSimulation type when dedicated API is available
+ * Individual scenario within a Case - uses same structure as PathScenario
  */
 export type CaseSimulation = PathScenario;
 
 /**
- * Cases list response type - currently aliases SimulationPathsResponse
- * TODO: Replace with actual CasesResponse type when dedicated API is available
+ * Cases list response type - uses same structure as SimulationPathsResponse
  */
 export type CasesResponse = SimulationPathsResponse;
+
+/**
+ * Room connection status for LiveKit sessions
+ */
+export enum RoomStatus {
+  CONNECTED = 'connected',
+  CONNECTING = 'connecting',
+  DISCONNECTED = 'disconnected',
+  DISCONNECTING = 'disconnecting',
+  AGENT_JOINED = 'agent_joined',
+}

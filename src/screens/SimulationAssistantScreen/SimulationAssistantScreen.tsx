@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -14,6 +14,7 @@ import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
@@ -36,6 +37,7 @@ import {
   ExperienceMode,
   Feedback,
   LiveEventPayload,
+  RoomStatus,
 } from '@/types';
 import {
   decodeFeedbackPayloadToJson,
@@ -60,24 +62,23 @@ import {
 } from './components/ScenarioInfoOverlay';
 import {styles} from './styles';
 
+const RINGING_BELL_DELAY = 5000; // 5 seconds for ringing the bell before connecting
+
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {sessionData, scenario, pathId, contextType} = route.params;
+  const {sessionData, scenario, pathId, caseId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
-  const startTime = useMemo(
-    () =>
-      sessionData?.createdAt ? new Date(sessionData?.createdAt) : new Date(),
-    [sessionData?.createdAt],
-  );
+  const [startTime, setStartTime] = useState<Date | null>(null);
   const navigation = useAppNavigation();
   const {t} = useTranslation();
   const [endScenarioSession] = useEndScenarioSessionMutation();
   const {showErrorToast} = useErrorToast();
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
+  const [roomStatus, setRoomStatus] = useState<RoomStatus>(
+    RoomStatus.DISCONNECTED,
+  );
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(false);
   const [room] = useState<Room>(() => new Room());
   const remoteParticipants = useRemoteParticipants({room});
@@ -104,7 +105,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     useState<boolean>(false);
   const [showBackPressConfirmation, setShowBackPressConfirmation] =
     useState<boolean>(false);
-  const isSimulationInProgress = !isConnecting && !isDisconnecting;
+  const isSimulationInProgress =
+    roomStatus === RoomStatus.AGENT_JOINED ||
+    roomStatus === RoomStatus.CONNECTED;
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -112,7 +115,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => {
     if (accessToken) {
-      handleConnect();
+      setRoomStatus(RoomStatus.CONNECTING);
+      // Delay connection to allow ringtone to play (matching web behavior)
+      const connectionTimeout = setTimeout(() => {
+        handleConnect();
+      }, RINGING_BELL_DELAY);
+
+      return () => {
+        clearTimeout(connectionTimeout);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -152,7 +163,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       remainingModal,
     );
     const autoEndTimer = setTimeout(() => {
-      if (!isDisconnecting) handleDisconnect();
+      if (roomStatus !== RoomStatus.DISCONNECTING) handleDisconnect();
     }, remainingAutoEnd);
 
     return () => {
@@ -160,7 +171,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       clearTimeout(autoEndTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startTime, isDisconnecting]);
+  }, [startTime, roomStatus]);
 
   const ensureSpeakerOutput = useCallback(async () => {
     // Try a few times with small delays; OEM skins sometimes override routing during focus changes
@@ -179,7 +190,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
-      setIsConnecting(false);
+      setRoomStatus(RoomStatus.CONNECTED);
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
@@ -188,18 +199,28 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         showErrorToast(error, 'Errors.attachListeners');
       }
     };
+
+    const onRemoteParticipantConnected = () => {
+      // Stop the ringtone once the agent joins (matching web behavior)
+      try {
+        SoundPlayer.stop();
+      } catch {
+        // Ignore if sound already finished
+      }
+      setStartTime(new Date());
+      setRoomStatus(RoomStatus.AGENT_JOINED);
+    };
+
     const onDisconnected = () => {
-      setIsConnecting(false);
-      if (!isDisconnecting) {
+      if (roomStatus !== RoomStatus.DISCONNECTING) {
         playNotificationSound(sounds.endSimulation);
-        setIsDisconnecting(true);
+        setRoomStatus(RoomStatus.DISCONNECTING);
         setIsMicEnabled(false);
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: sessionId,
           pathId,
-          contextType, // Pass contextType so feedback screen knows if this is a case or track
+          caseId,
         });
-        setIsDisconnecting(false);
       }
     };
     const onDataReceived = (payload: unknown) => {
@@ -207,7 +228,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       if (!eventObj?.data) return;
 
       const {score, emoji, message, detected_event_ids} = eventObj.data;
-      console.log(eventObj, 'eventObj');
 
       if (typeof score === 'number' && !Number.isNaN(score)) {
         setAccumulatedScore(prev => clamp(prev + score, -100, 100));
@@ -235,22 +255,24 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     room
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
+      .on(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
       .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
+        .off(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
         .off(RoomEvent.DataReceived, onDataReceived);
     };
   }, [
     room,
     ensureSpeakerOutput,
     showErrorToast,
-    isDisconnecting,
+    roomStatus,
     navigation,
     sessionId,
     pathId,
-    contextType,
+    caseId,
     clamp,
   ]);
 
@@ -285,7 +307,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const handleConnect = useCallback(async () => {
     try {
       await configureAudioSession();
-      setIsConnecting(true);
       await room.connect(liveKitServerUrl, accessToken);
     } catch (error) {
       showErrorToast(error, 'Errors.connect');
@@ -295,7 +316,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const handleDisconnect = useCallback(async () => {
     try {
-      setIsDisconnecting(true);
+      setRoomStatus(RoomStatus.DISCONNECTING);
       playNotificationSound(sounds.endSimulation);
       await room.disconnect();
       await endScenarioSession({
@@ -305,13 +326,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         scenarioSessionId: sessionId,
         pathId,
-        contextType, // Pass contextType so feedback screen knows if this is a case or track
+        caseId,
       });
       setIsMicEnabled(false);
-      setIsDisconnecting(false);
+      setRoomStatus(RoomStatus.DISCONNECTED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, pathId, contextType]);
+  }, [sessionId, pathId, caseId]);
 
   const handleToggleMic = useCallback(async () => {
     try {
@@ -325,17 +346,25 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   }, [isMicEnabled]);
 
   const renderLoader = () => {
+    const getLoadingText = () => {
+      if (
+        roomStatus === RoomStatus.CONNECTED ||
+        roomStatus === RoomStatus.CONNECTING
+      ) {
+        return t('SimulationAssistant.waitingForAgent');
+      }
+      if (roomStatus === RoomStatus.DISCONNECTING) {
+        return t('SimulationAssistant.ending');
+      }
+      return t('SimulationAssistant.connectingToSession');
+    };
+
     return (
       <View style={styles.loadingWrapper}>
         <Text style={styles.loadingTitle}>
-          {t('SimulationAssistant.startingTitle')}
-          <Text style={styles.loadingItalic}>
-            {isDisconnecting
-              ? t('SimulationAssistant.endingEllipsis')
-              : t('SimulationAssistant.startingEllipsis')}
-          </Text>
+          <Text style={styles.loadingItalic}>{getLoadingText()}</Text>
         </Text>
-        {isConnecting && (
+        {roomStatus === RoomStatus.CONNECTING && (
           <Text style={styles.loadingDescription}>
             {t('SimulationAssistant.startingSubtitle')}
           </Text>
