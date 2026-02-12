@@ -9,7 +9,6 @@ export interface Env {
   CLOUD_TELEPHONY_PATH: string;
   GOOGLE_WEB_CLIENT_ID: string;
   GOOGLE_IOS_CLIENT_ID: string;
-  SIMULATION_CASES_FLAG: boolean;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -43,5 +42,4 @@ export const env: Env = {
     Config.GOOGLE_IOS_CLIENT_ID,
     'GOOGLE_IOS_CLIENT_ID',
   ),
-  SIMULATION_CASES_FLAG: Config.SIMULATION_CASES_FLAG === 'true',
 };
