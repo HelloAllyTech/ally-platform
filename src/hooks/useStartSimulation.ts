@@ -2,29 +2,27 @@ import {useEffect, useState} from 'react';
 import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 
 import {useErrorToast} from '@/components';
-import {
-  LearningPathType,
-  MICROPHONE_PERMISSION,
-  SCREEN_NAMES,
-} from '@/constants';
+import {MICROPHONE_PERMISSION, SCREEN_NAMES} from '@/constants';
 import {useStartScenarioSessionMutation} from '@/services';
 
 import {useAppNavigation} from './useAppNavigation';
 import {usePermissionAlert} from './usePermissionAlert';
 import {useTranslate} from './useTranslate';
 
+interface StartSimulationParams {
+  scenarioId: number;
+  scenarioPathSessionItemId?: string;
+  casesSessionItemId?: string;
+  pathId?: string;
+  caseId?: string;
+  languageId?: number;
+}
 interface UseStartSimulationReturn {
   isCreatingRoom: boolean;
   isMicPermissionGranted: boolean;
   activeSimulationId: string | null;
   showActiveSimulationModal: boolean;
-  startSimulation: (
-    scenarioId: number,
-    scenarioPathSessionItemId?: string,
-    pathId?: string,
-    languageId?: number,
-    contextType?: LearningPathType,
-  ) => Promise<void>;
+  startSimulation: (params: StartSimulationParams) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
 }
@@ -66,12 +64,8 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
   };
 
   const startSimulation = async (
-    scenarioId: number,
-    scenarioPathSessionItemId?: string,
-    pathId?: string,
-    languageId?: number,
-    contextType: LearningPathType = LearningPathType.TRACK,
-  ) => {
+    params: StartSimulationParams,
+  ): Promise<void> => {
     try {
       if (!isMicPermissionGranted) {
         const result = await request(MICROPHONE_PERMISSION);
@@ -100,25 +94,29 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
 
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
-        scenarioId,
-        ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
-        ...(languageId && {languageId}),
+        scenarioId: params.scenarioId,
+        ...(params.scenarioPathSessionItemId && {
+          scenarioPathSessionItemId: params.scenarioPathSessionItemId,
+        }),
+        ...(params.casesSessionItemId && {
+          casesSessionItemId: params.casesSessionItemId,
+        }),
+        ...(params.languageId && {languageId: params.languageId}),
       }).unwrap();
 
       if (startResp) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
           sessionData: {
             id: startResp.scenarioSession.id,
-            createdAt: startResp.scenarioSession.createdAt,
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },
           scenario: startResp.scenario,
-          ...(scenarioPathSessionItemId && {
-            pathSessionItemId: scenarioPathSessionItemId,
+          ...(params.scenarioPathSessionItemId && {
+            pathSessionItemId: params.scenarioPathSessionItemId,
           }),
-          ...(pathId && {pathId}),
-          contextType,
+          ...(params.pathId && {pathId: params.pathId}),
+          ...(params.caseId && {caseId: params.caseId}),
         });
       }
     } catch (error) {

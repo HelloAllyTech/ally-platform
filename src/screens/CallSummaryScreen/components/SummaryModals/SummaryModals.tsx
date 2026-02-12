@@ -1,8 +1,18 @@
 import React from 'react';
 import {useTranslation} from 'react-i18next';
+import {Linking} from 'react-native';
 
+import {
+  ArchiveIcon,
+  ContractIcon,
+  EditIcon,
+  ExportIcon,
+  UnarchiveIcon,
+} from '@/assets';
 import {FeedbackPopup} from '@/components';
+import {PRIVACY_POLICY_URL} from '@/constants';
 
+import {CustomMenuModalOption} from '../CustomMenuModal/CustomMenuModal';
 import {
   ArchiveActionModal,
   CustomMenuModal,
@@ -65,6 +75,44 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   onSubmitSummaryFeedback,
 }) => {
   const {t} = useTranslation();
+
+  const customMenuOptions: CustomMenuModalOption[] = [
+    {
+      label: t('CallSummary.info.rename'),
+      iconRight: <EditIcon width={16} height={16} />,
+      onPress: () => {
+        setActiveModal('rename');
+        hideMenu();
+      },
+    },
+    ...(showExportOption
+      ? [
+          {
+            label: t('CallSummary.customMenu.export'),
+            iconRight: <ExportIcon width={16} height={16} />,
+            onPress: handleExport,
+          },
+        ]
+      : []),
+    {
+      label: t('CallSummary.customMenu.dataPolicy'),
+      iconRight: <ContractIcon width={16} height={16} />,
+      onPress: () => Linking.openURL(PRIVACY_POLICY_URL),
+    },
+    {
+      label:
+        actionType === 'archive'
+          ? t(`CallSummary.customMenu.archive`)
+          : t(`CallSummary.customMenu.unarchive`),
+      iconRight:
+        actionType === 'archive' ? (
+          <ArchiveIcon width={16} height={16} />
+        ) : (
+          <UnarchiveIcon width={16} height={16} />
+        ),
+      onPress: () => setShowArchiveConfirmation(true),
+    },
+  ];
   return (
     <>
       <DeleteRenameModal
@@ -84,11 +132,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
       <CustomMenuModal
         visible={isMenuVisible}
         onClose={hideMenu}
-        onExport={handleExport}
-        actionType={actionType}
-        onArchive={() => setShowArchiveConfirmation(true)}
-        setModalType={setActiveModal}
-        showExportOption={showExportOption}
+        options={customMenuOptions}
       />
       <FeedbackPopup
         note={t('FeedbackPopup.instructionText')}

@@ -17,20 +17,11 @@ export const callsAPI = api.injectEndpoints({
   endpoints: builder => ({
     getCallLogs: builder.query<
       CallLogsResponse,
-      {limit: number; offset: number}
+      {limit: number; offset: number; archive: boolean}
     >({
-      query: ({limit, offset}) => ({
+      query: ({limit, offset, archive}) => ({
         url: API_ROUTES.CHATS.CALL_LOGS,
-        params: {limit, offset},
-      }),
-    }),
-    getArchivedCallLogs: builder.query<
-      CallLogsResponse,
-      {limit: number; offset: number}
-    >({
-      query: ({limit, offset}) => ({
-        url: API_ROUTES.CHATS.GET_ARCHIVED_CALL_LOGS,
-        params: {limit, offset},
+        params: {limit, offset, archive},
       }),
     }),
     archiveCallLog: builder.mutation<void, ArchiveCallLogsRequest>({
@@ -47,6 +38,4 @@ export const {
   useGetCallLogsQuery,
   useLazyGetCallLogsQuery,
   useArchiveCallLogMutation,
-  useLazyGetArchivedCallLogsQuery,
-  useGetArchivedCallLogsQuery,
 } = callsAPI;

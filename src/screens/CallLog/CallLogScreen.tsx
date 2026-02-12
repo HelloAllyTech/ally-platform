@@ -40,20 +40,10 @@ import {
   useUser,
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
-import {
-  useLazyGetArchivedCallLogsQuery,
-  useLazyGetCallLogsQuery,
-} from '@/services/callsApi';
-import {
-  useLazyGetSummaryFieldsQuery,
-  useLazyGetVisibleChatTypesQuery,
-} from '@/services/settingsApi';
+import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
-import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {
-  selectSummaryVisibleFields,
-  setSummaryVisibleFields,
-} from '@/store/slices/summarySlice';
+import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {logger} from '@/utils/logger';
@@ -108,15 +98,10 @@ export const CallLogScreen: React.FC = () => {
   const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
-  const dispatch = useAppDispatch();
   const [getCallLogs, {isFetching: isFetchingRealLogs}] =
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getArchivedCallLogs, {isFetching: isFetchingArchivedRealLogs}] =
-    useLazyGetArchivedCallLogsQuery();
-  const [getSummaryFields, {data: visibleFields}] =
-    useLazyGetSummaryFieldsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
@@ -127,7 +112,6 @@ export const CallLogScreen: React.FC = () => {
     return route.name === firstTab;
   }, [permissions, route.name]);
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
-  const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
   const showFeatureUnavailable = useMemo(() => {
     return !permissions?.some(permission =>
       TAB_PERMISSIONS.includes(permission as USER_PERMISSIONS),
@@ -142,18 +126,6 @@ export const CallLogScreen: React.FC = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]),
   );
-
-  useEffect(() => {
-    if (visibleFields) {
-      dispatch(setSummaryVisibleFields(visibleFields));
-    }
-  }, [visibleFields, dispatch]);
-
-  useEffect(() => {
-    if (!visibleFieldsState?.length) {
-      getSummaryFields();
-    }
-  }, [getSummaryFields, visibleFieldsState?.length]);
 
   const canStartCall = START_CALL_PERMISSIONS.some(permission =>
     permissions?.includes(permission),
@@ -220,7 +192,11 @@ export const CallLogScreen: React.FC = () => {
    * Sets up the initial state for pagination
    */
   const fetchInitialRealLogs = useCallback(async () => {
-    const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
+    const result = await getCallLogs({
+      limit: ITEMS_PER_PAGE,
+      offset: 0,
+      archive: false,
+    });
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
       const filteredCallLogs = result.data.data.filter(
@@ -253,9 +229,10 @@ export const CallLogScreen: React.FC = () => {
    * Sets up the initial state for pagination
    */
   const fetchInitialArchivedRealLogs = useCallback(async () => {
-    const result = await getArchivedCallLogs({
+    const result = await getCallLogs({
       limit: ITEMS_PER_PAGE,
       offset: 0,
+      archive: true,
     });
     const logsResponse = result.data?.data;
     if (logsResponse) {
@@ -264,7 +241,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllArchivedRealLogs([]);
     }
-  }, [getArchivedCallLogs]);
+  }, [getCallLogs]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
@@ -292,7 +269,6 @@ export const CallLogScreen: React.FC = () => {
       fetchInitialRealLogs,
       fetchInitialSimulationLogs,
       fetchInitialArchivedRealLogs,
-      dispatch,
     ]),
   );
 
@@ -305,9 +281,10 @@ export const CallLogScreen: React.FC = () => {
       if (!hasMoreArchivedRealLogs || isFetchingRealLogs) return;
 
       const newOffset = archivedRealLogsOffset + ITEMS_PER_PAGE;
-      const result = await getArchivedCallLogs({
+      const result = await getCallLogs({
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
+        archive: true,
       });
       if (result?.data?.data) {
         setAllArchivedRealLogs(prev => [
@@ -325,6 +302,7 @@ export const CallLogScreen: React.FC = () => {
         const result = await getCallLogs({
           limit: ITEMS_PER_PAGE,
           offset: newOffset,
+          archive: false,
         });
 
         if (result?.data?.data) {
@@ -499,7 +477,7 @@ export const CallLogScreen: React.FC = () => {
       ? allRealLogs
       : allSimulationLogs;
   const isFetching = isViewingArchivedRealLogs
-    ? isFetchingArchivedRealLogs
+    ? isFetchingRealLogs
     : activeTab === LogType.REAL
       ? isFetchingRealLogs
       : isFetchingSimulationLogs;
@@ -545,9 +523,7 @@ export const CallLogScreen: React.FC = () => {
         onGoBack={() => setIsViewingArchivedRealLogs(false)}
         onArchivePress={handleArchivePress}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
-        showActionsMenu={
-          !isViewingArchivedRealLogs && env.ARCHIVE_CALL_LOGS_FLAG
-        }
+        showActionsMenu={!isViewingArchivedRealLogs}
       />
       {availableLogTypes.length > 1 && !isViewingArchivedRealLogs && (
         <View style={styles.tabMargin}>

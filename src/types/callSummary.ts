@@ -89,6 +89,8 @@ export type SummaryFormData = {
   [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: string | null;
   [SUMMARY_FIELDS.LOCATION]: string | null;
   [SUMMARY_FIELDS.CONCERN_CODE]: string | null;
+  [SUMMARY_FIELDS.COUNSELLOR]: string | null;
+  [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]: string | null;
 
   // Text content fields - all editable
   [SUMMARY_FIELDS.SESSION_SUMMARY]: string | null;

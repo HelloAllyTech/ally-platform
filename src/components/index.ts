@@ -87,3 +87,4 @@ export type {ChartComponentProps, ChartDataset} from './ChartComponent';
 export {ActionsMenu} from './ActionsMenu';
 export {SessionChecklist} from './Checklist';
 export type {SessionChecklistItem, SessionChecklistProps} from './Checklist';
+export {SimulationTransitionSection} from './SimulationTransitionSection';

@@ -131,6 +131,7 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UnarchiveIcon from './unarchive.svg';
 import UpArrowIcon from './up_arrow.svg';
 import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
@@ -270,6 +271,7 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
+  UnarchiveIcon,
   UserIcon,
   VolumeIcon,
   VolumeOffIcon,

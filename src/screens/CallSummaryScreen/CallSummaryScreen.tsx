@@ -20,6 +20,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
@@ -51,6 +52,14 @@ export const CallSummaryScreen: React.FC<
   const chatId = callId || currentChat?.chatId;
 
   const navigation = useAppNavigation();
+
+  // Fetch summary fields on mount (follows web approach)
+  const {refetch: refetchSummaryFields} = useGetSummaryFieldsQuery();
+
+  useEffect(() => {
+    // Refetch when callId changes to ensure fresh data
+    refetchSummaryFields();
+  }, [callId, refetchSummaryFields]);
 
   const {
     isLoading,
@@ -237,7 +246,8 @@ export const CallSummaryScreen: React.FC<
     }
 
     if (showSummary && isSummaryAvailable && canShowSummary) {
-      const shouldShowSaveButton = !callId || hasChanges;
+      const shouldShowSaveButton =
+        (!callId || hasChanges) && !isFeedbackPopupVisible;
       return (
         <CallSummaryDetails
           isLoading={isLoading}
@@ -271,7 +281,7 @@ export const CallSummaryScreen: React.FC<
               onNoteChange={handleNoteChange}
             />
           </KeyboardAwareScrollView>
-          {renderSummaryButtons()}
+          {!isFeedbackPopupVisible && renderSummaryButtons()}
         </>
       );
     }
