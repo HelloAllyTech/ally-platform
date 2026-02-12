@@ -3,9 +3,6 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
-  container: {
-    marginHorizontal: '10@ms',
-  },
   scrollView: {
     flex: 1,
   },

@@ -37,9 +37,7 @@ export const Reflection: React.FC = () => {
   };
 
   return (
-    <SummaryCard
-      title={t('SimulationFeedback.reflection.sectionTitle')}
-      containerStyle={styles.container}>
+    <SummaryCard title={t('SimulationFeedback.reflection.sectionTitle')}>
       <KeyboardAwareScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}

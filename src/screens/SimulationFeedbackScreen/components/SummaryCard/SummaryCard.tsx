@@ -27,6 +27,7 @@ const styles = ScaledSheet.create({
   container: {
     flex: 1,
     marginVertical: '10@vs',
+    marginHorizontal: '10@ms',
     borderWidth: '0.5@ms',
     borderColor: colors.ds.stroke.primary,
     padding: '16@ms',

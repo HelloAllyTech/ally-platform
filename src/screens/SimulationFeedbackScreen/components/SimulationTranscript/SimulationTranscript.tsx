@@ -101,9 +101,7 @@ export const SimulationTranscript: React.FC<{
   };
 
   return (
-    <SummaryCard
-      title={t('SimulationFeedback.annotatedTranscription')}
-      containerStyle={styles.container}>
+    <SummaryCard title={t('SimulationFeedback.annotatedTranscription')}>
       <FlatList
         contentContainerStyle={styles.contentContainer}
         ref={listRef}
@@ -140,9 +138,6 @@ export const SimulationTranscript: React.FC<{
 };
 
 const styles = ScaledSheet.create({
-  container: {
-    marginHorizontal: '10@ms',
-  },
   placeholder: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,

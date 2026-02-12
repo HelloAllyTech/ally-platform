@@ -105,7 +105,7 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '12.25@ms',
     color: colors.ds.typography.highEmphasis,
-    letterSpacing: '-0.0179@ms',
+    letterSpacing: -0.0179,
     padding: 0,
   },
   sendButton: {
