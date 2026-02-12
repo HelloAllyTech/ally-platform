@@ -469,7 +469,8 @@
       "transcription": "Transcription",
       "checklist": "Checklist",
       "skills": "Skills",
-      "reflection": "Reflection"
+      "reflection": "Reflection",
+      "upNext": "Up next"
     },
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",

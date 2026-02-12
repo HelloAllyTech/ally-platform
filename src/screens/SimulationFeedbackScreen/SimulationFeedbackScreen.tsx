@@ -650,6 +650,13 @@ export const SimulationFeedbackScreen: React.FC<
       case 5: // Reflection
         return <Reflection />;
 
+      case 6: // Up Next
+        return (
+          <View>
+            <Text>Up Next</Text>
+          </View>
+        );
+
       default:
         return null;
     }
@@ -681,6 +688,10 @@ export const SimulationFeedbackScreen: React.FC<
       // {
       //   key: 'reflection',
       //   title: t('SimulationFeedback.tabs.reflection'),
+      // },
+      // {
+      //   key: 'upNext',
+      //   title: t('SimulationFeedback.tabs.upNext'),
       // },
     ],
     [t],
