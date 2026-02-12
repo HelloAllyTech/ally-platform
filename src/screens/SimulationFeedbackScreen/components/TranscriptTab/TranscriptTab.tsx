@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect} from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -17,17 +17,19 @@ interface TranscriptTabProps {
   scenarioSessionId?: string;
   reviewId?: string;
   setReviewId: (reviewId: string) => void;
+  isPrivate: boolean;
+  setIsPrivate: (isPrivate: boolean) => void;
 }
 
 export const TranscriptTab: React.FC<TranscriptTabProps> = ({
   scenarioSessionId,
   reviewId,
   setReviewId,
+  isPrivate,
+  setIsPrivate,
 }) => {
   const {t} = useTranslate();
   const {showToast} = useToast();
-
-  const [isPrivate, setIsPrivate] = useState<boolean>(true);
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
@@ -50,6 +52,7 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
       }
     }
   }, [
+    setIsPrivate,
     setReviewId,
     simulationDetails?.reviewId,
     simulationDetails?.reviewStatus,
