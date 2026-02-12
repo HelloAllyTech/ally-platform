@@ -1,6 +1,7 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {SimulationEventStatus} from '@/constants';
+import {useStartSimulation} from '@/hooks';
 import {
   useGetUpcomingCaseScenarioQuery,
   useGetUpcomingScenarioQuery,
@@ -26,11 +27,15 @@ interface UseSimulationTransitionReturn {
   canRetryCurrentSession: boolean; // Renamed from canRetryCurrent for clarity
   isCurrentSessionCompleted: boolean;
   isLoading: boolean;
+  // Actions
+  retrySimulation: () => void;
+  startNextSimulation: () => void;
+  isStartingSimulation: boolean;
 }
 
 /**
- * Custom hook to manage simulation transition state for both path and case flows.
- * Handles polling for upcoming scenarios and provides computed state flags.
+ * Custom hook to manage simulation transition state and actions for both path and case flows.
+ * Handles polling for upcoming scenarios, provides computed state flags, and transition actions.
  * Automatically determines the flow type based on whether pathId or caseId is provided.
  *
  * @param params - Hook parameters
@@ -48,8 +53,9 @@ interface UseSimulationTransitionReturn {
  * - canRetryCurrentSession: Whether the current session can be retried
  * - isCurrentSessionCompleted: Whether the current session item is completed
  * - isLoading: Loading state
- * - isPathCompleted: @deprecated Use isFlowCompleted instead
- * - canRetryCurrent: @deprecated Use canRetryCurrentSession instead
+ * - retrySimulation: Function to retry the current simulation
+ * - startNextSimulation: Function to start the next simulation in the flow
+ * - isStartingSimulation: Whether a simulation is currently being started
  */
 export const useSimulationTransition = ({
   scenarioSessionId,
@@ -59,6 +65,10 @@ export const useSimulationTransition = ({
 }: UseSimulationTransitionParams): UseSimulationTransitionReturn => {
   const [pollingInterval, setPollingInterval] = useState<number>(RETRY_DELAY);
   const nextSimulationPollingAttemptsRef = useRef<number>(0);
+
+  // Use the startSimulation hook for retry and next actions
+  const {startSimulation, isCreatingRoom: isStartingSimulation} =
+    useStartSimulation();
 
   // Automatically determine flow type based on which ID is provided
   const isCase = !!caseId;
@@ -136,6 +146,66 @@ export const useSimulationTransition = ({
   const isEventCompleted =
     currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
 
+  /**
+   * Retry the current simulation session
+   * Automatically handles both path and case flows
+   */
+  const retrySimulation = useCallback(() => {
+    if (!currentSession || !currentSession.scenarioId) {
+      return;
+    }
+
+    // Check for either path or case session item ID
+    const hasPathSessionItem = !!currentSession.scenarioPathSessionItemId;
+    const hasCaseSessionItem = !!currentSession.caseSessionItemId;
+
+    if (!hasPathSessionItem && !hasCaseSessionItem) {
+      return;
+    }
+
+    startSimulation({
+      scenarioId: currentSession.scenarioId,
+      ...(hasPathSessionItem && {
+        scenarioPathSessionItemId: currentSession.scenarioPathSessionItemId,
+      }),
+      ...(hasCaseSessionItem && {
+        caseSessionItemId: currentSession.caseSessionItemId,
+      }),
+      pathId,
+      caseId,
+    });
+  }, [currentSession, pathId, caseId, startSimulation]);
+
+  /**
+   * Start the next simulation in the flow
+   * Automatically handles both path and case flows
+   */
+  const startNextSimulation = useCallback(() => {
+    if (!upcomingScenario || !upcomingScenario.id) {
+      return;
+    }
+
+    // Check for either path or case session item ID
+    const hasPathSessionItem = !!upcomingScenario.scenarioPathSessionItemId;
+    const hasCaseSessionItem = !!upcomingScenario.caseSessionItemId;
+
+    if (!hasPathSessionItem && !hasCaseSessionItem) {
+      return;
+    }
+
+    startSimulation({
+      scenarioId: upcomingScenario.id,
+      ...(hasPathSessionItem && {
+        scenarioPathSessionItemId: upcomingScenario.scenarioPathSessionItemId,
+      }),
+      ...(hasCaseSessionItem && {
+        caseSessionItemId: upcomingScenario.caseSessionItemId,
+      }),
+      pathId,
+      caseId,
+    });
+  }, [upcomingScenario, pathId, caseId, startSimulation]);
+
   return {
     currentSession,
     upcomingScenario,
@@ -145,5 +215,8 @@ export const useSimulationTransition = ({
     canRetryCurrentSession,
     isCurrentSessionCompleted,
     isLoading,
+    retrySimulation,
+    startNextSimulation,
+    isStartingSimulation,
   };
 };

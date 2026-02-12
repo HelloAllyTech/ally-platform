@@ -3,13 +3,21 @@ import {renderHook, waitFor} from '@testing-library/react-native';
 import {SimulationEventStatus} from '@/constants';
 import {SessionItemStatus} from '@/types';
 
-import {useSimulationTransition} from '../useSimulationTransition';
+// Mock the useStartSimulation hook BEFORE importing useSimulationTransition
+jest.mock('../useStartSimulation', () => ({
+  useStartSimulation: jest.fn(() => ({
+    startSimulation: jest.fn(),
+    isCreatingRoom: false,
+  })),
+}));
 
 // Mock the API hooks
 jest.mock('@/services', () => ({
   useGetUpcomingScenarioQuery: jest.fn(),
   useGetUpcomingCaseScenarioQuery: jest.fn(),
 }));
+
+import {useSimulationTransition} from '../useSimulationTransition';
 
 const mockUseGetUpcomingScenarioQuery =
   require('@/services').useGetUpcomingScenarioQuery;
@@ -50,6 +58,9 @@ describe('useSimulationTransition', () => {
     expect(result.current.canRetryCurrentSession).toBe(false);
     expect(result.current.isCurrentSessionCompleted).toBe(false);
     expect(result.current.isLoading).toBe(true);
+    expect(typeof result.current.retrySimulation).toBe('function');
+    expect(typeof result.current.startNextSimulation).toBe('function');
+    expect(result.current.isStartingSimulation).toBe(false);
   });
 
   it('should return correct state when event is completed', () => {
