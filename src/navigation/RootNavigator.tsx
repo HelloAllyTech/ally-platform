@@ -19,6 +19,7 @@ import {
   AchievementsScreen,
   BreathingScreen,
   CallSummaryScreen,
+  CaseDetailsScreen,
   ListeningScreen,
   ProfileSettingsScreen,
   ReactionsScreen,
@@ -232,6 +233,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_PATH_DETAILS}
             component={SimulationPathDetailsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.CASE_DETAILS}
+            component={CaseDetailsScreen}
           />
           <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
           <Stack.Screen

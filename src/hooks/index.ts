@@ -11,6 +11,7 @@ export * from './useHardwareBackPressHandler';
 export * from './useKeyboardState';
 export * from './useLanguageDropdown';
 export * from './useLeaderboard';
+export * from './useLearningPathDetails';
 export * from './useListeningScreen';
 export * from './useLiveAudioStream';
 export * from './useNavigationAwareCounselorChat';

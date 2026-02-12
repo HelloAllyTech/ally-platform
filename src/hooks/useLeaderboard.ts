@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 
 import {LeaderboardPeriod} from '@/constants/leaderboard';
 import {
@@ -55,11 +56,18 @@ export const useLeaderboard = ({
     isLoading: isMyRankLoading,
     isError: isMyRankError,
     error: myRankError,
+    refetch: refetchMyRank,
   } = useGetMyRankQuery(
     {window},
     {
       refetchOnMountOrArgChange: true,
     },
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchMyRank();
+    }, [refetchMyRank]),
   );
 
   // Accumulate data when new page loads (based on leaderboardResponse only)

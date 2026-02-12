@@ -3,7 +3,8 @@ import {Animated, Linking, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
+import {ArchiveIcon, ContractIcon, EditIcon, ExportIcon} from '@/assets/icons';
+import {env} from '@/config/env';
 import {isIOS, PRIVACY_POLICY_URL, SCREEN_WIDTH} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
@@ -12,16 +13,20 @@ interface CustomMenuModalProps {
   visible: boolean;
   onClose: () => void;
   onExport: () => void;
+  onArchive: () => void;
   setModalType: (type: 'rename' | 'delete' | null) => void;
   showExportOption?: boolean;
+  actionType: 'archive' | 'unarchive' | null;
 }
 
 export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
   visible,
   onClose,
   onExport,
+  onArchive,
   setModalType,
   showExportOption = false,
+  actionType,
 }) => {
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
@@ -107,6 +112,19 @@ export const CustomMenuModal: React.FC<CustomMenuModalProps> = ({
           </Text>
           <ContractIcon width={16} height={16} />
         </TouchableOpacity>
+        {env.ARCHIVE_CALL_LOGS_FLAG && (
+          <>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={onArchive}>
+              <Text style={styles.menuText}>
+                {actionType === 'archive'
+                  ? t('CallSummary.customMenu.archive')
+                  : t('CallSummary.customMenu.unarchive')}
+              </Text>
+              <ArchiveIcon width={16} height={16} />
+            </TouchableOpacity>
+          </>
+        )}
         {/* <View style={styles.menuDivider} /> */}
         {/* Hiding delete option for now */}
         {/* <TouchableOpacity style={styles.menuItem} onPress={onPressDelete}>
@@ -151,6 +169,7 @@ const styles = ScaledSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: ms(8),
     elevation: 5,
+    minWidth: ms(200),
   },
   androidShadow: {
     elevation: 8,

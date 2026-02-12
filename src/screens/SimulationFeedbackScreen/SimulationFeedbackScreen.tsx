@@ -12,8 +12,15 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
-import {CustomTabs, FeedbackPopup, PrimaryButton, useToast} from '@/components';
 import {
+  CustomTabs,
+  FeedbackPopup,
+  PrimaryButton,
+  SessionChecklist,
+  useToast,
+} from '@/components';
+import {
+  LearningPathType,
   SCREEN_NAMES,
   SimulationEventStatus,
   USER_PERMISSIONS,
@@ -41,6 +48,7 @@ import {navigateToLearnTab} from '@/utils';
 import {
   AskAI,
   PrivacyToggle,
+  Reflection,
   SessionSkills,
   SimulationSummary,
   SimulationSummarySkeleton,
@@ -56,7 +64,13 @@ const FEEDBACK_THRESHOLD = 30 * 1000;
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId} = route.params;
+  const {
+    fromLogs,
+    scenarioSessionId,
+    pathId,
+    contextType = LearningPathType.TRACK,
+  } = route.params;
+  const isCase = contextType === LearningPathType.CASE;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -205,15 +219,29 @@ export const SimulationFeedbackScreen: React.FC<
 
   const handleBack = () => {
     if (pathId) {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
-            params: {pathId},
-          },
-        ],
-      });
+      // Navigate back to the correct detail screen based on context type
+      // Cases go to CaseDetails, Tracks go to SimulationPathDetails
+      if (isCase) {
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: SCREEN_NAMES.CASE_DETAILS,
+              params: {caseId: pathId},
+            },
+          ],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
+              params: {pathId},
+            },
+          ],
+        });
+      }
       return;
     }
 
@@ -556,7 +584,30 @@ export const SimulationFeedbackScreen: React.FC<
         return null;
 
       case 3: // Checklist
-        return null; // TODO: Implement checklist tab
+        return (
+          <View style={styles.checklistContainer}>
+            <SessionChecklist
+              items={[
+                // TODO: Replace with actual checklist items
+                {
+                  id: '1',
+                  name: 'Item 1',
+                  completed: true,
+                },
+                {
+                  id: '2',
+                  name: 'Item 2',
+                  completed: true,
+                },
+                {
+                  id: '3',
+                  name: 'Item 3',
+                  completed: false,
+                },
+              ]}
+            />
+          </View>
+        );
 
       case 4: // Skills - TODO: Remove dummy data after API is implemented
         return (
@@ -599,7 +650,7 @@ export const SimulationFeedbackScreen: React.FC<
         );
 
       case 5: // Reflection
-        return null; // TODO: Implement reflection tab
+        return <Reflection />;
 
       default:
         return null;
@@ -691,7 +742,7 @@ export const SimulationFeedbackScreen: React.FC<
         placeholder={t('SimulationFeedback.placeholderText')}
         customTitle={t('SimulationFeedback.questionText')}
       />
-      {showScrollButton && !isSimulationDetailsLoading && (
+      {showScrollButton && !isSimulationDetailsLoading && activeTab === 0 && (
         <TouchableOpacity
           onPress={handleScrollToBottom}
           style={styles.scrollToBottomButton}>

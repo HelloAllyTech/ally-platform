@@ -25,6 +25,7 @@ const makeSummaryResponse = (): CallSummaryResponse => ({
   startedAt: '2024-01-01T00:00:00.000Z',
   endedAt: '2024-01-01T01:00:00.000Z',
   summaryStatus: 'SUCCESS' as any,
+  archivedAt: '2024-01-01T02:00:00.000Z',
   details: {
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T01:00:00.000Z',

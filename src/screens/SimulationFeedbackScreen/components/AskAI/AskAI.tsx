@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import LinearGradient from 'react-native-linear-gradient';
 
 import {RankBadgeIcon, UpArrowIcon} from '@/assets';
@@ -40,48 +41,54 @@ export const AskAI: React.FC = () => {
             {t('SimulationFeedback.askAIHeader')}
           </Text>
         </View>
-        <View style={styles.contentContainer}>
-          <View style={styles.content}>
-            {/* Question Bubble */}
-            <View style={styles.questionBubble}>
-              <Text style={styles.questionText}>{MOCK_QUESTION}</Text>
-            </View>
-
-            {/* AI Response */}
-            <View style={styles.responseContainer}>
-              <View style={styles.rankBadgeContainer}>
-                <LinearGradient
-                  colors={[colors.ds.blue[50], colors.white]}
-                  start={{x: 0, y: 0}}
-                  end={{x: 0, y: 1}}
-                  style={styles.rankBadgeGradient}>
-                  <RankBadgeIcon width={9} height={9} />
-                </LinearGradient>
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.scrollContent}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}>
+          <View style={styles.contentContainer}>
+            <View style={styles.content}>
+              {/* Question Bubble */}
+              <View style={styles.questionBubble}>
+                <Text style={styles.questionText}>{MOCK_QUESTION}</Text>
               </View>
-              <View style={styles.responseTextContainer}>
-                <Text style={styles.responseText}>{MOCK_RESPONSE}</Text>
-              </View>
-            </View>
 
-            {/* Input Field */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder={t('SimulationFeedback.askAIPlaceholder')}
-                placeholderTextColor={colors.ds.typography.lowEmphasis}
-                value={question}
-                onChangeText={setQuestion}
-                multiline={false}
-              />
-              <TouchableOpacity
-                style={styles.sendButton}
-                onPress={handleSend}
-                activeOpacity={0.7}>
-                <UpArrowIcon width={14} height={14} color={colors.white} />
-              </TouchableOpacity>
+              {/* AI Response */}
+              <View style={styles.responseContainer}>
+                <View style={styles.rankBadgeContainer}>
+                  <LinearGradient
+                    colors={[colors.ds.blue[50], colors.white]}
+                    start={{x: 0, y: 0}}
+                    end={{x: 0, y: 1}}
+                    style={styles.rankBadgeGradient}>
+                    <RankBadgeIcon width={9} height={9} />
+                  </LinearGradient>
+                </View>
+                <View style={styles.responseTextContainer}>
+                  <Text style={styles.responseText}>{MOCK_RESPONSE}</Text>
+                </View>
+              </View>
+
+              {/* Input Field */}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('SimulationFeedback.askAIPlaceholder')}
+                  placeholderTextColor={colors.ds.typography.lowEmphasis}
+                  value={question}
+                  onChangeText={setQuestion}
+                  multiline={false}
+                />
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={handleSend}
+                  activeOpacity={0.7}>
+                  <UpArrowIcon width={14} height={14} color={colors.white} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAwareScrollView>
       </LinearGradient>
     </View>
   );

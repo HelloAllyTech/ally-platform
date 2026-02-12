@@ -261,6 +261,9 @@ export const GENDER_OPTIONS = [
 
 // Age range options
 export const AGE_RANGE_OPTIONS = [
+  '0-5',
+  '6-12',
+  '13-17',
   '18-24',
   '25-34',
   '35-44',

@@ -1,6 +1,9 @@
 import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
+  Case,
+  CaseDetails,
+  CasesResponse,
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
@@ -128,6 +131,8 @@ export const simulationsApi = api.injectEndpoints({
         'SimulationCredits',
         'SimulationPaths',
         'SimulationPathDetails',
+        'Cases',
+        'CaseDetails',
       ],
     }),
 
@@ -195,6 +200,74 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
     }),
+
+    // ============================================
+    // CASES API - Currently using scenario-paths endpoints (same as Tracks)
+    // TODO: Replace with dedicated /learn/scenario-cases endpoints when backend is ready
+    // Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/api/learn.ts)
+    // ============================================
+
+    /**
+     * Get all cases
+     * Currently fetches from scenario-paths endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
+     */
+    getCases: builder.query<Case[], void>({
+      query: () => ({
+        url: API_ROUTES.LEARN.CASES,
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CasesResponse) => response.data,
+      providesTags: ['Cases'],
+    }),
+
+    /**
+     * Get case details by ID
+     * Currently fetches from scenario-paths endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
+     */
+    getCaseDetails: builder.query<CaseDetails, {caseId: string}>({
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CaseDetails) => ({
+        ...response,
+        scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+      }),
+      providesTags: ['CaseDetails'],
+    }),
+
+    /**
+     * Create a case session to start a case
+     * Currently uses scenario-paths create-session endpoint (same as Tracks)
+     * TODO: Update to dedicated cases endpoint when backend API is available
+     */
+    createCaseSession: builder.mutation<
+      {caseSessionItemId: string},
+      {caseId: string}
+    >({
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CREATE_CASE_SESSION(caseId),
+        method: API_METHODS.POST,
+      }),
+      invalidatesTags: ['CaseDetails', 'Cases'],
+    }),
+
+    /**
+     * Get scenario session by case session item ID
+     * Currently uses scenario-path-session-item endpoint (same as Tracks)
+     * TODO: Update to dedicated case-session-item endpoint when backend API is available
+     */
+    getScenarioSessionByCaseItem: builder.query<
+      {id: string},
+      {caseSessionItemId: string}
+    >({
+      query: ({caseSessionItemId}) => ({
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_CASE_ITEM(caseSessionItemId),
+        method: API_METHODS.GET,
+      }),
+    }),
   }),
 });
 
@@ -215,4 +288,8 @@ export const {
   useGetUpcomingScenarioQuery,
   useLazyGetUpcomingScenarioQuery,
   useLazyGetScenarioSessionByPathItemQuery,
+  useGetCasesQuery,
+  useGetCaseDetailsQuery,
+  useCreateCaseSessionMutation,
+  useLazyGetScenarioSessionByCaseItemQuery,
 } = simulationsApi;

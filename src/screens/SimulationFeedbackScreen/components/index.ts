@@ -11,3 +11,4 @@ export type {
   SessionSkillsProps,
   SkillCoverageItem,
 } from './SessionSkills/SessionSkills';
+export {Reflection} from './Reflection/Reflection';

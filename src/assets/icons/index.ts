@@ -3,6 +3,7 @@ import AddReactionIcon from './addReaction.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
+import ArchiveIcon from './archive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
@@ -20,10 +21,12 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import CancelIcon from './cancel.svg';
 import ChangeImageIcon from './changeImage.svg';
 import ChatAddOnIcon from './chatAddOn.svg';
 import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
+import CheckCircleIcon from './checkCircle.svg';
 import ChecklistIcon from './checklist.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -135,6 +138,7 @@ import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  ArchiveIcon,
   Forward10Icon,
   Replay10Icon,
   PausePlayerIcon,
@@ -161,8 +165,10 @@ export {
   CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  CancelIcon,
   ChangeImageIcon,
   ChatAddOnIcon,
+  CheckCircleIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,

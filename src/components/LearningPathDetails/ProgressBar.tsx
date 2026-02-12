@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {StyleProp, Text, TextStyle, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {useTranslate} from '@/hooks';
@@ -26,6 +26,18 @@ export interface ProgressBarProps {
    * Height of the progress bar
    */
   height?: number;
+  /**
+   * Whether to show the progress text
+   */
+  isProgressTextVisible?: boolean;
+  /**
+   *  Progress bar text
+   */
+  progressText?: string;
+  /**
+   * Style of the progress bar text
+   */
+  progressTextStyle?: StyleProp<TextStyle>;
 }
 
 /**
@@ -40,6 +52,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   inProgressColor = colors.ds.theme.primary,
   completedColor = colors.ds.green[400],
   height = ms(6),
+  isProgressTextVisible = true,
+  progressText,
+  progressTextStyle,
 }) => {
   const {t} = useTranslate();
   const progressPercentage = total > 0 ? (current / total) * 100 : 0;
@@ -61,9 +76,11 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         />
       </View>
       {/* Progress text - inline with bar */}
-      <Text style={styles.progressText}>
-        {t('Simulations.progressCompleted', {current, total})}
-      </Text>
+      {isProgressTextVisible && (
+        <Text style={[styles.progressText, progressTextStyle]}>
+          {progressText || t('Simulations.progressCompleted', {current, total})}
+        </Text>
+      )}
     </View>
   );
 };

@@ -324,3 +324,34 @@ export interface ChecklistItem {
   score?: number;
   message?: string;
 }
+
+// ============================================
+// CASES - Currently using same types as Tracks/Pathways
+// Cases and Tracks share the same data model and backend API (scenario-paths)
+// Reference: ally-web uses the same approach (see ally-helpline-dashboard/src/types/learn.ts)
+// TODO: Replace with dedicated Case types when backend provides /learn/scenario-cases endpoints
+// ============================================
+
+/**
+ * Case list item type - currently aliases SimulationPath
+ * TODO: Replace with actual Case type when dedicated API is available
+ */
+export type Case = SimulationPath;
+
+/**
+ * Case detail type - currently aliases SimulationPathDetails
+ * TODO: Replace with actual CaseDetails type when dedicated API is available
+ */
+export type CaseDetails = SimulationPathDetails;
+
+/**
+ * Individual scenario within a Case - currently aliases PathScenario
+ * TODO: Replace with actual CaseSimulation type when dedicated API is available
+ */
+export type CaseSimulation = PathScenario;
+
+/**
+ * Cases list response type - currently aliases SimulationPathsResponse
+ * TODO: Replace with actual CasesResponse type when dedicated API is available
+ */
+export type CasesResponse = SimulationPathsResponse;
