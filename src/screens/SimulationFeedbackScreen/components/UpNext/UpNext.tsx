@@ -150,8 +150,7 @@ const styles = ScaledSheet.create({
   },
   backButton: {
     flex: 1,
-    paddingVertical: '12@vs',
-    paddingHorizontal: '24@ms',
+    paddingVertical: '8@vs',
     borderRadius: radius.full,
     borderWidth: '1@ms',
     borderColor: colors.ds.stroke.primary,
