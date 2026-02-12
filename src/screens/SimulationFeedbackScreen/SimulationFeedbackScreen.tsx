@@ -41,6 +41,7 @@ import {navigateToLearnTab} from '@/utils';
 import {
   AskAI,
   PrivacyToggle,
+  SessionSkills,
   SimulationSummary,
   SimulationSummarySkeleton,
   SimulationTranscript,
@@ -557,8 +558,45 @@ export const SimulationFeedbackScreen: React.FC<
       case 3: // Checklist
         return null; // TODO: Implement checklist tab
 
-      case 4: // Skills
-        return null; // TODO: Implement skills tab
+      case 4: // Skills - TODO: Remove dummy data after API is implemented
+        return (
+          <SessionSkills
+            skillCoverage={[
+              {name: 'Learning', percentage: 60, color: colors.ds.blue[300]},
+              {name: 'Support', percentage: 90, color: colors.ds.green[400]},
+              {name: 'Standards', percentage: 40, color: colors.ds.amber[400]},
+            ]}
+            emotionalMovementDatasets={[
+              {
+                data: [
+                  {x: 0, y: 1},
+                  {x: 55, y: 1.292},
+                  {x: 70, y: 3},
+                  {x: 110, y: 3.5},
+                  {x: 130, y: 5},
+                  {x: 140, y: 5},
+                  {x: 175, y: 4},
+                  {x: 185, y: 3},
+                  {x: 190, y: 5.5},
+                  {x: 200, y: 4.7},
+                  {x: 210, y: 6.5},
+                  {x: 220, y: 6},
+                  {x: 230, y: 6.5},
+                  {x: 250, y: 2},
+                  {x: 260, y: 7.5},
+                  {x: 265, y: 4},
+                  {x: 270, y: 8},
+                  {x: 290, y: 3},
+                  {x: 290, y: 2},
+                  {x: 315, y: 3.21},
+                  {x: 340, y: 3.33},
+                ],
+                color: opacity => `rgba(102, 187, 106, 1)`,
+                strokeWidth: 2,
+              },
+            ]}
+          />
+        );
 
       case 5: // Reflection
         return null; // TODO: Implement reflection tab

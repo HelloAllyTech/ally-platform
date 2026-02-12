@@ -77,3 +77,5 @@ export {NotificationModal} from './NotificationModal';
 export type {NotificationModalProps} from './NotificationModal';
 export {UserProfileImage} from './UserProfileImage';
 export {InfoTooltip} from './InfoTooltip';
+export {ChartComponent} from './ChartComponent';
+export type {ChartComponentProps, ChartDataset} from './ChartComponent';
