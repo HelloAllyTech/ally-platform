@@ -4,36 +4,7 @@ import {colors, fontFamily, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
-    flex: 1,
-    marginVertical: '10@vs',
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.stroke.primary,
-    padding: '16@ms',
-    borderRadius: '8@ms',
-    backgroundColor: colors.white,
-    shadowColor: colors.ds.grey[900],
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
     marginHorizontal: '10@ms',
-  },
-  titleContainer: {
-    width: '100%',
-    marginBottom: '16@vs',
-  },
-  title: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.ds.typography.highEmphasis,
-    letterSpacing: '0.25@ms',
-    lineHeight: '20@vs',
-  },
-  divider: {
-    height: '0.5@ms',
-    backgroundColor: colors.ds.stroke.primary,
-    width: '100%',
-    marginBottom: '16@vs',
   },
   scrollView: {
     flex: 1,

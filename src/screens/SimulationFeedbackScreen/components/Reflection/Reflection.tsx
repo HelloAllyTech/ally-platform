@@ -5,6 +5,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
+import {SummaryCard} from '../SummaryCard';
 import {styles} from './styles';
 
 const PROMPTS = [
@@ -36,14 +37,9 @@ export const Reflection: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>
-          {t('SimulationFeedback.reflection.sectionTitle')}
-        </Text>
-      </View>
-      <View style={styles.divider} />
-
+    <SummaryCard
+      title={t('SimulationFeedback.reflection.sectionTitle')}
+      containerStyle={styles.container}>
       <KeyboardAwareScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -100,6 +96,6 @@ export const Reflection: React.FC = () => {
           </View>
         ))}
       </KeyboardAwareScrollView>
-    </View>
+    </SummaryCard>
   );
 };
