@@ -68,7 +68,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {sessionData, scenario, pathId, contextType} = route.params;
+  const {sessionData, scenario, pathId, caseId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -219,7 +219,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: sessionId,
           pathId,
-          contextType, // Pass contextType so feedback screen knows if this is a case or track
+          caseId,
         });
       }
     };
@@ -272,7 +272,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     navigation,
     sessionId,
     pathId,
-    contextType,
+    caseId,
     clamp,
   ]);
 
@@ -326,13 +326,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
         scenarioSessionId: sessionId,
         pathId,
-        contextType, // Pass contextType so feedback screen knows if this is a case or track
+        caseId,
       });
       setIsMicEnabled(false);
       setRoomStatus(RoomStatus.DISCONNECTED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, pathId, contextType]);
+  }, [sessionId, pathId, caseId]);
 
   const handleToggleMic = useCallback(async () => {
     try {

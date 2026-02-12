@@ -14,7 +14,6 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
 import {
-  LearningPathType,
   SCREEN_NAMES,
   SimulationEventStatus,
   USER_PERMISSIONS,
@@ -56,13 +55,8 @@ const FEEDBACK_THRESHOLD = 30 * 1000;
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {
-    fromLogs,
-    scenarioSessionId,
-    pathId,
-    contextType = LearningPathType.TRACK,
-  } = route.params;
-  const isCase = contextType === LearningPathType.CASE;
+  const {fromLogs, scenarioSessionId, pathId, caseId} = route.params;
+  const isCase = !!caseId;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -391,17 +385,21 @@ export const SimulationFeedbackScreen: React.FC<
       return;
     }
 
-    startSimulation(
-      current.scenarioId,
-      current.scenarioPathSessionItemId,
+    startSimulation({
+      scenarioId: current.scenarioId,
+      scenarioPathSessionItemId: current.scenarioPathSessionItemId,
       pathId,
-    );
+    });
   };
 
   const handleNextSimulation = () => {
     const next = upcomingScenario;
     if (next && next.scenarioPathSessionItemId && next.id) {
-      startSimulation(next.id, next.scenarioPathSessionItemId, pathId);
+      startSimulation({
+        scenarioId: next.id,
+        scenarioPathSessionItemId: next.scenarioPathSessionItemId,
+        pathId,
+      });
     }
   };
 

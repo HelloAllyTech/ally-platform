@@ -158,17 +158,14 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
-    // ============================================
-    // CASES - Currently using scenario-paths endpoints (same as Tracks)
-    // TODO: Change to dedicated /learn/scenario-cases endpoints when backend is ready
-    // Reference: ally-web uses the same approach (see ally-admin-dashboard/src/constants/common.ts)
-    // ============================================
-    CASES: '/learn/scenario-paths', // TODO: Change to '/learn/scenario-cases' when backend is ready
-    CASE_DETAILS: (caseId: string) => `/learn/scenario-paths/${caseId}`, // TODO: Change to '/learn/scenario-cases/${caseId}'
+    CASES: '/learn/case-sessions',
+    CASE_DETAILS: (caseId: string) => `/learn/cases/${caseId}`,
     CREATE_CASE_SESSION: (caseId: string) =>
-      `/learn/scenario-paths/${caseId}/create-session`, // TODO: Change to '/learn/scenario-cases/${caseId}/create-session'
+      `/learn/cases/${caseId}/create-session`,
+    UPCOMING_CASE_SCENARIO: (scenarioSessionId: string) =>
+      `/learn/cases/${scenarioSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
-      `/learn/scenario-session/scenario-path-session-item/${caseSessionItemId}`, // TODO: Change to dedicated case-session-item endpoint
+      `/learn/scenario-session/scenario-path-session-item/${caseSessionItemId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',

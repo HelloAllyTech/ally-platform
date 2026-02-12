@@ -136,7 +136,7 @@ export const CaseDetailsScreen: React.FC<
   });
 
   const handleStart = async () => {
-    if (!data || !data.scenarioPathSessionId) {
+    if (!data || !data.caseSessionId) {
       await checkAndCreateSession();
       return;
     }
@@ -171,7 +171,6 @@ export const CaseDetailsScreen: React.FC<
         navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: response.id,
           pathId: caseId,
-          contextType: LearningPathType.CASE,
           fromLogs: true,
         });
       } else {
@@ -196,13 +195,11 @@ export const CaseDetailsScreen: React.FC<
     setShowNotification(false);
     if (selectedSimulation) {
       const languageId = languageMap.get(selectedLanguage);
-      startSimulation(
-        selectedSimulation.scenarioId,
-        selectedSimulation.sessionId || undefined,
-        caseId,
+      startSimulation({
+        scenarioId: selectedSimulation.scenarioId,
+        casesSessionItemId: selectedSimulation.sessionId || '',
         languageId,
-        LearningPathType.CASE,
-      ).finally(() => {
+      }).finally(() => {
         handleCloseModal();
       });
     }
