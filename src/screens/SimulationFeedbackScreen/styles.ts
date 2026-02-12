@@ -102,20 +102,6 @@ export const styles = ScaledSheet.create({
     lineHeight: '24@ms',
     color: colors.ds.typography.highEmphasis,
   },
-  transitionMessageContainer: {
-    marginBottom: '16@vs',
-  },
-  transitionMessageTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '8@vs',
-  },
-  transitionMessageContent: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.ds.typography.highEmphasis,
-  },
   privacyToggleContainer: {
     position: 'absolute',
     bottom: '20@vs',

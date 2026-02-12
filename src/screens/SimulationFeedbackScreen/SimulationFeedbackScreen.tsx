@@ -51,7 +51,7 @@ import {
   SimulationSummary,
   SimulationSummarySkeleton,
   SimulationTranscript,
-  UpNextSimulationCard,
+  UpNext,
 } from './components';
 import {styles} from './styles';
 
@@ -411,57 +411,8 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const renderButtonContainer = () => {
-    // Path simulations: show Finish / Retry / Next
-    if (pathId) {
-      if (!isEventCompleted) {
-        return null;
-      }
-      // Path completed: show a single Finish button
-      if (isPathCompleted) {
-        return (
-          <View style={styles.buttonContainer}>
-            <PrimaryButton
-              label={t('Common.finish')}
-              onPress={handleFeedbackAndNavigate}
-              customContainerStyle={styles.submitButton}
-            />
-          </View>
-        );
-      }
-
-      return (
-        <View style={styles.buttonContainer}>
-          <View style={styles.pathNavigationContainer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={handleFeedbackAndNavigate}
-              activeOpacity={0.7}>
-              <Text style={styles.backButtonText}>{t('Common.back')}</Text>
-            </TouchableOpacity>
-            {/* Show either Retry or Next, but never both */}
-            {!hasUpcoming && canRetryCurrent && (
-              <PrimaryButton
-                label={t('CallSummaryProgress.retry')}
-                onPress={handleRetrySimulation}
-                customContainerStyle={styles.retryButton}
-                isLoading={isStartingSimulation}
-              />
-            )}
-            {isCurrentSessionCompleted && hasUpcoming && (
-              <PrimaryButton
-                label={t('Common.next')}
-                onPress={handleNextSimulation}
-                customContainerStyle={styles.nextButton}
-                isLoading={isStartingSimulation}
-              />
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    // For normal simulations, show "Try Another" button
-    if (!fromLogs) {
+    // For normal simulations (not paths/cases), show "Try Another" button
+    if (!pathId && !caseId && !fromLogs) {
       return (
         <View style={styles.buttonContainer}>
           <PrimaryButton
@@ -516,39 +467,6 @@ export const SimulationFeedbackScreen: React.FC<
             ) : (
               <>
                 <SimulationSummary data={simulationDetails ?? null} />
-                {isEventCompleted && (
-                  <>
-                    {/* Transition message section */}
-                    {(currentSession?.transitionMessageTitle ||
-                      currentSession?.transitionMessageContent) && (
-                      <View style={styles.transitionMessageContainer}>
-                        {currentSession?.transitionMessageTitle && (
-                          <Text style={styles.transitionMessageTitle}>
-                            {currentSession.transitionMessageTitle}
-                          </Text>
-                        )}
-                        {currentSession?.transitionMessageContent && (
-                          <Text style={styles.transitionMessageContent}>
-                            {currentSession.transitionMessageContent}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-                    {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
-                      <>
-                        <Text style={styles.transitionMessageTitle}>
-                          {t('SimulationFeedback.almostThereTitle')}
-                        </Text>
-                        <Text style={styles.transitionMessageContent}>
-                          {t('SimulationFeedback.almostThereDescription')}
-                        </Text>
-                      </>
-                    )}
-                    {isCurrentSessionCompleted && !!upcomingScenario && (
-                      <UpNextSimulationCard upNext={upcomingScenario} />
-                    )}
-                  </>
-                )}
                 {simulationDetails && renderButtonContainer()}
               </>
             )}
@@ -650,12 +568,28 @@ export const SimulationFeedbackScreen: React.FC<
       case 5: // Reflection
         return <Reflection />;
 
-      case 6: // Up Next
-        return (
-          <View>
-            <Text>Up Next</Text>
-          </View>
-        );
+      case 2: // Up Next (only for paths/cases)
+        if (pathId || caseId) {
+          return (
+            <UpNext
+              currentSession={currentSession}
+              upcomingScenario={upcomingScenario}
+              isEventCompleted={isEventCompleted}
+              isPathCompleted={isPathCompleted}
+              hasUpcoming={hasUpcoming}
+              canRetryCurrent={canRetryCurrent}
+              isCurrentSessionCompleted={isCurrentSessionCompleted}
+              pathId={pathId}
+              caseId={caseId}
+              onFinish={handleFeedbackAndNavigate}
+              onBack={handleFeedbackAndNavigate}
+              onRetry={handleRetrySimulation}
+              onNext={handleNextSimulation}
+              isStartingSimulation={isStartingSimulation}
+            />
+          );
+        }
+        return null;
 
       default:
         return null;
@@ -689,12 +623,17 @@ export const SimulationFeedbackScreen: React.FC<
       //   key: 'reflection',
       //   title: t('SimulationFeedback.tabs.reflection'),
       // },
-      // {
-      //   key: 'upNext',
-      //   title: t('SimulationFeedback.tabs.upNext'),
-      // },
+      // Only show "Up Next" tab for paths and cases
+      ...(pathId || caseId
+        ? [
+            {
+              key: 'upNext',
+              title: t('SimulationFeedback.tabs.upNext'),
+            },
+          ]
+        : []),
     ],
-    [t],
+    [t, pathId, caseId],
   );
 
   return (
