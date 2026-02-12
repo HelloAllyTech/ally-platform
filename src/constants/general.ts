@@ -153,7 +153,7 @@ export const API_ROUTES = {
       `/learn/scenario-paths/${pathId}/create-session`,
     SIMULATION_PATH_DETAILS: (pathId: string) =>
       `/learn/scenario-paths/${pathId}`,
-    UPCOMING_SCENARIO: (scenarioPathSessionId: string) =>
+    UPCOMING_PATH_SCENARIO: (scenarioPathSessionId: string) =>
       `/learn/scenario-paths/${scenarioPathSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
@@ -165,7 +165,7 @@ export const API_ROUTES = {
     UPCOMING_CASE_SCENARIO: (scenarioSessionId: string) =>
       `/learn/cases/${scenarioSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
-      `/learn/scenario-session/scenario-path-session-item/${caseSessionItemId}`,
+      `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',

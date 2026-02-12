@@ -83,3 +83,4 @@ export type {NotificationModalProps} from './NotificationModal';
 export {UserProfileImage} from './UserProfileImage';
 export {InfoTooltip} from './InfoTooltip';
 export {ActionsMenu} from './ActionsMenu';
+export {SimulationTransitionSection} from './SimulationTransitionSection';
