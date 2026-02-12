@@ -3,47 +3,47 @@ import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PrimaryButton, SimulationTransitionSection} from '@/components';
-import {useTranslate} from '@/hooks';
+import {useSimulationTransition, useTranslate} from '@/hooks';
 import {colors, fontFamily, radius} from '@/theme';
-import {CurrentSessionInfo, UpNextSimulation} from '@/types';
 
 import {SessionGlimpse} from '../SessionGlimpse';
 import {SummaryCard} from '../SummaryCard';
 
 interface UpNextProps {
-  currentSession?: CurrentSessionInfo;
-  upcomingScenario?: UpNextSimulation;
-  isEventCompleted: boolean;
-  isFlowCompleted: boolean;
-  hasUpcoming: boolean;
-  canRetryCurrentSession: boolean;
-  isCurrentSessionCompleted: boolean;
+  scenarioSessionId?: string;
   pathId?: string;
   caseId?: string;
   onFinish: () => void;
   onBack: () => void;
-  onRetry: () => void;
-  onNext: () => void;
-  isStartingSimulation: boolean;
 }
 
 export const UpNext: React.FC<UpNextProps> = ({
-  currentSession,
-  upcomingScenario,
-  isEventCompleted,
-  isFlowCompleted,
-  hasUpcoming,
-  canRetryCurrentSession,
-  isCurrentSessionCompleted,
+  scenarioSessionId,
   pathId,
   caseId,
   onFinish,
   onBack,
-  onRetry,
-  onNext,
-  isStartingSimulation,
 }) => {
   const {t} = useTranslate();
+
+  // Get transition data and actions from the hook
+  const {
+    currentSession,
+    upcomingScenario,
+    isEventCompleted,
+    isFlowCompleted,
+    hasUpcoming,
+    canRetryCurrentSession,
+    isCurrentSessionCompleted,
+    retrySimulation,
+    startNextSimulation,
+    isStartingSimulation,
+  } = useSimulationTransition({
+    scenarioSessionId,
+    pathId,
+    caseId,
+    enabled: !!(pathId || caseId),
+  });
 
   const renderButtons = () => {
     // Only show buttons for paths/cases
@@ -82,7 +82,7 @@ export const UpNext: React.FC<UpNextProps> = ({
           {!hasUpcoming && canRetryCurrentSession && (
             <PrimaryButton
               label={t('CallSummaryProgress.retry')}
-              onPress={onRetry}
+              onPress={retrySimulation}
               customContainerStyle={styles.retryButton}
               isLoading={isStartingSimulation}
             />
@@ -90,7 +90,7 @@ export const UpNext: React.FC<UpNextProps> = ({
           {isCurrentSessionCompleted && hasUpcoming && (
             <PrimaryButton
               label={t('Common.next')}
-              onPress={onNext}
+              onPress={startNextSimulation}
               customContainerStyle={styles.nextButton}
               isLoading={isStartingSimulation}
             />
@@ -136,7 +136,6 @@ const styles = ScaledSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: '10@ms',
     paddingBottom: '40@vs',
   },
   buttonContainer: {

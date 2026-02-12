@@ -15,3 +15,6 @@ export type {
 export {Reflection} from './Reflection/Reflection';
 export {UpNext} from './UpNext';
 export {SessionGlimpse} from './SessionGlimpse';
+export {SummaryTab} from './SummaryTab';
+export {TranscriptTab} from './TranscriptTab';
+export {ChecklistTab} from './ChecklistTab';

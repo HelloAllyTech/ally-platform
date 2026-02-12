@@ -28,6 +28,8 @@ export interface SkillCoverageItem {
 }
 
 export interface SessionSkillsProps {
+  /** Optional scenario session ID for fetching real data (when API is ready) */
+  scenarioSessionId?: string;
   /** Array of skill coverage items to display in the bar chart */
   skillCoverage?: SkillCoverageItem[];
   /** Chart datasets for the emotional movement line chart */
@@ -160,20 +162,66 @@ const chartConfig = {
 };
 
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
-  skillCoverage = [],
-  emotionalMovementDatasets = [],
+  scenarioSessionId,
+  skillCoverage,
+  emotionalMovementDatasets,
 }) => {
+  // TODO: Fetch real data using scenarioSessionId when API is ready
+  // For now, use dummy data if not provided
+  const defaultSkillCoverage: SkillCoverageItem[] = [
+    {name: 'Learning', percentage: 60, color: colors.ds.blue[300]},
+    {name: 'Support', percentage: 90, color: colors.ds.green[400]},
+    {name: 'Standards', percentage: 40, color: colors.ds.amber[400]},
+  ];
+
+  const defaultEmotionalMovementDatasets: EmotionalMovementDataset[] = [
+    {
+      data: [
+        {x: 0, y: 1},
+        {x: 55, y: 1.292},
+        {x: 70, y: 3},
+        {x: 110, y: 3.5},
+        {x: 130, y: 5},
+        {x: 140, y: 5},
+        {x: 175, y: 4},
+        {x: 185, y: 3},
+        {x: 190, y: 5.5},
+        {x: 200, y: 4.7},
+        {x: 210, y: 6.5},
+        {x: 220, y: 6},
+        {x: 230, y: 6.5},
+        {x: 250, y: 2},
+        {x: 260, y: 7.5},
+        {x: 265, y: 4},
+        {x: 270, y: 8},
+        {x: 290, y: 3},
+        {x: 290, y: 2},
+        {x: 315, y: 3.21},
+        {x: 340, y: 3.33},
+      ],
+      color: _opacity => `rgba(102, 187, 106, 1)`,
+      strokeWidth: 2,
+    },
+  ];
+
+  const finalSkillCoverage: SkillCoverageItem[] =
+    skillCoverage || defaultSkillCoverage;
+  const finalEmotionalMovementDatasets: EmotionalMovementDataset[] =
+    emotionalMovementDatasets || defaultEmotionalMovementDatasets;
   // Generate the labels map using the util function.
   const normalisedXAxisLabelsMap = useMemo(
     () =>
-      getNormalisedXAxisLabelsMap(emotionalMovementDatasets, formatTimeToMMSS),
-    [emotionalMovementDatasets],
+      getNormalisedXAxisLabelsMap(
+        finalEmotionalMovementDatasets,
+        formatTimeToMMSS,
+      ),
+    [finalEmotionalMovementDatasets],
   );
 
   // Interpolated Y values at each normalised X-axis position (one number[] per dataset).
   const interpolatedYValues = useMemo(
-    () => getInterpolatedYValues(emotionalMovementDatasets),
-    [emotionalMovementDatasets],
+    () => getInterpolatedYValues(finalEmotionalMovementDatasets),
+    [finalEmotionalMovementDatasets],
   );
 
   const renderSkillItem = (skill: SkillCoverageItem, index: number) => (
@@ -199,19 +247,19 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       showsVerticalScrollIndicator={false}>
       <SummaryCard title="Skills shown in this session">
         {/* Skill Coverage Card */}
-        {skillCoverage.length > 0 && (
+        {finalSkillCoverage.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>Skill Coverage</Text>
             </View>
             <View style={styles.cardContent}>
-              {skillCoverage.map(renderSkillItem)}
+              {finalSkillCoverage.map(renderSkillItem)}
             </View>
           </View>
         )}
 
         {/* Client Emotional Movement Card */}
-        {emotionalMovementDatasets.length > 0 && (
+        {finalEmotionalMovementDatasets.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>
@@ -227,10 +275,12 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             <View style={styles.chartWrapper}>
               <ChartComponent
                 xAxisLabels={Array.from(normalisedXAxisLabelsMap.values())}
-                datasets={emotionalMovementDatasets.map((dataset, idx) => ({
-                  ...dataset,
-                  data: interpolatedYValues[idx] || [],
-                }))}
+                datasets={finalEmotionalMovementDatasets.map(
+                  (dataset, idx) => ({
+                    ...dataset,
+                    data: interpolatedYValues[idx] || [],
+                  }),
+                )}
                 height={ms(250)}
                 showLegend={false}
                 chartConfig={chartConfig}
@@ -249,7 +299,6 @@ const styles = ScaledSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: '10@ms',
     paddingBottom: '40@vs',
   },
   card: {
