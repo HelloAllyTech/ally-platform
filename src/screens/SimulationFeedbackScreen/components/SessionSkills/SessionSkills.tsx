@@ -2,8 +2,7 @@ import React, {useMemo} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ChartComponent} from '@/components/ChartComponent/ChartComponent';
-import {ProgressBar} from '@/screens/SimulationPathDetailsScreen/components/ProgressBar';
+import {ChartComponent, ProgressBar} from '@/components';
 import {colors, fontFamily, typography} from '@/theme';
 import {formatTimeToMMSS} from '@/utils/date';
 

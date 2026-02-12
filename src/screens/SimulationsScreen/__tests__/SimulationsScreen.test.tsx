@@ -114,6 +114,7 @@ jest.mock('@/components', () => {
 jest.mock('@/services', () => ({
   useGetScenariosQuery: jest.fn(),
   useGetSimulationPathsQuery: jest.fn(),
+  useGetCasesQuery: jest.fn(),
 }));
 
 describe('SimulationsScreen', () => {
@@ -121,6 +122,8 @@ describe('SimulationsScreen', () => {
     .useGetScenariosQuery as jest.Mock;
   const useGetSimulationPathsQueryMock = require('@/services')
     .useGetSimulationPathsQuery as jest.Mock;
+  const useGetCasesQueryMock = require('@/services')
+    .useGetCasesQuery as jest.Mock;
 
   const renderWithSafeArea = (ui: React.ReactElement) =>
     render(
@@ -137,6 +140,12 @@ describe('SimulationsScreen', () => {
     jest.clearAllMocks();
     // Provide default mock for useGetSimulationPathsQuery
     useGetSimulationPathsQueryMock.mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
+    // Provide default mock for useGetCasesQuery
+    useGetCasesQueryMock.mockReturnValue({
       data: undefined,
       isFetching: false,
       refetch: jest.fn(),

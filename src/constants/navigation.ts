@@ -11,6 +11,7 @@ export const SCREEN_NAMES = {
   SIMULATIONS: 'Simulations',
   SIMULATION_DETAILS: 'SimulationDetails',
   SIMULATION_PATH_DETAILS: 'SimulationPathDetails',
+  CASE_DETAILS: 'CaseDetails',
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',

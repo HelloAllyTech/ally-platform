@@ -11,6 +11,7 @@ export {DrawerContent} from './LogoutScreen/components/CustomDrawerContent';
 export {SimulationsScreen} from './SimulationsScreen';
 export {SimulationDetailsScreen} from './SimulationDetailsScreen';
 export {SimulationPathDetailsScreen} from './SimulationPathDetailsScreen';
+export {CaseDetailsScreen} from './CaseDetailsScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
 export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
 export {LeaderboardScreen} from './LeaderboardScreen';

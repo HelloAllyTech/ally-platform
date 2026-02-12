@@ -62,6 +62,7 @@ export enum AllyPlatforms {
 export enum LogType {
   REAL = 'real',
   SIMULATION = 'simulation',
+  ARCHIVED_REAL = 'archived_real',
 }
 
 export enum LanguageMap {
@@ -111,6 +112,9 @@ export const API_ROUTES = {
     MESSAGES_FEEDBACK: (chatId: number) => `/chats/messages/${chatId}/feedback`,
     MESSAGES_FEEDBACK_BY_ID: (feedbackId: number) =>
       `/chats/messages/feedback/${feedbackId}`,
+    GET_ARCHIVED_CALL_LOGS: '/chats/call-logs?archive=true',
+    ARCHIVE_CALL_LOG: (callLogId: number) =>
+      `/chats/call-logs/${callLogId}/archive`,
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
@@ -155,6 +159,17 @@ export const API_ROUTES = {
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
+    // ============================================
+    // CASES - Currently using scenario-paths endpoints (same as Tracks)
+    // TODO: Change to dedicated /learn/scenario-cases endpoints when backend is ready
+    // Reference: ally-web uses the same approach (see ally-admin-dashboard/src/constants/common.ts)
+    // ============================================
+    CASES: '/learn/scenario-paths', // TODO: Change to '/learn/scenario-cases' when backend is ready
+    CASE_DETAILS: (caseId: string) => `/learn/scenario-paths/${caseId}`, // TODO: Change to '/learn/scenario-cases/${caseId}'
+    CREATE_CASE_SESSION: (caseId: string) =>
+      `/learn/scenario-paths/${caseId}/create-session`, // TODO: Change to '/learn/scenario-cases/${caseId}/create-session'
+    SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
+      `/learn/scenario-session/scenario-path-session-item/${caseSessionItemId}`, // TODO: Change to dedicated case-session-item endpoint
   },
   REVIEWS: {
     REVIEWS: '/reviews',

@@ -28,6 +28,9 @@ export const styles = ScaledSheet.create({
     letterSpacing: '0.25@ms',
     lineHeight: '20@vs',
   },
+  scrollContent: {
+    flex: 1,
+  },
   contentContainer: {
     flex: 1,
     marginHorizontal: '4@ms',
@@ -103,7 +106,6 @@ export const styles = ScaledSheet.create({
     fontSize: '12.25@ms',
     color: colors.ds.typography.highEmphasis,
     letterSpacing: '-0.0179@ms',
-    lineHeight: '17.5@vs',
     padding: 0,
   },
   sendButton: {

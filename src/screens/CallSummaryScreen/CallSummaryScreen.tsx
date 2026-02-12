@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   StatusBar,
@@ -78,6 +78,8 @@ export const CallSummaryScreen: React.FC<
     !isUnauthorized &&
     permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
+  const isArchived = !!summaryData?.archivedAt;
+
   const dispatch = useAppDispatch();
 
   const {
@@ -86,6 +88,7 @@ export const CallSummaryScreen: React.FC<
     hideMenu,
     showMenu,
     handleExport,
+    handleArchive,
     handleDelete,
     handleGoBack,
     summaryName,
@@ -110,6 +113,19 @@ export const CallSummaryScreen: React.FC<
   const [mountTime] = useState<number>(Date.now());
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
+  const [showArchiveConfirmation, setShowArchiveConfirmation] =
+    useState<boolean>(false);
+  const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (isArchived) {
+      setActionType('unarchive');
+    } else {
+      setActionType('archive');
+    }
+  }, [isArchived]);
 
   useHardwareBackPressHandler(() => {
     onBackNavigation();
@@ -276,6 +292,11 @@ export const CallSummaryScreen: React.FC<
         isMenuVisible={isMenuVisible}
         hideMenu={hideMenu}
         handleExport={handleExport}
+        actionType={actionType}
+        setActionType={setActionType}
+        showArchiveConfirmation={showArchiveConfirmation}
+        setShowArchiveConfirmation={setShowArchiveConfirmation}
+        onArchive={handleArchive}
         isSummaryDropdownVisible={isSummaryDropdownVisible}
         hideHeaderDropdown={hideHeaderDropdown}
         showSummary={showSummary}
