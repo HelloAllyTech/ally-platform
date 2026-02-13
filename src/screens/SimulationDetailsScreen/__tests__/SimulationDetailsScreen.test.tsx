@@ -163,13 +163,11 @@ describe('SimulationDetailsScreen', () => {
     fireEvent.press(notificationButton);
 
     await waitFor(() => {
-      // startSimulation is called with (scenarioId, sessionId, pathId, languageId)
-      expect(mockStartSimulation).toHaveBeenCalledWith(
-        scenario.id,
-        undefined,
-        undefined,
-        1, // languageId from mock preferences
-      );
+      // startSimulation is called with an object containing scenarioId and languageId
+      expect(mockStartSimulation).toHaveBeenCalledWith({
+        scenarioId: scenario.id,
+        languageId: 1, // languageId from mock preferences
+      });
     });
   });
 
