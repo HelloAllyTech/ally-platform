@@ -29,7 +29,7 @@ export const styles = ScaledSheet.create({
     lineHeight: '20@vs',
   },
   scrollContent: {
-    flex: 1,
+    flexGrow: 1,
   },
   contentContainer: {
     flex: 1,
@@ -39,10 +39,33 @@ export const styles = ScaledSheet.create({
   },
   content: {
     flex: 1,
-    padding: '16@ms',
-    gap: '24@vs',
     backgroundColor: colors.white,
     borderRadius: '12@ms',
+  },
+  messageList: {
+    flex: 1,
+    paddingHorizontal: '16@ms',
+    paddingTop: '16@vs',
+  },
+  messageListContent: {
+    gap: '16@vs',
+    paddingBottom: '8@vs',
+  },
+  emptyListContent: {
+    flex: 1,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: '32@ms',
+  },
+  emptyStateText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.lowEmphasis,
+    textAlign: 'center',
+    lineHeight: '18@vs',
   },
   questionBubble: {
     backgroundColor: colors.ds.blue[50],
@@ -62,7 +85,6 @@ export const styles = ScaledSheet.create({
   responseContainer: {
     flexDirection: 'row',
     gap: '8@ms',
-    flex: 1,
   },
   rankBadgeContainer: {
     width: '24@ms',
@@ -88,6 +110,30 @@ export const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     lineHeight: '16.9@vs',
   },
+  streamingIndicator: {
+    flexDirection: 'row',
+    gap: '8@ms',
+    paddingTop: '4@vs',
+    alignItems: 'center',
+  },
+  typingDot: {
+    width: '4@ms',
+    height: '4@ms',
+    borderRadius: '2@ms',
+    backgroundColor: colors.ds.typography.lowEmphasis,
+  },
+  maxMessagesText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.lowEmphasis,
+    textAlign: 'center',
+    paddingVertical: '8@vs',
+  },
+  inputWrapper: {
+    paddingHorizontal: '16@ms',
+    paddingTop: '8@vs',
+    paddingBottom: '16@vs',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -99,6 +145,9 @@ export const styles = ScaledSheet.create({
     paddingRight: '4@ms',
     paddingVertical: '4@vs',
     gap: '10@ms',
+  },
+  inputContainerDisabled: {
+    opacity: 0.5,
   },
   input: {
     flex: 1,
@@ -115,5 +164,8 @@ export const styles = ScaledSheet.create({
     backgroundColor: '#d1d5dc',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  sendButtonActive: {
+    backgroundColor: colors.ds.blue[500],
   },
 });
