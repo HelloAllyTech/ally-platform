@@ -3,7 +3,7 @@ import {View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useLazyGetSimulationDetailsQuery} from '@/services';
 
@@ -81,7 +81,7 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
     if (!pathId && !caseId && !fromLogs) {
       return (
         <View style={styles.buttonContainer}>
-          <PrimaryButton
+          <Button
             label={t('SimulationFeedback.tryAnother')}
             onPress={onTryAnother}
             customContainerStyle={styles.submitButton}
@@ -122,6 +122,7 @@ const styles = ScaledSheet.create({
     marginTop: '24@vs',
   },
   submitButton: {
-    width: '100%',
+    width: '90%',
+    alignSelf: 'center',
   },
 });

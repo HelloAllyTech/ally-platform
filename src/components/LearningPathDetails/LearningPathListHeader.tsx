@@ -2,7 +2,7 @@ import React from 'react';
 import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ProgressBar} from './ProgressBar';
@@ -54,7 +54,7 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
         )}
 
         {!isCompleted && (
-          <PrimaryButton
+          <Button
             label={startButtonLabel}
             onPress={onStartPress}
             isDisabled={isStartDisabled}

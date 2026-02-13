@@ -3,7 +3,7 @@ import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {PrimaryButton, useErrorToast} from '@/components';
+import {Button, useErrorToast} from '@/components';
 import {useTranslate} from '@/hooks';
 import {
   colors,
@@ -88,21 +88,17 @@ export const ArchiveActionModal = React.memo(
             </View>
             <Text style={styles.description}>{description}</Text>
             <View style={styles.buttonContainer}>
-              <PrimaryButton
+              <Button
                 label={cancel}
                 onPress={onClose}
-                customContainerStyle={styles.cancel}
-                customTextStyle={styles.cancelText}
+                variant="secondary"
+                customContainerStyle={styles.button}
               />
-              <PrimaryButton
+              <Button
                 label={confirm}
                 onPress={onConfirm}
-                customContainerStyle={[
-                  styles.confirm,
-                  actionType === 'archive' && {
-                    backgroundColor: colors.ds.red[400],
-                  },
-                ]}
+                variant={actionType === 'archive' ? 'destructive' : 'primary'}
+                customContainerStyle={styles.button}
               />
             </View>
           </View>
@@ -165,16 +161,7 @@ const styles = ScaledSheet.create({
     gap: '12@ms',
     width: '100%',
   },
-  confirm: {
+  button: {
     flex: 1,
-  },
-  cancel: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.lightGray2,
-    flex: 1,
-  },
-  cancelText: {
-    color: colors.darkGray12,
   },
 });

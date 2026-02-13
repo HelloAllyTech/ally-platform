@@ -5,9 +5,9 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {GoogleIcon} from '@/assets';
 import {colors, fontFamily, radius, typography} from '@/theme';
 
-import type {PrimaryButtonProps} from './types';
+import type {ButtonProps} from './types';
 
-interface GoogleLoginButtonProps extends Omit<PrimaryButtonProps, 'label'> {
+interface GoogleLoginButtonProps extends Omit<ButtonProps, 'label'> {
   label?: string;
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import {render, fireEvent, waitFor, act} from '@testing-library/react-native';
+import {render, fireEvent, waitFor} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SimulationFeedbackScreen} from '../SimulationFeedbackScreen';
@@ -16,6 +16,7 @@ jest.mock('@/hooks', () => ({
     goBack: (...args: any[]) => mockGoBack(...args),
     navigate: jest.fn(),
     replace: jest.fn(),
+    reset: jest.fn(),
   }),
   useHardwareBackPressHandler: () => {},
   useStartSimulation: () => ({
@@ -65,7 +66,7 @@ jest.mock('@/components', () => {
   const {View, TouchableOpacity, Text} = require('react-native');
   const showToastMock = jest.fn();
   return {
-    PrimaryButton: ({label, onPress}: any) => (
+    Button: ({label, onPress}: any) => (
       <TouchableOpacity testID="primary-button" onPress={onPress}>
         <Text>{label}</Text>
       </TouchableOpacity>
@@ -168,41 +169,25 @@ jest.mock('../components', () => {
   const React = require('react');
   const {TouchableOpacity, Text, View} = require('react-native');
   return {
-    SimulationSummarySkeleton: () => <View testID="summary-skeleton" />,
-    SimulationSummary: () => <View testID="summary-comp" />,
-    SimulationTranscript: () => <View testID="transcript-comp" />,
-    SimulationAudioPlayer: () => <View testID="audio-player" />,
-    PrivacyToggle: () => <View testID="privacy-toggle" />,
-    UpNextSimulationCard: () => <View testID="up-next-card" />,
-    FeedbackDropdown: ({visible, setShowSummary}: any) => {
-      if (!visible) return null;
-      return (
-        <TouchableOpacity 
-          testID="transcript-option" 
-          onPress={() => setShowSummary(false)}
-        >
-          <Text>Transcript Option</Text>
+    SummaryTab: ({onTryAnother}: any) => (
+      <View testID="summary-tab">
+        <TouchableOpacity testID="try-another-button" onPress={onTryAnother}>
+          <Text>Try Another</Text>
         </TouchableOpacity>
-      );
-    },
-    AskAI: () => <View testID="ask-ai" />,
-    SummaryTab: () => (
-      <>
-        <View testID="summary-tab" />
-        <View testID="summary-skeleton" />
-        <View testID="summary-comp" />
-      </>
+      </View>
     ),
-    TranscriptTab: () => (
-      <>
-        <View testID="transcript-tab" />
-        <View testID="transcript-comp" />
-      </>
+    TranscriptTab: () => <View testID="transcript-tab" />,
+    AskAI: () => <View testID="ask-ai-tab" />,
+    UpNext: ({onFinish, onBack}: any) => (
+      <View testID="up-next-tab">
+        <TouchableOpacity testID="finish-button" onPress={onFinish}>
+          <Text>Finish</Text>
+        </TouchableOpacity>
+        <TouchableOpacity testID="back-button" onPress={onBack}>
+          <Text>Back</Text>
+        </TouchableOpacity>
+      </View>
     ),
-    UpNext: () => <View testID="up-next" />,
-    ChecklistTab: () => <View testID="checklist-tab" />,
-    SessionSkills: () => <View testID="session-skills" />,
-    Reflection: () => <View testID="reflection" />,
   };
 });
 
@@ -218,26 +203,32 @@ describe('SimulationFeedbackScreen', () => {
       </SafeAreaProvider>,
     );
 
-  it('renders summary when data exists', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('renders summary tab when data exists', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
         navigation={{} as any}
         route={{params: {scenarioSessionId: '1'}} as any}
       />,
     );
-    expect(getByTestId('summary-comp')).toBeTruthy();
+    expect(getByTestId('summary-tab')).toBeTruthy();
   });
 
-  it.skip('opens feedback popup on button press', () => {
+  it('opens feedback popup when try another is pressed', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    fireEvent.press(getByTestId('primary-button'));
-    // Popup rendered by mocked component within screen
-    // We don’t have direct access; behavior covered by the screen showing popup internally
+    fireEvent.press(getByTestId('try-another-button'));
+    await waitFor(() => {
+      expect(getByTestId('feedback-popup')).toBeTruthy();
+    });
   });
 
-  it('shows skeleton when details are missing', () => {
+  it('renders summary tab even when details are missing', () => {
     const services = require('@/services');
     (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
       jest.fn().mockResolvedValue({data: {details: null}}),
@@ -247,59 +238,57 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    expect(getByTestId('summary-skeleton')).toBeTruthy();
+    // Screen always renders SummaryTab; loading state is handled internally by SummaryTab
+    expect(getByTestId('summary-tab')).toBeTruthy();
   });
 
-  it('switches to transcript when header pressed (via dropdown sets showSummary=false)', async () => {
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
-    ]);
+  it('switches to transcript tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Switch to transcript tab by clicking on the transcription tab (index 1)
-    const transcriptionTab = getByTestId('tab-1');
-    fireEvent.press(transcriptionTab);
-    // Transcript should render after clicking the transcription tab
+    // Tab index 1 is TRANSCRIPTION
+    fireEvent.press(getByTestId('tab-1'));
     await waitFor(() => {
-      expect(getByTestId('transcript-comp')).toBeTruthy();
+      expect(getByTestId('transcript-tab')).toBeTruthy();
     });
   });
 
-  it.skip('shows scroll-to-bottom button when not near bottom and handles press', async () => {
-    // This test is skipped because scroll-to-bottom functionality is now in SummaryTab component
-    // The main SimulationFeedbackScreen no longer contains KeyboardAwareScrollView
+  it('shows up next tab when pathId is provided', async () => {
+    const {getByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
+    );
+    // Tab index 2 is UP_NEXT (only visible when pathId or caseId is provided)
+    fireEvent.press(getByTestId('tab-2'));
+    await waitFor(() => {
+      expect(getByTestId('up-next-tab')).toBeTruthy();
+    });
   });
 
-  it.skip('when fromLogs and >= threshold with no feedback, shows feedback popup on back', async () => {
-    // This test is skipped because the feedback threshold logic has been removed
-    // The screen now uses a simpler back navigation without threshold checks
-  });
-
-  it('when fromLogs and < threshold, back goes to previous screen', () => {
+  it('navigates back when fromLogs back button is pressed', () => {
     mockGoBack = jest.fn();
-
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, hasFeedback: false}, isLoading: false},
-    ]);
 
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
 
-    // immediately press back (below threshold)
     fireEvent.press(getByTestId('left-arrow-icon'));
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it.skip('retries until limit and then shows toast error', async () => {
-    // This test is skipped because retry logic is now in SummaryTab component
-    // The main SimulationFeedbackScreen no longer handles simulation details fetching
+  it('does not show back arrow when not from logs', () => {
+    const {queryByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
+    );
+    expect(queryByTestId('left-arrow-icon')).toBeNull();
+  });
+
+  it('renders tabs with correct count based on route params', () => {
+    const {getByTestId, queryByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
+    );
+    // Without pathId/caseId: SUMMARY (0) and TRANSCRIPTION (1) only
+    expect(getByTestId('tab-0')).toBeTruthy();
+    expect(getByTestId('tab-1')).toBeTruthy();
+    expect(queryByTestId('tab-2')).toBeNull();
   });
 });
-
-

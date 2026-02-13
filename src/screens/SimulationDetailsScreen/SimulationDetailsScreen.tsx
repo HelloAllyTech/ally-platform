@@ -13,10 +13,10 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
 import {
+  Button,
   CustomDropdown,
   IllustratedModal,
   NotificationModal,
-  PrimaryButton,
   useToast,
   VideoPreview,
 } from '@/components';
@@ -181,7 +181,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const renderCtaSection = () => {
     return (
       <View style={styles.ctaWrapper}>
-        <PrimaryButton
+        <Button
           label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}

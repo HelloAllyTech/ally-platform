@@ -1,12 +1,13 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {SimulationEventStatus} from '@/constants';
-import {useStartSimulation} from '@/hooks';
 import {
   useGetUpcomingCaseScenarioQuery,
   useGetUpcomingScenarioQuery,
 } from '@/services';
 import {CurrentSessionInfo, SessionItemStatus, UpNextSimulation} from '@/types';
+
+import {useStartSimulation} from './useStartSimulation';
 
 const RETRY_COUNT_LIMIT = 4;
 const RETRY_DELAY = 5000;
