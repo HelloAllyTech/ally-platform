@@ -16,7 +16,7 @@ jest.mock('@/components', () => {
         star
       </Text>
     ),
-    PrimaryButton: ({onPress, label, testID}: any) => (
+    Button: ({onPress, label, testID}: any) => (
       <Text testID={testID} onPress={onPress}>
         {label}
       </Text>

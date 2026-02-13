@@ -12,7 +12,7 @@ jest.mock('@/hooks', () => ({
 
 jest.mock('@/components', () => ({
   __esModule: true,
-  PrimaryButton: ({label, onPress}: any) => {
+  Button: ({label, onPress}: any) => {
     const React = require('react');
     const {TouchableOpacity, Text} = require('react-native');
     return (

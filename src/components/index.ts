@@ -1,5 +1,5 @@
-export {PrimaryButton} from './Button';
-export type {PrimaryButtonProps} from './Button';
+export {Button} from './Button';
+export type {ButtonProps} from './Button';
 export {CustomModal} from './CustomModal';
 export {IllustratedModal} from './IllustratedModal';
 export {IllustratedActionModal} from './IllustratedActionModal';
@@ -49,6 +49,11 @@ export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';
 export {SimulationCard} from './SimulationCard';
+export {
+  LearningPathHeader,
+  LearningPathListHeader,
+  ProgressBar,
+} from './LearningPathDetails';
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
@@ -77,3 +82,9 @@ export {NotificationModal} from './NotificationModal';
 export type {NotificationModalProps} from './NotificationModal';
 export {UserProfileImage} from './UserProfileImage';
 export {InfoTooltip} from './InfoTooltip';
+export {ChartComponent} from './ChartComponent';
+export type {ChartComponentProps, ChartDataset} from './ChartComponent';
+export {ActionsMenu} from './ActionsMenu';
+export {SessionChecklist} from './Checklist';
+export type {SessionChecklistItem, SessionChecklistProps} from './Checklist';
+export {SimulationTransitionSection} from './SimulationTransitionSection';

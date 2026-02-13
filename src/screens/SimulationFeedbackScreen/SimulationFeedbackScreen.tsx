@@ -1,125 +1,83 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {
-  SafeAreaView,
-  Text,
-  TouchableOpacity,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
-import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
+import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {ArrowDown, ChevronDown, CommentIcon, LeftArrowIcon} from '@/assets';
-import {FeedbackPopup, PrimaryButton, useToast} from '@/components';
-import {
-  SCREEN_NAMES,
-  SimulationEventStatus,
-  USER_PERMISSIONS,
-} from '@/constants';
-import {
-  useAppNavigation,
-  useHardwareBackPressHandler,
-  useStartSimulation,
-} from '@/hooks';
+import {CommentIcon, LeftArrowIcon} from '@/assets';
+import {CustomTabs, FeedbackPopup, useToast} from '@/components';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
-  useCreateReviewMutation,
-  useGetUpcomingScenarioQuery,
   useLazyGetReactionsCountQuery,
   useLazyGetSimulationDetailsQuery,
-  useUpdateReviewStatusMutation,
 } from '@/services';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
-import {ReviewStatus, SessionItemStatus} from '@/types';
+import {ReviewStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
-import {
-  FeedbackDropdown,
-  PrivacyToggle,
-  SimulationSummary,
-  SimulationSummarySkeleton,
-  SimulationTranscript,
-  UpNextSimulationCard,
-} from './components';
+import {AskAI, SummaryTab, TranscriptTab, UpNext} from './components';
 import {styles} from './styles';
 
-const RETRY_COUNT_LIMIT = 4;
-const RETRY_DELAY = 5000;
-const FEEDBACK_THRESHOLD = 30 * 1000;
+// Tab keys enum for better maintainability and type safety
+enum TabKey {
+  SUMMARY = 'SUMMARY',
+  ASK_AI = 'ASK_AI',
+  TRANSCRIPTION = 'TRANSCRIPTION',
+  // CHECKLIST = 'CHECKLIST',
+  // SKILLS = 'SKILLS',
+  // REFLECTION = 'REFLECTION',
+  UP_NEXT = 'UP_NEXT',
+}
 
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId} = route.params;
+  const {fromLogs, scenarioSessionId, pathId, caseId} = route.params;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const [mountTime] = useState<number>(Date.now());
-  const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
-  const [showSummary, setShowSummary] = useState<boolean>(true);
-  const [isDropdownVisible, setIsDropdownVisible] = useState<boolean>(false);
-  const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<number>(0);
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
-  const [pollingInterval, setPollingInterval] = useState<number>(3000);
-  const nextSimulationPollingAttemptsRef = useRef<number>(0);
-
-  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
-  const [seekTime, setSeekTime] = useState<number | null>(null);
-  const [isPrivate, setIsPrivate] = useState(true);
-  const [reviewId, setReviewId] = useState<string | null>(null);
+  const [reviewId, setReviewId] = useState<string>();
   const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(false);
+  const [isPrivate, setIsPrivate] = useState<boolean>(true);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
-  const [createReview] = useCreateReviewMutation();
-  const [updateReviewStatus] = useUpdateReviewStatusMutation();
-  const [
-    getSimulationDetails,
-    {data: simulationDetails, isLoading: isSimulationDetailsLoading},
-  ] = useLazyGetSimulationDetailsQuery();
-  const {data: upcomingData, fulfilledTimeStamp} = useGetUpcomingScenarioQuery(
-    {scenarioSessionId: scenarioSessionId || ''},
-    {
-      skip: !scenarioSessionId || !pathId,
-      pollingInterval,
-    },
-  );
+  const {showToast} = useToast();
+
+  const [getSimulationDetails, {data: simulationDetails}] =
+    useLazyGetSimulationDetailsQuery();
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
 
-  const {showToast} = useToast();
-
+  // Fetch simulation details to get reviewId
   useEffect(() => {
-    if (
-      upcomingData?.currentSession?.eventStatus ===
-        SimulationEventStatus.COMPLETED ||
-      nextSimulationPollingAttemptsRef.current >= RETRY_COUNT_LIMIT
-    ) {
-      setPollingInterval(0);
-    } else {
-      nextSimulationPollingAttemptsRef.current += 1;
+    if (scenarioSessionId) {
+      getSimulationDetails({id: scenarioSessionId});
     }
-  }, [upcomingData, fulfilledTimeStamp]);
+  }, [scenarioSessionId, getSimulationDetails]);
 
+  // Set reviewId and isPrivate from simulation details
   useEffect(() => {
-    setPollingInterval(RETRY_DELAY);
-    nextSimulationPollingAttemptsRef.current = 0;
-  }, [scenarioSessionId]);
-
-  useEffect(() => {
-    if (simulationDetails?.details?.summary?.errorMessage) {
-      showToast(simulationDetails.details.summary.errorMessage, 'error');
+    if (simulationDetails?.reviewId) {
+      setReviewId(simulationDetails.reviewId);
+      if (simulationDetails.reviewStatus === ReviewStatus.IN_REVIEW) {
+        setIsPrivate(false);
+      } else if (simulationDetails.reviewStatus === ReviewStatus.HIDDEN) {
+        setIsPrivate(true);
+      }
     }
-  }, [showToast, simulationDetails?.details?.summary?.errorMessage]);
+  }, [simulationDetails?.reviewId, simulationDetails?.reviewStatus]);
 
+  // Fetch review threads and reactions to determine if comment icon should be shown
   useEffect(() => {
     const fetchReviewThreadComments = async () => {
       if (!reviewId) return;
@@ -133,7 +91,7 @@ export const SimulationFeedbackScreen: React.FC<
           offset: 0,
           limit: 1,
         });
-        if (threads.data && threads.data.data.length === 0) {
+        if (threads.data?.data?.length === 0) {
           const reactionsCount = await getReactionsCount(reviewId);
           if (
             reactionsCount.data &&
@@ -153,64 +111,16 @@ export const SimulationFeedbackScreen: React.FC<
     fetchReviewThreadComments();
   }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
 
-  const upcomingScenario = upcomingData?.upcomingScenario;
-  const currentSession = upcomingData?.currentSession;
-  const hasUpcoming = !!upcomingScenario;
-  const isCurrentSessionCompleted =
-    currentSession?.scenarioPathSessionItemStatus ===
-    SessionItemStatus.COMPLETED;
-  const canRetryCurrent =
-    !!currentSession?.scenarioPathSessionItemId && !isCurrentSessionCompleted;
-  const isPathCompleted = !!currentSession?.isScenarioPathSessionCompleted;
-  const isEventCompleted =
-    currentSession?.eventStatus === SimulationEventStatus.COMPLETED;
-
-  const {startSimulation, isCreatingRoom: isStartingSimulation} =
-    useStartSimulation();
-  const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchSimulationDetailsWithRetry = async (
-    currentRetryCount: number = 0,
-  ) => {
-    const sessionId = scenarioSessionId;
-    if (!sessionId) return;
-
-    try {
-      const response = await getSimulationDetails({
-        id: sessionId.toString(),
-      });
-      if (!response.data?.details && currentRetryCount < RETRY_COUNT_LIMIT) {
-        const nextRetryCount = currentRetryCount + 1;
-
-        retryTimeoutRef.current = setTimeout(() => {
-          fetchSimulationDetailsWithRetry(nextRetryCount);
-        }, RETRY_DELAY);
-      } else if (currentRetryCount >= RETRY_COUNT_LIMIT) {
-        setRetryLimitReached(true);
-        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
-      }
-    } catch (error) {
-      if (currentRetryCount < RETRY_COUNT_LIMIT) {
-        const nextRetryCount = currentRetryCount + 1;
-        retryTimeoutRef.current = setTimeout(() => {
-          fetchSimulationDetailsWithRetry(nextRetryCount);
-        }, RETRY_DELAY);
-      } else {
-        setRetryLimitReached(true);
-        showToast(t('SimulationFeedback.failedToFetchDetails'), 'error');
-      }
-    }
-  };
-
   const handleBack = () => {
-    if (pathId) {
+    if (pathId || caseId) {
       navigation.reset({
         index: 0,
         routes: [
           {
-            name: SCREEN_NAMES.SIMULATION_PATH_DETAILS,
-            params: {pathId},
+            name: pathId
+              ? SCREEN_NAMES.SIMULATION_PATH_DETAILS
+              : SCREEN_NAMES.CASE_DETAILS,
+            params: pathId ? {pathId: pathId} : {caseId: caseId},
           },
         ],
       });
@@ -226,13 +136,6 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const handleFeedbackAndNavigate = () => {
-    const currentTime = Date.now();
-    const timeElapsed = currentTime - mountTime;
-
-    if (timeElapsed >= FEEDBACK_THRESHOLD && !simulationDetails?.hasFeedback) {
-      setIsFeedbackPopupVisible(true);
-      return true;
-    }
     handleBack();
     return true;
   };
@@ -262,38 +165,16 @@ export const SimulationFeedbackScreen: React.FC<
     handleBack();
   };
 
-  useEffect(() => {
-    if (scenarioSessionId) {
-      setRetryLimitReached(false);
-      fetchSimulationDetailsWithRetry(0);
-    }
-
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioSessionId]);
-
-  useEffect(() => {
-    if (simulationDetails?.reviewId) {
-      setReviewId(simulationDetails.reviewId);
-      if (simulationDetails.reviewStatus === ReviewStatus.IN_REVIEW) {
-        setIsPrivate(false);
-      } else if (simulationDetails.reviewStatus === ReviewStatus.HIDDEN) {
-        setIsPrivate(true);
-      }
-    }
-  }, [simulationDetails?.reviewId, simulationDetails?.reviewStatus]);
-
   const hideFeedbackPopup = () => {
     setIsFeedbackPopupVisible(false);
   };
 
   const handleSubmit = () => {
     setIsFeedbackPopupVisible(true);
+  };
+
+  const handleTabChange = (tabIndex: number) => {
+    setActiveTab(tabIndex);
   };
 
   const handleViewReview = () => {
@@ -303,170 +184,120 @@ export const SimulationFeedbackScreen: React.FC<
     });
   };
 
-  const handlePrivacyToggle = async (isPrivateValue: boolean) => {
-    if (isPrivateValue === isPrivate) {
-      return;
-    }
-
-    setIsPrivate(isPrivateValue);
-
-    if (!scenarioSessionId) return;
-
-    try {
-      if (isPrivateValue) {
-        // User wants to keep it private (HIDDEN)
-        if (reviewId) {
-          await updateReviewStatus({
-            reviewId,
-            status: {status: ReviewStatus.HIDDEN},
-          }).unwrap();
-          showToast(t('SimulationFeedback.privacyUpdated'), 'success');
-        }
-      } else {
-        // User wants to share for review (IN_REVIEW)
-        if (reviewId) {
-          // Update existing review status
-          await updateReviewStatus({
-            reviewId,
-            status: {status: ReviewStatus.IN_REVIEW},
-          }).unwrap();
-          showToast(t('SimulationFeedback.sharedForReview'), 'success');
-        } else {
-          // Create new review
-          const response = await createReview({
-            scenarioSessionId: scenarioSessionId,
-          }).unwrap();
-          setReviewId(response.id);
-          showToast(t('SimulationFeedback.sharedForReview'), 'success');
-        }
-      }
-    } catch (error) {
-      showToast(t('Errors.updatePrivacy'), 'error');
-      // Revert the toggle state on error
-      setIsPrivate(!isPrivateValue);
-    }
-  };
-
-  const handleScrollToBottom = useCallback(() => {
-    scrollViewRef.current?.scrollToEnd();
-  }, []);
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
-      const isNearBottom =
-        contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-      setShowScrollButton(!isNearBottom);
-    },
-    [],
-  );
-
-  const onHeaderPress = () => setIsDropdownVisible(true);
-  const hideHeaderDropdown = () => setIsDropdownVisible(false);
-
-  const handleRetrySimulation = () => {
-    const current = currentSession;
-    if (!current || !current.scenarioId || !current.scenarioPathSessionItemId) {
-      return;
-    }
-
-    startSimulation(
-      current.scenarioId,
-      current.scenarioPathSessionItemId,
-      pathId,
-    );
-  };
-
-  const handleNextSimulation = () => {
-    const next = upcomingScenario;
-    if (next && next.scenarioPathSessionItemId && next.id) {
-      startSimulation(next.id, next.scenarioPathSessionItemId, pathId);
-    }
-  };
-
-  const renderButtonContainer = () => {
-    // Path simulations: show Finish / Retry / Next
-    if (pathId) {
-      if (!isEventCompleted) {
-        return null;
-      }
-      // Path completed: show a single Finish button
-      if (isPathCompleted) {
-        return (
-          <View style={styles.buttonContainer}>
-            <PrimaryButton
-              label={t('Common.finish')}
-              onPress={handleFeedbackAndNavigate}
-              customContainerStyle={styles.submitButton}
-            />
-          </View>
-        );
-      }
-
-      return (
-        <View style={styles.buttonContainer}>
-          <View style={styles.pathNavigationContainer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={handleFeedbackAndNavigate}
-              activeOpacity={0.7}>
-              <Text style={styles.backButtonText}>{t('Common.back')}</Text>
-            </TouchableOpacity>
-            {/* Show either Retry or Next, but never both */}
-            {!hasUpcoming && canRetryCurrent && (
-              <PrimaryButton
-                label={t('CallSummaryProgress.retry')}
-                onPress={handleRetrySimulation}
-                customContainerStyle={styles.retryButton}
-                isLoading={isStartingSimulation}
-              />
-            )}
-            {isCurrentSessionCompleted && hasUpcoming && (
-              <PrimaryButton
-                label={t('Common.next')}
-                onPress={handleNextSimulation}
-                customContainerStyle={styles.nextButton}
-                isLoading={isStartingSimulation}
-              />
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    // For normal simulations, show "Try Another" button
-    if (!fromLogs) {
-      return (
-        <View style={styles.buttonContainer}>
-          <PrimaryButton
-            label={t('SimulationFeedback.tryAnother')}
-            onPress={handleSubmit}
-            customContainerStyle={styles.submitButton}
-          />
-        </View>
-      );
-    }
-    return null;
-  };
-
   const renderTitle = () => {
     return (
       <Text style={styles.title}>
         {t('SimulationFeedback.title')}{' '}
         <Text style={styles.titleItalic}>
-          {showSummary
-            ? !fromLogs
-              ? t('SimulationFeedback.titleEnded')
-              : t('CallSummary.header.subtitle')
-            : t('SimulationFeedback.transcript')}
+          {fromLogs
+            ? t('CallSummary.header.subtitle')
+            : t('SimulationFeedback.titleEnded')}
         </Text>
       </Text>
     );
   };
-  const showTranscript = !isSimulationDetailsLoading && !showSummary;
   const hasScenarioMessagesPermission = permissions?.includes(
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
   );
+
+  const renderTabContent = () => {
+    if (!hasScenarioMessagesPermission) {
+      return null;
+    }
+
+    // Get the current tab key based on index
+    const currentTabKey = tabs[activeTab]?.key;
+
+    switch (currentTabKey) {
+      case TabKey.SUMMARY:
+        return (
+          <SummaryTab
+            scenarioSessionId={scenarioSessionId}
+            pathId={pathId}
+            caseId={caseId}
+            fromLogs={fromLogs}
+            onTryAnother={handleSubmit}
+          />
+        );
+
+      case TabKey.ASK_AI:
+        return <AskAI />;
+
+      case TabKey.TRANSCRIPTION:
+        return (
+          <TranscriptTab
+            isPrivate={isPrivate}
+            setIsPrivate={setIsPrivate}
+            reviewId={reviewId}
+            setReviewId={setReviewId}
+            scenarioSessionId={scenarioSessionId}
+          />
+        );
+
+      // case TabKey.CHECKLIST:
+      //   return <ChecklistTab scenarioSessionId={scenarioSessionId} />;
+
+      // case TabKey.SKILLS:
+      //   return <SessionSkills scenarioSessionId={scenarioSessionId} />;
+
+      // case TabKey.REFLECTION:
+      //   return <Reflection />;
+
+      case TabKey.UP_NEXT:
+        return (
+          <UpNext
+            scenarioSessionId={scenarioSessionId}
+            pathId={pathId}
+            caseId={caseId}
+            onFinish={handleFeedbackAndNavigate}
+            onBack={handleFeedbackAndNavigate}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Build tabs array using enum keys for type safety
+  const tabs = useMemo(() => {
+    const tabsList = [
+      {
+        key: TabKey.SUMMARY,
+        title: t('SimulationFeedback.tabs.summary'),
+      },
+      // {
+      //   key: TabKey.ASK_AI,
+      //   title: t('SimulationFeedback.tabs.askAI'),
+      // },
+      {
+        key: TabKey.TRANSCRIPTION,
+        title: t('SimulationFeedback.tabs.transcription'),
+      },
+      // {
+      //   key: TabKey.CHECKLIST,
+      //   title: t('SimulationFeedback.tabs.checklist'),
+      // },
+      // {
+      //   key: TabKey.SKILLS,
+      //   title: t('SimulationFeedback.tabs.skills'),
+      // },
+      // {
+      //   key: TabKey.REFLECTION,
+      //   title: t('SimulationFeedback.tabs.reflection'),
+      // },
+    ];
+
+    // Only show "Up Next" tab for paths and cases
+    if (pathId || caseId) {
+      tabsList.push({
+        key: TabKey.UP_NEXT,
+        title: t('SimulationFeedback.tabs.upNext'),
+      });
+    }
+
+    return tabsList;
+  }, [t, pathId, caseId]);
 
   return (
     <SafeAreaView
@@ -485,117 +316,37 @@ export const SimulationFeedbackScreen: React.FC<
           )}
           <View style={globalStyles.column}>
             {hasScenarioMessagesPermission && (
-              <TouchableOpacity
-                style={[
-                  globalStyles.rowCenter,
-                  !fromLogs && styles.titleExtraPadding,
-                ]}
-                onPress={onHeaderPress}
-                activeOpacity={0.8}>
+              <View style={!fromLogs && styles.titleExtraPadding}>
                 {renderTitle()}
-                <View style={styles.arrowDownContainer}>
-                  <ArrowDown width={9} height={5} />
-                </View>
+              </View>
+            )}
+          </View>
+          {/* Comment icon for transcript tab */}
+          {!!reviewId &&
+            tabs[activeTab]?.key === TabKey.TRANSCRIPTION &&
+            !hideReviewDetails && (
+              <TouchableOpacity
+                onPress={handleViewReview}
+                style={styles.reviewIconButton}
+                activeOpacity={0.7}>
+                <CommentIcon width={20} height={20} color={colors.black} />
               </TouchableOpacity>
             )}
-            {fromLogs && simulationDetails?.metadata?.sessionName && (
-              <Text style={styles.subTitle}>
-                {simulationDetails.metadata.sessionName}
-              </Text>
-            )}
-          </View>
-          {!!reviewId && !showSummary && !hideReviewDetails && (
-            <TouchableOpacity
-              onPress={handleViewReview}
-              style={styles.reviewIconButton}
-              activeOpacity={0.7}>
-              <CommentIcon width={20} height={20} color={colors.black} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
-      {showSummary && (
-        <KeyboardAwareScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          extraScrollHeight={100}
-          automaticallyAdjustKeyboardInsets
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={16}>
-          {!simulationDetails?.details && !retryLimitReached ? (
-            <SimulationSummarySkeleton />
-          ) : (
-            <>
-              <SimulationSummary data={simulationDetails ?? null} />
-              {isEventCompleted && (
-                <>
-                  {/* Transition message section */}
-                  {(currentSession?.transitionMessageTitle ||
-                    currentSession?.transitionMessageContent) && (
-                    <View style={styles.transitionMessageContainer}>
-                      {currentSession?.transitionMessageTitle && (
-                        <Text style={styles.transitionMessageTitle}>
-                          {currentSession.transitionMessageTitle}
-                        </Text>
-                      )}
-                      {currentSession?.transitionMessageContent && (
-                        <Text style={styles.transitionMessageContent}>
-                          {currentSession.transitionMessageContent}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                  {!isPathCompleted && !hasUpcoming && canRetryCurrent && (
-                    <>
-                      <Text style={styles.transitionMessageTitle}>
-                        {t('SimulationFeedback.almostThereTitle')}
-                      </Text>
-                      <Text style={styles.transitionMessageContent}>
-                        {t('SimulationFeedback.almostThereDescription')}
-                      </Text>
-                    </>
-                  )}
-                  {isCurrentSessionCompleted && !!upcomingScenario && (
-                    <UpNextSimulationCard upNext={upcomingScenario} />
-                  )}
-                </>
-              )}
-              {simulationDetails && renderButtonContainer()}
-            </>
-          )}
-        </KeyboardAwareScrollView>
-      )}
-      {showTranscript && scenarioSessionId && (
-        <>
-          {/* TODO: Replace with actual audio url */}
-          {/* <SimulationAudioPlayer
-            audioUrl="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-            onProgress={setCurrentPlaybackTime}
-            externalSeekTime={seekTime}
-          /> */}
-          <SimulationTranscript
-            sessionId={scenarioSessionId}
-            startedAt={simulationDetails?.startedAt}
-            // currentTime={currentPlaybackTime}
-            // onSeek={setSeekTime}
-            agentName={simulationDetails?.scenario?.metadata?.name}
+      {hasScenarioMessagesPermission && (
+        <View style={styles.tabsContainer}>
+          <CustomTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            activeTabTextColor={colors.ds.theme.primary}
+            inactiveTabTextColor={colors.ds.typography.lowEmphasis}
+            activeTabBorderColor={colors.ds.theme.primary}
           />
-          <View style={styles.privacyToggleContainer}>
-            <PrivacyToggle
-              isPrivate={isPrivate}
-              onToggle={handlePrivacyToggle}
-            />
-          </View>
-        </>
+        </View>
       )}
-      <FeedbackDropdown
-        visible={isDropdownVisible}
-        onClose={hideHeaderDropdown}
-        showSummary={showSummary}
-        setShowSummary={setShowSummary}
-      />
+      {renderTabContent()}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}
@@ -604,13 +355,6 @@ export const SimulationFeedbackScreen: React.FC<
         placeholder={t('SimulationFeedback.placeholderText')}
         customTitle={t('SimulationFeedback.questionText')}
       />
-      {showScrollButton && !isSimulationDetailsLoading && (
-        <TouchableOpacity
-          onPress={handleScrollToBottom}
-          style={styles.scrollToBottomButton}>
-          <ChevronDown width={14} height={14} color={colors.lightGray4} />
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   );
 };

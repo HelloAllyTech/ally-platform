@@ -86,7 +86,10 @@ export const useListeningCommon = ({
 
   // Handle end call success/error
   useEffect(() => {
-    if (isEndCallSuccess || isEndCallError) {
+    if (isEndCallSuccess) {
+      handleCallEndRedirection();
+    }
+    if (isEndCallError) {
       handleCallEndRedirection();
     }
   }, [isEndCallSuccess, isEndCallError, handleCallEndRedirection]);

@@ -93,6 +93,13 @@ export const blue = {
 } as const;
 
 /**
+ * Blue Alpha (transparency variations)
+ */
+export const blueAlpha = {
+  25: 'rgba(226, 242, 255, 0.25)',
+} as const;
+
+/**
  * Light Blue color scale (50-900 + A100-A700)
  */
 export const lightBlue = {
@@ -309,6 +316,14 @@ export const deepPurple = {
   A700: '#6200ea',
 } as const;
 
+/**
+ * Deep Purple Alpha (transparency variations)
+ */
+export const deepPurpleAlpha = {
+  25: 'rgba(237, 231, 246, 0.25)',
+  50: 'rgba(237, 231, 246, 0.5)',
+} as const;
+
 // ==================== SEMANTIC COLOR TOKENS ====================
 
 /**
@@ -417,6 +432,7 @@ export const typographyColors = {
  */
 export const stroke = {
   primary: '#d2d2d2',
+  lightGray: '#C8C5D0',
 } as const;
 
 export const icon = {
@@ -447,7 +463,9 @@ export const dsColors = {
   grey,
   blackAlpha,
   whiteAlpha,
+  blueAlpha,
   deepPurple,
+  deepPurpleAlpha,
 
   // Semantic tokens
   theme,

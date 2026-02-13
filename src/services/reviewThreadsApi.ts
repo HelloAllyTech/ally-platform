@@ -31,6 +31,7 @@ export const reviewThreadsApi = api.injectEndpoints({
 
         return {data: result.data as ThreadsResponse};
       },
+      providesTags: ['ReviewThreads'],
     }),
     getCommentReplies: builder.query<GetThreadCommentsResponse, RepliesParams>({
       queryFn: async (

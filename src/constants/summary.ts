@@ -18,7 +18,6 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
-import {env} from '@/config/env';
 import {colors} from '@/theme';
 import type {
   FieldDataContext,
@@ -151,7 +150,6 @@ export const SUMMARY_FIELDS = {
   CALL_DATE: 'callDate',
   CALL_TIME: 'callTime',
   CALLER_ID: 'clientId',
-  COUNSELOR_NAME: 'counselorName',
   CALLER_TYPE: 'callType',
   AGE: 'age',
   GENDER: 'gender',
@@ -160,6 +158,8 @@ export const SUMMARY_FIELDS = {
   LANGUAGES: 'languages',
   LOCATION: 'location',
   CONCERN_CODE: 'codeOfConcern',
+  COUNSELLOR: 'counsellor',
+  NEW_CALL_FOLLOW_UP: 'newCallFollowUp',
 
   // Session Summary
   SESSION_SUMMARY: 'sessionSummary',
@@ -204,6 +204,7 @@ export const SUMMARY_FIELDS = {
   LISTENING_RATIO: 'listeningShare',
   EMOTIONAL_LIFT: 'emotionalLift',
   REFLECTIVE_QUESTIONS_ASKED: 'reflectiveQuestionsAsked',
+  OPEN_ENDED_QUESTIONS_ASKED: 'openEndedQuestionsAsked',
 
   // Intake section
   INTAKE_NOTES: 'intakeNotes',
@@ -261,6 +262,9 @@ export const GENDER_OPTIONS = [
 
 // Age range options
 export const AGE_RANGE_OPTIONS = [
+  '0-5',
+  '6-12',
+  '13-17',
   '18-24',
   '25-34',
   '35-44',
@@ -395,24 +399,20 @@ export const SECTION_LIST: SectionItem[] = [
     canEdit: false,
     canEnhance: false,
   },
-  ...(env.SCRIBE_SETTINGS_FLAG
-    ? [
-        {
-          key: SectionKey.Intake,
-          label: 'Intake',
-          icon: IntakeIcon,
-          canEdit: true,
-          canEnhance: false,
-        },
-        {
-          key: SectionKey.OngoingRisks,
-          label: 'Ongoing Risks',
-          icon: OngoingRisksIcon,
-          canEdit: true,
-          canEnhance: false,
-        },
-      ]
-    : []),
+  {
+    key: SectionKey.Intake,
+    label: 'Intake',
+    icon: IntakeIcon,
+    canEdit: true,
+    canEnhance: false,
+  },
+  {
+    key: SectionKey.OngoingRisks,
+    label: 'Ongoing Risks',
+    icon: OngoingRisksIcon,
+    canEdit: true,
+    canEnhance: false,
+  },
   {
     key: SectionKey.AdditionalNotes,
     label: 'Additional Notes',
@@ -481,13 +481,6 @@ export const summaryFields: SummaryField[] = [
   },
   {
     isEditable: false,
-    key: SUMMARY_FIELDS.COUNSELOR_NAME,
-    label: 'Counselor Name',
-    sectionKey: SectionKey.FeaturesAndDemographics,
-    type: FieldType.Text,
-  },
-  {
-    isEditable: false,
     key: SUMMARY_FIELDS.CALLER_TYPE,
     label: 'Caller Type',
     sectionKey: SectionKey.FeaturesAndDemographics,
@@ -542,6 +535,20 @@ export const summaryFields: SummaryField[] = [
     isEditable: true,
     key: SUMMARY_FIELDS.CONCERN_CODE,
     label: 'Concern Code',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: FieldType.InlineTextInput,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.COUNSELLOR,
+    label: 'Counselor',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: FieldType.InlineTextInput,
+  },
+  {
+    isEditable: true,
+    key: SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP,
+    label: 'New Call Follow Up',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.InlineTextInput,
   },
@@ -661,6 +668,14 @@ export const summaryFields: SummaryField[] = [
     label: 'Emotional Lift',
     sectionKey: SectionKey.Metrics,
     type: FieldType.Text,
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.OPEN_ENDED_QUESTIONS_ASKED,
+    label: 'Open Ended Questions Asked',
+    sectionKey: SectionKey.Metrics,
+    type: FieldType.Text,
+    formatDisplay: formatAsStringOrDash,
   },
 
   // Intake section
@@ -795,7 +810,7 @@ export const summaryFields: SummaryField[] = [
   {
     isEditable: true,
     key: SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS,
-    label: 'Assessment, Psychological Diagnosis',
+    label: 'Assessment,\nPsychological Diagnosis',
     sectionKey: SectionKey.Intake,
     type: FieldType.Dropdown,
     options: YES_NO_OPTIONS,

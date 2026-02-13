@@ -14,15 +14,18 @@ export type RootStackParamList = {
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
   SimulationPathDetails: {pathId: string};
+  CaseDetails: {caseId: string};
   SimulationAssistant: {
     sessionData: SessionData;
     scenario?: Scenario;
     pathId?: string;
+    caseId?: string;
   };
   SimulationFeedback: {
     scenarioSessionId?: string;
     fromLogs?: boolean;
     pathId?: string;
+    caseId?: string;
   };
   Achievements: undefined;
   ProfileSettings: undefined;

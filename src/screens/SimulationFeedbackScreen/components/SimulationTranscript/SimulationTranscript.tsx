@@ -10,6 +10,7 @@ import {colors, fontFamily} from '@/theme';
 import {SimulationTranscriptMessage} from '@/types';
 
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
+import {SummaryCard} from '../SummaryCard';
 
 export const SimulationTranscript: React.FC<{
   sessionId: string;
@@ -100,47 +101,43 @@ export const SimulationTranscript: React.FC<{
   };
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      ref={listRef}
-      data={formattedMessages || []}
-      keyExtractor={item => String(item.id)}
-      renderItem={renderItem}
-      ListFooterComponent={
-        isLoading && formattedMessages?.length > 0 ? (
-          <ActivityIndicator color={colors.ds.theme.primary} />
-        ) : null
-      }
-      onEndReached={handleEndReached}
-      onEndReachedThreshold={0.1}
-      ListEmptyComponent={renderEmptyComponent}
-      onScrollBeginDrag={() => (isUserScrolling.current = true)}
-      onMomentumScrollEnd={() => (isUserScrolling.current = false)}
-      onScrollToIndexFailed={info => {
-        // Fallback or retry logic if needed
-        setTimeout(() => {
-          if (listRef.current) {
-            try {
-              listRef.current.scrollToIndex({
-                index: info.index,
-                animated: true,
-                viewPosition: 0.3,
-              });
-            } catch (e) {}
-          }
-        }, 100);
-      }}
-    />
+    <SummaryCard title={t('SimulationFeedback.annotatedTranscription')}>
+      <FlatList
+        contentContainerStyle={styles.contentContainer}
+        ref={listRef}
+        data={formattedMessages || []}
+        keyExtractor={item => String(item.id)}
+        renderItem={renderItem}
+        ListFooterComponent={
+          isLoading && formattedMessages?.length > 0 ? (
+            <ActivityIndicator color={colors.ds.theme.primary} />
+          ) : null
+        }
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.1}
+        ListEmptyComponent={renderEmptyComponent}
+        onScrollBeginDrag={() => (isUserScrolling.current = true)}
+        onMomentumScrollEnd={() => (isUserScrolling.current = false)}
+        onScrollToIndexFailed={info => {
+          // Fallback or retry logic if needed
+          setTimeout(() => {
+            if (listRef.current) {
+              try {
+                listRef.current.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.3,
+                });
+              } catch (e) {}
+            }
+          }, 100);
+        }}
+      />
+    </SummaryCard>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: '16@ms',
-    paddingBottom: '40@vs',
-  },
   placeholder: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.darkGray2,

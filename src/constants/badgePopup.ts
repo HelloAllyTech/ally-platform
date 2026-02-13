@@ -16,5 +16,5 @@ export const BADGE_CLOSE_ANIMATION_DELAY = 300;
 export const BADGE_NEXT_BADGE_DELAY = 350;
 
 // Polling interval for checking new badges (in milliseconds)
-// Set to 30 seconds
-export const BADGE_POLLING_INTERVAL = 30000;
+// Set to 10 minutes
+export const BADGE_POLLING_INTERVAL = 600000;

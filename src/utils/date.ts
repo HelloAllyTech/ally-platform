@@ -125,6 +125,15 @@ export const formatTimeToMMSS = (ms: number): string => {
     .padStart(2, '0')}`;
 };
 
+export const formatSecondsToMMSS = (s: number): string => {
+  const minutes = Math.floor(s / 60);
+  const seconds = s % 60;
+
+  return `${minutes.toString().padStart(2, '0')}.${seconds
+    .toString()
+    .padStart(2, '0')}`;
+};
+
 const SECONDS_IN = {
   year: 31536000,
   month: 2592000,
@@ -246,7 +255,9 @@ const formatLongDuration = (
     parts.push(`${seconds} ${getUnitLabel(seconds, 'second', t)}`);
   }
 
-  return parts.length > 0 ? parts.join(' ') : '0 seconds';
+  return parts.length > 0
+    ? parts.join(' ')
+    : `0 ${includeSeconds ? 'seconds' : 'minutes'}`;
 };
 
 /**

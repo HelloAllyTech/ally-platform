@@ -51,7 +51,7 @@ jest.mock('@/components', () => {
   const {TouchableOpacity, Text, View} = require('react-native');
   return {
     __esModule: true,
-    PrimaryButton: ({label, onPress, isLoading}: any) => (
+    Button: ({label, onPress, isLoading}: any) => (
       <TouchableOpacity
         testID="primary-button"
         accessibilityState={{busy: !!isLoading}}
@@ -163,13 +163,10 @@ describe('SimulationDetailsScreen', () => {
     fireEvent.press(notificationButton);
 
     await waitFor(() => {
-      // startSimulation is called with (scenarioId, sessionId, pathId, languageId)
-      expect(mockStartSimulation).toHaveBeenCalledWith(
-        scenario.id,
-        undefined,
-        undefined,
-        1, // languageId from mock preferences
-      );
+      expect(mockStartSimulation).toHaveBeenCalledWith({
+        scenarioId: scenario.id,
+        languageId: 1,
+      });
     });
   });
 

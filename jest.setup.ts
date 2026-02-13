@@ -218,7 +218,7 @@ jest.mock('react-native-size-matters', () => ({
 jest.mock('@/components', () => {
   const React = require('react');
   return {
-    PrimaryButton: jest.fn(({label, onPress, isDisabled}) =>
+    Button: jest.fn(({label, onPress, isDisabled}) =>
       React.createElement(
         'TouchableOpacity',
         {

@@ -9,17 +9,20 @@ import {useAppNavigation} from './useAppNavigation';
 import {usePermissionAlert} from './usePermissionAlert';
 import {useTranslate} from './useTranslate';
 
+interface StartSimulationParams {
+  scenarioId: number;
+  scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
+  pathId?: string;
+  caseId?: string;
+  languageId?: number;
+}
 interface UseStartSimulationReturn {
   isCreatingRoom: boolean;
   isMicPermissionGranted: boolean;
   activeSimulationId: string | null;
   showActiveSimulationModal: boolean;
-  startSimulation: (
-    scenarioId: number,
-    scenarioPathSessionItemId?: string,
-    pathId?: string,
-    languageId?: number,
-  ) => Promise<void>;
+  startSimulation: (params: StartSimulationParams) => Promise<void>;
   closeActiveSimulationModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
 }
@@ -61,11 +64,8 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
   };
 
   const startSimulation = async (
-    scenarioId: number,
-    scenarioPathSessionItemId?: string,
-    pathId?: string,
-    languageId?: number,
-  ) => {
+    params: StartSimulationParams,
+  ): Promise<void> => {
     try {
       if (!isMicPermissionGranted) {
         const result = await request(MICROPHONE_PERMISSION);
@@ -94,24 +94,29 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
 
       setIsCreatingRoom(true);
       const startResp = await startScenarioSession({
-        scenarioId,
-        ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
-        ...(languageId && {languageId}),
+        scenarioId: params.scenarioId,
+        ...(params.scenarioPathSessionItemId && {
+          scenarioPathSessionItemId: params.scenarioPathSessionItemId,
+        }),
+        ...(params.caseSessionItemId && {
+          caseSessionItemId: params.caseSessionItemId,
+        }),
+        ...(params.languageId && {languageId: params.languageId}),
       }).unwrap();
 
       if (startResp) {
         navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
           sessionData: {
             id: startResp.scenarioSession.id,
-            createdAt: startResp.scenarioSession.createdAt,
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },
           scenario: startResp.scenario,
-          ...(scenarioPathSessionItemId && {
-            pathSessionItemId: scenarioPathSessionItemId,
+          ...(params.scenarioPathSessionItemId && {
+            pathSessionItemId: params.scenarioPathSessionItemId,
           }),
-          ...(pathId && {pathId}),
+          ...(params.pathId && {pathId: params.pathId}),
+          ...(params.caseId && {caseId: params.caseId}),
         });
       }
     } catch (error) {

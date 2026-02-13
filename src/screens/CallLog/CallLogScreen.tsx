@@ -41,16 +41,9 @@ import {
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
-import {
-  useLazyGetSummaryFieldsQuery,
-  useLazyGetVisibleChatTypesQuery,
-} from '@/services/settingsApi';
+import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
-import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {
-  selectSummaryVisibleFields,
-  setSummaryVisibleFields,
-} from '@/store/slices/summarySlice';
+import {useAppSelector} from '@/store/hooks';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 import {logger} from '@/utils/logger';
@@ -79,11 +72,18 @@ export const CallLogScreen: React.FC = () => {
   const [search, setSearch] = useState('');
   const [expandedIdx, setExpandedIdx] = useState(-1);
   const [activeTab, setActiveTab] = useState<LogType>(LogType.REAL);
+  const [isViewingArchivedRealLogs, setIsViewingArchivedRealLogs] =
+    useState<boolean>(false);
 
   // Real call logs state
   const [realLogsOffset, setRealLogsOffset] = useState(0);
   const [allRealLogs, setAllRealLogs] = useState<LogItem[]>([]);
   const [hasMoreRealLogs, setHasMoreRealLogs] = useState(true);
+
+  // Archived real logs state
+  const [archivedRealLogsOffset, setArchivedRealLogsOffset] = useState(0);
+  const [allArchivedRealLogs, setAllArchivedRealLogs] = useState<LogItem[]>([]);
+  const [hasMoreArchivedRealLogs, setHasMoreArchivedRealLogs] = useState(true);
 
   // Simulation logs state
   const [simulationLogsOffset, setSimulationLogsOffset] = useState(0);
@@ -98,13 +98,10 @@ export const CallLogScreen: React.FC = () => {
   const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
-  const dispatch = useAppDispatch();
   const [getCallLogs, {isFetching: isFetchingRealLogs}] =
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getSummaryFields, {data: visibleFields}] =
-    useLazyGetSummaryFieldsQuery();
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
@@ -115,7 +112,6 @@ export const CallLogScreen: React.FC = () => {
     return route.name === firstTab;
   }, [permissions, route.name]);
   const {showMicrophoneSettingsAlert} = usePermissionAlert();
-  const visibleFieldsState = useAppSelector(selectSummaryVisibleFields);
   const showFeatureUnavailable = useMemo(() => {
     return !permissions?.some(permission =>
       TAB_PERMISSIONS.includes(permission as USER_PERMISSIONS),
@@ -130,18 +126,6 @@ export const CallLogScreen: React.FC = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]),
   );
-
-  useEffect(() => {
-    if (visibleFields) {
-      dispatch(setSummaryVisibleFields(visibleFields));
-    }
-  }, [visibleFields, dispatch]);
-
-  useEffect(() => {
-    if (!visibleFieldsState?.length) {
-      getSummaryFields();
-    }
-  }, [getSummaryFields, visibleFieldsState?.length]);
 
   const canStartCall = START_CALL_PERMISSIONS.some(permission =>
     permissions?.includes(permission),
@@ -174,6 +158,10 @@ export const CallLogScreen: React.FC = () => {
       logTypes.push(LogType.SIMULATION);
     }
 
+    if (permissions?.includes(USER_PERMISSIONS.ARCHIVE_CALL_LOG)) {
+      logTypes.push(LogType.ARCHIVED_REAL);
+    }
+
     return logTypes;
   }, [permissions]);
 
@@ -204,7 +192,11 @@ export const CallLogScreen: React.FC = () => {
    * Sets up the initial state for pagination
    */
   const fetchInitialRealLogs = useCallback(async () => {
-    const result = await getCallLogs({limit: ITEMS_PER_PAGE, offset: 0});
+    const result = await getCallLogs({
+      limit: ITEMS_PER_PAGE,
+      offset: 0,
+      archive: false,
+    });
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
       const filteredCallLogs = result.data.data.filter(
@@ -232,13 +224,34 @@ export const CallLogScreen: React.FC = () => {
     }
   }, [getSimulationLogs]);
 
+  /**
+   * Fetches the initial set of archived real logs
+   * Sets up the initial state for pagination
+   */
+  const fetchInitialArchivedRealLogs = useCallback(async () => {
+    const result = await getCallLogs({
+      limit: ITEMS_PER_PAGE,
+      offset: 0,
+      archive: true,
+    });
+    const logsResponse = result.data?.data;
+    if (logsResponse) {
+      setAllArchivedRealLogs(logsResponse);
+      setHasMoreArchivedRealLogs(logsResponse.length === ITEMS_PER_PAGE);
+    } else {
+      setAllArchivedRealLogs([]);
+    }
+  }, [getCallLogs]);
+
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       setRealLogsOffset(0);
       setSimulationLogsOffset(0);
+      setArchivedRealLogsOffset(0);
       setHasMoreRealLogs(true);
       setHasMoreSimulationLogs(true);
+      setHasMoreArchivedRealLogs(true);
 
       // Only fetch data for available log types
       if (availableLogTypes.includes(LogType.REAL)) {
@@ -247,9 +260,16 @@ export const CallLogScreen: React.FC = () => {
       if (availableLogTypes.includes(LogType.SIMULATION)) {
         fetchInitialSimulationLogs();
       }
+      if (availableLogTypes.includes(LogType.ARCHIVED_REAL)) {
+        fetchInitialArchivedRealLogs();
+      }
 
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchInitialRealLogs, fetchInitialSimulationLogs, dispatch]),
+    }, [
+      fetchInitialRealLogs,
+      fetchInitialSimulationLogs,
+      fetchInitialArchivedRealLogs,
+    ]),
   );
 
   /**
@@ -257,33 +277,53 @@ export const CallLogScreen: React.FC = () => {
    * Implements infinite scroll functionality for both real and simulation logs
    */
   const handleLoadMore = async () => {
-    if (activeTab === LogType.REAL) {
-      if (!hasMoreRealLogs || isFetchingRealLogs) return;
+    if (isViewingArchivedRealLogs) {
+      if (!hasMoreArchivedRealLogs || isFetchingRealLogs) return;
 
-      const newOffset = realLogsOffset + ITEMS_PER_PAGE;
+      const newOffset = archivedRealLogsOffset + ITEMS_PER_PAGE;
       const result = await getCallLogs({
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
+        archive: true,
       });
-
       if (result?.data?.data) {
-        setAllRealLogs(prev => [...prev, ...(result?.data?.data || [])]);
-        setRealLogsOffset(newOffset);
-        setHasMoreRealLogs(result.data.data.length === ITEMS_PER_PAGE);
+        setAllArchivedRealLogs(prev => [
+          ...prev,
+          ...(result?.data?.data || []),
+        ]);
+        setArchivedRealLogsOffset(newOffset);
+        setHasMoreArchivedRealLogs(result.data.data.length === ITEMS_PER_PAGE);
       }
     } else {
-      if (!hasMoreSimulationLogs || isFetchingSimulationLogs) return;
+      if (activeTab === LogType.REAL) {
+        if (!hasMoreRealLogs || isFetchingRealLogs) return;
 
-      const newOffset = simulationLogsOffset + ITEMS_PER_PAGE;
-      const result = await getSimulationLogs({
-        limit: ITEMS_PER_PAGE,
-        offset: newOffset,
-      });
-      const logsResponse = result.data?.data;
-      if (logsResponse) {
-        setAllSimulationLogs(prev => [...prev, ...(logsResponse || [])]);
-        setSimulationLogsOffset(newOffset);
-        setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
+        const newOffset = realLogsOffset + ITEMS_PER_PAGE;
+        const result = await getCallLogs({
+          limit: ITEMS_PER_PAGE,
+          offset: newOffset,
+          archive: false,
+        });
+
+        if (result?.data?.data) {
+          setAllRealLogs(prev => [...prev, ...(result?.data?.data || [])]);
+          setRealLogsOffset(newOffset);
+          setHasMoreRealLogs(result.data.data.length === ITEMS_PER_PAGE);
+        }
+      } else {
+        if (!hasMoreSimulationLogs || isFetchingSimulationLogs) return;
+
+        const newOffset = simulationLogsOffset + ITEMS_PER_PAGE;
+        const result = await getSimulationLogs({
+          limit: ITEMS_PER_PAGE,
+          offset: newOffset,
+        });
+        const logsResponse = result.data?.data;
+        if (logsResponse) {
+          setAllSimulationLogs(prev => [...prev, ...(logsResponse || [])]);
+          setSimulationLogsOffset(newOffset);
+          setHasMoreSimulationLogs(logsResponse.length === ITEMS_PER_PAGE);
+        }
       }
     }
   };
@@ -293,28 +333,45 @@ export const CallLogScreen: React.FC = () => {
    * Resets the list and fetches fresh data for the active tab
    */
   const handleRefresh = async () => {
-    if (activeTab === LogType.REAL) {
-      setRealLogsOffset(0);
-      setHasMoreRealLogs(true);
-      await fetchInitialRealLogs();
+    if (isViewingArchivedRealLogs) {
+      setArchivedRealLogsOffset(0);
+      setHasMoreArchivedRealLogs(true);
+      await fetchInitialArchivedRealLogs();
     } else {
-      setSimulationLogsOffset(0);
-      setHasMoreSimulationLogs(true);
-      await fetchInitialSimulationLogs();
+      if (activeTab === LogType.REAL) {
+        setRealLogsOffset(0);
+        setHasMoreRealLogs(true);
+        await fetchInitialRealLogs();
+      } else if (activeTab === LogType.SIMULATION) {
+        setSimulationLogsOffset(0);
+        setHasMoreSimulationLogs(true);
+        await fetchInitialSimulationLogs();
+      }
     }
   };
 
+  const handleArchivePress = async () => {
+    setIsViewingArchivedRealLogs(true);
+  };
+
   const handleItemPress = (item: LogItem) => {
-    if (activeTab === LogType.REAL) {
+    if (isViewingArchivedRealLogs) {
       stackNavigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
         callId: item?.details?.chatId,
         fromLogs: true,
       });
     } else {
-      stackNavigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
-        scenarioSessionId: item?.id?.toString(),
-        fromLogs: true,
-      });
+      if (activeTab === LogType.REAL) {
+        stackNavigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
+          callId: item?.details?.chatId,
+          fromLogs: true,
+        });
+      } else {
+        stackNavigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          scenarioSessionId: item?.id?.toString(),
+          fromLogs: true,
+        });
+      }
     }
   };
 
@@ -346,7 +403,7 @@ export const CallLogScreen: React.FC = () => {
         disabled={isDisabled}
         onToggle={() => handleToggle(index)}
         onItemPress={() => handleItemPress(item)}
-        logType={activeTab}
+        logType={isViewingArchivedRealLogs ? LogType.ARCHIVED_REAL : activeTab}
       />
     );
   };
@@ -414,12 +471,21 @@ export const CallLogScreen: React.FC = () => {
   };
 
   // Get current logs and loading state based on active tab
-  const currentLogs =
-    activeTab === LogType.REAL ? allRealLogs : allSimulationLogs;
-  const isFetching =
-    activeTab === LogType.REAL ? isFetchingRealLogs : isFetchingSimulationLogs;
-  const currentOffset =
-    activeTab === LogType.REAL ? realLogsOffset : simulationLogsOffset;
+  const currentLogs = isViewingArchivedRealLogs
+    ? allArchivedRealLogs
+    : activeTab === LogType.REAL
+      ? allRealLogs
+      : allSimulationLogs;
+  const isFetching = isViewingArchivedRealLogs
+    ? isFetchingRealLogs
+    : activeTab === LogType.REAL
+      ? isFetchingRealLogs
+      : isFetchingSimulationLogs;
+  const currentOffset = isViewingArchivedRealLogs
+    ? archivedRealLogsOffset
+    : activeTab === LogType.REAL
+      ? realLogsOffset
+      : simulationLogsOffset;
 
   if (showFeatureUnavailable) {
     return (
@@ -427,7 +493,6 @@ export const CallLogScreen: React.FC = () => {
         <CallLogHeader
           search={search}
           onSearchChange={setSearch}
-          showTitle={false}
           isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         />
         <FeatureNotAvailable
@@ -443,12 +508,24 @@ export const CallLogScreen: React.FC = () => {
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <CallLogHeader
+        title={
+          isViewingArchivedRealLogs
+            ? t('CallLogs.archives.header.title')
+            : t('CallLogs.header.title')
+        }
+        subtitle={
+          !isViewingArchivedRealLogs ? t('CallLogs.header.subtitle') : ''
+        }
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
+        showBackButton={isViewingArchivedRealLogs}
+        onGoBack={() => setIsViewingArchivedRealLogs(false)}
+        onArchivePress={handleArchivePress}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
+        showActionsMenu={!isViewingArchivedRealLogs}
       />
-      {availableLogTypes.length > 1 && (
+      {availableLogTypes.length > 1 && !isViewingArchivedRealLogs && (
         <View style={styles.tabMargin}>
           <TabView
             tabs={[

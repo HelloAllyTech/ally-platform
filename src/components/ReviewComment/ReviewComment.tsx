@@ -3,7 +3,7 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ms} from 'react-native-size-matters';
 
 import {AddReactionIcon, EyeClosedIcon} from '@/assets';
-import {ActionsMenu} from '@/components/ActionsMenu/ActionsMenu';
+import {ActionsMenu} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 

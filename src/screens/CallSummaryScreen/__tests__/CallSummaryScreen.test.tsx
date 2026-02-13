@@ -6,7 +6,7 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {Text} = require('react-native');
   return {
-    PrimaryButton: ({onPress, label}: any) => React.createElement(Text, {onPress}, label),
+    Button: ({onPress, label}: any) => React.createElement(Text, {onPress}, label),
     useToast: () => ({ showToast: jest.fn() }),
   };
 });
@@ -40,6 +40,15 @@ jest.mock('@/store/slices/summarySlice', () => ({
 
 // Utils
 jest.mock('@/utils', () => ({ navigateToCallLogTab: jest.fn() }));
+
+// Services
+jest.mock('@/services/settingsApi', () => ({
+  useGetSummaryFieldsQuery: () => ({ 
+    data: [], 
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+}));
 
 // Constants
 jest.mock('@/constants', () => ({ 
