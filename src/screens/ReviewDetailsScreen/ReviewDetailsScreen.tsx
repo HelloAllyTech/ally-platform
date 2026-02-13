@@ -62,6 +62,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const [selectedMessageForThreads, setSelectedMessageForThreads] = useState<
     string | null
   >(null);
+  const [currentMessageThreadIds, setCurrentMessageThreadIds] = useState<
+    string[]
+  >([]);
   const navigation = useAppNavigation();
 
   const {userData} = useUser();
@@ -283,7 +286,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
       // Update raw messages with new thread
       setRawMessages(prev => {
-        const messageIndex = prev.findIndex(m => m.id === messageId);
+        const messageIndex = prev.findIndex(
+          m => m.id?.toString() === messageId.toString(),
+        );
         if (messageIndex === -1) return prev;
 
         const updatedMessages = [...prev];
@@ -393,10 +398,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   ]);
 
   const handleThreadClick = useCallback(
-    (_commentIds: string[], messageId: string) => {
+    (threadIds: string[], messageId: string) => {
       if (!showCommentInput) {
         setSelectedMessageForThreads(messageId);
         setIsMessageThreadsVisible(true);
+        setCurrentMessageThreadIds(threadIds);
       }
     },
     [showCommentInput],
@@ -429,10 +435,17 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
   // Get threads for selected message
   const selectedMessageThreads = useMemo(() => {
-    if (!selectedMessageForThreads) return [];
-    const message = rawMessages.find(m => m.id === selectedMessageForThreads);
-    return message?.threads || [];
-  }, [selectedMessageForThreads, rawMessages]);
+    if (!selectedMessageForThreads || currentMessageThreadIds.length === 0)
+      return [];
+    const message = rawMessages.find(
+      m => m.id?.toString() === selectedMessageForThreads.toString(),
+    );
+    return (
+      message?.threads.filter(thread =>
+        currentMessageThreadIds.includes(thread.id),
+      ) || []
+    );
+  }, [selectedMessageForThreads, rawMessages, currentMessageThreadIds]);
 
   // Early returns after ALL hooks
   if (isLoading) {
@@ -477,6 +490,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onRefresh={refreshMessages}
         isRefreshing={isFetching && offset === 0}
         reviewOwnerName={reviewData?.createdBy?.name}
+        onDismissSelection={resetCommentInput}
       />
       {/* Comment input bottom sheet */}
 
@@ -513,8 +527,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onClose={handleCloseMessageThreads}
         messageId={selectedMessageForThreads || ''}
         message={
-          conversationMessages.find(m => m.id === selectedMessageForThreads)
-            ?.content || ''
+          conversationMessages.find(
+            m => m.id?.toString() === selectedMessageForThreads?.toString(),
+          )?.content || ''
         }
         threads={selectedMessageThreads}
         onThreadPress={handleMessageThreadPress}
