@@ -138,7 +138,6 @@ export const CaseDetailsScreen: React.FC<
   const handleStart = async () => {
     if (!data || !data.caseSessionId) {
       await checkAndCreateSession();
-      return;
     }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
