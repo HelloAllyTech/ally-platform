@@ -3,6 +3,48 @@ import {renderHook, waitFor} from '@testing-library/react-native';
 import {SimulationEventStatus} from '@/constants';
 import {SessionItemStatus} from '@/types';
 
+// Mock native modules that are imported via hooks index
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+}));
+// Mock native modules that are imported via hooks index
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+}));
+
+// Mock the API base to prevent store initialization errors
+jest.mock('@/services/api', () => ({
+  api: {
+    reducerPath: 'api',
+    reducer: jest.fn((state = {}) => state),
+    middleware: jest.fn(() => next => action => next(action)),
+    injectEndpoints: jest.fn(() => ({
+      useQuery: jest.fn(),
+      useMutation: jest.fn(),
+    })),
+  },
+}));
+
 // Mock the useStartSimulation hook BEFORE importing useSimulationTransition
 jest.mock('../useStartSimulation', () => ({
   useStartSimulation: jest.fn(() => ({
@@ -13,8 +55,15 @@ jest.mock('../useStartSimulation', () => ({
 
 // Mock the API hooks
 jest.mock('@/services', () => ({
+  __esModule: true,
   useGetUpcomingScenarioQuery: jest.fn(),
   useGetUpcomingCaseScenarioQuery: jest.fn(),
+  // Add other exports that might be imported
+  useAddSimulationFeedbackMutation: jest.fn(() => [jest.fn()]),
+  useCreateReviewMutation: jest.fn(() => [jest.fn()]),
+  useUpdateReviewStatusMutation: jest.fn(() => [jest.fn()]),
+  useLazyGetSimulationDetailsQuery: jest.fn(() => [jest.fn(), {data: null}]),
+  useLazyGetReactionsCountQuery: jest.fn(() => [jest.fn(), {data: null}]),
 }));
 
 import {useSimulationTransition} from '../useSimulationTransition';
@@ -109,7 +158,7 @@ describe('useSimulationTransition', () => {
         scenarioId: 1,
         scenarioPathSessionItemId: '123',
         eventStatus: SimulationEventStatus.COMPLETED,
-        scenarioPathSessionItemStatus: SessionItemStatus.COMPLETED,
+        scenarioPathSessionItemStatus: SessionItemStatus.LOCKED,
         isScenarioPathSessionCompleted: false,
       },
     };
