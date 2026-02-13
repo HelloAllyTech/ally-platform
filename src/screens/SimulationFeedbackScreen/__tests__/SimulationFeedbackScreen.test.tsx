@@ -1,8 +1,14 @@
 import React from 'react';
-import {render, fireEvent, waitFor, act} from '@testing-library/react-native';
+import {render, fireEvent, waitFor} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SimulationFeedbackScreen} from '../SimulationFeedbackScreen';
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
 
 let mockGoBack = jest.fn();
 jest.mock('@/hooks', () => ({
@@ -10,6 +16,7 @@ jest.mock('@/hooks', () => ({
     goBack: (...args: any[]) => mockGoBack(...args),
     navigate: jest.fn(),
     replace: jest.fn(),
+    reset: jest.fn(),
   }),
   useHardwareBackPressHandler: () => {},
   useStartSimulation: () => ({
@@ -20,6 +27,10 @@ jest.mock('@/hooks', () => ({
     showActiveSimulationModal: false,
     closeActiveSimulationModal: jest.fn(),
     setShowActiveSimulationModal: jest.fn(),
+  }),
+  useTranslate: () => ({
+    t: (key: string) => key,
+    tVariable: (key: string) => key,
   }),
 }));
 
@@ -44,6 +55,9 @@ jest.mock('@/assets', () => {
     ChevronDown: () => <Text testID="chevron-down" />,
     LeftArrowIcon: () => <Text testID="left-arrow-icon" />,
     CommentIcon: () => <Text testID="comment-icon" />,
+    HelpIcon: () => <Text testID="help-icon" />,
+    LightBulbIcon: () => <Text testID="lightbulb-icon" />,
+    ThumbUpIcon: () => <Text testID="thumbup-icon" />,
   };
 });
 
@@ -52,13 +66,25 @@ jest.mock('@/components', () => {
   const {View, TouchableOpacity, Text} = require('react-native');
   const showToastMock = jest.fn();
   return {
-    PrimaryButton: ({label, onPress}: any) => (
+    Button: ({label, onPress}: any) => (
       <TouchableOpacity testID="primary-button" onPress={onPress}>
         <Text>{label}</Text>
       </TouchableOpacity>
     ),
     FeedbackPopup: ({visible, onClose}: any) => (
       visible ? <View testID="feedback-popup" onTouchEnd={onClose} /> : null
+    ),
+    CustomTabs: ({tabs, activeTab, onTabChange}: any) => (
+      <View testID="custom-tabs">
+        {tabs?.map((tab: any, index: number) => (
+          <TouchableOpacity
+            key={index}
+            testID={`tab-${index}`}
+            onPress={() => onTabChange?.(index)}>
+            <Text>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     ),
     useToast: () => ({showToast: showToastMock}),
     __mocks__: {showToastMock},
@@ -115,27 +141,53 @@ jest.mock('@/services/reviewThreadsApi', () => ({
   ],
 }));
 
+jest.mock('@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    SimulationDetailsModal: ({visible}: any) =>
+      visible ? <View testID="simulation-details-modal" /> : null,
+  };
+});
+
+jest.mock('@/utils', () => ({
+  formatDateTime: (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).replace(' at ', ' ');
+  },
+  navigateToLearnTab: jest.fn(),
+}));
+
 jest.mock('../components', () => {
   const React = require('react');
   const {TouchableOpacity, Text, View} = require('react-native');
   return {
-    SimulationSummarySkeleton: () => <View testID="summary-skeleton" />,
-    SimulationSummary: () => <View testID="summary-comp" />,
-    SimulationTranscript: () => <View testID="transcript-comp" />,
-    SimulationAudioPlayer: () => <View testID="audio-player" />,
-    PrivacyToggle: () => <View testID="privacy-toggle" />,
-    UpNextSimulationCard: () => <View testID="up-next-card" />,
-    FeedbackDropdown: ({visible, setShowSummary}: any) => {
-      if (!visible) return null;
-      return (
-        <TouchableOpacity 
-          testID="transcript-option" 
-          onPress={() => setShowSummary(false)}
-        >
-          <Text>Transcript Option</Text>
+    SummaryTab: ({onTryAnother}: any) => (
+      <View testID="summary-tab">
+        <TouchableOpacity testID="try-another-button" onPress={onTryAnother}>
+          <Text>Try Another</Text>
         </TouchableOpacity>
-      );
-    },
+      </View>
+    ),
+    TranscriptTab: () => <View testID="transcript-tab" />,
+    AskAI: () => <View testID="ask-ai-tab" />,
+    UpNext: ({onFinish, onBack}: any) => (
+      <View testID="up-next-tab">
+        <TouchableOpacity testID="finish-button" onPress={onFinish}>
+          <Text>Finish</Text>
+        </TouchableOpacity>
+        <TouchableOpacity testID="back-button" onPress={onBack}>
+          <Text>Back</Text>
+        </TouchableOpacity>
+      </View>
+    ),
   };
 });
 
@@ -151,26 +203,32 @@ describe('SimulationFeedbackScreen', () => {
       </SafeAreaProvider>,
     );
 
-  it('renders summary when data exists', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('renders summary tab when data exists', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
         navigation={{} as any}
         route={{params: {scenarioSessionId: '1'}} as any}
       />,
     );
-    expect(getByTestId('summary-comp')).toBeTruthy();
+    expect(getByTestId('summary-tab')).toBeTruthy();
   });
 
-  it('opens feedback popup on button press', () => {
+  it('opens feedback popup when try another is pressed', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    fireEvent.press(getByTestId('primary-button'));
-    // Popup rendered by mocked component within screen
-    // We don’t have direct access; behavior covered by the screen showing popup internally
+    fireEvent.press(getByTestId('try-another-button'));
+    await waitFor(() => {
+      expect(getByTestId('feedback-popup')).toBeTruthy();
+    });
   });
 
-  it('shows skeleton when details are missing', () => {
+  it('renders summary tab even when details are missing', () => {
     const services = require('@/services');
     (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
       jest.fn().mockResolvedValue({data: {details: null}}),
@@ -180,131 +238,57 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    expect(getByTestId('summary-skeleton')).toBeTruthy();
+    // Screen always renders SummaryTab; loading state is handled internally by SummaryTab
+    expect(getByTestId('summary-tab')).toBeTruthy();
   });
 
-  it('switches to transcript when header pressed (via dropdown sets showSummary=false)', async () => {
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
-    ]);
+  it('switches to transcript tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Press arrow icon within header to open dropdown (bubbles to Touchable)
-    fireEvent.press(getByTestId('arrow-down'));
-    // Wait for dropdown to appear and click transcript option
+    // Tab index 1 is TRANSCRIPTION
+    fireEvent.press(getByTestId('tab-1'));
     await waitFor(() => {
-      expect(getByTestId('transcript-option')).toBeTruthy();
-    });
-    fireEvent.press(getByTestId('transcript-option'));
-    // Transcript should render after clicking the transcript option
-    await waitFor(() => {
-      expect(getByTestId('transcript-comp')).toBeTruthy();
+      expect(getByTestId('transcript-tab')).toBeTruthy();
     });
   });
 
-  it('shows scroll-to-bottom button when not near bottom and handles press', async () => {
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, startedAt: '2024-01-01T00:00:00Z'}, isLoading: false},
-    ]);
-    const {UNSAFE_getByType, getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
-    );
-    const {KeyboardAwareScrollView} = require('react-native-keyboard-aware-scroll-view');
-    const scrollView = UNSAFE_getByType(KeyboardAwareScrollView);
-    // trigger onScroll with not near bottom to show button
-    await act(async () => {
-      scrollView.props.onScroll({
-        nativeEvent: {
-          contentOffset: {y: 0},
-          contentSize: {height: 2000},
-          layoutMeasurement: {height: 300},
-        },
-      });
-    });
-    // Button shows chevron icon
-    await waitFor(() => {
-      expect(getByTestId('chevron-down')).toBeTruthy();
-    });
-    // Press chevron icon (inside TouchableOpacity)
-    fireEvent.press(getByTestId('chevron-down'));
-  });
-
-  it('when fromLogs and >= threshold with no feedback, shows feedback popup on back', async () => {
-    jest.useFakeTimers();
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, hasFeedback: false}, isLoading: false},
-    ]);
-
+  it('shows up next tab when pathId is provided', async () => {
     const {getByTestId} = renderWithProviders(
-      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
     );
-
-    // advance beyond FEEDBACK_THRESHOLD (30s)
-    jest.advanceTimersByTime(31_000);
-
-    // press back button
-    fireEvent.press(getByTestId('left-arrow-icon'));
-    // popup should be visible via mocked FeedbackPopup
+    // Tab index 2 is UP_NEXT (only visible when pathId or caseId is provided)
+    fireEvent.press(getByTestId('tab-2'));
     await waitFor(() => {
-      // import from the module mock to ensure visibility
-      const popup = getByTestId('feedback-popup');
-      expect(popup).toBeTruthy();
+      expect(getByTestId('up-next-tab')).toBeTruthy();
     });
   });
 
-  it('when fromLogs and < threshold, back goes to previous screen', () => {
+  it('navigates back when fromLogs back button is pressed', () => {
     mockGoBack = jest.fn();
 
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: {}}}),
-      {data: {details: {summary: {}}, hasFeedback: false}, isLoading: false},
-    ]);
-
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
 
-    // immediately press back (below threshold)
     fireEvent.press(getByTestId('left-arrow-icon'));
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('retries until limit and then shows toast error', async () => {
-    jest.useFakeTimers();
-    const services = require('@/services');
-    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
-      jest.fn().mockResolvedValue({data: {details: null}}),
-      {data: {details: null}, isLoading: false},
-    ]);
-
-    const {__mocks__} = require('@/components');
-    const {showToastMock} = __mocks__;
-    showToastMock.mockClear();
-
-    renderWithProviders(
+  it('does not show back arrow when not from logs', () => {
+    const {queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
+    expect(queryByTestId('left-arrow-icon')).toBeNull();
+  });
 
-    // RETRY_COUNT_LIMIT is 4, each after 5000ms; advance enough time
-    for (let i = 0; i < 5; i++) {
-      await act(async () => {
-        jest.advanceTimersByTime(5000);
-        await Promise.resolve();
-      });
-    }
-
-    await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalled();
-    });
+  it('renders tabs with correct count based on route params', () => {
+    const {getByTestId, queryByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
+    );
+    // Without pathId/caseId: SUMMARY (0) and TRANSCRIPTION (1) only
+    expect(getByTestId('tab-0')).toBeTruthy();
+    expect(getByTestId('tab-1')).toBeTruthy();
+    expect(queryByTestId('tab-2')).toBeNull();
   });
 });
-
-

@@ -5,3 +5,16 @@ export {FeedbackDropdown} from './FeedbackDropdown';
 export {UpNextSimulationCard} from './UpNextSimulationCard';
 export {SimulationAudioPlayer} from './SimulationAudioPlayer/SimulationAudioPlayer';
 export {PrivacyToggle} from './PrivacyToggle/PrivacyToggle';
+export {AskAI} from './AskAI/AskAI';
+export {SessionSkills} from './SessionSkills/SessionSkills';
+export {SummaryCard} from './SummaryCard';
+export type {
+  SessionSkillsProps,
+  SkillCoverageItem,
+} from './SessionSkills/SessionSkills';
+export {Reflection} from './Reflection/Reflection';
+export {UpNext} from './UpNext';
+export {SessionGlimpse} from './SessionGlimpse';
+export {SummaryTab} from './SummaryTab';
+export {TranscriptTab} from './TranscriptTab';
+export {ChecklistTab} from './ChecklistTab';

@@ -31,6 +31,10 @@ export interface CustomTabsProps {
     isActive: boolean,
     onPress: () => void,
   ) => React.ReactNode;
+  // Custom style overrides
+  activeTabTextColor?: string;
+  inactiveTabTextColor?: string;
+  activeTabBorderColor?: string;
 }
 
 export const CustomTabs = ({
@@ -42,6 +46,9 @@ export const CustomTabs = ({
   tabHeaderProps,
   renderTabHeader,
   containerStyle,
+  activeTabTextColor,
+  inactiveTabTextColor,
+  activeTabBorderColor,
 }: CustomTabsProps) => {
   const [internalActiveTab, setInternalActiveTab] = useState(initialTab);
   const activeTab = controlledActiveTab ?? internalActiveTab;
@@ -76,6 +83,10 @@ export const CustomTabs = ({
             style={[
               themedStyles.tabButton,
               isActive && themedStyles.activeTabButton,
+              isActive &&
+                activeTabBorderColor && {
+                  borderBottomColor: activeTabBorderColor,
+                },
             ]}
             onPress={onPress}
             accessibilityRole="tab"
@@ -85,13 +96,27 @@ export const CustomTabs = ({
               style={[
                 themedStyles.tabText,
                 isActive && themedStyles.activeTabText,
+                isActive && activeTabTextColor && {color: activeTabTextColor},
+                !isActive &&
+                  inactiveTabTextColor && {
+                    color: inactiveTabTextColor,
+                  },
               ]}>
               {tab.title}
             </Text>
           </TouchableOpacity>
         );
       }),
-    [tabs, activeTab, themedStyles, renderTabHeader, handleTabPress],
+    [
+      tabs,
+      activeTab,
+      renderTabHeader,
+      themedStyles,
+      activeTabBorderColor,
+      activeTabTextColor,
+      inactiveTabTextColor,
+      handleTabPress,
+    ],
   );
 
   return (

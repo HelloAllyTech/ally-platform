@@ -1,0 +1,61 @@
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {colors, fontFamily, typography} from '@/theme';
+
+export const styles = ScaledSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: '16@vs',
+  },
+  promptContainerWrapper: {
+    marginBottom: '16@vs',
+  },
+  promptContainer: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: '4@ms',
+    overflow: 'hidden',
+  },
+  promptContainerFocused: {
+    borderColor: colors.ds.blue[400],
+  },
+  promptText: {
+    paddingHorizontal: '16@ms',
+    paddingVertical: '12@vs',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontSize: '13@ms',
+    color: colors.ds.typography.highEmphasis,
+    paddingBottom: '12@vs',
+    lineHeight: '20@vs',
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.primary,
+    backgroundColor: colors.ds.surface.background,
+  },
+  promptTextFocused: {
+    borderBottomColor: colors.ds.blue[400],
+    backgroundColor: 'rgba(226, 242, 255, 0.5)',
+  },
+  textInput: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.highEmphasis,
+    padding: '12@ms',
+    minHeight: '100@vs',
+    textAlignVertical: 'top',
+  },
+  textInputFocused: {
+    borderColor: colors.ds.blue[400],
+  },
+  buttonContainer: {
+    marginTop: '8@vs',
+    flexDirection: 'row',
+    gap: '12@ms',
+  },
+  button: {
+    flex: 1,
+  },
+});

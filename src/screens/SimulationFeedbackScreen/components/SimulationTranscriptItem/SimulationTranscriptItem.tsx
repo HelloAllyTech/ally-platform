@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TextStyle, View, ViewStyle} from 'react-native';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
@@ -8,56 +8,44 @@ export type SimulationTranscriptItemProps = {
   time: string;
   message: string;
   speakerLabel?: string;
-  containerStyle?: ViewStyle;
-  timeStyle?: TextStyle;
-  messageTextStyle?: TextStyle;
-  messageStyle?: TextStyle;
   isActive?: boolean;
   isLearner?: boolean;
 };
 
 export const SimulationTranscriptItem: React.FC<
   SimulationTranscriptItemProps
-> = ({
-  time,
-  message,
-  speakerLabel,
-  containerStyle,
-  timeStyle,
-  messageTextStyle,
-  messageStyle,
-  isActive = false,
-  isLearner = false,
-}) => {
+> = ({time, message, speakerLabel, isLearner = false}) => {
+  const backgroundColor = isLearner
+    ? colors.ds.blueAlpha[25]
+    : colors.ds.deepPurpleAlpha[25];
+  const borderColor = isLearner
+    ? colors.ds.theme.primary
+    : colors.ds.deepPurple[500];
+  const speakerColor = isLearner
+    ? colors.ds.theme.primary
+    : colors.ds.deepPurple[800];
+
   return (
-    <View style={[styles.messageContainer, containerStyle]}>
-      <View style={styles.leftContainer}>
-        <View
-          style={[
-            styles.activeIndicator,
-            // eslint-disable-next-line react-native/no-inline-styles
-            {
-              backgroundColor: isActive
-                ? colors.ds.theme.primary
-                : 'transparent',
-            },
-          ]}
-        />
-        <View style={styles.timeContainer}>
-          <Text style={[styles.timeText, timeStyle]}>{time}</Text>
-        </View>
-      </View>
-      <View
-        style={[styles.messageContent, isActive && styles.activeMessageText]}>
-        <Text style={[styles.messageText, messageTextStyle]}>
-          {!!speakerLabel && (
-            <Text
-              style={[
-                styles.speakerLabel,
-                isLearner && styles.learnerLabel,
-              ]}>{`${speakerLabel}: `}</Text>
+    <View
+      style={[
+        styles.messageContainer,
+        {
+          backgroundColor,
+          borderColor,
+        },
+      ]}>
+      <View style={[styles.aiClientLayout, isLearner && styles.learnerLayout]}>
+        <Text style={styles.messageText}>
+          {speakerLabel && (
+            <Text style={styles.timeAndSpeaker}>
+              <Text style={styles.timeInline}>{time} </Text>
+              <Text style={[styles.speakerLabel, {color: speakerColor}]}>
+                {speakerLabel}
+              </Text>
+              {'\n'}
+            </Text>
           )}
-          <Text style={[styles.message, messageStyle]}>{message}</Text>
+          <Text style={styles.message}>{message}</Text>
         </Text>
       </View>
     </View>
@@ -66,48 +54,57 @@ export const SimulationTranscriptItem: React.FC<
 
 const styles = ScaledSheet.create({
   messageContainer: {
-    marginVertical: '7@mvs',
+    borderWidth: '0.5@ms',
+    borderRadius: '8@ms',
+    padding: '12@ms',
+    marginBottom: '16@vs',
+  },
+  learnerLayout: {
     flexDirection: 'row',
   },
-  leftContainer: {
-    flexDirection: 'row',
-    width: '60@ms',
-    marginRight: '8@ms',
-  },
-  activeIndicator: {
-    width: '2@ms',
-    marginRight: '8@ms',
-    borderRadius: '1@ms',
-  },
-  timeContainer: {
+  learnerContent: {
     flex: 1,
+    marginLeft: '16@ms',
+  },
+  aiClientLayout: {
+    flex: 1,
+  },
+  speakerRow: {
+    flexDirection: 'row',
+    marginBottom: '4@vs',
   },
   timeText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.mediumGray2,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
+    fontSize: '10@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    letterSpacing: '0.25@ms',
+    lineHeight: '24@vs',
+    minWidth: '30@ms',
   },
-  messageContent: {
-    flex: 1,
+  timeInline: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    letterSpacing: '0.1@ms',
   },
-  messageText: {
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
-    color: colors.black,
+  timeAndSpeaker: {
+    lineHeight: '24@vs',
   },
   speakerLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.black,
+    fontSize: '13@ms',
+    letterSpacing: '0.25@ms',
+    lineHeight: '24@vs',
   },
-  learnerLabel: {
-    color: colors.ds.theme.primary,
+  messageText: {
+    fontSize: '13@ms',
+    lineHeight: '24@vs',
   },
   message: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.charcoal2,
-  },
-  activeMessageText: {
-    backgroundColor: colors.ds.blue[50],
+    fontSize: '13@ms',
+    color: colors.ds.typography.highEmphasis,
+    letterSpacing: '0.25@ms',
+    lineHeight: '24@vs',
   },
 });

@@ -18,7 +18,7 @@ jest.mock('@/constants', () => ({
 jest.mock('@/components', () => {
   const {Text} = require('react-native');
   return {
-    PrimaryButton: ({label, onPress}: any) => (
+    Button: ({label, onPress}: any) => (
       <Text testID="primary-button" onPress={onPress}>
         {label}
       </Text>

@@ -126,6 +126,7 @@ export const legacyColors = {
   emeraldGreen: '#47B881',
   sageGreen: '#BAD4B8',
   jadeGreen: '#26AF6C',
+  lightGreen2: 'rgba(232, 245, 233, 0.25)',
 
   // Reds
   brightRed: '#F93535',
@@ -136,6 +137,7 @@ export const legacyColors = {
   tomatoRed: '#FF5454',
   salmonRed: '#FF8A8A',
   softCoralRed: '#FE6F64',
+  lightRed: 'rgba(255, 217, 212, 0.25)',
 
   // Yellows
   yellow: '#FFD700',

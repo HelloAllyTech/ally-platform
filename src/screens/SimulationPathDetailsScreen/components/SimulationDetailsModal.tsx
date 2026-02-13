@@ -9,7 +9,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {CustomDropdown, PrimaryButton, VideoPreview} from '@/components';
+import {Button, CustomDropdown, VideoPreview} from '@/components';
 import {isIOS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -62,6 +62,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
     <Modal
       visible={visible}
       transparent
+      statusBarTranslucent
       animationType="fade"
       onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -175,7 +176,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
           {onStartSimulation && (
             <View style={styles.buttonContainer}>
               <View style={styles.ctaWrapper}>
-                <PrimaryButton
+                <Button
                   label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
                   onPress={onStartSimulation}
                   isLoading={isCreatingRoom}

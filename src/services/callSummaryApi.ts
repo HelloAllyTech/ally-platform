@@ -38,7 +38,7 @@ export interface SummaryDetails {
   callDate: string | null;
   callTime: string | null;
   clientId: string | null;
-  counselorName: string | null;
+  counsellor: string | null;
   callType: string | null;
   age: AgeRange | null;
   gender: string | null;
@@ -47,6 +47,7 @@ export interface SummaryDetails {
   languages: Language[] | null;
   location: string | null;
   codeOfConcern: string | null;
+  newCallFollowUp: string | null;
 
   // Session Summary
   sessionSummary: string | null;
@@ -88,6 +89,7 @@ export interface SummaryDetails {
   // Metrics
   listeningShare: number | null;
   reflectiveQuestionsAsked: number | null;
+  openEndedQuestionsAsked: number | null;
   emotionalLift: number | null;
 
   // Intake section
@@ -126,8 +128,6 @@ export interface SummaryDetails {
 
   // Additional fields from response
   workingStatus: string | null;
-  newCallFollowUp: string | null;
-  counsellor: string | null;
   followUpGoals: string | null;
   sessionNumber: string | null;
   followUpStatus: string | null;
@@ -169,6 +169,7 @@ export interface CallSummaryResponse {
   status: string;
   startedAt: string;
   endedAt: string;
+  archivedAt: string;
   details: CallDetails;
   summaryStatus: ChatSummaryStatus;
 }

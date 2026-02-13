@@ -1,6 +1,6 @@
 import React from 'react';
 import {Text} from 'react-native';
-import {act, render, waitFor} from '@testing-library/react-native';
+import {act, render} from '@testing-library/react-native';
 
 import {useCallSummaryActions} from '../useCallSummaryActions';
 
@@ -8,6 +8,12 @@ const mockUpdateCallInfo = jest.fn(async () => ({unwrap: async () => ({})}));
 const mockExport = jest.fn(() => ({unwrap: async () => 'file-contents'}));
 const mockUpdateSummary = jest.fn(async () => ({data: {ok: true}}));
 const mockAddFeedback = jest.fn(async () => ({data: {ok: true}}));
+
+jest.mock('@/services', () => ({
+  useArchiveCallLogMutation: () => [
+    jest.fn().mockResolvedValue({unwrap: async () => {}}),
+  ],
+}));
 
 jest.mock('@/services/callSummaryApi', () => ({
   useUpdateCallInfoMutation: () => [mockUpdateCallInfo],

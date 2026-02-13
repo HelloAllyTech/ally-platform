@@ -8,19 +8,19 @@ export const styles = ScaledSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  tabsContainer: {
+    marginHorizontal: '20@ms',
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: '20@ms',
+    paddingHorizontal: '10@ms',
     paddingBottom: '40@vs',
   },
   titleSection: {
-    marginBottom: '10@vs',
+    marginBottom: '8@vs',
     paddingRight: '20@ms',
     paddingLeft: '10@ms',
-    paddingBottom: '8@vs',
     marginTop: '8@vs',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
   },
   titleRow: {
     flexDirection: 'row',
@@ -33,11 +33,6 @@ export const styles = ScaledSheet.create({
     ...typography.headline.tiny,
     ...fontFamily.REPLAY_PRO.HEADLINE,
     color: colors.ds.typography.highEmphasis,
-  },
-  subTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    color: colors.ds.typography.mediumEmphasis,
   },
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
@@ -102,20 +97,6 @@ export const styles = ScaledSheet.create({
     lineHeight: '24@ms',
     color: colors.ds.typography.highEmphasis,
   },
-  transitionMessageContainer: {
-    marginBottom: '16@vs',
-  },
-  transitionMessageTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '8@vs',
-  },
-  transitionMessageContent: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.ds.typography.highEmphasis,
-  },
   privacyToggleContainer: {
     position: 'absolute',
     bottom: '20@vs',
@@ -126,5 +107,9 @@ export const styles = ScaledSheet.create({
   },
   reviewIconButton: {
     marginLeft: 'auto',
+  },
+  checklistContainer: {
+    flex: 1,
+    padding: '10@ms',
   },
 });

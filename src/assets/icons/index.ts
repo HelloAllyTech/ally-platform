@@ -3,6 +3,7 @@ import AddReactionIcon from './addReaction.svg';
 import AllyLogoIcon from './allyLogo.svg';
 import AnalyticsInactiveIcon from './analytics.svg';
 import AnalyticsActiveIcon from './analyticsActive.svg';
+import ArchiveIcon from './archive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
 import AssessmentIcon from './assessment.svg';
@@ -20,10 +21,12 @@ import CallEndIcon from './callEnd.svg';
 import CallHighlightsIcon from './callHighlights.svg';
 import CallLogInactiveIcon from './callLog.svg';
 import CallLogActiveIcon from './callLogActive.svg';
+import CancelIcon from './cancel.svg';
 import ChangeImageIcon from './changeImage.svg';
 import ChatAddOnIcon from './chatAddOn.svg';
 import CommentIcon from './chatBubble.svg';
 import CheckIcon from './check.svg';
+import CheckCircleIcon from './checkCircle.svg';
 import ChecklistIcon from './checklist.svg';
 import CheckWhiteIcon from './checkWhite.svg';
 import ChevronDown from './chevronDown.svg';
@@ -99,6 +102,7 @@ import ProfileSettingsIcon from './profileSettings.svg';
 import Rank1Icon from './rank1.svg';
 import Rank2Icon from './rank2.svg';
 import Rank3Icon from './rank3.svg';
+import RankBadgeIcon from './rankBadge.svg';
 import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import Replay10Icon from './replay10.svg';
@@ -127,12 +131,15 @@ import TickIcon from './tick.svg';
 import TickRoundIcon from './tickRound.svg';
 import TranscribeIcon from './transcribe.svg';
 import TranscriptIcon from './transcript.svg';
+import UnarchiveIcon from './unarchive.svg';
+import UpArrowIcon from './up_arrow.svg';
 import UserIcon from './user.svg';
 import VolumeOffIcon from './volumeMute.svg';
 import VolumeIcon from './volumeUnmute.svg';
 import WandStarsIcon from './wandStars.svg';
 
 export {
+  ArchiveIcon,
   Forward10Icon,
   Replay10Icon,
   PausePlayerIcon,
@@ -159,8 +166,10 @@ export {
   CallIcon,
   CallLogActiveIcon,
   CallLogInactiveIcon,
+  CancelIcon,
   ChangeImageIcon,
   ChatAddOnIcon,
+  CheckCircleIcon,
   CheckIcon,
   CheckWhiteIcon,
   ChevronDown,
@@ -178,6 +187,7 @@ export {
   DoubleRightArrowIcon,
   DownArrowIcon,
   DrawerMenuIcon,
+  UpArrowIcon,
   EditIcon,
   EditSquareIcon,
   EmptyReviewIcon,
@@ -232,6 +242,7 @@ export {
   Rank1Icon,
   Rank2Icon,
   Rank3Icon,
+  RankBadgeIcon,
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
@@ -260,6 +271,7 @@ export {
   TickRoundIcon,
   TranscriptIcon,
   TranscribeIcon,
+  UnarchiveIcon,
   UserIcon,
   VolumeIcon,
   VolumeOffIcon,

@@ -113,7 +113,7 @@ jest.mock('@/services/simulationsApi', () => ({
 }));
 jest.mock('@/services/settingsApi', () => ({
   useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],
-  useLazyGetSummaryFieldsQuery: () => [jest.fn(), { data: ['field1'] }],
+  useGetSummaryFieldsQuery: () => ({ data: ['field1'], isLoading: false }),
 }));
 
 // Utils (isAppFeatureEnabled removed)

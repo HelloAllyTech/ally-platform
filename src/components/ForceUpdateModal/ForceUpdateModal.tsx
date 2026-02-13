@@ -3,7 +3,7 @@ import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ForceUpdateAlertIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {ForceUpdateModalProps} from '@/types';
@@ -29,7 +29,7 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
 
         <Text style={styles.description}>{t('ForceUpdate.description')}</Text>
 
-        <PrimaryButton
+        <Button
           label={t('ForceUpdate.updateButton')}
           onPress={openAppStore}
           customContainerStyle={styles.updateButton}

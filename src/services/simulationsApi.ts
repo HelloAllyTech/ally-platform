@@ -1,6 +1,9 @@
 import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {LogItem} from '@/screens/CallLog/types';
 import {
+  Case,
+  CaseDetails,
+  CasesResponse,
   EndScenarioSessionResponse,
   FeedbackRequest,
   FeedbackResponse,
@@ -102,15 +105,22 @@ export const simulationsApi = api.injectEndpoints({
       {
         scenarioId: number;
         scenarioPathSessionItemId?: string;
+        caseSessionItemId?: string;
         languageId?: number;
       }
     >({
-      query: ({scenarioId, scenarioPathSessionItemId, languageId}) => ({
+      query: ({
+        scenarioId,
+        scenarioPathSessionItemId,
+        caseSessionItemId,
+        languageId,
+      }) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
         method: API_METHODS.POST,
         body: {
           scenarioId,
           ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
+          ...(caseSessionItemId && {caseSessionItemId}),
           ...(languageId && {languageId}),
         },
       }),
@@ -128,6 +138,8 @@ export const simulationsApi = api.injectEndpoints({
         'SimulationCredits',
         'SimulationPaths',
         'SimulationPathDetails',
+        'Cases',
+        'CaseDetails',
       ],
     }),
 
@@ -179,7 +191,7 @@ export const simulationsApi = api.injectEndpoints({
       {scenarioSessionId: string}
     >({
       query: ({scenarioSessionId}) => ({
-        url: API_ROUTES.LEARN.UPCOMING_SCENARIO(scenarioSessionId),
+        url: API_ROUTES.LEARN.UPCOMING_PATH_SCENARIO(scenarioSessionId),
         method: API_METHODS.GET,
       }),
     }),
@@ -192,6 +204,58 @@ export const simulationsApi = api.injectEndpoints({
     >({
       query: ({pathSessionItemId}) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_PATH_ITEM(pathSessionItemId),
+        method: API_METHODS.GET,
+      }),
+    }),
+
+    getCases: builder.query<Case[], void>({
+      query: () => ({
+        url: API_ROUTES.LEARN.CASES,
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CasesResponse) => response.data,
+      providesTags: ['Cases'],
+    }),
+
+    getCaseDetails: builder.query<CaseDetails, {caseId: string}>({
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CASE_DETAILS(caseId),
+        method: API_METHODS.GET,
+      }),
+      transformResponse: (response: CaseDetails) => ({
+        ...response,
+        scenarios: [...response.scenarios].sort((a, b) => a.order - b.order),
+      }),
+      providesTags: ['CaseDetails'],
+    }),
+
+    createCaseSession: builder.mutation<
+      {caseSessionItemId: string},
+      {caseId: string}
+    >({
+      query: ({caseId}) => ({
+        url: API_ROUTES.LEARN.CREATE_CASE_SESSION(caseId),
+        method: API_METHODS.POST,
+      }),
+      invalidatesTags: ['CaseDetails', 'Cases'],
+    }),
+
+    getUpcomingCaseScenario: builder.query<
+      UpcomingScenarioResponse | null,
+      {scenarioSessionId: string}
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: API_ROUTES.LEARN.UPCOMING_CASE_SCENARIO(scenarioSessionId),
+        method: API_METHODS.GET,
+      }),
+    }),
+
+    getScenarioSessionByCaseItem: builder.query<
+      {id: string},
+      {caseSessionItemId: string}
+    >({
+      query: ({caseSessionItemId}) => ({
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_BY_CASE_ITEM(caseSessionItemId),
         method: API_METHODS.GET,
       }),
     }),
@@ -215,4 +279,10 @@ export const {
   useGetUpcomingScenarioQuery,
   useLazyGetUpcomingScenarioQuery,
   useLazyGetScenarioSessionByPathItemQuery,
+  useGetCasesQuery,
+  useGetCaseDetailsQuery,
+  useCreateCaseSessionMutation,
+  useGetUpcomingCaseScenarioQuery,
+  useLazyGetUpcomingCaseScenarioQuery,
+  useLazyGetScenarioSessionByCaseItemQuery,
 } = simulationsApi;

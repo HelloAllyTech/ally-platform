@@ -28,10 +28,14 @@ import {
   useSimulationCredits,
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
-import {useGetScenariosQuery, useGetSimulationPathsQuery} from '@/services';
+import {
+  useGetCasesQuery,
+  useGetScenariosQuery,
+  useGetSimulationPathsQuery,
+} from '@/services';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import type {Scenario, SimulationPath} from '@/types';
+import type {Case, Scenario, SimulationPath} from '@/types';
 import {getTriggerWarningNames} from '@/utils';
 
 export const SimulationsScreen: React.FC = () => {
@@ -58,9 +62,16 @@ export const SimulationsScreen: React.FC = () => {
     refetch: refetchPaths,
   } = useGetSimulationPathsQuery();
 
+  const {
+    data: casesData,
+    isFetching: isFetchingCases,
+    refetch: refetchCases,
+  } = useGetCasesQuery();
+
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  const keyExtractor = (item: Scenario | SimulationPath) => item.id?.toString();
+  const keyExtractor = (item: Scenario | SimulationPath | Case) =>
+    item.id?.toString();
 
   // Check if this is the first visible tab
   const isFirstTab = useMemo(() => {
@@ -94,11 +105,19 @@ export const SimulationsScreen: React.FC = () => {
     });
   };
 
+  const handleCasePress = (caseItem: Case) => {
+    navigation.navigate(SCREEN_NAMES.CASE_DETAILS, {
+      caseId: caseItem.id,
+    });
+  };
+
   const handleRefresh = () => {
     if (activeTab === SimulationTabs.SIMULATIONS) {
       refetchScenarios();
-    } else {
+    } else if (activeTab === SimulationTabs.PATHS) {
       refetchPaths();
+    } else {
+      refetchCases();
     }
   };
 
@@ -148,13 +167,49 @@ export const SimulationsScreen: React.FC = () => {
     );
   };
 
+  const renderCaseItem = ({item}: {item: Case}) => {
+    const progress = item.completedScenarios;
+    const total = item.totalScenarios;
+    const showProgress = !!progress && !!total;
+    const isCompleted = !!progress && progress >= total;
+
+    return (
+      <SimulationCard
+        title={item.title}
+        description={`${total} ${t('CallLogs.simulations')}`}
+        coverImageUrl={item.coverImageUrl}
+        onPress={() => handleCasePress(item)}
+        rightAccessory={
+          showProgress ? (
+            <View style={styles.progressContainer}>
+              <CircularProgress
+                progress={progress}
+                max={total}
+                size={33}
+                strokeWidth={3}
+                progressColor={
+                  isCompleted ? colors.ds.green[400] : colors.blue
+                }>
+                <Text style={styles.progressText}>
+                  {progress}/{total}
+                </Text>
+              </CircularProgress>
+            </View>
+          ) : null
+        }
+      />
+    );
+  };
+
   const ListEmptyElement = useMemo(
     () => (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>
           {activeTab === SimulationTabs.SIMULATIONS
             ? t('Simulations.noSimulationsAvailable')
-            : 'No paths available'}
+            : activeTab === SimulationTabs.PATHS
+              ? t('Simulations.noPathsAvailable')
+              : t('Simulations.noCasesAvailable')}
         </Text>
       </View>
     ),
@@ -193,14 +248,27 @@ export const SimulationsScreen: React.FC = () => {
 
   const renderTabContent = () => {
     const isSimulationsTab = activeTab === SimulationTabs.SIMULATIONS;
-    const isFetching = isSimulationsTab ? isFetchingScenarios : isFetchingPaths;
+    const isPathsTab = activeTab === SimulationTabs.PATHS;
+    const isCasesTab = activeTab === SimulationTabs.CASES;
+
+    const isFetching = isSimulationsTab
+      ? isFetchingScenarios
+      : isPathsTab
+        ? isFetchingPaths
+        : isFetchingCases;
+
+    const tabLabel = isSimulationsTab
+      ? 'simulation'
+      : isPathsTab
+        ? 'track'
+        : 'case';
 
     return (
       <>
         <Text style={styles.listTitle}>
           {t('Simulations.chooseYour')}{' '}
           <Text style={styles.pageTitleItalic}>
-            {t(`Simulations.${isSimulationsTab ? 'simulation' : 'track'}`)}
+            {t(`Simulations.${tabLabel}`)}
           </Text>
         </Text>
         {isSimulationsTab ? (
@@ -220,12 +288,29 @@ export const SimulationsScreen: React.FC = () => {
               />
             }
           />
-        ) : (
+        ) : isPathsTab ? (
           <FlatList
             contentContainerStyle={styles.list}
             data={pathsData ?? []}
             keyExtractor={keyExtractor}
             renderItem={renderPathItem}
+            ListEmptyComponent={
+              !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
+            }
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching}
+                onRefresh={handleRefresh}
+              />
+            }
+          />
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.list}
+            data={casesData ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderCaseItem}
             ListEmptyComponent={
               !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
             }
@@ -270,6 +355,10 @@ export const SimulationsScreen: React.FC = () => {
               {
                 key: SimulationTabs.PATHS,
                 label: t('Simulations.tracks'),
+              },
+              {
+                key: SimulationTabs.CASES,
+                label: t('Simulations.cases'),
               },
             ]}
             activeTab={activeTab}

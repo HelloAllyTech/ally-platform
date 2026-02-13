@@ -168,8 +168,10 @@ export interface UpNextSimulation {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   scenarioPathSessionItemStatus?: SessionItemStatus;
+  caseSessionItemStatus?: SessionItemStatus;
   order?: number;
   scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
 }
 
 export interface CurrentSessionInfo {
@@ -179,11 +181,15 @@ export interface CurrentSessionInfo {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   scenarioPathSessionItemStatus?: SessionItemStatus;
+  caseSessionItemStatus?: SessionItemStatus;
   scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
   transitionMessageTitle?: string;
   transitionMessageContent?: string;
   isScenarioPathSessionCompleted?: boolean;
+  isCaseSessionCompleted?: boolean;
   eventStatus?: string;
+  sessionGlimpse?: string;
 }
 
 export interface UpcomingScenarioResponse {
@@ -229,6 +235,9 @@ export interface SimulationSummaryData {
   reviewStatus?: ReviewStatus | null;
   scenario?: {
     title?: string;
+    description?: string;
+    coverImageUrl?: string;
+    coverVideoUrl?: string;
     metadata?: ScenarioMetadata;
   };
   details?: SimulationDetails;
@@ -236,7 +245,6 @@ export interface SimulationSummaryData {
 
 export type SessionData = {
   id: string;
-  createdAt: string;
   accessToken: string;
   liveKitServerUrl: string;
 };
@@ -286,6 +294,7 @@ export interface SimulationPathDetails {
   completedScenarios: number;
   completedAt: Date | null;
   scenarioPathSessionId: string | null;
+  caseSessionId?: string | null;
   scenarios: PathScenario[];
 }
 
@@ -320,4 +329,35 @@ export interface ChecklistItem {
   rank?: number;
   score?: number;
   message?: string;
+}
+
+/**
+ * Case list item type - uses same structure as SimulationPath
+ */
+export type Case = SimulationPath;
+
+/**
+ * Case detail type - uses same structure as SimulationPathDetails
+ */
+export type CaseDetails = SimulationPathDetails;
+
+/**
+ * Individual scenario within a Case - uses same structure as PathScenario
+ */
+export type CaseSimulation = PathScenario;
+
+/**
+ * Cases list response type - uses same structure as SimulationPathsResponse
+ */
+export type CasesResponse = SimulationPathsResponse;
+
+/**
+ * Room connection status for LiveKit sessions
+ */
+export enum RoomStatus {
+  CONNECTED = 'connected',
+  CONNECTING = 'connecting',
+  DISCONNECTED = 'disconnected',
+  DISCONNECTING = 'disconnecting',
+  AGENT_JOINED = 'agent_joined',
 }

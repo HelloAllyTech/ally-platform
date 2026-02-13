@@ -1,8 +1,9 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
+  Animated,
   KeyboardAvoidingView,
-  Modal,
+  ScrollView,
   Text,
   TextInput,
   TouchableWithoutFeedback,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChipGroup, PrimaryButton, StarRating} from '@/components';
+import {Button, ChipGroup, StarRating} from '@/components';
 import {FEEDBACK_ISSUE_OPTIONS, isIOS, RATING_TEXT_MAP} from '@/constants';
 import {colors, fontFamily, stroke, typography} from '@/theme';
 
@@ -36,14 +37,29 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
   const [rating, setRating] = useState(DEFAULT_RATING);
   const [suggestion, setSuggestion] = useState('');
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+  const [slideAnim] = useState(new Animated.Value(1000)); // Start off-screen
 
   useEffect(() => {
     if (visible) {
       setRating(DEFAULT_RATING);
       setSuggestion('');
       setSelectedIssues([]);
+      // Slide up animation
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    } else {
+      // Slide down animation
+      Animated.timing(slideAnim, {
+        toValue: 1000,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [visible]);
+  }, [visible, slideAnim]);
 
   const handleIssueSelectionChange = useCallback(
     (newSelectedIssues: string[]) => {
@@ -101,19 +117,31 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
     );
   };
 
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      testID={testID}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={isIOS ? 'padding' : 'height'}
-        keyboardVerticalOffset={isIOS ? 0 : 20}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={styles.overlay}>
+    <>
+      {/* Overlay backdrop */}
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.overlay} />
+      </TouchableWithoutFeedback>
+
+      {/* Animated bottom sheet */}
+      <Animated.View
+        style={[
+          styles.animatedContainer,
+          {transform: [{translateY: slideAnim}]},
+        ]}>
+        <KeyboardAvoidingView
+          behavior={isIOS ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}>
             <TouchableWithoutFeedback>
               <View style={[styles.container, customContainerStyle]}>
                 <Text style={[styles.title, customTitleStyle]}>
@@ -151,7 +179,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                 {note && note?.length > 0 && (
                   <Text style={styles.instructionText}>{note}</Text>
                 )}
-                <PrimaryButton
+                <Button
                   label={t('FeedbackPopup.submitButton')}
                   onPress={handleSubmit}
                   customContainerStyle={customButtonStyle}
@@ -160,31 +188,49 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                 />
               </View>
             </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </Modal>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </>
   );
 };
 
 const styles = ScaledSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    zIndex: 9998,
+  },
+  animatedContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    maxHeight: '90%',
+  },
+  scrollView: {
+    maxHeight: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   container: {
     backgroundColor: colors.ds.neutral.white,
-    borderRadius: '12@ms',
-    borderBottomEndRadius: '0@ms',
-    borderBottomLeftRadius: '0@ms',
+    borderTopLeftRadius: '12@ms',
+    borderTopRightRadius: '12@ms',
     padding: '24@ms',
     width: '100%',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: -2},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
   },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

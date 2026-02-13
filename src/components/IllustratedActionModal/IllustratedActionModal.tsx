@@ -1,7 +1,7 @@
 import {StyleProp, Text, TextStyle, View, ViewStyle} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {colors, fontFamily} from '@/theme';
 
 export interface ActionButton {
@@ -46,7 +46,7 @@ export const IllustratedActionModal: React.FC<IllustratedActionModalProps> = ({
 
         <View style={styles.actionsRow}>
           {actions.map((action, index) => (
-            <PrimaryButton
+            <Button
               key={index}
               onPress={action.onPress}
               label={action.label}

@@ -62,6 +62,7 @@ export enum AllyPlatforms {
 export enum LogType {
   REAL = 'real',
   SIMULATION = 'simulation',
+  ARCHIVED_REAL = 'archived_real',
 }
 
 export enum LanguageMap {
@@ -111,6 +112,8 @@ export const API_ROUTES = {
     MESSAGES_FEEDBACK: (chatId: number) => `/chats/messages/${chatId}/feedback`,
     MESSAGES_FEEDBACK_BY_ID: (feedbackId: number) =>
       `/chats/messages/feedback/${feedbackId}`,
+    ARCHIVE_CALL_LOG: (callLogId: number) =>
+      `/chats/call-logs/${callLogId}/archive`,
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
@@ -150,11 +153,19 @@ export const API_ROUTES = {
       `/learn/scenario-paths/${pathId}/create-session`,
     SIMULATION_PATH_DETAILS: (pathId: string) =>
       `/learn/scenario-paths/${pathId}`,
-    UPCOMING_SCENARIO: (scenarioPathSessionId: string) =>
+    UPCOMING_PATH_SCENARIO: (scenarioPathSessionId: string) =>
       `/learn/scenario-paths/${scenarioPathSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
       `/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
     GET_AVAILABLE_LANGUAGES: '/learn/scenario-languages',
+    CASES: '/learn/cases',
+    CASE_DETAILS: (caseId: string) => `/learn/cases/${caseId}`,
+    CREATE_CASE_SESSION: (caseId: string) =>
+      `/learn/cases/${caseId}/create-session`,
+    UPCOMING_CASE_SCENARIO: (scenarioSessionId: string) =>
+      `/learn/cases/${scenarioSessionId}/upcoming-scenario`,
+    SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
+      `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',
