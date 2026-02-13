@@ -10,7 +10,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {colors, fontFamily, typography} from '@/theme';
 
 interface IllustratedModalProps {
@@ -77,7 +77,7 @@ export const IllustratedModal: React.FC<IllustratedModalProps> = ({
         </Text>
 
         {!!actionButtonText && !!onActionPress && (
-          <PrimaryButton
+          <Button
             label={actionButtonText}
             onPress={handleActionPress}
             customContainerStyle={[

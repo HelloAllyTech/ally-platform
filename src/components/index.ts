@@ -1,5 +1,5 @@
-export {PrimaryButton} from './Button';
-export type {PrimaryButtonProps} from './Button';
+export {Button} from './Button';
+export type {ButtonProps} from './Button';
 export {CustomModal} from './CustomModal';
 export {IllustratedModal} from './IllustratedModal';
 export {IllustratedActionModal} from './IllustratedActionModal';

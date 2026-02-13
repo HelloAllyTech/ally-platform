@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
+import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
@@ -73,22 +74,17 @@ export const Reflection: React.FC = () => {
             </View>
             {focusedInput === index && (
               <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={styles.clearButton}
+                <Button
+                  customContainerStyle={styles.button}
                   onPress={handleClear}
-                  activeOpacity={0.7}>
-                  <Text style={styles.clearButtonText}>
-                    {t('SimulationFeedback.reflection.clear')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.saveButton}
+                  variant="secondary"
+                  label={t('SimulationFeedback.reflection.clear')}
+                />
+                <Button
+                  customContainerStyle={styles.button}
+                  label={t('SimulationFeedback.reflection.save')}
                   onPress={handleSave}
-                  activeOpacity={0.7}>
-                  <Text style={styles.saveButtonText}>
-                    {t('SimulationFeedback.reflection.save')}
-                  </Text>
-                </TouchableOpacity>
+                />
               </View>
             )}
           </View>

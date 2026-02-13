@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChipGroup, PrimaryButton, StarRating} from '@/components';
+import {Button, ChipGroup, StarRating} from '@/components';
 import {FEEDBACK_ISSUE_OPTIONS, isIOS, RATING_TEXT_MAP} from '@/constants';
 import {colors, fontFamily, stroke, typography} from '@/theme';
 
@@ -179,7 +179,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                 {note && note?.length > 0 && (
                   <Text style={styles.instructionText}>{note}</Text>
                 )}
-                <PrimaryButton
+                <Button
                   label={t('FeedbackPopup.submitButton')}
                   onPress={handleSubmit}
                   customContainerStyle={customButtonStyle}

@@ -9,7 +9,7 @@ import {
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {PrimaryButton, useToast} from '@/components';
+import {Button, useToast} from '@/components';
 import {ChatSummaryStatus, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
@@ -225,7 +225,7 @@ export const CallSummaryScreen: React.FC<
           </TouchableOpacity>
         )}
         {!showSummaryButtonLoader && (
-          <PrimaryButton
+          <Button
             label={t('CallLogs.willCheckLater')}
             onPress={onViewCallLogs}
             customContainerStyle={[

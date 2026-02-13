@@ -3,7 +3,7 @@ import {Image, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {summaryFailed} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 
@@ -23,7 +23,7 @@ export const SummaryUnauthorized: React.FC<SummaryUnauthorizedProps> = ({
       <Text style={styles.subtitle}>
         {t('CallSummaryUnauthorized.description')}
       </Text>
-      <PrimaryButton
+      <Button
         label={t('Common.offline.goBack')}
         onPress={onGoBack}
         customContainerStyle={styles.button}

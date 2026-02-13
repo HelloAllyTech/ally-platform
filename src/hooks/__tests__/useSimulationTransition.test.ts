@@ -109,7 +109,7 @@ describe('useSimulationTransition', () => {
         scenarioId: 1,
         scenarioPathSessionItemId: '123',
         eventStatus: SimulationEventStatus.COMPLETED,
-        scenarioPathSessionItemStatus: SessionItemStatus.COMPLETED,
+        scenarioPathSessionItemStatus: SessionItemStatus.UNLOCKED,
         isScenarioPathSessionCompleted: false,
       },
     };

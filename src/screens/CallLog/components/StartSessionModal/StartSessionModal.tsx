@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 
 import {CloseIcon} from '@/assets';
-import {NotificationModal, PrimaryButton, SecurityCarousel} from '@/components';
+import {Button, NotificationModal, SecurityCarousel} from '@/components';
 import {useTranslate} from '@/hooks';
 
 import {styles} from './styles';
@@ -74,7 +74,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
 
           <View style={[styles.separator, styles.marginB16]} />
 
-          <PrimaryButton
+          <Button
             label={t('CallLogs.startSessionNow')}
             onPress={handleStart}
             customContainerStyle={styles.ctaBtn}
