@@ -1,5 +1,5 @@
 import React, {type ComponentType} from 'react';
-import {Modal, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import type {SvgProps} from 'react-native-svg';
 
@@ -54,13 +54,10 @@ export const ConfirmationModal = React.memo(
     confirmVariant = 'primary',
     isLoading = false,
   }: ConfirmationModalProps) => {
+    if (!visible) return null;
+
     return (
-      <Modal
-        visible={visible}
-        onRequestClose={onClose}
-        transparent
-        animationType="fade"
-        statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill}>
         <View style={styles.overlay}>
           <View style={styles.container}>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -95,7 +92,7 @@ export const ConfirmationModal = React.memo(
             </View>
           </View>
         </View>
-      </Modal>
+      </View>
     );
   },
 );
@@ -103,9 +100,15 @@ export const ConfirmationModal = React.memo(
 const styles = ScaledSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: colors.blackTransparent50,
+    backgroundColor: 'rgba(19, 19, 19, 0.37)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    left: 0,
+    zIndex: 9999,
   },
   container: {
     backgroundColor: colors.white,
