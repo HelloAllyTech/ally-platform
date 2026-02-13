@@ -18,6 +18,7 @@ import {LeftArrow} from '@/assets/icons';
 import {
   BottomSheet,
   CommentBottomSheetFooter,
+  ConfirmationModal,
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
@@ -80,6 +81,8 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const [hasMore, setHasMore] = React.useState(false);
   const [replyText, setReplyText] = useState('');
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [deleteReplyId, setDeleteReplyId] = useState<string | null>(null);
+  const deleteGobackRef = useRef<(() => void) | null>(null);
   const [addReaction] = useAddReactionToCommentMutation();
 
   const handleGoback = useCallback(() => {
@@ -95,30 +98,38 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   );
 
   const handleDeleteComment = useCallback(
-    async (replyId: string, goback?: () => void) => {
-      try {
-        await deleteComment({commentId: replyId}).unwrap();
-        // Remove deleted item from local state to preserve scroll position
-        // This avoids resetting scroll by not replacing the entire data array
-        setReplies(prev => {
-          if (!prev) return null;
-          const filteredData = prev.data.filter(reply => reply.id !== replyId);
-          const newCount = Math.max(0, prev.count - 1);
-          // Update hasMore based on remaining items
-          setHasMore(filteredData.length < newCount);
-          return {
-            data: filteredData,
-            count: newCount,
-          };
-        });
-      } catch (error) {
-        console.error('Failed to delete reply:', error);
-      } finally {
-        goback?.();
-      }
+    (replyId: string, goback?: () => void) => {
+      setDeleteReplyId(replyId);
+      deleteGobackRef.current = goback || null;
     },
-    [deleteComment],
+    [],
   );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteReplyId) return;
+    try {
+      await deleteComment({commentId: deleteReplyId}).unwrap();
+      // Remove deleted item from local state to preserve scroll position
+      setReplies(prev => {
+        if (!prev) return null;
+        const filteredData = prev.data.filter(
+          reply => reply.id !== deleteReplyId,
+        );
+        const newCount = Math.max(0, prev.count - 1);
+        setHasMore(filteredData.length < newCount);
+        return {
+          data: filteredData,
+          count: newCount,
+        };
+      });
+    } catch (error) {
+      console.error('Failed to delete reply:', error);
+    } finally {
+      deleteGobackRef.current?.();
+      deleteGobackRef.current = null;
+      setDeleteReplyId(null);
+    }
+  }, [deleteComment, deleteReplyId]);
 
   const handleHideComment = useCallback(
     async (replyId: string, hidden: boolean) => {
@@ -631,6 +642,19 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           )}
         </View>
       </BottomSheet>
+      <ConfirmationModal
+        visible={!!deleteReplyId}
+        onClose={() => {
+          deleteGobackRef.current = null;
+          setDeleteReplyId(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title={t('ReplyBottomSheet.deleteConfirmation.title')}
+        description={t('ReplyBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('ReplyBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('ReplyBottomSheet.deleteConfirmation.cancel')}
+        confirmVariant="destructive"
+      />
     </>
   );
 };
