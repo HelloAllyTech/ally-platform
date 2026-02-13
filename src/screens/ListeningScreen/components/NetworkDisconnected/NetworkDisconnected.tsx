@@ -3,7 +3,7 @@ import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {NetworkDisconnectedIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {useNetworkConnectivity, useTranslate} from '@/hooks';
 import {colors, fontFamily} from '@/theme';
 import {DisconnectedType} from '@/types';
@@ -55,14 +55,14 @@ export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
         <Text style={styles.title}>{getTitle()}</Text>
         <Text style={styles.description}>{getDescription()}</Text>
         {!isOffline && (
-          <PrimaryButton
+          <Button
             label={t('Common.offline.tryAgain')}
             onPress={onRetry}
             customContainerStyle={[styles.buttonContainer, styles.bgWhite]}
             customTextStyle={styles.secondaryText}
           />
         )}
-        <PrimaryButton
+        <Button
           label={t('Common.offline.goBack')}
           onPress={onGoBack}
           customContainerStyle={[styles.buttonContainer, styles.bgDarkGray7]}

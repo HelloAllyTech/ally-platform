@@ -1,10 +1,9 @@
 import React from 'react';
-import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {ScrollView, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {PrimaryButton, SimulationTransitionSection} from '@/components';
+import {Button, SimulationTransitionSection} from '@/components';
 import {useSimulationTransition, useTranslate} from '@/hooks';
-import {colors, fontFamily, radius} from '@/theme';
 
 import {SessionGlimpse} from '../SessionGlimpse';
 import {SummaryCard} from '../SummaryCard';
@@ -59,7 +58,7 @@ export const UpNext: React.FC<UpNextProps> = ({
     if (isFlowCompleted) {
       return (
         <View style={styles.buttonContainer}>
-          <PrimaryButton
+          <Button
             label={t('Common.finish')}
             onPress={onFinish}
             customContainerStyle={styles.submitButton}
@@ -72,26 +71,26 @@ export const UpNext: React.FC<UpNextProps> = ({
     return (
       <View style={styles.buttonContainer}>
         <View style={styles.pathNavigationContainer}>
-          <TouchableOpacity
-            style={styles.backButton}
+          <Button
+            label={t('Common.back')}
             onPress={onBack}
-            activeOpacity={0.7}>
-            <Text style={styles.backButtonText}>{t('Common.back')}</Text>
-          </TouchableOpacity>
+            variant="secondary"
+            customContainerStyle={styles.button}
+          />
           {/* Show either Retry or Next, but never both */}
           {!hasUpcoming && canRetryCurrentSession && (
-            <PrimaryButton
+            <Button
               label={t('CallSummaryProgress.retry')}
               onPress={retrySimulation}
-              customContainerStyle={styles.retryButton}
+              customContainerStyle={styles.button}
               isLoading={isStartingSimulation}
             />
           )}
           {isCurrentSessionCompleted && hasUpcoming && (
-            <PrimaryButton
+            <Button
               label={t('Common.next')}
               onPress={startNextSimulation}
-              customContainerStyle={styles.nextButton}
+              customContainerStyle={styles.button}
               isLoading={isStartingSimulation}
             />
           )}
@@ -147,29 +146,10 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     gap: '12@ms',
   },
-  backButton: {
-    flex: 1,
-    paddingVertical: '8@vs',
-    borderRadius: radius.full,
-    borderWidth: '1@ms',
-    borderColor: colors.ds.stroke.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white,
-  },
-  backButtonText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
-    lineHeight: '24@ms',
-    color: colors.ds.typography.highEmphasis,
-  },
   submitButton: {
     width: '100%',
   },
-  retryButton: {
-    flex: 1,
-  },
-  nextButton: {
+  button: {
     flex: 1,
   },
 });

@@ -4,7 +4,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {GoldenShieldIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
   SECTION_LIST,
@@ -161,7 +161,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       </KeyboardAwareScrollView>
       {showSaveButton && (
         <View style={styles.buttonContainer}>
-          <PrimaryButton
+          <Button
             label={t('save')}
             onPress={onSubmitButtonPress}
             isLoading={isUpdating}

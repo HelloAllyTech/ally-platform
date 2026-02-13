@@ -3,7 +3,7 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {SIMULATION_START_NOTIFICATION} from '@/constants';
 import {colors, fontFamily} from '@/theme';
 
@@ -45,7 +45,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           {SIMULATION_START_NOTIFICATION.DESCRIPTION}
         </Text>
 
-        <PrimaryButton
+        <Button
           label={SIMULATION_START_NOTIFICATION.START_SESSION}
           onPress={onConfirm}
           customContainerStyle={styles.actionButton}

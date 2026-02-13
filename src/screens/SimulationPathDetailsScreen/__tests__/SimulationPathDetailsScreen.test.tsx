@@ -118,7 +118,7 @@ jest.mock('@/components', () => {
   return {
     IllustratedModal: ({visible, children}: any) =>
       visible ? <View testID="illustrated-modal">{children}</View> : null,
-    PrimaryButton: ({label, onPress, isLoading, isDisabled}: any) => (
+    Button: ({label, onPress, isLoading, isDisabled}: any) => (
       <TouchableOpacity
         testID="primary-button"
         onPress={onPress}

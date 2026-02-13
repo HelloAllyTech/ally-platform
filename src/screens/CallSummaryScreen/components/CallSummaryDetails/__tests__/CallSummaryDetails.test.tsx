@@ -16,9 +16,9 @@ jest.mock('../../SectionWrapper/SectionWrapper', () => ({
   },
 }));
 
-// Mock PrimaryButton to make onPress accessible
+// Mock Button to make onPress accessible
 jest.mock('@/components', () => ({
-  PrimaryButton: ({label, onPress}: any) => {
+  Button: ({label, onPress}: any) => {
     const React = require('react');
     const {Text, TouchableOpacity} = require('react-native');
     return (
@@ -76,7 +76,7 @@ describe('CallSummaryDetails', () => {
     expect(getByTestId).toBeDefined();
   });
 
-  it('renders sections and submits via PrimaryButton', async () => {
+  it('renders sections and submits via Button', async () => {
     const onSubmit = jest.fn();
     const {getByText} = render(
       <CallSummaryDetails isLoading={false} onSubmit={onSubmit} showSaveButton />,

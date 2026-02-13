@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {Checkbox, PrimaryButton} from '@/components';
+import {Button, Checkbox} from '@/components';
 import {TERMS_AND_CONDITIONS_URL, TermsAndAgreementData} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {TranslationType} from '@/localization/locales/type';
@@ -173,7 +173,7 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
                     </Text>
                   </TouchableOpacity>
 
-                  <PrimaryButton
+                  <Button
                     label={t('TermsAndAgreement.agree')}
                     onPress={onAgree}
                     isDisabled={!isAgreed}
