@@ -139,7 +139,6 @@ export const SimulationPathDetailsScreen: React.FC<
   const handleStartPath = async () => {
     if (!pathData || !pathData.scenarioPathSessionId) {
       await checkAndCreatePathSession();
-      return;
     }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
