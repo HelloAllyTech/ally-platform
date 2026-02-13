@@ -12,7 +12,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {CustomDropdown, CustomModal, PrimaryButton} from '@/components';
+import {Button, CustomDropdown, CustomModal} from '@/components';
 import {
   useAppNavigation,
   useLanguageDropdown,
@@ -223,7 +223,7 @@ export const ProfileSettingsScreen: React.FC = () => {
 
       {hasUnsavedChanges && (
         <View style={styles.saveButtonContainer}>
-          <PrimaryButton
+          <Button
             label={t('save')}
             onPress={handleSave}
             isLoading={isSaving}

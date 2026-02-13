@@ -5,7 +5,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {breathingBackground} from '@/assets';
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {isIOS, SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
@@ -151,7 +151,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
             />
           </View>
 
-          <PrimaryButton
+          <Button
             label={t('BreathingScreen.viewSessionSummary')}
             onPress={onPressViewSessionSummary}
             customContainerStyle={styles.viewSummaryButton}

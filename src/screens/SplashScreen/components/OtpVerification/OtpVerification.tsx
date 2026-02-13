@@ -3,7 +3,7 @@ import {Trans} from 'react-i18next';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
-import {PrimaryButton, useToast} from '@/components';
+import {Button, useToast} from '@/components';
 import {
   DEFAULT_OTP_EXPIRY_MINUTES,
   isIOS,
@@ -200,7 +200,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         </View>
       </KeyboardAwareScrollView>
 
-      <PrimaryButton
+      <Button
         label={t('SplashScreen.verifyOtp')}
         onPress={handleSubmit}
         isDisabled={!isOtpComplete || showTermsModal}

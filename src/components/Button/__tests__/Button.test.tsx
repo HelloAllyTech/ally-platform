@@ -1,11 +1,11 @@
 import {fireEvent, render} from '@testing-library/react-native';
 
-import {PrimaryButton} from '../PrimaryButton';
+import {Button} from '../Button';
 
-describe('PrimaryButton', () => {
+describe('Button', () => {
   it('renders the label', () => {
     const {getByText} = render(
-      <PrimaryButton label="Submit" onPress={() => {}} />,
+      <Button label="Submit" onPress={() => {}} />,
     );
     expect(getByText('Submit')).toBeTruthy();
   });
@@ -13,7 +13,7 @@ describe('PrimaryButton', () => {
   it('calls onPress when pressed', () => {
     const onPress = jest.fn();
     const {getByTestId} = render(
-      <PrimaryButton label="Tap" onPress={onPress} testID="primary-button" />,
+      <Button label="Tap" onPress={onPress} testID="primary-button" />,
     );
     fireEvent.press(getByTestId('primary-button'));
     expect(onPress).toHaveBeenCalledTimes(1);
@@ -22,7 +22,7 @@ describe('PrimaryButton', () => {
   it('is disabled when isDisabled is true', () => {
     const onPress = jest.fn();
     const {getByTestId} = render(
-      <PrimaryButton
+      <Button
         label="Disabled"
         onPress={onPress}
         isDisabled
@@ -35,7 +35,7 @@ describe('PrimaryButton', () => {
 
   it('shows loader and hides label when isLoading is true', () => {
     const {queryByText, getByTestId} = render(
-      <PrimaryButton
+      <Button
         label="Loading"
         onPress={() => {}}
         isLoading
@@ -48,5 +48,12 @@ describe('PrimaryButton', () => {
 
     // ActivityIndicator is rendered within the button
     expect(getByTestId('primary-button')).toBeTruthy();
+  });
+
+  it('renders secondary variant', () => {
+    const {getByText} = render(
+      <Button label="Secondary" onPress={() => {}} variant="secondary" />,
+    );
+    expect(getByText('Secondary')).toBeTruthy();
   });
 });

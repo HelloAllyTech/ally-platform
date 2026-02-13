@@ -10,7 +10,7 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (key: string) => key}),
 }));
 
-// Mock Checkbox and PrimaryButton
+// Mock Checkbox and Button
 jest.mock('@/components', () => {
   const React = require('react');
   const {TouchableOpacity, Text} = require('react-native');
@@ -20,7 +20,7 @@ jest.mock('@/components', () => {
         <Text>{checked ? 'Checked' : 'Unchecked'}</Text>
       </TouchableOpacity>
     ),
-    PrimaryButton: ({label, onPress, isDisabled, isLoading}: any) => (
+    Button: ({label, onPress, isDisabled, isLoading}: any) => (
       <TouchableOpacity
         onPress={onPress}
         testID="mock-primary-button"

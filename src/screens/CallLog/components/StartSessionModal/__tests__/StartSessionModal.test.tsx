@@ -13,7 +13,7 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {Text, View} = require('react-native');
   return {
-    PrimaryButton: ({onPress, label}: any) => (
+    Button: ({onPress, label}: any) => (
       <Text onPress={onPress}>{label}</Text>
     ),
     SecurityCarousel: () => <View testID="security-carousel" />,

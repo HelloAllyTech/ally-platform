@@ -9,7 +9,7 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {Text} = require('react-native');
   return {
-    PrimaryButton: ({label, onPress, isDisabled}: any) => (
+    Button: ({label, onPress, isDisabled}: any) => (
       React.createElement(
         Text,
         {accessibilityRole: 'button', onPress: isDisabled ? undefined : onPress},

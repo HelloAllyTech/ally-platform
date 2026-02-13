@@ -4,7 +4,7 @@ import {FetchBaseQueryError} from '@reduxjs/toolkit/query';
 import {Alert, Linking, Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
-import {PrimaryButton} from '@/components';
+import {Button} from '@/components';
 import {GoogleLoginButton} from '@/components/Button/GoogleLoginButton';
 import {
   isIOS,
@@ -138,7 +138,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               editable={!isLoading}
               placeholderTextColor={colors.mediumGray}
             />
-            <PrimaryButton
+            <Button
               label={t('Common.next')}
               onPress={handleSubmit}
               isDisabled={!isValidEmail(email)}

@@ -69,9 +69,9 @@ jest.mock('../components', () => ({
   },
 }));
 
-// Mock PrimaryButton
+// Mock Button
 jest.mock('@/components', () => ({
-  PrimaryButton: ({label, onPress}: any) => {
+  Button: ({label, onPress}: any) => {
     const React = require('react');
     const {TouchableOpacity, Text} = require('react-native');
     return (

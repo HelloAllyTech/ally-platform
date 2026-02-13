@@ -55,36 +55,7 @@ export const styles = ScaledSheet.create({
     flexDirection: 'row',
     gap: '12@ms',
   },
-  clearButton: {
+  button: {
     flex: 1,
-    paddingVertical: '12@vs',
-    paddingHorizontal: '16@ms',
-    borderRadius: '8@ms',
-    borderWidth: '1@ms',
-    borderColor: colors.ds.stroke.primary,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearButtonText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.ds.typography.highEmphasis,
-    letterSpacing: '0.25@ms',
-  },
-  saveButton: {
-    flex: 1,
-    paddingVertical: '12@vs',
-    paddingHorizontal: '16@ms',
-    borderRadius: '8@ms',
-    backgroundColor: colors.ds.theme.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.white,
-    letterSpacing: '0.25@ms',
   },
 });
