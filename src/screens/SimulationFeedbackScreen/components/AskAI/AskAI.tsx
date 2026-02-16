@@ -1,8 +1,9 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import LottieView from 'lottie-react-native';
 import {FlatList, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-import {RankBadgeIcon, UpArrowIcon} from '@/assets';
+import {animations, RankBadgeIcon, UpArrowIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
@@ -46,20 +47,13 @@ const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = ({message}) => (
 /** Renders the "thinking" dots shown before a stream starts */
 const ThinkingIndicator: React.FC = () => (
   <View style={styles.responseContainer}>
-    <View style={styles.rankBadgeContainer}>
-      <LinearGradient
-        colors={[colors.ds.blue[50], colors.white]}
-        start={{x: 0, y: 0}}
-        end={{x: 0, y: 1}}
-        style={styles.rankBadgeGradient}>
-        <RankBadgeIcon width={9} height={9} />
-      </LinearGradient>
-    </View>
-    <View style={styles.streamingIndicator}>
-      <View style={styles.typingDot} />
-      <View style={styles.typingDot} />
-      <View style={styles.typingDot} />
-    </View>
+    <LottieView
+      source={animations.thinking}
+      style={styles.thinkingLottie}
+      autoPlay
+      loop
+      resizeMode="contain"
+    />
   </View>
 );
 
