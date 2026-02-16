@@ -9,6 +9,7 @@ import {
   EMOTIONAL_MOVEMENT_CHART_CONFIG,
   SKILL_CATEGORY_COLOR_MAP,
 } from '@/constants';
+import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, typography} from '@/theme';
 import {EmotionalMovement, SkillCoverage} from '@/types';
@@ -34,6 +35,7 @@ export interface SessionSkillsProps {
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
 }) => {
+  const {t} = useTranslate();
   const defaultEmotionalMovement: EmotionalMovement[] = [
     {sessionTime: 0, level: 0},
     {sessionTime: 100, level: 4.5},
@@ -157,12 +159,14 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
-      <SummaryCard title="Skills shown in this session">
+      <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
         {/* Skill Coverage Card */}
         {skillCoverage.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardHeaderText}>Skill Coverage</Text>
+              <Text style={styles.cardHeaderText}>
+                {t('SimulationFeedback.sessionSkills.skillCoverage')}
+              </Text>
             </View>
             <View style={styles.cardContent}>
               {skillCoverage.map(renderSkillItem)}
@@ -175,14 +179,16 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>
-                Client Emotional Movement
+                {t('SimulationFeedback.sessionSkills.clientEmotionalMovement')}
               </Text>
             </View>
             <View style={styles.chartInfoRow}>
               <Text style={styles.chartInfoText}>
-                X: Session Timeline(Min) graph
+                {t('SimulationFeedback.sessionSkills.chartXAxisLabel')}
               </Text>
-              <Text style={styles.chartInfoText}>Y: Level (1-10)</Text>
+              <Text style={styles.chartInfoText}>
+                {t('SimulationFeedback.sessionSkills.chartYAxisLabel')}
+              </Text>
             </View>
             <View style={styles.chartWrapper}>
               <ChartComponent
@@ -202,7 +208,9 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
               />
               {!hasEmotionalData && (
                 <View style={styles.noDataOverlay}>
-                  <Text style={styles.noDataText}>No data found</Text>
+                  <Text style={styles.noDataText}>
+                    {t('SimulationFeedback.sessionSkills.noDataFound')}
+                  </Text>
                 </View>
               )}
             </View>
