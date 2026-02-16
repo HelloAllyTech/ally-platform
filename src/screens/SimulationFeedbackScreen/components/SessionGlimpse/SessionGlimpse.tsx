@@ -61,7 +61,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     paddingVertical: '10@vs',
     paddingHorizontal: '24@ms',
-    backgroundColor: '#EDE7F680', // Match web background with opacity
+    backgroundColor: colors.ds.deepPurple[300],
   },
   iconContainer: {
     transform: [{rotate: '0deg'}],
