@@ -88,3 +88,5 @@ export {ActionsMenu} from './ActionsMenu';
 export {SessionChecklist} from './Checklist';
 export type {SessionChecklistItem, SessionChecklistProps} from './Checklist';
 export {SimulationTransitionSection} from './SimulationTransitionSection';
+export {ConfirmationModal} from './ConfirmationModal';
+export type {ConfirmationModalProps} from './ConfirmationModal';

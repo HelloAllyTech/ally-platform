@@ -18,6 +18,7 @@ import {LeftArrow} from '@/assets/icons';
 import {
   BottomSheet,
   CommentBottomSheetFooter,
+  ConfirmationModal,
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
@@ -81,6 +82,7 @@ export const CommentThreadBottomSheet: React.FC<
   const [commentText, setCommentText] = useState('');
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
 
   const [getThreadComments, {isLoading, isFetching}] =
     useLazyGetThreadCommentsQuery();
@@ -99,29 +101,33 @@ export const CommentThreadBottomSheet: React.FC<
     [],
   );
 
-  const handleDeleteComment = useCallback(
-    async (commentId: string) => {
-      try {
-        await deleteComment({commentId}).unwrap();
-        // Remove deleted item from local state to preserve scroll position
-        setComments(prev => {
-          if (!prev) return null;
-          const filteredData = prev.data.filter(
-            comment => comment.id !== commentId,
-          );
-          const newCount = Math.max(0, prev.count - 1);
-          setHasMore(filteredData.length < newCount);
-          return {
-            data: filteredData,
-            count: newCount,
-          };
-        });
-      } catch (error) {
-        console.error('Failed to delete comment:', error);
-      }
-    },
-    [deleteComment],
-  );
+  const handleDeleteComment = useCallback((commentId: string) => {
+    setDeleteCommentId(commentId);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteCommentId) return;
+    try {
+      await deleteComment({commentId: deleteCommentId}).unwrap();
+      // Remove deleted item from local state to preserve scroll position
+      setComments(prev => {
+        if (!prev) return null;
+        const filteredData = prev.data.filter(
+          comment => comment.id !== deleteCommentId,
+        );
+        const newCount = Math.max(0, prev.count - 1);
+        setHasMore(filteredData.length < newCount);
+        return {
+          data: filteredData,
+          count: newCount,
+        };
+      });
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setDeleteCommentId(null);
+    }
+  }, [deleteComment, deleteCommentId]);
 
   const handleHideComment = useCallback(
     async (commentId: string, hidden: boolean) => {
@@ -600,6 +606,18 @@ export const CommentThreadBottomSheet: React.FC<
           )}
         </View>
       </BottomSheet>
+      <ConfirmationModal
+        visible={!!deleteCommentId}
+        onClose={() => setDeleteCommentId(null)}
+        onConfirm={handleConfirmDelete}
+        title={t('CommentThreadBottomSheet.deleteConfirmation.title')}
+        description={t(
+          'CommentThreadBottomSheet.deleteConfirmation.description',
+        )}
+        confirmLabel={t('CommentThreadBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('CommentThreadBottomSheet.deleteConfirmation.cancel')}
+        confirmVariant="destructive"
+      />
     </>
   );
 };

@@ -1,2 +1,6 @@
 export {CommentableTextInput} from './CommentableTextInput';
-export type {CommentableTextInputProps} from './CommentableTextInput';
+export type {
+  AddCommentMenuData,
+  CommentableTextInputProps,
+  SelectionData,
+} from './CommentableTextInput';
