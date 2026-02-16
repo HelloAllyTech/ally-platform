@@ -1,10 +1,14 @@
 from textwrap import dedent
-from typing import Optional
+from typing import List, Optional
 
 from langchain_core.messages import SystemMessage
 
 from app.core.logger import get_logger
-from app.core.scenario.base import PromptData
+from app.core.scenario.base import (
+    PromptData,
+    SimulationBehaviorInstruction,
+    SimulationStateInstruction,
+)
 
 logger = get_logger(__name__)
 
@@ -91,67 +95,218 @@ def _format_custom_fields(custom_fields: list) -> str:
     return "".join(formatted_blocks)
 
 
-# --- Main Prompt Generator Function ---
+def _build_behavior_conditions_block(
+    behavior_instructions: List[SimulationBehaviorInstruction],
+    current_state: Optional[SimulationStateInstruction] = None,
+) -> str:
+    """
+    Build the behavior-based conditions block for the prompt.
+
+    Generates conditional instructions based on helper behaviors and actor responses,
+    combined with the current state's dialogues.
+
+    Args:
+        behavior_instructions: List of behavior instructions with categories,
+            behaviors, and actor responses.
+        current_state: Optional current state instruction (resolved by score).
+
+    Returns:
+        Formatted conditions block string for prompt injection.
+    """
+    if not behavior_instructions:
+        return ""
+
+    # Build the state continuation text from the current state
+    state_continuation = ""
+    if current_state:
+        state_label = f"State {current_state.state_id}"
+
+        # Check if dialogues exist and are not empty
+        dialogue_options = []
+        if current_state.dialogues:
+            dialogue_options = [d for d in current_state.dialogues if d and d.strip()]
+
+        if dialogue_options:
+            dialogues_str = " OR ".join([f'"{d}"' for d in dialogue_options])
+            state_continuation = (
+                f" - ({state_label}) {current_state.instruction} "
+                f"and say something similar to: {dialogues_str}"
+            )
+        elif current_state.instruction:
+            state_continuation = f" - ({state_label}) {current_state.instruction}"
+
+    # Build condition blocks from behavior instructions
+    condition_blocks = []
+    for bi in behavior_instructions:
+        # Skip if behaviors list is empty or None
+        if not bi.behaviors:
+            continue
+
+        # Filter out empty strings and join behaviors with OR
+        non_empty_behaviors = [b for b in bi.behaviors if b]
+        if not non_empty_behaviors:
+            continue
+
+        behaviors_str = " OR ".join([f'"{b}"' for b in non_empty_behaviors])
+
+        # Determine the classification context based on category
+        if bi.category.value == "SHOULD_DO":
+            classification_prefix = "can be classified as"
+        else:
+            classification_prefix = "can be classified as"
+
+        # Build the actor response prefix
+        actor_response_prefix = ""
+        if bi.actors_responses:
+            non_empty_responses = [r for r in bi.actors_responses if r]
+            if non_empty_responses:
+                actor_response_prefix = f'start by saying: "{non_empty_responses[0]}"'
+
+        # Build the condition block
+        condition = (
+            f"If the previous helper utterance {classification_prefix} "
+            f"{behaviors_str}"
+        )
+
+        if actor_response_prefix:
+            then_clause = f"Then, {actor_response_prefix}"
+            if state_continuation:
+                then_clause += f" and continue with{state_continuation}"
+        else:
+            if state_continuation:
+                then_clause = f"Then, continue with{state_continuation}"
+            else:
+                then_clause = "Then, respond naturally based on your character."
+
+        condition_blocks.append(f"{condition}\n{then_clause}")
+
+    return "\n\n".join(condition_blocks)
 
 
-def generate_system_message(
-    prompt_data: PromptData,
-    next_instruction: Optional[str] = None,
-    language_code: Optional[str] = None,
+# --- Prompt Builder Functions ---
+
+
+def _build_branching_prompt(
+    next_instruction: str,
 ) -> SystemMessage:
     """
-    Generates a SystemMessage prompt for an AI roleplay assistant
-    based on the structured PromptData.
+    Build a minimal, directive-focused prompt for branching instructions.
 
-    When a branching instruction is provided (next_instruction), this function
-    generates a minimal, directive-focused prompt that prioritizes the
-    branching instruction over the detailed script. This ensures the agent
-    strictly follows the branching instruction without conflicting signals.
+    Args:
+        next_instruction: The conversation-specific directive.
 
-    When no branching instruction is provided, it generates a comprehensive
-    prompt with full character details, personality, and behavioral guidelines.
+    Returns:
+        A SystemMessage with the minimal branching prompt.
+    """
+    minimal_prompt = dedent(
+        f"""
+        Generate next dialogue as per the conversation history and instruction:
+
+        Important Instruction for next dialogue: {next_instruction}
+    """
+    ).strip()
+
+    return SystemMessage(content=minimal_prompt)
+
+
+def _build_behavior_prompt(
+    prompt_data: PromptData,
+    base_system_prompt: str,
+    behavior_instructions: List[SimulationBehaviorInstruction],
+    current_state: Optional[SimulationStateInstruction] = None,
+) -> SystemMessage:
+    """
+    Build a behavior-conditioned prompt using helper behavior classifications.
+
+    Generates conditional instructions based on helper behaviors and actor
+    responses, combined with the current state's dialogues.
 
     Args:
         prompt_data: An instance of PromptData containing all client info.
-        next_instruction: Optional conversation-specific directive
-            (branching instruction).
-                         If provided, triggers minimal prompt mode.
-        language_code: Optional language code.
+        base_system_prompt: The resolved base system prompt text.
+        behavior_instructions: List of behavior instructions for
+            condition-based response generation.
+        current_state: Optional current state instruction (resolved by score).
 
     Returns:
-        A SystemMessage object with the complete, formatted prompt.
+        A SystemMessage with the behavior-conditioned prompt.
     """
+    conditions_block = _build_behavior_conditions_block(
+        behavior_instructions, current_state
+    )
 
-    # 1. Determine the base instruction (Custom vs Default)
-    # This prevents code duplication and keeps the fallback logic in one place.
-    base_system_prompt = prompt_data.prompt if prompt_data.prompt else DEFAULT_PROMPT
+    # Build character details summary
+    character_details_parts = []
+    if prompt_data.name:
+        character_details_parts.append(f"Name: {prompt_data.name}")
+    if prompt_data.age:
+        character_details_parts.append(f"Age: {prompt_data.age}")
+    if prompt_data.gender:
+        character_details_parts.append(f"Gender: {prompt_data.gender}")
+    if prompt_data.profession:
+        character_details_parts.append(f"Profession: {prompt_data.profession}")
+    if prompt_data.current_location:
+        character_details_parts.append(f"Location: {prompt_data.current_location}")
+    character_details = ", ".join(character_details_parts)
 
-    # If we have a branching instruction, use simplified minimal prompt
-    if next_instruction:
-        # 2. Construct the final prompt using dedent to handle indentation cleanly
-        minimal_prompt = dedent(
-            f"""
-            <SYSTEM>
-            {base_system_prompt.strip()}
-            </SYSTEM>
+    # Build character backstory from context
+    character_backstory = prompt_data.context or ""
 
-            <CRITICAL_INSTRUCTION>
-            {next_instruction}
+    # Build additional context from custom fields
+    custom_context_block = ""
+    if prompt_data.custom_fields:
+        custom_parts = []
+        for cf in prompt_data.custom_fields:
+            if isinstance(cf, dict) and cf.get("name") and cf.get("value"):
+                custom_parts.append(f"{cf['name']}: {cf['value']}")
+        if custom_parts:
+            custom_context_block = (
+                "\nRefer to the following additional context:\n"
+                + "\n".join(custom_parts)
+            )
 
-            This instruction takes ABSOLUTE PRIORITY over all other guidelines.
-            You MUST follow this instruction exactly in your next response.
-            </CRITICAL_INSTRUCTION>
+    # Only include Conditions section if there are actual conditions
+    conditions_section = ""
+    if conditions_block.strip():
+        conditions_section = f"\n        Conditions:\n        {conditions_block}"
 
-            Respond as {prompt_data.name} while strictly following the critical
-            instruction above.
-        """
-        ).strip()
+    behavior_prompt = dedent(
+        f"""
+        Role instruction: {base_system_prompt.strip()}
+        Character details: {character_details}
+        Character backstory: {character_backstory}
+        Conversation history: Use the conversation history provided in the messages.
+        Instruction: Use following conditions to generate next dialogue
+        Previous helper utterance: Use the last helper message
+        from conversation history.
+        {conditions_section}
+        {custom_context_block}
 
-        system_message = SystemMessage(content=minimal_prompt)
-        return system_message
+        Generate the next dialogue
+    """
+    ).strip()
 
-    # Otherwise, use the full detailed prompt (original behavior)
+    return SystemMessage(content=behavior_prompt)
 
+
+def _build_full_prompt(
+    prompt_data: PromptData,
+    base_system_prompt: str,
+) -> SystemMessage:
+    """
+    Build a comprehensive prompt with full character details, personality,
+    and behavioral guidelines.
+
+    This is the original full prompt generation that includes all character
+    information and optional fields.
+
+    Args:
+        prompt_data: An instance of PromptData containing all client info.
+        base_system_prompt: The resolved base system prompt text.
+
+    Returns:
+        A SystemMessage with the comprehensive prompt.
+    """
     # Use helper functions to build optional sections
     gender_details_block = _get_gender_details(prompt_data)
     profession_block = _get_optional_block("Your profession", prompt_data.profession)
@@ -167,7 +322,7 @@ def generate_system_message(
     personality_block = _get_optional_block("Your personality", prompt_data.personality)
     starting_state_block = _get_optional_block(
         "Your current thoughts", prompt_data.starting_state
-    )  # Mapped from starting_state
+    )
     emotional_needs_block = _get_optional_block(
         "Your emotional needs from this counselling session",
         prompt_data.emotional_needs,
@@ -187,7 +342,7 @@ def generate_system_message(
         "use these dialogues for reference", prompt_data.agent_dialogues
     )
 
-    # Assemble the full detailed prompt (when no branching instruction is present)
+    # Assemble the full detailed prompt
     system_prompt = dedent(
         f"""
     {base_system_prompt.strip()}
@@ -233,14 +388,76 @@ def generate_system_message(
     """
     )
 
-    system_message = SystemMessage(content=system_prompt.strip())
-    return system_message
+    return SystemMessage(content=system_prompt.strip())
+
+
+# --- Main Prompt Generator Function ---
+
+
+def generate_system_message(
+    prompt_data: PromptData,
+    next_instruction: Optional[str] = None,
+    language_code: Optional[str] = None,
+    behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
+    current_state: Optional[SimulationStateInstruction] = None,
+) -> SystemMessage:
+    """
+    Generates a SystemMessage prompt for an AI roleplay assistant
+    based on the structured PromptData.
+
+    When a branching instruction is provided (next_instruction), this function
+    generates a minimal, directive-focused prompt that prioritizes the
+    branching instruction over the detailed script. This ensures the agent
+    strictly follows the branching instruction without conflicting signals.
+
+    When behavior_instructions are provided (and no branching instruction),
+    generates a behavior-conditioned prompt that uses helper behavior
+    classifications to determine the actor's response.
+
+    When neither next_instruction nor behavior_instructions are provided,
+    generates a comprehensive prompt with full character details, personality,
+    and behavioral guidelines.
+
+    Args:
+        prompt_data: An instance of PromptData containing all client info.
+        next_instruction: Optional conversation-specific directive
+            (branching instruction).
+                         If provided, triggers minimal prompt mode.
+        language_code: Optional language code.
+        behavior_instructions: Optional list of behavior instructions for
+            condition-based response generation.
+        current_state: Optional current state instruction (resolved by score).
+
+    Returns:
+        A SystemMessage object with the complete, formatted prompt.
+    """
+    base_system_prompt = prompt_data.prompt if prompt_data.prompt else DEFAULT_PROMPT
+
+    if next_instruction:
+        return _build_branching_prompt(next_instruction)
+
+    if behavior_instructions is not None:
+        # Handle empty behavior_instructions list by providing a default behavior prompt
+        if not behavior_instructions:
+            logger.warning(
+                "Empty behavior_instructions provided, using default behavior prompt"
+            )
+        return _build_behavior_prompt(
+            prompt_data, base_system_prompt, behavior_instructions, current_state
+        )
+
+    # TODO: Deprecated, remove in future versions
+    # Full prompt generation when neither next_instruction nor
+    # behavior_instructions provided
+    return _build_full_prompt(prompt_data, base_system_prompt)
 
 
 def generate_prompt_content(
     prompt_data: PromptData,
     next_instruction: Optional[str] = None,
     language_code: Optional[str] = None,
+    behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
+    current_state: Optional[SimulationStateInstruction] = None,
 ) -> str:
     """
     Generate prompt content string from PromptData.
@@ -254,11 +471,17 @@ def generate_prompt_content(
         next_instruction: Optional conversation-specific directive
             (branching instruction).
         language_code: Optional language code.
+        behavior_instructions: Optional list of behavior instructions.
+        current_state: Optional current state instruction (resolved by score).
 
     Returns:
         The prompt content as a string.
     """
     system_message = generate_system_message(
-        prompt_data, next_instruction, language_code
+        prompt_data,
+        next_instruction,
+        language_code,
+        behavior_instructions=behavior_instructions,
+        current_state=current_state,
     )
     return system_message.content

@@ -542,5 +542,6 @@ if __name__ == "__main__":
             ws_url=settings.LIVEKIT_URL,
             # Increased from 10 to 600 seconds (10 minutes) for longer conversations
             drain_timeout=600,
+            job_memory_warn_mb=650,
         )
     )

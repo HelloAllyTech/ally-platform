@@ -99,7 +99,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -197,7 +202,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -276,7 +286,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -353,7 +368,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario}}
 
@@ -435,7 +455,14 @@ class TestGenerateResponse:
 
         # No language_config
         scenario = type(
-            "Scenario", (), {"prompt_data": prompt_data, "language_config": None}
+            "Scenario",
+            (),
+            {
+                "prompt_data": prompt_data,
+                "language_config": None,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -501,7 +528,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -584,7 +616,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -673,7 +710,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
@@ -743,7 +785,12 @@ class TestGenerateResponse:
         scenario = type(
             "Scenario",
             (),
-            {"prompt_data": prompt_data, "language_config": language_config},
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 

@@ -19,9 +19,39 @@ from app.core.graph.utils import (
     is_event_eligible,
 )
 from app.core.logger import logger
-from app.core.scenario.base import Scenario
+from app.core.scenario.base import Scenario, SimulationStateInstruction
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
+
+
+def _resolve_current_state(
+    state_instructions: Optional[list],
+    current_score: int,
+) -> Optional[SimulationStateInstruction]:
+    """
+    Resolve the current state instruction based on the cumulative score.
+
+    Iterates through state instructions and returns the one whose score
+    window (score_lower, score_upper) contains the current_score.
+    Boundaries of None represent -infinity (lower) or +infinity (upper).
+
+    Args:
+        state_instructions: List of SimulationStateInstruction with score bounds.
+        current_score: The current cumulative score from the simulation state.
+
+    Returns:
+        The matching SimulationStateInstruction, or None if no match found.
+    """
+    if not state_instructions:
+        return None
+
+    for si in state_instructions:
+        lower = si.score_lower if si.score_lower is not None else float("-inf")
+        upper = si.score_upper if si.score_upper is not None else float("inf")
+        if lower <= current_score <= upper:
+            return si
+
+    return None
 
 
 def _prepare_event_context(
@@ -523,11 +553,22 @@ async def generate_response(
         logger.info(f"Using default language code '{language_code}'")
 
     system_message = None
+    current_state = None
     if scenario is not None:
+        # Log prompt mode for observability
+        if not next_instruction:
+            # Resolve current state for behavior/default modes
+            current_state = _resolve_current_state(
+                scenario.state_instructions, state.current_score
+            )
+
+        # Let generate_system_message handle routing based on parameters
         system_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
             language_code=language_code,
+            behavior_instructions=scenario.behavior_instructions,
+            current_state=current_state,
         )
 
     # Get LLM client from config (pre-configured in AgentSetup) or create dynamically
