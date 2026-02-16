@@ -67,7 +67,7 @@ export const ChartComponent: React.FC<ChartComponentProps> = ({
   chartConfig,
 }) => {
   const screenWidth = Dimensions.get('window').width;
-  const chartWidth = width || screenWidth - ms(50);
+  const chartWidth = width || screenWidth - ms(32);
 
   const chartData = {
     labels: xAxisLabels,
@@ -116,8 +116,10 @@ const styles = ScaledSheet.create({
     pointerEvents: 'box-none',
   },
   chart: {
-    marginVertical: ms(8),
+    marginBottom: ms(8),
+    marginTop: ms(16),
     borderRadius: ms(16),
     backgroundColor: colors.white,
+    marginLeft: -ms(32),
   },
 });
