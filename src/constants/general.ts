@@ -202,6 +202,10 @@ export const API_ROUTES = {
     LEADERBOARD: '/community/leaderboard',
     MY_RANK: '/community/leaderboard/my-rank',
   },
+  SIMULATION_SUMMARY: {
+    GET_SKILLS: (scenarioSessionId: string) =>
+      `/learn/scenario-session/${scenarioSessionId}/skills`,
+  },
 } as const;
 
 export const API_METHODS = {
