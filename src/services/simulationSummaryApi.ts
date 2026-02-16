@@ -1,5 +1,5 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
-import {SimulationSkillsResponse} from '@/types/simulationSummary';
+import {SimulationSkillsResponse} from '@/types';
 
 import {api} from './api';
 

@@ -11,12 +11,9 @@ import {
 } from '@/constants';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, typography} from '@/theme';
-import {EmotionalMovement, SkillCoverage} from '@/types/simulationSummary';
+import {EmotionalMovement, SkillCoverage} from '@/types';
+import {getInterpolatedYValues, getNormalisedXAxisLabelsMap} from '@/utils';
 import {formatTimeToMMSS} from '@/utils/date';
-import {
-  getInterpolatedYValues,
-  getNormalisedXAxisLabelsMap,
-} from '@/utils/simulationSummary';
 
 import {SummaryCard} from '../SummaryCard';
 
