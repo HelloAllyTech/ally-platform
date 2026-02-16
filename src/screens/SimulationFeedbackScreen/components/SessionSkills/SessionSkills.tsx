@@ -149,6 +149,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
           inProgressColor={skillColor}
           completedColor={skillColor}
           height={ms(8)}
+          isProgressTextVisible={false}
         />
       </View>
     );

@@ -476,6 +476,7 @@
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
+    "askAIInitialStateTitle": "Suggestions",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Overall Score",

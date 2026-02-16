@@ -86,9 +86,20 @@ jest.mock('@/theme', () => ({
       typography: {
         highEmphasis: '#000000',
         mediumEmphasis: '#666666',
+        lowEmphasis: '#999999',
       },
       stroke: {
         primary: '#d2d2d2',
+      },
+      brand: {
+        logo: '#4A90E2',
+      },
+      blue: {
+        300: '#64B5F6',
+        400: '#42A5F5',
+      },
+      amber: {
+        400: '#FFCA28',
       },
       red: {
         50: '#ffd9d4',
@@ -128,6 +139,9 @@ jest.mock('@/theme', () => ({
     IBM_PLEX_SERIF: {
       MEDIUM: {fontFamily: 'IBMPlexSerif-Medium'},
       REGULAR: {fontFamily: 'IBMPlexSerif-Regular'},
+    },
+    ROBOTO: {
+      REGULAR: {fontFamily: 'Roboto-Regular'},
     },
   },
   typography: {
