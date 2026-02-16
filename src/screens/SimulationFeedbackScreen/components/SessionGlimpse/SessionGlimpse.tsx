@@ -2,8 +2,9 @@ import React, {useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ChevronDown} from '@/assets';
-import {colors, fontFamily} from '@/theme';
+import {ArrowRight} from '@/assets';
+import {useTranslate} from '@/hooks';
+import {colors, fontFamily, radius, typography} from '@/theme';
 
 interface SessionGlimpseProps {
   content?: string;
@@ -11,15 +12,10 @@ interface SessionGlimpseProps {
 
 export const SessionGlimpse: React.FC<SessionGlimpseProps> = ({content}) => {
   const [isExpanded, setIsExpanded] = useState(false);
-
+  const {t} = useTranslate();
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
-
-  // Dummy content for now
-  const glimpseContent =
-    content ||
-    "During the session, the exhibited signs of unease, such as fidgeting and glancing away from the camera. As they spoke, Kai revealed feelings of stagnation and worry about future prospects. The counselor acknowledged Kai's concerns with empathy. They explored past experiences, discovering moments of strength that seemed to spark a hint of optimism in Kai. By the end, Kai seemed more open to discussing achievable steps toward positive change, showing renewed hope.";
 
   return (
     <View style={styles.container}>
@@ -32,18 +28,20 @@ export const SessionGlimpse: React.FC<SessionGlimpseProps> = ({content}) => {
             styles.iconContainer,
             isExpanded && styles.iconContainerExpanded,
           ]}>
-          <ChevronDown
-            width={16}
-            height={16}
+          <ArrowRight
+            width={6}
+            height={6}
             color={colors.ds.typography.mediumEmphasis}
           />
         </View>
-        <Text style={styles.headerText}>Session glimpse</Text>
+        <Text style={styles.headerText}>
+          {t('SimulationFeedback.sessionGlimpse')}
+        </Text>
       </TouchableOpacity>
 
       {isExpanded && (
         <View style={styles.contentContainer}>
-          <Text style={styles.contentText}>{glimpseContent}</Text>
+          <Text style={styles.contentText}>{content}</Text>
         </View>
       )}
     </View>
@@ -53,41 +51,40 @@ export const SessionGlimpse: React.FC<SessionGlimpseProps> = ({content}) => {
 const styles = ScaledSheet.create({
   container: {
     borderWidth: '0.5@ms',
-    borderColor: '#C8C5D0', // Match web border color
+    borderColor: colors.ds.deepPurple[800],
     marginBottom: '16@vs',
     overflow: 'hidden',
+    borderRadius: radius.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: '8@vs',
-    paddingHorizontal: '16@ms',
+    paddingVertical: '10@vs',
+    paddingHorizontal: '24@ms',
     backgroundColor: '#EDE7F680', // Match web background with opacity
   },
   iconContainer: {
-    marginRight: '8@ms',
     transform: [{rotate: '0deg'}],
+    marginRight: '12@ms',
   },
   iconContainerExpanded: {
-    transform: [{rotate: '180deg'}],
+    transform: [{rotate: '90deg'}],
   },
   headerText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
-    lineHeight: '24@ms',
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
     flex: 1,
   },
   contentContainer: {
     paddingHorizontal: '16@ms',
-    paddingVertical: '16@vs',
-    paddingTop: '8@vs',
+    paddingVertical: '12@vs',
+    paddingTop: '10@vs',
     backgroundColor: colors.white,
   },
   contentText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '16@ms',
-    lineHeight: '24@ms',
-    color: colors.ds.typography.mediumEmphasis,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
 });
