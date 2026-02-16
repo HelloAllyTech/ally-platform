@@ -269,6 +269,5 @@ const styles = ScaledSheet.create({
   },
   chartWrapper: {
     paddingHorizontal: '8@ms',
-    paddingBottom: '8@vs',
   },
 });
