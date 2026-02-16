@@ -2,7 +2,9 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {TRANSCRIPT_TAG_COLORS} from '@/constants';
+import {SimulationMessageTag} from '@/services/simulationTranscriptApi';
+import {colors, fontFamily, radius, typography} from '@/theme';
 
 export type SimulationTranscriptItemProps = {
   time: string;
@@ -10,11 +12,12 @@ export type SimulationTranscriptItemProps = {
   speakerLabel?: string;
   isActive?: boolean;
   isLearner?: boolean;
+  tags?: SimulationMessageTag[];
 };
 
 export const SimulationTranscriptItem: React.FC<
   SimulationTranscriptItemProps
-> = ({time, message, speakerLabel, isLearner = false}) => {
+> = ({time, message, speakerLabel, isLearner = false, tags}) => {
   const backgroundColor = isLearner
     ? colors.ds.blueAlpha[25]
     : colors.ds.deepPurpleAlpha[25];
@@ -24,6 +27,19 @@ export const SimulationTranscriptItem: React.FC<
   const speakerColor = isLearner
     ? colors.ds.theme.primary
     : colors.ds.deepPurple[800];
+
+  const renderTag = (tag: SimulationMessageTag, index: number) => {
+    const tagColors = TRANSCRIPT_TAG_COLORS[tag.category];
+    return (
+      <View
+        key={index}
+        style={[styles.tag, {backgroundColor: tagColors.background}]}>
+        <Text style={[styles.tagText, {color: tagColors.text}]}>
+          {tag.label}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View
@@ -35,18 +51,20 @@ export const SimulationTranscriptItem: React.FC<
         },
       ]}>
       <View style={[styles.aiClientLayout, isLearner && styles.learnerLayout]}>
-        <Text style={styles.messageText}>
+        <Text style={styles.timeAndSpeaker}>
           {speakerLabel && (
-            <Text style={styles.timeAndSpeaker}>
+            <View style={styles.speakerRow}>
               <Text style={styles.timeInline}>{time} </Text>
               <Text style={[styles.speakerLabel, {color: speakerColor}]}>
                 {speakerLabel}
               </Text>
-              {'\n'}
-            </Text>
+            </View>
           )}
-          <Text style={styles.message}>{message}</Text>
         </Text>
+        {tags && tags.length > 0 && (
+          <View style={styles.tagsContainer}>{tags.map(renderTag)}</View>
+        )}
+        <Text style={styles.message}>{message}</Text>
       </View>
     </View>
   );
@@ -60,7 +78,7 @@ const styles = ScaledSheet.create({
     marginBottom: '16@vs',
   },
   learnerLayout: {
-    flexDirection: 'row',
+    flexDirection: 'column',
   },
   learnerContent: {
     flex: 1,
@@ -71,7 +89,8 @@ const styles = ScaledSheet.create({
   },
   speakerRow: {
     flexDirection: 'row',
-    marginBottom: '4@vs',
+    alignItems: 'center',
+    gap: '4@ms',
   },
   timeText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
@@ -105,6 +124,21 @@ const styles = ScaledSheet.create({
     fontSize: '13@ms',
     color: colors.ds.typography.highEmphasis,
     letterSpacing: '0.25@ms',
-    lineHeight: '24@vs',
+    lineHeight: '20@vs',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: '4@ms',
+    marginBottom: '2@vs',
+  },
+  tag: {
+    paddingHorizontal: '4@ms',
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  tagText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
   },
 });
