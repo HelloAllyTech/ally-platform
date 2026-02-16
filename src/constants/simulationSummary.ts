@@ -1,7 +1,7 @@
 import {ms} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
-import {SkillCoverage} from '@/types/simulationSummary';
+import {SkillCoverage} from '@/types';
 
 export const EMOTIONAL_MOVEMENT_CHART_CONFIG = {
   backgroundColor: colors.white,
