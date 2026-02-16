@@ -6,6 +6,7 @@ import {RankBadgeIcon, UpArrowIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
+import {AskAiInitialState} from './AskAiInitialState';
 import {styles} from './styles';
 import {AskAIChatMessage, ChatMessageRole} from './types';
 import {useAskAIChat} from './useAskAIChat';
@@ -126,14 +127,8 @@ export const AskAI: React.FC = () => {
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
 
   const renderEmptyState = useCallback(
-    () => (
-      <View style={styles.emptyStateContainer}>
-        <Text style={styles.emptyStateText}>
-          {t('SimulationFeedback.askAIPlaceholder')}
-        </Text>
-      </View>
-    ),
-    [t],
+    () => <AskAiInitialState onQuestionSelection={() => {}} />,
+    [],
   );
 
   return (
