@@ -70,7 +70,7 @@ export const SimulationTranscript: React.FC<{
     item: SimulationTranscriptMessage;
     index: number;
   }) => {
-    const {time, message, learner, startSeconds} = item;
+    const {time, message, learner, startSeconds, tags} = item;
     const speaker = learner
       ? userName || t('CallTranscript.you')
       : `${agentName} (${t('CallTranscript.aiClient')})`;
@@ -83,6 +83,7 @@ export const SimulationTranscript: React.FC<{
         isActive={index === activeIndex}
         // onPress={onSeek ? () => onSeek(startSeconds) : undefined}
         isLearner={learner}
+        tags={tags}
       />
     );
   };

@@ -95,6 +95,7 @@ export const useSimulationTranscriptDetails = (
             : 0,
       ),
       learner: message.senderId !== -1,
+      tags: message.tags,
     }));
   }, [messages, sessionStartedAt]);
 

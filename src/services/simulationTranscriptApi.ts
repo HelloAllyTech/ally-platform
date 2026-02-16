@@ -2,6 +2,11 @@ import {API_METHODS, API_ROUTES} from '@/constants';
 
 import {api} from './api';
 
+export interface SimulationMessageTag {
+  label: string;
+  category: 'POSITIVE' | 'NEGATIVE';
+}
+
 export interface SimulationMessage {
   id: number;
   scenarioSessionId: number;
@@ -11,6 +16,7 @@ export interface SimulationMessage {
   feedback?: string | null;
   senderId: number;
   startSeconds?: number | null;
+  tags?: SimulationMessageTag[];
 }
 
 type SimulationMessagesResponse = {
@@ -40,6 +46,7 @@ export const simulationTranscriptApi = api.injectEndpoints({
           offset,
           sortBy,
           sortOrder,
+          includeTags: true,
         },
       }),
     }),
