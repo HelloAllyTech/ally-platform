@@ -3,8 +3,14 @@ import {ScrollView, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ChartComponent, ProgressBar} from '@/components';
+import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, typography} from '@/theme';
+import {EmotionalMovement, SkillCoverage} from '@/types/simulationSummary';
 import {formatTimeToMMSS} from '@/utils/date';
+import {
+  getInterpolatedYValues,
+  getNormalisedXAxisLabelsMap,
+} from '@/utils/simulationSummary';
 
 import {SummaryCard} from '../SummaryCard';
 
@@ -18,120 +24,8 @@ export interface EmotionalMovementDataset {
   label?: string;
 }
 
-export interface SkillCoverageItem {
-  /** Skill name (e.g., "Learning", "Support", "Standards") */
-  name: string;
-  /** Percentage value (0-100) */
-  percentage: number;
-  /** Color for the progress bar */
-  color: string;
-}
-
 export interface SessionSkillsProps {
-  /** Optional scenario session ID for fetching real data (when API is ready) */
-  scenarioSessionId?: string;
-  /** Array of skill coverage items to display in the bar chart */
-  skillCoverage?: SkillCoverageItem[];
-  /** Chart datasets for the emotional movement line chart */
-  emotionalMovementDatasets?: EmotionalMovementDataset[];
-  /** X-axis labels for the emotional movement chart */
-  emotionalMovementXLabels?: string[];
-}
-
-/**
- * Utility function to generate a Map of uniformly spaced x-axis labels (in ms + formatted string)
- * for emotional movement datasets.
- */
-function getNormalisedXAxisLabelsMap(
-  datasets: EmotionalMovementDataset[] = [],
-  formatFn: (ms: number) => string = formatTimeToMMSS,
-): Map<number, string> {
-  if (!datasets.length) return new Map();
-
-  const allTimes = datasets
-    .flatMap(d => d.data)
-    .filter(x => typeof x === 'object' && 'x' in x && typeof x.x === 'number');
-  if (!allTimes.length) return new Map();
-
-  const minTime = Math.min(...allTimes.map(x => x.x));
-  const maxTime = Math.max(...allTimes.map(x => x.x));
-
-  const interval = (maxTime - minTime) / NUM_X_AXIS_INTERVALS;
-
-  return new Map(
-    Array.from({length: NUM_X_AXIS_INTERVALS + 1}, (_, idx) => [
-      Math.round((minTime + idx * interval) * 1000),
-      formatFn(Math.round((minTime + idx * interval) * 1000)),
-    ]),
-  );
-}
-
-/**
- * Linearly interpolate the Y value at `targetX` from a **sorted** (by x) array of {x, y} points.
- * If targetX falls outside the data range the nearest endpoint's y is returned.
- */
-function interpolateY(
-  sortedData: {x: number; y: number}[],
-  targetX: number,
-): number {
-  if (!sortedData.length) return 0;
-  if (targetX <= sortedData[0].x) return sortedData[0].y;
-  if (targetX >= sortedData[sortedData.length - 1].x)
-    return sortedData[sortedData.length - 1].y;
-
-  for (let i = 0; i < sortedData.length - 1; i++) {
-    const p1 = sortedData[i];
-    const p2 = sortedData[i + 1];
-    if (targetX >= p1.x && targetX <= p2.x) {
-      const t = (targetX - p1.x) / (p2.x - p1.x);
-      return p1.y + t * (p2.y - p1.y);
-    }
-  }
-
-  return sortedData[sortedData.length - 1].y;
-}
-
-/**
- * For each dataset, compute the interpolated Y values at the normalised
- * (uniformly-spaced) X-axis positions so that dots appear exactly on the
- * X-axis gridlines.
- */
-function getInterpolatedYValues(
-  datasets: EmotionalMovementDataset[],
-  numIntervals: number = NUM_X_AXIS_INTERVALS,
-): number[][] {
-  if (!datasets.length) return [];
-
-  const allPoints = datasets
-    .flatMap(d => d.data)
-    .filter(
-      (pt): pt is {x: number; y: number} =>
-        typeof pt === 'object' && 'x' in pt && typeof pt.x === 'number',
-    );
-  if (!allPoints.length) return datasets.map(() => []);
-
-  const minTime = Math.min(...allPoints.map(pt => pt.x));
-  const maxTime = Math.max(...allPoints.map(pt => pt.x));
-  const interval = (maxTime - minTime) / numIntervals;
-
-  // The same uniformly-spaced x positions used by getNormalisedXAxisLabelsMap
-  const normalisedXPositions = Array.from(
-    {length: numIntervals + 1},
-    (_, idx) => minTime + idx * interval,
-  );
-
-  return datasets.map(dataset => {
-    const sorted = [...dataset.data]
-      .filter(
-        (pt): pt is {x: number; y: number} =>
-          typeof pt === 'object' && 'x' in pt && typeof pt.x === 'number',
-      )
-      .sort((a, b) => a.x - b.x);
-
-    return normalisedXPositions.map(
-      x => Math.round(interpolateY(sorted, x) * 1000) / 1000,
-    );
-  });
+  scenarioSessionId: string;
 }
 
 const chartConfig = {
@@ -161,84 +55,123 @@ const chartConfig = {
   },
 };
 
+const SKILL_CATEGORY_COLOR_MAP: Record<string, string> = {
+  Learning: colors.ds.blue[300],
+  Support: colors.ds.green[400],
+  Standards: colors.ds.amber[400],
+};
+
+const DEFAULT_SKILL_COLOR = colors.ds.blue[300];
+
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
-  skillCoverage,
-  emotionalMovementDatasets,
 }) => {
-  // TODO: Fetch real data using scenarioSessionId when API is ready
-  // For now, use dummy data if not provided
-  const defaultSkillCoverage: SkillCoverageItem[] = [
-    {name: 'Learning', percentage: 60, color: colors.ds.blue[300]},
-    {name: 'Support', percentage: 90, color: colors.ds.green[400]},
-    {name: 'Standards', percentage: 40, color: colors.ds.amber[400]},
+  // TODO: Remove default data after API is ready
+
+  const defaultSkillCoverage: SkillCoverage[] = [
+    {category: 'Learning', percentage: 60},
+    {category: 'Support', percentage: 90},
+    {category: 'Standards', percentage: 40},
   ];
 
-  const defaultEmotionalMovementDatasets: EmotionalMovementDataset[] = [
+  const defaultEmotionalMovement: EmotionalMovement[] = [
+    {sessionTime: 0, level: 1},
+    {sessionTime: 55, level: 1.292},
+    {sessionTime: 70, level: 3},
+    {sessionTime: 110, level: 3.5},
+    {sessionTime: 130, level: 5},
+    {sessionTime: 140, level: 5},
+    {sessionTime: 175, level: 4},
+    {sessionTime: 185, level: 3},
+    {sessionTime: 190, level: 5.5},
+    {sessionTime: 200, level: 4.7},
+    {sessionTime: 210, level: 6.5},
+    {sessionTime: 220, level: 6},
+    {sessionTime: 230, level: 6.5},
+    {sessionTime: 250, level: 2},
+    {sessionTime: 260, level: 7.5},
+    {sessionTime: 265, level: 4},
+    {sessionTime: 270, level: 8},
+    {sessionTime: 290, level: 3},
+    {sessionTime: 290, level: 2},
+    {sessionTime: 315, level: 3.21},
+    {sessionTime: 340, level: 3.33},
+    {sessionTime: 360, level: 3.45},
+    {sessionTime: 380, level: 3.57},
+    {sessionTime: 400, level: 3.69},
+    {sessionTime: 420, level: 3.81},
+    {sessionTime: 440, level: 3.93},
+    {sessionTime: 460, level: 4.05},
+    {sessionTime: 480, level: 4.17},
+    {sessionTime: 500, level: 4.29},
+  ];
+
+  const {data: simulationSkills} = useGetSimulationSkillsQuery(
     {
-      data: [
-        {x: 0, y: 1},
-        {x: 55, y: 1.292},
-        {x: 70, y: 3},
-        {x: 110, y: 3.5},
-        {x: 130, y: 5},
-        {x: 140, y: 5},
-        {x: 175, y: 4},
-        {x: 185, y: 3},
-        {x: 190, y: 5.5},
-        {x: 200, y: 4.7},
-        {x: 210, y: 6.5},
-        {x: 220, y: 6},
-        {x: 230, y: 6.5},
-        {x: 250, y: 2},
-        {x: 260, y: 7.5},
-        {x: 265, y: 4},
-        {x: 270, y: 8},
-        {x: 290, y: 3},
-        {x: 290, y: 2},
-        {x: 315, y: 3.21},
-        {x: 340, y: 3.33},
-      ],
-      color: _opacity => `rgba(102, 187, 106, 1)`,
-      strokeWidth: 2,
+      scenarioSessionId,
     },
-  ];
+    {
+      skip: !scenarioSessionId,
+    },
+  );
 
-  const finalSkillCoverage: SkillCoverageItem[] =
-    skillCoverage || defaultSkillCoverage;
-  const finalEmotionalMovementDatasets: EmotionalMovementDataset[] =
-    emotionalMovementDatasets || defaultEmotionalMovementDatasets;
+  const skillCoverage = simulationSkills?.skillCoverage ?? defaultSkillCoverage;
+  const emotionalMovementRaw =
+    simulationSkills?.emotionalMovement ?? defaultEmotionalMovement;
+
+  // Convert EmotionalMovement[] to EmotionalMovementDataset[] for chart utils
+  const emotionalMovementDatasets: EmotionalMovementDataset[] = useMemo(
+    () =>
+      emotionalMovementRaw && emotionalMovementRaw.length > 0
+        ? [
+            {
+              data: emotionalMovementRaw.map(item => ({
+                x: item.sessionTime,
+                y: item.level,
+              })),
+            },
+          ]
+        : [],
+    [emotionalMovementRaw],
+  );
+
   // Generate the labels map using the util function.
   const normalisedXAxisLabelsMap = useMemo(
     () =>
       getNormalisedXAxisLabelsMap(
-        finalEmotionalMovementDatasets,
+        emotionalMovementDatasets,
         formatTimeToMMSS,
+        NUM_X_AXIS_INTERVALS,
       ),
-    [finalEmotionalMovementDatasets],
+    [emotionalMovementDatasets],
   );
 
   // Interpolated Y values at each normalised X-axis position (one number[] per dataset).
   const interpolatedYValues = useMemo(
-    () => getInterpolatedYValues(finalEmotionalMovementDatasets),
-    [finalEmotionalMovementDatasets],
+    () =>
+      getInterpolatedYValues(emotionalMovementDatasets, NUM_X_AXIS_INTERVALS),
+    [emotionalMovementDatasets],
   );
 
-  const renderSkillItem = (skill: SkillCoverageItem, index: number) => (
-    <View key={index} style={styles.skillItem}>
-      <View style={styles.skillLabelRow}>
-        <Text style={styles.skillName}>{skill.name}</Text>
-        <Text style={styles.skillPercentage}>{skill.percentage}%</Text>
+  const renderSkillItem = (skill: SkillCoverage, index: number) => {
+    const skillColor =
+      SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
+    return (
+      <View key={index} style={styles.skillItem}>
+        <View style={styles.skillLabelRow}>
+          <Text style={styles.skillName}>{skill.category}</Text>
+          <Text style={styles.skillPercentage}>{skill.percentage}%</Text>
+        </View>
+        <ProgressBar
+          current={skill.percentage}
+          total={100}
+          inProgressColor={skillColor}
+          completedColor={skillColor}
+          height={ms(8)}
+        />
       </View>
-      <ProgressBar
-        current={skill.percentage}
-        total={100}
-        inProgressColor={skill.color}
-        completedColor={skill.color}
-        height={ms(8)}
-      />
-    </View>
-  );
+    );
+  };
 
   return (
     <ScrollView
@@ -247,19 +180,19 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       showsVerticalScrollIndicator={false}>
       <SummaryCard title="Skills shown in this session">
         {/* Skill Coverage Card */}
-        {finalSkillCoverage.length > 0 && (
+        {skillCoverage.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>Skill Coverage</Text>
             </View>
             <View style={styles.cardContent}>
-              {finalSkillCoverage.map(renderSkillItem)}
+              {skillCoverage.map(renderSkillItem)}
             </View>
           </View>
         )}
 
         {/* Client Emotional Movement Card */}
-        {finalEmotionalMovementDatasets.length > 0 && (
+        {emotionalMovementDatasets.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>
@@ -275,12 +208,12 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             <View style={styles.chartWrapper}>
               <ChartComponent
                 xAxisLabels={Array.from(normalisedXAxisLabelsMap.values())}
-                datasets={finalEmotionalMovementDatasets.map(
-                  (dataset, idx) => ({
-                    ...dataset,
-                    data: interpolatedYValues[idx] || [],
-                  }),
-                )}
+                datasets={emotionalMovementDatasets.map((_dataset, idx) => ({
+                  data: interpolatedYValues[idx] || [],
+                  color: (_opacity: number) => `rgba(102, 187, 106, 1)`,
+                  strokeWidth: 2,
+                  label: 'Emotional Movement',
+                }))}
                 height={ms(250)}
                 showLegend={false}
                 chartConfig={chartConfig}
@@ -343,6 +276,7 @@ const styles = ScaledSheet.create({
   },
   chartInfoRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: '16@ms',
     paddingTop: '12@vs',
     gap: '16@ms',
