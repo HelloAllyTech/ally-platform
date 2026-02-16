@@ -457,6 +457,7 @@
     "noDataAvailable": "No Data Available",
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
+    "sessionGlimpse": "Session glimpse",
     "almostThereTitle": "Almost there",
     "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready.",
     "keepItPrivate": "Keep it private",
