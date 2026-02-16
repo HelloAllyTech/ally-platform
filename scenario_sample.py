@@ -777,7 +777,7 @@ SCENARIO_SAMPLE_MALAYALAM_ENGLISH = {
             "config": {"model": "bulbul:v2", "speaker": "anushka"},
         },
         "languageCode": "ml-IN",
-        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "stt": {"provider": "sarvam", "config": {"model": "saarika:v2.5"}},
         "llm": {"provider": "google", "config": {"model": "gemini-2.0-flash-exp"}},
         "metadata": {},
     },
