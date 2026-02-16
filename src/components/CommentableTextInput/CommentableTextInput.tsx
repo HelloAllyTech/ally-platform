@@ -20,6 +20,14 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {colors, fontFamily, typography} from '@/theme';
 import type {MessagePart} from '@/types/reviews';
 
+/** Data passed to onShowAddCommentMenu when the floating menu should appear. */
+export interface AddCommentMenuData {
+  /** Absolute (window-relative) position for the menu. */
+  position: {x: number; y: number};
+  messageId: string;
+  selectionData: SelectionData;
+}
+
 export interface SelectionData {
   startIndex: number;
   endIndex: number;
@@ -51,6 +59,14 @@ export interface CommentableTextInputProps {
   highlightedPartIndices?: number[];
   placeholder?: string;
   multiline?: boolean;
+  /**
+   * When provided, the component delegates "Add comment" menu rendering to the
+   * parent instead of showing its own Modal. This avoids the Modal intercepting
+   * all touch events (which blocks selection-handle dragging on iOS).
+   */
+  onShowAddCommentMenu?: (data: AddCommentMenuData) => void;
+  /** Called when the floating menu should be hidden. */
+  onHideAddCommentMenu?: (messageId: string) => void;
 }
 
 type Sel = {start: number; end: number};
@@ -91,6 +107,7 @@ type NativeProps = {
   onCommentPress?: (
     event: NativeSyntheticEvent<NativeCommentPressEvent>,
   ) => void;
+  onContentSizeChange?: (event: NativeSyntheticEvent<{height: number}>) => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -140,6 +157,8 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
   highlightedPartIndices = [],
   placeholder,
   multiline = false,
+  onShowAddCommentMenu,
+  onHideAddCommentMenu,
 }) => {
   const containerRef = useRef<View>(null);
   const selectionRef = useRef<Sel>({start: 0, end: 0});
@@ -209,6 +228,35 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     [measuredHeight],
   );
 
+  // Native content-size handler (replaces hidden measurement overlay when
+  // onShowAddCommentMenu is used, i.e. "external menu" mode).
+  const handleContentSizeChange = useCallback(
+    (event: NativeSyntheticEvent<{height: number}>) => {
+      const h = Math.ceil(event.nativeEvent.height);
+      setMeasuredHeight(prev => (prev === h ? prev : h));
+    },
+    [],
+  );
+
+  /** Pure position computation — returns null when selectionRect is missing. */
+  const computeMenuPosition = useCallback(
+    (
+      rect?: NativeSelectionEvent['selectionRect'],
+    ): {x: number; y: number} | null => {
+      if (!rect) return null;
+      const screen = Dimensions.get('window');
+      const anchorX = rect.x + rect.width / 2;
+      const anchorY = rect.y;
+      const anchorH = rect.height || 20;
+      let y = anchorY - MENU_H - MENU_MARGIN;
+      if (y < 0) y = anchorY + anchorH + MENU_MARGIN;
+      let x = anchorX - MENU_W / 2;
+      x = Math.max(8, Math.min(x, screen.width - MENU_W - 8));
+      return {x, y};
+    },
+    [],
+  );
+
   // Reset on text change
   useEffect(() => {
     const s = {start: prefixLength, end: prefixLength};
@@ -216,9 +264,11 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     setForcedSelection(s);
     setSelectedText('');
     setShowMenu(false);
+    onHideAddCommentMenu?.(messageId);
 
     const t = setTimeout(() => setForcedSelection(null), 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayText, prefixLength]);
 
   const clearSelection = useCallback(() => {
@@ -228,8 +278,9 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     setForcedSelection(s);
     setSelectedText('');
     setShowMenu(false);
+    onHideAddCommentMenu?.(messageId);
     requestAnimationFrame(() => setForcedSelection(null));
-  }, [prefixLength]);
+  }, [prefixLength, messageId, onHideAddCommentMenu]);
 
   // Close when parent requests
   useEffect(() => {
@@ -239,27 +290,6 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestCloseSignal]);
-
-  const positionMenuFromRect = useCallback(
-    (rect?: NativeSelectionEvent['selectionRect']) => {
-      if (!rect) return false;
-
-      const screen = Dimensions.get('window');
-      const anchorX = rect.x + rect.width / 2;
-      const anchorY = rect.y;
-      const anchorH = rect.height || 20;
-
-      let y = anchorY - MENU_H - MENU_MARGIN;
-      if (y < 0) y = anchorY + anchorH + MENU_MARGIN;
-
-      let x = anchorX - MENU_W / 2;
-      x = Math.max(8, Math.min(x, screen.width - MENU_W - 8));
-
-      setMenuAbsPos({x, y});
-      return true;
-    },
-    [],
-  );
 
   const handleSelectionChange = useCallback(
     (event: NativeSyntheticEvent<NativeSelectionEvent>) => {
@@ -287,6 +317,7 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
         if (clampedStart === clampedEnd) {
           setShowMenu(false);
           setSelectedText('');
+          onHideAddCommentMenu?.(messageId);
           return;
         }
       }
@@ -298,6 +329,7 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
       if (!hasSelection) {
         setShowMenu(false);
         setSelectedText('');
+        onHideAddCommentMenu?.(messageId);
         return;
       }
 
@@ -305,14 +337,35 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
       if (!text) {
         setShowMenu(false);
         setSelectedText('');
+        onHideAddCommentMenu?.(messageId);
         return;
       }
 
       onRequestActivate?.(messageId);
       setSelectedText(text);
-      if (!positionMenuFromRect(selectionRect)) {
+
+      // ── Show menu ──────────────────────────────────────────────
+      const selData: SelectionData = {
+        startIndex: clampedStart - prefixLength,
+        endIndex: clampedEnd - prefixLength,
+        selectedText: text,
+      };
+
+      const showMenuAt = (pos: {x: number; y: number}) => {
+        setMenuAbsPos(pos);
+        onShowAddCommentMenu?.({
+          position: pos,
+          messageId,
+          selectionData: selData,
+        });
+      };
+
+      const menuPos = computeMenuPosition(selectionRect);
+      if (menuPos) {
+        showMenuAt(menuPos);
+      } else {
         containerRef.current?.measureInWindow((x, y, w) => {
-          setMenuAbsPos({
+          showMenuAt({
             x: x + Math.max(8, Math.floor(w / 2 - MENU_W / 2)),
             y: y + MENU_MARGIN,
           });
@@ -321,10 +374,12 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
       setShowMenu(true);
     },
     [
+      computeMenuPosition,
       displayText,
       messageId,
+      onHideAddCommentMenu,
       onRequestActivate,
-      positionMenuFromRect,
+      onShowAddCommentMenu,
       prefixLength,
     ],
   );
@@ -386,6 +441,9 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
   }, [clearSelection, onRequestClose]);
 
   const shouldShowModal = showMenu && isActive;
+  // When the parent provides onShowAddCommentMenu, it renders the floating
+  // menu externally (avoiding the Modal that blocks selection handles).
+  const useExternalMenu = !!onShowAddCommentMenu;
 
   return (
     <View ref={containerRef} style={[styles.container, style]}>
@@ -393,30 +451,34 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
         <Text style={[styles.placeholder, textStyle]}>{placeholder}</Text>
       ) : null}
 
-      <View pointerEvents="none" style={styles.measureOverlay}>
-        <Text
-          style={[styles.measureText, textStyle]}
-          onTextLayout={handleTextLayout}>
-          {prefixText ? (
-            <Text style={[styles.measureText, textStyle, prefixTextStyle]}>
-              {prefix}
-            </Text>
-          ) : null}
-          {parts && parts.length > 0
-            ? parts.map((part, index) => {
-                const suffix = index < parts.length - 1 ? separator : '';
-                return (
-                  <Text
-                    key={`measure-${index}-${part.text}`}
-                    style={[styles.measureText, textStyle, partTextStyle]}>
-                    {part.text}
-                    {suffix}
-                  </Text>
-                );
-              })
-            : mainText}
-        </Text>
-      </View>
+      {/* Hidden measurement overlay — only needed when native
+          onContentSizeChange is not used (i.e. internal-menu mode). */}
+      {!useExternalMenu && (
+        <View pointerEvents="none" style={styles.measureOverlay}>
+          <Text
+            style={[styles.measureText, textStyle]}
+            onTextLayout={handleTextLayout}>
+            {prefixText ? (
+              <Text style={[styles.measureText, textStyle, prefixTextStyle]}>
+                {prefix}
+              </Text>
+            ) : null}
+            {parts && parts.length > 0
+              ? parts.map((part, index) => {
+                  const suffix = index < parts.length - 1 ? separator : '';
+                  return (
+                    <Text
+                      key={`measure-${index}-${part.text}`}
+                      style={[styles.measureText, textStyle, partTextStyle]}>
+                      {part.text}
+                      {suffix}
+                    </Text>
+                  );
+                })
+              : mainText}
+          </Text>
+        </View>
+      )}
 
       <NativeCommentableTextView
         text={displayText}
@@ -435,37 +497,44 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
         ]}
         onSelectionChange={handleSelectionChange}
         onCommentPress={handleCommentPress}
+        onContentSizeChange={
+          useExternalMenu ? handleContentSizeChange : undefined
+        }
       />
 
-      <Modal
-        visible={shouldShowModal}
-        transparent
-        animationType="fade"
-        onRequestClose={handleDismissMenu}>
-        <TouchableWithoutFeedback onPress={handleDismissMenu}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.menuContainer,
-                  {
-                    top: menuAbsPos.y,
-                    left: menuAbsPos.x,
-                    width: MENU_W,
-                    height: MENU_H,
-                  },
-                ]}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleAddComment}
-                  activeOpacity={0.7}>
-                  <Text style={styles.menuItemText}>Add comment</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* Internal Modal menu — only rendered when the parent does NOT
+          provide an external menu handler. */}
+      {!useExternalMenu && (
+        <Modal
+          visible={shouldShowModal}
+          transparent
+          animationType="fade"
+          onRequestClose={handleDismissMenu}>
+          <TouchableWithoutFeedback onPress={handleDismissMenu}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    styles.menuContainer,
+                    {
+                      top: menuAbsPos.y,
+                      left: menuAbsPos.x,
+                      width: MENU_W,
+                      height: MENU_H,
+                    },
+                  ]}>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleAddComment}
+                    activeOpacity={0.7}>
+                    <Text style={styles.menuItemText}>Add comment</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </View>
   );
 };
