@@ -1,3 +1,4 @@
+import {colors} from '@/theme';
 import type {CircleConfig} from '@/types';
 
 import {SECONDS_IN_MS} from './general';
@@ -63,3 +64,14 @@ export enum SimulationEventStatus {
 }
 
 export const DEFAULT_MAX_TIME_VALUE = '00:10:00';
+
+export const TRANSCRIPT_TAG_COLORS = {
+  NEGATIVE: {
+    background: colors.ds.red[50],
+    text: colors.ds.red[950],
+  },
+  POSITIVE: {
+    background: colors.ds.green[100],
+    text: colors.ds.green[900],
+  },
+} as const;
