@@ -116,7 +116,6 @@ const styles = ScaledSheet.create({
     pointerEvents: 'box-none',
   },
   chart: {
-    marginBottom: ms(8),
     marginTop: ms(16),
     borderRadius: ms(16),
     backgroundColor: colors.white,
