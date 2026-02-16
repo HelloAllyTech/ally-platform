@@ -1,8 +1,14 @@
 import React, {useMemo} from 'react';
-import {ScrollView, Text, View} from 'react-native';
+import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ChartComponent, ProgressBar} from '@/components';
+import {
+  DEFAULT_SKILL_COLOR,
+  DEFAULT_SKILL_COVERAGE,
+  EMOTIONAL_MOVEMENT_CHART_CONFIG,
+  SKILL_CATEGORY_COLOR_MAP,
+} from '@/constants';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, typography} from '@/theme';
 import {EmotionalMovement, SkillCoverage} from '@/types/simulationSummary';
@@ -28,52 +34,9 @@ export interface SessionSkillsProps {
   scenarioSessionId: string;
 }
 
-const chartConfig = {
-  backgroundColor: colors.white,
-  backgroundGradientFrom: colors.white,
-  backgroundGradientTo: colors.white,
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`, // #6B7280
-  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`, // #6B7280
-  strokeWidth: ms(2),
-  barPercentage: 0.5,
-  propsForBackgroundLines: {
-    strokeDasharray: '3,3', // Dashed grid lines
-    stroke: colors.lightGray2,
-    strokeWidth: 1,
-  },
-  propsForDots: {
-    r: ms(2),
-    strokeWidth: ms(2),
-    stroke: colors.ds.green[400],
-    fill: colors.white,
-  },
-  propsForLabels: {
-    fontSize: ms(12),
-    fontFamily: fontFamily.ROBOTO.REGULAR.fontFamily,
-    fill: colors.ds.typography.lowEmphasis,
-  },
-};
-
-const SKILL_CATEGORY_COLOR_MAP: Record<string, string> = {
-  Learning: colors.ds.blue[300],
-  Support: colors.ds.green[400],
-  Standards: colors.ds.amber[400],
-};
-
-const DEFAULT_SKILL_COLOR = colors.ds.blue[300];
-
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
 }) => {
-  // TODO: Remove default data after API is ready
-
-  const defaultSkillCoverage: SkillCoverage[] = [
-    {category: 'Learning', percentage: 60},
-    {category: 'Support', percentage: 90},
-    {category: 'Standards', percentage: 40},
-  ];
-
   const defaultEmotionalMovement: EmotionalMovement[] = [
     {sessionTime: 0, level: 0},
     {sessionTime: 100, level: 4.5},
@@ -96,25 +59,41 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     },
   );
 
-  const skillCoverage = simulationSkills?.skillCoverage ?? defaultSkillCoverage;
+  const skillCoverage =
+    simulationSkills?.skillCoverage ?? DEFAULT_SKILL_COVERAGE;
+
+  // TODO: Remove default data after API is ready
   const emotionalMovementRaw =
     simulationSkills?.emotionalMovement ?? defaultEmotionalMovement;
+  const hasEmotionalData =
+    !!emotionalMovementRaw && emotionalMovementRaw.length > 0;
 
-  // Convert EmotionalMovement[] to EmotionalMovementDataset[] for chart utils
-  const emotionalMovementDatasets: EmotionalMovementDataset[] = useMemo(
-    () =>
-      emotionalMovementRaw && emotionalMovementRaw.length > 0
-        ? [
-            {
-              data: emotionalMovementRaw.map(item => ({
-                x: item.sessionTime,
-                y: item.level,
-              })),
-            },
-          ]
-        : [],
-    [emotionalMovementRaw],
-  );
+  // Convert EmotionalMovement[] to EmotionalMovementDataset[] for chart utils.
+  // When the array is empty, provide placeholder points with y=0 so the chart
+  // still renders a flat baseline instead of being hidden.
+  const emotionalMovementDatasets: EmotionalMovementDataset[] = useMemo(() => {
+    if (hasEmotionalData) {
+      return [
+        {
+          data: emotionalMovementRaw.map(item => ({
+            x: item.sessionTime,
+            y: item.level,
+          })),
+        },
+      ];
+    }
+
+    const defaultIntervalSeconds = 60;
+    const placeholderPoints = Array.from(
+      {length: NUM_X_AXIS_INTERVALS + 1},
+      (_, i) => ({
+        x: i * defaultIntervalSeconds,
+        y: 0,
+      }),
+    );
+
+    return [{data: placeholderPoints}];
+  }, [hasEmotionalData, emotionalMovementRaw]);
 
   // Generate the labels map using the util function.
   const normalisedXAxisLabelsMap = useMemo(
@@ -132,6 +111,28 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     () =>
       getInterpolatedYValues(emotionalMovementDatasets, NUM_X_AXIS_INTERVALS),
     [emotionalMovementDatasets],
+  );
+
+  const resolvedChartConfig = useMemo(
+    () =>
+      hasEmotionalData
+        ? EMOTIONAL_MOVEMENT_CHART_CONFIG
+        : {
+            ...EMOTIONAL_MOVEMENT_CHART_CONFIG,
+            propsForDots: {
+              ...EMOTIONAL_MOVEMENT_CHART_CONFIG.propsForDots,
+              r: 0,
+              strokeWidth: 0,
+              stroke: 'transparent',
+              fill: 'transparent',
+            },
+            propsForBackgroundLines: {
+              strokeDasharray: '3,3', // Dashed grid lines
+              stroke: colors.lightGray2,
+              strokeWidth: 1,
+            },
+          },
+    [hasEmotionalData],
   );
 
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
@@ -191,14 +192,22 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
                 xAxisLabels={Array.from(normalisedXAxisLabelsMap.values())}
                 datasets={emotionalMovementDatasets.map((_dataset, idx) => ({
                   data: interpolatedYValues[idx] || [],
-                  color: (_opacity: number) => `rgba(102, 187, 106, 1)`,
-                  strokeWidth: 2,
+                  color: (_opacity: number) =>
+                    hasEmotionalData
+                      ? 'rgba(102, 187, 106, 1)'
+                      : 'rgba(0, 0, 0, 0)',
+                  strokeWidth: hasEmotionalData ? 2 : 0,
                   label: 'Emotional Movement',
                 }))}
                 height={ms(250)}
                 showLegend={false}
-                chartConfig={chartConfig}
+                chartConfig={resolvedChartConfig}
               />
+              {!hasEmotionalData && (
+                <View style={styles.noDataOverlay}>
+                  <Text style={styles.noDataText}>No data found</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -269,5 +278,16 @@ const styles = ScaledSheet.create({
   },
   chartWrapper: {
     paddingHorizontal: '8@ms',
+    position: 'relative',
+  },
+  noDataOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noDataText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });
