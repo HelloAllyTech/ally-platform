@@ -35,7 +35,7 @@ export const useBadgePopup = (
   );
 
   const {data: badges, isLoading: isBadgesLoading} = useGetBadgesQuery(
-    ViewedStatus.UNVIEWED,
+    {viewedStatus: ViewedStatus.UNVIEWED},
     {
       pollingInterval: BADGE_POLLING_INTERVAL,
       refetchOnFocus: true,
