@@ -240,11 +240,10 @@ SCENARIO_SAMPLE = {
             }
         ],
         "voice": {
-            "name": "Meera 30 year old",
-            "provider": "ELEVENLABS",
+            "name": "helena",
+            "provider": "deepgram",
             "config": {
-                "model": "eleven_multilingual_v2",
-                "voice_id": "jqz1rTaQ0LwR55wGp1Z7",
+                "model": "aura-2-helena-en",
             },
         },
         "languageCode": "en-IN",
