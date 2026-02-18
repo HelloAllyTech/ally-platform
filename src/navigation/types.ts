@@ -20,12 +20,14 @@ export type RootStackParamList = {
     scenario?: Scenario;
     pathId?: string;
     caseId?: string;
+    languageId?: number;
   };
   SimulationFeedback: {
     scenarioSessionId?: string;
     fromLogs?: boolean;
     pathId?: string;
     caseId?: string;
+    languageId?: number;
   };
   Achievements: undefined;
   ProfileSettings: undefined;

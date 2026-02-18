@@ -66,7 +66,8 @@ describe('SimulationSummary', () => {
     const {getByText} = render(<SimulationSummary data={baseData as any} />);
     expect(getByText('Scenario Title')).toBeTruthy();
     expect(getByText('SimulationFeedback.sessionFeedback')).toBeTruthy();
-    expect(getByText(/ID: SS-/)).toBeTruthy();
+    // Session id shows "ID: {metadata.sessionName ?? id}" (ally-web format)
+    expect(getByText('ID: test-id-123')).toBeTruthy();
     expect(getByText(/Min/)).toBeTruthy();
   });
 

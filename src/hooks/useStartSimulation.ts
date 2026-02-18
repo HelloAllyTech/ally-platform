@@ -117,6 +117,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
           }),
           ...(params.pathId && {pathId: params.pathId}),
           ...(params.caseId && {caseId: params.caseId}),
+          ...(params.languageId && {languageId: params.languageId}),
         });
       }
     } catch (error) {

@@ -16,6 +16,7 @@ export interface UseSimulationTransitionParams {
   scenarioSessionId?: string;
   pathId?: string;
   caseId?: string;
+  languageId?: number;
   enabled?: boolean;
 }
 
@@ -62,6 +63,7 @@ export const useSimulationTransition = ({
   scenarioSessionId,
   pathId,
   caseId,
+  languageId,
   enabled = true,
 }: UseSimulationTransitionParams): UseSimulationTransitionReturn => {
   const [pollingInterval, setPollingInterval] = useState<number>(RETRY_DELAY);
@@ -174,8 +176,9 @@ export const useSimulationTransition = ({
       }),
       pathId,
       caseId,
+      ...(languageId && {languageId}),
     });
-  }, [currentSession, pathId, caseId, startSimulation]);
+  }, [currentSession, pathId, caseId, languageId, startSimulation]);
 
   /**
    * Start the next simulation in the flow
@@ -204,8 +207,9 @@ export const useSimulationTransition = ({
       }),
       pathId,
       caseId,
+      ...(languageId && {languageId}),
     });
-  }, [upcomingScenario, pathId, caseId, startSimulation]);
+  }, [upcomingScenario, pathId, caseId, languageId, startSimulation]);
 
   return {
     currentSession,
