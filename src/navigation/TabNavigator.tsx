@@ -117,36 +117,24 @@ const CustomTabBar = (props: BottomTabBarProps) => {
 
   const renderTabBarIcon = (route: string, focused: boolean) => {
     const focusedIcons = {
-      [SCREEN_NAMES.CALL_LOG]: <CallLogActiveIcon width={18} height={18} />,
-      [SCREEN_NAMES.USER_ANALYTICS]: (
-        <AnalyticsActiveIcon width={18} height={18} />
-      ),
-      [SCREEN_NAMES.COMMUNITY]: <CommunityActiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.LEADERBOARD]: (
-        <LeaderboardActiveIcon width={20} height={20} color={colors.blue} />
-      ),
-      [SCREEN_NAMES.SEARCH]: (
-        <SearchActiveIcon width={20} height={20} color={colors.blue} />
-      ),
-      [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.REVIEW]: <ReviewActiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.CALL_LOG]: <CallLogActiveIcon />,
+      [SCREEN_NAMES.USER_ANALYTICS]: <AnalyticsActiveIcon />,
+      [SCREEN_NAMES.COMMUNITY]: <CommunityActiveIcon />,
+      [SCREEN_NAMES.LEADERBOARD]: <LeaderboardActiveIcon />,
+      [SCREEN_NAMES.SEARCH]: <SearchActiveIcon />,
+      [SCREEN_NAMES.LEARN]: <LearnActiveIcon />,
+      [SCREEN_NAMES.REVIEW]: <ReviewActiveIcon />,
       [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeActiveIcon width={20} height={20} />,
     };
 
     const unfocusedIcons = {
-      [SCREEN_NAMES.CALL_LOG]: <CallLogInactiveIcon width={18} height={18} />,
-      [SCREEN_NAMES.USER_ANALYTICS]: (
-        <AnalyticsInactiveIcon width={18} height={18} />
-      ),
-      [SCREEN_NAMES.COMMUNITY]: (
-        <CommunityInactiveIcon width={20} height={20} />
-      ),
-      [SCREEN_NAMES.LEADERBOARD]: (
-        <LeaderboardInactiveIcon width={20} height={20} />
-      ),
-      [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.REVIEW]: <ReviewInactiveIcon width={20} height={20} />,
+      [SCREEN_NAMES.CALL_LOG]: <CallLogInactiveIcon />,
+      [SCREEN_NAMES.USER_ANALYTICS]: <AnalyticsInactiveIcon />,
+      [SCREEN_NAMES.COMMUNITY]: <CommunityInactiveIcon />,
+      [SCREEN_NAMES.LEADERBOARD]: <LeaderboardInactiveIcon />,
+      [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon />,
+      [SCREEN_NAMES.LEARN]: <LearnInactiveIcon />,
+      [SCREEN_NAMES.REVIEW]: <ReviewInactiveIcon />,
       [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeInactiveIcon width={20} height={20} />,
     };
 
