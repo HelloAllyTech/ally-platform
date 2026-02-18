@@ -168,4 +168,8 @@ export const styles = ScaledSheet.create({
   sendButtonActive: {
     backgroundColor: colors.ds.blue[500],
   },
+  thinkingLottie: {
+    width: '24@ms',
+    height: '24@ms',
+  },
 });

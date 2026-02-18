@@ -134,6 +134,10 @@ jest.mock('@/services', () => {
   };
 });
 
+jest.mock('@/services/simulationSummaryApi', () => ({
+  useGetSimulationSkillsQuery: () => ({data: null, isLoading: false}),
+}));
+
 jest.mock('@/services/reviewThreadsApi', () => ({
   useLazyGetThreadsQuery: () => [
     jest.fn().mockResolvedValue({data: {data: []}}),

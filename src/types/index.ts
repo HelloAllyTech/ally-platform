@@ -58,3 +58,6 @@ export * from './reviews';
 
 // Leaderboard types
 export * from './leaderboard';
+
+// Simulation Summary types
+export * from './simulationSummary';

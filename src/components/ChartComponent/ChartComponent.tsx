@@ -3,7 +3,7 @@ import {Dimensions, StyleSheet, View} from 'react-native';
 import {LineChart} from 'react-native-chart-kit';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily} from '@/theme';
 
 export interface ChartDataset {
   data: number[];
@@ -67,7 +67,7 @@ export const ChartComponent: React.FC<ChartComponentProps> = ({
   chartConfig,
 }) => {
   const screenWidth = Dimensions.get('window').width;
-  const chartWidth = width || screenWidth - ms(40);
+  const chartWidth = width || screenWidth - ms(32);
 
   const chartData = {
     labels: xAxisLabels,
@@ -113,64 +113,12 @@ const styles = ScaledSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     pointerEvents: 'box-none',
   },
   chart: {
-    marginVertical: ms(8),
+    marginTop: ms(16),
     borderRadius: ms(16),
-    backgroundColor: '#FFFFFF',
-  },
-  yAxisTitleContainer: {
-    position: 'absolute',
-    left: ms(-10),
-    top: ms(1),
-    width: ms(65),
-    height: ms(227),
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  yAxisTitle: {
-    ...typography.body.small,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.ds.typography.mediumEmphasis,
-    transform: [{rotate: '-90deg'}],
-    textAlign: 'left',
-  },
-  xAxisTitleContainer: {
-    position: 'absolute',
-    bottom: ms(10),
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  xAxisTitle: {
-    ...typography.body.small,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.ds.typography.mediumEmphasis,
-    textAlign: 'center',
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: ms(12),
-    gap: ms(16),
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(8),
-  },
-  legendIndicator: {
-    width: ms(14),
-    height: ms(14),
-    borderRadius: ms(2),
-  },
-  legendText: {
-    ...typography.body.large,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.ds.typography.mediumEmphasis,
-    letterSpacing: ms(-0.3),
+    backgroundColor: colors.white,
+    marginLeft: -ms(32),
   },
 });

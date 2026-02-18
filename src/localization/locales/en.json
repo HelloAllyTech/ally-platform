@@ -476,6 +476,7 @@
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
+    "askAIInitialStateTitle": "Suggestions",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Overall Score",
@@ -484,6 +485,14 @@
       "placeholder": "Add response",
       "clear": "Clear",
       "save": "Save"
+    },
+    "sessionSkills": {
+      "sectionTitle": "Skills shown in this session",
+      "skillCoverage": "Skill Coverage",
+      "clientEmotionalMovement": "Client Emotional Movement",
+      "chartXAxisLabel": "X: Session Timeline(Min) graph",
+      "chartYAxisLabel": "Y: Level (1-10)",
+      "noDataFound": "No data found"
     }
   },
   "Errors": {
