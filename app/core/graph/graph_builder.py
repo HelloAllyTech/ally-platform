@@ -3,9 +3,11 @@ from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.graph.nodes import (
+    detect_behaviors,
     generate_response,
     process_events,
     resolve_branching_instruction,
+    send_behavior_feedback,
 )
 from app.core.graph.state import SimulationState
 
@@ -61,6 +63,30 @@ def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
     return subgraph.compile()
 
 
+def build_detect_behaviors_subgraph() -> CompiledStateGraph[SimulationState]:
+    """
+    Build a subgraph for detecting and sending behavior feedback.
+
+    This subgraph is isolated from the main graph's streaming output.
+    When subgraphs=False (default in LLMAdapter), the LLM outputs from
+    this subgraph will NOT be streamed to TTS/UI.
+
+    Flow:
+    1. detect_behaviors: Detects behaviors from behavior instructions
+    2. send_behavior_feedback: Sends detected behavior feedback to UI and BE
+
+    Returns:
+        Compiled subgraph that detects behaviors and sends feedback
+    """
+    subgraph = StateGraph(SimulationState)
+    subgraph.add_node("detect_behaviors", detect_behaviors)
+    subgraph.add_node("send_behavior_feedback", send_behavior_feedback)
+    subgraph.add_edge(START, "detect_behaviors")
+    subgraph.add_edge("detect_behaviors", "send_behavior_feedback")
+    subgraph.add_edge("send_behavior_feedback", END)
+    return subgraph.compile()
+
+
 def build_graph() -> StateGraph[SimulationState]:
     """
     Build the LangGraph state graph.
@@ -69,12 +95,14 @@ def build_graph() -> StateGraph[SimulationState]:
     1. process_events: Detects events, updates EventRegistry
     2. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
-    3. generate_response: Generates LLM response based on detected events
+    3. generate_response + detect_behaviors (parallel):
+       - generate_response: Generates LLM response based on detected events
+       - detect_behaviors: Detects behaviors from behavior instructions (as subgraph)
     4. apply_voice_expressions: Applies voice expression parameters and text enhancement
        (as subgraph)
 
-    Note: resolve_branching_instruction and apply_voice_expressions are subgraphs to
-    prevent their LLM outputs from being streamed. With subgraphs=False
+    Note: resolve_branching_instruction, detect_behaviors, and apply_voice_expressions
+    are subgraphs to prevent their LLM outputs from being streamed. With subgraphs=False
     (default in LLMAdapter), only root graph outputs are streamed.
 
     This is a workaround for LiveKit issue #2836:
@@ -92,16 +120,27 @@ def build_graph() -> StateGraph[SimulationState]:
     # Add generate_response as a regular node (its LLM outputs WILL be streamed)
     graph.add_node("generate_response", generate_response)
 
+    # Build the detect_behaviors subgraph and add it as a node
+    # This runs in parallel with generate_response after resolve_branching_instruction
+    detect_behaviors_subgraph = build_detect_behaviors_subgraph()
+    graph.add_node("detect_behaviors", detect_behaviors_subgraph)
+
     graph.add_edge(START, "process_events")
     graph.add_edge("process_events", "resolve_branching_instruction")
+
+    # Fan-out: resolve_branching_instruction → [generate_response, detect_behaviors]
     graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("resolve_branching_instruction", "detect_behaviors")
 
     # Build the apply_voice_expressions subgraph and add it as a node
     # This prevents its LLM outputs (for voice expression parameters) from being
     # streamed
     voice_expressions_subgraph = build_voice_expressions_subgraph()
     graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
+
+    # Fan-in: [generate_response, detect_behaviors] → apply_voice_expressions
     graph.add_edge("generate_response", "apply_voice_expressions")
+    graph.add_edge("detect_behaviors", "apply_voice_expressions")
     graph.add_edge("apply_voice_expressions", END)
 
     return graph

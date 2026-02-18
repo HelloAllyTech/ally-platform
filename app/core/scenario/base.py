@@ -1,13 +1,17 @@
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
 from app.core.logger import get_logger
+from app.core.scenario.simulation_instructions import (
+    SimulationBehaviorInstruction,
+    SimulationStateInstruction,
+)
 
 logger = get_logger(__name__)
 
@@ -31,58 +35,6 @@ class ScenarioResponseLength(str, Enum):
     BRIEF = "BRIEF"
     MEDIUM = "MEDIUM"
     ELABORATE = "ELABORATE"
-
-
-class SimulationBehaviorCategory(str, Enum):
-    """Category of helper behavior in the simulation."""
-
-    SHOULD_DO = "SHOULD_DO"
-    SHOULD_NOT_DO = "SHOULD_NOT_DO"
-
-
-class SimulationBehaviorInstruction(BaseModel):
-    """Describes what the helper should or should not do, and the actor's response."""
-
-    category: SimulationBehaviorCategory = Field(
-        ...,
-        description="Whether the helper should or should not exhibit these behaviors",
-    )
-    behaviors: List[str] = Field(
-        ..., description="List of behavior labels (e.g. 'Validated experience')"
-    )
-    score: int = Field(..., description="Score assigned to this behavior instruction")
-    actors_responses: Optional[List[str]] = Field(
-        default=None,
-        alias="actorsResponses",
-        description="The actor's responses when these behaviors are exhibited",
-    )
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class SimulationStateInstruction(BaseModel):
-    """Describes an ordered agent state with instruction and optional dialogues."""
-
-    state_id: str = Field(
-        ..., alias="stateId", description="State identifier (e.g. '1')"
-    )
-    instruction: str = Field(..., description="What the agent should do in this state")
-    score_lower: Optional[int] = Field(
-        default=None,
-        alias="scoreLower",
-        description="Lower score limit for this state (None represents -infinity)",
-    )
-    score_upper: Optional[int] = Field(
-        default=None,
-        alias="scoreUpper",
-        description="Upper score limit for this state (None represents +infinity)",
-    )
-    dialogues: Optional[List[str]] = Field(
-        default=None,
-        description="Specific dialogue lines the agent can use in this state",
-    )
-
-    model_config = ConfigDict(populate_by_name=True)
 
 
 class PromptData(BaseModel):

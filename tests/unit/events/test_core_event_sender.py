@@ -4,7 +4,7 @@ from typing import List
 import pytest
 
 from app.core.events.base import BaseEvent, ChatMessage, VisibilityType
-from app.core.events.schemas import CoreEventMessageType, CoreEventType
+from app.core.events.schemas import CoreEventMessageType, CoreEventType, CoreMessageType
 
 
 class DummyEvent(BaseEvent):
@@ -52,7 +52,7 @@ async def test_core_event_message_create_event_only_builds_event_payload():
 
     msg = CoreEventMessageType.create(room_id="room-1", event_data=event_dict)
 
-    assert msg.message_type == "event"
+    assert msg.message_type == CoreMessageType.EVENT
     assert msg.room_id == "room-1"
     assert msg.data.chat_message is None
     assert msg.data.event is not None
@@ -67,7 +67,7 @@ async def test_core_event_message_create_with_chat_message_builds_message_payloa
     chat = ChatMessage(role="user", content="hello world")
     msg = CoreEventMessageType.create(room_id="room-2", chat_message=chat)
 
-    assert msg.message_type == "message"
+    assert msg.message_type == CoreMessageType.MESSAGE
     assert msg.room_id == "room-2"
     assert msg.data.chat_message == chat
     assert msg.data.event is None

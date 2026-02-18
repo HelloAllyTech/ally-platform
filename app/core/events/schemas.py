@@ -4,7 +4,8 @@ Centralized schemas for event orchestrator and related structures.
 
 import time
 from datetime import datetime
-from typing import Literal, Optional, TypedDict
+from enum import Enum
+from typing import Optional, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -13,6 +14,12 @@ from app.core.events.base import ChatMessage
 from app.core.events.event_types.combination.constants import ExpressionNode
 from app.core.time_utils import get_current_iso_timestamp
 from app.core.time_utils import get_current_iso_timestamp as get_iso_timestamp
+
+
+class CoreMessageType(str, Enum):
+    MESSAGE = "message"
+    EVENT = "event"
+    BEHAVIOR_INSTRUCTION = "behavior_instruction"
 
 
 class EventRegistryEntry(BaseModel):
@@ -78,6 +85,26 @@ class CoreEventType(BaseModel):
         return cls(timestamp=timestamp, event_data=event_data)
 
 
+class CoreBehaviorInstructionType(BaseModel):
+    """Core behavior instruction data structure for BE."""
+
+    behavior_instruction_data: dict = None
+    timestamp: Optional[str] = None
+
+    @classmethod
+    def create(
+        cls,
+        timestamp: Optional[str] = None,
+        behavior_instruction_data: dict = None,
+    ) -> "CoreBehaviorInstructionType":
+        if timestamp is None:
+            timestamp = get_current_iso_timestamp()
+        return cls(
+            timestamp=timestamp,
+            behavior_instruction_data=behavior_instruction_data,
+        )
+
+
 class CoreEventMessageTypeData(BaseModel):
     """Data payload for core event messages."""
 
@@ -87,12 +114,15 @@ class CoreEventMessageTypeData(BaseModel):
     event: Optional[CoreEventType] = Field(
         default=None, description="Event ID of an event"
     )
+    behavior_instruction: Optional[CoreBehaviorInstructionType] = Field(
+        default=None, description="Behavior instruction detection result"
+    )
 
 
 class CoreEventMessageType(BaseModel):
     """Schema for core event messages."""
 
-    message_type: Literal["message", "event"]
+    message_type: CoreMessageType
     data: CoreEventMessageTypeData
     room_id: str
     timestamp: int
@@ -109,8 +139,32 @@ class CoreEventMessageType(BaseModel):
             event = CoreEventType.create(event_data=event_data)
 
         return cls(
-            message_type="message" if chat_message else "event",
+            message_type=(
+                CoreMessageType.MESSAGE if chat_message else CoreMessageType.EVENT
+            ),
             data=CoreEventMessageTypeData(chat_message=chat_message, event=event),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_behavior_instruction(
+        cls,
+        room_id: str,
+        behavior_instruction_data: dict = None,
+    ) -> "CoreEventMessageType":
+        """Create a behavior instruction message for BE."""
+        behavior_instruction = None
+        if behavior_instruction_data:
+            behavior_instruction = CoreBehaviorInstructionType.create(
+                behavior_instruction_data=behavior_instruction_data,
+            )
+
+        return cls(
+            message_type=CoreMessageType.BEHAVIOR_INSTRUCTION,
+            data=CoreEventMessageTypeData(
+                behavior_instruction=behavior_instruction,
+            ),
             room_id=room_id,
             timestamp=int(time.time()),
         )

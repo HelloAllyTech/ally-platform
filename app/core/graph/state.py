@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.core.branching_instructions.base import BranchingInstruction
 from app.core.events.base import BaseEvent
+from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -155,6 +156,37 @@ def add_non_branching_feedback_data(
     return unique_by(left + right, key=lambda x: x.event_id)
 
 
+@dataclass
+class BehaviorInstructionFeedbackData:
+    """
+    Data structure for detected behavior instruction feedback.
+
+    Stores the result of behavior detection for a single behavior instruction.
+    Used to send score updates to UI (with empty emoji/feedback) and to BE
+    (as behavior_instruction type, distinct from event type).
+    """
+
+    behavior_instruction_id: Optional[str]  # ID from core service
+    score: int  # Score for this behavior instruction
+    category: "SimulationBehaviorCategory"  # SHOULD_DO or SHOULD_NOT_DO
+    detected: bool  # Whether the behavior was detected
+
+
+def add_behavior_feedback_data(
+    left: List[BehaviorInstructionFeedbackData],
+    right: List[BehaviorInstructionFeedbackData],
+) -> List[BehaviorInstructionFeedbackData]:
+    """
+    Reducer for behavior_feedback_data.
+
+    When data is provided (right has items), accumulate with existing data.
+    When an empty list is provided (right is empty), clear all data.
+    """
+    if not right:
+        return []
+    return left + right
+
+
 def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional[str]:
     """
     Reducer to replace next_instruction.
@@ -187,6 +219,7 @@ class SimulationState(BaseModel):
     - Score tracking
     - Branching and feedback data (unified structure for branching + feedback)
     - Non-branching feedback data (processed asynchronously, doesn't block)
+    - Behavior feedback data (from detect_behaviors node)
     - Resolved branching instruction (for LLM)
     - Feedback to send (for UI)
     """
@@ -210,3 +243,6 @@ class SimulationState(BaseModel):
     feedback_to_send: Annotated[Optional[EventFeedback], replace_feedback_to_send] = (
         None  # Feedback to send to UI
     )
+    behavior_feedback_data: Annotated[
+        List[BehaviorInstructionFeedbackData], add_behavior_feedback_data
+    ] = []  # Behavior detection results (from detect_behaviors node)

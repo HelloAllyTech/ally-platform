@@ -9,9 +9,13 @@ from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.handlers import send_event_to_ui
-from app.core.events.schemas import CustomUIEventMessageType
+from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.graph.prompt import generate_system_message
-from app.core.graph.state import BranchingAndFeedbackData, SimulationState
+from app.core.graph.state import (
+    BehaviorInstructionFeedbackData,
+    BranchingAndFeedbackData,
+    SimulationState,
+)
 from app.core.graph.utils import (
     calculate_elapsed_time,
     convert_messages_to_chat_messages,
@@ -19,7 +23,12 @@ from app.core.graph.utils import (
     is_event_eligible,
 )
 from app.core.logger import logger
-from app.core.scenario.base import Scenario, SimulationStateInstruction
+from app.core.queue import msg_event_queue
+from app.core.scenario.base import (
+    Scenario,
+    SimulationBehaviorInstruction,
+    SimulationStateInstruction,
+)
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
 
@@ -468,7 +477,7 @@ async def resolve_branching_instruction(
                         )
                     )
 
-                    print("using next instruction", next_instruction)
+                    logger.info("Using next instruction: ", next_instruction)
 
     # Determine feedback message for UI from branching events only
     # Priority 1: If branching event was selected, use its feedback
@@ -498,6 +507,190 @@ async def resolve_branching_instruction(
     }
 
 
+async def _detect_single_behavior_instruction(
+    behavior_instruction: SimulationBehaviorInstruction,
+    chat_messages: list,
+) -> Optional[BehaviorInstructionFeedbackData]:
+    """
+    Detect a single behavior instruction by delegating to its detect method.
+
+    Follows the same pattern as detect_single_event in _detect_events:
+    the model owns its detection logic (like BaseEvent.detect_event).
+
+    Args:
+        behavior_instruction: The behavior instruction to detect
+        chat_messages: Conversation messages (ChatMessage format)
+
+    Returns:
+        BehaviorInstructionFeedbackData if detected, None otherwise
+    """
+    try:
+        detected = await behavior_instruction.detect(chat_messages)
+        if detected:
+            return BehaviorInstructionFeedbackData(
+                behavior_instruction_id=behavior_instruction.behavior_instruction_id,
+                score=behavior_instruction.score,
+                category=behavior_instruction.category,
+                detected=True,
+            )
+    except Exception as e:
+        logger.exception(
+            f"Behavior instruction detection failed for "
+            f"{behavior_instruction.behavior_instruction_id}: {e}"
+        )
+
+    return None
+
+
+async def _detect_behavior_instructions(
+    behavior_instructions: list[SimulationBehaviorInstruction],
+    chat_messages: list,
+) -> list[BehaviorInstructionFeedbackData]:
+    """
+    Detect all behavior instructions in parallel.
+
+    Similar to _detect_events, all behavior instructions are evaluated
+    concurrently for optimal performance.
+
+    Args:
+        behavior_instructions: List of behavior instructions from scenario
+        chat_messages: Conversation messages (ChatMessage format)
+
+    Returns:
+        List of BehaviorInstructionFeedbackData for detected behaviors
+    """
+
+    async def detect_with_timeout(
+        bi: SimulationBehaviorInstruction,
+    ) -> Optional[BehaviorInstructionFeedbackData]:
+        try:
+            return await asyncio.wait_for(
+                _detect_single_behavior_instruction(bi, chat_messages),
+                timeout=10.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"Behavior instruction {bi.behavior_instruction_id or ''} "
+                f"detection timed out after 10s, skipping"
+            )
+            return None
+
+    detection_tasks = [
+        asyncio.create_task(detect_with_timeout(bi)) for bi in behavior_instructions
+    ]
+
+    results = []
+    if detection_tasks:
+        logger.debug(
+            f"Detecting {len(detection_tasks)} behavior instructions in parallel"
+        )
+        for t in asyncio.as_completed(detection_tasks):
+            result = await t
+            if result is not None:
+                results.append(result)
+
+    logger.info(
+        f"Behavior detection complete: {len(results)}/{len(behavior_instructions)} "
+        f"detected"
+    )
+    return results
+
+
+async def detect_behaviors(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Detect behaviors from behavior instructions based on conversation.
+
+    This node runs in parallel with generate_response. It evaluates the
+    conversation against the scenario's behavior instructions and produces
+    BehaviorInstructionFeedbackData entries for each detected behavior.
+
+    The results are stored in state and later:
+    - Sent to UI with score updates (empty emoji and feedback message)
+    - Sent to BE as behavior_instruction type (distinct from event type)
+    """
+    logger.info("Detecting behaviors")
+
+    # Get scenario from config
+    scenario = None
+    if config and "configurable" in config:
+        scenario = config["configurable"].get("scenario")
+
+    if not scenario or not getattr(scenario, "behavior_instructions", None):
+        logger.debug("No behavior instructions configured, skipping detection")
+        return {"behavior_feedback_data": []}
+
+    # Prepare conversation messages
+    chat_messages = convert_messages_to_chat_messages(state.messages)
+
+    if not chat_messages:
+        logger.debug("No conversation messages, skipping behavior detection")
+        return {"behavior_feedback_data": []}
+
+    # Detect all behavior instructions in parallel
+    behavior_feedback = await _detect_behavior_instructions(
+        scenario.behavior_instructions, chat_messages
+    )
+
+    return {"behavior_feedback_data": behavior_feedback}
+
+
+async def send_behavior_feedback(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Send detected behavior feedback to UI and BE.
+
+    This node runs after detect_behaviors within the same subgraph.
+    It sends each detected behavior's score to the UI (with empty emoji/message)
+    and to the BE as a behavior_instruction type (distinct from event type).
+    """
+    if not state.behavior_feedback_data:
+        return {"behavior_feedback_data": []}
+
+    room = None
+    if config and "configurable" in config:
+        room = config["configurable"].get("room")
+
+    if room is None:
+        logger.warning("No room available, skipping behavior feedback sending")
+        return {"behavior_feedback_data": state.behavior_feedback_data}
+
+    logger.info(
+        f"Processing {len(state.behavior_feedback_data)} " f"behavior feedback entries"
+    )
+    for bf_data in state.behavior_feedback_data:
+        # Send to UI with score, empty emoji and feedback message
+        behavior_ui_message = CustomUIEventMessageType.create(
+            score=bf_data.score,
+            emoji=None,
+            message="",
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            show_feedback=True,
+        )
+        await send_event_to_ui(behavior_ui_message, room)
+
+        # Send to BE as behavior_instruction type
+        # (distinct from event type)
+        behavior_data = {
+            "behaviorInstructionId": bf_data.behavior_instruction_id,
+            "score": bf_data.score,
+            "category": bf_data.category.value,
+            "detected": bf_data.detected,
+        }
+        core_behavior_message = CoreEventMessageType.create_behavior_instruction(
+            room_id=room.name,
+            behavior_instruction_data=behavior_data,
+        )
+        await msg_event_queue.send_message(
+            message_body=core_behavior_message.model_dump_json()
+        )
+
+    logger.info("Behavior feedback sent to UI and BE successfully")
+    return {"behavior_feedback_data": state.behavior_feedback_data}
+
+
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> SimulationState:
@@ -511,8 +704,11 @@ async def generate_response(
        - Priority 1: Branching event feedback (from resolve_branching_instruction)
        - Priority 2: Highest score non-branching event feedback
     4. Sends feedback to UI after STT/TTS flow completes
-    5. Clears branching_and_feedback_data and
-       non_branching_feedback_data after processing
+    5. Clears branching_and_feedback_data,
+       non_branching_feedback_data, and behavior_feedback_data after processing
+
+    Note: Behavior feedback sending is handled by send_behavior_feedback
+    in the detect_behaviors subgraph.
     """
     logger.info("Generating response")
 
@@ -757,6 +953,7 @@ async def generate_response(
         non_branching_feedback_data=[],  # Clear after use
         next_instruction=None,  # Reset after use
         feedback_to_send=None,  # Reset after use
+        behavior_feedback_data=[],  # Clear after use
     )
 
 

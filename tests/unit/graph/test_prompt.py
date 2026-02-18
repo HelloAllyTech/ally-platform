@@ -1,10 +1,10 @@
 from app.core.graph.prompt import generate_system_message
 from app.core.scenario.base import (
     PromptData,
-    SimulationBehaviorCategory,
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
+from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 
 
 def make_prompt_data(**overrides):
