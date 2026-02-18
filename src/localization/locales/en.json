@@ -476,6 +476,8 @@
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
+    "askAIRetry": "Retry",
+    "askAIInterrupted": "Response was interrupted. Tap Retry to try again.",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Overall Score",
