@@ -1,5 +1,12 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {FlatList, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 import {RankBadgeIcon, UpArrowIcon} from '@/assets';
@@ -10,9 +17,14 @@ import {styles} from './styles';
 import {AskAIChatMessage, ChatMessageRole} from './types';
 import {useAskAIChat} from './useAskAIChat';
 
-// ── Sub-components ─────────────────────────────────────────────
+// ── Props ───────────────────────────────────────────────────────
 
-/** Renders a right-aligned user question bubble */
+interface AskAIProps {
+  scenarioSessionId?: string;
+}
+
+// ── Sub-components ──────────────────────────────────────────────
+
 const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = ({
   message,
 }) => (
@@ -21,7 +33,6 @@ const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = ({
   </View>
 );
 
-/** Renders a left-aligned AI response with the rank badge icon */
 const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = ({message}) => (
   <View style={styles.responseContainer}>
     <View style={styles.rankBadgeContainer}>
@@ -42,7 +53,6 @@ const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = ({message}) => (
   </View>
 );
 
-/** Renders the "thinking" dots shown before a stream starts */
 const ThinkingIndicator: React.FC = () => (
   <View style={styles.responseContainer}>
     <View style={styles.rankBadgeContainer}>
@@ -62,18 +72,25 @@ const ThinkingIndicator: React.FC = () => (
   </View>
 );
 
-// ── Main Component ─────────────────────────────────────────────
+// ── Main Component ──────────────────────────────────────────────
 
-export const AskAI: React.FC = () => {
+export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   const {t} = useTranslate();
   const [inputText, setInputText] = useState('');
 
-  const {messages, isStreaming, isMaxMessagesReached, sendMessage, cleanup} =
-    useAskAIChat();
+  const {
+    messages,
+    isStreaming,
+    isLoading,
+    error,
+    isInterrupted,
+    sendMessage,
+    retry,
+    cleanup,
+  } = useAskAIChat({scenarioSessionId: 'b14fae23-e0a9-44a7-a911-edf14498fc53'}); // TODO: Remove this after the API is ready
 
   const flatListRef = useRef<FlatList<AskAIChatMessage>>(null);
 
-  // Track whether the AI is "thinking" (user sent msg, AI hasn't started streaming yet)
   const [isThinking, setIsThinking] = useState(false);
   const prevMessageCountRef = useRef(messages.length);
 
@@ -81,22 +98,20 @@ export const AskAI: React.FC = () => {
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === ChatMessageRole.AI) {
+      if (lastMsg.role === ChatMessageRole.ASSISTANT) {
         setIsThinking(false);
       }
     }
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
-  // Cleanup timers on unmount
   useEffect(() => {
     return cleanup;
   }, [cleanup]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
     if (messages.length > 0) {
-      // Small delay to let the FlatList render the new item
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({animated: true});
       }, 100);
@@ -105,16 +120,20 @@ export const AskAI: React.FC = () => {
 
   const handleSend = useCallback(() => {
     const trimmed = inputText.trim();
-    if (!trimmed || isStreaming || isMaxMessagesReached) {
+    if (!trimmed || isStreaming) {
       return;
     }
     sendMessage(trimmed);
     setInputText('');
     setIsThinking(true);
-  }, [inputText, isStreaming, isMaxMessagesReached, sendMessage]);
+  }, [inputText, isStreaming, sendMessage]);
 
-  const canSend =
-    inputText.trim().length > 0 && !isStreaming && !isMaxMessagesReached;
+  const handleRetry = useCallback(() => {
+    setIsThinking(true);
+    retry();
+  }, [retry]);
+
+  const canSend = inputText.trim().length > 0 && !isStreaming;
 
   const renderMessage = useCallback(({item}: {item: AskAIChatMessage}) => {
     if (item.role === ChatMessageRole.USER) {
@@ -136,6 +155,9 @@ export const AskAI: React.FC = () => {
     [t],
   );
 
+  const showThinking = isThinking && !isStreaming && !error;
+  const showRetry = !!(error || isInterrupted) && !isStreaming;
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -156,65 +178,83 @@ export const AskAI: React.FC = () => {
 
         <View style={styles.contentContainer}>
           <View style={styles.content}>
-            {/* Message List */}
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={keyExtractor}
-              style={styles.messageList}
-              contentContainerStyle={[
-                styles.messageListContent,
-                messages.length === 0 && styles.emptyListContent,
-              ]}
-              ListEmptyComponent={renderEmptyState}
-              ListFooterComponent={
-                isThinking && !isStreaming ? <ThinkingIndicator /> : null
-              }
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() =>
-                flatListRef.current?.scrollToEnd({animated: true})
-              }
-            />
-
-            {/* Max messages indicator */}
-            {isMaxMessagesReached && (
-              <Text style={styles.maxMessagesText}>
-                {t('SimulationFeedback.askAIMaxMessages')}
-              </Text>
-            )}
-
-            {/* Input */}
-            <View style={styles.inputWrapper}>
-              <View
-                style={[
-                  styles.inputContainer,
-                  isMaxMessagesReached && styles.inputContainerDisabled,
-                ]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('SimulationFeedback.askAIPlaceholder')}
-                  placeholderTextColor={colors.ds.typography.lowEmphasis}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  multiline={false}
-                  editable={!isStreaming && !isMaxMessagesReached}
-                  onSubmitEditing={handleSend}
-                  returnKeyType="send"
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.sendButton,
-                    canSend && styles.sendButtonActive,
-                  ]}
-                  onPress={handleSend}
-                  activeOpacity={0.7}
-                  disabled={!canSend}>
-                  <UpArrowIcon width={14} height={14} color={colors.white} />
-                </TouchableOpacity>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.ds.blue[500]} />
               </View>
-            </View>
+            ) : (
+              <>
+                {/* Message List */}
+                <FlatList
+                  ref={flatListRef}
+                  data={messages}
+                  renderItem={renderMessage}
+                  keyExtractor={keyExtractor}
+                  style={styles.messageList}
+                  contentContainerStyle={[
+                    styles.messageListContent,
+                    messages.length === 0 && styles.emptyListContent,
+                  ]}
+                  ListEmptyComponent={renderEmptyState}
+                  ListFooterComponent={
+                    showThinking ? <ThinkingIndicator /> : null
+                  }
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  onContentSizeChange={() =>
+                    flatListRef.current?.scrollToEnd({animated: true})
+                  }
+                />
+
+                {/* Error banner with retry */}
+                {showRetry && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>
+                      {error || t('SimulationFeedback.askAIInterrupted')}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={handleRetry}
+                      activeOpacity={0.7}>
+                      <Text style={styles.retryButtonText}>
+                        {t('SimulationFeedback.askAIRetry')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Input */}
+                <View style={styles.inputWrapper}>
+                  <View style={[styles.inputContainer]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('SimulationFeedback.askAIPlaceholder')}
+                      placeholderTextColor={colors.ds.typography.lowEmphasis}
+                      value={inputText}
+                      onChangeText={setInputText}
+                      multiline={false}
+                      editable={!isStreaming}
+                      onSubmitEditing={handleSend}
+                      returnKeyType="send"
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.sendButton,
+                        canSend && styles.sendButtonActive,
+                      ]}
+                      onPress={handleSend}
+                      activeOpacity={0.7}
+                      disabled={!canSend}>
+                      <UpArrowIcon
+                        width={14}
+                        height={14}
+                        color={colors.white}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </LinearGradient>
