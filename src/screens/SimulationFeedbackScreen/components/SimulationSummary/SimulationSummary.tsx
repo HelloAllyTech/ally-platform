@@ -36,10 +36,8 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} Min`;
   };
 
-  const formatSimulationId = (id?: string) => {
-    if (!id) return '';
-    return `ID: SS-${id}`;
-  };
+  // Match ally-web: use metadata.sessionName for session id display (FeedbackSection shows "ID: {formattedData.sessionName}")
+  const sessionName = data?.metadata?.sessionName ?? data?.id ?? '';
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -120,7 +118,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
         )}
         <View style={styles.headerContent}>
           <View style={styles.idRow}>
-            <Text style={styles.idText}>{formatSimulationId(data?.id)}</Text>
+            {!!sessionName && (
+              <Text style={styles.idText}>ID: {sessionName}</Text>
+            )}
           </View>
           {data?.scenario?.title && (
             <View style={styles.titleRow}>

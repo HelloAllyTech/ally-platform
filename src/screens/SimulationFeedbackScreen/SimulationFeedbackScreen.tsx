@@ -36,7 +36,8 @@ enum TabKey {
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId, caseId} = route.params;
+  const {fromLogs, scenarioSessionId, pathId, caseId, languageId} =
+    route.params;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -249,6 +250,7 @@ export const SimulationFeedbackScreen: React.FC<
             scenarioSessionId={scenarioSessionId}
             pathId={pathId}
             caseId={caseId}
+            languageId={languageId}
             onFinish={handleFeedbackAndNavigate}
             onBack={handleFeedbackAndNavigate}
           />
