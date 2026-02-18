@@ -12,3 +12,4 @@ export * from './feedback';
 export * from './permissions';
 export * from './terms';
 export * from './reviews';
+export * from './simulationSummary';

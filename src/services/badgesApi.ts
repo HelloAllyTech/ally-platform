@@ -12,15 +12,30 @@ export const badgesApi = api.injectEndpoints({
       }),
       providesTags: ['Badges'],
     }),
-    getBadges: builder.query<GetBadgesResponse, ViewedStatus>({
-      query: (viewedStatus: ViewedStatus) => ({
-        url: API_ROUTES.BADGES.GET_BADGES(viewedStatus),
+    getBadges: builder.query<GetBadgesResponse, {viewedStatus: ViewedStatus}>({
+      query: ({viewedStatus}) => ({
+        url: API_ROUTES.BADGES.GET_BADGES,
         method: API_METHODS.GET,
+        params: {
+          viewedStatus,
+        },
       }),
-      providesTags: (result, error, viewedStatus) => [
+      providesTags: (result, error, {viewedStatus}) => [
         {type: 'Badges', id: `LIST-${viewedStatus}`},
       ],
     }),
+    getBadgeCount: builder.query<{count: number}, {viewedStatus: ViewedStatus}>(
+      {
+        query: ({viewedStatus}) => ({
+          url: API_ROUTES.BADGES.GET_BADGE_COUNT,
+          method: API_METHODS.GET,
+          params: {
+            viewedStatus,
+          },
+        }),
+        providesTags: ['Badges'],
+      },
+    ),
     markBadgeAsViewed: builder.mutation<void, string>({
       query: badgeId => ({
         url: API_ROUTES.BADGES.MARK_BADGE_AS_VIEWED(badgeId),
@@ -38,5 +53,6 @@ export const badgesApi = api.injectEndpoints({
 export const {
   useGetAvailableBadgesQuery,
   useGetBadgesQuery,
+  useGetBadgeCountQuery,
   useMarkBadgeAsViewedMutation,
 } = badgesApi;
