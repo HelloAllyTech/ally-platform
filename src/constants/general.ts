@@ -205,6 +205,10 @@ export const API_ROUTES = {
     GET_SKILLS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/skills`,
   },
+  APP_VERSION: {
+    ANDROID: '/app-version/android',
+    IOS: '/app-version/ios',
+  },
 } as const;
 
 export const API_METHODS = {

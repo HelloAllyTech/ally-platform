@@ -1,5 +1,6 @@
 export * from './analyticsApi';
 export * from './api';
+export * from './appConfigApi';
 export * from './authApi';
 export * from './badgesApi';
 export * from './callsApi';

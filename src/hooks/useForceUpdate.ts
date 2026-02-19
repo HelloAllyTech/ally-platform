@@ -1,53 +1,33 @@
-import {useEffect, useState} from 'react';
-import VersionCheck from 'react-native-version-check';
+import {useMemo} from 'react';
 
+import {useGetForceUpdateConfigQuery} from '@/services/appConfigApi';
 import {UseForceUpdateReturn, VersionInfo} from '@/types';
+import {getAppVersion, isVersionLower} from '@/utils/version';
 
 export const useForceUpdate = (): UseForceUpdateReturn => {
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {data, isLoading, error, refetch} = useGetForceUpdateConfigQuery();
 
-  const checkForUpdate = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const currentVersion = VersionCheck.getCurrentVersion();
-      const latestVersion = await VersionCheck.getLatestVersion({
-        country: 'IN',
-      });
-      const isUpdateAvailable = await VersionCheck.needUpdate({
-        currentVersion,
-        latestVersion,
-      });
-      const isUpdateRequired = isUpdateAvailable?.isNeeded || false;
-
-      const versionData: VersionInfo = {
-        currentVersion,
-        latestVersion: latestVersion || currentVersion,
-        isUpdateRequired,
-        isUpdateAvailable: isUpdateAvailable?.isNeeded || false,
-      };
-
-      setVersionInfo(versionData);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to check for updates';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+  const versionInfo: VersionInfo | null = useMemo(() => {
+    if (!data?.minimumSupportedVersion) {
+      return null;
     }
-  };
 
-  useEffect(() => {
-    checkForUpdate();
-  }, []);
+    const currentVersion = getAppVersion();
+
+    return {
+      currentVersion,
+      minimumVersion: data.minimumSupportedVersion,
+      isUpdateRequired: isVersionLower(
+        currentVersion,
+        data.minimumSupportedVersion,
+      ),
+    };
+  }, [data]);
 
   return {
     versionInfo,
     isLoading,
-    error,
-    checkForUpdate,
+    error: error ? 'Failed to check for updates' : null,
+    checkForUpdate: refetch,
   };
 };
