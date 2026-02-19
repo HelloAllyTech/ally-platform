@@ -2,16 +2,19 @@ export interface ForceUpdateModalProps {
   visible?: boolean;
 }
 
+export interface ForceUpdateResponse {
+  minimumSupportedVersion: string;
+}
+
 export interface VersionInfo {
-  currentVersion?: string;
-  latestVersion?: string;
+  currentVersion: string;
+  minimumVersion: string;
   isUpdateRequired: boolean;
-  isUpdateAvailable: boolean;
 }
 
 export interface UseForceUpdateReturn {
   versionInfo: VersionInfo | null;
   isLoading: boolean;
   error: string | null;
-  checkForUpdate: () => Promise<void>;
+  checkForUpdate: () => void;
 }
