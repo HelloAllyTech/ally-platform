@@ -86,8 +86,7 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
     isInterrupted,
     sendMessage,
     retry,
-    cleanup,
-  } = useAskAIChat({scenarioSessionId: 'b14fae23-e0a9-44a7-a911-edf14498fc53'}); // TODO: Remove this after the API is ready
+  } = useAskAIChat({scenarioSessionId});
 
   const flatListRef = useRef<FlatList<AskAIChatMessage>>(null);
 
@@ -104,10 +103,6 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
     }
     prevMessageCountRef.current = messages.length;
   }, [messages]);
-
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
