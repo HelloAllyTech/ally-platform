@@ -1,4 +1,5 @@
 export interface SkillCoverage {
+  iconUrl: string;
   category: string;
   percentage: number;
 }
