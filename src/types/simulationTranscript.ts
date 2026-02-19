@@ -7,7 +7,7 @@ export interface SimulationTranscriptMessage {
   id: number;
   time: string;
   message: string;
-  learner: boolean;
+  isLearner: boolean;
   startSeconds: number;
   tags?: SimulationMessageTag[];
 }
