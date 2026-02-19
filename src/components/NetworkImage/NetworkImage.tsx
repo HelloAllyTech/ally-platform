@@ -11,7 +11,7 @@ import {SvgUri, SvgXml} from 'react-native-svg';
 
 import {colors} from '@/theme';
 
-interface BadgeImageProps {
+interface NetworkImageProps {
   imageUrl: string;
   width?: number;
   height?: number;
@@ -20,7 +20,7 @@ interface BadgeImageProps {
 }
 
 /**
- * BadgeImage Component
+ * NetworkImage Component
  *
  * A component that handles rendering both regular image formats (PNG, JPG, etc.)
  * and SVG images from remote URLs. Automatically detects the image type based on
@@ -30,13 +30,13 @@ interface BadgeImageProps {
  * 1. First tries SvgUri (direct URL loading - works best with GCP signed URLs or public buckets)
  * 2. Falls back to fetch + SvgXml if SvgUri fails
  *
- * @param imageUrl - The URL of the badge image (can be PNG, JPG, SVG, etc.)
+ * @param imageUrl - The URL of the image (can be PNG, JPG, SVG, etc.)
  * @param width - Width of the image (optional, uses style if not provided)
  * @param height - Height of the image (optional, uses style if not provided)
  * @param style - Additional styles for the image container
  * @param resizeMode - How to resize the image (only applies to regular images, not SVG)
  */
-export const BadgeImage: React.FC<BadgeImageProps> = ({
+export const NetworkImage: React.FC<NetworkImageProps> = ({
   imageUrl,
   width,
   height,
