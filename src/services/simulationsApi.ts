@@ -5,6 +5,7 @@ import {
   CaseDetails,
   CasesResponse,
   EndScenarioSessionResponse,
+  EventChecklistResponse,
   FeedbackRequest,
   FeedbackResponse,
   RoomListResponse,
@@ -259,6 +260,16 @@ export const simulationsApi = api.injectEndpoints({
         method: API_METHODS.GET,
       }),
     }),
+
+    getEventChecklist: builder.query<
+      EventChecklistResponse,
+      {scenarioSessionId: string}
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: API_ROUTES.LEARN.EVENT_CHECKLIST(scenarioSessionId),
+        method: API_METHODS.GET,
+      }),
+    }),
   }),
 });
 
@@ -285,4 +296,6 @@ export const {
   useGetUpcomingCaseScenarioQuery,
   useLazyGetUpcomingCaseScenarioQuery,
   useLazyGetScenarioSessionByCaseItemQuery,
+  useGetEventChecklistQuery,
+  useLazyGetEventChecklistQuery,
 } = simulationsApi;
