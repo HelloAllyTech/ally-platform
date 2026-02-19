@@ -4,7 +4,7 @@ export interface SkillCoverage {
 }
 
 export interface EmotionalMovement {
-  sessionTime: number;
+  startTime: number;
   level: number;
 }
 
