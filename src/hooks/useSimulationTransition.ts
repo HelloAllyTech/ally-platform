@@ -1,9 +1,11 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {SimulationEventStatus} from '@/constants';
 import {
+  useGetAvailableLanguagesQuery,
   useGetUpcomingCaseScenarioQuery,
   useGetUpcomingScenarioQuery,
+  useGetUserPreferencesQuery,
 } from '@/services';
 import {CurrentSessionInfo, SessionItemStatus, UpNextSimulation} from '@/types';
 
@@ -72,6 +74,27 @@ export const useSimulationTransition = ({
   // Use the startSimulation hook for retry and next actions
   const {startSimulation, isCreatingRoom: isStartingSimulation} =
     useStartSimulation();
+
+  // Resolve languageId: use explicit param, fall back to user preference, then first available
+  const {data: preferencesData} = useGetUserPreferencesQuery();
+  const {data: languagesData} = useGetAvailableLanguagesQuery({
+    active: true,
+    hasVoices: true,
+  });
+
+  const resolvedLanguageId = useMemo(() => {
+    if (languageId) {
+      return languageId;
+    }
+    const preferredId = preferencesData?.data?.default_language_id;
+    if (
+      preferredId &&
+      languagesData?.some(lang => lang.language_id === preferredId)
+    ) {
+      return preferredId;
+    }
+    return languagesData?.[0]?.language_id;
+  }, [languageId, preferencesData, languagesData]);
 
   // Automatically determine flow type based on which ID is provided
   const isCase = !!caseId;
@@ -176,9 +199,9 @@ export const useSimulationTransition = ({
       }),
       pathId,
       caseId,
-      ...(languageId && {languageId}),
+      ...(resolvedLanguageId && {languageId: resolvedLanguageId}),
     });
-  }, [currentSession, pathId, caseId, languageId, startSimulation]);
+  }, [currentSession, pathId, caseId, resolvedLanguageId, startSimulation]);
 
   /**
    * Start the next simulation in the flow
@@ -207,9 +230,9 @@ export const useSimulationTransition = ({
       }),
       pathId,
       caseId,
-      ...(languageId && {languageId}),
+      ...(resolvedLanguageId && {languageId: resolvedLanguageId}),
     });
-  }, [upcomingScenario, pathId, caseId, languageId, startSimulation]);
+  }, [upcomingScenario, pathId, caseId, resolvedLanguageId, startSimulation]);
 
   return {
     currentSession,

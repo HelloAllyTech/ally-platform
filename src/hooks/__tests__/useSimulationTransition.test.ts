@@ -58,6 +58,14 @@ jest.mock('@/services', () => ({
   __esModule: true,
   useGetUpcomingScenarioQuery: jest.fn(),
   useGetUpcomingCaseScenarioQuery: jest.fn(),
+  useGetAvailableLanguagesQuery: jest.fn(() => ({
+    data: [{language_id: 1, label: 'English', active: true}],
+    isLoading: false,
+  })),
+  useGetUserPreferencesQuery: jest.fn(() => ({
+    data: {data: {default_language_id: 1}},
+    isLoading: false,
+  })),
   // Add other exports that might be imported
   useAddSimulationFeedbackMutation: jest.fn(() => [jest.fn()]),
   useCreateReviewMutation: jest.fn(() => [jest.fn()]),
