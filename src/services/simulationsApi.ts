@@ -282,6 +282,7 @@ export const {
   useLazyGetSimulationLogsQuery,
   useStartScenarioSessionMutation,
   useEndScenarioSessionMutation,
+  useGetSimulationDetailsQuery,
   useLazyGetSimulationDetailsQuery,
   useLazyGetSimulationCreditsQuery,
   useGetSimulationPathsQuery,

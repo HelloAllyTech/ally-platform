@@ -279,7 +279,7 @@ export const SimulationFeedbackScreen: React.FC<
       //   return <SessionSkills scenarioSessionId={scenarioSessionId} />;
 
       // case TabKey.REFLECTION:
-      //   return <Reflection />;
+      //   return <Reflection scenarioSessionId={scenarioSessionId} />;
 
       case TabKey.UP_NEXT:
         return (
@@ -303,7 +303,7 @@ export const SimulationFeedbackScreen: React.FC<
     const tabsList = [
       {
         key: TabKey.SUMMARY,
-        title: t('SimulationFeedback.tabs.summary'),
+        title: t('SimulationFeedback.tabs.sessionReview'),
       },
       // {
       //   key: TabKey.ASK_AI,
@@ -311,15 +311,15 @@ export const SimulationFeedbackScreen: React.FC<
       // },
       {
         key: TabKey.TRANSCRIPTION,
-        title: t('SimulationFeedback.tabs.transcription'),
+        title: t('SimulationFeedback.tabs.annotatedTranscript'),
       },
       // {
       //   key: TabKey.SKILLS,
-      //   title: t('SimulationFeedback.tabs.skills'),
+      //   title: t('SimulationFeedback.tabs.skillsDemonstrated'),
       // },
       // {
       //   key: TabKey.REFLECTION,
-      //   title: t('SimulationFeedback.tabs.reflection'),
+      //   title: t('SimulationFeedback.tabs.deeperReflection'),
       // },
     ];
 
