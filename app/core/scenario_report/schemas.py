@@ -35,8 +35,7 @@ class ScenarioReportRequest(BaseModel):
     metadata: Dict[str, Any] = Field(
         ...,
         description=(
-            "Full scenario metadata envelope "
-            "(same format as LiveKit room metadata)"
+            "Full scenario metadata envelope " "(same format as LiveKit room metadata)"
         ),
     )
 
@@ -56,14 +55,10 @@ class TranscriptEntry(BaseModel):
     start_time: float = Field(
         ...,
         description="Wall-clock start time in seconds from session start",
-        alias="start-time",
     )
     role: Literal["CLIENT", "COUNSELOR"] = Field(
         ..., description="Who sent this message"
     )
-
-    class Config:
-        populate_by_name = True
 
 
 class ScenarioReportWebhookPayload(BaseModel):
@@ -76,9 +71,7 @@ class ScenarioReportWebhookPayload(BaseModel):
             "colloquialism, context_appropriateness, consistency, resistance"
         ),
     )
-    status: ReportStatus = Field(
-        ..., description="Report completion status"
-    )
+    status: ReportStatus = Field(..., description="Report completion status")
     transcripts: List[TranscriptEntry] = Field(
         ..., description="Full conversation transcript"
     )
