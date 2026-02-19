@@ -392,7 +392,7 @@ class SpeechProsodyService:
                     max_val = float(range_vals[1])
 
             # Apply clamping
-            # Use MAX_TURN_DELTA_PERCENT (10%) as limit
+            # Use MAX_TURN_DELTA_PERCENT (3%) as limit
             try:
                 smoothed_val = clamp_value(
                     float(new_value),
