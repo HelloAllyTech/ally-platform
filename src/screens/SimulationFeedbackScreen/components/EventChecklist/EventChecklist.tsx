@@ -1,23 +1,31 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {CancelIcon, CheckCircleIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
+import {useGetEventChecklistQuery} from '@/services';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 
-interface ChecklistTabProps {
-  items: ChecklistItem[];
+interface EventChecklistProps {
+  scenarioSessionId: string;
 }
 
-interface ChecklistItem {
-  id: string;
-  name: string;
-  completed: boolean;
-}
-
-export const ChecklistTab: React.FC<ChecklistTabProps> = ({items}) => {
+export const EventChecklist: React.FC<EventChecklistProps> = ({
+  scenarioSessionId,
+}) => {
   const {t} = useTranslate();
+  const {data, isLoading} = useGetEventChecklistQuery({scenarioSessionId});
+
+  const items = data?.eventChecklist ?? [];
+
+  if (isLoading) {
+    return <ActivityIndicator size="small" color={colors.ds.theme.primary} />;
+  }
+
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
     <>
@@ -32,9 +40,9 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({items}) => {
             key={item.id}
             style={[
               styles.checklistItem,
-              item.completed ? styles.itemCompleted : styles.itemIncomplete,
+              item.hasOccurred ? styles.itemCompleted : styles.itemIncomplete,
             ]}>
-            {item.completed ? (
+            {item.hasOccurred ? (
               <CheckCircleIcon width={ms(19)} height={ms(19)} />
             ) : (
               <CancelIcon width={ms(19)} height={ms(19)} />
