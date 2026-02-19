@@ -478,7 +478,11 @@
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
     "askAIRetry": "Retry",
     "askAIInterrupted": "Response was interrupted. Tap Retry to try again.",
-    "askAIInitialStateTitle": "Suggestions",
+    "askAIInitialStateTitle": {
+      "title": "What would you like ",
+      "subtitle": "feedback on?"
+    },
+    "askAIInitialStateDescription": "Select a prompt or ask your own.",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Overall Score",

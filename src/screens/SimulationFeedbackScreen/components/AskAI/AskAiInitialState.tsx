@@ -1,9 +1,10 @@
 import {FlatList, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {ArrowUpRight} from '@/assets';
 import {ASK_AI_EMPTY_STATE_QUESTIONS} from '@/constants';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, radius, typography} from '@/theme';
 
 interface AskAiInitialStateProps {
   onQuestionSelection: (question: string) => void;
@@ -17,8 +18,12 @@ export const AskAiInitialState = ({
     return (
       <TouchableOpacity
         style={styles.initialStateItem}
-        onPress={() => onQuestionSelection(item)}>
+        onPress={() => onQuestionSelection(item)}
+        activeOpacity={0.7}>
         <Text style={styles.initialStateItemText}>{item}</Text>
+        <View style={styles.initialStateItemArrowButton}>
+          <ArrowUpRight width={16} height={16} />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -29,8 +34,22 @@ export const AskAiInitialState = ({
 
   return (
     <View style={styles.initialStateContainer}>
-      <Text style={styles.initialStateItemText}>
-        {t('SimulationFeedback.askAIInitialStateTitle')}
+      <Text
+        style={[
+          styles.initialStateItemHeaderText,
+          styles.initialStateItemTitle,
+        ]}>
+        {t('SimulationFeedback.askAIInitialStateTitle.title')}
+        <Text
+          style={[
+            styles.initialStateItemHeaderText,
+            styles.initialStateItemSubtitle,
+          ]}>
+          {t('SimulationFeedback.askAIInitialStateTitle.subtitle')}
+        </Text>
+      </Text>
+      <Text style={styles.initialStateItemDescription}>
+        {t('SimulationFeedback.askAIInitialStateDescription')}
       </Text>
       <FlatList
         data={ASK_AI_EMPTY_STATE_QUESTIONS}
@@ -45,29 +64,55 @@ export const AskAiInitialState = ({
 
 const styles = ScaledSheet.create({
   initialStateContainer: {
-    marginTop: 'auto',
     gap: '8@ms',
+    marginVertical: 'auto',
   },
   initialStateItem: {
-    padding: '12@ms',
+    paddingHorizontal: '16@ms',
+    paddingVertical: '24@ms',
     gap: '8@ms',
     borderRadius: '8@ms',
     borderWidth: '0.5@ms',
-    maxWidth: '200@ms',
+    maxWidth: '160@ms',
     borderColor: colors.ds.stroke.primary,
     backgroundColor: colors.ds.neutral.white,
     shadowColor: '#A09E9E',
-    shadowOffset: {width: 2, height: 3},
-    shadowOpacity: 0.1,
-    shadowRadius: 7.81,
-    elevation: 4,
+    shadowOffset: {width: 12, height: 16},
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 12,
   },
   initialStateItemText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
+    ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
   },
+  initialStateItemHeaderText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.headline.large,
+    color: colors.ds.typography.highEmphasis,
+  },
+  initialStateItemTitle: {
+    color: colors.ds.typography.lowEmphasis,
+  },
+  initialStateItemSubtitle: {
+    color: colors.ds.typography.mediumEmphasis,
+  },
   initialStateItemSeparator: {
-    width: '4@ms',
+    width: '16@ms',
+  },
+  initialStateItemDescription: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.small,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  initialStateItemArrowButton: {
+    alignSelf: 'flex-end',
+    width: '36@ms',
+    height: '36@ms',
+    borderRadius: radius.full,
+    backgroundColor: colors.ds.theme.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
