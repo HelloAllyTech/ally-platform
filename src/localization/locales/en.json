@@ -452,8 +452,8 @@
     "sessionDuration": "Session Duration",
     "totalScore": "Total Score",
     "keyEvents": "Key events",
-    "whatWentWell": "What went well",
-    "areasForImprovement": "Areas for improvement",
+    "biggestStrengthsSkills": "Biggest Strengths & skills demonstrated",
+    "areasOfGrowth": "Areas of growth",
     "noDataAvailable": "No Data Available",
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
@@ -483,7 +483,7 @@
     "askAIInitialStateDescription": "Select a prompt or ask your own.",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
-    "checklistHeader": "Overall Score",
+    "checklistHeader": "Evaluation Checklist",
     "reflection": {
       "sectionTitle": "Self-Reflection Prompts",
       "placeholder": "Add response",
@@ -492,6 +492,7 @@
     },
     "sessionSkills": {
       "sectionTitle": "Skills shown in this session",
+      "overallScore": "Overall Score",
       "skillCoverage": "Skill Coverage",
       "clientEmotionalMovement": "Client Emotional Movement",
       "chartXAxisLabel": "X: Session Timeline(Min) graph",
