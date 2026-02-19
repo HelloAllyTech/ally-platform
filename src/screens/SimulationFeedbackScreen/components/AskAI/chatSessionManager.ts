@@ -1,6 +1,11 @@
 import {env} from '@/config/env';
-import {API_ROUTES, APIVersion, AsyncStorageKeys} from '@/constants';
-import {getItem} from '@/utils/asyncStorage';
+import {
+  API_METHODS,
+  API_ROUTES,
+  APIVersion,
+  AsyncStorageKeys,
+} from '@/constants';
+import {getItem, setItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
 import {
@@ -47,6 +52,57 @@ const createAssistantMessage = (): AskAIChatMessage => ({
   updatedAt: new Date().toISOString(),
   isStreaming: true,
 });
+
+// ── Token Refresh ───────────────────────────────────────────────
+
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Attempt to refresh the access token using the stored refresh token.
+ * Deduplicates concurrent calls so only one refresh request is in-flight.
+ * Returns the new access token or null on failure.
+ */
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = await getItem<string>(
+        AsyncStorageKeys.REFRESH_TOKEN,
+      );
+      if (!refreshToken) {
+        return null;
+      }
+
+      const url = `${env.API_BASE_URL}/api/${APIVersion.V1}${API_ROUTES.AUTH.REFRESH}`;
+
+      const response = await fetch(url, {
+        method: API_METHODS.POST,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({refreshToken}),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const tokens: {accessToken: string; refreshToken: string} =
+        await response.json();
+      await setItem(AsyncStorageKeys.ACCESS_TOKEN, tokens.accessToken);
+      await setItem(AsyncStorageKeys.REFRESH_TOKEN, tokens.refreshToken);
+      return tokens.accessToken;
+    } catch (err) {
+      logger.error(`Token refresh failed: ${err}`);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+};
 
 // ── SSE Parsing ─────────────────────────────────────────────────
 
@@ -178,7 +234,6 @@ export const subscribe = (
 /** Load chat history from the API (only once per session) */
 export const loadHistory = async (sessionId: string) => {
   const session = getOrCreateSession(sessionId);
-  const token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
   if (session.isHistoryLoaded || session.isLoading) {
     return;
   }
@@ -191,13 +246,29 @@ export const loadHistory = async (sessionId: string) => {
       `${env.API_BASE_URL}/api/${APIVersion.V1}` +
       `${API_ROUTES.LEARN.CHAT_HISTORY(sessionId)}`;
 
-    const response = await fetch(url, {
+    let token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
+
+    let response = await fetch(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
+
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        token = newToken;
+        response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    }
 
     if (response.ok) {
       const data: AskAIChatMessage[] = await response.json();
@@ -260,7 +331,11 @@ export const cleanup = (sessionId: string) => {
 
 // ── XHR Stream (internal) ───────────────────────────────────────
 
-const startStream = async (sessionId: string, userMessageContent: string) => {
+const startStream = async (
+  sessionId: string,
+  userMessageContent: string,
+  isRetryAfterRefresh = false,
+) => {
   const session = getOrCreateSession(sessionId);
 
   const assistantMsg = createAssistantMessage();
@@ -269,7 +344,7 @@ const startStream = async (sessionId: string, userMessageContent: string) => {
   session.error = null;
   notifyListeners(sessionId);
 
-  const token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
+  let token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
   if (!token) {
     session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
     session.error = 'No access token';
@@ -341,9 +416,25 @@ const startStream = async (sessionId: string, userMessageContent: string) => {
     }
   };
 
-  xhr.onload = () => {
+  xhr.onload = async () => {
     session.xhr = null;
     if (streamComplete) {
+      return;
+    }
+
+    if (xhr.status === 401 && !isRetryAfterRefresh) {
+      session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+      session.isStreaming = false;
+      notifyListeners(sessionId);
+
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        startStream(sessionId, userMessageContent, true);
+        return;
+      }
+
+      session.error = 'Session expired. Please log in again.';
+      notifyListeners(sessionId);
       return;
     }
 
