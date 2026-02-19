@@ -6,6 +6,7 @@ import AnalyticsActiveIcon from './analyticsActive.svg';
 import ArchiveIcon from './archive.svg';
 import ArrowDown from './arrowDown.svg';
 import ArrowRight from './arrowRight.svg';
+import ArrowUpRight from './arrowUpRight.svg';
 import AssessmentIcon from './assessment.svg';
 import BadgeIcon from './badgeIcon.svg';
 import BadgeActiveIcon from './badgesActive.svg';
@@ -150,6 +151,7 @@ export {
   AnalyticsInactiveIcon,
   ArrowDown,
   ArrowRight,
+  ArrowUpRight,
   ChevronRight,
   AssessmentIcon,
   BarsIcon,
