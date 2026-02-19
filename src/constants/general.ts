@@ -165,6 +165,8 @@ export const API_ROUTES = {
       `/learn/cases/${scenarioSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
       `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
+    EVENT_CHECKLIST: (scenarioSessionId: string) =>
+      `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',
