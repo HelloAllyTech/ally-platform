@@ -9,6 +9,7 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
+        'Common.community': 'Community',
         'Leaderboard.title': 'Leaderboard',
         'Leaderboard.badges': 'badges',
         'Leaderboard.tableHeaders.rank': 'Rank',
@@ -126,7 +127,7 @@ describe('LeaderboardScreen', () => {
 
   it('renders the leaderboard screen', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Leaderboard')).toBeTruthy();
+    expect(getByText('Community')).toBeTruthy();
   });
 
   it('renders table headers', () => {

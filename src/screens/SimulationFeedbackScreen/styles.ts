@@ -78,9 +78,6 @@ export const styles = ScaledSheet.create({
     height: '30@ms',
     paddingTop: '3@ms',
   },
-  titleExtraPadding: {
-    paddingLeft: '10@vs',
-  },
   backButton: {
     flex: 1,
     paddingVertical: '8@vs',

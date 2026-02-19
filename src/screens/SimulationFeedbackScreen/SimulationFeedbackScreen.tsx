@@ -309,19 +309,13 @@ export const SimulationFeedbackScreen: React.FC<
       ]}>
       <View style={styles.titleSection}>
         <View style={styles.titleRow}>
-          {fromLogs && (
-            <TouchableOpacity
-              onPress={handleFeedbackAndNavigate}
-              style={styles.backArrowButton}>
-              <LeftArrowIcon color={colors.black} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={handleFeedbackAndNavigate}
+            style={styles.backArrowButton}>
+            <LeftArrowIcon color={colors.black} />
+          </TouchableOpacity>
           <View style={globalStyles.column}>
-            {hasScenarioMessagesPermission && (
-              <View style={!fromLogs && styles.titleExtraPadding}>
-                {renderTitle()}
-              </View>
-            )}
+            {hasScenarioMessagesPermission && renderTitle()}
           </View>
           {/* Comment icon for transcript tab */}
           {!!reviewId &&
