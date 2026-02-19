@@ -1,8 +1,20 @@
-import React, {useMemo} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useMemo, useState} from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ChartComponent, ProgressBar} from '@/components';
+import {ArrowDown, BulbIcon, LightBulbIcon, ThumbUpIcon} from '@/assets';
+import {
+  ChartComponent,
+  CircularProgress,
+  NetworkImage,
+  ProgressBar,
+} from '@/components';
 import {
   DEFAULT_SKILL_COLOR,
   DEFAULT_SKILL_COVERAGE,
@@ -11,9 +23,13 @@ import {
 } from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, radius, typography} from '@/theme';
 import {EmotionalMovement, SkillCoverage} from '@/types';
-import {getInterpolatedYValues, getNormalisedXAxisLabelsMap} from '@/utils';
+import {
+  calculateAverageForObjectArray,
+  getInterpolatedYValues,
+  getNormalisedXAxisLabelsMap,
+} from '@/utils';
 import {formatTimeToMMSS} from '@/utils/date';
 
 import {SummaryCard} from '../SummaryCard';
@@ -36,6 +52,11 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
 }) => {
   const {t} = useTranslate();
+  const [expandedSections, setExpandedSections] = useState({
+    keyEvents: false,
+    whatWentWell: false,
+    areasForImprovement: false,
+  });
   const defaultEmotionalMovement: EmotionalMovement[] = [
     {startTime: 0, level: 0},
     {startTime: 100, level: 4.5},
@@ -135,23 +156,99 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     [hasEmotionalData],
   );
 
+  const positives = useMemo(() => [], []); // TODO: Remove default data after API is ready
+  const improvements = useMemo(() => [], []); // TODO: Remove default data after API is ready
+
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
     const skillColor =
       SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
     return (
-      <View key={index} style={styles.skillItem}>
-        <View style={styles.skillLabelRow}>
-          <Text style={styles.skillName}>{skill.category}</Text>
-          <Text style={styles.skillPercentage}>{skill.percentage}%</Text>
+      <View key={index} style={styles.skillItemContent}>
+        {skill.iconUrl ? (
+          <NetworkImage
+            imageUrl={skill.iconUrl}
+            style={styles.skillIconContainer}
+          />
+        ) : (
+          <View style={styles.skillIconContainer}>
+            <BulbIcon width={20} height={20} />{' '}
+            {/* TODO: Replace with placeholder icon */}
+          </View>
+        )}
+        <View style={styles.skillItem}>
+          <View style={styles.skillLabelRow}>
+            <Text style={styles.skillName}>{skill.category}</Text>
+            <Text style={styles.skillPercentage}>{skill.percentage}%</Text>
+          </View>
+          <ProgressBar
+            current={skill.percentage}
+            total={100}
+            inProgressColor={skillColor}
+            completedColor={skillColor}
+            height={ms(8)}
+            isProgressTextVisible={false}
+          />
         </View>
-        <ProgressBar
-          current={skill.percentage}
-          total={100}
-          inProgressColor={skillColor}
-          completedColor={skillColor}
-          height={ms(8)}
-          isProgressTextVisible={false}
-        />
+      </View>
+    );
+  };
+
+  const overallScore = useMemo(() => {
+    return calculateAverageForObjectArray(skillCoverage, 'percentage');
+  }, [skillCoverage]);
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const renderFeedbackItem = (item: string, index: number) => (
+    <View key={index} style={styles.feedbackItemContainer}>
+      <Text style={styles.feedbackText}>{item}</Text>
+    </View>
+  );
+
+  const renderExpandableSection = <T,>(
+    title: string,
+    icon: React.ReactNode,
+    items: T[] = [],
+    sectionKey: keyof typeof expandedSections,
+    renderItem: (item: T, index: number) => React.ReactNode,
+  ) => {
+    const isExpanded = expandedSections[sectionKey];
+    const displayItems = isExpanded ? items : items?.slice(0, 3);
+
+    return (
+      <View style={styles.feedbackSectionContainer}>
+        <View style={styles.feedbackSectionHeader}>
+          <Text style={styles.feedbackSectionTitle}>{title}</Text>
+        </View>
+        <View style={styles.feedbackSectionContent}>
+          {displayItems?.length > 0 ? (
+            displayItems?.map(renderItem)
+          ) : (
+            <Text style={styles.noItemsText}>
+              {t('SimulationFeedback.noDataAvailable')}
+            </Text>
+          )}
+          {items.length > 3 && (
+            <TouchableOpacity
+              style={styles.viewMoreButton}
+              onPress={() => toggleSection(sectionKey)}>
+              <Text style={styles.viewMoreText}>
+                {isExpanded ? t('Common.viewLess') : t('Common.viewMore')}
+              </Text>
+              <ArrowDown
+                width={10}
+                height={10}
+                color={colors.black}
+                style={[isExpanded && styles.arrowIconRotated]}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -162,6 +259,20 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
       <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+        <View style={styles.overallScoreContainer}>
+          <CircularProgress
+            progress={overallScore}
+            max={100}
+            size={ms(200)}
+            strokeWidth={10}
+            progressColor={colors.blue}
+            trackColor={colors.lightGray2}>
+            <Text style={styles.overallScorePercentage}>{overallScore}%</Text>
+            <Text style={styles.overallScoreLabel}>
+              {t('SimulationFeedback.sessionSkills.overallScore')}
+            </Text>
+          </CircularProgress>
+        </View>
         {/* Skill Coverage Card */}
         {skillCoverage.length > 0 && (
           <View style={styles.card}>
@@ -218,6 +329,20 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             </View>
           </View>
         )}
+        {renderExpandableSection(
+          t('SimulationFeedback.biggestStrengthsSkills'),
+          <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
+          positives,
+          'whatWentWell',
+          renderFeedbackItem,
+        )}
+        {renderExpandableSection(
+          t('SimulationFeedback.areasOfGrowth'),
+          <LightBulbIcon width={20} height={20} style={styles.sectionIcon} />,
+          improvements,
+          'areasForImprovement',
+          renderFeedbackItem,
+        )}
       </SummaryCard>
     </ScrollView>
   );
@@ -253,8 +378,27 @@ const styles = ScaledSheet.create({
     padding: '16@ms',
     gap: '16@vs',
   },
+  skillItemContent: {
+    gap: '8@ms',
+    borderWidth: '1@ms',
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: radius.md,
+    padding: '16@ms',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   skillItem: {
     gap: '6@vs',
+    flex: 1,
+  },
+  skillIconContainer: {
+    width: '40@ms',
+    height: '40@ms',
+    borderRadius: radius.md,
+    borderWidth: '1@ms',
+    borderColor: colors.ds.stroke.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   skillLabelRow: {
     flexDirection: 'row',
@@ -296,5 +440,83 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  feedbackSectionContainer: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.deepPurple[300],
+    borderRadius: '4@ms',
+    backgroundColor: colors.white,
+    marginBottom: '16@vs',
+  },
+  feedbackSectionHeader: {
+    backgroundColor: colors.ds.deepPurpleAlpha[50],
+    paddingHorizontal: '16@ms',
+    paddingVertical: '8@vs',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10@ms',
+  },
+  feedbackSectionTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '20@ms',
+    letterSpacing: '0.25@ms',
+    color: colors.ds.typography.highEmphasis,
+  },
+  feedbackSectionContent: {
+    padding: '16@ms',
+    gap: '16@vs',
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.lightGray,
+  },
+  feedbackItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: '8@ms',
+  },
+  feedbackText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '20@ms',
+    letterSpacing: '0.25@ms',
+    color: colors.black,
+    flex: 1,
+  },
+  noItemsText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.lowEmphasis,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+  },
+  viewMoreText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  arrowIconRotated: {
+    transform: [{rotate: '180deg'}],
+  },
+  sectionIcon: {
+    marginRight: '8@ms',
+    color: colors.darkGray2,
+  },
+  overallScoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '24@vs',
+  },
+  overallScorePercentage: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.display.large,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  overallScoreLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
   },
 });
