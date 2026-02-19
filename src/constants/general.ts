@@ -165,6 +165,10 @@ export const API_ROUTES = {
       `/learn/cases/${scenarioSessionId}/upcoming-scenario`,
     SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
       `/learn/scenario-session/case-session-item/${caseSessionItemId}`,
+    CHAT_STREAM: (scenarioSessionId: string) =>
+      `/learn/scenario-sessions/${scenarioSessionId}/chat/stream`,
+    CHAT_HISTORY: (scenarioSessionId: string) =>
+      `/learn/scenario-sessions/${scenarioSessionId}/chat/history`,
     EVENT_CHECKLIST: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
   },
