@@ -10,7 +10,7 @@ import {useLazyGetSimulationDetailsQuery} from '@/services';
 import {SimulationSummary, SimulationSummarySkeleton} from '../';
 
 interface SummaryTabProps {
-  scenarioSessionId?: string;
+  scenarioSessionId: string;
   pathId?: string;
   caseId?: string;
   fromLogs?: boolean;

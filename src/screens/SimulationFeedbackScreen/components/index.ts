@@ -14,4 +14,4 @@ export {UpNext} from './UpNext';
 export {SessionGlimpse} from './SessionGlimpse';
 export {SummaryTab} from './SummaryTab';
 export {TranscriptTab} from './TranscriptTab';
-export {ChecklistTab} from './ChecklistTab';
+export {EventChecklist} from './EventChecklist';
