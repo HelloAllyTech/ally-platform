@@ -27,32 +27,34 @@ interface AskAIProps {
 
 // ── Sub-components ──────────────────────────────────────────────
 
-const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = ({
-  message,
-}) => (
-  <View style={styles.questionBubble}>
-    <Text style={styles.questionText}>{message.content}</Text>
-  </View>
+const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
+  ({message}) => (
+    <View style={styles.questionBubble}>
+      <Text style={styles.questionText}>{message.content}</Text>
+    </View>
+  ),
 );
 
-const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = ({message}) => (
-  <View style={styles.responseContainer}>
-    <View style={styles.rankBadgeContainer}>
-      <LinearGradient
-        colors={[colors.ds.blue[50], colors.white]}
-        start={{x: 0, y: 0}}
-        end={{x: 0, y: 1}}
-        style={styles.rankBadgeGradient}>
-        <RankBadgeIcon width={9} height={9} />
-      </LinearGradient>
+const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
+  ({message}) => (
+    <View style={styles.responseContainer}>
+      <View style={styles.rankBadgeContainer}>
+        <LinearGradient
+          colors={[colors.ds.blue[50], colors.white]}
+          start={{x: 0, y: 0}}
+          end={{x: 0, y: 1}}
+          style={styles.rankBadgeGradient}>
+          <RankBadgeIcon width={9} height={9} />
+        </LinearGradient>
+      </View>
+      <View style={styles.responseTextContainer}>
+        <Text style={styles.responseText}>
+          {message.content}
+          {message.isStreaming ? '▍' : ''}
+        </Text>
+      </View>
     </View>
-    <View style={styles.responseTextContainer}>
-      <Text style={styles.responseText}>
-        {message.content}
-        {message.isStreaming ? '▍' : ''}
-      </Text>
-    </View>
-  </View>
+  ),
 );
 
 const ThinkingIndicator: React.FC = () => (

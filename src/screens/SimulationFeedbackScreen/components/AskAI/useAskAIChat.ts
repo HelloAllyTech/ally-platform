@@ -1,8 +1,9 @@
-import {useCallback, useEffect, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useMemo, useSyncExternalStore} from 'react';
 
 import {
   ChatSessionState,
   cleanup,
+  destroySession,
   getSnapshot,
   loadHistory,
   retry,
@@ -37,6 +38,30 @@ export const useAskAIChat = ({
     }
   }, [sessionId, state.isHistoryLoaded]);
 
+  // Cleanup session Maps on unmount when no XHR is active
+  useEffect(() => {
+    return () => {
+      if (!state.isStreaming) {
+        destroySession(sessionId);
+      }
+    };
+    // Only run on unmount — sessionId is stable for the hook's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * During streaming, `state.messages` is stable (no history re-cloning).
+   * Only `streamingMessage` changes per token, so the spread only happens
+   * when that ref changes. History objects keep their references.
+   */
+  const allMessages = useMemo(
+    () =>
+      state.streamingMessage
+        ? [...state.messages, state.streamingMessage]
+        : state.messages,
+    [state.messages, state.streamingMessage],
+  );
+
   const send = useCallback(
     (text: string) => sendMessage(sessionId, text),
     [sessionId],
@@ -52,7 +77,7 @@ export const useAskAIChat = ({
     !state.isStreaming;
 
   return {
-    messages: state.messages,
+    messages: allMessages,
     isStreaming: state.isStreaming,
     isLoading: state.isLoading,
     error: state.error,
