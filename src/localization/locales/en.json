@@ -476,7 +476,11 @@
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
-    "askAIInitialStateTitle": "Suggestions",
+    "askAIInitialStateTitle": {
+      "title": "What would you like ",
+      "subtitle": "feedback on?"
+    },
+    "askAIInitialStateDescription": "Select a prompt or ask your own.",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Overall Score",
