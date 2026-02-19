@@ -11,7 +11,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
-import {BadgeImage} from '@/components/BadgeImage';
+import {NetworkImage} from '@/components/NetworkImage';
 import {useBadgePopup} from '@/hooks/useBadgePopup';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
@@ -60,7 +60,7 @@ export const BadgePopup = () => {
                   style={styles.imageContainer}
                   onLayout={handleImageContainerLayout}>
                   {isLayoutReady ? (
-                    <BadgeImage
+                    <NetworkImage
                       key={currentBadge.id}
                       imageUrl={currentBadge.imageUrl}
                       style={styles.badgeImage}

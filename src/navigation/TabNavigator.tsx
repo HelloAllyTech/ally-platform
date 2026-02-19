@@ -8,151 +8,36 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
+import {SCREEN_NAMES} from '@/constants';
 import {
-  AnalyticsActiveIcon,
-  AnalyticsInactiveIcon,
-  BadgeActiveIcon,
-  BadgeInactiveIcon,
-  CallLogActiveIcon,
-  CallLogInactiveIcon,
-  CommunityActiveIcon,
-  CommunityInactiveIcon,
-  LeaderboardActiveIcon,
-  LeaderboardInactiveIcon,
-  LearnActiveIcon,
-  LearnInactiveIcon,
-  ReviewActiveIcon,
-  ReviewInactiveIcon,
-  SearchActiveIcon,
-  SearchInactiveIcon,
-} from '@/assets';
-import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
-import {
-  AchievementsScreen,
-  CallLogScreen,
-  CommunityScreen,
-  LeaderboardScreen,
-  ReviewScreen,
-  SearchScreen,
-  SimulationsScreen,
-  UserAnalyticsScreen,
-} from '@/screens';
+  getFirstVisibleTab,
+  isReviewerOnly,
+  TAB_CONFIG,
+  TabConfig,
+} from '@/constants/tabs';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 
 const Tab = createBottomTabNavigator();
 
-const ALL_TABS = [
-  {
-    name: SCREEN_NAMES.LEARN,
-    component: SimulationsScreen,
-    requiredPermissions: [USER_PERMISSIONS.EDIT_SCENARIO_SESSION],
-  },
-  {
-    name: SCREEN_NAMES.CALL_LOG,
-    component: CallLogScreen,
-    requiredPermissions: [
-      USER_PERMISSIONS.VIEW_CALL_LOGS,
-      USER_PERMISSIONS.VIEW_SCENARIO_SESSION,
-    ],
-  },
-  {
-    name: SCREEN_NAMES.REVIEW,
-    component: ReviewScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_REVIEWS],
-  },
-  {
-    name: SCREEN_NAMES.USER_ANALYTICS,
-    component: UserAnalyticsScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_ANALYTICS_DASHBOARD],
-  },
-  {
-    name: SCREEN_NAMES.LEADERBOARD,
-    component: LeaderboardScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD],
-  },
-  {
-    name: SCREEN_NAMES.ACHIEVEMENTS,
-    component: AchievementsScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_USER_BADGES],
-  },
-  {
-    name: SCREEN_NAMES.SEARCH,
-    component: SearchScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_REFERENCE_DOCUMENT],
-  },
-  {
-    name: SCREEN_NAMES.COMMUNITY,
-    component: CommunityScreen,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_COMMUNITY],
-  },
-];
-
-/**
- * Returns the first visible tab name based on user permissions
- * @param permissions - Array of user permissions
- * @returns The name of the first visible tab or SEARCH as fallback
- */
-export const getFirstVisibleTab = (permissions: string[]) => {
-  const visibleTabs = ALL_TABS.filter(
-    tab =>
-      tab?.requiredPermissions?.length === 0 ||
-      tab?.requiredPermissions?.some(permission =>
-        permissions.includes(permission),
-      ),
-  );
-  return visibleTabs[0]?.name ?? SCREEN_NAMES.SEARCH;
-};
-
-export const isReviewerOnly = (permissions: string[]): boolean =>
-  permissions.includes(USER_PERMISSIONS.VIEW_USER_BADGES) &&
-  !permissions.includes(USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD);
+export {getFirstVisibleTab} from '@/constants/tabs';
+export {isReviewerOnly} from '@/constants/tabs';
 
 interface BottomTabsProps {
   hideTabBar?: boolean;
 }
 
-const CustomTabBar = (props: BottomTabBarProps) => {
+interface CustomTabBarProps extends BottomTabBarProps {
+  visibleTabs: TabConfig[];
+}
+
+const CustomTabBar = (props: CustomTabBarProps) => {
   const insets = useSafeAreaInsets();
+  const {visibleTabs} = props;
 
-  const renderTabBarIcon = (route: string, focused: boolean) => {
-    const focusedIcons = {
-      [SCREEN_NAMES.CALL_LOG]: <CallLogActiveIcon width={18} height={18} />,
-      [SCREEN_NAMES.USER_ANALYTICS]: (
-        <AnalyticsActiveIcon width={18} height={18} />
-      ),
-      [SCREEN_NAMES.COMMUNITY]: <CommunityActiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.LEADERBOARD]: (
-        <LeaderboardActiveIcon width={20} height={20} color={colors.blue} />
-      ),
-      [SCREEN_NAMES.SEARCH]: (
-        <SearchActiveIcon width={20} height={20} color={colors.blue} />
-      ),
-      [SCREEN_NAMES.LEARN]: <LearnActiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.REVIEW]: <ReviewActiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeActiveIcon width={20} height={20} />,
-    };
-
-    const unfocusedIcons = {
-      [SCREEN_NAMES.CALL_LOG]: <CallLogInactiveIcon width={18} height={18} />,
-      [SCREEN_NAMES.USER_ANALYTICS]: (
-        <AnalyticsInactiveIcon width={18} height={18} />
-      ),
-      [SCREEN_NAMES.COMMUNITY]: (
-        <CommunityInactiveIcon width={20} height={20} />
-      ),
-      [SCREEN_NAMES.LEADERBOARD]: (
-        <LeaderboardInactiveIcon width={20} height={20} />
-      ),
-      [SCREEN_NAMES.SEARCH]: <SearchInactiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.LEARN]: <LearnInactiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.REVIEW]: <ReviewInactiveIcon width={20} height={20} />,
-      [SCREEN_NAMES.ACHIEVEMENTS]: <BadgeInactiveIcon width={20} height={20} />,
-    };
-
-    return focused
-      ? focusedIcons[route as keyof typeof focusedIcons]
-      : unfocusedIcons[route as keyof typeof unfocusedIcons];
+  const renderTabBarIcon = (routeName: string, focused: boolean) => {
+    const tab = visibleTabs.find(t => t.name === routeName);
+    return tab ? (focused ? tab.focusedIcon : tab.unfocusedIcon) : null;
   };
 
   return (
@@ -179,10 +64,6 @@ const CustomTabBar = (props: BottomTabBarProps) => {
 };
 
 export const BottomTabs: React.FC<BottomTabsProps> = () => {
-  const renderCustomTabBar = (props: BottomTabBarProps) => {
-    return <CustomTabBar {...props} />;
-  };
-
   const userLoading = useSelector((s: AppRootState) => s.user.loading);
   const permissions = useSelector((s: AppRootState) => s.user.permissions);
 
@@ -190,7 +71,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
     return null;
   }
 
-  const visibleTabs = ALL_TABS.filter(tab => {
+  const visibleTabs = TAB_CONFIG.filter(tab => {
     // Check if user has permission for this tab
     const hasPermission =
       !tab.requiredPermissions?.length ||
@@ -209,6 +90,10 @@ export const BottomTabs: React.FC<BottomTabsProps> = () => {
   });
 
   const initial = getFirstVisibleTab(permissions);
+
+  const renderCustomTabBar = (tabBarProps: BottomTabBarProps) => (
+    <CustomTabBar {...tabBarProps} visibleTabs={visibleTabs} />
+  );
 
   return (
     <View style={styles.container}>

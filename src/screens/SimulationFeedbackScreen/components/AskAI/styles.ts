@@ -206,4 +206,8 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  thinkingLottie: {
+    width: '24@ms',
+    height: '24@ms',
+  },
 });

@@ -948,3 +948,12 @@ export const CallSummaryGenerationData = {
   durationInSeconds: 2503, // 41 mins 43 secs
   summaryGenerationDurationInSeconds: 178, // 2 mins 58 secs
 };
+
+export const ASK_AI_EMPTY_STATE_QUESTIONS = [
+  'Did i miss any key emotional signals from the client?',
+  'What therapeutic techniques were most effective?',
+  'What deeper questions should I have explored?',
+  'What did I do well in building rapport today?',
+  'How did I handle the client’s resistance?',
+  'How was my active listening and reflection?',
+];

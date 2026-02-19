@@ -12,6 +12,7 @@ interface UpNextProps {
   scenarioSessionId?: string;
   pathId?: string;
   caseId?: string;
+  languageId?: number;
   onFinish: () => void;
   onBack: () => void;
 }
@@ -20,6 +21,7 @@ export const UpNext: React.FC<UpNextProps> = ({
   scenarioSessionId,
   pathId,
   caseId,
+  languageId,
   onFinish,
   onBack,
 }) => {
@@ -41,6 +43,7 @@ export const UpNext: React.FC<UpNextProps> = ({
     scenarioSessionId,
     pathId,
     caseId,
+    languageId,
     enabled: !!(pathId || caseId),
   });
 

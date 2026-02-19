@@ -1,19 +1,19 @@
 import React from 'react';
 import {render, waitFor} from '@testing-library/react-native';
 
-import {BadgeImage} from '../BadgeImage';
+import {NetworkImage} from '../NetworkImage';
 
 // Mock fetch
 global.fetch = jest.fn();
 
-describe('BadgeImage', () => {
+describe('NetworkImage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('should render Image component for PNG URLs', () => {
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.png" />,
+      <NetworkImage imageUrl="https://example.com/badge.png" />,
     );
     const Image = require('react-native').Image;
     expect(UNSAFE_getByType(Image)).toBeTruthy();
@@ -21,7 +21,7 @@ describe('BadgeImage', () => {
 
   it('should render Image component for JPG URLs', () => {
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.jpg" />,
+      <NetworkImage imageUrl="https://example.com/badge.jpg" />,
     );
     const Image = require('react-native').Image;
     expect(UNSAFE_getByType(Image)).toBeTruthy();
@@ -29,7 +29,7 @@ describe('BadgeImage', () => {
 
   it('should render SvgUri component for SVG URLs', async () => {
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.svg" />,
+      <NetworkImage imageUrl="https://example.com/badge.svg" />,
     );
 
     // Should render SvgUri by default
@@ -41,7 +41,7 @@ describe('BadgeImage', () => {
 
   it('should handle uppercase SVG extension', async () => {
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.SVG" />,
+      <NetworkImage imageUrl="https://example.com/badge.SVG" />,
     );
 
     await waitFor(() => {
@@ -52,7 +52,7 @@ describe('BadgeImage', () => {
 
   it('should render with custom width and height for SVG', async () => {
     const {UNSAFE_getByType} = render(
-      <BadgeImage
+      <NetworkImage
         imageUrl="https://example.com/badge.svg"
         width={100}
         height={100}
@@ -75,7 +75,7 @@ describe('BadgeImage', () => {
     });
 
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.svg" />,
+      <NetworkImage imageUrl="https://example.com/badge.svg" />,
     );
 
     // Initially renders SvgUri
@@ -114,7 +114,7 @@ describe('BadgeImage', () => {
     );
 
     const {UNSAFE_getByType} = render(
-      <BadgeImage imageUrl="https://example.com/badge.svg" />,
+      <NetworkImage imageUrl="https://example.com/badge.svg" />,
     );
 
     // Initially renders SvgUri

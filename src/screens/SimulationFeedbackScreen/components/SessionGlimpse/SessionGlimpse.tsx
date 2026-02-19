@@ -11,7 +11,7 @@ interface SessionGlimpseProps {
 }
 
 export const SessionGlimpse: React.FC<SessionGlimpseProps> = ({content}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const {t} = useTranslate();
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
