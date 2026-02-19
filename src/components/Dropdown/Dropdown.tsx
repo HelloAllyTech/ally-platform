@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Animated,
+  Dimensions,
   Modal,
   ScrollView,
   Text,
@@ -12,7 +13,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown} from '@/assets/icons';
 import commonStyles from '@/components/styles';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, globalStyles, typography} from '@/theme';
 
 interface DropdownProps {
   value: string;
@@ -27,6 +28,8 @@ interface DropdownProps {
   customHeaderStyle?: object;
   customTextStyle?: object;
   modalTranslateX?: `${number}%` | number; // Optional translateX transform for modal dropdown positioning (e.g., '-50%')
+  fixedWidth?: number; // Optional fixed width for the dropdown header (prevents width changes based on selected value)
+  alignModalRight?: boolean; // When true, aligns the right edge of modal with right edge of dropdown button
 }
 
 export const CustomDropdown: React.FC<DropdownProps> = ({
@@ -42,6 +45,8 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
   customHeaderStyle,
   customTextStyle,
   modalTranslateX,
+  fixedWidth,
+  alignModalRight = false,
 }) => {
   const [dropdownWidth, setDropdownWidth] = useState<number>(0);
   const [headerLayout, setHeaderLayout] = useState({
@@ -108,6 +113,9 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
           style={[
             styles.header,
             disabled && styles.disabled,
+            fixedWidth
+              ? [globalStyles.mainSpaceBetween, {width: fixedWidth}]
+              : undefined,
             customHeaderStyle,
           ]}
           disabled={disabled}>
@@ -151,11 +159,17 @@ export const CustomDropdown: React.FC<DropdownProps> = ({
                   styles.modalDropdown,
                   {
                     top: headerLayout.y + headerLayout.height - ms(2),
-                    left: headerLayout.x,
+                    ...(alignModalRight
+                      ? {
+                          right:
+                            Dimensions.get('window').width -
+                            (headerLayout.x + headerLayout.width),
+                        }
+                      : {left: headerLayout.x}),
                     minWidth: Math.max(dropdownWidth, headerLayout.width),
                     maxHeight: Math.min(200, options.length * 40),
                   },
-                  modalTranslateX
+                  modalTranslateX && !alignModalRight
                     ? {
                         transform: [{translateX: modalTranslateX}],
                       }
