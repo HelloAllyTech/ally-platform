@@ -24,7 +24,7 @@ import {
 import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
-import {EmotionalMovement, SkillCoverage} from '@/types';
+import {SkillCoverage} from '@/types';
 import {
   calculateAverageForObjectArray,
   getInterpolatedYValues,
@@ -57,19 +57,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     whatWentWell: false,
     areasForImprovement: false,
   });
-  const defaultEmotionalMovement: EmotionalMovement[] = [
-    {startTime: 0, level: 0},
-    {startTime: 100, level: 4.5},
-    {startTime: 250, level: 6},
-    {startTime: 400, level: 4},
-    {startTime: 410, level: 10},
-    {startTime: 480, level: 1},
-    {startTime: 700, level: 4},
-    {startTime: 850, level: 5},
-    {startTime: 1000, level: 2.5},
-    {startTime: 1150, level: 4},
-    {startTime: 1200, level: 6.5},
-  ];
 
   const {data: simulationSkills} = useGetSimulationSkillsQuery(
     {
@@ -84,8 +71,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     simulationSkills?.skillCoverage ?? DEFAULT_SKILL_COVERAGE;
 
   // TODO: Remove default data after API is ready
-  const emotionalMovementRaw =
-    simulationSkills?.emotionalMovement ?? defaultEmotionalMovement;
+  const emotionalMovementRaw = simulationSkills?.emotionalMovement;
   const hasEmotionalData =
     !!emotionalMovementRaw && emotionalMovementRaw.length > 0;
 
