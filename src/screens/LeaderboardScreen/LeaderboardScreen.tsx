@@ -279,18 +279,17 @@ export const LeaderboardScreen: React.FC = () => {
   const renderLeaderboardHeader = () => {
     return (
       <View style={styles.leaderboardHeader}>
-        <Text style={styles.title}>{t('Leaderboard.title')}</Text>
-        <View style={styles.dropdownWrapper}>
-          <CustomDropdown
-            value={getPeriodLabel(activePeriod)}
-            options={dropdownOptions}
-            onSelect={handleDropdownSelect}
-            isOpen={isDropdownOpen}
-            setIsOpen={setIsDropdownOpen}
-            customHeaderStyle={styles.dropdownHeader}
-            customTextStyle={styles.dropdownText}
-          />
-        </View>
+        <CustomDropdown
+          value={getPeriodLabel(activePeriod)}
+          options={dropdownOptions}
+          onSelect={handleDropdownSelect}
+          isOpen={isDropdownOpen}
+          setIsOpen={setIsDropdownOpen}
+          customHeaderStyle={styles.dropdownHeader}
+          customTextStyle={styles.dropdownText}
+          fixedWidth={120}
+          alignModalRight
+        />
       </View>
     );
   };
