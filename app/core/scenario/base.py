@@ -65,6 +65,18 @@ class PromptData(BaseModel):
         default=None,
         description="Summary from previous session for continuity",
     )
+    cultural_context: Optional[str] = Field(
+        default=None, description="Cultural background/setting for the character"
+    )
+    speaking_style: Optional[str] = Field(
+        default=None, description="Specific speaking style or dialect instructions"
+    )
+    prompts: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Editable prompt templates from backend (promptData.prompts). "
+        "Keys: ally_ai_learn_default, ally_ai_learn_context_generation, etc. "
+        "Used only when present and different from local prompts.",
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -273,14 +285,25 @@ class Scenario(BaseModel):
                 "starting_state": prompt_data_dict.get("startingState", None),
                 "emotional_needs": prompt_data_dict.get("emotionalNeeds", None),
                 "tone": prompt_data_dict.get("tone", None),
-                "opening_statements": prompt_data_dict.get("openingStatements"),
+                "opening_statements": prompt_data_dict.get("openingStatements") or [],
                 "agent_goal": prompt_data_dict.get("agentGoal"),
                 "custom_fields": prompt_data_dict.get("customFields"),
-                "prompt": prompt_data_dict.get("prompt"),
+                # Legacy: backend may send at scenario.prompt or promptData.prompt
+                "prompt": prompt_data_dict.get("prompt") or raw.get("prompt"),
                 "response_length": prompt_data_dict.get("responseLength"),
                 "agent_dialogues": prompt_data_dict.get("agentDialogues"),
                 "previous_memory": prompt_data_dict.get("previousMemory", None),
+                "cultural_context": prompt_data_dict.get("culturalContext", None),
+                "speaking_style": prompt_data_dict.get("speakingStyle", None),
+                "prompts": prompt_data_dict.get("prompts"),
             }
+
+            # Sync backend prompts that differ from local into app/prompts/templates/
+            backend_prompts = prompt_data_dict.get("prompts")
+            if backend_prompts and isinstance(backend_prompts, dict):
+                from app.prompts.resolver import sync_backend_prompts_to_local
+
+                sync_backend_prompts_to_local(backend_prompts)
 
             prompt_data_obj = PromptData(**mapped_data)
             return prompt_data_obj

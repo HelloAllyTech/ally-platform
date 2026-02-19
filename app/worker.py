@@ -9,6 +9,7 @@ from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 
+from app.core.agent.context_generator import generate_cultural_context
 from app.core.agent.factory import (
     cleanup_background_tasks,
     configure_llm_client,
@@ -139,6 +140,44 @@ class AgentWorker:
         except Exception as e:
             logger.error(f"[AgentWorker] Failed to configure prosody: {e}")
             logger.info(f"[AgentWorker] Phase 1: Prosody configuration failed: {e}")
+
+        # Automatic Context Generation for Multilingual Support
+        try:
+            logger.info(
+                "[AgentWorker] Phase 1: Generating cultural context if needed..."
+            )
+
+            # Robust language code resolution
+            language_code = "en-US"
+            if (
+                self.scenario.language_config
+                and self.scenario.language_config.language_code
+            ):
+                language_code = self.scenario.language_config.language_code
+
+            logger.info(
+                "[AgentWorker] Resolved language code for context generation: '%s'",
+                language_code,
+            )
+
+            # Generate Cultural Context & Style (if missing) + Translate Openings
+            cultural, style = await generate_cultural_context(
+                self.scenario.prompt_data, language_code, self.llm_client
+            )
+
+            # Update scenario prompt data with generated context
+            if cultural:
+                self.scenario.prompt_data.cultural_context = cultural
+            if style:
+                self.scenario.prompt_data.speaking_style = style
+
+            logger.info(
+                "[AgentWorker] Context generation complete. Cultural: %s, Style: %s",
+                bool(cultural),
+                bool(style),
+            )
+        except Exception as e:
+            logger.error(f"[AgentWorker] Failed to generate cultural context: {e}")
 
         logger.info("[AgentWorker] Configuration phase complete")
         # Get defaults from prosody service (single source of truth)
@@ -473,6 +512,7 @@ async def entrypoint(ctx: agents.JobContext):
         and worker._termination_event is not None
         and worker._room_disconnected_event is not None
     ):
+        termination_triggered = False
         try:
             # Wait for either termination event or room disconnection
             logger.info(
@@ -494,7 +534,33 @@ async def entrypoint(ctx: agents.JobContext):
                 except asyncio.CancelledError:
                     pass
 
-            logger.info(f"[AgentWorker] Waiting completed. Done count: {len(done)}")
+            termination_triggered = worker._termination_event.is_set()
+            logger.info(
+                f"[AgentWorker] Waiting completed. Done count: {len(done)}. "
+                f"Termination triggered: {termination_triggered}"
+            )
+
+            # CRITICAL: When termination triggered, wait for termination handler
+            # to play the goodbye message before shutdown. Otherwise we would
+            # cancel it via cleanup_background_tasks and the user never hears it.
+            if termination_triggered:
+                logger.info(
+                    "[AgentWorker] Waiting for termination audio to complete..."
+                )
+                try:
+                    await asyncio.wait_for(termination_task, timeout=30.0)
+                    logger.info("[AgentWorker] Termination audio completed.")
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "[AgentWorker] Termination audio timed out after 30s. "
+                        "Proceeding with shutdown."
+                    )
+                except asyncio.CancelledError:
+                    logger.warning(
+                        "[AgentWorker] Termination task was cancelled. "
+                        "Proceeding with shutdown."
+                    )
+
             logger.info("Entrypoint waiting completed - agent will shutdown")
         except Exception as e:
             logger.exception(f"Error waiting for conversation end: {e}")

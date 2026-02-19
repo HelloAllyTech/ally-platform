@@ -3,6 +3,7 @@ Base LLM client interface.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any, List
 
 
 class BaseLLMClient(ABC):
@@ -25,3 +26,10 @@ class BaseLLMClient(ABC):
             LLM instance (e.g., ChatOpenAI, etc.)
         """
         pass
+
+    async def achat(self, messages: List[Any]) -> Any:
+        """
+        Async chat - invokes the underlying LLM with messages.
+        Returns a message-like object with .content (e.g. LangChain AIMessage).
+        """
+        return await self.llm_instance.ainvoke(messages)

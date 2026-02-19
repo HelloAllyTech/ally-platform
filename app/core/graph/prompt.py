@@ -9,38 +9,13 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
+from app.prompts.manager import prompt_manager
+from app.prompts.resolver import resolve_template
 
 logger = get_logger(__name__)
 
-# --- Constants ---
-
-DEFAULT_PROMPT = """
-You are an AI roleplay assistant for counselor training.
-In this simulation, you must act ONLY as the **client** in a therapy session.
-Stay fully in character, provide realistic dialogue, and do not switch roles
-unless explicitly instructed.
-
-**Important Instructions:**
-- Prefer first-person phrasing (e.g., "I feel…", "I've been struggling with…").
-- Allow the counselor to guide the conversation.
-- If the counselor is silent or open-ended, share one thought, feeling,
-  or small story, then stop.
-- Maintain consistency with your life history but allow natural
-  variation in tone and detail.
-- Respond naturally, as a real client would (use first-person voice).
-- Reveal information gradually, not all at once.
-- Start with few details and open up more as counsellor asks questions.
-- Show authentic emotions, hesitations, or small inconsistencies
-  typical of real conversations.
-- Do not give therapy advice, diagnoses, or act as the counselor.
-- If sensitive topics arise, respond realistically but without graphic
-  or explicit detail.
-- Keep each reply under ~120 words to simulate session pacing.
-- Do NOT include stage directions, action descriptions, or expressions in
-  brackets or parentheses (e.g., "(sighs)", "(pausing)", "(shaking head)").
-  Your response will be spoken aloud via text-to-speech, so output only
-  the words the client would actually say.
-"""
+# Fallback when no prompt_data or legacy prompt_data.prompt; resolver used at runtime
+DEFAULT_PROMPT = prompt_manager.get_template("system", "default_system_prompt")
 
 
 def _get_optional_block(label: str, value: Optional[str]) -> str:
@@ -68,6 +43,51 @@ def _get_behavioral_guidelines(prompt_data: PromptData) -> str:
             f"{prompt_data.session_behavior_guidelines}\n\n"
         )
     return ""
+
+
+def _get_language_instruction(
+    language_code: Optional[str],
+    backend_prompts: Optional[dict] = None,
+) -> str:
+    """
+    Get language instruction from prompt template when language is non-English.
+    Uses dashboard/backend template if available in metadata, else local YAML.
+    Returns empty string for English or missing language_code.
+    """
+    if not language_code or language_code.startswith("en"):
+        return ""
+    template = resolve_template(
+        "language_instruction_non_english",
+        backend_prompts,
+    )
+    if not template:
+        return ""
+    try:
+        return template.format(language_code=language_code) + "\n\n"
+    except KeyError:
+        return template + "\n\n"
+
+
+def _get_cultural_and_style_block(
+    prompt_data: PromptData, language_code: Optional[str] = None
+) -> str:
+    """
+    Creates a formatted block for cultural context and speaking style.
+    Also adds a specific instruction if the language is not English.
+    """
+    content = ""
+
+    # Add Language specific instruction from template if not English
+    backend_prompts = getattr(prompt_data, "prompts", None)
+    content += _get_language_instruction(language_code, backend_prompts)
+
+    if prompt_data.cultural_context:
+        content += f"**Cultural Context:**\n{prompt_data.cultural_context}\n\n"
+
+    if prompt_data.speaking_style:
+        content += f"**Speaking Style & Tone:**\n{prompt_data.speaking_style}\n\n"
+
+    return content
 
 
 def _format_custom_fields(custom_fields: list) -> str:
@@ -187,26 +207,47 @@ def _build_behavior_conditions_block(
 
 
 def _build_branching_prompt(
+    prompt_data: PromptData,
     next_instruction: str,
+    language_code: Optional[str] = None,
 ) -> SystemMessage:
     """
-    Build a minimal, directive-focused prompt for branching instructions.
+    Build a branching prompt that includes core persona context.
 
-    Args:
-        next_instruction: The conversation-specific directive.
-
-    Returns:
-        A SystemMessage with the minimal branching prompt.
+    Includes character identity and style to ensure consistency even when
+    following specific directives.
     """
-    minimal_prompt = dedent(
-        f"""
-        Generate next dialogue as per the conversation history and instruction:
+    # Build minimal but essential context blocks
+    character_details_parts = []
+    if prompt_data.name:
+        character_details_parts.append(f"Name: {prompt_data.name}")
+    if prompt_data.age:
+        character_details_parts.append(f"Age: {prompt_data.age}")
+    if prompt_data.gender:
+        character_details_parts.append(f"Gender: {prompt_data.gender}")
+    character_details = ", ".join(character_details_parts)
 
-        Important Instruction for next dialogue: {next_instruction}
+    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+
+    character_backstory = prompt_data.context or ""
+
+    branching_prompt = dedent(
+        f"""
+        Role: You are the client {prompt_data.name}. Stay in character.
+
+        ## Character Context
+        {character_details}
+        {cultural_block}
+        Backstory: {character_backstory}
+
+        ## Current Task
+        Generate next dialogue as per the conversation history and instruction below.
+
+        Important Instruction: {next_instruction}
     """
     ).strip()
 
-    return SystemMessage(content=minimal_prompt)
+    return SystemMessage(content=branching_prompt)
 
 
 def _build_behavior_prompt(
@@ -214,6 +255,7 @@ def _build_behavior_prompt(
     base_system_prompt: str,
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
+    language_code: Optional[str] = None,
 ) -> SystemMessage:
     """
     Build a behavior-conditioned prompt using helper behavior classifications.
@@ -249,6 +291,9 @@ def _build_behavior_prompt(
         character_details_parts.append(f"Location: {prompt_data.current_location}")
     character_details = ", ".join(character_details_parts)
 
+    # Build cultural and style block
+    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+
     # Build character backstory from context
     character_backstory = prompt_data.context or ""
 
@@ -270,19 +315,67 @@ def _build_behavior_prompt(
     if conditions_block.strip():
         conditions_section = f"\n        Conditions:\n        {conditions_block}"
 
+    # Build ALL optional blocks to ensure full context is present
+    gender_details_block = _get_gender_details(prompt_data)
+    profession_block = _get_optional_block("Your profession", prompt_data.profession)
+    guidelines_block = _get_behavioral_guidelines(prompt_data)
+    previous_memory_block = _get_optional_block(
+        "Summary from your previous session", prompt_data.previous_memory
+    )
+    core_memories_block = _get_optional_block(
+        "Your core memories influencing your beliefs & actions",
+        prompt_data.core_memories,
+    )
+    personality_block = _get_optional_block("Your personality", prompt_data.personality)
+    starting_state_block = _get_optional_block(
+        "Your current thoughts", prompt_data.starting_state
+    )
+    emotional_needs_block = _get_optional_block(
+        "Your emotional needs from this counselling session",
+        prompt_data.emotional_needs,
+    )
+    tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
+    life_history = _get_optional_block(
+        "your life history is", prompt_data.life_history_summary
+    )
+    response_length = _get_optional_block(
+        "your response length should be", prompt_data.response_length
+    )
+    agent_dialogues = _get_optional_block(
+        "use these dialogues for reference", prompt_data.agent_dialogues
+    )
+
     behavior_prompt = dedent(
         f"""
         Role instruction: {base_system_prompt.strip()}
-        Character details: {character_details}
-        Character backstory: {character_backstory}
-        Conversation history: Use the conversation history provided in the messages.
-        Instruction: Use following conditions to generate next dialogue
-        Previous helper utterance: Use the last helper message
-        from conversation history.
-        {conditions_section}
-        {custom_context_block}
 
-        Generate the next dialogue
+        ## Your Client Persona Details
+        Character details: {character_details}
+        {gender_details_block}
+        {profession_block}
+        {cultural_block}
+
+        Character backstory: {character_backstory}
+        {life_history}
+        {guidelines_block}
+        {previous_memory_block}
+        {core_memories_block}
+        {personality_block}
+        {starting_state_block}
+        {emotional_needs_block}
+        {tone_block}
+
+        {custom_context_block}
+        {response_length}
+        {agent_dialogues}
+
+        Conversation history: Use the conversation history provided in the messages.
+
+        Instruction: Use following conditions to generate next dialogue
+        Previous helper utterance: Use the last helper message from history.
+        {conditions_section}
+
+        Generate the next dialogue.
     """
     ).strip()
 
@@ -292,6 +385,7 @@ def _build_behavior_prompt(
 def _build_full_prompt(
     prompt_data: PromptData,
     base_system_prompt: str,
+    language_code: Optional[str] = None,
 ) -> SystemMessage:
     """
     Build a comprehensive prompt with full character details, personality,
@@ -329,6 +423,9 @@ def _build_full_prompt(
     )
     tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
 
+    # Build cultural and style block
+    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
 
@@ -365,6 +462,8 @@ def _build_full_prompt(
     {prompt_data.current_location}
 
     {profession_block}
+
+    {cultural_block}
 
     **Your current context:**
     {prompt_data.context}
@@ -431,10 +530,20 @@ def generate_system_message(
     Returns:
         A SystemMessage object with the complete, formatted prompt.
     """
-    base_system_prompt = prompt_data.prompt if prompt_data.prompt else DEFAULT_PROMPT
+    # Use legacy prompt_data.prompt if set; else resolve from backend or local
+    if prompt_data.prompt:
+        base_system_prompt = prompt_data.prompt
+    else:
+        base_system_prompt = (
+            resolve_template(
+                "ally_ai_learn_default",
+                getattr(prompt_data, "prompts", None),
+            )
+            or DEFAULT_PROMPT
+        )
 
     if next_instruction:
-        return _build_branching_prompt(next_instruction)
+        return _build_branching_prompt(prompt_data, next_instruction, language_code)
 
     if behavior_instructions is not None:
         # Handle empty behavior_instructions list by providing a default behavior prompt
@@ -443,13 +552,17 @@ def generate_system_message(
                 "Empty behavior_instructions provided, using default behavior prompt"
             )
         return _build_behavior_prompt(
-            prompt_data, base_system_prompt, behavior_instructions, current_state
+            prompt_data,
+            base_system_prompt,
+            behavior_instructions,
+            current_state,
+            language_code,
         )
 
     # TODO: Deprecated, remove in future versions
     # Full prompt generation when neither next_instruction nor
     # behavior_instructions provided
-    return _build_full_prompt(prompt_data, base_system_prompt)
+    return _build_full_prompt(prompt_data, base_system_prompt, language_code)
 
 
 def generate_prompt_content(

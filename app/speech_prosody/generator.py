@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
-from app.speech_prosody import prompts
+from app.prompts.manager import prompt_manager
+from app.prompts.resolver import resolve_template
 from app.speech_prosody.constants import DEFAULT_CONVERSATION_HISTORY_LIMIT
 from app.speech_prosody.utils import (
     build_prosody_prompt,
@@ -61,8 +62,12 @@ async def generate_default_parameters(
         else:
             opening_statements_section = ""
 
-        # Create generation prompt with metadata
-        generation_prompt = prompts.DEFAULT_GENERATION_PROMPT.format(
+        # Create generation prompt with metadata (resolve from backend or local)
+        generation_template = resolve_template(
+            "ally_ai_learn_prosody_generation",
+            getattr(scenario.prompt_data, "prompts", None),
+        ) or prompt_manager.get_template("prosody", "default_generation_prompt")
+        generation_prompt = generation_template.format(
             prompt_content=prompt_content,
             opening_statements_section=opening_statements_section,
             parameter_metadata=parameter_metadata_json,
@@ -98,6 +103,7 @@ async def generate_runtime_parameters(
     conversation_history_limit: int = DEFAULT_CONVERSATION_HISTORY_LIMIT,
     enhancement_instructions: Optional[str] = None,
     current_parameters: Optional[Dict[str, Any]] = None,
+    backend_prompts: Optional[Dict[str, str]] = None,
 ) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
     Generate runtime prosody parameters and enhanced text.
@@ -131,6 +137,16 @@ async def generate_runtime_parameters(
         )
         persona_context_text = format_persona_context(persona_context)
 
+        # Resolve prosody templates from backend or local
+        prompt_with_enhancement = resolve_template(
+            "ally_ai_learn_prosody_unified",
+            backend_prompts,
+        ) or prompt_manager.get_template("prosody", "unified_prompt_with_enhancement")
+        prompt_parameters_only = resolve_template(
+            "ally_ai_learn_prosody_parameters_only",
+            backend_prompts,
+        ) or prompt_manager.get_template("prosody", "parameters_only_prompt")
+
         # Build prompt
         generation_prompt = build_prosody_prompt(
             response_text=response_text,
@@ -139,8 +155,8 @@ async def generate_runtime_parameters(
             conversation_history_text=conversation_history_text,
             conversation_history_count=conversation_history_count,
             enhancement_instructions=enhancement_instructions,
-            prompt_with_enhancement=prompts.UNIFIED_PROMPT_WITH_ENHANCEMENT,
-            prompt_parameters_only=prompts.PARAMETERS_ONLY_PROMPT,
+            prompt_with_enhancement=prompt_with_enhancement,
+            prompt_parameters_only=prompt_parameters_only,
             current_parameters=current_parameters,
         )
 

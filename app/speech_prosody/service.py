@@ -237,6 +237,7 @@ class SpeechProsodyService:
         persona_context: Optional[Dict[str, Any]] = None,
         conversation_history_limit: int = DEFAULT_CONVERSATION_HISTORY_LIMIT,
         current_parameters: Optional[Dict[str, Any]] = None,
+        backend_prompts: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """
         Generate and apply runtime prosody parameters and enhanced text.
@@ -286,6 +287,7 @@ class SpeechProsodyService:
             conversation_history_limit=conversation_history_limit,
             enhancement_instructions=enhancement_instructions,
             current_parameters=params_for_context,
+            backend_prompts=backend_prompts,
         )
 
         if not params_dict:
@@ -490,6 +492,11 @@ async def generate_and_apply_prosody_for_message(
                 scenario.prompt_data
             )
 
+        # Extract backend prompts from scenario for template resolution
+        backend_prompts = (
+            getattr(scenario.prompt_data, "prompts", None) if scenario else None
+        )
+
         # Generate and apply prosody parameters
         enhanced_text = await prosody_service.generate_and_apply_runtime(
             response_text=message_text,
@@ -498,6 +505,7 @@ async def generate_and_apply_prosody_for_message(
             persona_context=persona_context,
             conversation_history_limit=conversation_history_limit,
             current_parameters=current_parameters,
+            backend_prompts=backend_prompts,
         )
 
         # Return enhanced text if available, otherwise original

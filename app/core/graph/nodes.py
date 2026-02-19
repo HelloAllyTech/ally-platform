@@ -477,7 +477,7 @@ async def resolve_branching_instruction(
                         )
                     )
 
-                    logger.info("Using next instruction: ", next_instruction)
+                    logger.info("Using next instruction: %s", next_instruction)
 
     # Determine feedback message for UI from branching events only
     # Priority 1: If branching event was selected, use its feedback

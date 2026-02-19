@@ -73,6 +73,18 @@ def cleanup_env_vars():
             os.environ[key] = original_value
 
 
+@pytest.fixture(scope="session", autouse=True)
+def prevent_prompt_file_modification():
+    """Prevent tests from modifying prompt YAML files (system.yaml, prosody.yaml)."""
+    with patch(
+        "app.prompts.resolver.sync_backend_prompt_to_local", lambda *a, **k: None
+    ):
+        with patch(
+            "app.prompts.resolver.sync_backend_prompts_to_local", lambda *a, **k: None
+        ):
+            yield
+
+
 # Test data fixtures
 @pytest.fixture
 def sample_room_metadata() -> Dict[str, Any]:

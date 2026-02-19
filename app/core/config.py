@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     ENV: Environment = Field(default=Environment.DEV, description="App environment")
 
     LOG_LEVEL: str = "INFO"
+
+    # When True: use metadata prompts when available, sync differing ones to local YAML.
+    # When False: always use local YAML, ignore metadata prompts.
+    SYNC_PROMPTS_TO_LOCAL: bool = Field(
+        default=False,
+        description="Use metadata prompts and sync to local; False = local YAML only",
+    )
     SLACK_ALERTS_ENABLED: bool = False
     SLACK_ALERTS_API_TOKEN: str = Field(...)
     SLACK_ALERTS_CHANNEL_ID: str = Field(...)

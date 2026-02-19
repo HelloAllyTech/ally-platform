@@ -62,16 +62,12 @@ class TestPrompt:
         )
         content = msg.content
 
-        # When next_instruction is provided, minimal prompt is used
-        # It should contain the critical instruction and essential details only
-        assert (
-            "Generate next dialogue as per the conversation history and instruction:"
-            in content
-        )
-        assert "Important Instruction for next dialogue: Focus on rapport." in content
-        # Minimal prompt intentionally excludes detailed fields like age,
-        # gender, context
-        # to keep the prompt focused on the critical instruction
+        # When next_instruction is provided, it is appended to the prompt
+        # It should contain the critical instruction
+        assert "Important Instruction: Focus on rapport." in content
+
+        # The prompt should still contain the core character details
+        assert "Name: Alex" in content
 
     def test_generate_system_message_with_gender_identity(self):
         """Test that gender_identity is included when provided."""
@@ -280,3 +276,62 @@ class TestPrompt:
         assert "State 1" in content
         assert "Be anxious" in content
         assert "say something similar to" not in content  # No dialogue options
+
+    def test_generate_system_message_multilingual_fields(self):
+        """Test that cultural_context and speaking_style are injected when provided."""
+        pd = make_prompt_data(
+            cultural_context="Urban Indian middle class",
+            speaking_style="Hinglish, casual",
+        )
+        msg = generate_system_message(prompt_data=pd, language_code="en-IN")
+        content = msg.content
+
+        assert "**Cultural Context:**" in content
+        assert "Urban Indian middle class" in content
+        assert "**Speaking Style & Tone:**" in content
+        assert "Hinglish, casual" in content
+
+    def test_generate_system_message_missing_multilingual_fields(self):
+        """Test that multilingual sections are omitted when fields are missing."""
+        pd = make_prompt_data(cultural_context=None, speaking_style=None)
+        msg = generate_system_message(prompt_data=pd, language_code="en-US")
+        content = msg.content
+
+        assert "**Cultural Context:**" not in content
+        assert "**Speaking Style & Tone:**" not in content
+
+    def test_generate_system_message_non_english_injects_language_instruction(self):
+        """Test language_instruction_non_english when language_code is non-English."""
+        pd = make_prompt_data()
+        msg = generate_system_message(prompt_data=pd, language_code="hi-IN")
+        content = msg.content
+
+        assert "**LANGUAGE INSTRUCTION:**" in content
+        assert "hi-IN" in content
+        assert "communicate in the language" in content
+
+    def test_generate_system_message_english_omits_language_instruction(self):
+        """Test that language instruction is omitted for English language codes."""
+        pd = make_prompt_data()
+        msg_en_in = generate_system_message(prompt_data=pd, language_code="en-IN")
+        msg_en_us = generate_system_message(prompt_data=pd, language_code="en-US")
+
+        assert "**LANGUAGE INSTRUCTION:**" not in msg_en_in.content
+        assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
+
+    def test_generate_system_message_uses_dashboard_language_instruction_when_provided(
+        self,
+    ):
+        """Test dashboard language instruction used when in promptData.prompts."""
+        custom_instruction = (
+            "**LANGUAGE INSTRUCTION:**\n"
+            "Speak in language '{language_code}'. Use DASHBOARD custom text."
+        )
+        pd = make_prompt_data(
+            prompts={"language_instruction_non_english": custom_instruction}
+        )
+        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        content = msg.content
+
+        assert "DASHBOARD custom text" in content
+        assert "ml-IN" in content
