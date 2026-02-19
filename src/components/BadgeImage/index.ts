@@ -1,1 +1,0 @@
-export {BadgeImage} from './BadgeImage';

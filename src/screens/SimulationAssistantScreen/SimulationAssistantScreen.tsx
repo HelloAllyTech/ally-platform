@@ -68,7 +68,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {sessionData, scenario, pathId, caseId} = route.params;
+  const {sessionData, scenario, pathId, caseId, languageId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -327,6 +327,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         scenarioSessionId: sessionId,
         pathId,
         caseId,
+        ...(languageId && {languageId}),
       });
       setIsMicEnabled(false);
       setRoomStatus(RoomStatus.DISCONNECTED);

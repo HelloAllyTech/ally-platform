@@ -15,24 +15,10 @@ export const styles = ScaledSheet.create({
   },
   leaderboardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: '24@ms',
     paddingVertical: '10@ms',
-    gap: '8@ms',
-  },
-  title: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '16@ms',
-    lineHeight: '27@ms',
-    color: colors.ds.typography.highEmphasis,
-    fontWeight: '500',
-    flex: 1,
-  },
-  dropdownWrapper: {
-    flexShrink: 1,
-    minWidth: '120@ms',
-    maxWidth: '160@ms',
   },
   dropdownHeader: {
     borderWidth: '0.5@ms',

@@ -7,7 +7,6 @@ import {CarouselConfig} from '@/components/Carousel/types';
 import {colors, fontFamily, typography} from '@/theme';
 import {UserRole} from '@/types';
 
-import {ViewedStatus} from './badges';
 import {USER_PERMISSIONS} from './permissions';
 
 export const MICROPHONE_AUDIO_SAMPLE_RATE = 16000;
@@ -197,9 +196,9 @@ export const API_ROUTES = {
       `/reviews/${reviewId}/reactions`,
   },
   BADGES: {
+    GET_BADGES: `/badges/me`,
     AVAILABLE: '/badges/me/available',
-    GET_BADGES: (viewedStatus: ViewedStatus) =>
-      `/badges/me?viewedStatus=${viewedStatus}`,
+    GET_BADGE_COUNT: '/badges/me/count',
     MARK_BADGE_AS_VIEWED: (badgeId: string) => `/badges/me/${badgeId}/viewed`,
   },
   COMMUNITY: {

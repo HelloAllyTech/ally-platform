@@ -36,7 +36,8 @@ enum TabKey {
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId, caseId} = route.params;
+  const {fromLogs, scenarioSessionId, pathId, caseId, languageId} =
+    route.params;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
@@ -249,6 +250,7 @@ export const SimulationFeedbackScreen: React.FC<
             scenarioSessionId={scenarioSessionId}
             pathId={pathId}
             caseId={caseId}
+            languageId={languageId}
             onFinish={handleFeedbackAndNavigate}
             onBack={handleFeedbackAndNavigate}
           />
@@ -307,19 +309,13 @@ export const SimulationFeedbackScreen: React.FC<
       ]}>
       <View style={styles.titleSection}>
         <View style={styles.titleRow}>
-          {fromLogs && (
-            <TouchableOpacity
-              onPress={handleFeedbackAndNavigate}
-              style={styles.backArrowButton}>
-              <LeftArrowIcon color={colors.black} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={handleFeedbackAndNavigate}
+            style={styles.backArrowButton}>
+            <LeftArrowIcon color={colors.black} />
+          </TouchableOpacity>
           <View style={globalStyles.column}>
-            {hasScenarioMessagesPermission && (
-              <View style={!fromLogs && styles.titleExtraPadding}>
-                {renderTitle()}
-              </View>
-            )}
+            {hasScenarioMessagesPermission && renderTitle()}
           </View>
           {/* Comment icon for transcript tab */}
           {!!reviewId &&

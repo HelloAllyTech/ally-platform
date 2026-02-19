@@ -146,9 +146,9 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '10@ms',
   },
   title: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.headline.small,
-    fontWeight: fontWeights.medium,
+    ...fontFamily.REPLAY_PRO.HEADLINE,
+    ...typography.display.small,
+    fontWeight: fontWeights.regular,
     color: colors.ds.typography.highEmphasis,
   },
   list: {

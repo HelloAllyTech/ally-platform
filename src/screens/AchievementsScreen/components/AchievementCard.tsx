@@ -3,7 +3,7 @@ import {Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {AchievementLockedIcon} from '@/assets/icons';
-import {BadgeImage} from '@/components/BadgeImage';
+import {NetworkImage} from '@/components/NetworkImage';
 import {LockStatus} from '@/constants/badges';
 import {colors, fontFamily} from '@/theme';
 import {Badge} from '@/types';
@@ -22,7 +22,7 @@ export const AchievementCard = memo<AchievementCardProps>(({badge}) => {
         {isLocked ? (
           <AchievementLockedIcon />
         ) : (
-          <BadgeImage
+          <NetworkImage
             imageUrl={badge.imageUrl}
             style={styles.badgeImage}
             resizeMode="contain"
