@@ -220,6 +220,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           scenarioSessionId: sessionId,
           pathId,
           caseId,
+          ...(languageId && {languageId}),
         });
       }
     };
@@ -273,6 +274,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     sessionId,
     pathId,
     caseId,
+    languageId,
     clamp,
   ]);
 
