@@ -9,7 +9,6 @@ import {colors, fontFamily} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
-import {ChecklistTab} from '../ChecklistTab';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
@@ -81,60 +80,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
           </View>
         </View>
       </View>
-      <ChecklistTab
-        items={[
-          {
-            id: '1',
-            name: 'Item 1',
-            completed: true,
-          },
-          {
-            id: '2',
-            name: 'Item 2',
-            completed: true,
-          },
-          {
-            id: '3',
-            name: 'Item 3',
-            completed: false,
-          },
-          {
-            id: '4',
-            name: 'Item 4',
-            completed: false,
-          },
-          {
-            id: '5',
-            name: 'Item 5',
-            completed: false,
-          },
-          {
-            id: '6',
-            name: 'Item 6',
-            completed: false,
-          },
-          {
-            id: '7',
-            name: 'Item 7',
-            completed: false,
-          },
-          {
-            id: '8',
-            name: 'Item 8',
-            completed: false,
-          },
-          {
-            id: '9',
-            name: 'Item 9',
-            completed: false,
-          },
-          {
-            id: '10',
-            name: 'Item 10',
-            completed: false,
-          },
-        ]}
-      />
+      {/* {data?.id && <EventChecklist scenarioSessionId={data.id} />} */}
       <SimulationDetailsModal
         visible={showSimulationDetailsModal}
         onClose={() => setShowSimulationDetailsModal(false)}

@@ -14,7 +14,7 @@ import {ReviewStatus} from '@/types';
 import {PrivacyToggle, SimulationTranscript} from '../';
 
 interface TranscriptTabProps {
-  scenarioSessionId?: string;
+  scenarioSessionId: string;
   reviewId?: string;
   setReviewId: (reviewId: string) => void;
   isPrivate: boolean;

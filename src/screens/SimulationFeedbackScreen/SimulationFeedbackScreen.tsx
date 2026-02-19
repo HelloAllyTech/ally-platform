@@ -27,7 +27,6 @@ enum TabKey {
   SUMMARY = 'SUMMARY',
   ASK_AI = 'ASK_AI',
   TRANSCRIPTION = 'TRANSCRIPTION',
-  // CHECKLIST = 'CHECKLIST',
   // SKILLS = 'SKILLS',
   // REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
@@ -202,7 +201,7 @@ export const SimulationFeedbackScreen: React.FC<
   );
 
   const renderTabContent = () => {
-    if (!hasScenarioMessagesPermission) {
+    if (!hasScenarioMessagesPermission || !scenarioSessionId) {
       return null;
     }
 
@@ -234,9 +233,6 @@ export const SimulationFeedbackScreen: React.FC<
             scenarioSessionId={scenarioSessionId}
           />
         );
-
-      // case TabKey.CHECKLIST:
-      //   return <ChecklistTab scenarioSessionId={scenarioSessionId} />;
 
       // case TabKey.SKILLS:
       //   return <SessionSkills scenarioSessionId={scenarioSessionId} />;
@@ -276,10 +272,6 @@ export const SimulationFeedbackScreen: React.FC<
         key: TabKey.TRANSCRIPTION,
         title: t('SimulationFeedback.tabs.transcription'),
       },
-      // {
-      //   key: TabKey.CHECKLIST,
-      //   title: t('SimulationFeedback.tabs.checklist'),
-      // },
       // {
       //   key: TabKey.SKILLS,
       //   title: t('SimulationFeedback.tabs.skills'),
