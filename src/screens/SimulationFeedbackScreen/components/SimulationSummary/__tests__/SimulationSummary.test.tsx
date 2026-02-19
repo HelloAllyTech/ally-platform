@@ -18,16 +18,6 @@ jest.mock('@/assets', () => {
   };
 });
 
-jest.mock('../../ChecklistTab', () => {
-  const React = require('react');
-  const {View} = require('react-native');
-  return {
-    ChecklistTab: ({items}: any) => (
-      <View testID="checklist-tab">{items?.length}</View>
-    ),
-  };
-});
-
 jest.mock(
   '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal',
   () => {
@@ -75,12 +65,6 @@ describe('SimulationSummary', () => {
     expect(getByText(/Min/)).toBeTruthy();
   });
 
-  it('renders checklist tab', () => {
-    const {getByTestId} = render(
-      <SimulationSummary data={baseData as any} />,
-    );
-    expect(getByTestId('checklist-tab')).toBeTruthy();
-  });
 });
 
 

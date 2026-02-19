@@ -61,7 +61,7 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     paddingVertical: '10@vs',
     paddingHorizontal: '24@ms',
-    backgroundColor: colors.ds.deepPurple[300],
+    backgroundColor: colors.ds.deepPurpleAlpha[50],
   },
   iconContainer: {
     transform: [{rotate: '0deg'}],

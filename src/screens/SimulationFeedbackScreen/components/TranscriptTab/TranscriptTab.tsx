@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React from 'react';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -6,7 +6,6 @@ import {useToast} from '@/components';
 import {useTranslate} from '@/hooks';
 import {
   useCreateReviewMutation,
-  useLazyGetSimulationDetailsQuery,
   useUpdateReviewStatusMutation,
 } from '@/services';
 import {ReviewStatus} from '@/types';
@@ -14,11 +13,13 @@ import {ReviewStatus} from '@/types';
 import {PrivacyToggle, SimulationTranscript} from '../';
 
 interface TranscriptTabProps {
-  scenarioSessionId?: string;
+  scenarioSessionId: string;
   reviewId?: string;
   setReviewId: (reviewId: string) => void;
   isPrivate: boolean;
   setIsPrivate: (isPrivate: boolean) => void;
+  startedAt?: string;
+  agentName?: string;
 }
 
 export const TranscriptTab: React.FC<TranscriptTabProps> = ({
@@ -27,36 +28,14 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
   setReviewId,
   isPrivate,
   setIsPrivate,
+  startedAt,
+  agentName,
 }) => {
   const {t} = useTranslate();
   const {showToast} = useToast();
 
-  const [getSimulationDetails, {data: simulationDetails}] =
-    useLazyGetSimulationDetailsQuery();
   const [createReview] = useCreateReviewMutation();
   const [updateReviewStatus] = useUpdateReviewStatusMutation();
-
-  useEffect(() => {
-    if (scenarioSessionId) {
-      getSimulationDetails({id: scenarioSessionId});
-    }
-  }, [scenarioSessionId, getSimulationDetails]);
-
-  useEffect(() => {
-    if (simulationDetails?.reviewId) {
-      setReviewId(simulationDetails.reviewId);
-      if (simulationDetails.reviewStatus === ReviewStatus.IN_REVIEW) {
-        setIsPrivate(false);
-      } else if (simulationDetails.reviewStatus === ReviewStatus.HIDDEN) {
-        setIsPrivate(true);
-      }
-    }
-  }, [
-    setIsPrivate,
-    setReviewId,
-    simulationDetails?.reviewId,
-    simulationDetails?.reviewStatus,
-  ]);
 
   const handlePrivacyToggle = async (isPrivateValue: boolean) => {
     // Optimistically update the UI
@@ -110,8 +89,8 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
     <>
       <SimulationTranscript
         sessionId={scenarioSessionId}
-        startedAt={simulationDetails?.startedAt}
-        agentName={simulationDetails?.scenario?.metadata?.name}
+        startedAt={startedAt}
+        agentName={agentName}
       />
       <View style={styles.privacyToggleContainer}>
         <PrivacyToggle isPrivate={isPrivate} onToggle={handlePrivacyToggle} />

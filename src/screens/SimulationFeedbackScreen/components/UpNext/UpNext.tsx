@@ -9,7 +9,7 @@ import {SessionGlimpse} from '../SessionGlimpse';
 import {SummaryCard} from '../SummaryCard';
 
 interface UpNextProps {
-  scenarioSessionId?: string;
+  scenarioSessionId: string;
   pathId?: string;
   caseId?: string;
   languageId?: number;
