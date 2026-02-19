@@ -34,7 +34,16 @@ default_system_prompt: |-
     the target language; do not impose English-style grammar.
 language_instruction_non_english: |-
   **LANGUAGE INSTRUCTION:**
-  - You must communicate in the language for code '{language_code}'. Use colloquial, spoken style, not formal or textbook. Prefer common loanwords where they are used in everyday speech. Avoid formal native equivalents. Use vocabulary and phrasing native speakers use in everyday conversation. Do not translate from English sentence-by-sentence—generate as a native speaker would say it, with natural grammar and word order. Prefer verbs and everyday phrases over abstract nouns. Use correct grammatical cases and structures natural to the target language; do not impose English-style grammar. Use natural code-mixing where appropriate. Prefer short, everyday verbs (feel, think, get, say) over long, formal verbs. If a verb sounds like it belongs in a textbook or formal writing, replace it with a simpler everyday equivalent or a common English loanword.
+  - You must communicate in the language for code '{language_code}'.
+  Use colloquial, spoken style, not formal or textbook. Prefer common
+  loanwords where they are used in everyday speech. Avoid formal native equivalents.
+  Use vocabulary and phrasing native speakers use in everyday conversation. Do not
+  translate from English sentence-by-sentence—generate as a native speaker would say it,
+  with natural grammar and word order. Prefer verbs and everyday phrases over abstract nouns.
+  Use correct grammatical cases and structures natural to the target language; do not impose
+  English-style grammar. Use natural code-mixing where appropriate. Prefer short, everyday verbs
+  (feel, think, get, say) over long, formal verbs. If a verb sounds like it belongs in a textbook
+  or formal writing, replace it with a simpler everyday equivalent or a common English loanword.
 context_generation_system_prompt: |-
   You are an expert in cultural linguistics and sociolinguistics, specializing in youth culture and colloquial speech patterns.
   Your task is to generate brief, authentic cultural context and speaking style descriptions for a character in a roleplay scenario.

@@ -14,6 +14,9 @@ from app.prompts.resolver import resolve_template
 
 logger = get_logger(__name__)
 
+# Searchable log prefix for prompt injection (grep: SIMULATION_PROMPT)
+LOG_PREFIX = "[SIMULATION_PROMPT]"
+
 # Fallback when no prompt_data or legacy prompt_data.prompt; resolver used at runtime
 DEFAULT_PROMPT = prompt_manager.get_template("system", "default_system_prompt")
 
@@ -55,6 +58,11 @@ def _get_language_instruction(
     Returns empty string for English or missing language_code.
     """
     if not language_code or language_code.startswith("en"):
+        logger.info(
+            "%s LANGUAGE_INSTRUCTION omitted (English or missing): language_code=%s",
+            LOG_PREFIX,
+            language_code or "None",
+        )
         return ""
     template = resolve_template(
         "language_instruction_non_english",
@@ -63,7 +71,13 @@ def _get_language_instruction(
     if not template:
         return ""
     try:
-        return template.format(language_code=language_code) + "\n\n"
+        result = template.format(language_code=language_code) + "\n\n"
+        logger.info(
+            "%s LANGUAGE_INSTRUCTION injected for non-English: language_code=%s",
+            LOG_PREFIX,
+            language_code,
+        )
+        return result
     except KeyError:
         return template + "\n\n"
 
@@ -76,16 +90,30 @@ def _get_cultural_and_style_block(
     Also adds a specific instruction if the language is not English.
     """
     content = ""
+    injected = []
 
     # Add Language specific instruction from template if not English
     backend_prompts = getattr(prompt_data, "prompts", None)
-    content += _get_language_instruction(language_code, backend_prompts)
+    lang_block = _get_language_instruction(language_code, backend_prompts)
+    content += lang_block
+    if lang_block:
+        injected.append("language_instruction")
 
     if prompt_data.cultural_context:
         content += f"**Cultural Context:**\n{prompt_data.cultural_context}\n\n"
+        injected.append("cultural_context")
 
     if prompt_data.speaking_style:
         content += f"**Speaking Style & Tone:**\n{prompt_data.speaking_style}\n\n"
+        injected.append("speaking_style")
+
+    if injected:
+        logger.info(
+            "%s INJECTED blocks: %s (language_code=%s)",
+            LOG_PREFIX,
+            ", ".join(injected),
+            language_code or "None",
+        )
 
     return content
 
@@ -543,7 +571,16 @@ def generate_system_message(
         )
 
     if next_instruction:
-        return _build_branching_prompt(prompt_data, next_instruction, language_code)
+        msg = _build_branching_prompt(prompt_data, next_instruction, language_code)
+        logger.info(
+            "%s BUILT branching prompt: language_code=%s, "
+            "has_cultural=%s, has_style=%s",
+            LOG_PREFIX,
+            language_code or "None",
+            bool(prompt_data.cultural_context),
+            bool(prompt_data.speaking_style),
+        )
+        return msg
 
     if behavior_instructions is not None:
         # Handle empty behavior_instructions list by providing a default behavior prompt
@@ -551,18 +588,34 @@ def generate_system_message(
             logger.warning(
                 "Empty behavior_instructions provided, using default behavior prompt"
             )
-        return _build_behavior_prompt(
+        msg = _build_behavior_prompt(
             prompt_data,
             base_system_prompt,
             behavior_instructions,
             current_state,
             language_code,
         )
+        logger.info(
+            "%s BUILT behavior prompt: language_code=%s, has_cultural=%s, has_style=%s",
+            LOG_PREFIX,
+            language_code or "None",
+            bool(prompt_data.cultural_context),
+            bool(prompt_data.speaking_style),
+        )
+        return msg
 
     # TODO: Deprecated, remove in future versions
     # Full prompt generation when neither next_instruction nor
     # behavior_instructions provided
-    return _build_full_prompt(prompt_data, base_system_prompt, language_code)
+    msg = _build_full_prompt(prompt_data, base_system_prompt, language_code)
+    logger.info(
+        "%s BUILT full prompt: language_code=%s, has_cultural=%s, has_style=%s",
+        LOG_PREFIX,
+        language_code or "None",
+        bool(prompt_data.cultural_context),
+        bool(prompt_data.speaking_style),
+    )
+    return msg
 
 
 def generate_prompt_content(

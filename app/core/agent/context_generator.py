@@ -10,6 +10,9 @@ from app.prompts.resolver import resolve_template
 
 logger = logging.getLogger(__name__)
 
+# Searchable log prefix for AI-generated prompt components (grep: SIMULATION_PROMPT)
+LOG_PREFIX = "[SIMULATION_PROMPT]"
+
 
 async def generate_cultural_context(
     prompt_data: PromptData, language_code: str, llm_client: BaseLLMClient
@@ -31,6 +34,13 @@ async def generate_cultural_context(
     speaking_style = prompt_data.speaking_style
 
     if cultural_context and speaking_style:
+        logger.info(
+            "%s AI_GENERATED skipped (using existing): cultural_context=%s, "
+            "speaking_style=%s",
+            LOG_PREFIX,
+            bool(cultural_context),
+            bool(speaking_style),
+        )
         return cultural_context, speaking_style
 
     if not llm_client:
@@ -75,8 +85,8 @@ async def generate_cultural_context(
         if is_indian:
             style_instruction.append(
                 "- **Indian Language Rule:** Do NOT use formal/bookish words "
-                "(e.g., avoid 'samvadikkan', use 'samsarikkan'). "
-                "Use common, everyday words."
+                "Use common, everyday words. Avoid formal equivalents; use "
+                "colloquial or English where native speakers do in daily speech."
             )
 
             code_mix_term = "Code-Mixing"
@@ -206,10 +216,18 @@ async def generate_cultural_context(
         if not speaking_style:
             speaking_style = generated_style
 
+        def _trunc(s):
+            return (s[:200] + "...") if s and len(s) > 200 else (s or "")
+
         logger.info(
-            "Generated Context - Cultural: %s, Style: %s",
-            cultural_context,
-            speaking_style,
+            "%s AI_GENERATED cultural_context: %s",
+            LOG_PREFIX,
+            _trunc(cultural_context),
+        )
+        logger.info(
+            "%s AI_GENERATED speaking_style: %s",
+            LOG_PREFIX,
+            _trunc(speaking_style),
         )
         return cultural_context, speaking_style
 

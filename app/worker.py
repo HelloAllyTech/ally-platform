@@ -156,7 +156,9 @@ class AgentWorker:
                 language_code = self.scenario.language_config.language_code
 
             logger.info(
-                "[AgentWorker] Resolved language code for context generation: '%s'",
+                "[SIMULATION_PROMPT] [AgentWorker] room=%s language_code=%s "
+                "context_generation starting",
+                self.ctx.room.name,
                 language_code,
             )
 
@@ -172,7 +174,9 @@ class AgentWorker:
                 self.scenario.prompt_data.speaking_style = style
 
             logger.info(
-                "[AgentWorker] Context generation complete. Cultural: %s, Style: %s",
+                "[SIMULATION_PROMPT] [AgentWorker] room=%s context_generation complete "
+                "cultural=%s style=%s",
+                self.ctx.room.name,
                 bool(cultural),
                 bool(style),
             )
@@ -390,6 +394,11 @@ class AgentWorker:
         try:
             # Wait for termination event to be set
             await self._termination_event.wait()
+
+            logger.info(
+                "[SIMULATION_PROMPT] CONVERSATION_END room=%s termination_triggered",
+                self.ctx.room.name,
+            )
 
             # Validate termination message exists and is not empty
             if not self._termination_message or not self._termination_message.strip():

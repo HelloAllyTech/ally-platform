@@ -742,6 +742,18 @@ async def generate_response(
             current_state=current_state,
         )
 
+        room_name = ""
+        if config and "configurable" in config:
+            room = config["configurable"].get("room")
+            if room and hasattr(room, "name"):
+                room_name = room.name
+        logger.info(
+            "[SIMULATION_PROMPT] room=%s language_code=%s prompt_built mode=%s",
+            room_name or "unknown",
+            language_code or "None",
+            "branching" if next_instruction else "behavior",
+        )
+
     # Get LLM client from config (pre-configured in AgentSetup) or create dynamically
     llm_client = None
     if config and "configurable" in config:

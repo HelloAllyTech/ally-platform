@@ -40,11 +40,18 @@ async def generate_default_parameters(
     try:
         # Get prompt content (same as agent LLM uses)
         # Import here to avoid circular dependency with app.core.graph
+        from app.core.constants import DEFAULT_LANGUAGE_CODE
         from app.core.graph.prompt import generate_prompt_content
 
+        language_code = (
+            scenario.language_config.language_code
+            if scenario.language_config
+            else DEFAULT_LANGUAGE_CODE
+        )
         prompt_content = generate_prompt_content(
             prompt_data=scenario.prompt_data,
             next_instruction=None,
+            language_code=language_code,
         )
 
         parameter_metadata_json = json.dumps(parameter_metadata, indent=2)
