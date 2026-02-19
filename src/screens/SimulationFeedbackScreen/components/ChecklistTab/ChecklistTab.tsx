@@ -3,15 +3,11 @@ import {Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {CancelIcon, CheckCircleIcon} from '@/assets';
-import {ProgressBar} from '@/components/LearningPathDetails';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
-import {formatAsPercentage} from '@/utils';
-
-import {SummaryCard} from '../SummaryCard';
 
 interface ChecklistTabProps {
-  scenarioSessionId?: string;
+  items: ChecklistItem[];
 }
 
 interface ChecklistItem {
@@ -20,76 +16,34 @@ interface ChecklistItem {
   completed: boolean;
 }
 
-export const ChecklistTab: React.FC<ChecklistTabProps> = ({
-  scenarioSessionId,
-}) => {
+export const ChecklistTab: React.FC<ChecklistTabProps> = ({items}) => {
   const {t} = useTranslate();
 
-  // TODO: Fetch real checklist data using scenarioSessionId when API is ready
-  // For now, use dummy data
-  const dummyItems: ChecklistItem[] = [
-    {
-      id: '1',
-      name: 'Item 1',
-      completed: true,
-    },
-    {
-      id: '2',
-      name: 'Item 2',
-      completed: true,
-    },
-    {
-      id: '3',
-      name: 'Item 3',
-      completed: false,
-    },
-  ];
-
-  const completedCount = dummyItems.filter(item => item.completed).length;
-  const totalCount = dummyItems.length;
-
   return (
-    <SummaryCard>
-      {/* Title Header */}
+    <>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>
           {t('SimulationFeedback.checklistHeader')}
         </Text>
-        <Text style={styles.percentageText}>
-          {totalCount > 0 && formatAsPercentage(completedCount / totalCount)}
-        </Text>
       </View>
-
-      {/* Progress Bar */}
-      <View style={styles.progressBarContainer}>
-        <ProgressBar
-          current={completedCount}
-          total={totalCount}
-          height={ms(8)}
-          inProgressColor={colors.ds.theme.primaryLight}
-          isProgressTextVisible={false}
-        />
-      </View>
-
-      {/* Checklist Items */}
       <View style={styles.itemsContainer}>
-        {dummyItems.map(item => (
+        {items.map(item => (
           <View
             key={item.id}
             style={[
               styles.checklistItem,
               item.completed ? styles.itemCompleted : styles.itemIncomplete,
             ]}>
-            <Text style={styles.itemText}>{item.name}</Text>
             {item.completed ? (
               <CheckCircleIcon width={ms(19)} height={ms(19)} />
             ) : (
               <CancelIcon width={ms(19)} height={ms(19)} />
             )}
+            <Text style={styles.itemText}>{item.name}</Text>
           </View>
         ))}
       </View>
-    </SummaryCard>
+    </>
   );
 };
 
@@ -103,16 +57,7 @@ const styles = ScaledSheet.create({
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
-    fontSize: '14@ms',
-    color: colors.ds.typography.highEmphasis,
-  },
-  percentageText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.large,
-    color: colors.ds.typography.highEmphasis,
-  },
-  progressBarContainer: {
-    marginBottom: '16@ms',
+    color: colors.ds.typography.mediumEmphasis,
   },
   itemsContainer: {
     gap: '12@ms',
@@ -120,7 +65,6 @@ const styles = ScaledSheet.create({
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: '12@ms',
     gap: '16@ms',
     backgroundColor: colors.ds.grey[50],
@@ -136,10 +80,10 @@ const styles = ScaledSheet.create({
   },
   itemCompleted: {
     backgroundColor: colors.lightGreen2,
-    borderColor: colors.ds.green[400],
+    borderColor: colors.ds.green[200],
   },
   itemIncomplete: {
     backgroundColor: colors.lightRed,
-    borderColor: colors.ds.red[400],
+    borderColor: colors.ds.red[200],
   },
 });

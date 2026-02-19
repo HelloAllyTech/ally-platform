@@ -351,9 +351,16 @@ export type CaseSimulation = PathScenario;
  */
 export type CasesResponse = SimulationPathsResponse;
 
-/**
- * Room connection status for LiveKit sessions
- */
+export interface EventChecklistItem {
+  id: string;
+  name: string;
+  hasOccurred: boolean;
+}
+
+export interface EventChecklistResponse {
+  eventChecklist: EventChecklistItem[];
+}
+
 export enum RoomStatus {
   CONNECTED = 'connected',
   CONNECTING = 'connecting',

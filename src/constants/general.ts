@@ -169,6 +169,8 @@ export const API_ROUTES = {
       `/learn/scenario-sessions/${scenarioSessionId}/chat/stream`,
     CHAT_HISTORY: (scenarioSessionId: string) =>
       `/learn/scenario-sessions/${scenarioSessionId}/chat/history`,
+    EVENT_CHECKLIST: (scenarioSessionId: string) =>
+      `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',
@@ -208,6 +210,10 @@ export const API_ROUTES = {
   SIMULATION_SUMMARY: {
     GET_SKILLS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/skills`,
+  },
+  APP_VERSION: {
+    ANDROID: '/app-version/android',
+    IOS: '/app-version/ios',
   },
 } as const;
 

@@ -101,3 +101,17 @@ export const formatAsStringOrDash = (value: unknown): string => {
   if (!value) return '-';
   return String(value);
 };
+
+export const calculateAverageForObjectArray = <T, K extends keyof T>(
+  arr: T[],
+  key: K,
+): number => {
+  if (!arr.length) return 0;
+
+  const total = arr.reduce((sum, item) => {
+    const value = item[key];
+    return sum + Number(value);
+  }, 0);
+
+  return Math.round(total / arr.length);
+};
