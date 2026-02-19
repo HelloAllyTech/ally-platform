@@ -135,8 +135,15 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
 
   const renderEmptyState = useCallback(
-    () => <AskAiInitialState onQuestionSelection={() => {}} />,
-    [],
+    () => (
+      <AskAiInitialState
+        onQuestionSelection={message => {
+          sendMessage(message);
+          setIsThinking(true);
+        }}
+      />
+    ),
+    [sendMessage],
   );
 
   const showThinking = isThinking && !isStreaming && !error;
