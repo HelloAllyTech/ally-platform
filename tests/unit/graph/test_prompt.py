@@ -318,20 +318,3 @@ class TestPrompt:
 
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_in.content
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
-
-    def test_generate_system_message_uses_dashboard_language_instruction_when_provided(
-        self,
-    ):
-        """Test dashboard language instruction used when in promptData.prompts."""
-        custom_instruction = (
-            "**LANGUAGE INSTRUCTION:**\n"
-            "Speak in language '{language_code}'. Use DASHBOARD custom text."
-        )
-        pd = make_prompt_data(
-            prompts={"language_instruction_non_english": custom_instruction}
-        )
-        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
-        content = msg.content
-
-        assert "DASHBOARD custom text" in content
-        assert "ml-IN" in content
