@@ -169,7 +169,6 @@ class BehaviorInstructionFeedbackData:
     behavior_instruction_id: Optional[str]  # ID from core service
     score: int  # Score for this behavior instruction
     category: "SimulationBehaviorCategory"  # SHOULD_DO or SHOULD_NOT_DO
-    detected: bool  # Whether the behavior was detected
 
 
 def add_behavior_feedback_data(

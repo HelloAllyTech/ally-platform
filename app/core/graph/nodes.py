@@ -531,7 +531,6 @@ async def _detect_single_behavior_instruction(
                 behavior_instruction_id=behavior_instruction.behavior_instruction_id,
                 score=behavior_instruction.score,
                 category=behavior_instruction.category,
-                detected=True,
             )
     except Exception as e:
         logger.exception(
@@ -677,7 +676,6 @@ async def send_behavior_feedback(
             "behaviorInstructionId": bf_data.behavior_instruction_id,
             "score": bf_data.score,
             "category": bf_data.category.value,
-            "detected": bf_data.detected,
         }
         core_behavior_message = CoreEventMessageType.create_behavior_instruction(
             room_id=room.name,
