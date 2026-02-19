@@ -182,6 +182,7 @@ jest.mock('../components', () => {
     ),
     TranscriptTab: () => <View testID="transcript-tab" />,
     AskAI: () => <View testID="ask-ai-tab" />,
+    SessionSkills: () => <View testID="session-skills-tab" />,
     UpNext: ({onFinish, onBack}: any) => (
       <View testID="up-next-tab">
         <TouchableOpacity testID="finish-button" onPress={onFinish}>
@@ -250,8 +251,8 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Tab index 1 is TRANSCRIPTION
-    fireEvent.press(getByTestId('tab-1'));
+    // Tab index 2 is TRANSCRIPTION (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3)
+    fireEvent.press(getByTestId('tab-2'));
     await waitFor(() => {
       expect(getByTestId('transcript-tab')).toBeTruthy();
     });
@@ -261,8 +262,8 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
     );
-    // Tab index 2 is UP_NEXT (only visible when pathId or caseId is provided)
-    fireEvent.press(getByTestId('tab-2'));
+    // Tab index 4 is UP_NEXT (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3, UP_NEXT=4)
+    fireEvent.press(getByTestId('tab-4'));
     await waitFor(() => {
       expect(getByTestId('up-next-tab')).toBeTruthy();
     });
@@ -290,9 +291,11 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId, queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Without pathId/caseId: SUMMARY (0) and TRANSCRIPTION (1) only
+    // Without pathId/caseId: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3)
     expect(getByTestId('tab-0')).toBeTruthy();
     expect(getByTestId('tab-1')).toBeTruthy();
-    expect(queryByTestId('tab-2')).toBeNull();
+    expect(getByTestId('tab-2')).toBeTruthy();
+    expect(getByTestId('tab-3')).toBeTruthy();
+    expect(queryByTestId('tab-4')).toBeNull();
   });
 });

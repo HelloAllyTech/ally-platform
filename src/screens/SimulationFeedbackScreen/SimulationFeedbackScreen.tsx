@@ -19,7 +19,13 @@ import {colors, globalStyles} from '@/theme';
 import {ReviewStatus} from '@/types';
 import {navigateToLearnTab} from '@/utils';
 
-import {AskAI, SummaryTab, TranscriptTab, UpNext} from './components';
+import {
+  AskAI,
+  SessionSkills,
+  SummaryTab,
+  TranscriptTab,
+  UpNext,
+} from './components';
 import {styles} from './styles';
 
 // Tab keys enum for better maintainability and type safety
@@ -27,7 +33,7 @@ enum TabKey {
   SUMMARY = 'SUMMARY',
   ASK_AI = 'ASK_AI',
   TRANSCRIPTION = 'TRANSCRIPTION',
-  // SKILLS = 'SKILLS',
+  SKILLS = 'SKILLS',
   // REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
 }
@@ -275,8 +281,8 @@ export const SimulationFeedbackScreen: React.FC<
           />
         );
 
-      // case TabKey.SKILLS:
-      //   return <SessionSkills scenarioSessionId={scenarioSessionId} />;
+      case TabKey.SKILLS:
+        return <SessionSkills scenarioSessionId={scenarioSessionId} />;
 
       // case TabKey.REFLECTION:
       //   return <Reflection scenarioSessionId={scenarioSessionId} />;
@@ -305,18 +311,18 @@ export const SimulationFeedbackScreen: React.FC<
         key: TabKey.SUMMARY,
         title: t('SimulationFeedback.tabs.sessionReview'),
       },
-      // {
-      //   key: TabKey.ASK_AI,
-      //   title: t('SimulationFeedback.tabs.askAI'),
-      // },
+      {
+        key: TabKey.ASK_AI,
+        title: t('SimulationFeedback.tabs.askAI'),
+      },
       {
         key: TabKey.TRANSCRIPTION,
         title: t('SimulationFeedback.tabs.annotatedTranscript'),
       },
-      // {
-      //   key: TabKey.SKILLS,
-      //   title: t('SimulationFeedback.tabs.skillsDemonstrated'),
-      // },
+      {
+        key: TabKey.SKILLS,
+        title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+      },
       // {
       //   key: TabKey.REFLECTION,
       //   title: t('SimulationFeedback.tabs.deeperReflection'),
