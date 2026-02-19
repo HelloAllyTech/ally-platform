@@ -476,6 +476,8 @@
     "askAIHeader": "Ask AI",
     "askAIPlaceholder": "Ask a question about the session....",
     "askAIMaxMessages": "You've reached the maximum number of questions for this session.",
+    "askAIRetry": "Retry",
+    "askAIInterrupted": "Response was interrupted. Tap Retry to try again.",
     "askAIInitialStateTitle": {
       "title": "What would you like ",
       "subtitle": "feedback on?"
@@ -496,7 +498,7 @@
       "skillCoverage": "Skill Coverage",
       "clientEmotionalMovement": "Client Emotional Movement",
       "chartXAxisLabel": "X: Session Timeline(Min) graph",
-      "chartYAxisLabel": "Y: Level (1-10)",
+      "chartYAxisLabel": "Y: Level (-5 to 5)",
       "noDataFound": "No data found"
     }
   },

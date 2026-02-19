@@ -168,6 +168,44 @@ export const styles = ScaledSheet.create({
   sendButtonActive: {
     backgroundColor: colors.ds.blue[500],
   },
+
+  // ── Error / Retry ─────────────────────────────────────────────
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.ds.red[50],
+    marginHorizontal: '16@ms',
+    paddingHorizontal: '12@ms',
+    paddingVertical: '8@vs',
+    borderRadius: '8@ms',
+    gap: '8@ms',
+    marginBottom: '4@vs',
+  },
+  errorText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '12@ms',
+    color: colors.ds.red[500],
+    flex: 1,
+    lineHeight: '16@vs',
+  },
+  retryButton: {
+    paddingHorizontal: '12@ms',
+    paddingVertical: '6@vs',
+    borderRadius: '99@ms',
+    backgroundColor: colors.ds.blue[500],
+  },
+  retryButtonText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '12@ms',
+    color: colors.white,
+  },
+
+  // ── Loading ───────────────────────────────────────────────────
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   thinkingLottie: {
     width: '24@ms',
     height: '24@ms',
