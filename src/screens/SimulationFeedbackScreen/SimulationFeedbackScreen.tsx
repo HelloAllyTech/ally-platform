@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -32,6 +32,9 @@ enum TabKey {
   UP_NEXT = 'UP_NEXT',
 }
 
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 2000;
+
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
@@ -52,18 +55,53 @@ export const SimulationFeedbackScreen: React.FC<
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
   const {showToast} = useToast();
 
+  const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
 
-  // Fetch simulation details to get reviewId
+  const fetchSimulationDetailsWithRetry = useCallback(
+    async (retryCount = 0) => {
+      if (!scenarioSessionId) {
+        return;
+      }
+      try {
+        const response = await getSimulationDetails({
+          id: scenarioSessionId,
+        }).unwrap();
+
+        if (!response?.details && retryCount < MAX_RETRY_ATTEMPTS) {
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSimulationDetailsWithRetry(retryCount + 1);
+          }, RETRY_DELAY);
+        } else if (retryCount >= MAX_RETRY_ATTEMPTS) {
+          setRetryLimitReached(true);
+        }
+      } catch (error) {
+        if (retryCount < MAX_RETRY_ATTEMPTS) {
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSimulationDetailsWithRetry(retryCount + 1);
+          }, RETRY_DELAY);
+        } else {
+          setRetryLimitReached(true);
+        }
+      }
+    },
+    [scenarioSessionId, getSimulationDetails],
+  );
+
   useEffect(() => {
-    if (scenarioSessionId) {
-      getSimulationDetails({id: scenarioSessionId});
-    }
-  }, [scenarioSessionId, getSimulationDetails]);
+    fetchSimulationDetailsWithRetry();
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, [fetchSimulationDetailsWithRetry]);
 
   // Set reviewId and isPrivate from simulation details
   useEffect(() => {
@@ -212,7 +250,8 @@ export const SimulationFeedbackScreen: React.FC<
       case TabKey.SUMMARY:
         return (
           <SummaryTab
-            scenarioSessionId={scenarioSessionId}
+            simulationDetails={simulationDetails ?? null}
+            retryLimitReached={retryLimitReached}
             pathId={pathId}
             caseId={caseId}
             fromLogs={fromLogs}
@@ -231,6 +270,8 @@ export const SimulationFeedbackScreen: React.FC<
             reviewId={reviewId}
             setReviewId={setReviewId}
             scenarioSessionId={scenarioSessionId}
+            startedAt={simulationDetails?.startedAt}
+            agentName={simulationDetails?.scenario?.metadata?.name}
           />
         );
 
