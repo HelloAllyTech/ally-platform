@@ -110,17 +110,17 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Should return only the new AI message in state.messages
-        assert len(new_state.messages) == 1
-        assert isinstance(new_state.messages[0], AIMessage)
-        assert new_state.messages[0].content == "hello from llm"
+        # Should return a dict with the new AI message
+        assert isinstance(result, dict)
+        assert len(result["messages"]) == 1
+        assert isinstance(result["messages"][0], AIMessage)
+        assert result["messages"][0].content == "hello from llm"
 
-        # new_events cleared
-        assert new_state.new_events == []
-        # permitted/events_accumulator/current_score preserved
-        assert new_state.current_score == state.current_score
+        # new_events cleared, next_instruction reset
+        assert result["new_events"] == []
+        assert result["next_instruction"] is None
 
     @pytest.mark.asyncio
     async def test_generate_response_selects_max_magnitude_branching_instruction(
@@ -215,10 +215,12 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Branching and feedback data should be cleared after use
-        assert new_state.branching_and_feedback_data == []
+        # generate_response returns a dict; feedback clearing is now
+        # handled by the separate send_event_feedback node
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_branching_instructions(self, monkeypatch):
@@ -301,11 +303,10 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Branching and feedback data should be cleared after use
-        assert new_state.branching_and_feedback_data == []
-        assert new_state.non_branching_feedback_data == []
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None
 
     @pytest.mark.asyncio
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):
@@ -385,11 +386,11 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
         assert call_count["primary"] == 1
         assert call_count["fallback"] == 1
-        assert new_state.messages[0].content == "fallback response"
+        assert result["messages"][0].content == "fallback response"
 
     @pytest.mark.asyncio
     async def test_generate_response_without_scenario(self, monkeypatch):
@@ -412,10 +413,10 @@ class TestGenerateResponse:
         # No scenario in config
         config = {"configurable": {}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        assert len(new_state.messages) == 1
-        assert new_state.messages[0].content == "response without scenario"
+        assert len(result["messages"]) == 1
+        assert result["messages"][0].content == "response without scenario"
 
     @pytest.mark.asyncio
     async def test_generate_response_with_no_language_config(self, monkeypatch):
@@ -476,9 +477,9 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        assert "en-US" in new_state.messages[0].content
+        assert "en-US" in result["messages"][0].content
 
     @pytest.mark.asyncio
     async def test_generate_response_preserves_state_fields(self, monkeypatch):
@@ -549,12 +550,13 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Verify preserved fields
-        assert new_state.permitted_events == [e1]
-        assert new_state.events_accumulator == accumulated
-        assert new_state.current_score == 42
+        # generate_response now returns a dict with only the fields it updates;
+        # permitted_events, events_accumulator, and current_score are preserved
+        # by the LangGraph state (not overwritten by this node)
+        assert isinstance(result, dict)
+        assert len(result["messages"]) == 1
 
     @pytest.mark.asyncio
     async def test_generate_response_selects_feedback_from_branching_event(
@@ -639,10 +641,10 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Branching and feedback data should be cleared
-        assert new_state.branching_and_feedback_data == []
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None
 
     @pytest.mark.asyncio
     async def test_generate_response_selects_highest_score_feedback_when_no_branching(
@@ -735,10 +737,10 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Branching and feedback data should be cleared
-        assert new_state.branching_and_feedback_data == []
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None
 
     @pytest.mark.asyncio
     async def test_generate_response_handles_empty_feedback_message(self, monkeypatch):
@@ -812,7 +814,7 @@ class TestGenerateResponse:
         )()
         config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
 
-        new_state = await generate_response(state, config=config)
+        result = await generate_response(state, config=config)
 
-        # Branching and feedback data should be cleared
-        assert new_state.branching_and_feedback_data == []
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None

@@ -8,6 +8,7 @@ from app.core.graph.nodes import (
     process_events,
     resolve_branching_instruction,
     send_behavior_feedback,
+    send_event_feedback,
 )
 from app.core.graph.state import SimulationState
 
@@ -100,6 +101,9 @@ def build_graph() -> StateGraph[SimulationState]:
        - detect_behaviors: Detects behaviors from behavior instructions (as subgraph)
     4. apply_voice_expressions: Applies voice expression parameters and text enhancement
        (as subgraph)
+    5. send_event_feedback: Sends event scores/feedback to the UI and clears
+       transient event state. Separated from generate_response so the core
+       nodes (1-3) can be reused by the report graph without UI concerns.
 
     Note: resolve_branching_instruction, detect_behaviors, and apply_voice_expressions
     are subgraphs to prevent their LLM outputs from being streamed. With subgraphs=False
@@ -141,6 +145,12 @@ def build_graph() -> StateGraph[SimulationState]:
     # Fan-in: [generate_response, detect_behaviors] → apply_voice_expressions
     graph.add_edge("generate_response", "apply_voice_expressions")
     graph.add_edge("detect_behaviors", "apply_voice_expressions")
-    graph.add_edge("apply_voice_expressions", END)
+
+    # send_event_feedback runs last — sends event scores/feedback to UI.
+    # Kept separate from generate_response so that node stays reusable
+    # for contexts that don't need UI feedback (e.g. report generation).
+    graph.add_node("send_event_feedback", send_event_feedback)
+    graph.add_edge("apply_voice_expressions", "send_event_feedback")
+    graph.add_edge("send_event_feedback", END)
 
     return graph

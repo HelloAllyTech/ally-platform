@@ -53,6 +53,7 @@ class TestSubgraphStructure:
             "generate_response",
             "detect_behaviors",
             "apply_voice_expressions",
+            "send_event_feedback",
         ]
 
         for node_name in expected_nodes:
@@ -72,6 +73,7 @@ class TestSubgraphStructure:
         assert "generate_response" in graph.nodes
         assert "detect_behaviors" in graph.nodes
         assert "apply_voice_expressions" in graph.nodes
+        assert "send_event_feedback" in graph.nodes
 
 
 class TestSubgraphIsolation:

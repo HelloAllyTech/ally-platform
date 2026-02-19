@@ -691,47 +691,24 @@ async def send_behavior_feedback(
 
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
-) -> SimulationState:
+) -> dict:
     """
-    Generate LLM response and handle event feedback.
+    Generate LLM response based on detected events and branching instruction.
 
     This function:
     1. Uses resolved branching instruction from state (resolved in previous node)
     2. Generates LLM response using the branching instruction (if any)
-    3. Merges feedback from branching and non-branching events:
-       - Priority 1: Branching event feedback (from resolve_branching_instruction)
-       - Priority 2: Highest score non-branching event feedback
-    4. Sends feedback to UI after STT/TTS flow completes
-    5. Clears branching_and_feedback_data,
-       non_branching_feedback_data, and behavior_feedback_data after processing
+    3. Returns the AI message and clears consumed fields
 
-    Note: Behavior feedback sending is handled by send_behavior_feedback
-    in the detect_behaviors subgraph.
+    Feedback sending to UI is handled separately by ``send_event_feedback``,
+    which runs as a dedicated node at the end of the agent graph. This
+    separation keeps generate_response reusable for contexts that don't
+    need UI feedback (e.g. report generation).
     """
     logger.info("Generating response")
 
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
-    feedback_to_send = state.feedback_to_send
-
-    # Merge feedback selection: Priority 1 = branching, Priority 2 = non-branching
-    # If no branching feedback was selected, use highest score non-branching feedback
-    # (Only in parallel mode - in sequential mode, non_branching_feedback_data is empty)
-    if (
-        not feedback_to_send
-        and state.non_branching_feedback_data
-        and settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS
-    ):
-        events_with_feedback = [
-            ed for ed in state.non_branching_feedback_data if ed.feedback is not None
-        ]
-        if events_with_feedback:
-            selected_event_data = max(events_with_feedback, key=lambda e: abs(e.score))
-            feedback_to_send = selected_event_data.feedback
-            logger.info(
-                f"Priority 2: Selected highest score non-branching event "
-                f"(score={selected_event_data.score}) for UI feedback"
-            )
 
     # Build system message from scenario and prepend only for the LLM call
     scenario = (
@@ -837,28 +814,54 @@ async def generate_response(
         except Exception as e:
             logger.warning(f"Failed to log interaction for evaluation: {e}")
 
-    # Prepare the final messages
-    # Note: response.content is the agent's conversation response
-    # - it should not contain parameters dict
-    # Parameters are generated separately in apply_voice_expressions node
-    # and go to update_options() only
-    messages = [AIMessage(content=response.content)]
+    return {
+        "messages": [AIMessage(content=response.content)],
+        "new_events": [],
+        "next_instruction": None,
+    }
 
-    # Step 2: Send feedback to UI after STT/TTS flow completes
-    # This ensures feedback is sent only after the agent finishes speaking
-    # Score is sent even if there's no feedback message (matches old behavior)
+
+async def send_event_feedback(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Send event feedback to UI after LLM response generation.
+
+    This node is placed at the end of the agent graph (after
+    apply_voice_expressions) and is NOT used by the report graph.
+
+    It:
+    1. Merges feedback from branching and non-branching events:
+       - Priority 1: Branching event feedback (from resolve_branching_instruction)
+       - Priority 2: Highest score non-branching event feedback
+    2. Calculates cumulative score from all active events
+    3. Sends the combined score + feedback to the UI
+    4. Clears transient event/feedback state after processing
+    """
+    feedback_to_send = state.feedback_to_send
+
+    # Merge feedback selection: Priority 1 = branching, Priority 2 = non-branching
+    if (
+        not feedback_to_send
+        and state.non_branching_feedback_data
+        and settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS
+    ):
+        events_with_feedback = [
+            ed for ed in state.non_branching_feedback_data if ed.feedback is not None
+        ]
+        if events_with_feedback:
+            selected_event_data = max(events_with_feedback, key=lambda e: abs(e.score))
+            feedback_to_send = selected_event_data.feedback
+            logger.info(
+                f"Priority 2: Selected highest score non-branching event "
+                f"(score={selected_event_data.score}) for UI feedback"
+            )
+
     if config and "configurable" in config:
         room = config["configurable"].get("room")
         if room is not None:
-            # Calculate cumulative score from ALL ACTIVE events
-            # (both branching and non-branching events with feedback)
-            # ACTIVE events always have a feedback object
-            # (even if message is None)
             all_active_events_data = []
 
-            # Add branching events with feedback
-            # (including events without branching instructions
-            # for backward compatibility)
             if state.branching_and_feedback_data:
                 branching_active = [
                     ed
@@ -867,7 +870,6 @@ async def generate_response(
                 ]
                 all_active_events_data.extend(branching_active)
 
-            # Add non-branching events with feedback
             if state.non_branching_feedback_data:
                 non_branching_active = [
                     ed
@@ -887,7 +889,6 @@ async def generate_response(
                 f"     ACTIVE events count: {len(all_active_events_data)} "
                 f"({branching_count} branching + {non_branching_count} non-branching)"
             )
-
             # Send score if there are ACTIVE events (matches old behavior)
             # Cumulative score includes ALL ACTIVE events, even if they don't
             # have feedback messages
@@ -905,6 +906,7 @@ async def generate_response(
                 detected_event_ids = [ed.event_id for ed in all_active_events_data]
                 # Handle feedback message - assign empty string if not present
                 # Even if ACTIVE events exist, they may not have feedback
+
                 if feedback_to_send:
                     # Feedback object exists, but message might be None
                     feedback_message = (
@@ -940,19 +942,14 @@ async def generate_response(
                 logger.info("Sending feedback to UI:")
                 await send_event_to_ui(ui_message, room)
                 logger.info("UI feedback sent successfully")
+                print("\n\n UI Message Sending:", ui_message)
 
-    return SimulationState(
-        messages=messages,
-        permitted_events=state.permitted_events,
-        events_accumulator=state.events_accumulator,
-        current_score=state.current_score,
-        new_events=[],
-        branching_and_feedback_data=[],  # Clear after use
-        non_branching_feedback_data=[],  # Clear after use
-        next_instruction=None,  # Reset after use
-        feedback_to_send=None,  # Reset after use
-        behavior_feedback_data=[],  # Clear after use
-    )
+    return {
+        "branching_and_feedback_data": [],
+        "non_branching_feedback_data": [],
+        "feedback_to_send": None,
+        "behavior_feedback_data": [],
+    }
 
 
 async def apply_voice_expressions(

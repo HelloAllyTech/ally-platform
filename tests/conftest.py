@@ -41,6 +41,7 @@ def _set_test_env_vars():
         # Core service settings
         "CORE_SERVICE_BASE_URL": "https://test.core-service.local",
         "CORE_SERVICE_API_KEY": "test-core-service-api-key",
+        "SYNC_PROMPTS_TO_LOCAL": "True",
     }
 
     # Set environment variables and store originals

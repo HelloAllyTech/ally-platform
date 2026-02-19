@@ -18,6 +18,7 @@ from app.core.graph.nodes import (
     generate_response,
     process_events,
     resolve_branching_instruction,
+    send_event_feedback,
 )
 from app.core.graph.state import (
     BranchingAndFeedbackData,
@@ -174,8 +175,8 @@ class TestBranchingVsNonBranchingSeparation:
         assert result["feedback_to_send"].message == "Branch feedback"
 
     @pytest.mark.asyncio
-    async def test_generate_response_merges_feedback_from_both_paths(self):
-        """Test that generate_response correctly merges feedback from both paths."""
+    async def test_generate_response_returns_dict_without_feedback_logic(self):
+        """Test that generate_response returns a dict and does not handle feedback."""
         state = SimulationState(
             messages=[HumanMessage(content="Hello")],
             permitted_events=[],
@@ -199,12 +200,9 @@ class TestBranchingVsNonBranchingSeparation:
                 )
             ],
             next_instruction="Branch",
-            feedback_to_send=EventFeedback(
-                emoji="👍", message="Branch feedback"
-            ),  # From branching event
+            feedback_to_send=EventFeedback(emoji="👍", message="Branch feedback"),
         )
 
-        # Mock LLM client
         mock_llm_client = MagicMock()
         mock_llm_instance = AsyncMock()
         mock_llm_instance.ainvoke = AsyncMock(
@@ -222,22 +220,20 @@ class TestBranchingVsNonBranchingSeparation:
 
         result = await generate_response(state, config=config)
 
-        # Verify state is cleared
-        assert result.branching_and_feedback_data == []
-        assert result.non_branching_feedback_data == []
-        assert result.next_instruction is None
-        assert result.feedback_to_send is None
+        assert isinstance(result, dict)
+        assert result["next_instruction"] is None
+        assert result["messages"][0].content == "Response"
 
     @pytest.mark.asyncio
-    async def test_generate_response_fallback_to_non_branching_feedback(self):
-        """Test generate_response falls back to non-branching feedback."""
+    async def test_send_event_feedback_fallback_to_non_branching(self):
+        """Test send_event_feedback falls back to non-branching feedback."""
         state = SimulationState(
             messages=[HumanMessage(content="Hello")],
             permitted_events=[],
             events_accumulator=[],
             new_events=[],
             current_score=0,
-            branching_and_feedback_data=[],  # No branching events
+            branching_and_feedback_data=[],
             non_branching_feedback_data=[
                 BranchingAndFeedbackData(
                     branching_instruction=None,
@@ -247,32 +243,27 @@ class TestBranchingVsNonBranchingSeparation:
                 )
             ],
             next_instruction=None,
-            feedback_to_send=None,  # No branching feedback
+            feedback_to_send=None,
         )
 
-        # Mock LLM client
-        mock_llm_client = MagicMock()
-        mock_llm_instance = AsyncMock()
-        mock_llm_instance.ainvoke = AsyncMock(
-            return_value=AIMessage(content="Response")
-        )
-        mock_llm_client.llm_instance = mock_llm_instance
+        mock_room = MagicMock()
+        mock_room.name = "test_room"
 
         config = {
             "configurable": {
-                "llm_client": mock_llm_client,
-                "scenario": None,
-                "room": None,
+                "room": mock_room,
             }
         }
 
-        result = await generate_response(state, config=config)
+        with patch("app.core.graph.nodes.send_event_to_ui") as mock_send:
+            result = await send_event_feedback(state, config=config)
 
-        # Should have used non-branching feedback (merged in generate_response)
-        # The feedback was sent to UI, but we can't verify that here
-        # We can verify state is cleared
-        assert result.branching_and_feedback_data == []
-        assert result.non_branching_feedback_data == []
+            assert mock_send.called
+            call_args = mock_send.call_args[0][0]
+            assert call_args.data.message == "Non-branch feedback"
+
+        assert result["branching_and_feedback_data"] == []
+        assert result["non_branching_feedback_data"] == []
 
     @pytest.mark.asyncio
     async def test_cumulative_score_includes_both_branching_and_non_branching(self):
@@ -303,28 +294,17 @@ class TestBranchingVsNonBranchingSeparation:
             feedback_to_send=EventFeedback(emoji="👍", message="Branch feedback"),
         )
 
-        # Mock LLM client
-        mock_llm_client = MagicMock()
-        mock_llm_instance = AsyncMock()
-        mock_llm_instance.ainvoke = AsyncMock(
-            return_value=AIMessage(content="Response")
-        )
-        mock_llm_client.llm_instance = mock_llm_instance
-
-        # Mock room for UI feedback sending
         mock_room = MagicMock()
         mock_room.name = "test_room"
 
         config = {
             "configurable": {
-                "llm_client": mock_llm_client,
-                "scenario": None,
                 "room": mock_room,
             }
         }
 
         with patch("app.core.graph.nodes.send_event_to_ui") as mock_send:
-            await generate_response(state, config=config)
+            await send_event_feedback(state, config=config)
 
             # Verify feedback was sent with cumulative score (10 + 5 = 15)
             assert mock_send.called
@@ -439,12 +419,15 @@ class TestBranchingVsNonBranchingSeparation:
             }
         }
 
-        # The non-branching feedback should be available and used
-        # (it's merged in generate_response when feedback_to_send is None)
         result = await generate_response(generate_state, generate_config)
 
-        # State should be cleared
-        assert result.non_branching_feedback_data == []
+        # generate_response returns a dict with the AI message
+        assert isinstance(result, dict)
+        assert result["messages"][0].content == "Response"
+
+        # Non-branching feedback data is still on generate_state for
+        # send_event_feedback to consume later
+        assert len(generate_state.non_branching_feedback_data) == 1
 
     @pytest.mark.asyncio
     async def test_error_handling_orchestrator_failure(self):
@@ -548,26 +531,17 @@ class TestBranchingVsNonBranchingSeparation:
             ),  # From branching (Priority 1)
         )
 
-        mock_llm_client = MagicMock()
-        mock_llm_instance = AsyncMock()
-        mock_llm_instance.ainvoke = AsyncMock(
-            return_value=AIMessage(content="Response")
-        )
-        mock_llm_client.llm_instance = mock_llm_instance
-
         mock_room = MagicMock()
         mock_room.name = "test_room"
 
         config = {
             "configurable": {
-                "llm_client": mock_llm_client,
-                "scenario": None,
                 "room": mock_room,
             }
         }
 
         with patch("app.core.graph.nodes.send_event_to_ui") as mock_send:
-            await generate_response(state, config=config)
+            await send_event_feedback(state, config=config)
 
             # Verify branching feedback was used (Priority 1)
             assert mock_send.called
@@ -591,21 +565,12 @@ class TestBranchingVsNonBranchingSeparation:
             feedback_to_send=None,
         )
 
-        mock_llm_client = MagicMock()
-        mock_llm_instance = AsyncMock()
-        mock_llm_instance.ainvoke = AsyncMock(
-            return_value=AIMessage(content="Response")
-        )
-        mock_llm_client.llm_instance = mock_llm_instance
-
         config = {
             "configurable": {
-                "llm_client": mock_llm_client,
-                "scenario": None,
                 "room": None,
             }
         }
 
         # Should handle gracefully without errors
-        result = await generate_response(state, config=config)
-        assert result.non_branching_feedback_data == []
+        result = await send_event_feedback(state, config=config)
+        assert result["non_branching_feedback_data"] == []
