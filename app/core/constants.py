@@ -102,6 +102,9 @@ class ExpressionType(str, Enum):
 
 # Core service endpoint paths
 AUTH_VERIFY_ENDPOINT: Final[str] = "/api/v1/authorization/permissions/validate"
+SCENARIO_REPORT_WEBHOOK_ENDPOINT: Final[str] = (
+    "/api/v1/learn/scenarios/reports/webhook"
+)
 
 # Worker configuration constants
 DEFAULT_VAD_ACTIVATION_THRESHOLD: Final[float] = 0.7

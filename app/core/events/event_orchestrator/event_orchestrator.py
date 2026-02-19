@@ -52,11 +52,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
     def __init__(
         self,
         scenario: Scenario,
-        room: rtc.Room,
         thread_id: str,
+        room: Optional[rtc.Room] = None,
         termination_callback: Optional[callable] = None,
         agent_joined_at: Optional[datetime] = None,
+        is_report_mode: bool = False,
     ):
+        self.is_report_mode = is_report_mode
         self.events = scenario.events
         self._event_map = {e.event_id: e for e in self.events}
         self.event_registry: Dict[str, EventRegistryEntry] = {}
@@ -169,7 +171,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 # Non-combination events: add to registry normally
                 self.set_event_state(event.event_id, False, event.detection_type)
 
-    async def initialize(self) -> None:
+    async def initialize(self, graph=None) -> None:
         """
         Initialize the event orchestrator and send initial events.
 
@@ -177,6 +179,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         1. Sends initial score-based events to Core (example: score < 5)
         2. Updates graph state with initial branching_and_feedback_data
         3. Starts timers for all TIME events
+
+        Args:
+            graph: Optional compiled LangGraph instance. When provided
+                (e.g. in report mode), this graph is used instead of
+                the global ``agent_graph``. This keeps report state
+                isolated from the live-agent graph.
         """
         # Send initial score-based events to Core (example: score < 5)
         (
@@ -185,17 +193,23 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             branching_and_feedback_data,
         ) = await self.orchestrate_events(room=self.room, detected_event_ids=None)
 
+        # Resolve which graph to use: caller-supplied or global
+        if graph is None:
+            # Lazy import to avoid circular dependency
+            from app.core.graph import agent_graph
+
+            resolved_graph = agent_graph
+        else:
+            resolved_graph = graph
+
         # Update graph state with initial branching_and_feedback_data
         # if any were triggered
-        # Lazy import to avoid circular dependency
-        from app.core.graph import agent_graph
-
-        if agent_graph and self.thread_id and branching_and_feedback_data:
+        if resolved_graph and self.thread_id and branching_and_feedback_data:
             logger.info(
                 f"Updating graph state with {len(branching_and_feedback_data)} "
                 f"initial branching and feedback data entries"
             )
-            agent_graph.update_state(
+            resolved_graph.update_state(
                 {"configurable": {"thread_id": self.thread_id}},
                 values={"branching_and_feedback_data": branching_and_feedback_data},
             )
@@ -208,7 +222,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             get_live_score=lambda: self.live_score,
             room=self.room,
             default_seconds=60.0,
-            agent_graph=agent_graph,
+            agent_graph=resolved_graph,
             thread_id=self.thread_id,
         )
 
@@ -450,7 +464,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
     async def orchestrate_events(
         self,
-        room: rtc.Room,
+        room: Optional[rtc.Room] = None,
         detected_event_ids: Optional[Set[str]] = None,
     ) -> Tuple[List[BaseEvent], int, List[BranchingAndFeedbackData]]:
         """
@@ -494,7 +508,9 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         # Send events to Core immediately (backend needs real-time updates)
         # UI events are handled via branching_and_feedback_data in generate_response
-        await self._send_events_to_core(events_to_process, room)
+        # In report mode, skip SQS entirely -- results are delivered via webhook
+        if not self.is_report_mode:
+            await self._send_events_to_core(events_to_process, room)
 
         # Update live_score with scores from events sent to core
         await self._update_live_score(events_to_process)

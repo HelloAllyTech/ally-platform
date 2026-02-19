@@ -1,7 +1,7 @@
 """API dependencies for authentication and authorization."""
 
 import httpx
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
@@ -11,6 +11,28 @@ from app.core.logger import get_logger
 logger = get_logger(__name__)
 
 security = HTTPBearer()
+
+
+async def verify_api_key(
+    x_api_key: str = Header(..., description="API key for backend-to-backend auth"),
+) -> None:
+    """
+    Validate the x-api-key header for backend-to-backend authentication.
+
+    Compares the provided key against the configured CORE_SERVICE_API_KEY.
+
+    Args:
+        x_api_key: The API key from the request header.
+
+    Raises:
+        HTTPException 401: If the API key is missing or invalid.
+    """
+    if x_api_key != settings.X_API_KEY:
+        logger.warning("Invalid API key provided for backend-to-backend auth")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
 
 
 async def verify_token(

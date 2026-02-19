@@ -34,6 +34,17 @@ class TimeEventScheduler:
         # Map of event_id -> asyncio.Task for scheduled time events
         self._time_tasks: Dict[str, asyncio.Task] = {}
 
+    async def cancel_all(self) -> int:
+        """Cancel all pending time event tasks and return the count cancelled."""
+        tasks = list(self._time_tasks.values())
+        if not tasks:
+            return 0
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._time_tasks.clear()
+        return len(tasks)
+
     async def start_time_event_schedulers(
         self,
         events: List[BaseEvent],

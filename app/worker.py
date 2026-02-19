@@ -207,9 +207,9 @@ class AgentWorker:
 
         self.event_orchestrator = EventOrchestrator(
             scenario=self.scenario,
-            termination_callback=termination_handler,
-            room=self.ctx.room,
             thread_id=self.ctx.room.name,
+            room=self.ctx.room,
+            termination_callback=termination_handler,
             agent_joined_at=self.joined_iso,
         )
 

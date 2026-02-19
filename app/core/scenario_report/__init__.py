@@ -1,0 +1,1 @@
+"""Scenario report generation feature."""

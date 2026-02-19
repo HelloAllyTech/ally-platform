@@ -117,6 +117,13 @@ class Settings(BaseSettings):
         default="dummy-key",
         description="API key sent as x-api-key header when calling the core service",
     )
+    X_API_KEY: str = Field(
+        default="dummy-key",
+        description=(
+            "API key for validating incoming requests to this service "
+            "(callers must send this value in the x-api-key header)"
+        ),
+    )
 
     # CORS
     ALLOWED_ORIGINS: str = Field(
