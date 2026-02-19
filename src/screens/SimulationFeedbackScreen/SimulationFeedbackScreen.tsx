@@ -266,7 +266,7 @@ export const SimulationFeedbackScreen: React.FC<
         );
 
       case TabKey.ASK_AI:
-        return <AskAI />;
+        return <AskAI scenarioSessionId={scenarioSessionId || ''} />;
 
       case TabKey.TRANSCRIPTION:
         return (
