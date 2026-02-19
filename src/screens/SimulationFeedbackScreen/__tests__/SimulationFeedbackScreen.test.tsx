@@ -279,11 +279,11 @@ describe('SimulationFeedbackScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('does not show back arrow when not from logs', () => {
-    const {queryByTestId} = renderWithProviders(
+  it('shows back arrow even when not from logs', () => {
+    const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    expect(queryByTestId('left-arrow-icon')).toBeNull();
+    expect(getByTestId('left-arrow-icon')).toBeTruthy();
   });
 
   it('renders tabs with correct count based on route params', () => {
