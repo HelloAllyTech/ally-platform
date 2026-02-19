@@ -492,7 +492,7 @@
       "skillCoverage": "Skill Coverage",
       "clientEmotionalMovement": "Client Emotional Movement",
       "chartXAxisLabel": "X: Session Timeline(Min) graph",
-      "chartYAxisLabel": "Y: Level (1-10)",
+      "chartYAxisLabel": "Y: Level (-5 to 5)",
       "noDataFound": "No data found"
     }
   },

@@ -37,16 +37,17 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
 }) => {
   const {t} = useTranslate();
   const defaultEmotionalMovement: EmotionalMovement[] = [
-    {sessionTime: 0, level: 0},
-    {sessionTime: 100, level: 4.5},
-    {sessionTime: 250, level: 6},
-    {sessionTime: 400, level: 8.5},
-    {sessionTime: 480, level: 10},
-    {sessionTime: 700, level: 7.5},
-    {sessionTime: 850, level: 5},
-    {sessionTime: 1000, level: 2.5},
-    {sessionTime: 1150, level: 4},
-    {sessionTime: 1200, level: 6.5},
+    {startTime: 0, level: 0},
+    {startTime: 100, level: 4.5},
+    {startTime: 250, level: 6},
+    {startTime: 400, level: 4},
+    {startTime: 410, level: 10},
+    {startTime: 480, level: 1},
+    {startTime: 700, level: 4},
+    {startTime: 850, level: 5},
+    {startTime: 1000, level: 2.5},
+    {startTime: 1150, level: 4},
+    {startTime: 1200, level: 6.5},
   ];
 
   const {data: simulationSkills} = useGetSimulationSkillsQuery(
@@ -75,7 +76,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       return [
         {
           data: emotionalMovementRaw.map(item => ({
-            x: item.sessionTime,
+            x: item.startTime,
             y: item.level,
           })),
         },
