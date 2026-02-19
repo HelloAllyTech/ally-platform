@@ -1,9 +1,11 @@
-import React from 'react';
-import {View} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {Animated, Easing, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import Svg, {Circle} from 'react-native-svg';
 
 import {colors} from '@/theme';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface CircularProgressProps {
   progress: number;
@@ -12,6 +14,7 @@ export interface CircularProgressProps {
   strokeWidth?: number;
   progressColor?: string;
   trackColor?: string;
+  animationDuration?: number;
   children?: React.ReactNode;
 }
 
@@ -20,6 +23,7 @@ export interface CircularProgressProps {
  *
  * A reusable circular progress indicator using SVG.
  * Displays progress as a partial circle arc with optional center content.
+ * Animates from 0 to the target progress on mount and when progress changes.
  */
 export const CircularProgress: React.FC<CircularProgressProps> = ({
   progress,
@@ -28,21 +32,31 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   strokeWidth = 3,
   progressColor = colors.blue,
   trackColor = colors.ds.grey[100],
+  animationDuration = 1200,
   children,
 }) => {
-  // Calculate the circle properties
   const center = size / 2;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // Calculate progress percentage
   const progressPercentage = Math.min(Math.max(progress / max, 0), 1);
-  const strokeDashoffset = circumference * (1 - progressPercentage);
+  const targetOffset = circumference * (1 - progressPercentage);
+
+  const animatedOffset = useRef(new Animated.Value(circumference)).current;
+
+  useEffect(() => {
+    animatedOffset.setValue(circumference);
+    Animated.timing(animatedOffset, {
+      toValue: targetOffset,
+      duration: animationDuration,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [targetOffset, circumference, animationDuration, animatedOffset]);
 
   return (
     <View style={[styles.container, {width: size, height: size}]}>
       <Svg width={size} height={size}>
-        {/* Background track circle */}
         <Circle
           cx={center}
           cy={center}
@@ -51,9 +65,8 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        {/* Progress arc - only render if progress > 0 to avoid dot from rounded linecap */}
         {progressPercentage > 0 && (
-          <Circle
+          <AnimatedCircle
             cx={center}
             cy={center}
             r={radius}
@@ -61,7 +74,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
+            strokeDashoffset={animatedOffset}
             strokeLinecap="round"
             rotation="-90"
             origin={`${center}, ${center}`}

@@ -40,7 +40,7 @@ export const DEFAULT_SKILL_COLOR = colors.ds.blue[300];
 
 // SKILL COVERAGE FALLBACK DATA
 export const DEFAULT_SKILL_COVERAGE: SkillCoverage[] = [
-  {category: 'Learning', percentage: 60, iconUrl: ''},
-  {category: 'Support', percentage: 70, iconUrl: ''},
-  {category: 'Standards', percentage: 90, iconUrl: ''},
+  {category: 'Learning', percentage: 0, iconUrl: ''},
+  {category: 'Support', percentage: 0, iconUrl: ''},
+  {category: 'Standards', percentage: 0, iconUrl: ''},
 ];

@@ -22,6 +22,7 @@ import {
   SKILL_CATEGORY_COLOR_MAP,
 } from '@/constants';
 import {useTranslate} from '@/hooks';
+import {useGetSimulationDetailsQuery} from '@/services';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
 import {SkillCoverage} from '@/types';
@@ -67,8 +68,14 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     },
   );
 
-  const skillCoverage =
-    simulationSkills?.skillCoverage ?? DEFAULT_SKILL_COVERAGE;
+  const {data: simulationDetails} = useGetSimulationDetailsQuery(
+    {id: scenarioSessionId},
+    {skip: !scenarioSessionId},
+  );
+
+  const skillCoverage = simulationSkills?.skillCoverage?.length
+    ? simulationSkills.skillCoverage
+    : DEFAULT_SKILL_COVERAGE;
 
   // TODO: Remove default data after API is ready
   const emotionalMovementRaw = simulationSkills?.emotionalMovement;
@@ -142,8 +149,14 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     [hasEmotionalData],
   );
 
-  const positives = useMemo(() => [], []); // TODO: Remove default data after API is ready
-  const improvements = useMemo(() => [], []); // TODO: Remove default data after API is ready
+  const positives = useMemo(
+    () => simulationDetails?.details?.summary?.feedback?.positives ?? [],
+    [simulationDetails?.details?.summary?.feedback?.positives],
+  );
+  const improvements = useMemo(
+    () => simulationDetails?.details?.summary?.feedback?.improvements ?? [],
+    [simulationDetails?.details?.summary?.feedback?.improvements],
+  );
 
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
     const skillColor =
@@ -157,8 +170,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
           />
         ) : (
           <View style={styles.skillIconContainer}>
-            <BulbIcon width={20} height={20} />{' '}
-            {/* TODO: Replace with placeholder icon */}
+            <BulbIcon width={20} height={20} />
           </View>
         )}
         <View style={styles.skillItem}>
@@ -253,7 +265,9 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             strokeWidth={10}
             progressColor={colors.blue}
             trackColor={colors.lightGray2}>
-            <Text style={styles.overallScorePercentage}>{overallScore}%</Text>
+            <Text style={styles.overallScorePercentage}>
+              {`${overallScore}%`}
+            </Text>
             <Text style={styles.overallScoreLabel}>
               {t('SimulationFeedback.sessionSkills.overallScore')}
             </Text>

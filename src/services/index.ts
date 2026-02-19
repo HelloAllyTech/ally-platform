@@ -15,3 +15,4 @@ export * from './badgesApi';
 export * from './reactionsApi';
 export * from './reviewsApi';
 export * from './userApi';
+export * from './reflectionsApi';

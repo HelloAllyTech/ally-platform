@@ -171,6 +171,8 @@ export const API_ROUTES = {
       `/learn/scenario-sessions/${scenarioSessionId}/chat/history`,
     EVENT_CHECKLIST: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
+    REFLECTION_PROMPTS: (scenarioSessionId: string) =>
+      `/learn/scenario-session/${scenarioSessionId}/reflection-prompts`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',
