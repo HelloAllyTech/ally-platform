@@ -49,7 +49,7 @@ export const styles = ScaledSheet.create({
   },
   messageListContent: {
     gap: '16@vs',
-    paddingBottom: '8@vs',
+    paddingBottom: '24@vs',
   },
   emptyListContent: {
     flex: 1,

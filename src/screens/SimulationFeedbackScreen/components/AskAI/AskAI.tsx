@@ -3,6 +3,7 @@ import LottieView from 'lottie-react-native';
 import {
   ActivityIndicator,
   FlatList,
+  LayoutChangeEvent,
   Text,
   TextInput,
   TouchableOpacity,
@@ -27,32 +28,34 @@ interface AskAIProps {
 
 // ── Sub-components ──────────────────────────────────────────────
 
-const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = ({
-  message,
-}) => (
-  <View style={styles.questionBubble}>
-    <Text style={styles.questionText}>{message.content}</Text>
-  </View>
+const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
+  ({message}) => (
+    <View style={styles.questionBubble}>
+      <Text style={styles.questionText}>{message.content}</Text>
+    </View>
+  ),
 );
 
-const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = ({message}) => (
-  <View style={styles.responseContainer}>
-    <View style={styles.rankBadgeContainer}>
-      <LinearGradient
-        colors={[colors.ds.blue[50], colors.white]}
-        start={{x: 0, y: 0}}
-        end={{x: 0, y: 1}}
-        style={styles.rankBadgeGradient}>
-        <RankBadgeIcon width={9} height={9} />
-      </LinearGradient>
+const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
+  ({message}) => (
+    <View style={styles.responseContainer}>
+      <View style={styles.rankBadgeContainer}>
+        <LinearGradient
+          colors={[colors.ds.blue[50], colors.white]}
+          start={{x: 0, y: 0}}
+          end={{x: 0, y: 1}}
+          style={styles.rankBadgeGradient}>
+          <RankBadgeIcon width={9} height={9} />
+        </LinearGradient>
+      </View>
+      <View style={styles.responseTextContainer}>
+        <Text style={styles.responseText}>
+          {message.content}
+          {message.isStreaming ? '▍' : ''}
+        </Text>
+      </View>
     </View>
-    <View style={styles.responseTextContainer}>
-      <Text style={styles.responseText}>
-        {message.content}
-        {message.isStreaming ? '▍' : ''}
-      </Text>
-    </View>
-  </View>
+  ),
 );
 
 const ThinkingIndicator: React.FC = () => (
@@ -84,9 +87,18 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   } = useAskAIChat({scenarioSessionId});
 
   const flatListRef = useRef<FlatList<AskAIChatMessage>>(null);
+  const contentHeightRef = useRef(0);
+  const listHeightRef = useRef(0);
 
   const [isThinking, setIsThinking] = useState(false);
   const prevMessageCountRef = useRef(messages.length);
+
+  const scrollToBottom = useCallback((animated = true) => {
+    const offset = contentHeightRef.current - listHeightRef.current;
+    if (offset > 0) {
+      flatListRef.current?.scrollToOffset({offset, animated});
+    }
+  }, []);
 
   // Detect when AI message gets added (thinking -> streaming transition)
   useEffect(() => {
@@ -99,14 +111,17 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
-  // Auto-scroll to bottom when messages update
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({animated: true});
-      }, 100);
-    }
-  }, [messages]);
+  const handleContentSizeChange = useCallback(
+    (_w: number, h: number) => {
+      contentHeightRef.current = h;
+      scrollToBottom(true);
+    },
+    [scrollToBottom],
+  );
+
+  const handleListLayout = useCallback((e: LayoutChangeEvent) => {
+    listHeightRef.current = e.nativeEvent.layout.height;
+  }, []);
 
   const handleSend = useCallback(() => {
     const trimmed = inputText.trim();
@@ -192,9 +207,8 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
                   }
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
-                  onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd({animated: true})
-                  }
+                  onContentSizeChange={handleContentSizeChange}
+                  onLayout={handleListLayout}
                 />
 
                 {/* Error banner with retry */}
