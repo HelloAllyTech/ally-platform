@@ -21,6 +21,7 @@ import {navigateToLearnTab} from '@/utils';
 
 import {
   AskAI,
+  Reflection,
   SessionSkills,
   SummaryTab,
   TranscriptTab,
@@ -34,7 +35,7 @@ enum TabKey {
   ASK_AI = 'ASK_AI',
   TRANSCRIPTION = 'TRANSCRIPTION',
   SKILLS = 'SKILLS',
-  // REFLECTION = 'REFLECTION',
+  REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
 }
 
@@ -284,8 +285,8 @@ export const SimulationFeedbackScreen: React.FC<
       case TabKey.SKILLS:
         return <SessionSkills scenarioSessionId={scenarioSessionId} />;
 
-      // case TabKey.REFLECTION:
-      //   return <Reflection scenarioSessionId={scenarioSessionId} />;
+      case TabKey.REFLECTION:
+        return <Reflection scenarioSessionId={scenarioSessionId} />;
 
       case TabKey.UP_NEXT:
         return (
@@ -323,10 +324,10 @@ export const SimulationFeedbackScreen: React.FC<
         key: TabKey.SKILLS,
         title: t('SimulationFeedback.tabs.skillsDemonstrated'),
       },
-      // {
-      //   key: TabKey.REFLECTION,
-      //   title: t('SimulationFeedback.tabs.deeperReflection'),
-      // },
+      {
+        key: TabKey.REFLECTION,
+        title: t('SimulationFeedback.tabs.deeperReflection'),
+      },
     ];
 
     // Only show "Up Next" tab for paths and cases

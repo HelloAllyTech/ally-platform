@@ -1,6 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily} from '@/theme';
 
 export const styles = ScaledSheet.create({
   scrollView: {
@@ -9,53 +9,46 @@ export const styles = ScaledSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: '16@vs',
+    gap: '16@vs',
   },
-  promptContainerWrapper: {
-    marginBottom: '16@vs',
-  },
-  promptContainer: {
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.stroke.primary,
+  promptCard: {
+    backgroundColor: '#FFFDFB',
+    borderWidth: 0.5,
+    borderColor: '#D4B896',
     borderRadius: '4@ms',
-    overflow: 'hidden',
+    padding: '24@ms',
+    gap: '16@vs',
   },
-  promptContainerFocused: {
-    borderColor: colors.ds.blue[400],
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  numberBadge: {
+    backgroundColor: '#8B6F47',
+    width: '32@ms',
+    height: '32@ms',
+    borderRadius: '16@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  numberBadgeText: {
+    color: colors.white,
+    fontSize: '14@ms',
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   promptText: {
-    paddingHorizontal: '16@ms',
-    paddingVertical: '12@vs',
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    fontSize: '13@ms',
-    color: colors.ds.typography.highEmphasis,
-    paddingBottom: '12@vs',
-    lineHeight: '20@vs',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.primary,
-    backgroundColor: colors.ds.surface.background,
-  },
-  promptTextFocused: {
-    borderBottomColor: colors.ds.blue[400],
-    backgroundColor: 'rgba(226, 242, 255, 0.5)',
+    fontSize: '18@ms',
+    color: '#81663E',
+    letterSpacing: 0.25,
   },
   textInput: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '13@ms',
     color: colors.ds.typography.highEmphasis,
-    padding: '12@ms',
     minHeight: '100@vs',
     textAlignVertical: 'top',
-  },
-  textInputFocused: {
-    borderColor: colors.ds.blue[400],
-  },
-  buttonContainer: {
-    marginTop: '8@vs',
-    flexDirection: 'row',
-    gap: '12@ms',
-  },
-  button: {
-    flex: 1,
+    padding: 0,
   },
 });

@@ -488,9 +488,7 @@
     "checklistHeader": "Evaluation Checklist",
     "reflection": {
       "sectionTitle": "Self-Reflection Prompts",
-      "placeholder": "Add response",
-      "clear": "Clear",
-      "save": "Save"
+      "placeholder": "Write your thoughts here..."
     },
     "sessionSkills": {
       "sectionTitle": "Skills shown in this session",

@@ -1,8 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
-import {Button, useErrorToast} from '@/components';
+import {useErrorToast} from '@/components';
 import {useTranslate} from '@/hooks';
 import {
   ReflectionPrompt,
@@ -18,35 +18,35 @@ interface ReflectionProps {
   scenarioSessionId: string;
 }
 
+const DEBOUNCE_DELAY = 1500;
+
 const DEFAULT_REFLECTION_PROMPTS: ReflectionPrompt[] = [
   {
     id: '1',
     prompt:
-      '1. What do you think the client needed most in the moment you shifted to problem-solving?',
+      'What do you think the client needed most in the moment you shifted to problem-solving?',
   },
   {
     id: '2',
-    prompt: '2. Where did you feel unsure or rushed during the conversation?',
+    prompt: 'Where did you feel unsure or rushed during the conversation?',
   },
 ];
 
 export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   const {t} = useTranslate();
   const {showErrorToast} = useErrorToast();
-  const [focusedPromptId, setFocusedPromptId] = useState<string | null>(null);
   const [reflectionPrompts, setReflectionPrompts] = useState<
     ReflectionPrompt[]
   >(DEFAULT_REFLECTION_PROMPTS);
 
-  // TODO: Remove skip when API endpoint is deployed
+  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
   const {data: reflectionPromptsData} = useGetReflectionPromptsQuery(
-    {
-      scenarioSessionId,
-    },
+    {scenarioSessionId},
     {skip: true},
   );
 
-  const [_updateReflectionPrompt] = useUpdateReflectionPromptMutation();
+  const [updateReflectionPrompt] = useUpdateReflectionPromptMutation();
 
   useEffect(() => {
     if (reflectionPromptsData?.reflectionPrompts) {
@@ -54,46 +54,46 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
     }
   }, [reflectionPromptsData?.reflectionPrompts]);
 
-  const handleResponseChange = (value: string) => {
-    setReflectionPrompts(prev =>
-      prev.map(prompt =>
-        prompt.id === focusedPromptId ? {...prompt, response: value} : prompt,
-      ),
-    );
-  };
-
-  const handleClear = () => {
-    const currentResponse = reflectionPrompts.find(
-      prompt => prompt.id === focusedPromptId,
-    )?.response;
-    if (!currentResponse) {
-      return;
-    }
-    setReflectionPrompts(prev =>
-      prev.map(prompt =>
-        prompt.id === focusedPromptId ? {...prompt, response: ''} : prompt,
-      ),
-    );
-  };
-
-  const handleSave = async () => {
-    if (!focusedPromptId) {
-      return;
-    }
-    const prompt = reflectionPrompts.find(
-      promptItem => promptItem.id === focusedPromptId,
-    );
-    const _body = {
-      promptId: focusedPromptId,
-      response: prompt?.response || '',
+  useEffect(() => {
+    const timers = debounceTimers.current;
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
     };
-    try {
-      // TODO: Uncomment when API endpoint is deployed
-      // await _updateReflectionPrompt({scenarioSessionId, body: _body}).unwrap();
-    } catch (error) {
-      showErrorToast(error, 'Errors.reflectionPromptSaveFailed');
-    }
-  };
+  }, []);
+
+  const savePromptResponse = useCallback(
+    async (promptId: string, response: string) => {
+      try {
+        await updateReflectionPrompt({
+          scenarioSessionId,
+          body: {promptId, response},
+        }).unwrap();
+      } catch (error) {
+        showErrorToast(error, 'Errors.reflectionPromptSaveFailed');
+      }
+    },
+    [scenarioSessionId, updateReflectionPrompt, showErrorToast],
+  );
+
+  const handleResponseChange = useCallback(
+    (promptId: string, value: string) => {
+      setReflectionPrompts(prev =>
+        prev.map(prompt =>
+          prompt.id === promptId ? {...prompt, response: value} : prompt,
+        ),
+      );
+
+      if (debounceTimers.current[promptId]) {
+        clearTimeout(debounceTimers.current[promptId]);
+      }
+
+      debounceTimers.current[promptId] = setTimeout(() => {
+        savePromptResponse(promptId, value);
+        delete debounceTimers.current[promptId];
+      }, DEBOUNCE_DELAY);
+    },
+    [savePromptResponse],
+  );
 
   return (
     <SummaryCard title={t('SimulationFeedback.reflection.sectionTitle')}>
@@ -104,52 +104,25 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
         enableOnAndroid
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}>
-        {reflectionPrompts.map(prompt => {
-          return (
-            <View key={prompt.id} style={styles.promptContainerWrapper}>
-              <View
-                style={[
-                  styles.promptContainer,
-                  focusedPromptId === prompt.id &&
-                    styles.promptContainerFocused,
-                ]}>
-                <Text
-                  style={[
-                    styles.promptText,
-                    focusedPromptId === prompt.id && styles.promptTextFocused,
-                  ]}>
-                  {prompt.prompt}
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder={t('SimulationFeedback.reflection.placeholder')}
-                  placeholderTextColor={colors.ds.typography.lowEmphasis}
-                  value={prompt.response || ''}
-                  onChangeText={handleResponseChange}
-                  multiline
-                  textAlignVertical="top"
-                  onFocus={() => setFocusedPromptId(prompt.id)}
-                  onBlur={() => setFocusedPromptId(null)}
-                />
+        {reflectionPrompts.map((prompt, index) => (
+          <View key={prompt.id} style={styles.promptCard}>
+            <View style={styles.badgeRow}>
+              <View style={styles.numberBadge}>
+                <Text style={styles.numberBadgeText}>{index + 1}</Text>
               </View>
-              {focusedPromptId === prompt.id && (
-                <View style={styles.buttonContainer}>
-                  <Button
-                    customContainerStyle={styles.button}
-                    onPress={handleClear}
-                    variant="secondary"
-                    label={t('SimulationFeedback.reflection.clear')}
-                  />
-                  <Button
-                    customContainerStyle={styles.button}
-                    label={t('SimulationFeedback.reflection.save')}
-                    onPress={handleSave}
-                  />
-                </View>
-              )}
             </View>
-          );
-        })}
+            <Text style={styles.promptText}>{prompt.prompt}</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder={t('SimulationFeedback.reflection.placeholder')}
+              placeholderTextColor={colors.ds.typography.lowEmphasis}
+              value={prompt.response || ''}
+              onChangeText={value => handleResponseChange(prompt.id, value)}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        ))}
       </KeyboardAwareScrollView>
     </SummaryCard>
   );
