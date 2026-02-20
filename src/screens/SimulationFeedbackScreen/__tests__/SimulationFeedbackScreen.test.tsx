@@ -183,6 +183,7 @@ jest.mock('../components', () => {
     TranscriptTab: () => <View testID="transcript-tab" />,
     AskAI: () => <View testID="ask-ai-tab" />,
     SessionSkills: () => <View testID="session-skills-tab" />,
+    Reflection: () => <View testID="reflection-tab" />,
     UpNext: ({onFinish, onBack}: any) => (
       <View testID="up-next-tab">
         <TouchableOpacity testID="finish-button" onPress={onFinish}>
