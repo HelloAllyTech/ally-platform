@@ -18,7 +18,10 @@ import {
 // ── Session State ───────────────────────────────────────────────
 
 export interface ChatSessionState {
+  /** Committed messages (history + completed exchanges). Stable during streaming. */
   messages: AskAIChatMessage[];
+  /** The in-progress assistant message, or null when not streaming. */
+  streamingMessage: AskAIChatMessage | null;
   isStreaming: boolean;
   isLoading: boolean;
   error: string | null;
@@ -152,6 +155,7 @@ const snapshotCache = new Map<string, ChatSessionState>();
 
 const DEFAULT_STATE: ChatSessionState = {
   messages: [],
+  streamingMessage: null,
   isStreaming: false,
   isLoading: false,
   error: null,
@@ -178,6 +182,7 @@ const buildSnapshot = (sessionId: string): ChatSessionState => {
   if (
     cached &&
     cached.messages === session.messages &&
+    cached.streamingMessage === session.streamingMessage &&
     cached.isStreaming === session.isStreaming &&
     cached.isLoading === session.isLoading &&
     cached.error === session.error &&
@@ -188,6 +193,7 @@ const buildSnapshot = (sessionId: string): ChatSessionState => {
 
   const snapshot: ChatSessionState = {
     messages: session.messages,
+    streamingMessage: session.streamingMessage,
     isStreaming: session.isStreaming,
     isLoading: session.isLoading,
     error: session.error,
@@ -324,9 +330,21 @@ export const cleanup = (sessionId: string) => {
   if (session?.xhr) {
     session.xhr.abort();
     session.xhr = null;
+    session.streamingMessage = null;
     session.isStreaming = false;
     notifyListeners(sessionId);
   }
+};
+
+/** Remove all state for a session from memory */
+export const destroySession = (sessionId: string) => {
+  const session = sessions.get(sessionId);
+  if (session?.xhr) {
+    session.xhr.abort();
+  }
+  sessions.delete(sessionId);
+  listeners.delete(sessionId);
+  snapshotCache.delete(sessionId);
 };
 
 // ── XHR Stream (internal) ───────────────────────────────────────
@@ -338,15 +356,14 @@ const startStream = async (
 ) => {
   const session = getOrCreateSession(sessionId);
 
-  const assistantMsg = createAssistantMessage();
-  session.messages = [...session.messages, assistantMsg];
+  session.streamingMessage = createAssistantMessage();
   session.isStreaming = true;
   session.error = null;
   notifyListeners(sessionId);
 
   let token = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
   if (!token) {
-    session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+    session.streamingMessage = null;
     session.error = 'No access token';
     session.isStreaming = false;
     notifyListeners(sessionId);
@@ -384,29 +401,32 @@ const startStream = async (
     for (const event of events) {
       switch (event.type) {
         case SSEEventType.TOKEN:
-          session.messages = session.messages.map(msg =>
-            msg.id === assistantMsg.id
-              ? {...msg, content: msg.content + event.content}
-              : msg,
-          );
-          notifyListeners(sessionId);
+          if (session.streamingMessage) {
+            session.streamingMessage = {
+              ...session.streamingMessage,
+              content: session.streamingMessage.content + event.content,
+            };
+            notifyListeners(sessionId);
+          }
           break;
 
-        case SSEEventType.DONE:
+        case SSEEventType.DONE: {
           streamComplete = true;
-          session.messages = session.messages.map(msg =>
-            msg.id === assistantMsg.id ? {...msg, isStreaming: false} : msg,
-          );
+          const finalMsg = {
+            ...session.streamingMessage!,
+            isStreaming: false,
+          };
+          session.messages = [...session.messages, finalMsg];
+          session.streamingMessage = null;
           session.isStreaming = false;
           session.xhr = null;
           notifyListeners(sessionId);
           return;
+        }
 
         case SSEEventType.ERROR:
           streamComplete = true;
-          session.messages = session.messages.filter(
-            m => m.id !== assistantMsg.id,
-          );
+          session.streamingMessage = null;
           session.error = event.error;
           session.isStreaming = false;
           session.xhr = null;
@@ -423,7 +443,7 @@ const startStream = async (
     }
 
     if (xhr.status === 401 && !isRetryAfterRefresh) {
-      session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+      session.streamingMessage = null;
       session.isStreaming = false;
       notifyListeners(sessionId);
 
@@ -448,29 +468,31 @@ const startStream = async (
       } catch {
         session.error = `Request failed with status ${xhr.status}`;
       }
-      session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+      session.streamingMessage = null;
       session.isStreaming = false;
       notifyListeners(sessionId);
       return;
     }
 
     // Flush remaining buffer
-    if (buffer.trim()) {
+    if (buffer.trim() && session.streamingMessage) {
       const {events} = parseSSEBuffer(buffer + '\n\n');
       for (const event of events) {
         if (event.type === SSEEventType.TOKEN) {
-          session.messages = session.messages.map(msg =>
-            msg.id === assistantMsg.id
-              ? {...msg, content: msg.content + event.content}
-              : msg,
-          );
+          session.streamingMessage = {
+            ...session.streamingMessage,
+            content: session.streamingMessage.content + event.content,
+          };
         }
       }
     }
 
-    session.messages = session.messages.map(msg =>
-      msg.id === assistantMsg.id ? {...msg, isStreaming: false} : msg,
-    );
+    // Commit the streaming message
+    if (session.streamingMessage) {
+      const finalMsg = {...session.streamingMessage, isStreaming: false};
+      session.messages = [...session.messages, finalMsg];
+    }
+    session.streamingMessage = null;
     session.isStreaming = false;
     notifyListeners(sessionId);
   };
@@ -480,7 +502,7 @@ const startStream = async (
     if (streamComplete) {
       return;
     }
-    session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+    session.streamingMessage = null;
     session.error =
       'Network error. Please check your connection and try again.';
     session.isStreaming = false;
@@ -493,7 +515,7 @@ const startStream = async (
     if (streamComplete) {
       return;
     }
-    session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+    session.streamingMessage = null;
     session.error = 'Request timed out. Please try again.';
     session.isStreaming = false;
     notifyListeners(sessionId);
