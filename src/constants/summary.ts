@@ -950,10 +950,8 @@ export const CallSummaryGenerationData = {
 };
 
 export const ASK_AI_EMPTY_STATE_QUESTIONS = [
-  'Did i miss any key emotional signals from the client?',
-  'What therapeutic techniques were most effective?',
-  'What deeper questions should I have explored?',
-  'What did I do well in building rapport today?',
-  'How did I handle the client’s resistance?',
-  'How was my active listening and reflection?',
+  'Where did I respond most effectively in this session?',
+  'How was my pacing and presence overall?',
+  'Where might I have missed or misread the client?',
+  'What therapeutic techniques/moves were most helpful?',
 ];
