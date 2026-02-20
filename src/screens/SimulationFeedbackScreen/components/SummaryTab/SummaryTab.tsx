@@ -1,4 +1,4 @@
-import React, {useRef} from 'react';
+import React, {useMemo, useRef} from 'react';
 import {View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -29,8 +29,16 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
   const {t} = useTranslate();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
 
+  const positives = useMemo(
+    () => simulationDetails?.details?.summary?.feedback?.positives ?? [],
+    [simulationDetails?.details?.summary?.feedback?.positives],
+  );
+  const improvements = useMemo(
+    () => simulationDetails?.details?.summary?.feedback?.improvements ?? [],
+    [simulationDetails?.details?.summary?.feedback?.improvements],
+  );
+
   const renderButtonContainer = () => {
-    // For normal simulations (not paths/cases), show "Try Another" button
     if (!pathId && !caseId && !fromLogs) {
       return (
         <View style={styles.buttonContainer}>
@@ -58,7 +66,11 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
         <SimulationSummarySkeleton />
       ) : (
         <>
-          <SimulationSummary data={simulationDetails ?? null} />
+          <SimulationSummary
+            data={simulationDetails ?? null}
+            positives={positives}
+            improvements={improvements}
+          />
           {simulationDetails && renderButtonContainer()}
         </>
       )}

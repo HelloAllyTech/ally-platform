@@ -5,7 +5,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
 import {CustomTabs, FeedbackPopup, useToast} from '@/components';
-import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
+import {
+  getSimulationSummaryTabs,
+  SCREEN_NAMES,
+  SimulationSummaryTabKey,
+  USER_PERMISSIONS,
+} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
@@ -27,16 +32,6 @@ import {
   UpNext,
 } from './components';
 import {styles} from './styles';
-
-// Tab keys enum for better maintainability and type safety
-enum TabKey {
-  SUMMARY = 'SUMMARY',
-  ASK_AI = 'ASK_AI',
-  TRANSCRIPTION = 'TRANSCRIPTION',
-  SKILLS = 'SKILLS',
-  // REFLECTION = 'REFLECTION',
-  UP_NEXT = 'UP_NEXT',
-}
 
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 2000;
@@ -253,7 +248,7 @@ export const SimulationFeedbackScreen: React.FC<
     const currentTabKey = tabs[activeTab]?.key;
 
     switch (currentTabKey) {
-      case TabKey.SUMMARY:
+      case SimulationSummaryTabKey.SUMMARY:
         return (
           <SummaryTab
             simulationDetails={simulationDetails ?? null}
@@ -265,10 +260,10 @@ export const SimulationFeedbackScreen: React.FC<
           />
         );
 
-      case TabKey.ASK_AI:
+      case SimulationSummaryTabKey.ASK_AI:
         return <AskAI scenarioSessionId={scenarioSessionId || ''} />;
 
-      case TabKey.TRANSCRIPTION:
+      case SimulationSummaryTabKey.TRANSCRIPTION:
         return (
           <TranscriptTab
             isPrivate={isPrivate}
@@ -281,13 +276,13 @@ export const SimulationFeedbackScreen: React.FC<
           />
         );
 
-      case TabKey.SKILLS:
+      case SimulationSummaryTabKey.SKILLS:
         return <SessionSkills scenarioSessionId={scenarioSessionId} />;
 
-      // case TabKey.REFLECTION:
+      // case SimulationSummaryTabKey.REFLECTION:
       //   return <Reflection scenarioSessionId={scenarioSessionId} />;
 
-      case TabKey.UP_NEXT:
+      case SimulationSummaryTabKey.UP_NEXT:
         return (
           <UpNext
             scenarioSessionId={scenarioSessionId}
@@ -304,41 +299,10 @@ export const SimulationFeedbackScreen: React.FC<
     }
   };
 
-  // Build tabs array using enum keys for type safety
-  const tabs = useMemo(() => {
-    const tabsList = [
-      {
-        key: TabKey.SUMMARY,
-        title: t('SimulationFeedback.tabs.sessionReview'),
-      },
-      {
-        key: TabKey.ASK_AI,
-        title: t('SimulationFeedback.tabs.askAI'),
-      },
-      {
-        key: TabKey.TRANSCRIPTION,
-        title: t('SimulationFeedback.tabs.annotatedTranscript'),
-      },
-      {
-        key: TabKey.SKILLS,
-        title: t('SimulationFeedback.tabs.skillsDemonstrated'),
-      },
-      // {
-      //   key: TabKey.REFLECTION,
-      //   title: t('SimulationFeedback.tabs.deeperReflection'),
-      // },
-    ];
-
-    // Only show "Up Next" tab for paths and cases
-    if (pathId || caseId) {
-      tabsList.push({
-        key: TabKey.UP_NEXT,
-        title: t('SimulationFeedback.tabs.upNext'),
-      });
-    }
-
-    return tabsList;
-  }, [t, pathId, caseId]);
+  const tabs = useMemo(
+    () => getSimulationSummaryTabs(t, {pathId, caseId}),
+    [t, pathId, caseId],
+  );
 
   return (
     <SafeAreaView
@@ -358,7 +322,7 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
           {/* Comment icon for transcript tab */}
           {!!reviewId &&
-            tabs[activeTab]?.key === TabKey.TRANSCRIPTION &&
+            tabs[activeTab]?.key === SimulationSummaryTabKey.TRANSCRIPTION &&
             !hideReviewDetails && (
               <TouchableOpacity
                 onPress={handleViewReview}

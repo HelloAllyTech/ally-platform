@@ -1,7 +1,54 @@
+import {TFunction} from 'i18next';
 import {ms} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
 import {SkillCoverage} from '@/types';
+
+export enum SimulationSummaryTabKey {
+  SUMMARY = 'SUMMARY',
+  ASK_AI = 'ASK_AI',
+  TRANSCRIPTION = 'TRANSCRIPTION',
+  SKILLS = 'SKILLS',
+  // REFLECTION = 'REFLECTION',
+  UP_NEXT = 'UP_NEXT',
+}
+
+export const getSimulationSummaryTabs = (
+  t: TFunction,
+  {pathId, caseId}: {pathId?: string; caseId?: string},
+) => {
+  const tabs = [
+    {
+      key: SimulationSummaryTabKey.SUMMARY,
+      title: t('SimulationFeedback.tabs.sessionReview'),
+    },
+    {
+      key: SimulationSummaryTabKey.ASK_AI,
+      title: t('SimulationFeedback.tabs.askAI'),
+    },
+    {
+      key: SimulationSummaryTabKey.TRANSCRIPTION,
+      title: t('SimulationFeedback.tabs.annotatedTranscript'),
+    },
+    {
+      key: SimulationSummaryTabKey.SKILLS,
+      title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+    },
+    // {
+    //   key: SimulationSummaryTabKey.REFLECTION,
+    //   title: t('SimulationFeedback.tabs.deeperReflection'),
+    // },
+  ];
+
+  if (pathId || caseId) {
+    tabs.push({
+      key: SimulationSummaryTabKey.UP_NEXT,
+      title: t('SimulationFeedback.tabs.upNext'),
+    });
+  }
+
+  return tabs;
+};
 
 export const EMOTIONAL_MOVEMENT_CHART_CONFIG = {
   backgroundColor: colors.white,
