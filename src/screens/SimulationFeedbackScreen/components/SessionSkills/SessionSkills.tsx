@@ -28,7 +28,6 @@ import {colors, fontFamily, radius, typography} from '@/theme';
 import {SkillCoverage} from '@/types';
 import {
   calculateAverageForObjectArray,
-  getInterpolatedYValues,
   getNormalisedXAxisLabelsMap,
 } from '@/utils';
 import {formatTimeToMMSS} from '@/utils/date';
@@ -77,7 +76,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     ? simulationSkills.skillCoverage
     : DEFAULT_SKILL_COVERAGE;
 
-  // TODO: Remove default data after API is ready
   const emotionalMovementRaw = simulationSkills?.emotionalMovement;
   const hasEmotionalData =
     !!emotionalMovementRaw && emotionalMovementRaw.length > 0;
@@ -109,7 +107,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     return [{data: placeholderPoints}];
   }, [hasEmotionalData, emotionalMovementRaw]);
 
-  // Generate the labels map using the util function.
+  // Generate the labels map using the util function (used by commented-out chart).
   const normalisedXAxisLabelsMap = useMemo(
     () =>
       getNormalisedXAxisLabelsMap(
@@ -117,13 +115,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         formatTimeToMMSS,
         NUM_X_AXIS_INTERVALS,
       ),
-    [emotionalMovementDatasets],
-  );
-
-  // Interpolated Y values at each normalised X-axis position (one number[] per dataset).
-  const interpolatedYValues = useMemo(
-    () =>
-      getInterpolatedYValues(emotionalMovementDatasets, NUM_X_AXIS_INTERVALS),
     [emotionalMovementDatasets],
   );
 
@@ -306,15 +297,18 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             <View style={styles.chartWrapper}>
               <ChartComponent
                 xAxisLabels={Array.from(normalisedXAxisLabelsMap.values())}
-                datasets={emotionalMovementDatasets.map((_dataset, idx) => ({
-                  data: interpolatedYValues[idx] || [],
-                  color: (_opacity: number) =>
-                    hasEmotionalData
-                      ? 'rgba(102, 187, 106, 1)'
-                      : 'rgba(0, 0, 0, 0)',
-                  strokeWidth: hasEmotionalData ? 2 : 0,
-                  label: 'Emotional Movement',
-                }))}
+                datasets={[
+                  {
+                    data:
+                      emotionalMovementDatasets[0]?.data.map(pt => pt.y) ?? [],
+                    color: (_opacity: number) =>
+                      hasEmotionalData
+                        ? 'rgba(102, 187, 106, 1)'
+                        : 'rgba(0, 0, 0, 0)',
+                    strokeWidth: hasEmotionalData ? 2 : 0,
+                    label: 'Emotional Movement',
+                  },
+                ]}
                 height={ms(250)}
                 showLegend={false}
                 chartConfig={resolvedChartConfig}
