@@ -47,7 +47,7 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '13@ms',
     color: colors.ds.typography.highEmphasis,
-    minHeight: '100@vs',
+    minHeight: '150@vs',
     textAlignVertical: 'top',
     padding: 0,
   },

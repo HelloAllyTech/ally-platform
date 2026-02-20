@@ -2,10 +2,10 @@ import React, {useState} from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {HelpIcon} from '@/assets';
+import {ArrowDown, HelpIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
@@ -13,13 +13,27 @@ import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
+  positives?: string[];
+  improvements?: string[];
 }
 
-export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
+export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
+  data,
+  positives = [],
+  improvements = [],
+}) => {
   const {t} = useTranslate();
 
   const [showSimulationDetailsModal, setShowSimulationDetailsModal] =
     useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    whatWentWell: false,
+    areasForImprovement: false,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({...prev, [section]: !prev[section]}));
+  };
 
   const formatDurationAsMMSS = (startedAt?: string, endedAt?: string) => {
     if (!startedAt || !endedAt) return '-';
@@ -37,6 +51,53 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   // Note: coverImageUrl may be available in extended scenario data
   const coverImageUrl =
     (data?.scenario as {coverImageUrl?: string})?.coverImageUrl || undefined;
+
+  const renderFeedbackItem = (item: string, index: number) => (
+    <View key={index} style={styles.feedbackItemContainer}>
+      <Text style={styles.feedbackText}>{item}</Text>
+    </View>
+  );
+
+  const renderExpandableSection = (
+    title: string,
+    items: string[],
+    sectionKey: keyof typeof expandedSections,
+  ) => {
+    const isExpanded = expandedSections[sectionKey];
+    const displayItems = isExpanded ? items : items.slice(0, 3);
+
+    return (
+      <View style={styles.feedbackSectionContainer}>
+        <View style={styles.feedbackSectionHeader}>
+          <Text style={styles.feedbackSectionTitle}>{title}</Text>
+        </View>
+        <View style={styles.feedbackSectionContent}>
+          {displayItems.length > 0 ? (
+            displayItems.map(renderFeedbackItem)
+          ) : (
+            <Text style={styles.noItemsText}>
+              {t('SimulationFeedback.noDataAvailable')}
+            </Text>
+          )}
+          {items.length > 3 && (
+            <TouchableOpacity
+              style={styles.viewMoreButton}
+              onPress={() => toggleSection(sectionKey)}>
+              <Text style={styles.viewMoreText}>
+                {isExpanded ? t('Common.viewLess') : t('Common.viewMore')}
+              </Text>
+              <ArrowDown
+                width={10}
+                height={10}
+                color={colors.black}
+                style={[isExpanded && styles.arrowIconRotated]}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SummaryCard title={t('SimulationFeedback.sessionFeedback')}>
@@ -81,6 +142,16 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
         </View>
       </View>
       {/* {data?.id && <EventChecklist scenarioSessionId={data.id} />} */}
+      {renderExpandableSection(
+        t('SimulationFeedback.biggestStrengthsSkills'),
+        positives,
+        'whatWentWell',
+      )}
+      {renderExpandableSection(
+        t('SimulationFeedback.areasOfGrowth'),
+        improvements,
+        'areasForImprovement',
+      )}
       <SimulationDetailsModal
         visible={showSimulationDetailsModal}
         onClose={() => setShowSimulationDetailsModal(false)}
@@ -154,5 +225,64 @@ const styles = ScaledSheet.create({
     letterSpacing: -0.5,
     textAlign: 'center',
     color: colors.ds.stroke.lightGray,
+  },
+  feedbackSectionContainer: {
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.deepPurple[300],
+    borderRadius: '4@ms',
+    backgroundColor: colors.white,
+    marginTop: '16@vs',
+  },
+  feedbackSectionHeader: {
+    backgroundColor: colors.ds.deepPurpleAlpha[50],
+    paddingHorizontal: '16@ms',
+    paddingVertical: '8@vs',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10@ms',
+  },
+  feedbackSectionTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '20@ms',
+    letterSpacing: '0.25@ms',
+    color: colors.ds.typography.highEmphasis,
+  },
+  feedbackSectionContent: {
+    padding: '16@ms',
+    gap: '16@vs',
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.lightGray,
+  },
+  feedbackItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: '8@ms',
+  },
+  feedbackText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '20@ms',
+    letterSpacing: '0.25@ms',
+    color: colors.black,
+    flex: 1,
+  },
+  noItemsText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.lowEmphasis,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+  },
+  viewMoreText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  arrowIconRotated: {
+    transform: [{rotate: '180deg'}],
   },
 });

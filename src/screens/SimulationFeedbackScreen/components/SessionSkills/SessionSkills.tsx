@@ -1,14 +1,8 @@
-import React, {useMemo, useState} from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, {useMemo} from 'react';
+import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, BulbIcon, LightBulbIcon, ThumbUpIcon} from '@/assets';
+import {BulbIcon} from '@/assets';
 import {
   ChartComponent,
   CircularProgress,
@@ -22,7 +16,6 @@ import {
   SKILL_CATEGORY_COLOR_MAP,
 } from '@/constants';
 import {useTranslate} from '@/hooks';
-import {useGetSimulationDetailsQuery} from '@/services';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
 import {SkillCoverage} from '@/types';
@@ -53,11 +46,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
 }) => {
   const {t} = useTranslate();
-  const [expandedSections, setExpandedSections] = useState({
-    keyEvents: false,
-    whatWentWell: false,
-    areasForImprovement: false,
-  });
 
   const {data: simulationSkills} = useGetSimulationSkillsQuery(
     {
@@ -66,11 +54,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     {
       skip: !scenarioSessionId,
     },
-  );
-
-  const {data: simulationDetails} = useGetSimulationDetailsQuery(
-    {id: scenarioSessionId},
-    {skip: !scenarioSessionId},
   );
 
   const skillCoverage = simulationSkills?.skillCoverage?.length
@@ -149,15 +132,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     [hasEmotionalData],
   );
 
-  const positives = useMemo(
-    () => simulationDetails?.details?.summary?.feedback?.positives ?? [],
-    [simulationDetails?.details?.summary?.feedback?.positives],
-  );
-  const improvements = useMemo(
-    () => simulationDetails?.details?.summary?.feedback?.improvements ?? [],
-    [simulationDetails?.details?.summary?.feedback?.improvements],
-  );
-
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
     const skillColor =
       SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
@@ -194,62 +168,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   const overallScore = useMemo(() => {
     return calculateAverageForObjectArray(skillCoverage, 'percentage');
   }, [skillCoverage]);
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
-
-  const renderFeedbackItem = (item: string, index: number) => (
-    <View key={index} style={styles.feedbackItemContainer}>
-      <Text style={styles.feedbackText}>{item}</Text>
-    </View>
-  );
-
-  const renderExpandableSection = <T,>(
-    title: string,
-    icon: React.ReactNode,
-    items: T[] = [],
-    sectionKey: keyof typeof expandedSections,
-    renderItem: (item: T, index: number) => React.ReactNode,
-  ) => {
-    const isExpanded = expandedSections[sectionKey];
-    const displayItems = isExpanded ? items : items?.slice(0, 3);
-
-    return (
-      <View style={styles.feedbackSectionContainer}>
-        <View style={styles.feedbackSectionHeader}>
-          <Text style={styles.feedbackSectionTitle}>{title}</Text>
-        </View>
-        <View style={styles.feedbackSectionContent}>
-          {displayItems?.length > 0 ? (
-            displayItems?.map(renderItem)
-          ) : (
-            <Text style={styles.noItemsText}>
-              {t('SimulationFeedback.noDataAvailable')}
-            </Text>
-          )}
-          {items.length > 3 && (
-            <TouchableOpacity
-              style={styles.viewMoreButton}
-              onPress={() => toggleSection(sectionKey)}>
-              <Text style={styles.viewMoreText}>
-                {isExpanded ? t('Common.viewLess') : t('Common.viewMore')}
-              </Text>
-              <ArrowDown
-                width={10}
-                height={10}
-                color={colors.black}
-                style={[isExpanded && styles.arrowIconRotated]}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  };
 
   return (
     <ScrollView
@@ -328,20 +246,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
               )}
             </View>
           </View>
-        )}
-        {renderExpandableSection(
-          t('SimulationFeedback.biggestStrengthsSkills'),
-          <ThumbUpIcon width={20} height={20} style={styles.sectionIcon} />,
-          positives,
-          'whatWentWell',
-          renderFeedbackItem,
-        )}
-        {renderExpandableSection(
-          t('SimulationFeedback.areasOfGrowth'),
-          <LightBulbIcon width={20} height={20} style={styles.sectionIcon} />,
-          improvements,
-          'areasForImprovement',
-          renderFeedbackItem,
         )}
       </SummaryCard>
     </ScrollView>
@@ -440,69 +344,6 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     color: colors.ds.typography.mediumEmphasis,
-  },
-  feedbackSectionContainer: {
-    borderWidth: '0.5@ms',
-    borderColor: colors.ds.deepPurple[300],
-    borderRadius: '4@ms',
-    backgroundColor: colors.white,
-    marginBottom: '16@vs',
-  },
-  feedbackSectionHeader: {
-    backgroundColor: colors.ds.deepPurpleAlpha[50],
-    paddingHorizontal: '16@ms',
-    paddingVertical: '8@vs',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '10@ms',
-  },
-  feedbackSectionTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '13@ms',
-    lineHeight: '20@ms',
-    letterSpacing: '0.25@ms',
-    color: colors.ds.typography.highEmphasis,
-  },
-  feedbackSectionContent: {
-    padding: '16@ms',
-    gap: '16@vs',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.lightGray,
-  },
-  feedbackItemContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: '8@ms',
-  },
-  feedbackText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '13@ms',
-    lineHeight: '20@ms',
-    letterSpacing: '0.25@ms',
-    color: colors.black,
-    flex: 1,
-  },
-  noItemsText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    color: colors.ds.typography.lowEmphasis,
-  },
-  viewMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '4@ms',
-  },
-  viewMoreText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    color: colors.ds.typography.mediumEmphasis,
-  },
-  arrowIconRotated: {
-    transform: [{rotate: '180deg'}],
-  },
-  sectionIcon: {
-    marginRight: '8@ms',
-    color: colors.darkGray2,
   },
   overallScoreContainer: {
     alignItems: 'center',
