@@ -465,12 +465,12 @@
     "privacyUpdated": "Privacy setting updated",
     "sharedForReview": "Transcript shared for review",
     "tabs": {
-      "summary": "Summary",
+      "sessionReview": "Session Review",
       "askAI": "Ask AI",
-      "transcription": "Transcription",
+      "annotatedTranscript": "Annotated Transcript",
       "checklist": "Checklist",
-      "skills": "Skills",
-      "reflection": "Reflection",
+      "skillsDemonstrated": "Skills  Demonstrated",
+      "deeperReflection": "Deeper Reflection",
       "upNext": "Up Next"
     },
     "askAIHeader": "Ask AI",
