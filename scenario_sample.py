@@ -12,6 +12,7 @@ SCENARIO_SAMPLE = {
             "name": "Ahana",
             "tone": "Anxious, overwhelmed, defeated",
             "gender": "female",
+            "competency": "Empathy",
             "context": "Say something from <Negative response>",
             "agentGoal": "Help Ahana process her disappointment, reduce anxiety, and develop strategies for communicating with her parents about her results.",
             "profession": "Student",

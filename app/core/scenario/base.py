@@ -77,6 +77,12 @@ class PromptData(BaseModel):
         "Keys: ally_ai_learn_default, ally_ai_learn_context_generation, etc. "
         "Used only when present and different from local prompts.",
     )
+    competency: Optional[str] = Field(
+        default=None,
+        description="The counseling competency being trained in this simulation. "
+        "When set, the simulation is shaped to help the counselor practice and "
+        "learn this specific competency.",
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -296,6 +302,7 @@ class Scenario(BaseModel):
                 "cultural_context": prompt_data_dict.get("culturalContext", None),
                 "speaking_style": prompt_data_dict.get("speakingStyle", None),
                 "prompts": prompt_data_dict.get("prompts"),
+                "competency": prompt_data_dict.get("competency", None),
             }
 
             # Sync backend prompts that differ from local into app/prompts/templates/

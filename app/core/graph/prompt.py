@@ -48,6 +48,28 @@ def _get_behavioral_guidelines(prompt_data: PromptData) -> str:
     return ""
 
 
+def _get_competency_block(competency: Optional[str]) -> str:
+    """
+    Returns a formatted counselor competency instruction block.
+
+    When a competency is specified, the simulation is shaped so that the
+    client's responses create natural opportunities for the counselor to
+    practice and demonstrate that competency.
+    """
+    if not competency:
+        return ""
+    return (
+        f"## Counselor Training Competency\n"
+        f"The counselor attending this simulation is being trained on the following"
+        f" competency:\n"
+        f"**{competency}**\n\n"
+        f"Shape your responses to create natural opportunities for the counselor to"
+        f" practice and demonstrate this competency. Do not make it obvious or"
+        f" forced — let it emerge "
+        f"organically through the conversation.\n\n"
+    )
+
+
 def _get_language_instruction(
     language_code: Optional[str],
     backend_prompts: Optional[dict] = None,
@@ -256,6 +278,7 @@ def _build_branching_prompt(
     character_details = ", ".join(character_details_parts)
 
     cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+    competency_block = _get_competency_block(prompt_data.competency)
 
     character_backstory = prompt_data.context or ""
 
@@ -268,6 +291,7 @@ def _build_branching_prompt(
         {cultural_block}
         Backstory: {character_backstory}
 
+        {competency_block}
         ## Current Task
         Generate next dialogue as per the conversation history and instruction below.
 
@@ -373,6 +397,8 @@ def _build_behavior_prompt(
         "use these dialogues for reference", prompt_data.agent_dialogues
     )
 
+    competency_block = _get_competency_block(prompt_data.competency)
+
     behavior_prompt = dedent(
         f"""
         Role instruction: {base_system_prompt.strip()}
@@ -397,6 +423,7 @@ def _build_behavior_prompt(
         {response_length}
         {agent_dialogues}
 
+        {competency_block}
         Conversation history: Use the conversation history provided in the messages.
 
         Instruction: Use following conditions to generate next dialogue
@@ -467,6 +494,8 @@ def _build_full_prompt(
         "use these dialogues for reference", prompt_data.agent_dialogues
     )
 
+    competency_block = _get_competency_block(prompt_data.competency)
+
     # Assemble the full detailed prompt
     system_prompt = dedent(
         f"""
@@ -512,6 +541,7 @@ def _build_full_prompt(
     {response_length}
     {agent_dialogues}
 
+    {competency_block}
     """
     )
 

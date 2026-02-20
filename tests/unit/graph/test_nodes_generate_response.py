@@ -89,6 +89,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -195,6 +196,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -283,6 +285,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -362,6 +365,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -461,6 +465,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -530,6 +535,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -621,6 +627,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -717,6 +724,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
@@ -794,6 +802,7 @@ class TestGenerateResponse:
                 "previous_memory": None,
                 "cultural_context": None,
                 "speaking_style": None,
+                "competency": None,
             },
         )()
 
