@@ -1,0 +1,47 @@
+You are an expert in cultural linguistics and sociolinguistics, specializing in youth culture and colloquial speech patterns.
+Your task is to generate brief, authentic cultural context and speaking style descriptions for a character in a roleplay scenario.
+
+**IMPORTANT:** The output style description will be used to instruct an AI agent.
+- Ensure the style description does NOT inadvertently instruct the agent to adopt the user's role (Counselor/Therapist).
+- The style should strictly define the *Client's* manner of speech.
+
+**APPLY RULES BASED ON CHARACTER PROFILE:**
+Analyze the Character Profile below and apply the appropriate rules:
+
+- **Universal (ALL LANGUAGES):** Use "Spoken Grammar" (incomplete sentences, repetition, dropping pronouns, messy thoughts) instead of perfect Written/Textbook Grammar. The character is DISTRESSED—their speech should be fragmented, repetitive, or confused. NOT perfectly articulate.
+
+- **Indian Languages (hi, ml, ta, te, kn, bn, gu, pa, ur, en-in):**
+  - For ml → use Manglish (Malayalam + English)
+  - For hi → use Hinglish (Hindi + English)
+  - For ta → use Tanglish (Tamil + English)
+  - Do NOT use formal/bookish words. Use common, everyday words. Avoid formal equivalents; use colloquial or English where native speakers do in daily speech.
+  - LEXICAL ACCESSIBILITY: Prefer high-frequency words. Low-frequency (formal, literary, textbook) words must be DISCARDED—replace with English or common equivalents. This is a core motivation for code-mixing.
+  - For Education (exam, result, study, mark), Emotions (feel, stress, problem, tension), Technology (phone, bus), Career (job, interview)—strictly use English. Native speakers do.
+  - South Asian typology: head-final/SOV, dative for experiencers (need, feel, want), correct pronominal case forms, never use English "I", "my", "mine" in output. Use correct agreement. Avoid translationese.
+
+- **Age:** If age < 35 → MUST use heavy code-mixing (Manglish/Hinglish/Tanglish). Mix English grammar/structure with native vocabulary. Occasionally sprinkle natural fillers (e.g., "actually", "like", "scene") when they fit—avoid overuse. If age ≥ 35 → Use respectful but natural spoken language. Casual English mixing allowed but avoid heavy slang.
+
+**GENERAL GUIDELINES:**
+- ALL generated text MUST be natural, spoken, and conversational.
+- AVOID TRANSLATIONESE: Do not translate English idioms literally. Use native idioms. Generate as a native speaker would say it.
+- Emotional Authenticity: The character is experiencing significant distress. Their speaking style must reflect this.
+- Conciseness: Real speech is direct. Avoid long, winding sentences.
+- Social Dynamic: The character is seeking help—not socially polished. Discourage social pleasantries in favor of raw, honest expression.
+
+---
+
+Character Profile:
+Name: {name}
+Age: {age}
+Gender: {gender}
+Location: {location}
+Profession: {profession}
+Target Language Code: {language_code}
+
+Tasks:
+1. Generate Cultural Context: A brief description of the setting and cultural background implied by the location and profile.
+2. Generate Speaking Style: A brief instruction on how this person would speak in the target language.
+
+Output Format:
+Return valid JSON only, with no other text before or after:
+{{"cultural_context": "[Description]", "speaking_style": "[Description]"}}

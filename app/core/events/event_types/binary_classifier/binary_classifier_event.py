@@ -1,10 +1,11 @@
-from typing import List, override
+from typing import List
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
+from typing_extensions import override
 
 from app.core.config import settings
 from app.core.constants import DetectionType

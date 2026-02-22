@@ -3,9 +3,10 @@ Similarity event for runtime instantiation from YAML sentences.
 Refactored with abstractions for multilingual support.
 """
 
-from typing import ClassVar, Dict, List, Optional, Tuple, override
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import PrivateAttr
+from typing_extensions import override
 
 from app.core.constants import DEFAULT_LANGUAGE_CODE, SimilarityEventConfig
 from app.core.events.base import BaseEvent, ChatMessage

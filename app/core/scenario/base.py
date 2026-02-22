@@ -305,13 +305,6 @@ class Scenario(BaseModel):
                 "competency": prompt_data_dict.get("competency", None),
             }
 
-            # Sync backend prompts that differ from local into app/prompts/templates/
-            backend_prompts = prompt_data_dict.get("prompts")
-            if backend_prompts and isinstance(backend_prompts, dict):
-                from app.prompts.resolver import sync_backend_prompts_to_local
-
-                sync_backend_prompts_to_local(backend_prompts)
-
             prompt_data_obj = PromptData(**mapped_data)
             return prompt_data_obj
         except Exception as e:

@@ -3,13 +3,14 @@ Helper paraphrased event using OpenAI LLM to detect if counselor
 paraphrased the agent's previous message.
 """
 
-from typing import List, Optional, override
+from typing import List, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
+from typing_extensions import override
 
 from app.core.config import settings
 from app.core.constants import DetectionType

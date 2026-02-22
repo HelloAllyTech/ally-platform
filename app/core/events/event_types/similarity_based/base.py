@@ -3,7 +3,9 @@ import unicodedata
 from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import ClassVar, List, override
+from typing import ClassVar, List
+
+from typing_extensions import override
 
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.similarity_based.constants import DEFAULT_STOPWORDS

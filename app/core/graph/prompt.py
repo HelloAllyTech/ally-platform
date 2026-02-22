@@ -76,7 +76,7 @@ def _get_language_instruction(
 ) -> str:
     """
     Get language instruction from prompt template when language is non-English.
-    Uses metadata template if available in promptData.prompts, else local YAML.
+    Uses metadata template if available in promptData.prompts, else local .txt.
     Returns empty string for English or missing language_code.
     """
     if not language_code or language_code.startswith("en"):

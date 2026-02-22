@@ -4,10 +4,11 @@ Uses cosine similarity between embeddings instead of token-based matching.
 """
 
 from dataclasses import dataclass
-from typing import ClassVar, Dict, List, Optional, Tuple, override
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 import numpy as np
 from pydantic import PrivateAttr
+from typing_extensions import override
 
 from app.core.config import settings
 from app.core.embeddings import BaseEmbeddingClient

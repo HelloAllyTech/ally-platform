@@ -3,7 +3,9 @@ Utterance length-based event detection.
 Tracks the length of counselor/helper utterances.
 """
 
-from typing import List, override
+from typing import List
+
+from typing_extensions import override
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent, ChatMessage

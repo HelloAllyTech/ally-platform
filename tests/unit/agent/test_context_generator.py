@@ -8,7 +8,7 @@ from app.core.scenario.base import PromptData
 
 
 @pytest.mark.asyncio
-async def test_generate_cultural_context_generates_and_translates(mocker):
+async def test_generate_cultural_context_generates_and_translates():
     """
     Test that the function generates context only.
     """
@@ -25,11 +25,11 @@ async def test_generate_cultural_context_generates_and_translates(mocker):
     language_code = "hi-IN"
     llm_client = AsyncMock()
 
-    # Mock LLM response
-    llm_response_content = """
-    Cultural Context: Urban Indian middle class context.
-    Speaking Style: Hinglish, casual and stressed.
-    """
+    # Mock LLM response (JSON format)
+    llm_response_content = (
+        '{"cultural_context": "Urban Indian middle class context.", '
+        '"speaking_style": "Hinglish, casual and stressed."}'
+    )
     llm_client.achat.return_value = AIMessage(content=llm_response_content)
 
     # Execute
@@ -43,9 +43,7 @@ async def test_generate_cultural_context_generates_and_translates(mocker):
 
 
 @pytest.mark.asyncio
-async def test_generate_cultural_context_preserves_existing_context_but_translates(
-    mocker,
-):
+async def test_generate_cultural_context_preserves_existing_context_but_translates():
     """
     Test that if cultural context exists, it is NOT overwritten.
     """
@@ -65,12 +63,10 @@ async def test_generate_cultural_context_preserves_existing_context_but_translat
     llm_client = AsyncMock()
 
     # Mock LLM response - it might generate new context, but we should ignore it
-    llm_response_content = """
-    Cultural Context: NEW GENERATED CONTEXT
-    Speaking Style: NEW GEN STYLE
-    Translated Opening Statements: नमस्ते
-    Translated Termination Messages: None
-    """
+    llm_response_content = (
+        '{"cultural_context": "NEW GENERATED CONTEXT", '
+        '"speaking_style": "NEW GEN STYLE"}'
+    )
     llm_client.achat.return_value = AIMessage(content=llm_response_content)
 
     # Execute
@@ -85,7 +81,7 @@ async def test_generate_cultural_context_preserves_existing_context_but_translat
 
 
 @pytest.mark.asyncio
-async def test_generate_cultural_context_fallback_on_failure(mocker):
+async def test_generate_cultural_context_fallback_on_failure():
     """Test that it returns original values if LLM fails."""
     prompt_data = PromptData(
         name="Ahana",

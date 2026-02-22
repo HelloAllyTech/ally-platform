@@ -2,7 +2,9 @@
 Score-based event detection.
 """
 
-from typing import List, override
+from typing import List
+
+from typing_extensions import override
 
 from app.core.constants import ConditionOperator, DetectionType
 from app.core.events.base import BaseEvent, ChatMessage

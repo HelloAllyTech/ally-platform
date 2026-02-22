@@ -25,11 +25,12 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
 
-    # When True: use metadata prompts when available, sync differing ones to local YAML.
-    # When False: always use local YAML, ignore metadata prompts.
+    # When True: use metadata prompts when available (for experiments).
+    # When False: always use local .txt prompts from app/prompts/.
+    # Finalized prompts are copy-pasted to local and pushed; no auto-write.
     SYNC_PROMPTS_TO_LOCAL: bool = Field(
         default=False,
-        description="Use metadata prompts and sync to local; False = local YAML only",
+        description="Use metadata prompts when available; False = local .txt only",
     )
     SLACK_ALERTS_ENABLED: bool = False
     SLACK_ALERTS_API_TOKEN: str = Field(...)
