@@ -10,8 +10,8 @@ from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.graph.graph_builder import (
-    build_graph,
     build_resolve_branching_subgraph,
+    build_simulation_graph,
     build_voice_expressions_subgraph,
 )
 
@@ -35,7 +35,7 @@ class TestSubgraphStructure:
 
     def test_main_graph_has_all_nodes(self):
         """Test that main graph includes all required nodes."""
-        graph = build_graph()
+        graph = build_simulation_graph()
 
         assert isinstance(graph, StateGraph)
 
@@ -53,7 +53,7 @@ class TestSubgraphStructure:
 
     def test_graph_execution_flow(self):
         """Test that graph has correct execution flow."""
-        graph = build_graph()
+        graph = build_simulation_graph()
 
         # Verify edges exist for the expected flow
         # process_events -> resolve_branching_instruction

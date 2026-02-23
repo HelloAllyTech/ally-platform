@@ -63,7 +63,7 @@ def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
     return subgraph.compile()
 
 
-def build_graph() -> StateGraph[SimulationState]:
+def build_simulation_graph() -> StateGraph[SimulationState]:
     """
     Build the LangGraph state graph.
 
@@ -126,5 +126,42 @@ def build_graph() -> StateGraph[SimulationState]:
     graph.add_node("send_event_feedback", send_event_feedback)
     graph.add_edge("apply_voice_expressions", "send_event_feedback")
     graph.add_edge("send_event_feedback", END)
+
+    return graph
+
+
+def build_report_graph() -> StateGraph:
+    """
+    Build the report-specific LangGraph.
+
+    Reuses the core simulation nodes (process_events, resolve_branching_instruction,
+    generate_response) but omits the LiveKit/TTS/UI-only nodes:
+    - detect_behaviors  (behavior classification for UI display)
+    - apply_voice_expressions  (TTS voice parameter injection)
+    - send_event_feedback  (UI score/emoji feedback sending)
+
+    Uses SimulationState so nodes are shared without any adaptation.
+    The UI-only fields (non_branching_feedback_data, feedback_to_send,
+    behavior_feedback_data) carry their defaults and are simply never written.
+
+    Flow:
+        START → process_events → resolve_branching_instruction
+              → generate_response → END
+    """
+    graph = StateGraph(SimulationState)
+
+    graph.add_node("process_events", process_events)
+
+    # Reuse the same resolve_branching_instruction subgraph so that LLM
+    # calls for tag resolution are never streamed (same reason as main graph).
+    resolve_branching_subgraph = build_resolve_branching_subgraph()
+    graph.add_node("resolve_branching_instruction", resolve_branching_subgraph)
+
+    graph.add_node("generate_response", generate_response)
+
+    graph.add_edge(START, "process_events")
+    graph.add_edge("process_events", "resolve_branching_instruction")
+    graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("generate_response", END)
 
     return graph
