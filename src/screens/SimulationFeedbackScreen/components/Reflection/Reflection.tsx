@@ -20,31 +20,17 @@ interface ReflectionProps {
 
 const DEBOUNCE_DELAY = 1500;
 
-const DEFAULT_REFLECTION_PROMPTS: ReflectionPrompt[] = [
-  {
-    id: '1',
-    prompt:
-      'What do you think the client needed most in the moment you shifted to problem-solving?',
-  },
-  {
-    id: '2',
-    prompt: 'Where did you feel unsure or rushed during the conversation?',
-  },
-];
-
 export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   const {t} = useTranslate();
   const {showErrorToast} = useErrorToast();
-  const [reflectionPrompts, setReflectionPrompts] = useState<
-    ReflectionPrompt[]
-  >(DEFAULT_REFLECTION_PROMPTS);
+  const [reflectionPrompts, setReflectionPrompts] =
+    useState<ReflectionPrompt[]>();
 
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
-  const {data: reflectionPromptsData} = useGetReflectionPromptsQuery(
-    {scenarioSessionId},
-    {skip: true},
-  );
+  const {data: reflectionPromptsData} = useGetReflectionPromptsQuery({
+    scenarioSessionId,
+  });
 
   const [updateReflectionPrompt] = useUpdateReflectionPromptMutation();
 
@@ -78,7 +64,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   const handleResponseChange = useCallback(
     (promptId: string, value: string) => {
       setReflectionPrompts(prev =>
-        prev.map(prompt =>
+        prev?.map(prompt =>
           prompt.id === promptId ? {...prompt, response: value} : prompt,
         ),
       );
@@ -104,25 +90,31 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
         enableOnAndroid
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}>
-        {reflectionPrompts.map((prompt, index) => (
-          <View key={prompt.id} style={styles.promptCard}>
-            <View style={styles.badgeRow}>
-              <View style={styles.numberBadge}>
-                <Text style={styles.numberBadgeText}>{index + 1}</Text>
+        {reflectionPrompts && reflectionPrompts.length > 0 ? (
+          reflectionPrompts.map((prompt, index) => (
+            <View key={prompt.id} style={styles.promptCard}>
+              <View style={styles.badgeRow}>
+                <View style={styles.numberBadge}>
+                  <Text style={styles.numberBadgeText}>{index + 1}</Text>
+                </View>
               </View>
+              <Text style={styles.promptText}>{prompt.prompt}</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder={t('SimulationFeedback.reflection.placeholder')}
+                placeholderTextColor={colors.ds.typography.lowEmphasis}
+                value={prompt.response || ''}
+                onChangeText={value => handleResponseChange(prompt.id, value)}
+                multiline
+                textAlignVertical="top"
+              />
             </View>
-            <Text style={styles.promptText}>{prompt.prompt}</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder={t('SimulationFeedback.reflection.placeholder')}
-              placeholderTextColor={colors.ds.typography.lowEmphasis}
-              value={prompt.response || ''}
-              onChangeText={value => handleResponseChange(prompt.id, value)}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-        ))}
+          ))
+        ) : (
+          <Text style={styles.emptyText}>
+            {t('SimulationFeedback.reflection.noPromptsAvailable')}
+          </Text>
+        )}
       </KeyboardAwareScrollView>
     </SummaryCard>
   );
