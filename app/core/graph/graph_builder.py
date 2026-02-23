@@ -118,7 +118,7 @@ def build_graph() -> StateGraph[SimulationState]:
 
     # Fan-in: [generate_response, detect_behaviors] → apply_voice_expressions
     graph.add_edge("generate_response", "apply_voice_expressions")
-    graph.add_edge("detect_behaviors", "apply_voice_expressions")
+    graph.add_edge("detect_behaviors", "send_event_feedback")
 
     # send_event_feedback runs last — sends event scores/feedback to UI.
     # Kept separate from generate_response so that node stays reusable
