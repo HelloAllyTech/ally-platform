@@ -57,11 +57,12 @@ jest.mock('@/components', () => {
   };
 });
 
-// Avoid importing the barrel that pulls many dependencies; mock the barrel itself
-jest.mock('../index', () => ({
+// Mock the CallSummaryScreen components barrel to avoid deep import chains
+jest.mock('../../index', () => ({
   SummaryDropdown: () => <>dropdown</>,
   CustomMenuModal: () => <>menu</>,
   DeleteRenameModal: () => <>del</>,
+  ArchiveActionModal: () => <>archive</>,
 }));
 
 // Also mock safe area context to avoid provider requirement

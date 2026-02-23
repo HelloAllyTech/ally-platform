@@ -9,7 +9,7 @@ export enum SimulationSummaryTabKey {
   ASK_AI = 'ASK_AI',
   TRANSCRIPTION = 'TRANSCRIPTION',
   SKILLS = 'SKILLS',
-  // REFLECTION = 'REFLECTION',
+  REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
 }
 
@@ -34,10 +34,10 @@ export const getSimulationSummaryTabs = (
       key: SimulationSummaryTabKey.SKILLS,
       title: t('SimulationFeedback.tabs.skillsDemonstrated'),
     },
-    // {
-    //   key: SimulationSummaryTabKey.REFLECTION,
-    //   title: t('SimulationFeedback.tabs.deeperReflection'),
-    // },
+    {
+      key: SimulationSummaryTabKey.REFLECTION,
+      title: t('SimulationFeedback.tabs.deeperReflection'),
+    },
   ];
 
   if (pathId || caseId) {

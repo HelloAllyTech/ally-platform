@@ -26,6 +26,7 @@ import {navigateToLearnTab} from '@/utils';
 
 import {
   AskAI,
+  Reflection,
   SessionSkills,
   SummaryTab,
   TranscriptTab,
@@ -279,8 +280,8 @@ export const SimulationFeedbackScreen: React.FC<
       case SimulationSummaryTabKey.SKILLS:
         return <SessionSkills scenarioSessionId={scenarioSessionId} />;
 
-      // case SimulationSummaryTabKey.REFLECTION:
-      //   return <Reflection scenarioSessionId={scenarioSessionId} />;
+      case SimulationSummaryTabKey.REFLECTION:
+        return <Reflection scenarioSessionId={scenarioSessionId} />;
 
       case SimulationSummaryTabKey.UP_NEXT:
         return (

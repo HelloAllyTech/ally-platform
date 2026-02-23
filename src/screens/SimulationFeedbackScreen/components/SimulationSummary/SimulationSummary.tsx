@@ -9,6 +9,7 @@ import {colors, fontFamily, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
+import {EventChecklist} from '..';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
@@ -141,9 +142,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           </View>
         </View>
       </View>
-      {/* {data?.id && <EventChecklist scenarioSessionId={data.id} />} */}
+      {data?.id && <EventChecklist scenarioSessionId={data.id} />}
       {renderExpandableSection(
-        t('SimulationFeedback.biggestStrengthsSkills'),
+        t('SimulationFeedback.strengthsAndSkills'),
         positives,
         'whatWentWell',
       )}
