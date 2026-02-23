@@ -67,6 +67,7 @@ export const useReviewComments = () => {
     isCommentThreadBottomSheetVisible,
     closeCommentThreadBottomSheet,
     selectedThreadId,
+    setSelectedThreadId,
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,
     selectedComment,

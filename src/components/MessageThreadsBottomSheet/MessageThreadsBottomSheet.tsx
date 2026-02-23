@@ -92,6 +92,7 @@ export const MessageThreadsBottomSheet: React.FC<
               showReplyButton={false}
               disableAddReactionButton
               onCommentPress={() => onThreadPress?.(thread.id, messageId)}
+              hidden={firstComment.hidden}
             />
             {showMoreCommentsIndicator && (
               <LinearGradient
