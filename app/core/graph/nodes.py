@@ -1021,6 +1021,43 @@ async def apply_voice_expressions(
         )
         return state
 
+    # Skip runtime prosody when under pressure (keeps last params, reduces latency)
+    # IMPORTANT: Do NOT skip when provider supports text enhancement (SSML/audio tags).
+    # Skipping would send plain text instead of enhanced text, losing pauses and rate
+    # variations, which makes speech sound noticeably faster and less natural.
+    response_len = len(response_text)
+    skip_prosody = False
+    skip_reason = ""
+    has_text_enhancement = bool(tts_client.get_text_enhancement_instructions())
+    if not settings.PROSDY_SKIP_ENABLED:
+        pass  # Skip logic disabled, always run prosody
+    elif has_text_enhancement:
+        pass  # Provider needs enhanced text; skip would cause faster speech
+    elif response_len < settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH:
+        skip_prosody = True
+        min_len = settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH
+        skip_reason = f"response too short ({response_len} < {min_len} chars)"
+    elif (
+        settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH > 0
+        and response_len > settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
+    ):
+        skip_prosody = True
+        max_len = settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
+        skip_reason = f"response too long ({response_len} > {max_len} chars)"
+    elif settings.PROSDY_SKIP_WHEN_EVENTS_DETECTED and state.new_events:
+        skip_prosody = True
+        skip_reason = f"events detected this turn ({len(state.new_events)} events)"
+
+    if skip_prosody:
+        logger.debug(
+            "[apply_voice_expressions] Skipped prosody (%s)",
+            skip_reason,
+        )
+        # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
+        if hasattr(tts_client, "_current_params") and tts_client._current_params:
+            tts_client._apply_parameters_dict(tts_client._current_params.copy())
+        return state
+
     # Extract conversation history (last N messages, excluding the current response)
     conversation_history = []
     if state.messages:

@@ -65,11 +65,30 @@ Called once during `AgentWorker.configure()`:
 
 Called for each response in the `apply_voice_expressions` graph node:
 
-1. Gets `PARAMETER_METADATA` and `TEXT_ENHANCEMENT_METADATA` from TTS provider
-2. Calls `generate_runtime_parameters()` with response text, conversation history, persona context, and current parameters
-3. The LLM returns both parameters and enhanced text in a single call
-4. Validates parameters, applies to TTS
-5. Returns enhanced text (or `None` if provider does not support text enhancement)
+1. **Skip when under pressure** (optional): If response is too short, too long, or events were detected this turn, skip the prosody LLM call and keep last params. Reduces latency; see "Skip thresholds" below.
+2. Gets `PARAMETER_METADATA` and `TEXT_ENHANCEMENT_METADATA` from TTS provider
+3. Calls `generate_runtime_parameters()` with response text, conversation history, persona context, and current parameters
+4. The LLM returns both parameters and enhanced text in a single call
+5. Validates parameters, applies to TTS
+6. Returns enhanced text (or `None` if provider does not support text enhancement)
+
+### Skip thresholds (when under pressure)
+
+When skipped, TTS keeps `_current_params` from the last turn (no fallback to defaults).
+Current params are re-applied to TTS when skipping to ensure they persist.
+
+**Important:** Skip is **disabled** when the provider supports text enhancement (SSML/audio tags).
+Skipping would send plain text instead of enhanced text, losing pauses and rate variations,
+which makes speech sound noticeably faster and less natural.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `PROSDY_SKIP_ENABLED` | true | Master switch. When false, always run prosody (no skip). |
+| `PROSDY_SKIP_MIN_RESPONSE_LENGTH` | 50 | Skip when response shorter than N chars |
+| `PROSDY_SKIP_MAX_RESPONSE_LENGTH` | 0 (disabled) | Skip when response longer than N chars (0 = disabled) |
+| `PROSDY_SKIP_WHEN_EVENTS_DETECTED` | true | Skip when events detected this turn |
+
+Providers with text enhancement (Google, ElevenLabs) always run prosody; skip is never applied.
 
 ## Parameter Validation
 
@@ -123,6 +142,6 @@ Parameters go **only** to `update_options()`. They never appear in message conte
 
 - `app/speech_prosody/service.py` -- `SpeechProsodyService`, `generate_and_apply_prosody_for_message()`
 - `app/speech_prosody/generator.py` -- `generate_default_parameters()`, `generate_runtime_parameters()`
-- `app/speech_prosody/constants.py` -- `DEFAULT_CONVERSATION_HISTORY_LIMIT`
+- `app/speech_prosody/constants.py` -- `DEFAULT_CONVERSATION_HISTORY_LIMIT`, skip thresholds
 - `app/speech_prosody/utils.py` -- `extract_persona_context_from_prompt_data()`
 - `app/tts/base.py` -- `BaseTTSClient._validate_parameters_dict()`, `_apply_parameters_dict()`

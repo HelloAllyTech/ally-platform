@@ -174,5 +174,36 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Speech prosody skip thresholds (reduce latency when under pressure)
+    # When skipped, TTS keeps last params instead of running prosody LLM call
+    PROSDY_SKIP_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Enable skip-when-under-pressure logic. "
+            "When False, always run prosody (no skip)."
+        ),
+    )
+    PROSDY_SKIP_MIN_RESPONSE_LENGTH: int = Field(
+        default=50,
+        description=(
+            "Skip prosody when response is shorter than this (chars). "
+            "Short responses have low prosody impact."
+        ),
+    )
+    PROSDY_SKIP_MAX_RESPONSE_LENGTH: int = Field(
+        default=0,
+        description=(
+            "Skip prosody when response is longer than this (chars). "
+            "0 = disabled. Avoids compounding latency on long responses."
+        ),
+    )
+    PROSDY_SKIP_WHEN_EVENTS_DETECTED: bool = Field(
+        default=True,
+        description=(
+            "Skip prosody when events detected this turn. "
+            "Prioritizes responsiveness over voice expression."
+        ),
+    )
+
 
 settings = Settings()

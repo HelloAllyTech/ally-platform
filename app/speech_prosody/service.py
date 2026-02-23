@@ -13,6 +13,7 @@ from app.llms import BaseLLMClient
 from app.speech_prosody.constants import (
     DEFAULT_CONVERSATION_HISTORY_LIMIT,
     MAX_TURN_DELTA_PERCENT,
+    RATE_PARAM_NAMES,
 )
 from app.speech_prosody.generator import (
     generate_default_parameters,
@@ -189,6 +190,20 @@ class SpeechProsodyService:
 
             # Validate dict against metadata
             validated_dict = self.tts_client._validate_parameters_dict(params_dict)
+
+            # Cap rate params (pace/speed/speaking_rate) at safe default to avoid
+            # LLM generating excessively fast speech
+            safe_defaults = self._get_safe_defaults(parameter_metadata)
+            for param_name in RATE_PARAM_NAMES:
+                if param_name in validated_dict and param_name in safe_defaults:
+                    safe_val = safe_defaults[param_name]
+                    if validated_dict[param_name] > safe_val:
+                        original = validated_dict[param_name]
+                        validated_dict[param_name] = safe_val
+                        logger.info(
+                            f"[Speech Prosody] Capped {param_name} {original} -> "
+                            f"{safe_val} (safe default)"
+                        )
 
             # Store as defaults (single source of truth)
             self._default_params = validated_dict.copy()
