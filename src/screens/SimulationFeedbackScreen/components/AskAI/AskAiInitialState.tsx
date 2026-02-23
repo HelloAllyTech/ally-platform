@@ -114,5 +114,6 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 'auto',
   },
 });

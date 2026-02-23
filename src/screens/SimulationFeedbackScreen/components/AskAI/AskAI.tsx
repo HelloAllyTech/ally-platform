@@ -26,6 +26,8 @@ interface AskAIProps {
   scenarioSessionId?: string;
 }
 
+const MAX_MESSAGE_LENGTH = 2000;
+
 // ── Sub-components ──────────────────────────────────────────────
 
 const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
@@ -138,7 +140,8 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
     retry();
   }, [retry]);
 
-  const canSend = inputText.trim().length > 0 && !isStreaming;
+  const isOverLimit = inputText.length > MAX_MESSAGE_LENGTH;
+  const canSend = inputText.trim().length > 0 && !isStreaming && !isOverLimit;
 
   const renderMessage = useCallback(({item}: {item: AskAIChatMessage}) => {
     if (item.role === ChatMessageRole.USER) {
@@ -230,7 +233,11 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
 
                 {/* Input */}
                 <View style={styles.inputWrapper}>
-                  <View style={[styles.inputContainer]}>
+                  <View
+                    style={[
+                      styles.inputContainer,
+                      isOverLimit && styles.inputContainerError,
+                    ]}>
                     <TextInput
                       style={styles.input}
                       placeholder={t('SimulationFeedback.askAIPlaceholder')}
@@ -257,6 +264,12 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
                       />
                     </TouchableOpacity>
                   </View>
+                  {isOverLimit && (
+                    <Text style={styles.charLimitText}>
+                      Your message is too long. Please shorten it to{' '}
+                      {MAX_MESSAGE_LENGTH} characters or less.
+                    </Text>
+                  )}
                 </View>
               </>
             )}

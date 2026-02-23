@@ -149,6 +149,17 @@ export const styles = ScaledSheet.create({
   inputContainerDisabled: {
     opacity: 0.5,
   },
+  inputContainerError: {
+    borderColor: colors.ds.red[500],
+  },
+  charLimitText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.red[500],
+    textAlign: 'left',
+    marginTop: '4@vs',
+    marginLeft: '18@ms',
+  },
   input: {
     flex: 1,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

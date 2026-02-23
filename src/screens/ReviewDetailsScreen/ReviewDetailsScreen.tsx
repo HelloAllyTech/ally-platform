@@ -17,6 +17,7 @@ import {
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
+import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
 import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
@@ -126,9 +127,11 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     isCommentThreadBottomSheetVisible,
     closeCommentThreadBottomSheet,
     selectedThreadId,
+    setSelectedThreadId,
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,
     selectedComment,
+    setSelectedComment,
     onReplyPress,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
@@ -346,6 +349,93 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     setSelectedMessageId(null);
   }, []);
 
+  const handleThreadCommentChange = useCallback(
+    (change: ThreadCommentChange) => {
+      if (!selectedThreadId) return;
+
+      setRawMessages(prev =>
+        prev.map(message => {
+          if (!message.threads.some(thread => thread.id === selectedThreadId)) {
+            return message;
+          }
+
+          let updatedThreads;
+
+          switch (change.action) {
+            case 'delete':
+              updatedThreads = message.threads
+                .map(thread => {
+                  if (thread.id !== selectedThreadId) {
+                    return thread;
+                  }
+                  return {
+                    ...thread,
+                    comments: thread.comments.filter(
+                      commentItem => commentItem.id !== change.commentId,
+                    ),
+                  };
+                })
+                .filter(thread => thread.comments.length > 0);
+              if (
+                !updatedThreads.some(thread => thread.id === selectedThreadId)
+              ) {
+                setSelectedComment(null);
+                setSelectedThreadId(null);
+              }
+              break;
+
+            case 'edit':
+              updatedThreads = message.threads.map(thread => {
+                if (thread.id !== selectedThreadId) {
+                  return thread;
+                }
+                return {
+                  ...thread,
+                  comments: thread.comments.map(commentItem =>
+                    commentItem.id === change.commentId
+                      ? {...commentItem, content: change.content}
+                      : commentItem,
+                  ),
+                };
+              });
+              break;
+
+            case 'add':
+              updatedThreads = message.threads.map(thread => {
+                if (thread.id !== selectedThreadId) {
+                  return thread;
+                }
+                return {
+                  ...thread,
+                  comments: [...thread.comments, change.comment],
+                };
+              });
+              break;
+
+            case 'hide':
+              updatedThreads = message.threads.map(thread => {
+                if (thread.id !== selectedThreadId) {
+                  return thread;
+                }
+                return {
+                  ...thread,
+                  comments: thread.comments.map(commentItem =>
+                    commentItem.id === change.commentId
+                      ? {...commentItem, hidden: change.hidden}
+                      : commentItem,
+                  ),
+                };
+              });
+              break;
+          }
+
+          return {...message, threads: updatedThreads};
+        }),
+      );
+    },
+    [selectedThreadId, setSelectedThreadId, setSelectedComment],
+  );
+
   const handleSelection = useCallback(
     (selection: TextSelection, messageId: string) => {
       setShowCommentInput(true);
@@ -543,16 +633,19 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onReplyPress={onReplyPress}
         hideCommentThreadBottomSheet={handleHideCommentThreadBottomSheet}
         isPrivate={isPrivate}
+        onCommentsChanged={handleThreadCommentChange}
       />
       <ReplyBottomSheet
         visible={isReplyBottomSheetVisible}
         onClose={closeReplyBottomSheet}
         commentId={selectedComment?.id || ''}
         originalComment={selectedComment || null}
+        setOriginalComment={setSelectedComment}
         hideReplyBottomSheet={hideReplyBottomSheet}
         reviewId={_reviewId}
         reviewOwnerId={reviewData?.createdBy?.id}
         isPrivate={isPrivate}
+        onCommentsChanged={handleThreadCommentChange}
       />
     </SafeAreaView>
   );
