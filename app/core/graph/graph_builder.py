@@ -135,18 +135,17 @@ def build_report_graph() -> StateGraph:
     Build the report-specific LangGraph.
 
     Reuses the core simulation nodes (process_events, resolve_branching_instruction,
-    generate_response) but omits the LiveKit/TTS/UI-only nodes:
-    - detect_behaviors  (behavior classification for UI display)
+    generate_response, detect_behaviors) but omits the LiveKit/TTS/UI-only nodes:
     - apply_voice_expressions  (TTS voice parameter injection)
     - send_event_feedback  (UI score/emoji feedback sending)
 
     Uses SimulationState so nodes are shared without any adaptation.
     The UI-only fields (non_branching_feedback_data, feedback_to_send,
-    behavior_feedback_data) carry their defaults and are simply never written.
+    behavior_feedback_data) carry their defaults and are simply never sent to UI.
 
     Flow:
         START → process_events → resolve_branching_instruction
-              → generate_response → END
+              → [generate_response, detect_behaviors] (parallel) → END
     """
     graph = StateGraph(SimulationState)
 
@@ -159,9 +158,20 @@ def build_report_graph() -> StateGraph:
 
     graph.add_node("generate_response", generate_response)
 
+    # Add detect_behaviors as a regular node
+    # This runs in parallel with generate_response after resolve_branching_instruction
+    # Behavior detection is valuable for report generation to track user behaviors
+    graph.add_node("detect_behaviors", detect_behaviors)
+
     graph.add_edge(START, "process_events")
     graph.add_edge("process_events", "resolve_branching_instruction")
+
+    # Fan-out: resolve_branching_instruction → [generate_response, detect_behaviors]
     graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("resolve_branching_instruction", "detect_behaviors")
+
+    # Both nodes complete independently and lead to END
     graph.add_edge("generate_response", END)
+    graph.add_edge("detect_behaviors", END)
 
     return graph
