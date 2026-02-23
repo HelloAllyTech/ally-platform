@@ -205,9 +205,7 @@ class SpeechProsodyService:
             self.tts_client._apply_parameters_dict(validated_dict)
 
         except Exception as e:
-            logger.error(
-                f"[Speech Prosody] Failed to generate defaults: {e}", exc_info=True
-            )
+            logger.exception(f"[Speech Prosody] Failed to generate defaults: {e}")
             # Set safe defaults from metadata
             safe_defaults = self._get_safe_defaults(parameter_metadata)
             self._default_params = safe_defaults.copy()
