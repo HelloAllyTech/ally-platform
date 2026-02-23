@@ -60,7 +60,7 @@ const defaultChartConfig = {
 };
 
 export const ChartComponent: React.FC<ChartComponentProps> = ({
-  xAxisLabels = ['0:00', '2:30', '5:00', '7:30', '10:00', '12:30', '15:00'],
+  xAxisLabels = [],
   datasets,
   width,
   height = ms(300),
