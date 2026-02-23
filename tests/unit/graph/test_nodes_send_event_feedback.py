@@ -5,7 +5,8 @@ This node is responsible for:
 1. Merging feedback from branching and non-branching events (Priority 1 vs 2)
 2. Calculating cumulative scores from all active events
 3. Sending feedback to the UI
-4. Clearing transient event/feedback state
+4. Sending behavior feedback to UI and BE
+5. Clearing transient event/feedback/behavior state
 """
 
 from unittest.mock import MagicMock, patch
@@ -16,10 +17,12 @@ from langchain_core.messages import HumanMessage
 from app.core.branching_instructions.base import BranchingInstruction
 from app.core.graph.nodes import send_event_feedback
 from app.core.graph.state import (
+    BehaviorInstructionFeedbackData,
     BranchingAndFeedbackData,
     EventFeedback,
     SimulationState,
 )
+from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 
 
 class TestSendEventFeedback:
@@ -444,4 +447,194 @@ class TestSendEventFeedback:
         assert result["branching_and_feedback_data"] == []
         assert result["non_branching_feedback_data"] == []
         assert result["feedback_to_send"] is None
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_sends_behavior_feedback_to_ui_and_be(self):
+        """Test that behavior feedback is sent to both UI and BE."""
+        behavior_data = BehaviorInstructionFeedbackData(
+            behavior_instruction_id="behavior_123",
+            score=5,
+            category=SimulationBehaviorCategory.SHOULD_DO,
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="Hello")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
+            feedback_to_send=None,
+            behavior_feedback_data=[behavior_data],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test_room"
+        config = {"configurable": {"room": mock_room}}
+
+        with (
+            patch("app.core.graph.nodes.send_event_to_ui") as mock_send_ui,
+            patch("app.core.graph.nodes.msg_event_queue.send_message") as mock_send_be,
+        ):
+            result = await send_event_feedback(state, config=config)
+
+            # Verify UI message was sent
+            assert mock_send_ui.called
+            ui_call_args = mock_send_ui.call_args_list[0][0][0]
+            assert ui_call_args.data.score == 5
+            assert ui_call_args.data.emoji is None
+            assert ui_call_args.data.message == ""
+            assert ui_call_args.data.show_feedback is True
+
+            # Verify BE message was sent
+            assert mock_send_be.called
+            be_call_args = mock_send_be.call_args[1]
+            assert "message_body" in be_call_args
+
+        # Verify behavior_feedback_data is cleared
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_sends_multiple_behavior_feedbacks(self):
+        """Test that multiple behavior feedbacks are sent correctly."""
+        behavior_data_1 = BehaviorInstructionFeedbackData(
+            behavior_instruction_id="behavior_1",
+            score=5,
+            category=SimulationBehaviorCategory.SHOULD_DO,
+        )
+        behavior_data_2 = BehaviorInstructionFeedbackData(
+            behavior_instruction_id="behavior_2",
+            score=-3,
+            category=SimulationBehaviorCategory.SHOULD_NOT_DO,
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="Hello")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
+            feedback_to_send=None,
+            behavior_feedback_data=[behavior_data_1, behavior_data_2],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test_room"
+        config = {"configurable": {"room": mock_room}}
+
+        with (
+            patch("app.core.graph.nodes.send_event_to_ui") as mock_send_ui,
+            patch("app.core.graph.nodes.msg_event_queue.send_message") as mock_send_be,
+        ):
+            result = await send_event_feedback(state, config=config)
+
+            # Should send 2 UI messages (one per behavior)
+            assert mock_send_ui.call_count == 2
+
+            # Verify first behavior UI message
+            ui_call_1 = mock_send_ui.call_args_list[0][0][0]
+            assert ui_call_1.data.score == 5
+
+            # Verify second behavior UI message
+            ui_call_2 = mock_send_ui.call_args_list[1][0][0]
+            assert ui_call_2.data.score == -3
+
+            # Should send 2 BE messages
+            assert mock_send_be.call_count == 2
+
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_sends_both_event_and_behavior_feedback(self):
+        """Test that both event and behavior feedback are sent in same call."""
+        behavior_data = BehaviorInstructionFeedbackData(
+            behavior_instruction_id="behavior_123",
+            score=7,
+            category=SimulationBehaviorCategory.SHOULD_DO,
+        )
+
+        state = SimulationState(
+            messages=[HumanMessage(content="Hello")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[
+                BranchingAndFeedbackData(
+                    branching_instruction=None,
+                    feedback=EventFeedback(emoji="👍", message="Event feedback"),
+                    score=10,
+                    event_id="e1",
+                )
+            ],
+            non_branching_feedback_data=[],
+            feedback_to_send=EventFeedback(emoji="👍", message="Event feedback"),
+            behavior_feedback_data=[behavior_data],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test_room"
+        config = {"configurable": {"room": mock_room}}
+
+        with (
+            patch("app.core.graph.nodes.send_event_to_ui") as mock_send_ui,
+            patch("app.core.graph.nodes.msg_event_queue.send_message") as mock_send_be,
+        ):
+            result = await send_event_feedback(state, config=config)
+
+            # Should send 2 UI messages: 1 for event, 1 for behavior
+            assert mock_send_ui.call_count == 2
+
+            # First call: event feedback
+            event_ui_call = mock_send_ui.call_args_list[0][0][0]
+            assert event_ui_call.data.score == 10
+            assert event_ui_call.data.message == "Event feedback"
+
+            # Second call: behavior feedback
+            behavior_ui_call = mock_send_ui.call_args_list[1][0][0]
+            assert behavior_ui_call.data.score == 7
+            assert behavior_ui_call.data.message == ""
+
+            # Should send 1 BE message (only for behavior)
+            assert mock_send_be.call_count == 1
+
+        # All transient state cleared
+        assert result["branching_and_feedback_data"] == []
+        assert result["non_branching_feedback_data"] == []
+        assert result["feedback_to_send"] is None
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_handles_empty_behavior_feedback_data(self):
+        """Test that empty behavior feedback data is handled gracefully."""
+        state = SimulationState(
+            messages=[HumanMessage(content="Hello")],
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[],
+            non_branching_feedback_data=[],
+            feedback_to_send=None,
+            behavior_feedback_data=[],
+        )
+
+        mock_room = MagicMock()
+        mock_room.name = "test_room"
+        config = {"configurable": {"room": mock_room}}
+
+        with (
+            patch("app.core.graph.nodes.send_event_to_ui") as mock_send_ui,
+            patch("app.core.graph.nodes.msg_event_queue.send_message") as mock_send_be,
+        ):
+            result = await send_event_feedback(state, config=config)
+
+            # Should not send any behavior feedback
+            assert not mock_send_ui.called
+            assert not mock_send_be.called
+
         assert result["behavior_feedback_data"] == []

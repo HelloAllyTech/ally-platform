@@ -10,7 +10,6 @@ from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.graph.graph_builder import (
-    build_detect_behaviors_subgraph,
     build_graph,
     build_resolve_branching_subgraph,
     build_voice_expressions_subgraph,
@@ -30,13 +29,6 @@ class TestSubgraphStructure:
     def test_voice_expressions_subgraph_structure(self):
         """Test that voice_expressions subgraph is properly structured."""
         subgraph = build_voice_expressions_subgraph()
-
-        assert isinstance(subgraph, CompiledStateGraph)
-        assert subgraph is not None
-
-    def test_detect_behaviors_subgraph_structure(self):
-        """Test that detect_behaviors subgraph is properly structured."""
-        subgraph = build_detect_behaviors_subgraph()
 
         assert isinstance(subgraph, CompiledStateGraph)
         assert subgraph is not None
@@ -83,15 +75,12 @@ class TestSubgraphIsolation:
         """Test that subgraphs are compiled (not raw StateGraph) when added to main."""
         # This ensures subgraphs=False in LLMAdapter will prevent their streaming
         resolve_subgraph = build_resolve_branching_subgraph()
-        behaviors_subgraph = build_detect_behaviors_subgraph()
         voice_subgraph = build_voice_expressions_subgraph()
 
         # All should be CompiledStateGraph, not StateGraph
         assert isinstance(resolve_subgraph, CompiledStateGraph)
-        assert isinstance(behaviors_subgraph, CompiledStateGraph)
         assert isinstance(voice_subgraph, CompiledStateGraph)
 
         # They should NOT be StateGraph instances
         assert not isinstance(resolve_subgraph, StateGraph)
-        assert not isinstance(behaviors_subgraph, StateGraph)
         assert not isinstance(voice_subgraph, StateGraph)

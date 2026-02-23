@@ -635,60 +635,6 @@ async def detect_behaviors(
     return {"behavior_feedback_data": behavior_feedback}
 
 
-async def send_behavior_feedback(
-    state: SimulationState, config: Optional[RunnableConfig] = None
-) -> dict:
-    """
-    Send detected behavior feedback to UI and BE.
-
-    This node runs after detect_behaviors within the same subgraph.
-    It sends each detected behavior's score to the UI (with empty emoji/message)
-    and to the BE as a behavior_instruction type (distinct from event type).
-    """
-    if not state.behavior_feedback_data:
-        return {"behavior_feedback_data": []}
-
-    room = None
-    if config and "configurable" in config:
-        room = config["configurable"].get("room")
-
-    if room is None:
-        logger.warning("No room available, skipping behavior feedback sending")
-        return {"behavior_feedback_data": state.behavior_feedback_data}
-
-    logger.info(
-        f"Processing {len(state.behavior_feedback_data)} " f"behavior feedback entries"
-    )
-    for bf_data in state.behavior_feedback_data:
-        # Send to UI with score, empty emoji and feedback message
-        behavior_ui_message = CustomUIEventMessageType.create(
-            score=bf_data.score,
-            emoji=None,
-            message="",
-            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            show_feedback=True,
-        )
-        await send_event_to_ui(behavior_ui_message, room)
-
-        # Send to BE as behavior_instruction type
-        # (distinct from event type)
-        behavior_data = {
-            "behaviorInstructionId": bf_data.behavior_instruction_id,
-            "score": bf_data.score,
-            "category": bf_data.category.value,
-        }
-        core_behavior_message = CoreEventMessageType.create_behavior_instruction(
-            room_id=room.name,
-            behavior_instruction_data=behavior_data,
-        )
-        await msg_event_queue.send_message(
-            message_body=core_behavior_message.model_dump_json()
-        )
-
-    logger.info("Behavior feedback sent to UI and BE successfully")
-    return {"behavior_feedback_data": state.behavior_feedback_data}
-
-
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -837,7 +783,7 @@ async def send_event_feedback(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
     """
-    Send event feedback to UI after LLM response generation.
+    Send all feedback (events + behaviors) to UI after LLM response generation.
 
     This node is placed at the end of the agent graph (after
     apply_voice_expressions) and is NOT used by the report graph.
@@ -848,7 +794,8 @@ async def send_event_feedback(
        - Priority 2: Highest score non-branching event feedback
     2. Calculates cumulative score from all active events
     3. Sends the combined score + feedback to the UI
-    4. Clears transient event/feedback state after processing
+    4. Sends detected behavior feedback to UI and BE
+    5. Clears transient event/feedback/behavior state after processing
     """
     feedback_to_send = state.feedback_to_send
 
@@ -954,7 +901,48 @@ async def send_event_feedback(
                 logger.info("Sending feedback to UI:")
                 await send_event_to_ui(ui_message, room)
                 logger.info("UI feedback sent successfully")
-                print("\n\n UI Message Sending:", ui_message)
+
+    # Send behavior feedback to UI and BE
+    if state.behavior_feedback_data:
+        room = None
+        if config and "configurable" in config:
+            room = config["configurable"].get("room")
+
+        if room is not None:
+            logger.info(
+                f"Processing {len(state.behavior_feedback_data)} "
+                f"behavior feedback entries"
+            )
+            for bf_data in state.behavior_feedback_data:
+                behavior_ui_message = CustomUIEventMessageType.create(
+                    score=bf_data.score,
+                    emoji=None,
+                    message="",
+                    timestamp=datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%S.%fZ"
+                    ),
+                    show_feedback=True,
+                )
+                await send_event_to_ui(behavior_ui_message, room)
+
+                behavior_data = {
+                    "behaviorInstructionId": bf_data.behavior_instruction_id,
+                    "score": bf_data.score,
+                    "category": bf_data.category.value,
+                }
+                core_behavior_message = (
+                    CoreEventMessageType.create_behavior_instruction(
+                        room_id=room.name,
+                        behavior_instruction_data=behavior_data,
+                    )
+                )
+                await msg_event_queue.send_message(
+                    message_body=core_behavior_message.model_dump_json()
+                )
+
+            logger.info("Behavior feedback sent to UI and BE successfully")
+        else:
+            logger.warning("No room available, skipping behavior feedback sending")
 
     return {
         "branching_and_feedback_data": [],
