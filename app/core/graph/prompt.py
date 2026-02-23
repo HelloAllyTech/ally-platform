@@ -280,7 +280,10 @@ def _build_branching_prompt(
     cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
     competency_block = _get_competency_block(prompt_data.competency)
 
-    character_backstory = prompt_data.context or ""
+    # Only include backstory if context is provided
+    backstory_block = ""
+    if prompt_data.context:
+        backstory_block = f"Backstory: {prompt_data.context}\n\n"
 
     branching_prompt = dedent(
         f"""
@@ -289,8 +292,7 @@ def _build_branching_prompt(
         ## Character Context
         {character_details}
         {cultural_block}
-        Backstory: {character_backstory}
-
+        {backstory_block}
         {competency_block}
         ## Current Task
         Generate next dialogue as per the conversation history and instruction below.
@@ -346,8 +348,10 @@ def _build_behavior_prompt(
     # Build cultural and style block
     cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
 
-    # Build character backstory from context
-    character_backstory = prompt_data.context or ""
+    # Build character backstory from context (only if provided)
+    backstory_block = ""
+    if prompt_data.context:
+        backstory_block = f"Character backstory: {prompt_data.context}\n\n"
 
     # Build additional context from custom fields
     custom_context_block = ""
@@ -409,7 +413,7 @@ def _build_behavior_prompt(
         {profession_block}
         {cultural_block}
 
-        Character backstory: {character_backstory}
+        {backstory_block}
         {life_history}
         {guidelines_block}
         {previous_memory_block}
@@ -522,9 +526,7 @@ def _build_full_prompt(
 
     {cultural_block}
 
-    **Your current context:**
-    {prompt_data.context}
-
+    {_get_optional_block("Your current context", prompt_data.context)}
     {guidelines_block}
 
     {previous_memory_block}

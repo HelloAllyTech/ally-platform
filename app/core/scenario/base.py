@@ -45,7 +45,7 @@ class PromptData(BaseModel):
     sexual_orientation: Optional[str] = Field(default=None)
     current_location: str = Field(...)
     profession: Optional[str] = Field(default=None)
-    context: str = Field(...)
+    context: Optional[str] = Field(default=None)
     session_behavior_guidelines: Optional[str] = Field(default=None)
     life_history_summary: Optional[str] = Field(default=None)
     core_memories: Optional[str] = Field(default=None)

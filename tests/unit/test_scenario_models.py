@@ -135,7 +135,6 @@ class TestPromptData:
             age="30",
             gender="female",
             current_location="Test City",
-            context="Minimal context",
             life_history_summary="Minimal history",
             opening_statements=["Hi!"],
         )
