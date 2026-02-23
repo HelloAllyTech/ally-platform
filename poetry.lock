@@ -2667,14 +2667,14 @@ livekit-agents = {version = ">=1.3.12", extras = ["codecs"]}
 
 [[package]]
 name = "livekit-plugins-google"
-version = "1.4.1"
+version = "1.4.3"
 description = "Agent Framework plugin for services from Google Cloud"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_google-1.4.1-py3-none-any.whl", hash = "sha256:837425b2dd1fce95d7b32b0489682128e49b833eaa7dc98b732a15e6a00543e5"},
-    {file = "livekit_plugins_google-1.4.1.tar.gz", hash = "sha256:c1942a84ea8bd55b19a0dce0d4faf528bd0b25638cda22d725e20e8e129de7d0"},
+    {file = "livekit_plugins_google-1.4.3-py3-none-any.whl", hash = "sha256:6d38bffeee1e39c21605fa2bbf307b30d4bdbd0573e812314b1bd7a9b094bb8c"},
+    {file = "livekit_plugins_google-1.4.3.tar.gz", hash = "sha256:1018b90503709cde4af43e7dcc8ec1e128bf6c08dc041abea4b1d45107410d50"},
 ]
 
 [package.dependencies]
