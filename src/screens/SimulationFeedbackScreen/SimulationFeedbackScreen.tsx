@@ -35,8 +35,8 @@ import {
 } from './components';
 import {styles} from './styles';
 
-const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 2000;
+const MAX_RETRY_ATTEMPTS = 5;
+const RETRY_DELAY = 3500;
 
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
@@ -77,11 +77,15 @@ export const SimulationFeedbackScreen: React.FC<
           id: scenarioSessionId,
         }).unwrap();
 
-        if (!response?.details && retryCount < MAX_RETRY_ATTEMPTS) {
+        if (response?.details?.summary?.feedback) {
+          return;
+        }
+
+        if (retryCount < MAX_RETRY_ATTEMPTS) {
           retryTimeoutRef.current = setTimeout(() => {
             fetchSimulationDetailsWithRetry(retryCount + 1);
           }, RETRY_DELAY);
-        } else if (retryCount >= MAX_RETRY_ATTEMPTS) {
+        } else {
           setRetryLimitReached(true);
         }
       } catch (error) {
