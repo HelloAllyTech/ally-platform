@@ -106,7 +106,7 @@ Some providers support markup in the response text for expressive speech:
 | Provider | Enhancement Type | Example |
 |----------|-----------------|---------|
 | ElevenLabs | Custom tags | Emphasis, pauses, breaks |
-| Google Cloud | SSML | `<prosody rate="slow">...</prosody>`, `<break time="500ms"/>` |
+| Google Cloud | None | Parameters only (streaming mode; SSML would be spoken aloud) |
 | Hume | None | Parameters only (description-based) |
 | Deepgram | None | No prosody support |
 | Sarvam | None | No prosody support |

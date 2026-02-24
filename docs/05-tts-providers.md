@@ -55,7 +55,7 @@ If a provider defines neither, the `apply_voice_expressions` graph node skips pr
 | Deepgram | `DeepgramTTSClient` | `TTSProvider.DEEPGRAM` | No | No |
 | ElevenLabs | `ElevenLabsTTSClient` | `TTSProvider.ELEVENLABS` | Yes (speed, stability, similarity_boost, style) | Yes (SSML-like tags) |
 | Sarvam | `SarvamTTSClient` | `TTSProvider.SARVAM` | No | No |
-| Google Cloud | `GoogleTTSClient` | `TTSProvider.GOOGLE` | Yes (speed, pitch, volume_gain_db) | Yes (SSML) |
+| Google Cloud | `GoogleTTSClient` | `TTSProvider.GOOGLE` | Yes (speed, pitch, volume_gain_db) | No |
 | Hume | `HumeTTSClient` | `TTSProvider.HUME` | Yes (speed, description) | No |
 
 ### Provider Details
@@ -66,7 +66,7 @@ If a provider defines neither, the `apply_voice_expressions` graph node skips pr
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 
-**Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Full SSML support for text enhancement.
+**Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Prosody via parameters only (no SSML) when streaming is enabled.
 
 **Hume** -- Emotion-aware TTS. Uses `voice_id` with optional `voice_provider` (HUME_AI for pre-existing, CUSTOM_VOICE for custom). Supports `instant_mode` for lower latency. Prosody parameters include a text `description` of desired emotional expression.
 
