@@ -2,10 +2,11 @@
 Tests for ScoreKeeper business logic.
 
 Covers:
-- Score accumulation from behavior instructions
-- Thread-safety (concurrent adds)
-- Correct total reported to send_final_score_to_core
-- detect_behaviors node wires scores into ScoreKeeper
+- Score accumulation from events and behavior instructions independently
+- get_total_score() returns the combined total
+- Thread-safety (concurrent adds across both buckets)
+- detect_behaviors node wires behavior scores into ScoreKeeper
+- send_final_score_to_core uses ScoreKeeper.get_total_score() as sole source
 """
 
 import asyncio
@@ -28,38 +29,44 @@ class TestScoreKeeperAccumulation:
     @pytest.mark.asyncio
     async def test_starts_at_zero(self):
         sk = ScoreKeeper()
+        assert sk.event_score == 0
         assert sk.behavior_score == 0
         assert sk.get_total_score() == 0
 
     @pytest.mark.asyncio
-    async def test_accumulates_positive_scores(self):
+    async def test_event_and_behavior_scores_are_tracked_independently(self):
         sk = ScoreKeeper()
+        await sk.add_event_score(10)
         await sk.add_behavior_score(5)
-        await sk.add_behavior_score(3)
-        assert sk.behavior_score == 8
-        assert sk.get_total_score() == 8
+        assert sk.event_score == 10
+        assert sk.behavior_score == 5
+        assert sk.get_total_score() == 15
 
     @pytest.mark.asyncio
-    async def test_accumulates_negative_scores(self):
-        """Negative scores (SHOULD_NOT_DO behaviors) must reduce the total."""
+    async def test_get_total_score_sums_both_buckets(self):
         sk = ScoreKeeper()
-        await sk.add_behavior_score(10)
+        await sk.add_event_score(7)
+        await sk.add_behavior_score(3)
+        assert sk.get_total_score() == 10
+
+    @pytest.mark.asyncio
+    async def test_negative_behavior_score_reduces_total(self):
+        """SHOULD_NOT_DO behaviors carry negative scores."""
+        sk = ScoreKeeper()
+        await sk.add_event_score(10)
         await sk.add_behavior_score(-4)
         assert sk.get_total_score() == 6
 
     @pytest.mark.asyncio
-    async def test_mixed_sign_scores_sum_correctly(self):
-        sk = ScoreKeeper()
-        await sk.add_behavior_score(7)
-        await sk.add_behavior_score(-7)
-        assert sk.get_total_score() == 0
-
-    @pytest.mark.asyncio
     async def test_concurrent_adds_are_thread_safe(self):
-        """All concurrent score additions must be reflected in the final total."""
+        """50 event + 50 behavior concurrent adds must all be reflected."""
         sk = ScoreKeeper()
-        # 100 concurrent coroutines each adding 1
-        await asyncio.gather(*[sk.add_behavior_score(1) for _ in range(100)])
+        await asyncio.gather(
+            *[sk.add_event_score(1) for _ in range(50)],
+            *[sk.add_behavior_score(1) for _ in range(50)],
+        )
+        assert sk.event_score == 50
+        assert sk.behavior_score == 50
         assert sk.get_total_score() == 100
 
 
@@ -159,14 +166,12 @@ class TestDetectBehaviorsScoreKeeperIntegration:
 # ---------------------------------------------------------------------------
 
 
-class TestFinalScoreIncludesScoreKeeper:
+class TestFinalScoreIsScoreKeeperTotal:
     @pytest.mark.asyncio
-    async def test_final_score_sums_event_and_behavior_scores(self):
-        """send_final_score_to_core must add event score + ScoreKeeper total."""
-        event_orchestrator = MagicMock()
-        event_orchestrator.live_score = 10
-
+    async def test_final_score_is_sum_of_event_and_behavior_buckets(self):
+        """ScoreKeeper.get_total_score() is the definitive final score."""
         score_keeper = ScoreKeeper()
+        await score_keeper.add_event_score(10)
         await score_keeper.add_behavior_score(7)
 
         with patch(
@@ -177,7 +182,6 @@ class TestFinalScoreIncludesScoreKeeper:
             await send_final_score_to_core(
                 room_id="room-1",
                 thread_id="room-1",
-                event_orchestrator=event_orchestrator,
                 score_keeper=score_keeper,
             )
 
@@ -185,32 +189,10 @@ class TestFinalScoreIncludesScoreKeeper:
         assert '"totalScore":17' in sent_payload
 
     @pytest.mark.asyncio
-    async def test_final_score_without_score_keeper_uses_event_score_only(self):
-        """Omitting ScoreKeeper must not break final score (backward compat)."""
-        event_orchestrator = MagicMock()
-        event_orchestrator.live_score = 10
-
-        with patch(
-            "app.core.queue.utils.send_message_to_queue", new_callable=AsyncMock
-        ) as mock_send:
-            from app.core.queue.utils import send_final_score_to_core
-
-            await send_final_score_to_core(
-                room_id="room-1",
-                thread_id="room-1",
-                event_orchestrator=event_orchestrator,
-            )
-
-        sent_payload = mock_send.call_args[0][0]
-        assert '"totalScore":10' in sent_payload
-
-    @pytest.mark.asyncio
-    async def test_final_score_with_negative_behavior_scores(self):
-        """Negative behavior scores must reduce the final total."""
-        event_orchestrator = MagicMock()
-        event_orchestrator.live_score = 10
-
+    async def test_negative_behavior_score_reduces_final_total(self):
+        """Negative behavior scores (SHOULD_NOT_DO) must reduce the final total."""
         score_keeper = ScoreKeeper()
+        await score_keeper.add_event_score(10)
         await score_keeper.add_behavior_score(-4)
 
         with patch(
@@ -221,9 +203,27 @@ class TestFinalScoreIncludesScoreKeeper:
             await send_final_score_to_core(
                 room_id="room-1",
                 thread_id="room-1",
-                event_orchestrator=event_orchestrator,
                 score_keeper=score_keeper,
             )
 
         sent_payload = mock_send.call_args[0][0]
         assert '"totalScore":6' in sent_payload
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_graph_state_when_no_score_keeper(self):
+        """When ScoreKeeper is absent, fall back to graph state (returns 0 in tests)."""
+        with patch(
+            "app.core.queue.utils.send_message_to_queue", new_callable=AsyncMock
+        ) as mock_send:
+            with patch(
+                "app.core.queue.utils.get_current_score_from_graph", return_value=42
+            ):
+                from app.core.queue.utils import send_final_score_to_core
+
+                await send_final_score_to_core(
+                    room_id="room-1",
+                    thread_id="room-1",
+                )
+
+        sent_payload = mock_send.call_args[0][0]
+        assert '"totalScore":42' in sent_payload

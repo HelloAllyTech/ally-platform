@@ -293,7 +293,7 @@ class TestScoreCascadingLogic:
             events, scenario, mock_room, thread_id
         )
 
-        orchestrator.live_score = 10
+        orchestrator.score_keeper._event_score = 10
 
         # Pass elapsed_time=0.0
         final_ids, added_score = orchestrator._evaluate_and_handle_cascade_score_events(

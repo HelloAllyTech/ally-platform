@@ -804,7 +804,7 @@ class TestWorker:
 
         registry_init_called = {}
 
-        # UPDATED MOCK: Now accepts agent_joined_at
+        # UPDATED MOCK: Now accepts agent_joined_at and score_keeper
         class MockEventOrchestrator:
             def __init__(
                 self,
@@ -813,6 +813,7 @@ class TestWorker:
                 room,
                 thread_id,
                 agent_joined_at=None,
+                score_keeper=None,
             ):
                 registry_init_called["scenario"] = scenario
                 registry_init_called["room"] = room
@@ -1108,7 +1109,7 @@ class TestWorker:
 
         registry_instance = {}
 
-        # UPDATED MOCK: Now accepts agent_joined_at
+        # UPDATED MOCK: Now accepts agent_joined_at and score_keeper
         class MockEventOrchestrator:
             def __init__(
                 self,
@@ -1117,6 +1118,7 @@ class TestWorker:
                 room,
                 thread_id,
                 agent_joined_at=None,
+                score_keeper=None,
             ):
                 self.termination_callback = termination_callback
                 self.termination_message = "Goodbye"
@@ -1345,7 +1347,7 @@ class TestWorker:
             agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
         )
 
-        # UPDATED MOCK: Now accepts agent_joined_at
+        # UPDATED MOCK: Now accepts agent_joined_at and score_keeper
         class MockEventOrchestrator:
             def __init__(
                 self,
@@ -1354,6 +1356,7 @@ class TestWorker:
                 room,
                 thread_id,
                 agent_joined_at=None,
+                score_keeper=None,
             ):
                 self.termination_callback = termination_callback
                 self.termination_message = None

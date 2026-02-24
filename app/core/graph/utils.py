@@ -106,16 +106,14 @@ def calculate_elapsed_time(config: Optional[RunnableConfig]) -> float:
 
 def get_live_score(config: Optional[RunnableConfig]) -> int:
     """
-    Retrieves the authoritative score.
-    Prioritizes the Orchestrator's live_score; falls back to 0 (or requires state).
+    Retrieves the committed event score from ScoreKeeper.
+    Falls back to 0 if ScoreKeeper is not in config.
     """
-    # 1. Try Orchestrator (Single Source of Truth)
     if config and "configurable" in config:
-        orchestrator = config["configurable"].get("event_orchestrator")
-        if orchestrator and hasattr(orchestrator, "live_score"):
-            return orchestrator.live_score
+        score_keeper = config["configurable"].get("score_keeper")
+        if score_keeper is not None:
+            return score_keeper.event_score
 
-    # FIX: Added return statement to satisfy '-> int' signature
     return 0
 
 

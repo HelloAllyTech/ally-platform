@@ -54,52 +54,35 @@ async def send_final_score_to_core(
     """
     Send final score to backend queue for session end or disconnect.
 
-    This provides the backend with the source of truth for the final score.
-    Not an event in the event system - just a session management indication.
-
-    The final score is the sum of:
-    - event_orchestrator.live_score: scores from detected events
-    - score_keeper.get_total_score(): scores from behavior instructions (and
-      future sources as they migrate to ScoreKeeper)
+    ScoreKeeper is the single source of truth: it holds both event scores
+    (committed by EventOrchestrator) and behavior scores (committed by
+    detect_behaviors). Falls back to LangGraph state only when ScoreKeeper
+    is absent (e.g. legacy callers or tests).
 
     Args:
         room_id: LiveKit room identifier
         thread_id: LangGraph thread identifier (usually same as room_id)
-        event_orchestrator: Optional EventOrchestrator instance to get
-            live_score from. If provided, uses live_score. Otherwise falls
-            back to graph state.
-        score_keeper: Optional ScoreKeeper instance to get behavior scores
-            from. If provided, its total is added to the event score.
+        event_orchestrator: Kept for backward-compatible call sites; unused
+            now that EventOrchestrator writes into ScoreKeeper directly.
+        score_keeper: ScoreKeeper instance. When present, its get_total_score()
+            is the definitive final score.
     """
     try:
-        # Get event-based score from event_orchestrator.live_score if available,
-        # otherwise fall back to graph state
-        if event_orchestrator is not None:
-            event_score = event_orchestrator.live_score
-            logger.info(f"Using live_score from event_orchestrator: {event_score}")
-        else:
-            event_score = get_current_score_from_graph(thread_id)
-            logger.warning(
-                "event_orchestrator not provided, falling back to graph state score"
+        if score_keeper is not None:
+            final_score = score_keeper.get_total_score()
+            logger.info(
+                f"Final score from ScoreKeeper — events: {score_keeper.event_score}, "
+                f"behaviors: {score_keeper.behavior_score}, total: {final_score}"
             )
-
-        # Add behavior scores from ScoreKeeper
-        behavior_score = (
-            score_keeper.get_total_score() if score_keeper is not None else 0
-        )
-        if behavior_score != 0:
-            logger.info(f"Adding behavior score from ScoreKeeper: {behavior_score}")
-
-        final_score = event_score + behavior_score
-        logger.info(
-            f"Final score breakdown — events: {event_score}, "
-            f"behaviors: {behavior_score}, total: {final_score}"
-        )
+        else:
+            final_score = get_current_score_from_graph(thread_id)
+            logger.warning(
+                "ScoreKeeper not provided, falling back to graph state score"
+            )
 
         # Create the session end message
         core_message = create_session_end_message(room_id, final_score)
 
-        # Send to queue
         logger.info(
             f"Sending end-of-session message {core_message} with final "
             f"score {final_score} to backend"

@@ -23,6 +23,7 @@ from app.core.graph.state import BranchingAndFeedbackData
 from app.core.graph.utils import is_event_eligible
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario, TerminationEvent
+from app.core.scoring.score_keeper import ScoreKeeper
 
 logger = get_logger(__name__)
 
@@ -57,6 +58,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         termination_callback: Optional[callable] = None,
         agent_joined_at: Optional[datetime] = None,
         is_report_mode: bool = False,
+        score_keeper: Optional[ScoreKeeper] = None,
     ):
         self.is_report_mode = is_report_mode
         self.events = scenario.events
@@ -102,8 +104,9 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # the agent finishes speaking the termination message. The event will
         # be sent in the shutdown callback after audio playback.
         self._init_event_sender()
-        # Track cumulative score of events sent to core
-        self._init_score_evaluator()
+        # ScoreKeeper is the single source of truth for all scoring.
+        # Create one if not provided (e.g. in tests or report mode).
+        self._init_score_evaluator(score_keeper or ScoreKeeper())
         self.setup_initial_state()
 
     def _has_circular_dependency(
@@ -219,7 +222,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             events=self.events,
             event_registry=self.event_registry,
             event_notifier=self.orchestrate_events,
-            get_live_score=lambda: self.live_score,
+            get_live_score=lambda: self.score_keeper.get_total_score(),
             room=self.room,
             default_seconds=60.0,
             agent_graph=resolved_graph,
@@ -343,8 +346,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         )
 
         # Current History + New Event Points + Cascade Bonus Points
+        # Uses total score (events + behaviors) so combination event eligibility
+        # checks reflect the full session score.
         projected_score = (
-            self.live_score
+            self.score_keeper.get_total_score()
             + score_from_new_events
             + additional_score_from_triggered_events
         )
@@ -475,7 +480,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
            registry and gather event data
         2. Sending events to Core immediately (backend needs real-time updates)
         3. Collecting event data (branching + feedback) to be stored in state
-        4. Updating live_score with scores from events sent to core
+        4. Committing event scores to ScoreKeeper
         5. Returning the collected data for use by the caller
 
         Note: UI events are no longer sent here. Instead,
@@ -512,8 +517,8 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         if not self.is_report_mode:
             await self._send_events_to_core(events_to_process, room)
 
-        # Update live_score with scores from events sent to core
-        await self._update_live_score(events_to_process)
+        # Commit event scores to ScoreKeeper
+        await self._update_event_score(events_to_process)
 
         # Handle termination events after sending events (even if room is None)
         await self._handle_termination_events(events_to_process)

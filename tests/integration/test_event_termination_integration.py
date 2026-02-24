@@ -196,7 +196,7 @@ class TestEventTerminationIntegration:
             termination_callback=termination_callback,
         )
 
-        orchestrator.live_score = 10
+        orchestrator.score_keeper._event_score = 10
         # First update with greeting - should not terminate
         await orchestrator.orchestrate_events(
             detected_event_ids={"greeting"},
@@ -205,7 +205,7 @@ class TestEventTerminationIntegration:
 
         termination_callback.assert_not_awaited()
 
-        orchestrator.live_score = 50
+        orchestrator.score_keeper._event_score = 50
 
         # Update with high score - should trigger termination
         await orchestrator.orchestrate_events(

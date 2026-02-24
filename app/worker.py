@@ -207,11 +207,12 @@ class AgentWorker:
         # Create session (needs clients from configure phase)
         self._create_session()
 
-        # Setup orchestrator
-        self._setup_event_orchestrator()
-
-        # Create ScoreKeeper (one per session, shared via agent config)
+        # Create ScoreKeeper first — it is injected into both EventOrchestrator
+        # and the agent config so all scoring flows through one instance.
         self.score_keeper = ScoreKeeper()
+
+        # Setup orchestrator (receives the ScoreKeeper)
+        self._setup_event_orchestrator(self.score_keeper)
 
         # Create agent (using utility function)
         self.agent = create_agent_with_adapter(
@@ -243,7 +244,7 @@ class AgentWorker:
             turn_detection="vad" if vad else None,
         )
 
-    def _setup_event_orchestrator(self):
+    def _setup_event_orchestrator(self, score_keeper=None):
         """Initialize event orchestrator with callbacks."""
         # Create termination handler that signals entrypoint context instead of
         # handling termination directly (which runs in graph context)
@@ -260,6 +261,7 @@ class AgentWorker:
             room=self.ctx.room,
             termination_callback=termination_handler,
             agent_joined_at=self.joined_iso,
+            score_keeper=score_keeper,
         )
 
         # Update termination handler with orchestrator reference

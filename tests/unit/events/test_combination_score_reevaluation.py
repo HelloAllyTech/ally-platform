@@ -108,13 +108,13 @@ class TestCombinationScoreBugFix:
         orchestrator = EventOrchestrator(scenario, mock_room, thread_id)
 
         # Step 1: Initially score = 5, S1 should be true
-        orchestrator.live_score = 5
+        orchestrator.score_keeper._event_score = 5
         triggered = orchestrator.get_newly_triggered_score_events(5, elapsed_time=0.0)
         assert "S1" in triggered
         assert orchestrator.get_event_state("S1") is True
 
         # Step 2: Score increases to 50, S1 should become false
-        orchestrator.live_score = 50
+        orchestrator.score_keeper._event_score = 50
         triggered = orchestrator.get_newly_triggered_score_events(50, elapsed_time=10.0)
         assert "S1" not in triggered  # Not newly triggered
         assert orchestrator.get_event_state("S1") is False  # Should be false now

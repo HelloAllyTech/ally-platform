@@ -3,7 +3,6 @@ Score-based event evaluation logic.
 Handles score calculation, live score updates, and cascading score events.
 """
 
-import asyncio
 from typing import TYPE_CHECKING, List, Set, Tuple
 
 from app.core.constants import DetectionType
@@ -11,6 +10,7 @@ from app.core.events.base import BaseEvent
 from app.core.events.utils import evaluate_condition
 from app.core.graph.utils import is_event_eligible
 from app.core.logger import get_logger
+from app.core.scoring.score_keeper import ScoreKeeper
 
 if TYPE_CHECKING:
     from app.core.events.schemas import EventRegistryEntry
@@ -24,7 +24,7 @@ class ScoreEvaluatorMixin:
 
     This mixin handles:
     - Score calculation from event IDs
-    - Live score tracking and updates
+    - Event score updates via ScoreKeeper
     - Score-based event triggering with cascading support
 
     Requires the following attributes on the host class:
@@ -33,8 +33,7 @@ class ScoreEvaluatorMixin:
     - trigger_events: Set[str]
     - score_based_events: List[BaseEvent]
     - _sent_events: Set[str]
-    - live_score: int
-    - _live_score_lock: asyncio.Lock
+    - score_keeper: ScoreKeeper
     """
 
     # Type hints for attributes expected from the host class
@@ -43,13 +42,11 @@ class ScoreEvaluatorMixin:
     trigger_events: Set[str]
     score_based_events: List[BaseEvent]
     _sent_events: Set[str]
-    live_score: int
-    _live_score_lock: asyncio.Lock
+    score_keeper: ScoreKeeper
 
-    def _init_score_evaluator(self) -> None:
+    def _init_score_evaluator(self, score_keeper: ScoreKeeper) -> None:
         """Initialize score evaluator state."""
-        self.live_score = 0
-        self._live_score_lock = asyncio.Lock()
+        self.score_keeper = score_keeper
 
         self.score_based_events = [
             e for e in self.events if e.detection_type == DetectionType.SCORE
@@ -202,13 +199,15 @@ class ScoreEvaluatorMixin:
         # (similarity, time, combination, etc.)
         current_cycle_score = self._calculate_score_from_event_ids(detected_event_ids)
 
-        # Start with live_score + current cycle's event scores
-        working_score = self.live_score + current_cycle_score
+        # Start with total committed score (events + behaviors) + current cycle's
+        # event scores. Behavior scores are included so score-based event thresholds
+        # are evaluated against the full session score.
+        working_score = self.score_keeper.get_total_score() + current_cycle_score
 
         if current_cycle_score != 0:
             logger.info(
-                f"Current cycle adding {current_cycle_score} to live_score "
-                f"{self.live_score}. Working score: {working_score}"
+                f"Current cycle adding {current_cycle_score} to total score "
+                f"{self.score_keeper.get_total_score()}. Working score: {working_score}"
             )
 
         # Evaluate score-based events against the working score
@@ -248,22 +247,20 @@ class ScoreEvaluatorMixin:
 
         return detected_event_ids, additional_score_from_triggered_events
 
-    async def _update_live_score(self, events_to_send: List[BaseEvent]) -> None:
+    async def _update_event_score(self, events_to_send: List[BaseEvent]) -> None:
         """
-        Update live_score with scores from events that were sent to core.
+        Commit scores from sent events into ScoreKeeper.
 
-        This method should be called after events have been successfully sent to core.
-        Uses asyncio.Lock to prevent race conditions during concurrent event processing.
+        Called after events have been successfully sent to core so the
+        committed event_score reflects only events the backend has received.
 
         Args:
             events_to_send: List of events that were sent to core
         """
         score_delta = self._calculate_total_score_from_events(events_to_send)
 
-        async with self._live_score_lock:
-            if score_delta != 0:
-                self.live_score += score_delta
-                logger.debug(f"Live score updated: +{score_delta} = {self.live_score}")
+        if score_delta != 0:
+            await self.score_keeper.add_event_score(score_delta)
 
         if events_to_send:
-            logger.info(f"Current live score: {self.live_score}")
+            logger.info(f"Current event score: {self.score_keeper.event_score}")

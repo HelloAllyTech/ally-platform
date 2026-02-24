@@ -9,6 +9,7 @@ from app.core.events.base import BaseEvent, ChatMessage, DetectionConfig
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.graph.nodes import process_events
 from app.core.graph.state import SimulationState
+from app.core.scoring.score_keeper import ScoreKeeper
 
 
 class MockEvent(BaseEvent):
@@ -65,13 +66,12 @@ async def test_process_events_time_filtering(base_state):
     mock_orchestrator = MagicMock(spec=EventOrchestrator)
     mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
 
-    mock_orchestrator.live_score = 0
-
     config = {
         "configurable": {
             "agent_joined_at": joined_iso,
             "room": MagicMock(),
             "event_orchestrator": mock_orchestrator,
+            "score_keeper": ScoreKeeper(),
         }
     }
 
@@ -111,10 +111,15 @@ async def test_process_events_score_filtering(base_state):
 
     mock_orchestrator = MagicMock()
     mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
-    # CRITICAL: This prevents 'int <= MagicMock' error
-    mock_orchestrator.live_score = 50
 
-    config = {"configurable": {"event_orchestrator": mock_orchestrator}}
+    score_keeper = ScoreKeeper()
+    score_keeper._event_score = 50
+    config = {
+        "configurable": {
+            "event_orchestrator": mock_orchestrator,
+            "score_keeper": score_keeper,
+        }
+    }
 
     with patch("app.core.graph.utils.dt") as mock_dt:
         mock_dt.datetime.now.return_value = datetime.now(timezone.utc)
@@ -133,16 +138,15 @@ async def test_process_events_invalid_time_format(base_state):
     event = MockEvent("always_run")
     base_state.permitted_events = [event]
 
-    # --- FIX 3: Configure Orchestrator ---
     mock_orchestrator = MagicMock()
     mock_orchestrator.orchestrate_events = AsyncMock(return_value=(None, 0, []))
-    mock_orchestrator.live_score = 0  # Default score
 
     config = {
         "configurable": {
             "agent_joined_at": "invalid-garbage-string",
             "room": MagicMock(),
             "event_orchestrator": mock_orchestrator,
+            "score_keeper": ScoreKeeper(),
         }
     }
 

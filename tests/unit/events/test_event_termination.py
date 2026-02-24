@@ -508,7 +508,7 @@ class TestEventTermination:
             termination_callback=callback,
         )
 
-        orchestrator.live_score = 10
+        orchestrator.score_keeper._event_score = 10
 
         # Update with score that triggers the event
         await orchestrator.orchestrate_events(room=mock_room, detected_event_ids=None)
@@ -934,15 +934,16 @@ class TestMultipleTerminationEvents:
             scenario, room=mock_room, thread_id="test-thread"
         )
 
-        # Initial live_score should be 0
-        assert orchestrator.live_score == 0
+        # Initial event score should be 0
+        assert orchestrator.score_keeper.event_score == 0
 
-        # Update live_score with both events
-        await orchestrator._update_live_score([trigger_event, termination_event])
+        # Commit scores from both events into ScoreKeeper
+        await orchestrator._update_event_score([trigger_event, termination_event])
 
         # Only trigger_event's score should be added (15)
         # termination_event's score (25) should be excluded
-        assert orchestrator.live_score == 15, (
-            f"Expected live_score to be 15, but got {orchestrator.live_score}. "
+        assert orchestrator.score_keeper.event_score == 15, (
+            f"Expected event_score to be 15, but got "
+            f"{orchestrator.score_keeper.event_score}. "
             "Only trigger_event score should be added."
         )
