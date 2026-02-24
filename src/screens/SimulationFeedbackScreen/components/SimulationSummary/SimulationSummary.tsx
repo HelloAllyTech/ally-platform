@@ -9,7 +9,7 @@ import {colors, fontFamily, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
-import {EventChecklist} from '..';
+import {EventChecklist} from '../EventChecklist';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {

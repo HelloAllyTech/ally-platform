@@ -5,6 +5,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
 import {CustomTabs, FeedbackPopup, useToast} from '@/components';
+import {env} from '@/config/env';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
@@ -301,7 +302,12 @@ export const SimulationFeedbackScreen: React.FC<
   };
 
   const tabs = useMemo(
-    () => getSimulationSummaryTabs(t, {pathId, caseId}),
+    () =>
+      getSimulationSummaryTabs(t, {
+        pathId,
+        caseId,
+        postSimulationNewTabs: env.POST_SIMULATION_NEW_TABS_FLAG,
+      }),
     [t, pathId, caseId],
   );
 
