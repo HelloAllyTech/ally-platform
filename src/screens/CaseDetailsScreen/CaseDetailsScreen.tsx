@@ -52,7 +52,6 @@ export const CaseDetailsScreen: React.FC<
     isCreatingSession,
     getSessionByItem,
   } = useLearningPathDetails({id: caseId, type: LearningPathType.CASE});
-  console.log('🚀 ~ CaseDetailsScreen ~ data:', data?.caseSessionId);
 
   const [selectedSimulation, setSelectedSimulation] =
     useState<CaseSimulation | null>(null);
