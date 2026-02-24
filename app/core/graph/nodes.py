@@ -29,6 +29,7 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
+from app.core.scoring.score_keeper import ScoreKeeper
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
 
@@ -608,13 +609,18 @@ async def detect_behaviors(
     The results are stored in state and later:
     - Sent to UI with score updates (empty emoji and feedback message)
     - Sent to BE as behavior_instruction type (distinct from event type)
+
+    Detected behavior scores are also accumulated in ScoreKeeper (if present
+    in config) so they are included in the final score sent to core.
     """
     logger.info("Detecting behaviors")
 
-    # Get scenario from config
+    # Get scenario and score_keeper from config
     scenario = None
+    score_keeper: Optional[ScoreKeeper] = None
     if config and "configurable" in config:
         scenario = config["configurable"].get("scenario")
+        score_keeper = config["configurable"].get("score_keeper")
 
     if not scenario or not getattr(scenario, "behavior_instructions", None):
         logger.debug("No behavior instructions configured, skipping detection")
@@ -631,6 +637,15 @@ async def detect_behaviors(
     behavior_feedback = await _detect_behavior_instructions(
         scenario.behavior_instructions, chat_messages
     )
+
+    # Accumulate behavior scores in ScoreKeeper
+    if score_keeper and behavior_feedback:
+        for feedback in behavior_feedback:
+            await score_keeper.add_behavior_score(feedback.score)
+        logger.info(
+            f"ScoreKeeper: accumulated {len(behavior_feedback)} behavior score(s), "
+            f"total behavior score = {score_keeper.behavior_score}"
+        )
 
     return {"behavior_feedback_data": behavior_feedback}
 

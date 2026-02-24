@@ -16,6 +16,7 @@ from app.core.events.event_orchestrator.event_orchestrator import EventOrchestra
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
+from app.core.scoring.score_keeper import ScoreKeeper
 from app.llms import BaseLLMClient, create_llm_client
 from app.stt import BaseSTTClient, create_stt_client
 from app.tts import BaseTTSClient, Gender, create_tts_client
@@ -231,6 +232,7 @@ def create_agent_with_adapter(
     embedding_client: OpenAIEmbeddingClient,
     event_orchestrator: EventOrchestrator,
     tts_client: Optional[BaseTTSClient] = None,
+    score_keeper: Optional[ScoreKeeper] = None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -244,6 +246,7 @@ def create_agent_with_adapter(
         embedding_client: Embedding client instance
         event_orchestrator: EventOrchestrator instance
         tts_client: Optional TTS client for voice expressions
+        score_keeper: Optional ScoreKeeper instance for behavior score tracking
 
     Returns:
         Agent instance with LLM adapter
@@ -262,6 +265,10 @@ def create_agent_with_adapter(
     # Add TTS client if provided
     if tts_client:
         configurable["tts_client"] = tts_client
+
+    # Add ScoreKeeper if provided
+    if score_keeper:
+        configurable["score_keeper"] = score_keeper
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph

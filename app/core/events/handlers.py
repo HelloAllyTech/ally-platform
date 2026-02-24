@@ -166,6 +166,7 @@ def create_connection_state_handler(
     final_score_sent_ref: Callable[[], bool],
     set_final_score_sent: Callable[[bool], None],
     background_tasks: Set[asyncio.Task],
+    score_keeper=None,
 ) -> Callable[[rtc.ConnectionState], None]:
     """
     Create a connection state change handler.
@@ -176,6 +177,7 @@ def create_connection_state_handler(
         final_score_sent_ref: Callable to get final_score_sent flag
         set_final_score_sent: Callable to set final_score_sent flag
         background_tasks: Set to track background tasks
+        score_keeper: Optional ScoreKeeper instance for behavior scores
 
     Returns:
         Connection state handler function
@@ -209,6 +211,7 @@ def create_connection_state_handler(
                         room_id=room_name,
                         thread_id=room_name,
                         event_orchestrator=event_orchestrator,
+                        score_keeper=score_keeper,
                     )
                 )
                 background_tasks.add(task)
@@ -272,6 +275,7 @@ def create_shutdown_handler(
     final_score_sent_ref: Callable[[], bool],
     set_final_score_sent: Callable[[bool], None],
     cleanup_background_tasks: Callable[[], None],
+    score_keeper=None,
 ) -> Callable[[], None]:
     """
     Create a shutdown callback handler.
@@ -282,6 +286,7 @@ def create_shutdown_handler(
         final_score_sent_ref: Callable to get final_score_sent flag
         set_final_score_sent: Callable to set final_score_sent flag
         cleanup_background_tasks: Async function to cleanup background tasks
+        score_keeper: Optional ScoreKeeper instance for behavior scores
 
     Returns:
         Async shutdown handler function
@@ -318,6 +323,7 @@ def create_shutdown_handler(
                     room_id=room_name,
                     thread_id=room_name,
                     event_orchestrator=event_orchestrator,
+                    score_keeper=score_keeper,
                 )
                 set_final_score_sent(True)
                 logger.info("Final score sent successfully")

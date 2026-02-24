@@ -38,6 +38,7 @@ from app.core.events.handlers import (
 )
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
+from app.core.scoring.score_keeper import ScoreKeeper
 from app.llms import BaseLLMClient
 from app.stt import BaseSTTClient
 from app.tts import BaseTTSClient
@@ -80,6 +81,7 @@ class AgentWorker:
         # ========== Runtime Components (set in initialize()) ==========
         self.session: Optional[AgentSession] = None
         self.event_orchestrator: Optional[EventOrchestrator] = None
+        self.score_keeper: Optional[ScoreKeeper] = None
         self.agent: Optional[Agent] = None
 
         # ========== State Tracking ==========
@@ -208,6 +210,9 @@ class AgentWorker:
         # Setup orchestrator
         self._setup_event_orchestrator()
 
+        # Create ScoreKeeper (one per session, shared via agent config)
+        self.score_keeper = ScoreKeeper()
+
         # Create agent (using utility function)
         self.agent = create_agent_with_adapter(
             thread_id=self.ctx.room.name,
@@ -218,6 +223,7 @@ class AgentWorker:
             embedding_client=self.embedding_client,
             event_orchestrator=self.event_orchestrator,
             tts_client=self.tts_client,
+            score_keeper=self.score_keeper,
         )
 
         # Register callbacks
@@ -281,6 +287,7 @@ class AgentWorker:
             final_score_sent_ref=lambda: self.final_score_sent,
             set_final_score_sent=lambda val: setattr(self, "final_score_sent", val),
             background_tasks=self._background_tasks,
+            score_keeper=self.score_keeper,
         )
 
         @self.ctx.room.on("connection_state_changed")
@@ -301,6 +308,7 @@ class AgentWorker:
             cleanup_background_tasks=lambda: cleanup_background_tasks(
                 self._background_tasks
             ),
+            score_keeper=self.score_keeper,
         )
 
         # Wrap shutdown handler to include conversation handler cleanup
