@@ -40,7 +40,7 @@ export const styles = ScaledSheet.create({
   promptText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '18@ms',
-    color: '#81663E',
+    color: colors.ds.deepPurple[500],
     letterSpacing: 0.25,
   },
   textInput: {
