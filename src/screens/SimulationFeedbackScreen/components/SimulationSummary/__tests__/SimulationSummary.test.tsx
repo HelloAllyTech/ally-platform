@@ -8,10 +8,7 @@ jest.mock('@/hooks', () => ({
   }),
 }));
 
-// babel-plugin-module-resolver transforms `import from '..'` in SimulationSummary.tsx
-// to the project root index.js. Mock it to provide EventChecklist.
-jest.mock('../../../../../../index', () => ({
-  __esModule: true,
+jest.mock('../../EventChecklist', () => ({
   EventChecklist: () => null,
 }));
 
