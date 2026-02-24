@@ -525,18 +525,20 @@ export const CallLogScreen: React.FC = () => {
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         showActionsMenu={!isViewingArchivedRealLogs}
       />
-      {availableLogTypes.length > 1 && !isViewingArchivedRealLogs && (
-        <View style={styles.tabMargin}>
-          <TabView
-            tabs={[
-              {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
-              {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
-            ]}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-        </View>
-      )}
+      {availableLogTypes.includes(LogType.REAL) &&
+        availableLogTypes.includes(LogType.SIMULATION) &&
+        !isViewingArchivedRealLogs && (
+          <View style={styles.tabMargin}>
+            <TabView
+              tabs={[
+                {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
+                {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
+              ]}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          </View>
+        )}
       {currentLogs.length === 0 && isFetching && currentOffset === 0 ? (
         <CallLogSkeleton count={10} />
       ) : currentLogs.length === 0 && !isFetching ? (
