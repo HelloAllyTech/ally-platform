@@ -1,3 +1,4 @@
+import {useState} from 'react';
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
 import {Image, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
@@ -37,6 +38,7 @@ export const DrawerContent = ({
   const {credits, getCreditsInfo} = useSimulationCredits();
   const {name, email, profileImageUrl} = userData ?? {};
   const {data: tenantData} = useGetLogoUrlQuery();
+  const [logoError, setLogoError] = useState(false);
 
   const handleProfileSettingsPress = () => {
     drawerNavigation.closeDrawer();
@@ -45,14 +47,23 @@ export const DrawerContent = ({
 
   return (
     <View style={styles.container}>
-      {tenantData?.logoUrl && (
+      {tenantData && (
         <>
           <View style={styles.orgLogoContainer}>
-            <Image
-              source={{uri: tenantData.logoUrl}}
-              style={styles.orgLogo}
-              resizeMode="contain"
-            />
+            {tenantData.logoUrl && !logoError ? (
+              <Image
+                source={{uri: tenantData.logoUrl}}
+                style={styles.orgLogo}
+                resizeMode="contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <View style={styles.orgLogoPlaceholder}>
+                <Text style={styles.orgLogoPlaceholderText}>
+                  {tenantData.name?.slice(0, 1)?.toUpperCase() ?? 'NA'}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.separator} />
         </>
@@ -263,5 +274,19 @@ const styles = ScaledSheet.create({
   orgLogo: {
     height: '100%',
     width: '100%',
+  },
+  orgLogoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.lightGray2,
+    borderRadius: '4@ms',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  orgLogoPlaceholderText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.large,
+    color: colors.ds.typography.mediumEmphasis,
+    textTransform: 'uppercase',
   },
 });
