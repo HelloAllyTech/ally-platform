@@ -23,9 +23,16 @@ flowchart TB
         subgraph Graph["LangGraph Pipeline"]
             N1[process_events]
             N2[resolve_branching_instruction]
-            N3[generate_response]
+            N3A[generate_response]
+            N3B[detect_behaviors]
             N4[apply_voice_expressions]
-            N1 --> N2 --> N3 --> N4
+            N5[send_event_feedback]
+            N1 --> N2
+            N2 --> N3A
+            N2 --> N3B
+            N3A --> N4
+            N4 --> N5
+            N3B --> N5
         end
 
         subgraph Events["Event System"]
@@ -46,6 +53,12 @@ flowchart TB
             SCEN[Scenario.create]
             PROMPT[PromptData]
             BRANCH[BranchingInstruction]
+            CTX[Context Generator]
+        end
+
+        subgraph Prompts["Prompts System"]
+            PM[PromptManager]
+            RESOLVER[Template Resolver]
         end
 
         PROSODY[SpeechProsodyService]
@@ -71,9 +84,9 @@ flowchart TB
 
 | Component | Location | Responsibility |
 |-----------|----------|----------------|
-| FastAPI Server | `app/main.py` | Health check endpoint, CORS middleware |
+| FastAPI Server | `app/main.py` | Health check, API routers (voice preview, scenario report), CORS |
 | AgentWorker | `app/worker.py` | Session lifecycle: configure, initialize, start |
-| LangGraph Pipeline | `app/core/graph/` | 4-node conversation processing graph |
+| LangGraph Pipeline | `app/core/graph/` | 6-node simulation graph; separate report graph for text-only runs |
 | EventOrchestrator | `app/core/events/event_orchestrator/` | Registry, scoring, event delivery |
 | Event Factory | `app/core/events/factory.py` | Build `BaseEvent` instances from metadata |
 | Event Types | `app/core/events/event_types/` | 9 concrete event implementations |
@@ -81,8 +94,14 @@ flowchart TB
 | STT Factory | `app/stt/factory.py` | Create STT clients (3 providers) |
 | LLM Factory | `app/llms/factory.py` | Create LLM clients (4 providers) |
 | Scenario Engine | `app/core/scenario/base.py` | Parse metadata into `Scenario` objects |
+| Context Generator | `app/core/agent/context_generator.py` | AI-generate cultural_context, speaking_style when missing |
+| Agent Factory | `app/core/agent/factory.py` | Parse metadata, configure clients, create agent |
 | Branching System | `app/core/branching_instructions/` | Variable substitution in instructions |
 | Speech Prosody | `app/speech_prosody/` | Voice expression parameter generation |
+| Prompts System | `app/prompts/` | Template loading, backend override resolution |
+| Scenario Report | `app/core/scenario_report/` | N-turn text simulation, webhook delivery |
+| ScoreKeeper | `app/core/scoring/score_keeper.py` | Behavior instruction score tracking |
+| Embeddings | `app/core/embeddings/` | OpenAI embeddings for semantic similarity |
 | SQS Queue | `app/core/queue/sqs.py` | Async message delivery to AWS SQS |
 | Configuration | `app/core/config.py` | Pydantic `Settings` from environment |
 
@@ -141,6 +160,8 @@ Both types are sent to Core (SQS). Only ACTIVE events generate `BranchingAndFeed
 
 - `app/main.py` -- FastAPI application
 - `app/worker.py` -- AgentWorker lifecycle
-- `app/core/graph/graph_builder.py` -- Graph construction
+- `app/core/graph/graph_builder.py` -- `build_simulation_graph()`, `build_report_graph()`
+- `app/core/agent/factory.py` -- `parse_room_metadata()`, client configuration, agent creation
+- `app/core/agent/context_generator.py` -- `generate_cultural_context()`
 - `app/core/config.py` -- Settings from environment
 - `app/core/constants.py` -- Enums and constants

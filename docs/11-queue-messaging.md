@@ -170,5 +170,5 @@ When running inside Docker Compose, the app reaches LocalStack at `http://locals
 - `app/core/events/schemas.py` -- `CoreEventMessageType`, `CustomUIEventMessageType`
 - `app/core/events/event_orchestrator/event_sender.py` -- `EventSender._send_events_to_core()`
 - `app/core/graph/utils.py` -- `serialize_event()`
-- `app/utils/event_handler.py` -- `send_event_to_ui()`
+- `app/core/events/handlers.py` -- `send_event_to_ui()`
 - `docker-compose.yml` -- LocalStack configuration

@@ -135,64 +135,61 @@ The service is exposed on host port `8002` (`http://localhost:8002`) to avoid cl
 ## API Endpoints
 
 - **Health Check**: `GET /api/health` - Service health status
+- **API v1** (prefix `/api/v1`): Voice preview, scenario report generation (see `app/api/`)
 
 ## Project Structure
 
 ```
 ally-learn-core/
 ├── app/
+│   ├── api/                             # FastAPI routers
+│   │   ├── scenario_report.py           # Scenario report generation
+│   │   ├── voice_preview.py             # Voice preview endpoint
+│   │   └── dependencies.py              # Auth, token verification
 │   ├── core/
+│   │   ├── agent/                       # Agent setup and utilities
+│   │   │   ├── factory.py               # parse_room_metadata, client config, agent creation
+│   │   │   └── context_generator.py     # AI-generated cultural_context, speaking_style
 │   │   ├── config.py                    # Application configuration
 │   │   ├── constants.py                 # Constants and enums
+│   │   ├── embeddings/                 # Embedding clients (OpenAI)
 │   │   ├── events/                      # Event detection and processing
 │   │   │   ├── base.py                  # Base event class
-│   │   │   ├── event_processor.py       # Event scoring and selection
 │   │   │   ├── factory.py               # Event factory
-│   │   │   ├── core_event_sender.py     # SQS event publishing
-│   │   │   ├── ui_event_sender.py       # UI event delivery
-│   │   │   └── event_list/              # Specific event implementations
+│   │   │   ├── handlers.py              # Conversation event handlers, send_event_to_ui
+│   │   │   ├── event_orchestrator/      # Orchestrator, sender, score evaluator
+│   │   │   └── event_types/             # Event implementations (9 types)
 │   │   ├── graph/                       # LangGraph workflow
-│   │   │   ├── graph_builder.py         # Graph construction
-│   │   │   ├── nodes.py                 # Graph nodes (event detection, response generation)
-│   │   │   ├── state.py                 # Conversation state management
-│   │   │   └── prompt.py                # System prompt generation
-│   │   ├── livekit/                     # LiveKit models and types
+│   │   │   ├── graph_builder.py         # build_simulation_graph, build_report_graph
+│   │   │   ├── nodes.py                 # Graph nodes
+│   │   │   ├── state.py                 # SimulationState
+│   │   │   └── prompt.py               # System prompt generation
+│   │   ├── livekit/                     # LiveKit models
 │   │   ├── queue/                       # AWS SQS integration
-│   │   │   └── sqs.py                   # SQS queue client
-│   │   └── scenario/                    # Scenario and persona models
-│   │       └── base.py                  # Scenario data structures
-│   ├── schemas/
-│   │   └── events.py                    # Event schemas
-│   ├── utils/
-│   │   ├── logger.py                    # Logging configuration
-│   │   ├── event_handler.py             # Conversation event handlers
-│   │   ├── metadata_parser.py           # Room metadata parsing
-│   │   ├── tts_validator.py             # TTS configuration validation
-│   │   └── datetime_utils.py            # Datetime utilities
+│   │   ├── scenario/                    # Scenario and persona models
+│   │   │   ├── base.py                  # Scenario, PromptData
+│   │   │   └── simulation_instructions.py  # Behavior and state instructions
+│   │   ├── scenario_report/             # Report generation service
+│   │   └── scoring/                    # ScoreKeeper for behavior scores
+│   ├── prompts/                         # Prompt templates
+│   │   ├── manager.py                  # Template loading
+│   │   ├── resolver.py                  # Backend override resolution
+│   │   ├── system/                     # System prompts
+│   │   └── prosody/                    # Prosody prompts
 │   ├── tts/                             # TTS provider implementations
-│   │   ├── base.py                      # Base TTS client interface
-│   │   ├── factory.py                   # TTS factory for provider selection
-│   │   ├── deepgram.py                  # Deepgram TTS client
-│   │   ├── elevenlabs.py                # ElevenLabs TTS client
-│   │   ├── sarvam.py                    # Sarvam TTS client
-│   │   └── google.py                    # Google Cloud TTS client
 │   ├── stt/                             # STT provider implementations
-│   │   ├── base.py                      # Base STT client interface
-│   │   ├── factory.py                   # STT factory for provider selection
-│   │   └── deepgram.py                  # Deepgram STT client
 │   ├── llms/                            # LLM provider implementations
-│   │   ├── base.py                      # Base LLM client interface
-│   │   ├── factory.py                   # LLM factory for provider selection
-│   │   └── openai.py                    # OpenAI LLM client
+│   ├── speech_prosody/                  # Voice expression parameters
 │   ├── main.py                          # FastAPI application
 │   ├── middleware.py                    # Request logging and CORS
 │   ├── worker.py                        # LiveKit agent worker
 │   └── scenario_sample.py               # Sample scenario data
-├── dockerfile                           # Docker configuration
-├── docker-compose.yml                   # LocalStack setup
-├── start.sh                             # Startup script
-├── pyproject.toml                       # Poetry dependencies
-└── README.md                            # This file
+├── docs/                                # Developer documentation
+├── dockerfile
+├── docker-compose.yml
+├── start.sh
+├── pyproject.toml
+└── README.md
 ```
 
 ## How It Works
@@ -208,12 +205,13 @@ ally-learn-core/
 
 2. **Conversation Loop**
    - User (counselor) speaks → STT (configured from metadata or default) → Text
-   - LangGraph processes:
+   - LangGraph processes (6 nodes with parallel execution):
      - **Event Detection**: Analyzes conversation for counseling events
-     - **Event Processing**: Calculates scores and selects feedback
-     - **UI Event Delivery**: Sends feedback to frontend
+     - **Branching Resolution**: Resolves branching instructions (LLM tags, dynamic variables)
+     - **Response + Behaviors** (parallel): LLM generates client response; behavior instructions are classified
+     - **Voice Expressions**: Applies prosody parameters and text enhancement
+     - **UI Feedback**: Sends event and behavior scores/feedback to frontend
      - **Core Event Publishing**: Publishes to SQS
-     - **Response Generation**: LLM (configured from metadata or default) generates client response
    - Client response → TTS → Audio → Played to user
 
 3. **Event System**
@@ -489,26 +487,13 @@ The container runs both the FastAPI server (port 8000) and LiveKit worker simult
 
 ### Adding New Events
 
-1. Create event class in `app/core/events/event_list/`
+1. Create event class in `app/core/events/event_types/`
 2. Extend `BaseEvent` with custom detection logic
 3. Register in event factory (`app/core/events/factory.py`)
 
 ### Event Termination
 
-Events can automatically terminate sessions when they occur. Add `"autoTerminationStatus": true` to any event:
-
-```json
-{
-  "id": "session-end",
-  "sentences": ["goodbye", "end session"],
-  "autoTerminationStatus": true,
-  "emoji": "👋",
-  "message": "Session ended",
-  "score": 0
-}
-```
-
-Supported by all event types: **Sentence Similarity**, **Time**, **Score**, and **Combination** events.
+Events can automatically terminate sessions when they occur. Configure via `autoTerminationEvents` in scenario metadata, mapping event IDs to termination messages. Supported by all event types.
 
 See [Event Termination Documentation](docs/EVENT_TERMINATION.md) for detailed guide and examples.
 

@@ -1,23 +1,26 @@
 # Graph Pipeline
 
-**Purpose.** This document describes the LangGraph pipeline: the `SimulationState` model, the four graph nodes, subgraph design, and data flow.
+**Purpose.** This document describes the LangGraph pipeline: the `SimulationState` model, the six graph nodes (including parallel execution), subgraph design, report graph, and data flow.
 
 ---
 
 ## Overview
 
-The conversation pipeline is a LangGraph `StateGraph` with four nodes connected in a linear chain:
+The conversation pipeline is a LangGraph `StateGraph` with six nodes. After `resolve_branching_instruction`, execution **fans out** to `generate_response` and `detect_behaviors` in parallel, then **fans in** before `send_event_feedback`:
 
 ```mermaid
 flowchart LR
     START --> process_events
     process_events --> resolve_branching_instruction
     resolve_branching_instruction --> generate_response
+    resolve_branching_instruction --> detect_behaviors
     generate_response --> apply_voice_expressions
-    apply_voice_expressions --> END
+    apply_voice_expressions --> send_event_feedback
+    detect_behaviors --> send_event_feedback
+    send_event_feedback --> END
 ```
 
-Two of the four nodes (`resolve_branching_instruction` and `apply_voice_expressions`) are wrapped in **subgraphs** to prevent their internal LLM calls from being streamed to the user. See [Architecture](architecture.md) for the rationale.
+Two nodes (`resolve_branching_instruction` and `apply_voice_expressions`) are wrapped in **subgraphs** to prevent their internal LLM calls from being streamed to the user. See [Architecture](architecture.md) for the rationale.
 
 ## SimulationState
 
@@ -34,6 +37,7 @@ Two of the four nodes (`resolve_branching_instruction` and `apply_voice_expressi
 | `non_branching_feedback_data` | `List[BranchingAndFeedbackData]` | `add_non_branching_feedback_data` | Non-branching events (async, no blocking) |
 | `next_instruction` | `Optional[str]` | `replace_next_instruction` | Resolved branching instruction text for the LLM |
 | `feedback_to_send` | `Optional[EventFeedback]` | `replace_feedback_to_send` | Feedback selected for UI delivery |
+| `behavior_feedback_data` | `List[BehaviorInstructionFeedbackData]` | `add_behavior_feedback_data` | Behavior detection results (from detect_behaviors) |
 
 ### Key Data Classes
 
@@ -47,6 +51,11 @@ Two of the four nodes (`resolve_branching_instruction` and `apply_voice_expressi
 - `feedback`: `EventFeedback` object (for UI display)
 - `score`: event score (for priority selection)
 - `event_id`: event identifier
+
+**`BehaviorInstructionFeedbackData`** -- behavior detection result:
+- `behavior_instruction_id`: ID from core service
+- `score`: score for this behavior instruction
+- `category`: `SHOULD_DO` or `SHOULD_NOT_DO`
 
 ## Node 1: process_events
 
@@ -82,7 +91,7 @@ This node resolves branching instructions that guide the LLM response. Steps:
 
 Returns `next_instruction` (resolved instruction text) and `feedback_to_send`.
 
-## Node 3: generate_response
+## Node 3a: generate_response
 
 **File:** `app/core/graph/nodes.py:generate_response`
 
@@ -92,15 +101,29 @@ This node generates the AI client response. Steps:
 2. **Build system message** -- `generate_system_message()` creates the system prompt from scenario `PromptData` and the resolved `next_instruction`
 3. **Get LLM client** -- from config or create dynamically
 4. **Generate response** -- `llm_instance.ainvoke(messages)` with system message prepended
-5. **Send UI feedback** -- calculate cumulative score from all ACTIVE events, send feedback to UI via LiveKit data channel
-6. **Clear state** -- reset `branching_and_feedback_data`, `non_branching_feedback_data`, `next_instruction`, and `feedback_to_send`
+5. **Clear state** -- reset `branching_and_feedback_data`, `non_branching_feedback_data`, `next_instruction`, and `feedback_to_send`
+
+**Note:** UI feedback (score, emoji) is sent by `send_event_feedback`, not by this node. This separation allows the core nodes to be reused by the report graph without UI concerns.
 
 ### System Prompt Modes
 
 The system prompt has two modes:
 
 - **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
-- **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, etc.)
+- **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, cultural context, speaking style, etc.)
+
+## Node 3b: detect_behaviors
+
+**File:** `app/core/graph/nodes.py:detect_behaviors`
+
+This node runs in **parallel** with `generate_response`. It detects counselor behaviors from `SimulationBehaviorInstruction` (SHOULD_DO / SHOULD_NOT_DO) defined in the scenario. Steps:
+
+1. **Get behavior instructions** -- from scenario `behavior_instructions`
+2. **Resolve current state** -- select `SimulationStateInstruction` based on score window
+3. **Detect behaviors** -- for each instruction, run binary classification on the last counselor utterance
+4. **Build feedback data** -- populate `behavior_feedback_data` with `BehaviorInstructionFeedbackData`
+
+Results are consumed by `send_event_feedback`, which sends behavior scores to the UI and clears the state.
 
 ## Node 4: apply_voice_expressions (subgraph)
 
@@ -113,6 +136,33 @@ This node applies voice expression parameters to the generated response. Steps:
 3. **Generate prosody** -- `generate_and_apply_prosody_for_message()` makes a single LLM call that produces both voice parameters (speed, tone, etc.) and enhanced text (SSML tags, etc.)
 4. **Apply parameters** -- parameters are applied to TTS via `update_options()`
 5. **Update message** -- if the provider supports text enhancement, replace the message content with the enhanced text
+
+See [Speech Prosody](08-speech-prosody.md) for details.
+
+## Node 5: send_event_feedback
+
+**File:** `app/core/graph/nodes.py:send_event_feedback`
+
+This node runs after both `apply_voice_expressions` and `detect_behaviors` complete. It sends feedback to the UI and clears transient state:
+
+1. **Send event feedback** -- cumulative score from ACTIVE events, emoji, message via LiveKit data channel
+2. **Send behavior feedback** -- behavior instruction scores to UI
+3. **Clear state** -- reset `branching_and_feedback_data`, `non_branching_feedback_data`, `feedback_to_send`, `behavior_feedback_data`
+
+Kept separate from `generate_response` so the core nodes (process_events, resolve_branching_instruction, generate_response, detect_behaviors) can be reused by the report graph without UI concerns.
+
+## Report Graph
+
+**File:** `app/core/graph/graph_builder.py:build_report_graph()`
+
+A separate graph for scenario report generation (N-turn text-only simulation). Reuses the core simulation nodes but omits:
+
+- `apply_voice_expressions` (TTS voice parameter injection)
+- `send_event_feedback` (UI score/emoji feedback sending)
+
+Flow: `START` → `process_events` → `resolve_branching_instruction` → [generate_response, detect_behaviors] (parallel) → `END`
+
+Used by `ScenarioReportService` for webhook-based report delivery.
 
 ## Data Flow Diagram
 
@@ -135,8 +185,13 @@ flowchart TD
         GR1[Merge feedback from branching + non-branching]
         GR1 --> GR2[Build system message]
         GR2 --> GR3[LLM ainvoke]
-        GR3 --> GR4[Send UI feedback]
-        GR4 --> GR5[Clear state]
+        GR3 --> GR4[Clear state]
+    end
+
+    subgraph detect_behaviors
+        DB1[Resolve current state]
+        DB1 --> DB2[Binary classify behaviors]
+        DB2 --> DB3[Build behavior_feedback_data]
     end
 
     subgraph apply_voice_expressions
@@ -145,9 +200,18 @@ flowchart TD
         VE2 --> VE3[Update message content if enhanced]
     end
 
+    subgraph send_event_feedback
+        SF1[Send event scores/feedback to UI]
+        SF1 --> SF2[Send behavior feedback to UI]
+        SF2 --> SF3[Clear transient state]
+    end
+
     process_events --> resolve_branching_instruction
     resolve_branching_instruction --> generate_response
+    resolve_branching_instruction --> detect_behaviors
     generate_response --> apply_voice_expressions
+    apply_voice_expressions --> send_event_feedback
+    detect_behaviors --> send_event_feedback
 ```
 
 ## Graph Construction
@@ -155,18 +219,23 @@ flowchart TD
 The graph is built in `app/core/graph/graph_builder.py`:
 
 ```python
-def build_graph() -> StateGraph[SimulationState]:
+def build_simulation_graph() -> StateGraph[SimulationState]:
     graph = StateGraph(SimulationState)
     graph.add_node("process_events", process_events)
     graph.add_node("resolve_branching_instruction", build_resolve_branching_subgraph())
     graph.add_node("generate_response", generate_response)
+    graph.add_node("detect_behaviors", detect_behaviors)
     graph.add_node("apply_voice_expressions", build_voice_expressions_subgraph())
+    graph.add_node("send_event_feedback", send_event_feedback)
 
     graph.add_edge(START, "process_events")
     graph.add_edge("process_events", "resolve_branching_instruction")
     graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("resolve_branching_instruction", "detect_behaviors")
     graph.add_edge("generate_response", "apply_voice_expressions")
-    graph.add_edge("apply_voice_expressions", END)
+    graph.add_edge("apply_voice_expressions", "send_event_feedback")
+    graph.add_edge("detect_behaviors", "send_event_feedback")
+    graph.add_edge("send_event_feedback", END)
     return graph
 ```
 
@@ -174,8 +243,9 @@ def build_graph() -> StateGraph[SimulationState]:
 
 ## Key Source Files
 
-- `app/core/graph/graph_builder.py` -- `build_graph()`, subgraph builders
-- `app/core/graph/nodes.py` -- `process_events`, `resolve_branching_instruction`, `generate_response`, `apply_voice_expressions`
+- `app/core/graph/graph_builder.py` -- `build_simulation_graph()`, `build_report_graph()`, subgraph builders
+- `app/core/graph/nodes.py` -- `process_events`, `resolve_branching_instruction`, `generate_response`, `detect_behaviors`, `apply_voice_expressions`, `send_event_feedback`
 - `app/core/graph/state.py` -- `SimulationState`, reducers, data classes
 - `app/core/graph/prompt.py` -- `generate_system_message()`
 - `app/core/graph/utils.py` -- `is_event_eligible()`, `convert_messages_to_chat_messages()`
+- `app/core/scenario/simulation_instructions.py` -- `SimulationBehaviorInstruction`, `SimulationStateInstruction`

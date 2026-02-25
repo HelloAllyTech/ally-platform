@@ -26,6 +26,8 @@ The top-level model that holds everything for a session:
 | `voice` | `Optional[ScenarioVoice]` | TTS voice configuration |
 | `prompt_data` | `PromptData` | Client persona definition |
 | `language_config` | `Optional[LanguageConfig]` | Language-specific STT/LLM overrides |
+| `behavior_instructions` | `Optional[List[SimulationBehaviorInstruction]]` | SHOULD_DO / SHOULD_NOT_DO behaviors for counselor |
+| `state_instructions` | `Optional[List[SimulationStateInstruction]]` | Ordered agent states with score windows and dialogues |
 
 ### PromptData
 
@@ -55,6 +57,10 @@ Defines the simulated client persona:
 | `response_length` | No | `VERY_BRIEF`, `BRIEF`, `MEDIUM`, or `ELABORATE` |
 | `agent_dialogues` | No | Pre-scripted dialogue options |
 | `previous_memory` | No | Summary from a previous session |
+| `cultural_context` | No | Cultural background/setting for the character (AI-generated if missing) |
+| `speaking_style` | No | Speaking style or dialect instructions (AI-generated if missing) |
+| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_default`, `context_generation_system_prompt`, etc.) |
+| `competency` | No | Counseling competency being trained; shapes the simulation |
 
 ### ScenarioVoice and VoiceConfig
 
@@ -150,11 +156,43 @@ Steps:
 | `promptData.responseLength` | `response_length` |
 | `promptData.agentDialogues` | `agent_dialogues` |
 | `promptData.previousMemory` | `previous_memory` |
+| `promptData.culturalContext` | `cultural_context` |
+| `promptData.speakingStyle` | `speaking_style` |
+| `promptData.prompts` | `prompts` |
+| `promptData.competency` | `competency` |
+
+## Context Generation
+
+When `cultural_context` or `speaking_style` are missing from PromptData, `AgentWorker.configure()` calls `generate_cultural_context()` before the graph runs. This runs an LLM call using `context_generation_prompt.txt` (or backend override via `promptData.prompts`) to generate culturally appropriate context and speaking style for the target language.
+
+**File:** `app/core/agent/context_generator.py`
+
+The generated values are written back into `scenario.prompt_data` and injected into the system prompt via `_get_cultural_and_style_block()` in `app/core/graph/prompt.py`. They also feed into persona context for speech prosody generation.
+
+## Simulation Instructions
+
+Behavior instructions and state instructions extend the scenario with behavioral guidance:
+
+**`SimulationBehaviorInstruction`** -- What the counselor should or should not do:
+- `behavior_instruction_id`: ID from core service
+- `category`: `SHOULD_DO` or `SHOULD_NOT_DO`
+- `behaviors`: List of behavior labels (e.g., "Validated experience")
+- `score`: Score assigned when detected
+
+**`SimulationStateInstruction`** -- Ordered agent states with score windows:
+- `state_id`: State identifier
+- `instruction`: What the agent should do in this state
+- `score_lower`, `score_upper`: Score window for this state (None = unbounded)
+- `dialogues`: Optional specific dialogue lines
+
+**File:** `app/core/scenario/simulation_instructions.py`
 
 ---
 
 ## Key Source Files
 
 - `app/core/scenario/base.py` -- `Scenario`, `PromptData`, `ScenarioVoice`, `VoiceConfig`, `LanguageConfig`, `TerminationEvent`
+- `app/core/scenario/simulation_instructions.py` -- `SimulationBehaviorInstruction`, `SimulationStateInstruction`
 - `app/core/events/factory.py` -- `build_events_from_metadata()`
-- `app/utils/metadata_parser.py` -- `parse_room_metadata()`
+- `app/core/agent/factory.py` -- `parse_room_metadata()`
+- `app/core/agent/context_generator.py` -- `generate_cultural_context()`

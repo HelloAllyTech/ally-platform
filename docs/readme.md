@@ -18,19 +18,17 @@
 
 1. [Architecture](architecture.md) -- factory pattern overview
 2. Provider-specific doc: [TTS](05-tts-providers.md) | [STT](06-stt-providers.md) | [LLM](07-llm-providers.md)
-3. Step-by-step guide: [Adding a TTS Provider](guides/adding-a-tts-provider.md) | [Adding an LLM Provider](guides/adding-an-llm-provider.md)
 
 ### "I want to add a new event type"
 
 1. [Event System](03-event-system.md) -- how the orchestrator works
 2. [Event Types Reference](04-event-types-reference.md) -- existing types for reference
-3. [Adding an Event Type](guides/adding-an-event-type.md) -- step-by-step guide
 
 ### "I want to understand scenario configuration"
 
-1. [Scenario Engine](09-scenario-engine.md) -- Pydantic models and metadata parsing
+1. [Scenario Engine](09-scenario-engine.md) -- Pydantic models, context generation, simulation instructions
 2. [Branching Instructions](10-branching-instructions.md) -- conditional conversation flow
-3. [Scenario Metadata Schema](guides/scenario-metadata-schema.md) -- full JSON schema reference
+3. [Prompts System](14-prompts-system.md) -- template overrides via promptData.prompts
 
 ### "I want to set up a dev environment"
 
@@ -45,7 +43,7 @@
 | -- | [Architecture](architecture.md) | System diagram, component inventory, design decisions |
 | -- | [Getting Started](getting-started.md) | Dev setup, local run, Docker, tests |
 | 01 | [Worker Lifecycle](01-worker-lifecycle.md) | AgentWorker 3-phase lifecycle, termination |
-| 02 | [Graph Pipeline](02-graph-pipeline.md) | SimulationState, 4 graph nodes, data flow |
+| 02 | [Graph Pipeline](02-graph-pipeline.md) | SimulationState, 6 graph nodes, parallel flow, report graph |
 | 03 | [Event System](03-event-system.md) | EventOrchestrator, registry, scoring, eligibility |
 | 04 | [Event Types Reference](04-event-types-reference.md) | All 9 event detection types |
 | 05 | [TTS Providers](05-tts-providers.md) | BaseTTSClient, 5 providers, factory |
@@ -55,12 +53,13 @@
 | 09 | [Scenario Engine](09-scenario-engine.md) | Pydantic models, metadata parsing pipeline |
 | 10 | [Branching Instructions](10-branching-instructions.md) | Variable substitution, dynamic resolution |
 | 11 | [Queue Messaging](11-queue-messaging.md) | AWS SQS event delivery, LocalStack |
+| 14 | [Prompts System](14-prompts-system.md) | Template loading, backend overrides, resolver |
+| -- | [Event Termination](EVENT_TERMINATION.md) | Auto-termination configuration and flow |
 
 ### Extension Guides
 
 | Guide | Description |
 |-------|-------------|
-| [Adding a TTS Provider](guides/adding-a-tts-provider.md) | Step-by-step walkthrough |
-| [Adding an Event Type](guides/adding-an-event-type.md) | Step-by-step walkthrough |
-| [Adding an LLM Provider](guides/adding-an-llm-provider.md) | Step-by-step walkthrough |
-| [Scenario Metadata Schema](guides/scenario-metadata-schema.md) | Full annotated JSON schema |
+| [Adding a TTS Provider](05-tts-providers.md) | See TTS providers doc for factory pattern |
+| [Adding an Event Type](04-event-types-reference.md) | See event types reference for detection types |
+| [Adding an LLM Provider](07-llm-providers.md) | See LLM providers doc for factory pattern |
