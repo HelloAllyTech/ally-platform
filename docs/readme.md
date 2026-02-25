@@ -28,7 +28,7 @@
 
 1. [Scenario Engine](09-scenario-engine.md) -- Pydantic models, context generation, simulation instructions
 2. [Branching Instructions](10-branching-instructions.md) -- conditional conversation flow
-3. [Prompts System](14-prompts-system.md) -- template overrides via promptData.prompts
+3. [Prompts System](12-prompts-system.md) -- template overrides via promptData.prompts
 
 ### "I want to set up a dev environment"
 
@@ -53,8 +53,8 @@
 | 09 | [Scenario Engine](09-scenario-engine.md) | Pydantic models, metadata parsing pipeline |
 | 10 | [Branching Instructions](10-branching-instructions.md) | Variable substitution, dynamic resolution |
 | 11 | [Queue Messaging](11-queue-messaging.md) | AWS SQS event delivery, LocalStack |
-| 14 | [Prompts System](14-prompts-system.md) | Template loading, backend overrides, resolver |
-| -- | [Event Termination](EVENT_TERMINATION.md) | Auto-termination configuration and flow |
+| 12 | [Prompts System](12-prompts-system.md) | Template loading, backend overrides, resolver |
+| 13 | [Event Termination](13-event-termination.md) | Auto-termination configuration and flow |
 
 ### Extension Guides
 

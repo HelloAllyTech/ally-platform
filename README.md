@@ -219,7 +219,7 @@ ally-learn-core/
    - **PASSIVE Events**: Logged for analytics only
    - **Scoring**: Cumulative score calculation with polarity-based event selection
    - **Publishing**: All events sent to SQS for downstream processing
-   - **Termination**: Events can trigger automatic session termination (see [Event Termination](docs/EVENT_TERMINATION.md))
+   - **Termination**: Events can trigger automatic session termination (see [Event Termination](docs/13-event-termination.md))
 
 ### Scenario Configuration
 
@@ -495,7 +495,7 @@ The container runs both the FastAPI server (port 8000) and LiveKit worker simult
 
 Events can automatically terminate sessions when they occur. Configure via `autoTerminationEvents` in scenario metadata, mapping event IDs to termination messages. Supported by all event types.
 
-See [Event Termination Documentation](docs/EVENT_TERMINATION.md) for detailed guide and examples.
+See [Event Termination Documentation](docs/13-event-termination.md) for detailed guide and examples.
 
 ### Customizing Agent Behavior
 

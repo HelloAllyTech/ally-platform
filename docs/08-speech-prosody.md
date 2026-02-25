@@ -139,7 +139,7 @@ Prosody templates can be overridden per scenario via `promptData.prompts`:
 | `ally_ai_learn_prosody_unified` | `prosody/unified_prompt_with_enhancement` | Runtime (params + enhanced text) |
 | `ally_ai_learn_prosody_parameters_only` | `prosody/parameters_only_prompt` | Runtime (params only) |
 
-When `SYNC_PROMPTS_TO_LOCAL` is true and the backend provides a different template, that template is used instead of the local `.txt` file. See [Prompts System](14-prompts-system.md).
+When `SYNC_PROMPTS_TO_LOCAL` is true and the backend provides a different template, that template is used instead of the local `.txt` file. See [Prompts System](12-prompts-system.md).
 
 ## Parameter Flow
 
