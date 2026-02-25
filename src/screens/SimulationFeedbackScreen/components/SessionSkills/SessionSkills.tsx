@@ -128,16 +128,18 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
     return (
       <View key={index} style={styles.skillItemContent}>
-        {skill.iconUrl ? (
-          <NetworkImage
-            imageUrl={skill.iconUrl}
-            style={styles.skillIconContainer}
-          />
-        ) : (
-          <View style={styles.skillIconContainer}>
+        <View style={styles.skillIconContainer}>
+          {skill.iconUrl ? (
+            <NetworkImage
+              imageUrl={skill.iconUrl}
+              style={styles.skillIconContainer}
+              height={20}
+              width={20}
+            />
+          ) : (
             <BulbIcon width={20} height={20} />
-          </View>
-        )}
+          )}
+        </View>
         <View style={styles.skillItem}>
           <View style={styles.skillLabelRow}>
             <Text style={styles.skillName}>{skill.category}</Text>
