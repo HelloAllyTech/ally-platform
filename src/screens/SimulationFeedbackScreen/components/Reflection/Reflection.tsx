@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Text, TextInput, View} from 'react-native';
+import {Keyboard, Pressable, Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {useErrorToast} from '@/components';
@@ -48,10 +48,11 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   }, []);
 
   const savePromptResponse = useCallback(
-    async (promptId: string, response: string) => {
+    async (reflectionPromptId: string, promptId: string, response: string) => {
       try {
         await updateReflectionPrompt({
           scenarioSessionId,
+          reflectionPromptId,
           body: {promptId, response},
         }).unwrap();
       } catch (error) {
@@ -62,20 +63,22 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   );
 
   const handleResponseChange = useCallback(
-    (promptId: string, value: string) => {
+    (reflectionPromptId: string, promptId: string, value: string) => {
       setReflectionPrompts(prev =>
         prev?.map(prompt =>
-          prompt.id === promptId ? {...prompt, response: value} : prompt,
+          prompt.id === reflectionPromptId
+            ? {...prompt, response: value}
+            : prompt,
         ),
       );
 
-      if (debounceTimers.current[promptId]) {
-        clearTimeout(debounceTimers.current[promptId]);
+      if (debounceTimers.current[reflectionPromptId]) {
+        clearTimeout(debounceTimers.current[reflectionPromptId]);
       }
 
-      debounceTimers.current[promptId] = setTimeout(() => {
-        savePromptResponse(promptId, value);
-        delete debounceTimers.current[promptId];
+      debounceTimers.current[reflectionPromptId] = setTimeout(() => {
+        savePromptResponse(reflectionPromptId, promptId, value);
+        delete debounceTimers.current[reflectionPromptId];
       }, DEBOUNCE_DELAY);
     },
     [savePromptResponse],
@@ -87,12 +90,16 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         enableOnAndroid
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}>
         {reflectionPrompts && reflectionPrompts.length > 0 ? (
           reflectionPrompts.map((prompt, index) => (
-            <View key={prompt.id} style={styles.promptCard}>
+            <Pressable
+              key={prompt.id}
+              style={styles.promptCard}
+              onPress={Keyboard.dismiss}>
               <View style={styles.badgeRow}>
                 <View style={styles.numberBadge}>
                   <Text style={styles.numberBadgeText}>{index + 1}</Text>
@@ -104,11 +111,13 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
                 placeholder={t('SimulationFeedback.reflection.placeholder')}
                 placeholderTextColor={colors.ds.typography.lowEmphasis}
                 value={prompt.response || ''}
-                onChangeText={value => handleResponseChange(prompt.id, value)}
+                onChangeText={value =>
+                  handleResponseChange(prompt.id, prompt.promptId, value)
+                }
                 multiline
                 textAlignVertical="top"
               />
-            </View>
+            </Pressable>
           ))
         ) : (
           <Text style={styles.emptyText}>
