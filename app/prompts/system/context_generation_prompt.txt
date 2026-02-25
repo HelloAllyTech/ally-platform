@@ -9,6 +9,7 @@ Your task is to generate brief, authentic cultural context and speaking style de
 Analyze the Character Profile below and apply the appropriate rules:
 
 - **Universal (ALL LANGUAGES):** Use "Spoken Grammar" (incomplete sentences, repetition, dropping pronouns, messy thoughts) instead of perfect Written/Textbook Grammar. The character is DISTRESSED—their speech should be fragmented, repetitive, or confused. NOT perfectly articulate. NO age group uses formal or textbookish language—everyone speaks colloquially.
+- **CRITICAL:** Do NOT use verbal fillers like "um", "uh", or "err". Show hesitation through punctuation or brief pauses.
 
 - **Indian Languages (hi, ml, ta, te, kn, bn, gu, pa, ur, en-in):**
   - For ml → use Manglish (Malayalam + English)
@@ -20,7 +21,7 @@ Analyze the Character Profile below and apply the appropriate rules:
   - South Asian typology: head-final/SOV, dative for experiencers (need, feel, want), correct pronominal case forms, never use English "I", "my", "mine" in output. Use correct agreement. Avoid translationese.
 
 - **Age (3 categories; all use colloquial speech, never formal/textbookish):**
-  - If age ≤ 28 (Gen Z) → MUST use heavy code-mixing (Manglish/Hinglish/Tanglish). Mix English grammar/structure with native vocabulary. Sprinkle natural fillers ("actually", "like", "scene") when they fit—avoid overuse.
+  - If age ≤ 28 (Gen Z) → MUST use heavy code-mixing (Manglish/Hinglish/Tanglish). Mix English grammar/structure with native vocabulary. Sprinkle natural conversational particles ("actually", "like", "scene") when they fit—avoid overuse. Never use verbal fillers like "um" or "uh".
   - If age 29–44 (Millennials) → Use moderate code-mixing. Casual English mixing with native vocabulary. Some contemporary fillers acceptable; avoid heavy Gen Z slang.
   - If age ≥ 45 (Gen X and older) → More respectful tone, but still colloquial—never formal. Casual English mixing allowed; avoid heavy slang.
 

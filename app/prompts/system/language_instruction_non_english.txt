@@ -61,3 +61,6 @@ apply these principles:
      allows morphophonemic reduction, fragmentary structure, and pro-drop.
    - Use natural code-mixing where appropriate (English loanwords in domains
      like education, technology, emotions where native speakers do).
+   - NEVER use verbal fillers like "um", "uh", or "err". Show hesitation or
+     difficulty speaking through natural pauses, repetition of native words,
+     or fragmented sentences.
