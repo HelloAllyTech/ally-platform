@@ -4,8 +4,13 @@ import {api} from './api';
 
 export interface ReflectionPrompt {
   id: string;
+  scenarioSessionId: string;
+  promptId: string;
   prompt: string;
   response?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ReflectionPromptsResponse {
@@ -15,6 +20,12 @@ export interface ReflectionPromptsResponse {
 export interface ReflectionPromptRequest {
   promptId: string;
   response: string;
+}
+
+export interface UpdateReflectionPromptArgs {
+  scenarioSessionId: string;
+  reflectionPromptId: string;
+  body: ReflectionPromptRequest;
 }
 
 export const reflectionsApi = api.injectEndpoints({
@@ -27,16 +38,21 @@ export const reflectionsApi = api.injectEndpoints({
         url: API_ROUTES.LEARN.REFLECTION_PROMPTS(scenarioSessionId),
         method: API_METHODS.GET,
       }),
+      providesTags: ['ReflectionPrompts'],
     }),
     updateReflectionPrompt: builder.mutation<
-      void,
-      {scenarioSessionId: string; body: ReflectionPromptRequest}
+      ReflectionPrompt,
+      UpdateReflectionPromptArgs
     >({
-      query: ({scenarioSessionId, body}) => ({
-        url: API_ROUTES.LEARN.REFLECTION_PROMPTS(scenarioSessionId),
+      query: ({scenarioSessionId, reflectionPromptId, body}) => ({
+        url: API_ROUTES.LEARN.REFLECTION_PROMPT_BY_ID(
+          scenarioSessionId,
+          reflectionPromptId,
+        ),
         method: API_METHODS.PATCH,
         body,
       }),
+      invalidatesTags: ['ReflectionPrompts'],
     }),
   }),
 });

@@ -173,6 +173,11 @@ export const API_ROUTES = {
       `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
     REFLECTION_PROMPTS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/reflection-prompts`,
+    REFLECTION_PROMPT_BY_ID: (
+      scenarioSessionId: string,
+      reflectionPromptId: string,
+    ) =>
+      `/learn/scenario-session/${scenarioSessionId}/reflection-prompts/${reflectionPromptId}`,
   },
   REVIEWS: {
     REVIEWS: '/reviews',
