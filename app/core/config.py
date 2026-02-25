@@ -100,6 +100,12 @@ class Settings(BaseSettings):
 
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
+    SARVAM_TTS_TIMEOUT: float = Field(
+        default=30.0,
+        description=(
+            "Upper limit in seconds to wait for Sarvam TTS response before giving up"
+        ),
+    )
     HUME_API_KEY: str = Field(...)
 
     LLM_TEMPERATURE: str = Field(...)

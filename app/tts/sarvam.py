@@ -87,6 +87,7 @@ class SarvamTTSClient(BaseTTSClient):
         speaker: str,
         language_code: str,
         api_key: Optional[str] = None,
+        tts_instance: Optional["sarvam.TTS"] = None,
     ):
         if not speaker:
             raise ValueError("Sarvam TTS requires 'speaker'")
@@ -107,7 +108,7 @@ class SarvamTTSClient(BaseTTSClient):
         self._language_code = language_code
         self._target_language = target_language
         self._api_key = api_key or settings.SARVAM_API_KEY
-        self._tts_instance = None
+        self._tts_instance = tts_instance
 
     @staticmethod
     def validate_voice(model: str, speaker: str, api_key: Optional[str] = None) -> bool:
@@ -193,7 +194,7 @@ class SarvamTTSClient(BaseTTSClient):
         )
 
     @property
-    def tts_instance(self) -> sarvam.TTS:
+    def tts_instance(self) -> "sarvam.TTS":
         """Get the underlying Sarvam TTS instance."""
         if self._tts_instance is None:
             # Create TTS instance - parameters will be set via update_options()
@@ -203,23 +204,51 @@ class SarvamTTSClient(BaseTTSClient):
                 speaker=self._speaker,
                 api_key=self._api_key,
             )
-            # Apply current parameters immediately after creation
-            # This ensures they're set before WebSocket session starts
-            if hasattr(self, "_current_params") and self._current_params:
-                valid_params = {
-                    k: v
-                    for k, v in self._current_params.items()
-                    if k in ["pace", "pitch", "loudness"]
-                }
-                if valid_params:
-                    try:
-                        if hasattr(self._tts_instance, "update_options"):
-                            self._tts_instance.update_options(**valid_params)
-                    except Exception as e:
-                        logger.warning(
-                            f"[Sarvam] Failed to apply parameters to new instance: "
-                            f"{e}"
-                        )
+
+        # Wrap stream method to inject higher timeout
+        # Apply this even if instance was provided via __init__
+        if not hasattr(self._tts_instance, "_timeout_wrapped"):
+            from livekit.agents import APIConnectOptions
+
+            # Use getattr to avoid potential Mock issues
+            original_stream = getattr(self._tts_instance, "stream")
+
+            def custom_stream(
+                conn_options: Optional[APIConnectOptions] = None,
+            ) -> Any:
+                if conn_options is None:
+                    conn_options = APIConnectOptions(
+                        timeout=settings.SARVAM_TTS_TIMEOUT
+                    )
+                else:
+                    from dataclasses import replace
+
+                    conn_options = replace(
+                        conn_options, timeout=settings.SARVAM_TTS_TIMEOUT
+                    )
+                return original_stream(conn_options=conn_options)
+
+            # Explicitly override the method on the instance level
+            # This works for both regular objects and Mocks
+            object.__setattr__(self._tts_instance, "stream", custom_stream)
+            object.__setattr__(self._tts_instance, "_timeout_wrapped", True)
+
+        # Apply current parameters immediately after creation
+        # This ensures they're set before WebSocket session starts
+        if hasattr(self, "_current_params") and self._current_params:
+            valid_params = {
+                k: v
+                for k, v in self._current_params.items()
+                if k in ["pace", "pitch", "loudness"]
+            }
+            if valid_params:
+                try:
+                    if hasattr(self._tts_instance, "update_options"):
+                        self._tts_instance.update_options(**valid_params)
+                except Exception as e:
+                    logger.warning(
+                        f"[Sarvam] Failed to apply parameters to new instance: " f"{e}"
+                    )
         return self._tts_instance
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
@@ -281,6 +310,7 @@ class SarvamTTSClient(BaseTTSClient):
             Preview audio as MP3 bytes (browser-compatible)
         """
         import io
+
         from pydub import AudioSegment
 
         logger.info(
