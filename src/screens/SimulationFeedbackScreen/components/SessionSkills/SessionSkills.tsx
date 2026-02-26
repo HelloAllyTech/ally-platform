@@ -18,13 +18,14 @@ import {
 import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
-import {SkillCoverage} from '@/types';
+import {ExperienceMode, SimulationSummaryData, SkillCoverage} from '@/types';
 import {
   calculateAverageForObjectArray,
   getNormalisedXAxisLabelsMap,
 } from '@/utils';
 import {formatTimeToMMSS} from '@/utils/date';
 
+import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
 import {SummaryCard} from '../SummaryCard';
 
 const NUM_X_AXIS_INTERVALS = 5;
@@ -39,10 +40,12 @@ export interface EmotionalMovementDataset {
 
 export interface SessionSkillsProps {
   scenarioSessionId: string;
+  simulationDetails?: SimulationSummaryData | null;
 }
 
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
+  simulationDetails,
 }) => {
   const {t} = useTranslate();
 
@@ -162,6 +165,14 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     return calculateAverageForObjectArray(skillCoverage, 'percentage');
   }, [skillCoverage]);
 
+  const isChecklistMode =
+    simulationDetails?.scenario?.metadata?.experienceMode ===
+    ExperienceMode.CHECKLIST;
+  const positives =
+    simulationDetails?.details?.summary?.feedback?.positives ?? [];
+  const improvements =
+    simulationDetails?.details?.summary?.feedback?.improvements ?? [];
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -242,6 +253,18 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
               )}
             </View>
           </View>
+        )}
+        {isChecklistMode && (
+          <>
+            <ExpandableFeedbackSection
+              title={t('SimulationFeedback.strengthsAndSkills')}
+              items={positives}
+            />
+            <ExpandableFeedbackSection
+              title={t('SimulationFeedback.areasOfGrowth')}
+              items={improvements}
+            />
+          </>
         )}
       </SummaryCard>
     </ScrollView>
