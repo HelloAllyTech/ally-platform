@@ -294,8 +294,9 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
                   </View>
                   {isOverLimit && (
                     <Text style={styles.charLimitText}>
-                      Your message is too long. Please shorten it to{' '}
-                      {MAX_MESSAGE_LENGTH} characters or less.
+                      {t('SimulationFeedback.askAIMaxMessages', {
+                        maxMessageLength: MAX_MESSAGE_LENGTH,
+                      })}
                     </Text>
                   )}
                 </View>
