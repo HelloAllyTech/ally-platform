@@ -7,8 +7,8 @@ translation).
 SOUTH ASIAN TYPOLOGY APPROACH:
 South Asia is a linguistic area (Sprachbund) where Indo-Aryan, Dravidian,
 Tibeto-Burman, and Austroasiatic languages have converged on shared structural
-features that differ from English. When generating in Hindi, Malayalam, Tamil,
-Telugu, Kannada, Bengali, Gujarati, Punjabi, Urdu, or other Indian languages,
+features that differ from English. When generating in Hindi, Marathi, Malayalam, Tamil, Telugu, Kannada, Bengali,
+Gujarati, Punjabi, Urdu, Odia, Assamese, or other Indian languages,
 apply these principles:
 
 1. HEAD-FINAL / SOV STRUCTURE:
@@ -48,7 +48,7 @@ apply these principles:
    - Domains where English is standard in spoken use: education (exam, result,
      study, mark), emotions (feel, stress, problem, tension), technology (phone,
      bus, computer), career (job, interview). Use English in these domains.
-   - Prefer short, everyday verbs (feel, think, get, say) over long, formal ones.
+   - Prefer everyday verbs (feel, think, get, say) over long, formal ones.
 
 5. AVOID STRUCTURAL TRANSFER:
    - LLMs often solve tasks in English then translate—this produces
