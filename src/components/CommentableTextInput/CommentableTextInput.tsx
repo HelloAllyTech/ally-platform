@@ -101,13 +101,15 @@ type NativeProps = {
   partTextStyle?: Record<string, unknown>;
   prefixTextStyle?: Record<string, unknown>;
   highlightStyle?: Record<string, unknown>;
-  onSelectionChange?: (
+  onCommentableSelectionChange?: (
     event: NativeSyntheticEvent<NativeSelectionEvent>,
   ) => void;
   onCommentPress?: (
     event: NativeSyntheticEvent<NativeCommentPressEvent>,
   ) => void;
-  onContentSizeChange?: (event: NativeSyntheticEvent<{height: number}>) => void;
+  onCommentableContentSizeChange?: (
+    event: NativeSyntheticEvent<{height: number}>,
+  ) => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -495,9 +497,9 @@ export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
           styles.nativeText,
           measuredHeight ? {height: measuredHeight} : null,
         ]}
-        onSelectionChange={handleSelectionChange}
+        onCommentableSelectionChange={handleSelectionChange}
         onCommentPress={handleCommentPress}
-        onContentSizeChange={
+        onCommentableContentSizeChange={
           useExternalMenu ? handleContentSizeChange : undefined
         }
       />
