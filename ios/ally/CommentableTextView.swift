@@ -42,9 +42,9 @@ class CommentableTextView: UITextView, UITextViewDelegate, UIGestureRecognizerDe
     didSet {}
   }
 
-  @objc var onSelectionChange: RCTBubblingEventBlock?
+  @objc var onCommentableSelectionChange: RCTDirectEventBlock?
   @objc var onCommentPress: RCTBubblingEventBlock?
-  @objc var onContentSizeChange: RCTBubblingEventBlock?
+  @objc var onCommentableContentSizeChange: RCTDirectEventBlock?
 
   private let commentKey = NSAttributedString.Key("CommentIds")
   private var isUpdatingText = false
@@ -103,7 +103,7 @@ class CommentableTextView: UITextView, UITextViewDelegate, UIGestureRecognizerDe
     let height = ceil(fitted.height)
     if height > 0 && height != lastEmittedHeight {
       lastEmittedHeight = height
-      onContentSizeChange?(["height": height])
+      onCommentableContentSizeChange?(["height": height])
     }
   }
 
@@ -281,7 +281,7 @@ class CommentableTextView: UITextView, UITextViewDelegate, UIGestureRecognizerDe
       ]
     }
 
-    onSelectionChange?(payload)
+    onCommentableSelectionChange?(payload)
   }
 
   // MARK: - UIGestureRecognizerDelegate
