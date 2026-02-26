@@ -292,7 +292,12 @@ export const SimulationFeedbackScreen: React.FC<
             />
           );
         case SimulationSummaryTabKey.SKILLS:
-          return <SessionSkills scenarioSessionId={scenarioSessionId} />;
+          return (
+            <SessionSkills
+              scenarioSessionId={scenarioSessionId}
+              simulationDetails={simulationDetails}
+            />
+          );
         case SimulationSummaryTabKey.REFLECTION:
           return <Reflection scenarioSessionId={scenarioSessionId} />;
         case SimulationSummaryTabKey.UP_NEXT:
