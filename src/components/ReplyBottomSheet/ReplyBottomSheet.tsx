@@ -53,10 +53,12 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   onClose,
   commentId,
   originalComment,
+  setOriginalComment,
   reviewOwnerId,
   reviewId,
   hideReplyBottomSheet,
   isPrivate = false,
+  onCommentsChanged,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -122,6 +124,12 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
           count: newCount,
         };
       });
+      if (originalComment && deleteReplyId === originalComment.id) {
+        onCommentsChanged?.({
+          action: 'delete',
+          commentId: deleteReplyId,
+        });
+      }
     } catch (error) {
       console.error('Failed to delete reply:', error);
     } finally {
@@ -129,7 +137,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       deleteGobackRef.current = null;
       setDeleteReplyId(null);
     }
-  }, [deleteComment, deleteReplyId]);
+  }, [deleteComment, deleteReplyId, onCommentsChanged, originalComment]);
 
   const handleHideComment = useCallback(
     async (replyId: string, hidden: boolean) => {
@@ -146,11 +154,27 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
             count: prev.count,
           };
         });
+        if (originalComment && replyId === originalComment.id) {
+          onCommentsChanged?.({
+            action: 'hide',
+            commentId: replyId,
+            hidden,
+          });
+          setOriginalComment({
+            ...originalComment,
+            hidden,
+          });
+        }
       } catch (error) {
         console.error('Failed to hide/unhide reply:', error);
       }
     },
-    [updateCommentVisibility],
+    [
+      updateCommentVisibility,
+      onCommentsChanged,
+      originalComment,
+      setOriginalComment,
+    ],
   );
 
   // Dismiss keyboard when bottom sheet closes
@@ -250,6 +274,17 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
               count: prev.count,
             };
           });
+          if (originalComment && editingReplyId === originalComment.id) {
+            onCommentsChanged?.({
+              action: 'edit',
+              commentId: editingReplyId,
+              content: comment,
+            });
+            setOriginalComment({
+              ...originalComment,
+              content: comment,
+            });
+          }
           setEditingReplyId(null);
         } else {
           const payload = {
@@ -307,6 +342,9 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       userId,
       userName,
       userProfileImage,
+      onCommentsChanged,
+      originalComment,
+      setOriginalComment,
     ],
   );
 

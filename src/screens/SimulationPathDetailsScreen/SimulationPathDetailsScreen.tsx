@@ -90,18 +90,6 @@ export const SimulationPathDetailsScreen: React.FC<
     }
   }, [getCreditsInfo?.isLow]);
 
-  const checkAndCreatePathSession = async () => {
-    if (pathData && !pathData.scenarioPathSessionId) {
-      try {
-        await createSession();
-        await refetch();
-        // Refetch will update the pathData, so we can access it directly
-      } catch (err) {
-        showToast(getErrorDetails(err)?.message, 'error');
-      }
-    }
-  };
-
   const {
     isCreatingRoom,
     startSimulation,
@@ -137,29 +125,30 @@ export const SimulationPathDetailsScreen: React.FC<
   });
 
   const handleStartPath = async () => {
-    if (!pathData || !pathData.scenarioPathSessionId) {
-      await checkAndCreatePathSession();
+    if (!pathData?.scenarioPathSessionId) {
+      try {
+        await createSession();
+      } catch (err) {
+        showToast(getErrorDetails(err)?.message, 'error');
+        return;
+      }
     }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
   };
 
-  /**
-   * Handle simulation card press
-   * - If completed: Show modal to allow retry
-   * - Otherwise: Open simulation details modal
-   * Only unlocked simulations are clickable (locked ones have disabled press)
-   */
   const handleSimulationPress = async (scenario: PathScenario) => {
-    if (!pathData || !pathData.scenarioPathSessionId) {
-      await checkAndCreatePathSession();
-      return;
-    }
     if (scenario.status === SessionItemStatus.LOCKED) {
       return;
     }
-
-    // For all clickable simulations (including completed), open the modal
+    if (!pathData?.scenarioPathSessionId) {
+      try {
+        await createSession();
+      } catch (err) {
+        showToast(getErrorDetails(err)?.message, 'error');
+        return;
+      }
+    }
     setSelectedSimulation(scenario);
   };
 
@@ -211,10 +200,14 @@ export const SimulationPathDetailsScreen: React.FC<
   const handleProceedWithSimulation = () => {
     setShowNotification(false);
     if (selectedSimulation) {
+      const freshScenario = pathData?.scenarios?.find(
+        s => s.id === selectedSimulation.id,
+      );
       const languageId = languageMap.get(selectedLanguage);
       startSimulation({
         scenarioId: selectedSimulation.scenarioId,
-        scenarioPathSessionItemId: selectedSimulation.sessionId || undefined,
+        scenarioPathSessionItemId:
+          (freshScenario ?? selectedSimulation).sessionId || undefined,
         pathId,
         languageId,
       }).finally(() => {
@@ -315,7 +308,7 @@ export const SimulationPathDetailsScreen: React.FC<
       )}
 
       <SimulationDetailsModal
-        visible={!!selectedSimulation?.sessionId && !showNotification}
+        visible={!!selectedSimulation && !showNotification}
         onClose={handleCloseModal}
         {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}

@@ -3,12 +3,14 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown, HelpIcon} from '@/assets';
+import {env} from '@/config/env';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, typography} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 import {formatDateTime} from '@/utils';
 
+import {EventChecklist} from '../EventChecklist';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
@@ -141,9 +143,11 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           </View>
         </View>
       </View>
-      {/* {data?.id && <EventChecklist scenarioSessionId={data.id} />} */}
+      {env.POST_SIMULATION_NEW_TABS_FLAG && data?.id && (
+        <EventChecklist scenarioSessionId={data.id} />
+      )}
       {renderExpandableSection(
-        t('SimulationFeedback.biggestStrengthsSkills'),
+        t('SimulationFeedback.strengthsAndSkills'),
         positives,
         'whatWentWell',
       )}
