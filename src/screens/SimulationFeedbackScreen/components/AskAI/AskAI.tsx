@@ -3,13 +3,16 @@ import LottieView from 'lottie-react-native';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   LayoutChangeEvent,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {animations, RankBadgeIcon, UpArrowIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
@@ -77,6 +80,8 @@ const ThinkingIndicator: React.FC = () => (
 export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   const {t} = useTranslate();
   const [inputText, setInputText] = useState('');
+  const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const {
     messages,
@@ -101,6 +106,25 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
       flatListRef.current?.scrollToOffset({offset, animated});
     }
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const showSub = Keyboard.addListener('keyboardWillShow', e => {
+      setKeyboardHeight(Math.max(0, e.endCoordinates.height - insets.bottom));
+      setTimeout(() => scrollToBottom(true), 100);
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [insets.bottom, scrollToBottom]);
 
   // Detect when AI message gets added (thinking -> streaming transition)
   useEffect(() => {
@@ -186,7 +210,11 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
         </View>
 
         <View style={styles.contentContainer}>
-          <View style={styles.content}>
+          <View
+            style={[
+              styles.content,
+              keyboardHeight > 0 && {paddingBottom: keyboardHeight},
+            ]}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.ds.blue[500]} />
