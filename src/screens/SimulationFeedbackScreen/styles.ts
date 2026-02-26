@@ -9,7 +9,27 @@ export const styles = ScaledSheet.create({
     backgroundColor: colors.white,
   },
   tabsContainer: {
-    marginHorizontal: '20@ms',
+    flex: 1,
+  },
+  tabViewWrapper: {
+    overflow: 'hidden',
+  },
+  tabBarIndicator: {
+    backgroundColor: colors.ds.theme.primary,
+    height: 2,
+  },
+  tabBar: {
+    backgroundColor: colors.white,
+  },
+  tabBarLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  tabBarTab: {
+    width: 'auto' as const,
+    paddingHorizontal: 10,
   },
   scrollContent: {
     flexGrow: 1,
