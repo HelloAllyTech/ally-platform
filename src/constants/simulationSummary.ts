@@ -21,18 +21,22 @@ export const getSimulationSummaryTabs = (
     {
       key: SimulationSummaryTabKey.SUMMARY,
       title: t('SimulationFeedback.tabs.sessionReview'),
+      testID: 'tab-0',
     },
     {
       key: SimulationSummaryTabKey.ASK_AI,
       title: t('SimulationFeedback.tabs.askAI'),
+      testID: 'tab-1',
     },
     {
       key: SimulationSummaryTabKey.TRANSCRIPTION,
       title: t('SimulationFeedback.tabs.annotatedTranscript'),
+      testID: 'tab-2',
     },
     {
       key: SimulationSummaryTabKey.SKILLS,
       title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+      testID: 'tab-3',
     },
     // {
     //   key: SimulationSummaryTabKey.REFLECTION,
@@ -44,6 +48,7 @@ export const getSimulationSummaryTabs = (
     tabs.push({
       key: SimulationSummaryTabKey.UP_NEXT,
       title: t('SimulationFeedback.tabs.upNext'),
+      testID: 'tab-4',
     });
   }
 
