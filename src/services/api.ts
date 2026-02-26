@@ -154,6 +154,7 @@ export const api = createApi({
     'ReviewMessages',
     'ReviewDetails',
     'ReviewThreads',
+    'GeneralComments',
     'ReflectionPrompts',
   ],
   endpoints: () => ({}),
