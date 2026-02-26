@@ -1,10 +1,17 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
+import {
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
-import {CustomTabs, FeedbackPopup, useToast} from '@/components';
+import {FeedbackPopup, useToast} from '@/components';
 import {env} from '@/config/env';
 import {
   getSimulationSummaryTabs,
@@ -47,7 +54,7 @@ export const SimulationFeedbackScreen: React.FC<
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [tabIndex, setTabIndex] = useState<number>(0);
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
   const [reviewId, setReviewId] = useState<string>();
@@ -156,7 +163,7 @@ export const SimulationFeedbackScreen: React.FC<
     fetchReviewThreadComments();
   }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (pathId || caseId) {
       navigation.reset({
         index: 0,
@@ -178,12 +185,12 @@ export const SimulationFeedbackScreen: React.FC<
     }
 
     navigateToLearnTab(navigation);
-  };
+  }, [pathId, caseId, fromLogs, navigation]);
 
-  const handleFeedbackAndNavigate = () => {
+  const handleFeedbackAndNavigate = useCallback(() => {
     handleBack();
     return true;
-  };
+  }, [handleBack]);
 
   useHardwareBackPressHandler(handleFeedbackAndNavigate);
 
@@ -218,9 +225,7 @@ export const SimulationFeedbackScreen: React.FC<
     setIsFeedbackPopupVisible(true);
   };
 
-  const handleTabChange = (tabIndex: number) => {
-    setActiveTab(tabIndex);
-  };
+  const layout = useWindowDimensions();
 
   const handleViewReview = () => {
     navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {
@@ -245,71 +250,6 @@ export const SimulationFeedbackScreen: React.FC<
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
   );
 
-  const renderTabContent = () => {
-    if (!hasScenarioMessagesPermission || !scenarioSessionId) {
-      return null;
-    }
-
-    // Get the current tab key based on index
-    const currentTabKey = tabs[activeTab]?.key;
-
-    switch (currentTabKey) {
-      case SimulationSummaryTabKey.SUMMARY:
-        return (
-          <SummaryTab
-            simulationDetails={simulationDetails ?? null}
-            retryLimitReached={retryLimitReached}
-            pathId={pathId}
-            caseId={caseId}
-            fromLogs={fromLogs}
-            onTryAnother={handleSubmit}
-          />
-        );
-
-      case SimulationSummaryTabKey.ASK_AI:
-        return <AskAI scenarioSessionId={scenarioSessionId || ''} />;
-
-      case SimulationSummaryTabKey.TRANSCRIPTION:
-        return (
-          <TranscriptTab
-            isPrivate={isPrivate}
-            setIsPrivate={setIsPrivate}
-            reviewId={reviewId}
-            setReviewId={setReviewId}
-            scenarioSessionId={scenarioSessionId}
-            startedAt={simulationDetails?.startedAt}
-            agentName={simulationDetails?.scenario?.metadata?.name}
-          />
-        );
-
-      case SimulationSummaryTabKey.SKILLS:
-        return (
-          <SessionSkills
-            scenarioSessionId={scenarioSessionId}
-            simulationDetails={simulationDetails}
-          />
-        );
-
-      case SimulationSummaryTabKey.REFLECTION:
-        return <Reflection scenarioSessionId={scenarioSessionId} />;
-
-      case SimulationSummaryTabKey.UP_NEXT:
-        return (
-          <UpNext
-            scenarioSessionId={scenarioSessionId}
-            pathId={pathId}
-            caseId={caseId}
-            languageId={languageId}
-            onFinish={handleFeedbackAndNavigate}
-            onBack={handleFeedbackAndNavigate}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
   const tabs = useMemo(
     () =>
       getSimulationSummaryTabs(t, {
@@ -318,6 +258,86 @@ export const SimulationFeedbackScreen: React.FC<
         postSimulationNewTabs: env.POST_SIMULATION_NEW_TABS_FLAG,
       }),
     [t, pathId, caseId],
+  );
+
+  const renderScene = useCallback(
+    ({route: sceneRoute}: {route: {key: string}}) => {
+      if (!hasScenarioMessagesPermission || !scenarioSessionId) {
+        return null;
+      }
+      switch (sceneRoute.key) {
+        case SimulationSummaryTabKey.SUMMARY:
+          return (
+            <SummaryTab
+              simulationDetails={simulationDetails ?? null}
+              retryLimitReached={retryLimitReached}
+              pathId={pathId}
+              caseId={caseId}
+              fromLogs={fromLogs}
+              onTryAnother={handleSubmit}
+            />
+          );
+        case SimulationSummaryTabKey.ASK_AI:
+          return <AskAI scenarioSessionId={scenarioSessionId || ''} />;
+        case SimulationSummaryTabKey.TRANSCRIPTION:
+          return (
+            <TranscriptTab
+              isPrivate={isPrivate}
+              setIsPrivate={setIsPrivate}
+              reviewId={reviewId}
+              setReviewId={setReviewId}
+              scenarioSessionId={scenarioSessionId}
+              startedAt={simulationDetails?.startedAt}
+              agentName={simulationDetails?.scenario?.metadata?.name}
+            />
+          );
+        case SimulationSummaryTabKey.SKILLS:
+          return <SessionSkills scenarioSessionId={scenarioSessionId} />;
+        case SimulationSummaryTabKey.REFLECTION:
+          return <Reflection scenarioSessionId={scenarioSessionId} />;
+        case SimulationSummaryTabKey.UP_NEXT:
+          return (
+            <UpNext
+              scenarioSessionId={scenarioSessionId}
+              pathId={pathId}
+              caseId={caseId}
+              languageId={languageId}
+              onFinish={handleFeedbackAndNavigate}
+              onBack={handleFeedbackAndNavigate}
+            />
+          );
+        default:
+          return null;
+      }
+    },
+    [
+      hasScenarioMessagesPermission,
+      scenarioSessionId,
+      simulationDetails,
+      retryLimitReached,
+      pathId,
+      caseId,
+      fromLogs,
+      handleFeedbackAndNavigate,
+      isPrivate,
+      reviewId,
+      languageId,
+    ],
+  );
+
+  const renderTabBar = useCallback(
+    (props: Parameters<typeof TabBar>[0]) => (
+      <TabBar
+        {...props}
+        scrollEnabled
+        indicatorStyle={styles.tabBarIndicator}
+        style={styles.tabBar}
+        tabStyle={styles.tabBarTab}
+        activeColor={colors.ds.theme.primary}
+        inactiveColor={colors.ds.typography.lowEmphasis}
+      />
+    ),
+    [],
   );
 
   return (
@@ -338,7 +358,7 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
           {/* Comment icon for transcript tab */}
           {!!reviewId &&
-            tabs[activeTab]?.key === SimulationSummaryTabKey.TRANSCRIPTION &&
+            tabs[tabIndex]?.key === SimulationSummaryTabKey.TRANSCRIPTION &&
             !hideReviewDetails && (
               <TouchableOpacity
                 onPress={handleViewReview}
@@ -350,18 +370,18 @@ export const SimulationFeedbackScreen: React.FC<
         </View>
       </View>
       {hasScenarioMessagesPermission && (
-        <View style={styles.tabsContainer}>
-          <CustomTabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            activeTabTextColor={colors.ds.theme.primary}
-            inactiveTabTextColor={colors.ds.typography.lowEmphasis}
-            activeTabBorderColor={colors.ds.theme.primary}
+        <View style={[styles.tabsContainer, styles.tabViewWrapper]}>
+          <TabView
+            navigationState={{index: tabIndex, routes: tabs}}
+            renderScene={renderScene}
+            renderTabBar={renderTabBar}
+            onIndexChange={setTabIndex}
+            initialLayout={{width: layout.width}}
+            swipeEnabled
+            commonOptions={{labelStyle: styles.tabBarLabel}}
           />
         </View>
       )}
-      {renderTabContent()}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}
