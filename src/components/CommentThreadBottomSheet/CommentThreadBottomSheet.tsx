@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   BottomSheetFlatList,
   BottomSheetFooter,
@@ -22,8 +22,8 @@ import {
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
-import {useTranslate, useUser} from '@/hooks';
-import {ReactionAction, useAddReactionToCommentMutation} from '@/services';
+import {useCommentActions, useTranslate} from '@/hooks';
+import {useAddReactionToCommentMutation} from '@/services';
 import {
   useAddReviewCommentMutation,
   useDeleteCommentMutation,
@@ -34,11 +34,7 @@ import {
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
-import {
-  getReactionAction,
-  getReactionsArray,
-  getTotalReactionCount,
-} from '@/utils/reviews';
+import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {CommentThreadBottomSheetProps} from './types';
@@ -62,100 +58,71 @@ export const CommentThreadBottomSheet: React.FC<
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const offsetRef = React.useRef(0);
-  const {userData} = useUser();
-  const {
-    id: userId,
-    name: userName,
-    profileImageUrl: userProfileImage,
-  } = userData || {};
 
-  // Mutations for comment actions
   const [updateCommentVisibility] = useUpdateCommentVisibilityMutation();
   const [updateComment, {isLoading: isUpdatingComment}] =
     useUpdateCommentMutation();
   const [deleteComment] = useDeleteCommentMutation();
-
-  const [comments, setComments] = React.useState<{
-    data: MessageThreadComment[];
-    count: number;
-  } | null>(null);
-  const [hasMore, setHasMore] = React.useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
+  const [addReviewComment, {isLoading: isAddingComment}] =
+    useAddReviewCommentMutation();
+  const [addReaction] = useAddReactionToCommentMutation();
 
   const [getThreadComments, {isLoading, isFetching}] =
     useLazyGetThreadCommentsQuery();
 
-  const [addReviewComment, {isLoading: isAddingComment}] =
-    useAddReviewCommentMutation();
+  const {
+    comments,
+    setComments,
+    commentText,
+    setCommentText,
+    editingCommentId: _editingCommentId,
+    setEditingCommentId,
+    deleteCommentId,
+    setDeleteCommentId,
+    handleEditComment,
+    handleDeleteComment,
+    handleConfirmDelete,
+    handleHideComment,
+    handleEmojiSelect,
+    onSubmitComment,
+    isSubmitting,
+    userId,
+  } = useCommentActions({
+    deleteCommentFn: deleteComment,
+    updateCommentFn: updateComment,
+    updateVisibilityFn: updateCommentVisibility,
+    addCommentFn: payload => addReviewComment(payload),
+    addReactionFn: addReaction,
+    isAddingComment,
+    isUpdatingComment,
+    onCommentsChanged,
+  });
 
-  const [addReaction] = useAddReactionToCommentMutation();
+  const [hasMore, setHasMore] = React.useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
-  const handleEditComment = useCallback(
-    (commentId: string, commentContent: string) => {
-      // Find the comment being edited
-      setEditingCommentId(commentId);
-      setCommentText(commentContent);
-    },
-    [],
-  );
+  const handleApiResponse = useCallback(
+    (
+      responseData: {data: MessageThreadComment[]; count: number} | undefined,
+      responseThreadId: string,
+    ) => {
+      if (!responseData || responseThreadId !== threadId) return;
 
-  const handleDeleteComment = useCallback((commentId: string) => {
-    setDeleteCommentId(commentId);
-  }, []);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deleteCommentId) return;
-    try {
-      await deleteComment({commentId: deleteCommentId}).unwrap();
-      // Remove deleted item from local state to preserve scroll position
       setComments(prev => {
-        if (!prev) return null;
-        const filteredData = prev.data.filter(
-          comment => comment.id !== deleteCommentId,
-        );
-        const newCount = Math.max(0, prev.count - 1);
-        setHasMore(filteredData.length < newCount);
-        return {
-          data: filteredData,
-          count: newCount,
-        };
+        const updated = prev
+          ? {
+              data: [...prev.data, ...responseData.data],
+              count: responseData.count,
+            }
+          : responseData;
+        setHasMore(updated.data.length < responseData.count);
+        return updated;
       });
-      onCommentsChanged?.({
-        action: 'delete',
-        commentId: deleteCommentId,
-      });
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-    } finally {
-      setDeleteCommentId(null);
-    }
-  }, [deleteComment, deleteCommentId, onCommentsChanged]);
-
-  const handleHideComment = useCallback(
-    async (commentId: string, hidden: boolean) => {
-      try {
-        await updateCommentVisibility({commentId, hidden}).unwrap();
-        // Update comment visibility in local state to preserve scroll position
-        setComments(prev => {
-          if (!prev) return null;
-          const updatedData = prev.data.map(comment =>
-            comment.id === commentId ? {...comment, hidden} : comment,
-          );
-          return {
-            data: updatedData,
-            count: prev.count,
-          };
-        });
-        onCommentsChanged?.({action: 'hide', commentId, hidden});
-      } catch (error) {
-        console.error('Failed to hide/unhide comment:', error);
-      }
+      setHasLoadedOnce(true);
     },
-    [updateCommentVisibility, onCommentsChanged],
+    [threadId, setComments],
   );
+
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
     if (!visible) {
@@ -163,35 +130,7 @@ export const CommentThreadBottomSheet: React.FC<
       setCommentText('');
       setEditingCommentId(null);
     }
-  }, [visible]);
-
-  // Common function to handle API response and update state
-  const handleApiResponse = useCallback(
-    (
-      responseData: {data: MessageThreadComment[]; count: number} | undefined,
-      responseThreadId: string,
-    ) => {
-      if (!responseData || responseThreadId !== threadId) {
-        return;
-      }
-
-      const newComments = responseData.data;
-
-      setComments(prev => {
-        const updated = prev
-          ? {data: [...prev.data, ...newComments], count: responseData.count}
-          : responseData;
-        if (updated.data.length >= responseData.count) {
-          setHasMore(false);
-        } else {
-          setHasMore(true);
-        }
-        return updated;
-      });
-      setHasLoadedOnce(true);
-    },
-    [threadId],
-  );
+  }, [visible, setCommentText, setEditingCommentId]);
 
   // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
@@ -209,7 +148,6 @@ export const CommentThreadBottomSheet: React.FC<
         if (result.data) {
           handleApiResponse(result.data, threadId);
         } else {
-          // If no data returned, mark as loaded to show empty state
           setHasLoadedOnce(true);
         }
       } else {
@@ -221,7 +159,7 @@ export const CommentThreadBottomSheet: React.FC<
     };
 
     fetchComments();
-  }, [visible, threadId, getThreadComments, handleApiResponse]);
+  }, [visible, threadId, getThreadComments, handleApiResponse, setComments]);
 
   const handleReplyPress = useCallback(
     (comment: MessageThreadComment) => {
@@ -230,178 +168,11 @@ export const CommentThreadBottomSheet: React.FC<
     [onReplyPress],
   );
 
-  const onSubmitComment = useCallback(
-    async (comment: string) => {
-      if (!comment || !threadId) {
-        return;
-      }
-
-      try {
-        // If editing, update the comment
-        if (editingCommentId) {
-          await updateComment({
-            commentId: editingCommentId,
-            content: comment,
-          }).unwrap();
-
-          // Update comment in local state to preserve scroll position
-          setComments(prev => {
-            if (!prev) return null;
-            const updatedData = prev.data.map(c =>
-              c.id === editingCommentId ? {...c, content: comment} : c,
-            );
-            return {
-              data: updatedData,
-              count: prev.count,
-            };
-          });
-          setEditingCommentId(null);
-          onCommentsChanged?.({
-            action: 'edit',
-            commentId: editingCommentId,
-            content: comment,
-          });
-        } else {
-          // Adding new comment
-          const payload = {
-            reviewId: reviewId,
-            content: comment,
-            threadId: threadId,
-          };
-
-          const newCommentObj: MessageThreadComment = {
-            id: '',
-            content: comment,
-            createdBy: {
-              id: userId,
-              name: userName,
-              profileImage: userProfileImage,
-            },
-            reactions: {},
-            replyCount: 0,
-          };
-
-          const response = await addReviewComment(payload);
-
-          if (response.data?.comment?.id) {
-            newCommentObj.id = response.data?.comment?.id;
-            newCommentObj.createdAt = response.data?.comment?.createdAt;
-            setComments(prev => {
-              if (prev) {
-                return {
-                  data: [...prev.data, newCommentObj],
-                  count: prev.count + 1,
-                };
-              }
-              return {data: [newCommentObj], count: 1};
-            });
-            onCommentsChanged?.({
-              action: 'add',
-              comment: newCommentObj,
-            });
-          }
-        }
-      } catch (error) {
-        console.error(
-          editingCommentId
-            ? 'Failed to update comment:'
-            : 'Failed to add comment:',
-          error,
-        );
-      } finally {
-        setCommentText('');
-        setEditingCommentId(null);
-        Keyboard.dismiss();
-      }
+  const handleSubmit = useCallback(
+    (text: string) => {
+      onSubmitComment(text, reviewId, threadId);
     },
-    [
-      editingCommentId,
-      updateComment,
-      addReviewComment,
-      reviewId,
-      threadId,
-      userId,
-      userName,
-      userProfileImage,
-      onCommentsChanged,
-    ],
-  );
-
-  const handleEmojiSelect = useCallback(
-    async (commentId: string, currentEmoji: string | null, unicode: string) => {
-      try {
-        const action = getReactionAction(currentEmoji, unicode);
-        await addReaction({
-          id: commentId,
-          reaction: unicode,
-          action,
-        }).unwrap();
-        // Update reaction in local state to preserve scroll position
-        setComments(prev => {
-          if (!prev) return null;
-          const updatedData = prev.data.map(comment => {
-            if (comment.id !== commentId) return comment;
-
-            const currentReactions = comment.reactions || {};
-            const newReactions = {...currentReactions};
-
-            if (action === ReactionAction.ADD) {
-              // Add reaction
-              const currentCount = newReactions[unicode] || 0;
-              newReactions[unicode] = currentCount + 1;
-              // Remove previous reaction if exists
-              if (currentEmoji && currentEmoji !== unicode) {
-                const prevCount = newReactions[currentEmoji] || 0;
-                if (prevCount > 1) {
-                  newReactions[currentEmoji] = prevCount - 1;
-                } else {
-                  delete newReactions[currentEmoji];
-                }
-              }
-            } else if (action === ReactionAction.UPDATE) {
-              // Update reaction (switch from one emoji to another)
-              // Remove previous reaction
-              if (currentEmoji) {
-                const prevCount = newReactions[currentEmoji] || 0;
-                if (prevCount > 1) {
-                  newReactions[currentEmoji] = prevCount - 1;
-                } else {
-                  delete newReactions[currentEmoji];
-                }
-              }
-              // Add new reaction
-              const currentCount = newReactions[unicode] || 0;
-              newReactions[unicode] = currentCount + 1;
-            } else if (action === ReactionAction.REMOVE) {
-              // Remove reaction
-              const currentCount = newReactions[unicode] || 0;
-              if (currentCount > 1) {
-                newReactions[unicode] = currentCount - 1;
-              } else {
-                delete newReactions[unicode];
-              }
-            }
-
-            return {
-              ...comment,
-              reactions: newReactions,
-              myReaction:
-                action === ReactionAction.ADD ||
-                action === ReactionAction.UPDATE
-                  ? unicode
-                  : null,
-            };
-          });
-          return {
-            data: updatedData,
-            count: prev.count,
-          };
-        });
-      } catch (error) {
-        console.error('Failed to add reaction:', error);
-      }
-    },
-    [addReaction],
+    [onSubmitComment, reviewId, threadId],
   );
 
   const renderCommentItem = useCallback(
@@ -491,7 +262,6 @@ export const CommentThreadBottomSheet: React.FC<
   }, [isFetching, insets.bottom, hasMore]);
 
   const renderEmpty = useCallback(() => {
-    // Only show loading or empty state if we've loaded at least once to prevent the flash of "no comments" before initial load
     if ((!hasLoadedOnce || isLoading) && threadId) {
       return (
         <View style={styles.emptyContainer}>
@@ -510,9 +280,7 @@ export const CommentThreadBottomSheet: React.FC<
 
   const loadMore = useCallback(async () => {
     if (!visible) return;
-    if (isLoading || !hasMore || !threadId) {
-      return;
-    }
+    if (isLoading || !hasMore || !threadId) return;
     const newOffset = offsetRef.current + LIMIT;
     offsetRef.current = newOffset;
     const result = await getThreadComments({
@@ -541,27 +309,24 @@ export const CommentThreadBottomSheet: React.FC<
   const stateRef = React.useRef({
     commentText,
     setCommentText,
-    onSubmitComment,
+    onSubmitComment: handleSubmit,
     placeholderText,
     insetsBottom: insets.bottom,
-    isLoading: isAddingComment || isUpdatingComment,
+    isLoading: isSubmitting,
   });
 
-  // Update ref synchronously (not in useEffect) to ensure current values
   stateRef.current = {
     commentText,
     setCommentText,
-    onSubmitComment,
+    onSubmitComment: handleSubmit,
     placeholderText,
     insetsBottom: insets.bottom,
-    isLoading: isAddingComment || isUpdatingComment,
+    isLoading: isSubmitting,
   };
 
   // Completely stable callback - reference never changes
-  // Reads current values from ref (updated synchronously above)
   const renderFooterComponent = React.useCallback(
     (props: BottomSheetFooterProps) => {
-      // Read from ref - always has current values due to synchronous update above
       const current = stateRef.current;
       return (
         <BottomSheetFooter
@@ -578,7 +343,7 @@ export const CommentThreadBottomSheet: React.FC<
         </BottomSheetFooter>
       );
     },
-    [], // Empty deps - callback reference never changes
+    [],
   );
 
   return (

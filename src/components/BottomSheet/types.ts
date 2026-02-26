@@ -125,6 +125,18 @@ export interface BottomSheetProps {
    * Default: undefined
    */
   footerComponent?: React.FC<BottomSheetFooterProps>;
+
+  /**
+   * Keyboard behavior when the keyboard is shown
+   * Default: 'interactive'
+   */
+  keyboardBehavior?: 'interactive' | 'extend' | 'fillParent';
+
+  /**
+   * Keyboard blur behavior when the keyboard is dismissed
+   * Default: 'restore'
+   */
+  keyboardBlurBehavior?: 'none' | 'restore';
 }
 
 export interface BottomSheetRef extends BottomSheetModalMethods {}

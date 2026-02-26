@@ -13,6 +13,7 @@ export * from './settingsApi';
 export * from './simulationsApi';
 export * from './badgesApi';
 export * from './reactionsApi';
+export * from './generalCommentsApi';
 export * from './reviewsApi';
 export * from './userApi';
 export * from './reflectionsApi';
