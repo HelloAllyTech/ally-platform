@@ -419,7 +419,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.helloally.app;
 				PRODUCT_NAME = ally;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ally_distribution_may_21;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ally_appstore_26_feb_2026;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
