@@ -525,11 +525,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 )}
           </>
 
-          {isSimulationInProgress && !isChecklistMode && (
-            <View style={styles.scoreMeterContainer}>
-              <SessionScoreMeter score={accumulatedScore} />
-            </View>
-          )}
+          {isSimulationInProgress &&
+            !isChecklistMode &&
+            scenario?.showScoreMeter !== false && (
+              <View style={styles.scoreMeterContainer}>
+                <SessionScoreMeter score={accumulatedScore} />
+              </View>
+            )}
 
           <EndingSoonModal
             visible={showEndingSoon && isSimulationInProgress}

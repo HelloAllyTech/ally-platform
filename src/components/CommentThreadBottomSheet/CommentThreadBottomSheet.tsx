@@ -57,6 +57,7 @@ export const CommentThreadBottomSheet: React.FC<
   onReplyPress,
   hideCommentThreadBottomSheet,
   isPrivate = false,
+  onCommentsChanged,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -122,12 +123,16 @@ export const CommentThreadBottomSheet: React.FC<
           count: newCount,
         };
       });
+      onCommentsChanged?.({
+        action: 'delete',
+        commentId: deleteCommentId,
+      });
     } catch (error) {
       console.error('Failed to delete comment:', error);
     } finally {
       setDeleteCommentId(null);
     }
-  }, [deleteComment, deleteCommentId]);
+  }, [deleteComment, deleteCommentId, onCommentsChanged]);
 
   const handleHideComment = useCallback(
     async (commentId: string, hidden: boolean) => {
@@ -144,11 +149,12 @@ export const CommentThreadBottomSheet: React.FC<
             count: prev.count,
           };
         });
+        onCommentsChanged?.({action: 'hide', commentId, hidden});
       } catch (error) {
         console.error('Failed to hide/unhide comment:', error);
       }
     },
-    [updateCommentVisibility],
+    [updateCommentVisibility, onCommentsChanged],
   );
   // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
@@ -250,6 +256,11 @@ export const CommentThreadBottomSheet: React.FC<
             };
           });
           setEditingCommentId(null);
+          onCommentsChanged?.({
+            action: 'edit',
+            commentId: editingCommentId,
+            content: comment,
+          });
         } else {
           // Adding new comment
           const payload = {
@@ -284,6 +295,10 @@ export const CommentThreadBottomSheet: React.FC<
               }
               return {data: [newCommentObj], count: 1};
             });
+            onCommentsChanged?.({
+              action: 'add',
+              comment: newCommentObj,
+            });
           }
         }
       } catch (error) {
@@ -308,6 +323,7 @@ export const CommentThreadBottomSheet: React.FC<
       userId,
       userName,
       userProfileImage,
+      onCommentsChanged,
     ],
   );
 
@@ -476,7 +492,7 @@ export const CommentThreadBottomSheet: React.FC<
 
   const renderEmpty = useCallback(() => {
     // Only show loading or empty state if we've loaded at least once to prevent the flash of "no comments" before initial load
-    if (!hasLoadedOnce || isLoading) {
+    if ((!hasLoadedOnce || isLoading) && threadId) {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.ds.theme.primary} />
@@ -490,7 +506,7 @@ export const CommentThreadBottomSheet: React.FC<
         </Text>
       </View>
     );
-  }, [isLoading, hasLoadedOnce, t]);
+  }, [isLoading, hasLoadedOnce, t, threadId]);
 
   const loadMore = useCallback(async () => {
     if (!visible) return;
@@ -576,7 +592,9 @@ export const CommentThreadBottomSheet: React.FC<
         enableDynamicSizing
         enableOverDrag
         enableHandlePanningGesture
-        footerComponent={isPrivate ? undefined : renderFooterComponent}>
+        footerComponent={
+          isPrivate || !threadId ? undefined : renderFooterComponent
+        }>
         <View style={styles.container}>
           {isLoading && !comments ? (
             <>

@@ -263,8 +263,8 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
     );
-    // Tab index 4 is UP_NEXT (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3, UP_NEXT=4)
-    fireEvent.press(getByTestId('tab-4'));
+    // Tab index 5 is UP_NEXT (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3, REFLECTION=4, UP_NEXT=5)
+    fireEvent.press(getByTestId('tab-5'));
     await waitFor(() => {
       expect(getByTestId('up-next-tab')).toBeTruthy();
     });
@@ -292,11 +292,12 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId, queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Without pathId/caseId: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3)
+    // Without pathId/caseId: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3), REFLECTION (4)
     expect(getByTestId('tab-0')).toBeTruthy();
     expect(getByTestId('tab-1')).toBeTruthy();
     expect(getByTestId('tab-2')).toBeTruthy();
     expect(getByTestId('tab-3')).toBeTruthy();
-    expect(queryByTestId('tab-4')).toBeNull();
+    expect(getByTestId('tab-4')).toBeTruthy();
+    expect(queryByTestId('tab-5')).toBeNull();
   });
 });

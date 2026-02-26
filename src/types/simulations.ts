@@ -54,6 +54,7 @@ export interface Scenario {
   checklistType?: ChecklistType;
   experienceMode?: string;
   checklistEvents?: ChecklistItem[];
+  showScoreMeter?: boolean;
 }
 
 export interface ScenariosResponse {

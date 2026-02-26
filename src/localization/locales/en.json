@@ -452,7 +452,7 @@
     "sessionDuration": "Session Duration",
     "totalScore": "Total Score",
     "keyEvents": "Key events",
-    "biggestStrengthsSkills": "Biggest Strengths & skills demonstrated",
+    "strengthsAndSkills": "Strengths & skills demonstrated",
     "areasOfGrowth": "Areas of growth",
     "noDataAvailable": "No Data Available",
     "benchmark": "(Benchmark: {{benchmark}})",
@@ -488,7 +488,8 @@
     "checklistHeader": "Evaluation Checklist",
     "reflection": {
       "sectionTitle": "Self-Reflection Prompts",
-      "placeholder": "Write your thoughts here..."
+      "placeholder": "Write your thoughts here...",
+      "noPromptsAvailable": "No prompts available"
     },
     "sessionSkills": {
       "sectionTitle": "Skills shown in this session",

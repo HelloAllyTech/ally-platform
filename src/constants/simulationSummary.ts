@@ -9,13 +9,17 @@ export enum SimulationSummaryTabKey {
   ASK_AI = 'ASK_AI',
   TRANSCRIPTION = 'TRANSCRIPTION',
   SKILLS = 'SKILLS',
-  // REFLECTION = 'REFLECTION',
+  REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
 }
 
 export const getSimulationSummaryTabs = (
   t: TFunction,
-  {pathId, caseId}: {pathId?: string; caseId?: string},
+  {
+    pathId,
+    caseId,
+    postSimulationNewTabs,
+  }: {pathId?: string; caseId?: string; postSimulationNewTabs?: boolean},
 ) => {
   const tabs = [
     {
@@ -23,32 +27,41 @@ export const getSimulationSummaryTabs = (
       title: t('SimulationFeedback.tabs.sessionReview'),
       testID: 'tab-0',
     },
-    {
-      key: SimulationSummaryTabKey.ASK_AI,
-      title: t('SimulationFeedback.tabs.askAI'),
-      testID: 'tab-1',
-    },
+    ...(postSimulationNewTabs
+      ? [
+          {
+            key: SimulationSummaryTabKey.ASK_AI,
+            title: t('SimulationFeedback.tabs.askAI'),
+            testID: 'tab-1',
+          },
+        ]
+      : []),
     {
       key: SimulationSummaryTabKey.TRANSCRIPTION,
       title: t('SimulationFeedback.tabs.annotatedTranscript'),
       testID: 'tab-2',
     },
-    {
-      key: SimulationSummaryTabKey.SKILLS,
-      title: t('SimulationFeedback.tabs.skillsDemonstrated'),
-      testID: 'tab-3',
-    },
-    // {
-    //   key: SimulationSummaryTabKey.REFLECTION,
-    //   title: t('SimulationFeedback.tabs.deeperReflection'),
-    // },
+    ...(postSimulationNewTabs
+      ? [
+          {
+            key: SimulationSummaryTabKey.SKILLS,
+            title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+            testID: 'tab-3',
+          },
+          {
+            key: SimulationSummaryTabKey.REFLECTION,
+            title: t('SimulationFeedback.tabs.deeperReflection'),
+            testID: 'tab-4',
+          },
+        ]
+      : []),
   ];
 
   if (pathId || caseId) {
     tabs.push({
       key: SimulationSummaryTabKey.UP_NEXT,
       title: t('SimulationFeedback.tabs.upNext'),
-      testID: 'tab-4',
+      testID: 'tab-5',
     });
   }
 

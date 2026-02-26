@@ -12,6 +12,7 @@ import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, useToast} from '@/components';
+import {env} from '@/config/env';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
@@ -33,6 +34,7 @@ import {navigateToLearnTab} from '@/utils';
 
 import {
   AskAI,
+  Reflection,
   SessionSkills,
   SummaryTab,
   TranscriptTab,
@@ -40,8 +42,8 @@ import {
 } from './components';
 import {styles} from './styles';
 
-const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 2000;
+const MAX_RETRY_ATTEMPTS = 5;
+const RETRY_DELAY = 3500;
 
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
@@ -82,11 +84,15 @@ export const SimulationFeedbackScreen: React.FC<
           id: scenarioSessionId,
         }).unwrap();
 
-        if (!response?.details && retryCount < MAX_RETRY_ATTEMPTS) {
+        if (response?.details?.summary?.feedback) {
+          return;
+        }
+
+        if (retryCount < MAX_RETRY_ATTEMPTS) {
           retryTimeoutRef.current = setTimeout(() => {
             fetchSimulationDetailsWithRetry(retryCount + 1);
           }, RETRY_DELAY);
-        } else if (retryCount >= MAX_RETRY_ATTEMPTS) {
+        } else {
           setRetryLimitReached(true);
         }
       } catch (error) {
@@ -245,7 +251,12 @@ export const SimulationFeedbackScreen: React.FC<
   );
 
   const tabs = useMemo(
-    () => getSimulationSummaryTabs(t, {pathId, caseId}),
+    () =>
+      getSimulationSummaryTabs(t, {
+        pathId,
+        caseId,
+        postSimulationNewTabs: env.POST_SIMULATION_NEW_TABS_FLAG,
+      }),
     [t, pathId, caseId],
   );
 
@@ -282,6 +293,8 @@ export const SimulationFeedbackScreen: React.FC<
           );
         case SimulationSummaryTabKey.SKILLS:
           return <SessionSkills scenarioSessionId={scenarioSessionId} />;
+        case SimulationSummaryTabKey.REFLECTION:
+          return <Reflection scenarioSessionId={scenarioSessionId} />;
         case SimulationSummaryTabKey.UP_NEXT:
           return (
             <UpNext

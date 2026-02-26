@@ -1,8 +1,6 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
-import {SimulationSummary} from '../SimulationSummary';
-
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string, vars?: any) =>
@@ -10,11 +8,16 @@ jest.mock('@/hooks', () => ({
   }),
 }));
 
+jest.mock('../../EventChecklist', () => ({
+  EventChecklist: () => null,
+}));
+
 jest.mock('@/assets', () => {
   const React = require('react');
   const {View} = require('react-native');
   return {
     HelpIcon: () => <View testID="help-icon" />,
+    ArrowDown: () => <View testID="arrow-down" />,
   };
 });
 
@@ -46,6 +49,8 @@ jest.mock('@/utils', () => ({
   },
 }));
 
+import {SimulationSummary} from '../SimulationSummary';
+
 describe('SimulationSummary', () => {
   const baseData = {
     id: 'test-id-123',
@@ -64,7 +69,4 @@ describe('SimulationSummary', () => {
     expect(getByText('ID: test-id-123')).toBeTruthy();
     expect(getByText(/Min/)).toBeTruthy();
   });
-
 });
-
-

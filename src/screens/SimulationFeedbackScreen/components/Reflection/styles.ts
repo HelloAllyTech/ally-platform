@@ -12,9 +12,9 @@ export const styles = ScaledSheet.create({
     gap: '16@vs',
   },
   promptCard: {
-    backgroundColor: '#FFFDFB',
+    backgroundColor: '#FBF9FD',
     borderWidth: 0.5,
-    borderColor: '#D4B896',
+    borderColor: colors.ds.deepPurple[200],
     borderRadius: '4@ms',
     padding: '24@ms',
     gap: '16@vs',
@@ -24,7 +24,7 @@ export const styles = ScaledSheet.create({
     alignItems: 'center',
   },
   numberBadge: {
-    backgroundColor: '#8B6F47',
+    backgroundColor: colors.ds.deepPurple[400],
     width: '32@ms',
     height: '32@ms',
     borderRadius: '16@ms',
@@ -40,7 +40,7 @@ export const styles = ScaledSheet.create({
   promptText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '18@ms',
-    color: '#81663E',
+    color: colors.ds.deepPurple[500],
     letterSpacing: 0.25,
   },
   textInput: {
@@ -50,5 +50,12 @@ export const styles = ScaledSheet.create({
     minHeight: '150@vs',
     textAlignVertical: 'top',
     padding: 0,
+  },
+  emptyText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.lowEmphasis,
+    textAlign: 'center',
+    paddingVertical: '24@vs',
   },
 });

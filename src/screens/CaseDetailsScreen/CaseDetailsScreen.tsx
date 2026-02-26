@@ -89,18 +89,6 @@ export const CaseDetailsScreen: React.FC<
     }
   }, [getCreditsInfo?.isLow]);
 
-  const checkAndCreateSession = async () => {
-    if (data && !data.scenarioPathSessionId) {
-      try {
-        await createSession();
-        await refetch();
-        // Refetch will update the data, so we can access it directly
-      } catch (err) {
-        showToast(getErrorDetails(err)?.message, 'error');
-      }
-    }
-  };
-
   const {
     isCreatingRoom,
     startSimulation,
@@ -136,22 +124,30 @@ export const CaseDetailsScreen: React.FC<
   });
 
   const handleStart = async () => {
-    if (!data || !data.caseSessionId) {
-      await checkAndCreateSession();
+    if (!data?.caseSessionId) {
+      try {
+        await createSession();
+      } catch (err) {
+        showToast(getErrorDetails(err)?.message, 'error');
+        return;
+      }
     }
     if (!nextSimulation) return;
     setSelectedSimulation(nextSimulation);
   };
 
   const handleSimulationPress = async (scenario: CaseSimulation) => {
-    if (!data || !data.caseSessionId) {
-      await checkAndCreateSession();
-      return;
-    }
     if (scenario.status === SessionItemStatus.LOCKED) {
       return;
     }
-
+    if (!data?.caseSessionId) {
+      try {
+        await createSession();
+      } catch (err) {
+        showToast(getErrorDetails(err)?.message, 'error');
+        return;
+      }
+    }
     setSelectedSimulation(scenario);
   };
 
@@ -193,10 +189,14 @@ export const CaseDetailsScreen: React.FC<
   const handleProceedWithSimulation = () => {
     setShowNotification(false);
     if (selectedSimulation) {
+      const freshScenario = data?.scenarios?.find(
+        s => s.id === selectedSimulation.id,
+      );
       const languageId = languageMap.get(selectedLanguage);
       startSimulation({
         scenarioId: selectedSimulation.scenarioId,
-        caseSessionItemId: selectedSimulation.sessionId || '',
+        caseSessionItemId:
+          (freshScenario ?? selectedSimulation).sessionId || '',
         languageId,
         caseId,
       }).finally(() => {
@@ -296,7 +296,7 @@ export const CaseDetailsScreen: React.FC<
       )}
 
       <SimulationDetailsModal
-        visible={!!selectedSimulation?.sessionId && !showNotification}
+        visible={!!selectedSimulation && !showNotification}
         onClose={handleCloseModal}
         {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}
