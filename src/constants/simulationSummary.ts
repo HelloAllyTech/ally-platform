@@ -109,3 +109,18 @@ export const DEFAULT_SKILL_COVERAGE: SkillCoverage[] = [
   {category: 'Support', percentage: 0, iconUrl: ''},
   {category: 'Standards', percentage: 0, iconUrl: ''},
 ];
+
+// Y axis values are from -5 to 5. This data set is to show when theres no data.
+// -6 is given to Y axis values so that the chart is visible but empty.
+// Empty charts shows 'NO DATA FOUND' message.
+export const DEFAULT_DATA_POINTS = [
+  {x: 0, y: -6},
+  {x: 120, y: -6},
+  {x: 24, y: -6},
+  {x: 36, y: -6},
+  {x: 48, y: -6},
+];
+
+export const NUM_X_AXIS_INTERVALS = 4;
+
+export const NUM_Y_AXIS_INTERVALS = 4;

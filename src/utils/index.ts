@@ -12,4 +12,3 @@ export * from './navigation';
 export * from './validation';
 export * from './version';
 export * from './simulation';
-export * from './simulationSummary';
