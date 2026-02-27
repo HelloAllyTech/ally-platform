@@ -254,15 +254,17 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '8@ms',
   },
   skillName: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
+    ...typography.body.small,
     color: colors.ds.typography.highEmphasis,
+    flex: 1,
   },
   skillPercentage: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
+    ...typography.body.small,
     color: colors.ds.typography.highEmphasis,
   },
   chartInfoRow: {
