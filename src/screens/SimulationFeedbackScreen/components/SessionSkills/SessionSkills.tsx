@@ -1,5 +1,11 @@
-import React, {useMemo} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useMemo, useRef} from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {BulbIcon} from '@/assets';
@@ -40,15 +46,24 @@ export interface EmotionalMovementDataset {
 export interface SessionSkillsProps {
   scenarioSessionId: string;
   simulationDetails?: SimulationSummaryData | null;
+  /** True when this tab is the currently active tab. Used to refetch on re-activation. */
+  isActive?: boolean;
 }
 
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
   simulationDetails,
+  isActive = false,
 }) => {
   const {t} = useTranslate();
 
-  const {data: simulationSkills} = useGetSimulationSkillsQuery(
+  const {
+    data: simulationSkills,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetSimulationSkillsQuery(
     {
       scenarioSessionId,
     },
@@ -56,6 +71,19 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       skip: !scenarioSessionId,
     },
   );
+
+  // Refetch every time the tab becomes active again (skip the very first
+  // activation since the query fires automatically on mount).
+  const isFirstActivation = useRef(true);
+  useEffect(() => {
+    if (isFirstActivation.current) {
+      isFirstActivation.current = false;
+      return;
+    }
+    if (isActive && !isFetching && !simulationSkills) {
+      refetch();
+    }
+  }, [isActive, isFetching, simulationSkills, refetch]);
 
   const skillCoverage = simulationSkills?.skillCoverage?.length
     ? simulationSkills.skillCoverage
@@ -170,6 +198,38 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     simulationDetails?.details?.summary?.feedback?.positives ?? [];
   const improvements =
     simulationDetails?.details?.summary?.feedback?.improvements ?? [];
+
+  if (isLoading || isFetching) {
+    return (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+          </View>
+        </SummaryCard>
+      </ScrollView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>
+              {t('SimulationFeedback.sessionSkills.errorLoading')}
+            </Text>
+          </View>
+        </SummaryCard>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -378,5 +438,21 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  loaderContainer: {
+    paddingVertical: '48@vs',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorContainer: {
+    paddingVertical: '40@vs',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
   },
 });
