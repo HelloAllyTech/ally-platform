@@ -10,10 +10,9 @@ import {
   ProgressBar,
 } from '@/components';
 import {
-  DEFAULT_SKILL_COLOR,
   DEFAULT_SKILL_COVERAGE,
   EMOTIONAL_MOVEMENT_CHART_CONFIG,
-  SKILL_CATEGORY_COLOR_MAP,
+  SKILL_COLORS,
 } from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
@@ -127,8 +126,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   );
 
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
-    const skillColor =
-      SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
+    const skillColor = SKILL_COLORS[index % SKILL_COLORS.length];
     return (
       <View key={index} style={styles.skillItemContent}>
         <View style={styles.skillIconContainer}>
