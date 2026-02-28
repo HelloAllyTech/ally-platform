@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
+  ActivityIndicator,
   SafeAreaView,
   Text,
   TouchableOpacity,
@@ -54,7 +55,9 @@ export const SimulationFeedbackScreen: React.FC<
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const [tabIndex, setTabIndex] = useState<number>(0);
+  const [activeTabKey, setActiveTabKey] = useState<string>(
+    SimulationSummaryTabKey.SUMMARY,
+  );
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
   const [reviewId, setReviewId] = useState<string>();
@@ -260,6 +263,18 @@ export const SimulationFeedbackScreen: React.FC<
     [t, pathId, caseId],
   );
 
+  const tabIndex = useMemo(() => {
+    const idx = tabs.findIndex(tab => tab.key === activeTabKey);
+    return idx >= 0 ? idx : 0;
+  }, [tabs, activeTabKey]);
+
+  const handleTabChange = useCallback(
+    (index: number) => {
+      setActiveTabKey(tabs[index]?.key ?? SimulationSummaryTabKey.SUMMARY);
+    },
+    [tabs],
+  );
+
   const renderScene = useCallback(
     ({route: sceneRoute}: {route: {key: string}}) => {
       if (!hasScenarioMessagesPermission || !scenarioSessionId) {
@@ -296,6 +311,7 @@ export const SimulationFeedbackScreen: React.FC<
             <SessionSkills
               scenarioSessionId={scenarioSessionId}
               simulationDetails={simulationDetails}
+              isActive={activeTabKey === SimulationSummaryTabKey.SKILLS}
             />
           );
         case SimulationSummaryTabKey.REFLECTION:
@@ -327,6 +343,7 @@ export const SimulationFeedbackScreen: React.FC<
       isPrivate,
       reviewId,
       languageId,
+      activeTabKey,
     ],
   );
 
@@ -363,7 +380,7 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
           {/* Comment icon for transcript tab */}
           {!!reviewId &&
-            tabs[tabIndex]?.key === SimulationSummaryTabKey.TRANSCRIPTION &&
+            activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
             !hideReviewDetails && (
               <TouchableOpacity
                 onPress={handleViewReview}
@@ -380,8 +397,17 @@ export const SimulationFeedbackScreen: React.FC<
             navigationState={{index: tabIndex, routes: tabs}}
             renderScene={renderScene}
             renderTabBar={renderTabBar}
-            onIndexChange={setTabIndex}
+            onIndexChange={handleTabChange}
             initialLayout={{width: layout.width}}
+            lazy
+            renderLazyPlaceholder={() => (
+              <View style={styles.lazyPlaceholder}>
+                <ActivityIndicator
+                  size="large"
+                  color={colors.ds.theme.primary}
+                />
+              </View>
+            )}
             swipeEnabled
             commonOptions={{labelStyle: styles.tabBarLabel}}
           />

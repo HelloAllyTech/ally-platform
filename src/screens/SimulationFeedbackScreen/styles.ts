@@ -129,4 +129,9 @@ export const styles = ScaledSheet.create({
     flex: 1,
     padding: '10@ms',
   },
+  lazyPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
