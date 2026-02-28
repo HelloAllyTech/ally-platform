@@ -95,13 +95,16 @@ export const EMOTIONAL_MOVEMENT_CHART_CONFIG = {
   },
 };
 
-export const SKILL_CATEGORY_COLOR_MAP: Record<string, string> = {
-  Learning: colors.ds.blue[300],
-  Support: colors.ds.green[400],
-  Standards: colors.ds.amber[400],
-};
-
-export const DEFAULT_SKILL_COLOR = colors.ds.blue[300];
+/**
+ * Skill progress bar colors cycling in order per Figma design.
+ * Colors are applied by index (index % SKILL_COLORS.length), so any number of
+ * skills from the backend will always use one of these three colors.
+ */
+export const SKILL_COLORS = [
+  colors.ds.deepPurple[300],
+  colors.ds.green[300],
+  colors.ds.orange[300],
+] as const;
 
 // SKILL COVERAGE FALLBACK DATA
 export const DEFAULT_SKILL_COVERAGE: SkillCoverage[] = [
