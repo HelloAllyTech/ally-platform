@@ -7,15 +7,15 @@ import {
 } from '@gorhom/bottom-sheet';
 import {
   ActivityIndicator,
-  Animated,
-  LayoutChangeEvent,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
+import {TabBar, TabView} from 'react-native-tab-view';
 
 import {ChevronRight} from '@/assets/icons';
 import {
@@ -35,8 +35,6 @@ import {styles} from './styles';
 import {ThreadsBottomSheetProps} from './types';
 
 const LIMIT = 20;
-const TAB_COUNT = 2;
-const INDICATOR_ANIM_DURATION = 250;
 
 type TabKey = 'inline' | 'general';
 
@@ -74,32 +72,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const {userData} = useUser();
   const insets = useSafeAreaInsets();
 
+  const layout = useWindowDimensions();
   const [tabIndex, setTabIndex] = useState(0);
-  const indicatorLeft = useRef(new Animated.Value(0)).current;
-  const tabBarWidth = useRef(0);
-
-  const handleTabBarLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      tabBarWidth.current = e.nativeEvent.layout.width;
-      indicatorLeft.setValue(
-        (tabIndex * e.nativeEvent.layout.width) / TAB_COUNT,
-      );
-    },
-    [indicatorLeft, tabIndex],
-  );
-
-  const handleTabChange = useCallback(
-    (idx: number) => {
-      setTabIndex(idx);
-      const targetLeft = (idx * tabBarWidth.current) / TAB_COUNT;
-      Animated.timing(indicatorLeft, {
-        toValue: targetLeft,
-        duration: INDICATOR_ANIM_DURATION,
-        useNativeDriver: false,
-      }).start();
-    },
-    [indicatorLeft],
-  );
 
   const routes = useMemo(
     () => [
@@ -108,6 +82,10 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     ],
     [t],
   );
+
+  const handleTabChange = useCallback((index: number) => {
+    setTabIndex(index);
+  }, []);
 
   const activeTab: TabKey = routes[tabIndex]?.key as TabKey;
 
@@ -129,7 +107,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       setCommentsData(null);
       setOffset(0);
       setTabIndex(0);
-      indicatorLeft.setValue(0);
     }
   }, [visible]);
 
@@ -154,7 +131,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   }, [apiData, visible]);
 
   // --- General tab: ref for functions, state for primitive text value ---
-  const generalFnRef = React.useRef({
+  const generalFnRef = useRef({
     setCommentText: (_text: string) => {},
     onSubmitComment: (_comment: string) => {},
     isSubmitting: false,
@@ -203,58 +180,20 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     [],
   );
 
-  // --- Tab bar ---
-  const indicatorWidth = useMemo(() => {
-    if (tabBarWidth.current > 0) {
-      return tabBarWidth.current / TAB_COUNT;
-    }
-    return '50%' as unknown as number;
-  }, []);
-
-  const renderTabBar = useCallback(() => {
-    return (
-      <View style={styles.tabBar} onLayout={handleTabBarLayout}>
-        {routes.map((route, idx) => {
-          const isActive = idx === tabIndex;
-          return (
-            <TouchableOpacity
-              key={route.key}
-              style={styles.tabBarTab}
-              onPress={() => handleTabChange(idx)}
-              activeOpacity={0.7}>
-              <Text
-                style={[
-                  styles.tabBarLabel,
-                  {
-                    color: isActive
-                      ? colors.ds.theme.primary
-                      : colors.ds.typography.lowEmphasis,
-                  },
-                ]}>
-                {route.title}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-        <Animated.View
-          style={[
-            styles.tabBarIndicator,
-            {
-              width: indicatorWidth,
-              left: indicatorLeft,
-            },
-          ]}
-        />
-      </View>
-    );
-  }, [
-    tabIndex,
-    routes,
-    indicatorWidth,
-    indicatorLeft,
-    handleTabChange,
-    handleTabBarLayout,
-  ]);
+  // --- Tab bar (react-native-tab-view) ---
+  const renderTabBar = useCallback(
+    (props: Parameters<typeof TabBar>[0]) => (
+      <TabBar
+        {...props}
+        indicatorStyle={styles.tabBarIndicator}
+        style={styles.tabBar}
+        tabStyle={styles.tabBarTab}
+        activeColor={colors.ds.theme.primary}
+        inactiveColor={colors.ds.typography.lowEmphasis}
+      />
+    ),
+    [],
+  );
 
   // --- Inline tab renderers ---
   const renderThreadItem = useCallback(
@@ -345,19 +284,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     [onThreadPress, t, userData],
   );
 
-  const renderHeader = useCallback(() => {
-    return (
-      <View>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {t('ThreadsBottomSheet.title')}
-          </Text>
-        </View>
-        {renderTabBar()}
-      </View>
-    );
-  }, [t, renderTabBar]);
-
   const renderInlineFooter = useCallback(() => {
     if (!isFetching) return null;
     if (!hasMore) return null;
@@ -431,24 +357,60 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     );
   };
 
+  const renderScene = useCallback(
+    ({route: sceneRoute}: {route: {key: string}}) => {
+      switch (sceneRoute.key) {
+        case 'inline':
+          return renderInlineTab();
+        case 'general':
+          return renderGeneralTab();
+        default:
+          return null;
+      }
+    },
+    [
+      visible,
+      commentsData,
+      isLoading,
+      isFetching,
+      hasMore,
+      reviewId,
+      reviewOwnerId,
+      activeTab,
+    ],
+  );
+
   return (
     <BottomSheet
       visible={visible}
       onClose={onClose}
       skipBottomSheetView
-      enableContentPanningGesture={activeTab === 'inline'}
+      enableContentPanningGesture
       enableDynamicSizing={false}
       snapPoints={['80%']}
       enableOverDrag
       enableHandlePanningGesture
       keyboardBehavior="extend"
       keyboardBlurBehavior="restore"
+      failOffsetX={[-5, 5]}
       footerComponent={
         activeTab === 'general' ? renderFooterComponent : undefined
       }>
       <View style={styles.container}>
-        {renderHeader()}
-        {activeTab === 'inline' ? renderInlineTab() : renderGeneralTab()}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {t('ThreadsBottomSheet.title')}
+          </Text>
+        </View>
+        <TabView
+          navigationState={{index: tabIndex, routes}}
+          renderScene={renderScene}
+          renderTabBar={renderTabBar}
+          onIndexChange={handleTabChange}
+          initialLayout={{width: layout.width}}
+          swipeEnabled
+          commonOptions={{labelStyle: styles.tabBarLabel}}
+        />
       </View>
     </BottomSheet>
   );
