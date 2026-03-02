@@ -1,52 +1,58 @@
-import React, {useMemo} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useMemo, useRef} from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {BulbIcon} from '@/assets';
 import {
-  ChartComponent,
   CircularProgress,
+  CustomLineChart,
   NetworkImage,
   ProgressBar,
 } from '@/components';
 import {
-  DEFAULT_SKILL_COLOR,
+  DEFAULT_DATA_POINTS,
   DEFAULT_SKILL_COVERAGE,
-  EMOTIONAL_MOVEMENT_CHART_CONFIG,
-  SKILL_CATEGORY_COLOR_MAP,
+  NUM_X_AXIS_INTERVALS,
+  NUM_Y_AXIS_INTERVALS,
+  SKILL_COLORS,
 } from '@/constants';
 import {useTranslate} from '@/hooks';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
-import {SkillCoverage} from '@/types';
-import {
-  calculateAverageForObjectArray,
-  getNormalisedXAxisLabelsMap,
-} from '@/utils';
-import {formatTimeToMMSS} from '@/utils/date';
+import {ExperienceMode, SimulationSummaryData, SkillCoverage} from '@/types';
+import {calculateAverageForObjectArray, formatSecondsToMMSS} from '@/utils';
 
+import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
 import {SummaryCard} from '../SummaryCard';
-
-const NUM_X_AXIS_INTERVALS = 5;
-
-/** Raw input dataset with {x, y} data points (before normalisation for the chart). */
-export interface EmotionalMovementDataset {
-  data: {x: number; y: number}[];
-  color?: (opacity: number) => string;
-  strokeWidth?: number;
-  label?: string;
-}
 
 export interface SessionSkillsProps {
   scenarioSessionId: string;
+  simulationDetails?: SimulationSummaryData | null;
+  /** True when this tab is the currently active tab. Used to refetch on re-activation. */
+  isActive?: boolean;
 }
 
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
+  simulationDetails,
+  isActive = false,
 }) => {
   const {t} = useTranslate();
 
-  const {data: simulationSkills} = useGetSimulationSkillsQuery(
+  const {
+    data: simulationSkills,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetSimulationSkillsQuery(
     {
       scenarioSessionId,
     },
@@ -55,77 +61,40 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     },
   );
 
+  // Refetch every time the tab becomes active again (skip the very first
+  // activation since the query fires automatically on mount).
+  const isFirstActivation = useRef(true);
+  useEffect(() => {
+    if (isFirstActivation.current) {
+      isFirstActivation.current = false;
+      return;
+    }
+    if (isActive && !isFetching && !simulationSkills) {
+      refetch();
+    }
+  }, [isActive, isFetching, simulationSkills, refetch]);
+
   const skillCoverage = simulationSkills?.skillCoverage?.length
     ? simulationSkills.skillCoverage
     : DEFAULT_SKILL_COVERAGE;
 
-  const emotionalMovementRaw = simulationSkills?.emotionalMovement;
+  const emotionalMovementData = useMemo(
+    () => simulationSkills?.emotionalMovement || [],
+    [simulationSkills?.emotionalMovement],
+  );
   const hasEmotionalData =
-    !!emotionalMovementRaw && emotionalMovementRaw.length > 0;
+    !!emotionalMovementData && emotionalMovementData.length > 0;
 
-  // Convert EmotionalMovement[] to EmotionalMovementDataset[] for chart utils.
-  // When the array is empty, provide placeholder points with y=0 so the chart
-  // still renders a flat baseline instead of being hidden.
-  const emotionalMovementDatasets: EmotionalMovementDataset[] = useMemo(() => {
-    if (hasEmotionalData) {
-      return [
-        {
-          data: emotionalMovementRaw.map(item => ({
-            x: item.startTime,
-            y: item.level,
-          })),
-        },
-      ];
-    }
-
-    const defaultIntervalSeconds = 60;
-    const placeholderPoints = Array.from(
-      {length: NUM_X_AXIS_INTERVALS + 1},
-      (_, i) => ({
-        x: i * defaultIntervalSeconds,
-        y: 0,
-      }),
-    );
-
-    return [{data: placeholderPoints}];
-  }, [hasEmotionalData, emotionalMovementRaw]);
-
-  // Generate the labels map using the util function (used by commented-out chart).
-  const normalisedXAxisLabelsMap = useMemo(
-    () =>
-      getNormalisedXAxisLabelsMap(
-        emotionalMovementDatasets,
-        formatTimeToMMSS,
-        NUM_X_AXIS_INTERVALS,
-      ),
-    [emotionalMovementDatasets],
-  );
-
-  const resolvedChartConfig = useMemo(
-    () =>
-      hasEmotionalData
-        ? EMOTIONAL_MOVEMENT_CHART_CONFIG
-        : {
-            ...EMOTIONAL_MOVEMENT_CHART_CONFIG,
-            propsForDots: {
-              ...EMOTIONAL_MOVEMENT_CHART_CONFIG.propsForDots,
-              r: 0,
-              strokeWidth: 0,
-              stroke: 'transparent',
-              fill: 'transparent',
-            },
-            propsForBackgroundLines: {
-              strokeDasharray: '3,3', // Dashed grid lines
-              stroke: colors.lightGray2,
-              strokeWidth: 1,
-            },
-          },
-    [hasEmotionalData],
-  );
+  const chartData = useMemo(() => {
+    if (!hasEmotionalData) return DEFAULT_DATA_POINTS;
+    return emotionalMovementData.map(item => ({
+      x: item.startTime,
+      y: item.level,
+    }));
+  }, [hasEmotionalData, emotionalMovementData]);
 
   const renderSkillItem = (skill: SkillCoverage, index: number) => {
-    const skillColor =
-      SKILL_CATEGORY_COLOR_MAP[skill.category] ?? DEFAULT_SKILL_COLOR;
+    const skillColor = SKILL_COLORS[index % SKILL_COLORS.length];
     return (
       <View key={index} style={styles.skillItemContent}>
         <View style={styles.skillIconContainer}>
@@ -161,6 +130,46 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   const overallScore = useMemo(() => {
     return calculateAverageForObjectArray(skillCoverage, 'percentage');
   }, [skillCoverage]);
+
+  const isChecklistMode =
+    simulationDetails?.scenario?.metadata?.experienceMode ===
+    ExperienceMode.CHECKLIST;
+  const positives =
+    simulationDetails?.details?.summary?.feedback?.positives ?? [];
+  const improvements =
+    simulationDetails?.details?.summary?.feedback?.improvements ?? [];
+
+  if (isLoading || isFetching) {
+    return (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+          </View>
+        </SummaryCard>
+      </ScrollView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>
+              {t('SimulationFeedback.sessionSkills.errorLoading')}
+            </Text>
+          </View>
+        </SummaryCard>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -199,49 +208,49 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         )}
 
         {/* Client Emotional Movement Card */}
-        {emotionalMovementDatasets.length > 0 && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardHeaderText}>
-                {t('SimulationFeedback.sessionSkills.clientEmotionalMovement')}
-              </Text>
-            </View>
-            <View style={styles.chartInfoRow}>
-              <Text style={styles.chartInfoText}>
-                {t('SimulationFeedback.sessionSkills.chartXAxisLabel')}
-              </Text>
-              <Text style={styles.chartInfoText}>
-                {t('SimulationFeedback.sessionSkills.chartYAxisLabel')}
-              </Text>
-            </View>
-            <View style={styles.chartWrapper}>
-              <ChartComponent
-                xAxisLabels={Array.from(normalisedXAxisLabelsMap.values())}
-                datasets={[
-                  {
-                    data:
-                      emotionalMovementDatasets[0]?.data.map(pt => pt.y) ?? [],
-                    color: (_opacity: number) =>
-                      hasEmotionalData
-                        ? 'rgba(102, 187, 106, 1)'
-                        : 'rgba(0, 0, 0, 0)',
-                    strokeWidth: hasEmotionalData ? 2 : 0,
-                    label: 'Emotional Movement',
-                  },
-                ]}
-                height={ms(250)}
-                showLegend={false}
-                chartConfig={resolvedChartConfig}
-              />
-              {!hasEmotionalData && (
-                <View style={styles.noDataOverlay}>
-                  <Text style={styles.noDataText}>
-                    {t('SimulationFeedback.sessionSkills.noDataFound')}
-                  </Text>
-                </View>
-              )}
-            </View>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardHeaderText}>
+              {t('SimulationFeedback.sessionSkills.clientEmotionalMovement')}
+            </Text>
           </View>
+          <View style={styles.chartInfoRow}>
+            <Text style={styles.chartInfoText}>
+              {t('SimulationFeedback.sessionSkills.chartXAxisLabel')}
+            </Text>
+            <Text style={styles.chartInfoText}>
+              {t('SimulationFeedback.sessionSkills.chartYAxisLabel')}
+            </Text>
+          </View>
+          <View style={styles.chartWrapper}>
+            <CustomLineChart
+              width={Dimensions.get('window').width - ms(65)}
+              height={220}
+              data={chartData}
+              formatXLabel={formatSecondsToMMSS}
+              xAxisSplitNumber={NUM_X_AXIS_INTERVALS}
+              yAxisSplitNumber={NUM_Y_AXIS_INTERVALS}
+            />
+            {!hasEmotionalData && (
+              <View style={styles.noDataOverlay}>
+                <Text style={styles.noDataText}>
+                  {t('SimulationFeedback.sessionSkills.noDataFound')}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {isChecklistMode && (
+          <>
+            <ExpandableFeedbackSection
+              title={t('SimulationFeedback.strengthsAndSkills')}
+              items={positives}
+            />
+            <ExpandableFeedbackSection
+              title={t('SimulationFeedback.areasOfGrowth')}
+              items={improvements}
+            />
+          </>
         )}
       </SummaryCard>
     </ScrollView>
@@ -304,15 +313,17 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '8@ms',
   },
   skillName: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
+    ...typography.body.small,
     color: colors.ds.typography.highEmphasis,
+    flex: 1,
   },
   skillPercentage: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
+    ...typography.body.small,
     color: colors.ds.typography.highEmphasis,
   },
   chartInfoRow: {
@@ -355,5 +366,21 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  loaderContainer: {
+    paddingVertical: '48@vs',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorContainer: {
+    paddingVertical: '40@vs',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
   },
 });

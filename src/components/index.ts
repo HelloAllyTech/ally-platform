@@ -84,6 +84,7 @@ export {UserProfileImage} from './UserProfileImage';
 export {InfoTooltip} from './InfoTooltip';
 export {ChartComponent} from './ChartComponent';
 export type {ChartComponentProps, ChartDataset} from './ChartComponent';
+export {CustomLineChart} from './CustomLineChart';
 export {ActionsMenu} from './ActionsMenu';
 export {SessionChecklist} from './Checklist';
 export type {SessionChecklistItem, SessionChecklistProps} from './Checklist';

@@ -498,7 +498,8 @@
       "clientEmotionalMovement": "Client Emotional Movement",
       "chartXAxisLabel": "X: Session Timeline(Min) graph",
       "chartYAxisLabel": "Y: Level (-5 to 5)",
-      "noDataFound": "No data found"
+      "noDataFound": "No data found",
+      "errorLoading": "Failed to load skills data. Please try again later."
     }
   },
   "Errors": {
