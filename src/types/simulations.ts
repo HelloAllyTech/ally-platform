@@ -130,6 +130,9 @@ export interface ControlButtonsProps {
 
 export interface SimulationTimerProps {
   startTime: Date;
+  timeLimit?: number; // seconds; if provided, triggers onWarning and onTimeLimit
+  onWarning?: () => void; // fired when timeLimit - elapsed <= WARNING_THRESHOLD_SECONDS
+  onTimeLimit?: () => void; // fired when elapsed >= timeLimit
 }
 
 export interface SimulationEventDetailsMeta {

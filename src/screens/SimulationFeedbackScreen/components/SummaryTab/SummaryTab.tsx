@@ -1,10 +1,7 @@
 import React, {useMemo, useRef} from 'react';
-import {View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
-import {useTranslate} from '@/hooks';
 import {SimulationSummaryData} from '@/types';
 
 import {SimulationSummary, SimulationSummarySkeleton} from '../';
@@ -12,21 +9,12 @@ import {SimulationSummary, SimulationSummarySkeleton} from '../';
 interface SummaryTabProps {
   simulationDetails: SimulationSummaryData | null;
   retryLimitReached: boolean;
-  pathId?: string;
-  caseId?: string;
-  fromLogs?: boolean;
-  onTryAnother: () => void;
 }
 
 export const SummaryTab: React.FC<SummaryTabProps> = ({
   simulationDetails,
   retryLimitReached,
-  pathId,
-  caseId,
-  fromLogs,
-  onTryAnother,
 }) => {
-  const {t} = useTranslate();
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
 
   const positives = useMemo(
@@ -37,21 +25,6 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
     () => simulationDetails?.details?.summary?.feedback?.improvements ?? [],
     [simulationDetails?.details?.summary?.feedback?.improvements],
   );
-
-  const renderButtonContainer = () => {
-    if (!pathId && !caseId && !fromLogs) {
-      return (
-        <View style={styles.buttonContainer}>
-          <Button
-            label={t('SimulationFeedback.tryAnother')}
-            onPress={onTryAnother}
-            customContainerStyle={styles.submitButton}
-          />
-        </View>
-      );
-    }
-    return null;
-  };
 
   return (
     <KeyboardAwareScrollView
@@ -71,7 +44,6 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
             positives={positives}
             improvements={improvements}
           />
-          {simulationDetails && renderButtonContainer()}
         </>
       )}
     </KeyboardAwareScrollView>

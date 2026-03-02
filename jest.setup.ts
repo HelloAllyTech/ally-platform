@@ -177,7 +177,6 @@ jest.mock('react-native-config', () => {
       CLOUD_TELEPHONY_PATH: '/test/telephony',
       GOOGLE_WEB_CLIENT_ID: 'test-google-web-client-id',
       GOOGLE_IOS_CLIENT_ID: 'test-google-ios-client-id',
-      POST_SIMULATION_NEW_TABS_FLAG: 'true',
     },
   };
 });
