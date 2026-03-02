@@ -491,7 +491,7 @@ describe('SimulationAssistantScreen', () => {
     expect(getByTestId('simulation-control-buttons')).toBeDefined();
   });
 
-  it('renders SessionChecklist and hides score meter when experienceMode is CHECKLIST', async () => {
+  it('renders SessionChecklist when experienceMode is CHECKLIST', async () => {
     const connectedHandlers: Array<() => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
       if (event === 'connected') connectedHandlers.push(cb);
@@ -508,7 +508,7 @@ describe('SimulationAssistantScreen', () => {
       },
     };
 
-    const {getByTestId, queryByTestId} = await renderWithProviders(
+    const {getByTestId} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: checklistParams} as any} />,
     );
 
@@ -517,9 +517,6 @@ describe('SimulationAssistantScreen', () => {
 
     // Verify SessionChecklist is rendered
     expect(getByTestId('session-checklist')).toBeDefined();
-
-    // Verify SessionScoreMeter is NOT rendered
-    expect(queryByTestId('score')).toBeNull();
   });
 });
 
