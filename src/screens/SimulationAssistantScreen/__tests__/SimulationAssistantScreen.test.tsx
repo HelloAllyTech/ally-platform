@@ -203,6 +203,7 @@ jest.mock('@/utils', () => ({
   ),
   logger: {info: jest.fn(), error: jest.fn()},
   playNotificationSound: jest.fn().mockResolvedValue(undefined),
+  parseMaxTimeSec: jest.fn().mockReturnValue(1200),
 }));
 
 jest.mock('react-i18next', () => ({
