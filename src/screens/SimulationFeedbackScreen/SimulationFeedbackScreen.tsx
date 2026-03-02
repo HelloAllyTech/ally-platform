@@ -13,7 +13,6 @@ import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
 import {FeedbackPopup, useToast} from '@/components';
-import {env} from '@/config/env';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
@@ -258,7 +257,6 @@ export const SimulationFeedbackScreen: React.FC<
       getSimulationSummaryTabs(t, {
         pathId,
         caseId,
-        postSimulationNewTabs: env.POST_SIMULATION_NEW_TABS_FLAG,
       }),
     [t, pathId, caseId],
   );
@@ -286,10 +284,6 @@ export const SimulationFeedbackScreen: React.FC<
             <SummaryTab
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
-              pathId={pathId}
-              caseId={caseId}
-              fromLogs={fromLogs}
-              onTryAnother={handleSubmit}
             />
           );
         case SimulationSummaryTabKey.ASK_AI:
@@ -338,7 +332,6 @@ export const SimulationFeedbackScreen: React.FC<
       retryLimitReached,
       pathId,
       caseId,
-      fromLogs,
       handleFeedbackAndNavigate,
       isPrivate,
       reviewId,
