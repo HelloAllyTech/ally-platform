@@ -20,14 +20,10 @@ export const styles = ScaledSheet.create({
     textAlign: 'center',
   },
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: colors.white,
-    position: 'relative',
   },
   tabBarTab: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: '10@vs',
   },
   tabBarLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
@@ -36,11 +32,8 @@ export const styles = ScaledSheet.create({
     fontWeight: '400',
   },
   tabBarIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    height: 2,
     backgroundColor: colors.ds.theme.primary,
+    height: 2,
   },
   listContent: {
     paddingHorizontal: '24@ms',

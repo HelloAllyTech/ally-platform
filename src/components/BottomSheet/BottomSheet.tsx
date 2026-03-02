@@ -33,6 +33,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   footerComponent,
   keyboardBehavior = 'interactive',
   keyboardBlurBehavior = 'restore',
+  activeOffsetX,
+  activeOffsetY,
+  failOffsetX,
+  failOffsetY,
 }) => {
   const bottomSheetRef = useRef<BottomSheetComponent>(null);
   const insets = useSafeAreaInsets();
@@ -126,7 +130,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         duration: animationDuration,
       }}
       keyboardBehavior={keyboardBehavior}
-      keyboardBlurBehavior={keyboardBlurBehavior}>
+      keyboardBlurBehavior={keyboardBlurBehavior}
+      activeOffsetX={activeOffsetX}
+      activeOffsetY={activeOffsetY}
+      failOffsetX={failOffsetX}
+      failOffsetY={failOffsetY}>
       {skipBottomSheetView ? (
         children
       ) : (
