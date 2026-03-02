@@ -286,10 +286,6 @@ export const SimulationFeedbackScreen: React.FC<
             <SummaryTab
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
-              pathId={pathId}
-              caseId={caseId}
-              fromLogs={fromLogs}
-              onTryAnother={handleSubmit}
             />
           );
         case SimulationSummaryTabKey.ASK_AI:
@@ -338,7 +334,6 @@ export const SimulationFeedbackScreen: React.FC<
       retryLimitReached,
       pathId,
       caseId,
-      fromLogs,
       handleFeedbackAndNavigate,
       isPrivate,
       reviewId,
