@@ -15,11 +15,7 @@ export enum SimulationSummaryTabKey {
 
 export const getSimulationSummaryTabs = (
   t: TFunction,
-  {
-    pathId,
-    caseId,
-    postSimulationNewTabs,
-  }: {pathId?: string; caseId?: string; postSimulationNewTabs?: boolean},
+  {pathId, caseId}: {pathId?: string; caseId?: string},
 ) => {
   const tabs = [
     {
@@ -27,34 +23,26 @@ export const getSimulationSummaryTabs = (
       title: t('SimulationFeedback.tabs.sessionReview'),
       testID: 'tab-0',
     },
-    ...(postSimulationNewTabs
-      ? [
-          {
-            key: SimulationSummaryTabKey.ASK_AI,
-            title: t('SimulationFeedback.tabs.askAI'),
-            testID: 'tab-1',
-          },
-        ]
-      : []),
+    {
+      key: SimulationSummaryTabKey.ASK_AI,
+      title: t('SimulationFeedback.tabs.askAI'),
+      testID: 'tab-1',
+    },
     {
       key: SimulationSummaryTabKey.TRANSCRIPTION,
       title: t('SimulationFeedback.tabs.annotatedTranscript'),
       testID: 'tab-2',
     },
-    ...(postSimulationNewTabs
-      ? [
-          {
-            key: SimulationSummaryTabKey.SKILLS,
-            title: t('SimulationFeedback.tabs.skillsDemonstrated'),
-            testID: 'tab-3',
-          },
-          {
-            key: SimulationSummaryTabKey.REFLECTION,
-            title: t('SimulationFeedback.tabs.deeperReflection'),
-            testID: 'tab-4',
-          },
-        ]
-      : []),
+    {
+      key: SimulationSummaryTabKey.SKILLS,
+      title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+      testID: 'tab-3',
+    },
+    {
+      key: SimulationSummaryTabKey.REFLECTION,
+      title: t('SimulationFeedback.tabs.deeperReflection'),
+      testID: 'tab-4',
+    },
   ];
 
   if (pathId || caseId) {
