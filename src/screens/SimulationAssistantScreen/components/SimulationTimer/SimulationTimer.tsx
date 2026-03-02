@@ -1,34 +1,55 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {WARNING_THRESHOLD_SECONDS} from '@/constants';
 import {colors, fontFamily} from '@/theme';
 import {SimulationTimerProps} from '@/types';
 
 export const SimulationTimer: React.FC<SimulationTimerProps> = ({
   startTime,
+  timeLimit,
+  onWarning,
+  onTimeLimit,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const {t} = useTranslation();
+  const hasWarnedRef = useRef(false);
+  const onWarningRef = useRef(onWarning);
+  const onTimeLimitRef = useRef(onTimeLimit);
 
   useEffect(() => {
-    const calculateInitialElapsed = () => {
-      const now = new Date();
-      return Math.floor(
-        ((now > startTime ? now : startTime).getTime() - startTime.getTime()) /
-          1000,
-      );
-    };
+    onWarningRef.current = onWarning;
+    onTimeLimitRef.current = onTimeLimit;
+  });
 
-    setElapsedSeconds(calculateInitialElapsed());
+  useEffect(() => {
+    hasWarnedRef.current = false;
 
     const interval = setInterval(() => {
-      setElapsedSeconds(calculateInitialElapsed());
+      const now = Date.now();
+      const elapsed = Math.floor((now - startTime.getTime()) / 1000);
+      setElapsedSeconds(elapsed);
+
+      if (timeLimit !== undefined) {
+        if (
+          timeLimit - elapsed <= WARNING_THRESHOLD_SECONDS &&
+          !hasWarnedRef.current
+        ) {
+          onWarningRef.current?.();
+          hasWarnedRef.current = true;
+        }
+
+        if (elapsed >= timeLimit) {
+          onTimeLimitRef.current?.();
+          clearInterval(interval);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, timeLimit]);
 
   const formatTime = (totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);

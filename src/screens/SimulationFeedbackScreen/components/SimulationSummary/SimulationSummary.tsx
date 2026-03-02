@@ -3,7 +3,6 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {HelpIcon} from '@/assets';
-import {env} from '@/config/env';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily} from '@/theme';
@@ -92,7 +91,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           </View>
         </View>
       </View>
-      {env.POST_SIMULATION_NEW_TABS_FLAG && data?.id && (
+      {isChecklistMode && data?.id && (
         <EventChecklist scenarioSessionId={data.id} />
       )}
       {!isChecklistMode && (
