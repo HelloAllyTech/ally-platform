@@ -6,6 +6,7 @@ conversation between a client agent (driven by the LangGraph) and a
 counselor agent (a standalone LLM), then delivers results via webhook.
 """
 
+import asyncio
 import random
 import time
 from datetime import datetime, timezone
@@ -34,6 +35,45 @@ from app.core.scenario_report.schemas import (
 from app.llms import create_llm_client
 
 logger = get_logger(__name__)
+
+# Semaphore to limit concurrent report generation tasks
+# Prevents memory spikes from too many simultaneous reports
+_report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
+
+
+async def run_report_with_concurrency_limit(
+    service: "ScenarioReportService",
+) -> None:
+    """
+    Execute report generation with semaphore-based concurrency control.
+
+    The semaphore ensures only N reports run concurrently, preventing
+    memory spikes from too many simultaneous long-running tasks.
+
+    When the limit is reached, new tasks wait in the queue until a slot
+    opens up. This is transparent to the API caller (they still get an
+    immediate 202 response).
+
+    Args:
+        service: ScenarioReportService instance to run
+    """
+    report_id = service._request.report_id
+
+    # Log queue position
+    waiting_count = settings.REPORT_CONCURRENCY_LIMIT - _report_semaphore._value
+    if waiting_count > 0:
+        logger.info(
+            "Report %s queued (waiting for slot, %d reports currently running)",
+            report_id,
+            waiting_count,
+        )
+
+    async with _report_semaphore:
+        logger.info(
+            "Report %s started execution (concurrency slot acquired)",
+            report_id,
+        )
+        await service.run()
 
 
 class _ReportCheckpointer(MemorySaver):
@@ -332,6 +372,7 @@ class ScenarioReportService:
                     break
 
                 client_text = self._extract_client_reply(graph_output)
+
                 if not client_text:
                     logger.warning("No client response at turn %d", turn + 1)
                     continue

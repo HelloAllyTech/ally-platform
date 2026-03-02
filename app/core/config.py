@@ -187,6 +187,16 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Scenario report generation settings
+    REPORT_CONCURRENCY_LIMIT: int = Field(
+        default=3,
+        description=(
+            "Maximum number of scenario reports that can run concurrently. "
+            "Prevents memory spikes from too many simultaneous long-running tasks. "
+            "Requests beyond this limit will queue until a slot opens."
+        ),
+    )
+
     # Speech prosody skip thresholds (reduce latency when under pressure)
     # When skipped, TTS keeps last params instead of running prosody LLM call
     PROSDY_SKIP_ENABLED: bool = Field(

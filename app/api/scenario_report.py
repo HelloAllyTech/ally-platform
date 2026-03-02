@@ -10,7 +10,10 @@ from app.core.scenario_report.schemas import (
     ScenarioReportRequest,
     ScenarioReportResponse,
 )
-from app.core.scenario_report.service import ScenarioReportService
+from app.core.scenario_report.service import (
+    ScenarioReportService,
+    run_report_with_concurrency_limit,
+)
 
 logger = get_logger(__name__)
 
@@ -46,7 +49,7 @@ async def generate_scenario_report(
 
     service = ScenarioReportService(request)
     asyncio.create_task(
-        service.run(),
+        run_report_with_concurrency_limit(service),
         name=f"report-{request.report_id}",
     )
 
