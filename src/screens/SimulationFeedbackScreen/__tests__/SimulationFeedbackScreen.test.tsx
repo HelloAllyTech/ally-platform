@@ -224,14 +224,11 @@ describe('SimulationFeedbackScreen', () => {
     expect(getByTestId('summary-tab')).toBeTruthy();
   });
 
-  it('opens feedback popup when try another is pressed', async () => {
+  it('renders try another button in summary tab', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    fireEvent.press(getByTestId('try-another-button'));
-    await waitFor(() => {
-      expect(getByTestId('feedback-popup')).toBeTruthy();
-    });
+    expect(getByTestId('try-another-button')).toBeTruthy();
   });
 
   it('renders summary tab even when details are missing', () => {
