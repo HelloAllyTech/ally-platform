@@ -29,6 +29,7 @@ export interface ScenarioMetadata {
   openingStatements?: string[];
   sexualOrientation?: string;
   sessionBehaviorGuidelines?: string;
+  experienceMode?: string;
 }
 
 export interface Scenario {

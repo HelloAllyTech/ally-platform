@@ -101,6 +101,12 @@ jest.mock('@/theme', () => ({
       amber: {
         400: '#FFCA28',
       },
+      deepPurple: {
+        300: '#9575cd',
+      },
+      orange: {
+        300: '#ffb74d',
+      },
       red: {
         50: '#ffd9d4',
         100: '#ffc9c1',
