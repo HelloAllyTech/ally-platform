@@ -443,17 +443,19 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       />
                     </View>
                   </View>
-                  <View style={styles.checklistWrapper}>
-                    <SessionChecklist
-                      mode={
-                        scenario.checklistType
-                          ? scenario.checklistType
-                          : ChecklistType.OFF
-                      }
-                      items={scenario.checklistEvents}
-                      triggeredEvents={detectedEvents}
-                    />
-                  </View>
+                  {isSimulationInProgress && !isFocusMode && (
+                    <View style={styles.checklistWrapper}>
+                      <SessionChecklist
+                        mode={
+                          scenario.checklistType
+                            ? scenario.checklistType
+                            : ChecklistType.OFF
+                        }
+                        items={scenario.checklistEvents}
+                        triggeredEvents={detectedEvents}
+                      />
+                    </View>
+                  )}
                 </View>
               )}
           </>
@@ -525,13 +527,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                 )}
           </>
 
-          {isSimulationInProgress &&
-            !isChecklistMode &&
-            scenario?.showScoreMeter !== false && (
-              <View style={styles.scoreMeterContainer}>
-                <SessionScoreMeter score={accumulatedScore} />
-              </View>
-            )}
+          {isSimulationInProgress && scenario?.showScoreMeter !== false && (
+            <View style={styles.scoreMeterContainer}>
+              <SessionScoreMeter score={accumulatedScore} />
+            </View>
+          )}
 
           <EndingSoonModal
             visible={showEndingSoon && isSimulationInProgress}
