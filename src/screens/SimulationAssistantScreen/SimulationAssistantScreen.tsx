@@ -19,15 +19,7 @@ import SoundPlayer from 'react-native-sound-player';
 import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
-import {
-  DEFAULT_MAX_TIME_VALUE,
-  MINUTES_IN_MS,
-  SCREEN_NAMES,
-  SECONDS_IN_MS,
-  SESSION_AUTO_END_MINUTES,
-  SESSION_END_MODAL_MINUTES,
-  SESSION_END_MODAL_SECONDS,
-} from '@/constants';
+import {DEFAULT_MAX_TIME_VALUE, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
@@ -43,6 +35,7 @@ import {
   decodeFeedbackPayloadToJson,
   getTriggerWarningNames,
   logger,
+  parseMaxTimeSec,
   playNotificationSound,
 } from '@/utils';
 
@@ -143,35 +136,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     return false;
   });
 
-  useEffect(() => {
-    // Show the ending-soon modal at 29 minutes 30 seconds from the start time
-    if (!startTime) return;
-
-    const modalTargetMs =
-      SESSION_END_MODAL_MINUTES * MINUTES_IN_MS +
-      SESSION_END_MODAL_SECONDS * SECONDS_IN_MS;
-    const autoEndTargetMs = SESSION_AUTO_END_MINUTES * MINUTES_IN_MS;
-
-    const now = Date.now();
-    const elapsed = now - startTime.getTime();
-
-    const remainingModal = Math.max(0, modalTargetMs - elapsed);
-    const remainingAutoEnd = Math.max(0, autoEndTargetMs - elapsed);
-
-    const modalTimer = setTimeout(
-      () => setShowEndingSoon(true),
-      remainingModal,
-    );
-    const autoEndTimer = setTimeout(() => {
-      if (roomStatus !== RoomStatus.DISCONNECTING) handleDisconnect();
-    }, remainingAutoEnd);
-
-    return () => {
-      clearTimeout(modalTimer);
-      clearTimeout(autoEndTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startTime, roomStatus]);
+  const maxTimeSec = parseMaxTimeSec(scenario?.maxTimeValue);
 
   const ensureSpeakerOutput = useCallback(async () => {
     // Try a few times with small delays; OEM skins sometimes override routing during focus changes
@@ -381,7 +346,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       <RoomContext.Provider value={room}>
         <View style={styles.contentContainer}>
           {isSimulationInProgress && startTime && (
-            <SimulationTimer startTime={startTime} />
+            <SimulationTimer
+              startTime={startTime}
+              timeLimit={maxTimeSec}
+              onWarning={() => setShowEndingSoon(true)}
+              onTimeLimit={handleDisconnect}
+            />
           )}
 
           {isSimulationInProgress && startTime && scenario?.timerMode && (
