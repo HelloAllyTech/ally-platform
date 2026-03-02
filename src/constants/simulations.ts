@@ -64,6 +64,7 @@ export enum SimulationEventStatus {
 }
 
 export const DEFAULT_MAX_TIME_VALUE = '00:10:00';
+export const WARNING_THRESHOLD_SECONDS = 30;
 
 export const TRANSCRIPT_TAG_COLORS = {
   NEGATIVE: {
