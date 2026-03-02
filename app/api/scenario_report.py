@@ -41,7 +41,7 @@ async def generate_scenario_report(
 ) -> ScenarioReportResponse:
     """Spawn a background report-generation task and return immediately."""
     logger.info(
-        "Report generation requested: report_id=%s, scenario_id=%s, turns=%d",
+        "Report generation requested: report_id=%s, scenario_id=%s, requested_turns=%d",
         request.report_id,
         request.scenario_id,
         request.turns,

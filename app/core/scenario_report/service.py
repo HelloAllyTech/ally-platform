@@ -151,6 +151,14 @@ class ScenarioReportService:
 
     def __init__(self, request: ScenarioReportRequest) -> None:
         self._request = request
+        # Limit turns to 15 to prevent memory spikes
+        if self._request.turns > 15:
+            logger.info(
+                "Requested turns %d exceeds limit of 15, capping at 15 (report_id=%s)",
+                self._request.turns,
+                self._request.report_id,
+            )
+            self._request.turns = 15
         self._terminated = False
         self._termination_event: Optional[BaseEvent] = None
         self._transcripts: list[TranscriptEntry] = []
