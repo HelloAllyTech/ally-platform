@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from app.core.graph.prompt import generate_system_message
 from app.core.scenario.base import (
     PromptData,
@@ -298,18 +296,14 @@ class TestPrompt:
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_in.content
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
 
-    def test_generate_system_message_use_language_sample_dialogues_injects_sample_block(
-        self,
-    ):
-        """When USE_LANGUAGE_SAMPLE_DIALOGUES=True and samples present, use samples."""
+    def test_generate_system_message_samples_present_injects_sample_block(self):
+        """When samples present, use sample block instead of default instruction."""
         samples = [
             {"counselor": "Hello, how are you?", "actor": "എനിക്ക് സഹായം വേണം."},
             {"counselor": "I understand.", "actor": "എനിക്ക് വളരെ വിഷമമാണ്."},
         ]
         pd = make_prompt_data(language_dialogue_samples=samples)
-        with patch("app.core.graph.prompt.settings") as mock_settings:
-            mock_settings.USE_LANGUAGE_SAMPLE_DIALOGUES = True
-            msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
         content = msg.content
         # Sample block should be present
         assert "Generate next dialogue" in content
@@ -322,12 +316,10 @@ class TestPrompt:
         assert "SOUTH ASIAN TYPOLOGY" not in content
 
     def test_all_empty_samples_falls_back_to_language_instruction(self):
-        """Flag=True but samples empty -> use default language instruction."""
+        """When samples are empty -> use default language instruction."""
         samples = ["", "", ""]
         pd = make_prompt_data(language_dialogue_samples=samples)
-        with patch("app.core.graph.prompt.settings") as mock_settings:
-            mock_settings.USE_LANGUAGE_SAMPLE_DIALOGUES = True
-            msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
         content = msg.content
         assert "SOUTH ASIAN TYPOLOGY" in content
         assert "Example 1:" not in content

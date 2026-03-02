@@ -4,7 +4,7 @@ Generate language dialogue samples for linguistic style instruction.
 
 Run this script to generate 10 sample counselor-client dialogues in the target
 language. Copy the output into scenario metadata.linguisticStyleSamples (via
-ally-be UI or API). Uses USE_LANGUAGE_SAMPLE_DIALOGUES when true.
+ally-be UI or API). ally-ai-learn uses samples when present.
 
 Usage:
     python scripts/generate_language_samples.py -s SCENARIO_SAMPLE_MALAYALAM_AUTO

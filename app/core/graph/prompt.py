@@ -3,7 +3,6 @@ from typing import List, Optional
 
 from langchain_core.messages import SystemMessage
 
-from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.scenario.base import (
     PromptData,
@@ -133,8 +132,7 @@ def _format_language_samples(samples: List) -> str:
 def _get_language_sample_block(samples: List, language_code: str) -> str:
     """
     Format sample dialogues for linguistic style instruction.
-    Used when USE_LANGUAGE_SAMPLE_DIALOGUES=True and prompt_data has
-    language_dialogue_samples (from ally-be/UI).
+    Used when prompt_data has language_dialogue_samples (from ally-be/UI).
     Template loaded from app/prompts/system/language_sample_instruction.txt.
     """
     if not samples:
@@ -156,15 +154,12 @@ def _get_language_block(
 ) -> str:
     """
     Creates a formatted block for language instruction.
-    When USE_LANGUAGE_SAMPLE_DIALOGUES is True and prompt_data has
-    language_dialogue_samples (from ally-be when user adds them in the UI),
-    returns the sample block instead of the default language instruction.
+    When use_linguistic_style_samples is True and prompt_data has
+    language_dialogue_samples, returns the sample block. When False or samples
+    absent, uses default language instruction.
     """
-    if (
-        settings.USE_LANGUAGE_SAMPLE_DIALOGUES
-        and prompt_data.language_dialogue_samples
-        and language_code
-    ):
+    use_samples = getattr(prompt_data, "use_linguistic_style_samples", True)
+    if use_samples and prompt_data.language_dialogue_samples and language_code:
         sample_block = _get_language_sample_block(
             prompt_data.language_dialogue_samples, language_code
         )
