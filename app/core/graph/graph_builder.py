@@ -103,12 +103,17 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # This runs in parallel with generate_response after resolve_branching_instruction
     graph.add_node("detect_behaviors", detect_behaviors)
 
+    # send_event_feedback runs last — sends event scores/feedback to UI.
+    # Kept separate from generate_response so that node stays reusable
+    # for contexts that don't need UI feedback (e.g. report generation).
+    graph.add_node("send_event_feedback", send_event_feedback)
+
     graph.add_edge(START, "process_events")
+    graph.add_edge(START, "detect_behaviors")
+
     graph.add_edge("process_events", "resolve_branching_instruction")
 
-    # Fan-out: resolve_branching_instruction → [generate_response, detect_behaviors]
     graph.add_edge("resolve_branching_instruction", "generate_response")
-    graph.add_edge("resolve_branching_instruction", "detect_behaviors")
 
     # Build the apply_voice_expressions subgraph and add it as a node
     # This prevents its LLM outputs (for voice expression parameters) from being
@@ -120,10 +125,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge("generate_response", "apply_voice_expressions")
     graph.add_edge("detect_behaviors", "send_event_feedback")
 
-    # send_event_feedback runs last — sends event scores/feedback to UI.
-    # Kept separate from generate_response so that node stays reusable
-    # for contexts that don't need UI feedback (e.g. report generation).
-    graph.add_node("send_event_feedback", send_event_feedback)
     graph.add_edge("apply_voice_expressions", "send_event_feedback")
     graph.add_edge("send_event_feedback", END)
 
