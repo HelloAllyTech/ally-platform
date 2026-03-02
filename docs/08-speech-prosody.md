@@ -72,7 +72,7 @@ Called for each response via `generate_and_apply_prosody_for_message()` from the
 5. Validates parameters, applies to TTS
 6. Returns enhanced text (or `None` if provider does not support text enhancement)
 
-**Persona context** is extracted by `extract_persona_context_from_prompt_data()` and includes: `personality`, `tone`, `emotional_needs`, `starting_state`, `context`, `cultural_context`, `speaking_style`. These fields shape the prosody generation.
+**Persona context** is extracted by `extract_persona_context_from_prompt_data()` and includes: `personality`, `tone`, `emotional_needs`, `starting_state`, `context`. These fields shape the prosody generation.
 
 ### Skip thresholds (when under pressure)
 

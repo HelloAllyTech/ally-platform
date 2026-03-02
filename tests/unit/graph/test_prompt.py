@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from app.core.graph.prompt import generate_system_message
 from app.core.scenario.base import (
     PromptData,
@@ -277,29 +279,6 @@ class TestPrompt:
         assert "Be anxious" in content
         assert "say something similar to" not in content  # No dialogue options
 
-    def test_generate_system_message_multilingual_fields(self):
-        """Test that cultural_context and speaking_style are injected when provided."""
-        pd = make_prompt_data(
-            cultural_context="Urban Indian middle class",
-            speaking_style="Hinglish, casual",
-        )
-        msg = generate_system_message(prompt_data=pd, language_code="en-IN")
-        content = msg.content
-
-        assert "**Cultural Context:**" in content
-        assert "Urban Indian middle class" in content
-        assert "**Speaking Style & Tone:**" in content
-        assert "Hinglish, casual" in content
-
-    def test_generate_system_message_missing_multilingual_fields(self):
-        """Test that multilingual sections are omitted when fields are missing."""
-        pd = make_prompt_data(cultural_context=None, speaking_style=None)
-        msg = generate_system_message(prompt_data=pd, language_code="en-US")
-        content = msg.content
-
-        assert "**Cultural Context:**" not in content
-        assert "**Speaking Style & Tone:**" not in content
-
     def test_generate_system_message_non_english_injects_language_instruction(self):
         """Test language_instruction_non_english when language_code is non-English."""
         pd = make_prompt_data()
@@ -318,3 +297,37 @@ class TestPrompt:
 
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_in.content
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
+
+    def test_generate_system_message_use_language_sample_dialogues_injects_sample_block(
+        self,
+    ):
+        """When USE_LANGUAGE_SAMPLE_DIALOGUES=True and samples present, use samples."""
+        samples = [
+            {"counselor": "Hello, how are you?", "actor": "എനിക്ക് സഹായം വേണം."},
+            {"counselor": "I understand.", "actor": "എനിക്ക് വളരെ വിഷമമാണ്."},
+        ]
+        pd = make_prompt_data(language_dialogue_samples=samples)
+        with patch("app.core.graph.prompt.settings") as mock_settings:
+            mock_settings.USE_LANGUAGE_SAMPLE_DIALOGUES = True
+            msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        content = msg.content
+        # Sample block should be present
+        assert "Generate next dialogue" in content
+        assert "ml-IN" in content
+        assert "Example 1:" in content
+        assert "Counselor:" in content
+        assert "Client:" in content
+        assert "എനിക്ക് സഹായം വേണം." in content
+        # Full language instruction should NOT be present when using samples
+        assert "SOUTH ASIAN TYPOLOGY" not in content
+
+    def test_all_empty_samples_falls_back_to_language_instruction(self):
+        """Flag=True but samples empty -> use default language instruction."""
+        samples = ["", "", ""]
+        pd = make_prompt_data(language_dialogue_samples=samples)
+        with patch("app.core.graph.prompt.settings") as mock_settings:
+            mock_settings.USE_LANGUAGE_SAMPLE_DIALOGUES = True
+            msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        content = msg.content
+        assert "SOUTH ASIAN TYPOLOGY" in content
+        assert "Example 1:" not in content

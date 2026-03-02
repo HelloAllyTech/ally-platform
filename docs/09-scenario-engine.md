@@ -57,9 +57,7 @@ Defines the simulated client persona:
 | `response_length` | No | `VERY_BRIEF`, `BRIEF`, `MEDIUM`, or `ELABORATE` |
 | `agent_dialogues` | No | Pre-scripted dialogue options |
 | `previous_memory` | No | Summary from a previous session |
-| `cultural_context` | No | Cultural background/setting for the character (AI-generated if missing) |
-| `speaking_style` | No | Speaking style or dialect instructions (AI-generated if missing) |
-| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_default`, `context_generation_system_prompt`, etc.) |
+| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_default`, `language_instruction_non_english`, etc.) |
 | `competency` | No | Counseling competency being trained; shapes the simulation |
 
 ### ScenarioVoice and VoiceConfig
@@ -156,18 +154,8 @@ Steps:
 | `promptData.responseLength` | `response_length` |
 | `promptData.agentDialogues` | `agent_dialogues` |
 | `promptData.previousMemory` | `previous_memory` |
-| `promptData.culturalContext` | `cultural_context` |
-| `promptData.speakingStyle` | `speaking_style` |
 | `promptData.prompts` | `prompts` |
 | `promptData.competency` | `competency` |
-
-## Context Generation
-
-When `cultural_context` or `speaking_style` are missing from PromptData, `AgentWorker.configure()` calls `generate_cultural_context()` before the graph runs. This runs an LLM call using `context_generation_prompt.txt` (or backend override via `promptData.prompts`) to generate culturally appropriate context and speaking style for the target language.
-
-**File:** `app/core/agent/context_generator.py`
-
-The generated values are written back into `scenario.prompt_data` and injected into the system prompt via `_get_cultural_and_style_block()` in `app/core/graph/prompt.py`. They also feed into persona context for speech prosody generation.
 
 ## Simulation Instructions
 
@@ -195,4 +183,3 @@ Behavior instructions and state instructions extend the scenario with behavioral
 - `app/core/scenario/simulation_instructions.py` -- `SimulationBehaviorInstruction`, `SimulationStateInstruction`
 - `app/core/events/factory.py` -- `build_events_from_metadata()`
 - `app/core/agent/factory.py` -- `parse_room_metadata()`
-- `app/core/agent/context_generator.py` -- `generate_cultural_context()`

@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from langchain_core.messages import SystemMessage
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.scenario.base import (
     PromptData,
@@ -104,13 +105,79 @@ def _get_language_instruction(
         return template + "\n\n"
 
 
-def _get_cultural_and_style_block(
+def _format_language_samples(samples: List) -> str:
+    """
+    Format sample dialogues for injection into language_sample_instruction template.
+    Supports both formats:
+    - List[str]: ["utterance 1", "utterance 2", ...]
+    - List[Dict]: [{"counselor": "...", "actor": "..."}, ...] (legacy)
+    """
+    lines = []
+    for i, s in enumerate(samples, 1):
+        if isinstance(s, str) and s.strip():
+            lines.append(f"Example {i}: {s.strip()}")
+            lines.append("")
+        elif isinstance(s, dict):
+            counselor = s.get("counselor", "").strip()
+            actor = s.get("actor", "").strip()
+            if counselor or actor:
+                lines.append(f"Example {i}:")
+                if counselor:
+                    lines.append(f"  Counselor: {counselor}")
+                if actor:
+                    lines.append(f"  Client: {actor}")
+                lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _get_language_sample_block(samples: List, language_code: str) -> str:
+    """
+    Format sample dialogues for linguistic style instruction.
+    Used when USE_LANGUAGE_SAMPLE_DIALOGUES=True and prompt_data has
+    language_dialogue_samples (from ally-be/UI).
+    Template loaded from app/prompts/system/language_sample_instruction.txt.
+    """
+    if not samples:
+        return ""
+    samples_text = _format_language_samples(samples)
+    if not samples_text.strip():
+        return ""
+    template = prompt_manager.get_template("system", "language_sample_instruction")
+    if not template:
+        return ""
+    return (
+        template.format(language_code=language_code, samples=samples_text).strip()
+        + "\n\n"
+    )
+
+
+def _get_language_block(
     prompt_data: PromptData, language_code: Optional[str] = None
 ) -> str:
     """
-    Creates a formatted block for cultural context and speaking style.
-    Also adds a specific instruction if the language is not English.
+    Creates a formatted block for language instruction.
+    When USE_LANGUAGE_SAMPLE_DIALOGUES is True and prompt_data has
+    language_dialogue_samples (from ally-be when user adds them in the UI),
+    returns the sample block instead of the default language instruction.
     """
+    if (
+        settings.USE_LANGUAGE_SAMPLE_DIALOGUES
+        and prompt_data.language_dialogue_samples
+        and language_code
+    ):
+        sample_block = _get_language_sample_block(
+            prompt_data.language_dialogue_samples, language_code
+        )
+        if sample_block:
+            logger.info(
+                "%s INJECTED language_sample_block (language_code=%s, samples=%d)",
+                LOG_PREFIX,
+                language_code,
+                len(prompt_data.language_dialogue_samples),
+            )
+            return sample_block
+
+    # Default behavior: language instruction
     content = ""
     injected = []
 
@@ -120,14 +187,6 @@ def _get_cultural_and_style_block(
     content += lang_block
     if lang_block:
         injected.append("language_instruction")
-
-    if prompt_data.cultural_context:
-        content += f"**Cultural Context:**\n{prompt_data.cultural_context}\n\n"
-        injected.append("cultural_context")
-
-    if prompt_data.speaking_style:
-        content += f"**Speaking Style & Tone:**\n{prompt_data.speaking_style}\n\n"
-        injected.append("speaking_style")
 
     if injected:
         logger.info(
@@ -277,7 +336,7 @@ def _build_branching_prompt(
         character_details_parts.append(f"Gender: {prompt_data.gender}")
     character_details = ", ".join(character_details_parts)
 
-    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+    language_block = _get_language_block(prompt_data, language_code)
     competency_block = _get_competency_block(prompt_data.competency)
 
     # Only include backstory if context is provided
@@ -291,7 +350,7 @@ def _build_branching_prompt(
 
         ## Character Context
         {character_details}
-        {cultural_block}
+        {language_block}
         {backstory_block}
         {competency_block}
         ## Current Task
@@ -345,8 +404,8 @@ def _build_behavior_prompt(
         character_details_parts.append(f"Location: {prompt_data.current_location}")
     character_details = ", ".join(character_details_parts)
 
-    # Build cultural and style block
-    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+    # Build language block (samples or instruction for non-English)
+    language_block = _get_language_block(prompt_data, language_code)
 
     # Build character backstory from context (only if provided)
     backstory_block = ""
@@ -411,7 +470,7 @@ def _build_behavior_prompt(
         Character details: {character_details}
         {gender_details_block}
         {profession_block}
-        {cultural_block}
+        {language_block}
 
         {backstory_block}
         {life_history}
@@ -482,8 +541,8 @@ def _build_full_prompt(
     )
     tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
 
-    # Build cultural and style block
-    cultural_block = _get_cultural_and_style_block(prompt_data, language_code)
+    # Build language block (samples or instruction for non-English)
+    language_block = _get_language_block(prompt_data, language_code)
 
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
@@ -524,7 +583,7 @@ def _build_full_prompt(
 
     {profession_block}
 
-    {cultural_block}
+    {language_block}
 
     {_get_optional_block("Your current context", prompt_data.context)}
     {guidelines_block}
@@ -605,12 +664,9 @@ def generate_system_message(
     if next_instruction:
         msg = _build_branching_prompt(prompt_data, next_instruction, language_code)
         logger.info(
-            "%s BUILT branching prompt: language_code=%s, "
-            "has_cultural=%s, has_style=%s",
+            "%s BUILT branching prompt: language_code=%s",
             LOG_PREFIX,
             language_code or "None",
-            bool(prompt_data.cultural_context),
-            bool(prompt_data.speaking_style),
         )
         return msg
 
@@ -628,11 +684,9 @@ def generate_system_message(
             language_code,
         )
         logger.info(
-            "%s BUILT behavior prompt: language_code=%s, has_cultural=%s, has_style=%s",
+            "%s BUILT behavior prompt: language_code=%s",
             LOG_PREFIX,
             language_code or "None",
-            bool(prompt_data.cultural_context),
-            bool(prompt_data.speaking_style),
         )
         return msg
 
@@ -641,11 +695,9 @@ def generate_system_message(
     # behavior_instructions provided
     msg = _build_full_prompt(prompt_data, base_system_prompt, language_code)
     logger.info(
-        "%s BUILT full prompt: language_code=%s, has_cultural=%s, has_style=%s",
+        "%s BUILT full prompt: language_code=%s",
         LOG_PREFIX,
         language_code or "None",
-        bool(prompt_data.cultural_context),
-        bool(prompt_data.speaking_style),
     )
     return msg
 

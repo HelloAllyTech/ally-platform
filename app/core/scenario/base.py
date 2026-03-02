@@ -65,16 +65,10 @@ class PromptData(BaseModel):
         default=None,
         description="Summary from previous session for continuity",
     )
-    cultural_context: Optional[str] = Field(
-        default=None, description="Cultural background/setting for the character"
-    )
-    speaking_style: Optional[str] = Field(
-        default=None, description="Specific speaking style or dialect instructions"
-    )
     prompts: Optional[Dict[str, str]] = Field(
         default=None,
         description="Editable prompt templates from backend (promptData.prompts). "
-        "Keys: ally_ai_learn_default, ally_ai_learn_context_generation, etc. "
+        "Keys: ally_ai_learn_default, language_instruction_non_english, etc. "
         "Used only when present and different from local prompts.",
     )
     competency: Optional[str] = Field(
@@ -82,6 +76,16 @@ class PromptData(BaseModel):
         description="The counseling competency being trained in this simulation. "
         "When set, the simulation is shaped to help the counselor practice and "
         "learn this specific competency.",
+    )
+    language_dialogue_samples: Optional[List] = Field(
+        default=None,
+        description=(
+            "Sample utterances for linguistic style in target language. "
+            "When present for non-English, used instead of "
+            "language_instruction_non_english. Format: "
+            '["utterance 1", "utterance 2", ...] or legacy '
+            '[{"counselor": "...", "actor": "..."}, ...]'
+        ),
     )
 
 
@@ -299,10 +303,12 @@ class Scenario(BaseModel):
                 "response_length": prompt_data_dict.get("responseLength"),
                 "agent_dialogues": prompt_data_dict.get("agentDialogues"),
                 "previous_memory": prompt_data_dict.get("previousMemory", None),
-                "cultural_context": prompt_data_dict.get("culturalContext", None),
-                "speaking_style": prompt_data_dict.get("speakingStyle", None),
                 "prompts": prompt_data_dict.get("prompts"),
                 "competency": prompt_data_dict.get("competency", None),
+                "language_dialogue_samples": prompt_data_dict.get(
+                    "languageDialogueSamples"
+                )
+                or prompt_data_dict.get("language_dialogue_samples"),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

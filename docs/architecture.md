@@ -94,7 +94,6 @@ flowchart TB
 | STT Factory | `app/stt/factory.py` | Create STT clients (3 providers) |
 | LLM Factory | `app/llms/factory.py` | Create LLM clients (4 providers) |
 | Scenario Engine | `app/core/scenario/base.py` | Parse metadata into `Scenario` objects |
-| Context Generator | `app/core/agent/context_generator.py` | AI-generate cultural_context, speaking_style when missing |
 | Agent Factory | `app/core/agent/factory.py` | Parse metadata, configure clients, create agent |
 | Branching System | `app/core/branching_instructions/` | Variable substitution in instructions |
 | Speech Prosody | `app/speech_prosody/` | Voice expression parameter generation |
@@ -162,6 +161,5 @@ Both types are sent to Core (SQS). Only ACTIVE events generate `BranchingAndFeed
 - `app/worker.py` -- AgentWorker lifecycle
 - `app/core/graph/graph_builder.py` -- `build_simulation_graph()`, `build_report_graph()`
 - `app/core/agent/factory.py` -- `parse_room_metadata()`, client configuration, agent creation
-- `app/core/agent/context_generator.py` -- `generate_cultural_context()`
 - `app/core/config.py` -- Settings from environment
 - `app/core/constants.py` -- Enums and constants

@@ -18,8 +18,6 @@ logger = get_logger(__name__)
 # Mapping: backend key -> (file_key, prompt_key) for local fallback
 BACKEND_TO_LOCAL = {
     "ally_ai_learn_default": ("system", "default_system_prompt"),
-    "ally_ai_learn_context_generation": ("system", "context_generation_prompt"),
-    "context_generation_system_prompt": ("system", "context_generation_prompt"),
     "language_instruction_non_english": ("system", "language_instruction_non_english"),
     "ally_ai_learn_prosody_generation": ("prosody", "default_generation_prompt"),
     "ally_ai_learn_prosody_unified": ("prosody", "unified_prompt_with_enhancement"),

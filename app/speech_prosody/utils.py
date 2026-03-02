@@ -16,8 +16,6 @@ PERSONA_CONTEXT_FIELDS = {
     "emotional_needs": "Emotional Needs",
     "starting_state": "Starting State",
     "context": "Context",
-    "cultural_context": "Cultural Context",
-    "speaking_style": "Speaking Style",
 }
 
 

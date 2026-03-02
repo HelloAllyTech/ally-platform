@@ -1,6 +1,42 @@
 from enum import Enum
 from typing import Dict, Final
 
+# BCP-47 language code -> explicit language name (avoids model confusion)
+# Used by generate_language_samples and other language-aware features
+LANGUAGE_CODE_TO_NAME: Final[Dict[str, str]] = {
+    "ml": "Malayalam",
+    "ml-IN": "Malayalam",
+    "hi": "Hindi",
+    "hi-IN": "Hindi",
+    "bn": "Bengali",
+    "bn-IN": "Bengali",
+    "ta": "Tamil",
+    "ta-IN": "Tamil",
+    "te": "Telugu",
+    "te-IN": "Telugu",
+    "kn": "Kannada",
+    "kn-IN": "Kannada",
+    "mr": "Marathi",
+    "mr-IN": "Marathi",
+    "gu": "Gujarati",
+    "gu-IN": "Gujarati",
+    "pa": "Punjabi",
+    "pa-IN": "Punjabi",
+    "ur": "Urdu",
+    "ur-IN": "Urdu",
+    "or": "Odia",
+    "or-IN": "Odia",
+    "as": "Assamese",
+    "as-IN": "Assamese",
+}
+
+
+def get_language_name_from_code(code: str) -> str:
+    """Return language name for BCP-47 code; fallback to code if unknown."""
+    base = code.split("-")[0]
+    return LANGUAGE_CODE_TO_NAME.get(code, LANGUAGE_CODE_TO_NAME.get(base, code))
+
+
 # Default language code when not specified
 DEFAULT_LANGUAGE_CODE: Final[str] = "en-IN"
 
@@ -102,9 +138,7 @@ class ExpressionType(str, Enum):
 
 # Core service endpoint paths
 AUTH_VERIFY_ENDPOINT: Final[str] = "/api/v1/authorization/permissions/validate"
-SCENARIO_REPORT_WEBHOOK_ENDPOINT: Final[str] = (
-    "/api/v1/learn/scenarios/reports/webhook"
-)
+SCENARIO_REPORT_WEBHOOK_ENDPOINT: Final[str] = "/api/v1/learn/scenarios/reports/webhook"
 
 # Worker configuration constants
 DEFAULT_VAD_ACTIVATION_THRESHOLD: Final[float] = 0.7

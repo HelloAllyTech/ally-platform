@@ -87,9 +87,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -194,9 +193,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -283,9 +281,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -363,9 +360,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -463,9 +459,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -533,9 +528,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -625,9 +619,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -722,9 +715,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 
@@ -800,9 +792,8 @@ class TestGenerateResponse:
                 "agent_dialogues": None,
                 "prompt": None,
                 "previous_memory": None,
-                "cultural_context": None,
-                "speaking_style": None,
                 "competency": None,
+                "language_dialogue_samples": None,
             },
         )()
 

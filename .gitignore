@@ -223,6 +223,7 @@ Thumbs.db
 Dockerfile.dev
 
 # Application specific
+data/
 uploads/
 media/
 static/collected/

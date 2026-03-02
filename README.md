@@ -148,8 +148,7 @@ ally-learn-core/
 │   │   └── dependencies.py              # Auth, token verification
 │   ├── core/
 │   │   ├── agent/                       # Agent setup and utilities
-│   │   │   ├── factory.py               # parse_room_metadata, client config, agent creation
-│   │   │   └── context_generator.py     # AI-generated cultural_context, speaking_style
+│   │   │   └── factory.py               # parse_room_metadata, client config, agent creation
 │   │   ├── config.py                    # Application configuration
 │   │   ├── constants.py                 # Constants and enums
 │   │   ├── embeddings/                 # Embedding clients (OpenAI)

@@ -9,7 +9,6 @@ from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
 from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 
-from app.core.agent.context_generator import generate_cultural_context
 from app.core.agent.factory import (
     cleanup_background_tasks,
     configure_llm_client,
@@ -142,48 +141,6 @@ class AgentWorker:
         except Exception as e:
             logger.error(f"[AgentWorker] Failed to configure prosody: {e}")
             logger.info(f"[AgentWorker] Phase 1: Prosody configuration failed: {e}")
-
-        # Automatic Context Generation for Multilingual Support
-        try:
-            logger.info(
-                "[AgentWorker] Phase 1: Generating cultural context if needed..."
-            )
-
-            # Robust language code resolution
-            language_code = "en-US"
-            if (
-                self.scenario.language_config
-                and self.scenario.language_config.language_code
-            ):
-                language_code = self.scenario.language_config.language_code
-
-            logger.info(
-                "[SIMULATION_PROMPT] [AgentWorker] room=%s language_code=%s "
-                "context_generation starting",
-                self.ctx.room.name,
-                language_code,
-            )
-
-            # Generate Cultural Context & Style (if missing) + Translate Openings
-            cultural, style = await generate_cultural_context(
-                self.scenario.prompt_data, language_code, self.llm_client
-            )
-
-            # Update scenario prompt data with generated context
-            if cultural:
-                self.scenario.prompt_data.cultural_context = cultural
-            if style:
-                self.scenario.prompt_data.speaking_style = style
-
-            logger.info(
-                "[SIMULATION_PROMPT] [AgentWorker] room=%s context_generation complete "
-                "cultural=%s style=%s",
-                self.ctx.room.name,
-                bool(cultural),
-                bool(style),
-            )
-        except Exception as e:
-            logger.error(f"[AgentWorker] Failed to generate cultural context: {e}")
 
         logger.info("[AgentWorker] Configuration phase complete")
         # Get defaults from prosody service (single source of truth)

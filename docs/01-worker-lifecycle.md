@@ -39,8 +39,7 @@ sequenceDiagram
 4. **Create TTS client** -- via `configure_tts_client()` using scenario voice config
 5. **Create LLM client** -- via `configure_llm_client()` using scenario language config
 6. **Generate default prosody** -- `SpeechProsodyService.generate_and_set_defaults()` uses the LLM to generate default voice expression parameters based on the persona
-7. **Generate cultural context** -- `generate_cultural_context()` AI-generates `cultural_context` and `speaking_style` when missing from PromptData (for multilingual support)
-8. **Initialize graph state** -- `initialize_agent_state()` sets up the LangGraph thread
+7. **Initialize graph state** -- `initialize_agent_state()` sets up the LangGraph thread
 
 After this phase, `worker.scenario`, `worker.tts_client`, `worker.stt_client`, `worker.llm_client`, and `worker.embedding_client` are all populated.
 
@@ -126,5 +125,4 @@ The entrypoint keeps alive by waiting on either `_termination_event` or `_room_d
 
 - `app/worker.py` -- `AgentWorker`, `entrypoint()`, `prewarm()`
 - `app/core/agent/factory.py` -- `parse_room_metadata()`, `configure_stt_client()`, `configure_tts_client()`, `configure_llm_client()`, `create_agent_with_adapter()`
-- `app/core/agent/context_generator.py` -- `generate_cultural_context()`
 - `app/core/events/handlers.py` -- callback creation functions

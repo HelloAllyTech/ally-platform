@@ -153,6 +153,13 @@ class Settings(BaseSettings):
             "'back_translation', 'none'"
         ),
     )
+    USE_LANGUAGE_SAMPLE_DIALOGUES: bool = Field(
+        default=False,
+        description=(
+            "When True: use language_dialogue_samples from promptData instead of "
+            "language instruction. Samples from ally-be when user adds them in the UI."
+        ),
+    )
     EVALUATION_LOG_DIR: Optional[str] = Field(
         default="evaluation_logs",
         description="Directory to store evaluation logs",
