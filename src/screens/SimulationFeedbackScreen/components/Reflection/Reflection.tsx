@@ -1,6 +1,15 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Keyboard, Pressable, Text, TextInput, View} from 'react-native';
-import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
+import {
+  Dimensions,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {ms} from 'react-native-size-matters';
 
 import {useErrorToast} from '@/components';
 import {useTranslate} from '@/hooks';
@@ -19,6 +28,7 @@ interface ReflectionProps {
 }
 
 const DEBOUNCE_DELAY = 1500;
+const SCROLL_PADDING = ms(40);
 
 export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   const {t} = useTranslate();
@@ -27,6 +37,12 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
     useState<ReflectionPrompt[]>();
 
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const scrollViewRef = useRef<ScrollView>(null);
+  const inputRefs = useRef<Record<string, TextInput | null>>({});
+  const focusedInputId = useRef<string | null>(null);
+  const scrollOffsetRef = useRef(0);
+  const isKeyboardVisible = useRef(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const {data: reflectionPromptsData} = useGetReflectionPromptsQuery({
     scenarioSessionId,
@@ -46,6 +62,61 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
       Object.values(timers).forEach(clearTimeout);
     };
   }, []);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, e => {
+      const kbHeight = e.endCoordinates.height;
+      setKeyboardHeight(kbHeight);
+
+      if (!isKeyboardVisible.current) {
+        isKeyboardVisible.current = true;
+        setTimeout(() => {
+          const promptId = focusedInputId.current;
+          const inputRef = promptId ? inputRefs.current[promptId] : null;
+          if (!inputRef || !scrollViewRef.current) {
+            return;
+          }
+          inputRef.measureInWindow((_x, y, _w, h) => {
+            if (y === undefined || y === null) {
+              return;
+            }
+            const screenHeight = Dimensions.get('window').height;
+            const keyboardTop = screenHeight - kbHeight;
+            const inputBottom = y + h;
+            if (inputBottom > keyboardTop - SCROLL_PADDING) {
+              const delta = inputBottom - keyboardTop + SCROLL_PADDING;
+              scrollViewRef.current?.scrollTo({
+                y: scrollOffsetRef.current + delta,
+                animated: true,
+              });
+            }
+          });
+        }, 350);
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+      isKeyboardVisible.current = false;
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleScroll = useCallback(
+    (e: {nativeEvent: {contentOffset: {y: number}}}) => {
+      scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+    },
+    [],
+  );
 
   const savePromptResponse = useCallback(
     async (reflectionPromptId: string, promptId: string, response: string) => {
@@ -86,14 +157,18 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
 
   return (
     <SummaryCard title={t('SimulationFeedback.reflection.sectionTitle')}>
-      <KeyboardAwareScrollView
+      <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          keyboardHeight > 0 && {paddingBottom: keyboardHeight},
+        ]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        enableOnAndroid
-        extraScrollHeight={0}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}>
         {reflectionPrompts && reflectionPrompts.length > 0 ? (
           reflectionPrompts.map((prompt, index) => (
             <Pressable
@@ -107,6 +182,9 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
               </View>
               <Text style={styles.promptText}>{prompt.prompt}</Text>
               <TextInput
+                ref={ref => {
+                  inputRefs.current[prompt.id] = ref;
+                }}
                 style={styles.textInput}
                 placeholder={t('SimulationFeedback.reflection.placeholder')}
                 placeholderTextColor={colors.ds.typography.lowEmphasis}
@@ -114,7 +192,14 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
                 onChangeText={value =>
                   handleResponseChange(prompt.id, prompt.promptId, value)
                 }
+                onFocus={() => {
+                  focusedInputId.current = prompt.id;
+                }}
+                onBlur={() => {
+                  focusedInputId.current = null;
+                }}
                 multiline
+                scrollEnabled
                 textAlignVertical="top"
               />
             </Pressable>
@@ -124,7 +209,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
             {t('SimulationFeedback.reflection.noPromptsAvailable')}
           </Text>
         )}
-      </KeyboardAwareScrollView>
+      </ScrollView>
     </SummaryCard>
   );
 };
