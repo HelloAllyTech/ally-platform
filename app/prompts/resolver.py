@@ -21,6 +21,7 @@ BACKEND_TO_LOCAL = {
     "ally_ai_learn_prosody_generation": ("prosody", "default_generation_prompt"),
     "ally_ai_learn_prosody_unified": ("prosody", "unified_prompt_with_enhancement"),
     "ally_ai_learn_prosody_parameters_only": ("prosody", "parameters_only_prompt"),
+    "ally_ai_learn_counselor_report": ("counselor", "report_generation_prompt"),
 }
 
 

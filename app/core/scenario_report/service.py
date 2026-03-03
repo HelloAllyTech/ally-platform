@@ -33,6 +33,7 @@ from app.core.scenario_report.schemas import (
     TranscriptEntry,
 )
 from app.llms import create_llm_client
+from app.prompts.resolver import resolve_template
 
 logger = get_logger(__name__)
 
@@ -147,6 +148,31 @@ class ScenarioReportService:
         if term_config and term_config.termination_message:
             return term_config.termination_message
         return None
+
+    def _build_counselor_prompt(self, language_code: str, custom_prompt: str) -> str:
+        """
+        Build the counselor system prompt with dynamic language code
+        and custom prompt injection.
+
+        Args:
+            language_code: BCP 47 language code (e.g., 'en-US', 'hi-IN')
+            custom_prompt: Custom counselor instructions from the request
+
+        Returns:
+            Complete system prompt with both placeholders injected
+        """
+        template = resolve_template("ally_ai_learn_counselor_report")
+        if not template:
+            logger.warning(
+                "Counselor template not found, using custom prompt only (report_id=%s)",
+                self._request.report_id,
+            )
+            return custom_prompt
+
+        return template.format(
+            language_code=language_code,
+            custom_prompt=custom_prompt.strip() if custom_prompt else "",
+        )
 
     async def _send_webhook(self, payload: ScenarioReportWebhookPayload) -> None:
         """PATCH the report payload to the core backend webhook."""
@@ -273,8 +299,13 @@ class ScenarioReportService:
             )
             self._record_transcript(opening, "CLIENT")
 
+            counselor_system_prompt = self._build_counselor_prompt(
+                language_code=req.language,
+                custom_prompt=req.prompt,
+            )
+
             counselor_messages = [
-                SystemMessage(content=req.prompt),
+                SystemMessage(content=counselor_system_prompt),
                 HumanMessage(content=opening),
             ]
 
@@ -346,7 +377,7 @@ class ScenarioReportService:
             eval_result = await evaluate_transcript(
                 transcripts=self._transcripts,
                 prompt_data=scenario.prompt_data,
-                counselor_prompt=req.prompt,
+                counselor_prompt=counselor_system_prompt,
             )
 
             # Check if evaluation failed (all metrics are zero)
