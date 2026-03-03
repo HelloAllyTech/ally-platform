@@ -36,7 +36,10 @@ import {ThreadsBottomSheetProps} from './types';
 
 const LIMIT = 20;
 
-type TabKey = 'inline' | 'general';
+enum TABS {
+  INLINE = 'INLINE',
+  GENERAL = 'GENERAL',
+}
 
 const GRADIENT_COLORS = [
   colors.whiteTransparent0,
@@ -77,8 +80,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const routes = useMemo(
     () => [
-      {key: 'inline' as const, title: t('ThreadsBottomSheet.tabInline')},
-      {key: 'general' as const, title: t('ThreadsBottomSheet.tabGeneral')},
+      {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
+      {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
     ],
     [t],
   );
@@ -87,7 +90,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     setTabIndex(index);
   }, []);
 
-  const activeTab: TabKey = routes[tabIndex]?.key as TabKey;
+  const activeTab = routes[tabIndex]?.key as TABS;
 
   // --- Inline tab state ---
   const [getThreads, {data: apiData, isLoading, isFetching}] =
@@ -345,7 +348,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const renderGeneralTab = () => {
     return (
       <GeneralCommentsList
-        visible={visible && activeTab === 'general'}
+        visible={visible && activeTab === TABS.GENERAL}
         reviewId={reviewId}
         reviewOwnerId={reviewOwnerId}
         onAddReactionPress={onAddReactionPress}
@@ -360,9 +363,9 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const renderScene = useCallback(
     ({route: sceneRoute}: {route: {key: string}}) => {
       switch (sceneRoute.key) {
-        case 'inline':
+        case TABS.INLINE:
           return renderInlineTab();
-        case 'general':
+        case TABS.GENERAL:
           return renderGeneralTab();
         default:
           return null;
@@ -394,7 +397,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       keyboardBlurBehavior="restore"
       failOffsetX={[-5, 5]}
       footerComponent={
-        activeTab === 'general' ? renderFooterComponent : undefined
+        activeTab === TABS.GENERAL ? renderFooterComponent : undefined
       }>
       <View style={styles.container}>
         <View style={styles.header}>
