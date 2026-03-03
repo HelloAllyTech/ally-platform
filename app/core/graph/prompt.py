@@ -139,8 +139,7 @@ def _get_language_block(
     if not language_code or language_code.startswith("en"):
         return ""
 
-    use_samples = getattr(prompt_data, "use_linguistic_style_samples", True)
-    samples = prompt_data.language_dialogue_samples if use_samples else None
+    samples = prompt_data.language_dialogue_samples
 
     block = _get_language_sample_block(samples, language_code)
     if not block or not block.strip():

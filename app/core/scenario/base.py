@@ -90,14 +90,6 @@ class PromptData(BaseModel):
             '[{"counselor": "...", "actor": "..."}, ...].'
         ),
     )
-    use_linguistic_style_samples: Optional[bool] = Field(
-        default=True,
-        description=(
-            "When True: use language_dialogue_samples when present. "
-            "When False: no language block is added. Kept for backward "
-            "compatibility with backend."
-        ),
-    )
 
 
 class VoiceConfig(BaseModel):
@@ -320,9 +312,6 @@ class Scenario(BaseModel):
                     "languageDialogueSamples"
                 )
                 or prompt_data_dict.get("language_dialogue_samples"),
-                "use_linguistic_style_samples": prompt_data_dict.get(
-                    "useLinguisticStyleSamples", True
-                ),
             }
 
             prompt_data_obj = PromptData(**mapped_data)
