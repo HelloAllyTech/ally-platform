@@ -70,8 +70,6 @@ export {ReplyBottomSheet} from './ReplyBottomSheet';
 export type {ReplyBottomSheetProps} from './ReplyBottomSheet';
 export {ReviewComment} from './ReviewComment';
 export type {ReviewCommentProps} from './ReviewComment';
-export {SelectableTextArea} from './SelectableTextArea';
-export type {SelectableTextAreaProps} from './SelectableTextArea';
 export {CommentInput} from './CommentInput';
 export type {CommentInputProps} from './CommentInput';
 export {Conversation} from './Conversation';
