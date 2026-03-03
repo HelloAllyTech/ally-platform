@@ -38,7 +38,7 @@ export interface SelectionData {
   endPartOffset?: number;
 }
 
-export interface CommentableTextInputProps {
+export interface IosCommentableTextProps {
   messageId: string;
   isActive?: boolean;
   requestCloseSignal?: number;
@@ -138,7 +138,7 @@ const normalizeTextStyle = (style?: StyleProp<TextStyle>) => {
   };
 };
 
-export const CommentableTextInput: React.FC<CommentableTextInputProps> = ({
+export const IosCommentableText: React.FC<IosCommentableTextProps> = ({
   messageId,
   isActive = true,
   requestCloseSignal,

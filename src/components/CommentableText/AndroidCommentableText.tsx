@@ -31,7 +31,7 @@ export interface ThreadPressEvent {
   end: number;
 }
 
-export interface AndroidCommentMessageRowProps {
+export interface AndroidCommentableTextProps {
   /** Which message this selection wrapper belongs to */
   messageId: string;
   /** Labels for the floating selection menu (default: ["Add comment"]) */
@@ -64,9 +64,9 @@ interface NativeProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const NativeAndroidCommentMessageRow =
+const NativeAndroidCommentableTextInput =
   Platform.OS === 'android'
-    ? requireNativeComponent<NativeProps>('AndroidCommentMessageRow')
+    ? requireNativeComponent<NativeProps>('CommentableTextView')
     : null;
 
 // ─── JS Wrapper ──────────────────────────────────────────────────
@@ -74,30 +74,8 @@ const NativeAndroidCommentMessageRow =
 /**
  * Android-only native wrapper that enables text selection on the
  * React Native <Text> rendered as its children.
- *
- * Follows the same pattern as `@rob117/react-native-selectable-text`:
- *   - Native FrameLayout wraps the RN children
- *   - Finds the underlying ReactTextView
- *   - Calls setTextIsSelectable(true)
- *   - Shows a floating ActionMode menu on selection
- *   - Emits selection indices when a menu item is tapped
- *
- * On iOS this is a no-op passthrough (iOS has its own implementation).
- *
- * Usage:
- * ```tsx
- * <AndroidCommentMessageRow
- *   messageId={item.id}
- *   onSelectionChange={(e) => handleSelection(e)}>
- *   <Text style={styles.message}>
- *     {parts.map(p => <Text key={p.id} style={...}>{p.text}</Text>)}
- *   </Text>
- * </AndroidCommentMessageRow>
- * ```
  */
-export const AndroidCommentMessageRow: React.FC<
-  AndroidCommentMessageRowProps
-> = ({
+export const AndroidCommentableText: React.FC<AndroidCommentableTextProps> = ({
   messageId,
   menuOptions = ['Add comment'],
   onSelectionChange,
@@ -121,13 +99,12 @@ export const AndroidCommentMessageRow: React.FC<
     [onSingleTap],
   );
 
-  // Guard: render passthrough on iOS
-  if (Platform.OS !== 'android' || !NativeAndroidCommentMessageRow) {
+  if (Platform.OS !== 'android' || !NativeAndroidCommentableTextInput) {
     return <View style={style}>{children}</View>;
   }
 
   return (
-    <NativeAndroidCommentMessageRow
+    <NativeAndroidCommentableTextInput
       messageId={messageId}
       menuOptions={menuOptions}
       clearSelectionSignal={clearSelectionSignal}
@@ -136,8 +113,8 @@ export const AndroidCommentMessageRow: React.FC<
       onSingleTap={handleSingleTap}
       style={style}>
       {children}
-    </NativeAndroidCommentMessageRow>
+    </NativeAndroidCommentableTextInput>
   );
 };
 
-export default AndroidCommentMessageRow;
+export default AndroidCommentableText;
