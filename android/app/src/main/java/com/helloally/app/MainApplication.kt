@@ -11,7 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
-import com.helloally.app.commentabletext.AndroidCommentMessageRowPackage
+import com.helloally.app.commentableText.CommentableTextViewPackage
 import com.livekit.reactnative.LiveKitReactNative
 import com.livekit.reactnative.audio.AudioType
 
@@ -22,7 +22,7 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               // Packages that cannot be autolinked yet can be added manually here, for example:
-              add(AndroidCommentMessageRowPackage())
+              add(CommentableTextViewPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

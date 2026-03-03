@@ -1,4 +1,4 @@
-package com.helloally.app.commentabletext
+package com.helloally.app.commentableText
 
 import android.content.Context
 import android.graphics.Color
@@ -22,8 +22,6 @@ import android.widget.TextView
  * A FrameLayout that wraps React Native <Text> children and enables
  * native text selection on the underlying ReactTextView.
  *
- * This follows the **exact same pattern** as the working
- * `@rob117/react-native-selectable-text` library:
  *
  *   1. Accept RN children via ViewGroupManager
  *   2. Recursively find the first TextView in the child hierarchy
@@ -34,7 +32,7 @@ import android.widget.TextView
  * emit the selection start/end indices + selected text via a callback,
  * so the JS side can use them for "Add comment" functionality.
  */
-class AndroidCommentMessageRowView : FrameLayout {
+class CommentableTextView : FrameLayout {
 
     private var menuOptions: Array<String> = arrayOf("Add comment")
     private var textView: TextView? = null
@@ -85,24 +83,21 @@ class AndroidCommentMessageRowView : FrameLayout {
     // =====================================================================
 
     private fun setupTextView() {
-        // Recursively find the first TextView in the view hierarchy
         textView = findTextViewRecursive(this)
         if (textView != null) {
-            android.util.Log.d("AndroidCommentMsgRow", "Found TextView: ${textView!!.javaClass.simpleName}")
+            android.util.Log.d("CommentableTextView", "Found TextView: ${textView!!.javaClass.simpleName}")
             setupSelectionCallback(textView!!)
         } else {
-            android.util.Log.w("AndroidCommentMsgRow", "No TextView found. Child count: $childCount")
+            android.util.Log.w("CommentableTextView", "No TextView found. Child count: $childCount")
             logViewHierarchy(this, 0)
         }
     }
 
     private fun findTextViewRecursive(view: View): TextView? {
-        // Check if current view is a TextView (including subclasses like ReactTextView)
         if (view is TextView) {
             return view
         }
 
-        // Recursively search in child views
         if (view is ViewGroup) {
             for (i in 0 until view.childCount) {
                 val child = view.getChildAt(i)
@@ -116,7 +111,7 @@ class AndroidCommentMessageRowView : FrameLayout {
     private fun logViewHierarchy(view: View, depth: Int) {
         val indent = "  ".repeat(depth)
         android.util.Log.d(
-            "AndroidCommentMsgRow",
+            "CommentableTextView",
             "$indent${view.javaClass.simpleName} (children: ${if (view is ViewGroup) view.childCount else 0})"
         )
 
@@ -133,13 +128,10 @@ class AndroidCommentMessageRowView : FrameLayout {
 
     private fun setupSelectionCallback(tv: TextView) {
         tv.setTextIsSelectable(true)
-        // Explicit highlight colour so selection is visible regardless of theme
         tv.highlightColor = Color.argb(80, 33, 150, 243) // semi-transparent blue
 
         tv.customSelectionActionModeCallback = object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
-                // If selection is entirely within the non-selectable prefix,
-                // reject the ActionMode so "Add comment" never appears.
                 if (prefixLength > 0) {
                     val s = tv.selectionStart
                     val e = tv.selectionEnd
@@ -159,17 +151,14 @@ class AndroidCommentMessageRowView : FrameLayout {
             }
 
             override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
-                // Clamp to exclude the non-selectable prefix (sender name)
                 val rawStart = maxOf(tv.selectionStart, prefixLength)
                 val rawEnd   = maxOf(tv.selectionEnd,   prefixLength)
 
-                // If user only selected within the prefix, ignore
                 if (rawStart >= rawEnd) {
                     mode?.finish()
                     return true
                 }
 
-                // Adjust indices so they are relative to message content only
                 val adjustedStart = rawStart - prefixLength
                 val adjustedEnd   = rawEnd   - prefixLength
                 val selectedText  = tv.text.toString().substring(rawStart, rawEnd)
@@ -185,9 +174,6 @@ class AndroidCommentMessageRowView : FrameLayout {
             override fun onDestroyActionMode(mode: ActionMode?) {}
         }
 
-        // ── Single-tap detector for thread taps ──
-        // onSingleTapConfirmed fires ONLY for genuine single taps —
-        // never for long-press (selection) or double-tap (word select).
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
 
@@ -195,11 +181,10 @@ class AndroidCommentMessageRowView : FrameLayout {
                 val listener = onSingleTapListener ?: return false
                 val layout = tv.layout ?: return false
 
-                // Convert coordinates from FrameLayout space → TextView text space
                 val tvLoc = IntArray(2)
                 val myLoc = IntArray(2)
                 tv.getLocationOnScreen(tvLoc)
-                this@AndroidCommentMessageRowView.getLocationOnScreen(myLoc)
+                this@CommentableTextView.getLocationOnScreen(myLoc)
 
                 val textX = e.x + myLoc[0] - tvLoc[0] - tv.totalPaddingLeft + tv.scrollX
                 val textY = e.y + myLoc[1] - tvLoc[1] - tv.totalPaddingTop + tv.scrollY
@@ -207,7 +192,6 @@ class AndroidCommentMessageRowView : FrameLayout {
                 val line = layout.getLineForVertical(textY.toInt())
                 val offset = layout.getOffsetForHorizontal(line, textX)
 
-                // Adjust for prefix so offset is relative to message content
                 val adjustedOffset = offset - prefixLength
                 if (adjustedOffset < 0) return false
 
@@ -237,7 +221,6 @@ class AndroidCommentMessageRowView : FrameLayout {
     private fun ensureSelectionClamp() {
         val tv = textView ?: return
         val text = tv.text as? Spannable ?: return
-        // Already watching this exact object – nothing to do
         if (text === watchedSpannable) return
         watchedSpannable = text
 
@@ -247,7 +230,6 @@ class AndroidCommentMessageRowView : FrameLayout {
                 ostart: Int, oend: Int, nstart: Int, nend: Int
             ) {
                 if (isClampingSelection || prefixLength <= 0) return
-                // Only react to the two selection-position spans
                 if (what !== Selection.SELECTION_START && what !== Selection.SELECTION_END) return
 
                 val selStart = Selection.getSelectionStart(buf)
@@ -259,7 +241,6 @@ class AndroidCommentMessageRowView : FrameLayout {
                     val cs = maxOf(selStart, prefixLength)
                     val ce = maxOf(selEnd, prefixLength)
                     if (cs >= ce) {
-                        // Entire selection is within the prefix → clear it
                         Selection.removeSelection(buf)
                     } else {
                         Selection.setSelection(buf, cs, ce)
@@ -281,8 +262,6 @@ class AndroidCommentMessageRowView : FrameLayout {
         if (prefixLength > 0 && event.action == MotionEvent.ACTION_DOWN) {
             ensureSelectionClamp()
         }
-        // Feed ALL events to the gesture detector so it can distinguish
-        // single-tap from long-press and double-tap.
         gestureDetector?.onTouchEvent(event)
         return super.dispatchTouchEvent(event)
     }
@@ -294,19 +273,16 @@ class AndroidCommentMessageRowView : FrameLayout {
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (changed && textView == null) {
-            // Post to ensure all child views are laid out
             post { setupTextView() }
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        // Use ViewTreeObserver to wait for layout to complete
         if (textView == null && layoutObserver == null) {
             layoutObserver = ViewTreeObserver.OnGlobalLayoutListener {
                 if (textView == null) {
                     setupTextView()
-                    // Remove observer after first successful setup
                     viewTreeObserver.removeOnGlobalLayoutListener(layoutObserver)
                     layoutObserver = null
                 }
