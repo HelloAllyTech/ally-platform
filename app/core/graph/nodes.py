@@ -965,6 +965,27 @@ async def send_event_feedback(
     }
 
 
+async def clear_events_and_detected_data(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Clear events and detected events data for report builder graph.
+
+    This node is used specifically in the report graph to ensure
+    clean state by clearing all event-related data structures including
+    detected events and feedback data.
+
+    Returns:
+        Dictionary with cleared event data structures
+    """
+    return {
+        "branching_and_feedback_data": [],
+        "non_branching_feedback_data": [],
+        "feedback_to_send": None,
+        "behavior_feedback_data": [],
+    }
+
+
 async def apply_voice_expressions(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> SimulationState:

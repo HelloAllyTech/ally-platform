@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.graph.nodes import (
+    clear_events_and_detected_data,
     detect_behaviors,
     generate_response,
     process_events,
@@ -146,7 +147,8 @@ def build_report_graph() -> StateGraph:
 
     Flow:
         START → process_events → resolve_branching_instruction
-              → [generate_response, detect_behaviors] (parallel) → END
+              → [generate_response, detect_behaviors] (parallel)
+              → clear_events_and_detected_data → END
     """
     graph = StateGraph(SimulationState)
 
@@ -164,6 +166,9 @@ def build_report_graph() -> StateGraph:
     # Behavior detection is valuable for report generation to track user behaviors
     graph.add_node("detect_behaviors", detect_behaviors)
 
+    # Add clear_events_and_detected_data node to clean up event data
+    graph.add_node("clear_events_and_detected_data", clear_events_and_detected_data)
+
     graph.add_edge(START, "process_events")
     graph.add_edge("process_events", "resolve_branching_instruction")
 
@@ -171,8 +176,11 @@ def build_report_graph() -> StateGraph:
     graph.add_edge("resolve_branching_instruction", "generate_response")
     graph.add_edge("resolve_branching_instruction", "detect_behaviors")
 
-    # Both nodes complete independently and lead to END
-    graph.add_edge("generate_response", END)
-    graph.add_edge("detect_behaviors", END)
+    # Fan-in: [generate_response, detect_behaviors] → clear_events_and_detected_data
+    graph.add_edge("generate_response", "clear_events_and_detected_data")
+    graph.add_edge("detect_behaviors", "clear_events_and_detected_data")
+
+    # Clear events data and lead to END
+    graph.add_edge("clear_events_and_detected_data", END)
 
     return graph
