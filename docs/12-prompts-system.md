@@ -21,7 +21,7 @@ app/prompts/
 ├── system/                 # System prompts for simulation
 │   ├── default_system_prompt.txt
 │   ├── context_generation_prompt.txt
-│   └── language_instruction_non_english.txt
+│   └── language_sample_instruction.txt
 └── prosody/                # Prosody generation prompts
     ├── default_generation_prompt.txt
     ├── unified_prompt_with_enhancement.txt
@@ -53,18 +53,15 @@ Loads all `.txt` files from subdirectories. Expects structure: `<file_key>/<prom
 | `ally_ai_learn_default` | `system/default_system_prompt` | System prompt |
 | `ally_ai_learn_context_generation` | `system/context_generation_prompt` | Context generator |
 | `context_generation_system_prompt` | `system/context_generation_prompt` | Context generator |
-| `language_instruction_non_english` | `system/language_instruction_non_english` | Non-English language instruction |
 | `ally_ai_learn_prosody_generation` | `prosody/default_generation_prompt` | Prosody default params |
 | `ally_ai_learn_prosody_unified` | `prosody/unified_prompt_with_enhancement` | Prosody runtime (params + text) |
 | `ally_ai_learn_prosody_parameters_only` | `prosody/parameters_only_prompt` | Prosody runtime (params only) |
 
-## Language Instruction
+## Language Instruction (Non-English)
 
-When the scenario language is non-English (`language_code` not starting with `"en"`), the system injects a language instruction block into the system prompt. This is resolved via `resolve_template("language_instruction_non_english", backend_prompts)` and formatted with `{language_code}`.
+For non-English scenarios (`language_code` not starting with `"en"`), the system always injects a language block. The base instruction tells the LLM to generate in the target language. When `promptData.languageDialogueSamples` is present and non-empty, a "Follow the following linguistic style" section with examples is appended. When samples are missing or empty, only the base instruction is included.
 
-**File:** `app/core/graph/prompt.py:_get_language_instruction()`
-
-The language instruction is injected in `_get_language_block()`.
+**File:** `app/core/graph/prompt.py:_get_language_block()`, `_get_language_sample_block()`
 
 ## Configuration
 
@@ -78,4 +75,4 @@ The language instruction is injected in `_get_language_block()`.
 
 - `app/prompts/manager.py` -- `PromptManager`, template loading
 - `app/prompts/resolver.py` -- `resolve_template()`, `BACKEND_TO_LOCAL` mapping
-- `app/core/graph/prompt.py` -- `_get_language_instruction()`, `_get_language_block()`
+- `app/core/graph/prompt.py` -- `_get_language_block()`, `_get_language_sample_block()`

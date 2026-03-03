@@ -70,40 +70,6 @@ def _get_competency_block(competency: Optional[str]) -> str:
     )
 
 
-def _get_language_instruction(
-    language_code: Optional[str],
-    backend_prompts: Optional[dict] = None,
-) -> str:
-    """
-    Get language instruction from prompt template when language is non-English.
-    Uses metadata template if available in promptData.prompts, else local .txt.
-    Returns empty string for English or missing language_code.
-    """
-    if not language_code or language_code.startswith("en"):
-        logger.info(
-            "%s LANGUAGE_INSTRUCTION omitted (English or missing): language_code=%s",
-            LOG_PREFIX,
-            language_code or "None",
-        )
-        return ""
-    template = resolve_template(
-        "language_instruction_non_english",
-        backend_prompts,
-    )
-    if not template:
-        return ""
-    try:
-        result = template.format(language_code=language_code) + "\n\n"
-        logger.info(
-            "%s LANGUAGE_INSTRUCTION injected for non-English: language_code=%s",
-            LOG_PREFIX,
-            language_code,
-        )
-        return result
-    except KeyError:
-        return template + "\n\n"
-
-
 def _format_language_samples(samples: List) -> str:
     """
     Format sample dialogues for injection into language_sample_instruction template.
@@ -129,20 +95,29 @@ def _format_language_samples(samples: List) -> str:
     return "\n".join(lines).strip()
 
 
-def _get_language_sample_block(samples: List, language_code: str) -> str:
+def _get_language_sample_block(samples: Optional[List], language_code: str) -> str:
     """
-    Format sample dialogues for linguistic style instruction.
-    Used when prompt_data has language_dialogue_samples (from ally-be/UI).
-    Template loaded from app/prompts/system/language_sample_instruction.txt.
+    Build language instruction block for non-English scenarios.
+
+    Always includes base instruction. When samples are present and non-empty,
+    appends the "Follow the following linguistic style" section. When samples
+    are missing or empty, returns the base block only.
     """
+    base = (
+        f"**LANGUAGE INSTRUCTION:**\n"
+        f"Generate next dialogue in the language for code '{language_code}'."
+    )
     if not samples:
-        return ""
+        return base.strip() + "\n\n"
+
     samples_text = _format_language_samples(samples)
     if not samples_text.strip():
-        return ""
+        return base.strip() + "\n\n"
+
     template = prompt_manager.get_template("system", "language_sample_instruction")
     if not template:
-        return ""
+        return base.strip() + "\n\n"
+
     return (
         template.format(language_code=language_code, samples=samples_text).strip()
         + "\n\n"
@@ -154,44 +129,31 @@ def _get_language_block(
 ) -> str:
     """
     Creates a formatted block for language instruction.
-    When use_linguistic_style_samples is True and prompt_data has
-    language_dialogue_samples, returns the sample block. When False or samples
-    absent, uses default language instruction.
+
+    For non-English scenarios, always injects a language block. When
+    language_dialogue_samples are present and non-empty, includes the
+    samples section; otherwise uses the base instruction only.
+
+    For English or missing language_code, returns empty string.
     """
+    if not language_code or language_code.startswith("en"):
+        return ""
+
     use_samples = getattr(prompt_data, "use_linguistic_style_samples", True)
-    if use_samples and prompt_data.language_dialogue_samples and language_code:
-        sample_block = _get_language_sample_block(
-            prompt_data.language_dialogue_samples, language_code
-        )
-        if sample_block:
-            logger.info(
-                "%s INJECTED language_sample_block (language_code=%s, samples=%d)",
-                LOG_PREFIX,
-                language_code,
-                len(prompt_data.language_dialogue_samples),
-            )
-            return sample_block
+    samples = prompt_data.language_dialogue_samples if use_samples else None
 
-    # Default behavior: language instruction
-    content = ""
-    injected = []
+    block = _get_language_sample_block(samples, language_code)
+    if not block or not block.strip():
+        return ""
 
-    # Add Language specific instruction from template if not English
-    backend_prompts = getattr(prompt_data, "prompts", None)
-    lang_block = _get_language_instruction(language_code, backend_prompts)
-    content += lang_block
-    if lang_block:
-        injected.append("language_instruction")
-
-    if injected:
-        logger.info(
-            "%s INJECTED blocks: %s (language_code=%s)",
-            LOG_PREFIX,
-            ", ".join(injected),
-            language_code or "None",
-        )
-
-    return content
+    sample_count = len(samples) if samples else 0
+    logger.info(
+        "%s INJECTED language_block (language_code=%s, samples=%d)",
+        LOG_PREFIX,
+        language_code,
+        sample_count,
+    )
+    return block
 
 
 def _format_custom_fields(custom_fields: list) -> str:

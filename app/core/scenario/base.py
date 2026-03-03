@@ -71,7 +71,7 @@ class PromptData(BaseModel):
     prompts: Optional[Dict[str, str]] = Field(
         default=None,
         description="Editable prompt templates from backend (promptData.prompts). "
-        "Keys: ally_ai_learn_default, language_instruction_non_english, etc. "
+        "Keys: ally_ai_learn_default, ally_ai_learn_prosody_unified, etc. "
         "Used only when present and different from local prompts.",
     )
     competency: Optional[str] = Field(
@@ -84,17 +84,18 @@ class PromptData(BaseModel):
         default=None,
         description=(
             "Sample utterances for linguistic style in target language. "
-            "When present for non-English, used instead of "
-            "language_instruction_non_english. Format: "
-            '["utterance 1", "utterance 2", ...] or legacy '
-            '[{"counselor": "...", "actor": "..."}, ...]'
+            "When present for non-English, injected into prompt; when absent, "
+            "no language block is added. Format: "
+            '["utterance 1", "utterance 2", ...] or '
+            '[{"counselor": "...", "actor": "..."}, ...].'
         ),
     )
     use_linguistic_style_samples: Optional[bool] = Field(
         default=True,
         description=(
             "When True: use language_dialogue_samples when present. "
-            "When False: always use default language instruction."
+            "When False: no language block is added. Kept for backward "
+            "compatibility with backend."
         ),
     )
 

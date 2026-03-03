@@ -277,15 +277,29 @@ class TestPrompt:
         assert "Be anxious" in content
         assert "say something similar to" not in content  # No dialogue options
 
-    def test_generate_system_message_non_english_injects_language_instruction(self):
-        """Test language_instruction_non_english when language_code is non-English."""
+    def test_generate_system_message_non_english_no_samples_uses_base_language_block(
+        self,
+    ):
+        """Non-English without samples: base language block is injected (no samples)."""
         pd = make_prompt_data()
         msg = generate_system_message(prompt_data=pd, language_code="hi-IN")
         content = msg.content
-
         assert "**LANGUAGE INSTRUCTION:**" in content
+        assert "Generate next dialogue" in content
         assert "hi-IN" in content
-        assert "communicate in the language" in content
+        assert "Example 1:" not in content
+        assert "Follow the following linguistic style" not in content
+
+    def test_generate_system_message_non_english_empty_samples_uses_base_language_block(
+        self,
+    ):
+        """Non-English, empty samples: base block only (no samples section)."""
+        pd = make_prompt_data(language_dialogue_samples=["", "", ""])
+        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
+        content = msg.content
+        assert "**LANGUAGE INSTRUCTION:**" in content
+        assert "ml-IN" in content
+        assert "Example 1:" not in content
 
     def test_generate_system_message_english_omits_language_instruction(self):
         """Test that language instruction is omitted for English language codes."""
@@ -297,7 +311,7 @@ class TestPrompt:
         assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
 
     def test_generate_system_message_samples_present_injects_sample_block(self):
-        """When samples present, use sample block instead of default instruction."""
+        """When samples present for non-English, use sample block."""
         samples = [
             {"counselor": "Hello, how are you?", "actor": "എനിക്ക് സഹായം വേണം."},
             {"counselor": "I understand.", "actor": "എനിക്ക് വളരെ വിഷമമാണ്."},
@@ -312,14 +326,3 @@ class TestPrompt:
         assert "Counselor:" in content
         assert "Client:" in content
         assert "എനിക്ക് സഹായം വേണം." in content
-        # Full language instruction should NOT be present when using samples
-        assert "SOUTH ASIAN TYPOLOGY" not in content
-
-    def test_all_empty_samples_falls_back_to_language_instruction(self):
-        """When samples are empty -> use default language instruction."""
-        samples = ["", "", ""]
-        pd = make_prompt_data(language_dialogue_samples=samples)
-        msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
-        content = msg.content
-        assert "SOUTH ASIAN TYPOLOGY" in content
-        assert "Example 1:" not in content
