@@ -102,6 +102,8 @@ export const styles = ScaledSheet.create({
   },
   listContent: {
     paddingHorizontal: '24@ms',
+    paddingTop: '16@vs',
+    paddingBottom: '32@vs',
     gap: '16@vs',
   },
   listStyle: {

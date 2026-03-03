@@ -33,6 +33,7 @@ export type RootStackParamList = {
   ProfileSettings: undefined;
   Reactions: {reviewId: string | number};
   ReviewDetails: {reviewId: string; isPrivate?: boolean};
+  ScribeReviewDetails: {reviewId: string; isPrivate?: boolean};
 };
 
 export type DrawerParamList = {
