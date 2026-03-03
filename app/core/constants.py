@@ -1,9 +1,27 @@
 from enum import Enum
-from typing import Dict, Final
+from typing import Dict, Final, Optional
 
 # BCP-47 language code -> explicit language name (avoids model confusion)
 # Used by generate_language_samples and other language-aware features
+# Non-standard codes that TTS/STT providers don't support -> BCP-47 equivalents
+LANGUAGE_CODE_NORMALIZATIONS: Final[Dict[str, str]] = {
+    "en-GLOBAL": "en-GB",
+}
+
+# Sarvam TTS/STT: map unsupported codes to Sarvam's supported equivalents.
+# Sarvam only supports en-IN for English; uses od-IN for Odia (not or-IN).
+SARVAM_LANGUAGE_CODE_OVERRIDES: Final[Dict[str, str]] = {
+    "or-IN": "od-IN",
+    "or": "od-IN",
+    "en-GB": "en-IN",
+    "en-US": "en-IN",
+}
+
 LANGUAGE_CODE_TO_NAME: Final[Dict[str, str]] = {
+    "en-US": "English (United States)",
+    "en-GB": "English (Global)",
+    "en-GLOBAL": "English (Global)",
+    "en-IN": "English (India)",
     "ml": "Malayalam",
     "ml-IN": "Malayalam",
     "hi": "Hindi",
@@ -35,6 +53,32 @@ def get_language_name_from_code(code: str) -> str:
     """Return language name for BCP-47 code; fallback to code if unknown."""
     base = code.split("-")[0]
     return LANGUAGE_CODE_TO_NAME.get(code, LANGUAGE_CODE_TO_NAME.get(base, code))
+
+
+def convert_language_code_for_sarvam(code: Optional[str]) -> str:
+    """
+    Convert language code to Sarvam API format.
+
+    Sarvam only supports en-IN for English (not en-GB, en-US) and od-IN
+    for Odia (not or-IN). Used by both Sarvam TTS and Sarvam STT.
+    """
+    if not code or not isinstance(code, str):
+        return DEFAULT_LANGUAGE_CODE
+    key = code.strip()
+    return SARVAM_LANGUAGE_CODE_OVERRIDES.get(key, key)
+
+
+def normalize_language_code_for_providers(code: Optional[str]) -> str:
+    """
+    Map non-standard codes to provider-supported BCP-47 codes.
+
+    TTS/STT providers (Sarvam, Google, etc.) do not support en-GLOBAL.
+    Returns normalized code for use with TTS, STT, and voice preview.
+    """
+    if not code or not isinstance(code, str):
+        return DEFAULT_LANGUAGE_CODE
+    key = code.strip()
+    return LANGUAGE_CODE_NORMALIZATIONS.get(key, key)
 
 
 # Default language code when not specified

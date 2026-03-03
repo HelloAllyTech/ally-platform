@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from livekit.plugins import sarvam
 
 from app.core.config import settings
+from app.core.constants import convert_language_code_for_sarvam
 from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
 
@@ -182,8 +183,8 @@ class SarvamSTTClient(BaseSTTClient):
 
         self._model = model
 
-        # Convert language code to Sarvam's required format
-        self._language_code = self.convert_language_code(language_code)
+        # Convert language code to Sarvam format (en-GB/en-US -> en-IN, or-IN -> od-IN)
+        self._language_code = convert_language_code_for_sarvam(language_code)
 
         # Use provided API key or fall back to settings
         self._api_key = api_key or settings.SARVAM_API_KEY

@@ -2,8 +2,13 @@
 
 import pytest
 
-from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.core.constants import (
+    DEFAULT_LANGUAGE_CODE,
+    convert_language_code_for_sarvam,
+    normalize_language_code_for_providers,
+)
 from app.core.scenario.base import LanguageConfig, Scenario
+from scenario_sample import SCENARIO_SAMPLE_EN_GB
 
 
 class TestLanguageConfig:
@@ -387,3 +392,89 @@ class TestScenarioWithLanguageConfig:
         # Other fields should still work
         assert scenario.name == "Backward Compat Test"
         assert scenario.voice is not None
+
+
+class TestNormalizeLanguageCodeForProviders:
+    """Test cases for normalize_language_code_for_providers (en-GLOBAL fix)."""
+
+    @pytest.mark.unit
+    def test_en_global_normalizes_to_en_gb(self):
+        """en-GLOBAL should normalize to en-GB for TTS/STT provider compatibility."""
+        assert normalize_language_code_for_providers("en-GLOBAL") == "en-GB"
+
+    @pytest.mark.unit
+    def test_other_codes_pass_through(self):
+        """Other language codes should pass through unchanged."""
+        assert normalize_language_code_for_providers("en-IN") == "en-IN"
+        assert normalize_language_code_for_providers("en-US") == "en-US"
+        assert normalize_language_code_for_providers("en-GB") == "en-GB"
+        assert normalize_language_code_for_providers("hi-IN") == "hi-IN"
+
+    @pytest.mark.unit
+    def test_none_or_empty_returns_default(self):
+        """None or empty string should return DEFAULT_LANGUAGE_CODE."""
+        assert normalize_language_code_for_providers(None) == DEFAULT_LANGUAGE_CODE
+        assert normalize_language_code_for_providers("") == DEFAULT_LANGUAGE_CODE
+
+
+class TestConvertLanguageCodeForSarvam:
+    """Test convert_language_code_for_sarvam (Sarvam TTS/STT fallbacks)."""
+
+    @pytest.mark.unit
+    def test_en_gb_and_en_us_fallback_to_en_in(self):
+        """Sarvam only supports en-IN; en-GB and en-US should fallback."""
+        assert convert_language_code_for_sarvam("en-GB") == "en-IN"
+        assert convert_language_code_for_sarvam("en-US") == "en-IN"
+
+    @pytest.mark.unit
+    def test_odia_maps_to_od_in(self):
+        """Sarvam uses od-IN for Odia, not or-IN."""
+        assert convert_language_code_for_sarvam("or-IN") == "od-IN"
+        assert convert_language_code_for_sarvam("or") == "od-IN"
+
+    @pytest.mark.unit
+    def test_en_in_and_indic_pass_through(self):
+        """en-IN and Indic codes should pass through unchanged."""
+        assert convert_language_code_for_sarvam("en-IN") == "en-IN"
+        assert convert_language_code_for_sarvam("hi-IN") == "hi-IN"
+        assert convert_language_code_for_sarvam("ml-IN") == "ml-IN"
+
+
+class TestScenarioBuildLanguageConfigEnGlobal:
+    """Test that en-GLOBAL in metadata normalizes to en-GB."""
+
+    @pytest.mark.unit
+    def test_build_language_config_normalizes_en_global(self):
+        """_build_language_config should normalize en-GLOBAL to en-GB."""
+        raw_payload = {
+            "languageCode": "en-GLOBAL",
+            "title": "Test Scenario",
+            "promptData": {
+                "name": "Test",
+                "age": 25,
+                "gender": "male",
+                "currentLocation": "City",
+                "context": "Context",
+                "lifeHistory": "History",
+                "openingStatements": ["Hello"],
+            },
+        }
+
+        result = Scenario._build_language_config(raw_payload)
+
+        assert result.language_code == "en-GB"
+
+
+class TestScenarioSampleEnGb:
+    """Test SCENARIO_SAMPLE_EN_GB parses correctly with en-GB."""
+
+    @pytest.mark.unit
+    def test_scenario_sample_en_gb_has_en_gb_language_code(self):
+        """SCENARIO_SAMPLE_EN_GB should use en-GB and parse correctly."""
+        payload = SCENARIO_SAMPLE_EN_GB.get("scenario") or SCENARIO_SAMPLE_EN_GB
+        scenario = Scenario.create(payload)
+
+        assert scenario.language_config is not None
+        assert scenario.language_config.language_code == "en-GB"
+        assert scenario.voice is not None
+        assert scenario.voice.provider == "google"

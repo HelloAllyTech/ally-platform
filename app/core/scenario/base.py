@@ -3,7 +3,10 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.core.constants import (
+    DEFAULT_LANGUAGE_CODE,
+    normalize_language_code_for_providers,
+)
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.factory import build_events_from_metadata
@@ -472,7 +475,9 @@ class Scenario(BaseModel):
         Returns:
             LanguageConfig object with language code and optional STT/LLM overrides
         """
-        language_code = raw.get("languageCode", DEFAULT_LANGUAGE_CODE)
+        language_code = normalize_language_code_for_providers(
+            raw.get("languageCode", DEFAULT_LANGUAGE_CODE)
+        )
         stt_config = raw.get("stt")
         llm_config = raw.get("llm")
 

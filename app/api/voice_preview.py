@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.dependencies import verify_token
+from app.core.constants import normalize_language_code_for_providers
 from app.core.logger import get_logger
 from app.tts.constants import DEFAULT_SAMPLE_TEXT, LANGUAGE_SAMPLE_TEXT
 from app.tts.factory import create_tts_client
@@ -123,15 +124,21 @@ async def generate_voice_preview(request: PreviewRequest):
     Returns MP3 audio directly for browser playback.
     """
     try:
+        # Normalize language code (e.g., en-GLOBAL -> en-GB) for provider compatibility
+        effective_language_code = normalize_language_code_for_providers(
+            request.language_code
+        )
+
         # Resolve sample text: use caller-supplied text, or pick from
         # the language mapping based on language_code
         preview_text = request.text or get_sample_text_for_language(
-            request.language_code
+            effective_language_code
         )
 
         logger.info(
             f"Generating voice preview: provider={request.provider}, "
             f"language_code={request.language_code}, "
+            f"effective={effective_language_code}, "
             f"text_source={'user' if request.text else 'auto'}"
         )
 
@@ -144,7 +151,7 @@ async def generate_voice_preview(request: PreviewRequest):
         # Create TTS client using the factory
         client = create_tts_client(
             tts_config=tts_config,
-            language_code=request.language_code,
+            language_code=effective_language_code,
         )
 
         # Generate preview audio

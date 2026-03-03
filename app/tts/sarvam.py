@@ -8,40 +8,11 @@ from sarvamai import SarvamAI
 from sarvamai.core import ApiError as SarvamaiApiError
 
 from app.core.config import settings
-from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.core.constants import convert_language_code_for_sarvam
 from app.core.logger import get_logger
 from app.tts.base import BaseTTSClient
 
 logger = get_logger(__name__)
-
-
-# Sarvam-specific language code overrides.
-# Sarvam uses od-IN for Odia instead of or-IN (ISO 639-1 standard).
-# See: docs.sarvam.ai API guides > Text-to-Speech > Set the language
-SARVAM_LANGUAGE_CODE_OVERRIDES: Dict[str, str] = {
-    "or-IN": "od-IN",
-    "or": "od-IN",
-}
-
-
-def _convert_language_code(language_code: Optional[str]) -> str:
-    """
-    Convert BCP 47 language code to Sarvam's required format.
-
-    Sarvam accepts BCP 47 format, but uses od-IN for Odia (not or-IN).
-    Falls back to DEFAULT_LANGUAGE_CODE if not provided.
-
-    Args:
-        language_code: BCP 47 language code (e.g., "en-IN", "hi-IN", "or-IN")
-
-    Returns:
-        Language code in format acceptable by Sarvam API
-    """
-    if not language_code:
-        return DEFAULT_LANGUAGE_CODE
-
-    code = language_code.strip()
-    return SARVAM_LANGUAGE_CODE_OVERRIDES.get(code, code)
 
 
 class SarvamTTSClient(BaseTTSClient):
@@ -102,8 +73,8 @@ class SarvamTTSClient(BaseTTSClient):
         if not model:
             raise ValueError("Sarvam TTS requires 'model'")
 
-        # Convert language code to Sarvam format
-        target_language = _convert_language_code(language_code)
+        # Convert language code to Sarvam format (en-GB/en-US -> en-IN, or-IN -> od-IN)
+        target_language = convert_language_code_for_sarvam(language_code)
 
         # Validate configuration
         if not self.validate_voice(model=model, speaker=speaker, api_key=api_key):

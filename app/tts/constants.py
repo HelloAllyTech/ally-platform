@@ -13,6 +13,7 @@ LANGUAGE_SAMPLE_TEXT: Dict[str, str] = {
     "en-US": ("Hello, this is a preview of how I sound."),
     "en-IN": ("Hello, this is a preview of how I sound."),
     "en-GB": ("Hello, this is a preview of how I sound."),
+    "en-GLOBAL": ("Hello, this is a preview of how I sound."),
     # Hindi
     "hi-IN": ("नमस्ते, यह मेरी आवाज़ का एक प्रीव्यू है। " "मैं आपकी कैसे मदद कर सकती हूँ?"),
     # Bengali

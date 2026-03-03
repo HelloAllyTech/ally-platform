@@ -583,6 +583,61 @@ SCENARIO_SAMPLE_GOOGLE = {
     },
 }
 
+# English (UK / en-GB) scenario - uses Google TTS (Sarvam does not support en-GB)
+SCENARIO_SAMPLE_EN_GB = {
+    "version": "1.0",
+    "scenario": {
+        "title": "Teenager in Academic Crisis - English (UK)",
+        "description": (
+            "Practice responding with empathy and validation to Ahana, a teenager "
+            "in acute academic crisis, reducing anxiety and building emotional "
+            "safety. Guide Ahana toward constructive communication with parents."
+        ),
+        "promptData": {
+            "age": "16",
+            "name": "Ahana",
+            "tone": "Anxious, overwhelmed, defeated",
+            "gender": "female",
+            "context": "Ahana just received her 10th grade pre-board exam results.",
+            "agentGoal": "Help Ahana process her disappointment and reduce anxiety.",
+            "profession": "Student",
+            "lifeHistory": "Ahana is the oldest of three siblings in London.",
+            "personality": "Extraverted, anxious, open to new experiences",
+            "coreMemories": "Her parents' expectations about academic performance.",
+            "startingState": "Scared, hopeless, ashamed",
+            "emotionalNeeds": "Validation, reassurance, support",
+            "genderIdentity": "Female/Woman",
+            "currentLocation": "London, UK",
+            "openingStatements": ["Hi, I need some help."],
+            "sexualOrientation": "Heterosexual (straight)",
+            "sessionBehaviorGuidelines": "Ahana should express fears openly.",
+        },
+        "events": [
+            {
+                "id": "superficial-hope",
+                "name": "offered superficial hope",
+                "description": "",
+                "score": -5,
+                "emoji": ":confused:",
+                "message": "Validate their emotions so they feel understood.",
+                "branchInstruction": "I am not sure if you understand what I feel.",
+                "detectionType": "SENTENCE_SIMILARITY",
+                "sentences": ["Hi", "Hello"],
+                "feedbackStatus": "True",
+            }
+        ],
+        "voice": {
+            "name": "google-female-en-gb-chirp3",
+            "provider": "google",
+            "config": {"voice_name": "en-GB-Chirp3-HD-Charon", "gender": "female"},
+        },
+        "languageCode": "en-GB",
+        "stt": {"provider": "deepgram", "config": {"model": "nova-3"}},
+        "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
+        "metadata": {},
+    },
+}
+
 # Hume AI TTS scenario for testing Hume.ai TTS with Hindi
 SCENARIO_SAMPLE_HUME_HINDI = {
     "version": "1.0",
