@@ -17,6 +17,7 @@ export const SCREEN_NAMES = {
   ACHIEVEMENTS: 'Achievements',
   PROFILE_SETTINGS: 'ProfileSettings',
   REVIEW_DETAILS: 'ReviewDetails',
+  SCRIBE_REVIEW_DETAILS: 'ScribeReviewDetails',
 
   REACTIONS: 'Reactions',
   // Tab Screens
