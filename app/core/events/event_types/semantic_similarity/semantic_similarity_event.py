@@ -46,7 +46,9 @@ class SemanticSimilarityEvent(BaseEvent):
     _instance_built: bool = PrivateAttr(default=False)
 
     # Shared cache across instances: (sentences_hash, threshold) -> patterns
+    # Uses FIFO eviction when cache exceeds max size to prevent memory issues
     _PATTERN_CACHE: ClassVar[Dict[Tuple[int, float], List[EmbeddedPattern]]] = {}
+    _PATTERN_CACHE_MAX_SIZE: ClassVar[int] = 100
 
     # Input embedding cache: text -> embedding (prevents duplicate API calls)
     # Uses FIFO eviction when cache exceeds max size to prevent memory issues
@@ -217,6 +219,15 @@ class SemanticSimilarityEvent(BaseEvent):
 
             for sentence, embedding in zip(deduped, embeddings):
                 patterns.append(EmbeddedPattern(original=sentence, embedding=embedding))
+
+            # Add to cache with size limit using FIFO eviction
+            if len(self._PATTERN_CACHE) >= self._PATTERN_CACHE_MAX_SIZE:
+                oldest_key = next(iter(self._PATTERN_CACHE))
+                del self._PATTERN_CACHE[oldest_key]
+                logger.debug(
+                    f"Evicted oldest pattern cache entry "
+                    f"(size limit: {self._PATTERN_CACHE_MAX_SIZE})"
+                )
 
             self._PATTERN_CACHE[cache_key] = patterns
             self._instance_patterns = patterns

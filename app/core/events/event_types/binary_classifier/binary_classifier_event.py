@@ -1,4 +1,4 @@
-from typing import List
+from typing import ClassVar, List, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -26,6 +26,15 @@ class BinaryClassifierEvent(BaseEvent):
     detection_type: DetectionType = DetectionType.BINARY_CLASSIFIER
     data: BinaryClassifierData
     model: str = "gpt-4o-mini"  # Default model for classification
+
+    # Shared client across all instances to avoid per-call SSL/connection overhead
+    _CLIENT: ClassVar[Optional[AsyncOpenAI]] = None
+
+    @classmethod
+    def _get_client(cls) -> AsyncOpenAI:
+        if cls._CLIENT is None:
+            cls._CLIENT = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        return cls._CLIENT
 
     @classmethod
     def create(
@@ -77,7 +86,7 @@ class BinaryClassifierEvent(BaseEvent):
             # Livekit has known issue where all messages wrapped in
             # AIMessageChunk will be spoken by the agent
             # See: https://github.com/livekit/agents/issues/2836
-            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            client = self._get_client()
 
             system_prompt, user_prompt = get_binary_classifier_prompt(
                 self.data.class_name,

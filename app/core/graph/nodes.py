@@ -289,9 +289,7 @@ def _build_state_update_dict(
 ) -> dict:
     """Build the state update dictionary."""
     update_dict = {
-        "messages": state.messages,
-        "permitted_events": state.permitted_events,
-        "events_accumulator": state.events_accumulator + detected_events,
+        "events_accumulator": detected_events,
         "new_events": new_events,
         "current_score": new_current_score,
     }

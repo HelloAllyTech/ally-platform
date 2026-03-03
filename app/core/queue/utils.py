@@ -48,11 +48,15 @@ def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessa
     )
 
 
-async def send_final_score_to_core(
+async def finalize_session(
     room_id: str, thread_id: str, event_orchestrator=None, score_keeper=None
 ) -> None:
     """
-    Send final score to backend queue for session end or disconnect.
+    Finalize a session by sending final score and cleaning up resources.
+
+    This function performs session cleanup tasks:
+    1. Sends final score to backend queue
+    2. Cleans up checkpoint data to prevent memory leaks
 
     ScoreKeeper is the single source of truth: it holds both event scores
     (committed by EventOrchestrator) and behavior scores (committed by
@@ -89,8 +93,18 @@ async def send_final_score_to_core(
         )
         await send_message_to_queue(core_message.model_dump_json())
 
+        # Clean up checkpoint data for this session
+        try:
+            from app.core.graph import cleanup_simulation_checkpoints
+
+            cleanup_simulation_checkpoints(thread_id)
+        except Exception as cleanup_error:
+            logger.warning(
+                f"Failed to cleanup checkpoints for thread {thread_id}: {cleanup_error}"
+            )
+
     except Exception as e:
-        logger.error(f"Failed to send end-of-session message to backend: {e}")
+        logger.error(f"Failed to finalize session: {e}")
 
 
 async def send_deferred_termination_event(

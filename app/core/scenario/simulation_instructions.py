@@ -1,9 +1,11 @@
 from enum import Enum
 from textwrap import dedent
-from typing import List, Optional, Tuple
+from typing import ClassVar, List, Optional, Tuple
 
+from openai import AsyncOpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.config import settings
 from app.core.events.base import ChatMessage
 from app.core.logger import get_logger
 
@@ -54,6 +56,16 @@ class SimulationBehaviorInstruction(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    # Shared client across all instances to avoid per-call SSL/connection overhead
+    _CLIENT: ClassVar[Optional[AsyncOpenAI]] = None
+
+    @classmethod
+    def _get_client(cls) -> AsyncOpenAI:
+        if cls._CLIENT is None:
+
+            cls._CLIENT = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        return cls._CLIENT
+
     async def detect(self, conversations: List[ChatMessage]) -> bool:
         """
         Detect if the counselor's latest message exhibits any of the
@@ -88,7 +100,6 @@ class SimulationBehaviorInstruction(BaseModel):
             return False
 
         try:
-            from openai import AsyncOpenAI
             from openai.types.chat import (
                 ChatCompletionSystemMessageParam,
                 ChatCompletionUserMessageParam,
@@ -96,14 +107,13 @@ class SimulationBehaviorInstruction(BaseModel):
 
             from app.core.config import settings
 
-            api_key = settings.OPENAI_API_KEY
-            if not api_key:
+            if not settings.OPENAI_API_KEY:
                 logger.warning(
                     "OpenAI API key not configured, skipping behavior detection"
                 )
                 return False
 
-            client = AsyncOpenAI(api_key=api_key)
+            client = self._get_client()
 
             system_prompt, user_prompt = self._get_behavior_detection_prompt(text)
 

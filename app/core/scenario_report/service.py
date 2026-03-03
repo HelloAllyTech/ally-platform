@@ -14,7 +14,6 @@ from typing import Optional
 
 import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.checkpoint.memory import MemorySaver
 
 from app.core.agent.factory import configure_llm_client
 from app.core.config import settings
@@ -22,6 +21,7 @@ from app.core.constants import SCENARIO_REPORT_WEBHOOK_ENDPOINT
 from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
+from app.core.graph.checkpointer import PruningCheckpointer
 from app.core.graph.graph_builder import build_report_graph
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
@@ -76,66 +76,6 @@ async def run_report_with_concurrency_limit(
         await service.run()
 
 
-class _ReportCheckpointer(MemorySaver):
-    """
-    In-memory checkpointer for report generation.
-
-    Unlike plain ``MemorySaver``, this variant keeps only the **latest**
-    checkpoint per (thread_id, namespace) so memory stays O(1) per turn
-    instead of growing quadratically.  Old checkpoint entries, their
-    pending writes, and any blobs they referenced are pruned immediately
-    after each new checkpoint is committed.
-
-    Call ``delete_thread(report_id)`` once the report finishes (success
-    or error) to release every byte associated with that run.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._latest_ids: dict[tuple[str, str], str] = {}
-
-    def put(self, config, checkpoint, metadata, new_versions):
-        result = super().put(config, checkpoint, metadata, new_versions)
-        thread_id = config["configurable"]["thread_id"]
-        checkpoint_ns = config["configurable"]["checkpoint_ns"]
-        current_id = checkpoint["id"]
-
-        ns_key = (thread_id, checkpoint_ns)
-        prev_id = self._latest_ids.get(ns_key)
-        self._latest_ids[ns_key] = current_id
-
-        if prev_id is not None:
-            ns_storage = self.storage.get(thread_id, {}).get(checkpoint_ns, {})
-
-            if prev_id in ns_storage:
-                del ns_storage[prev_id]
-
-            writes_key = (thread_id, checkpoint_ns, prev_id)
-            if writes_key in self.writes:
-                del self.writes[writes_key]
-
-            current_raw = ns_storage.get(current_id)
-            if current_raw:
-                current_ckpt = self.serde.loads_typed(current_raw[0])
-                active_versions = set(current_ckpt.get("channel_versions", {}).values())
-                for blob_key in list(self.blobs.keys()):
-                    if (
-                        blob_key[0] == thread_id
-                        and blob_key[1] == checkpoint_ns
-                        and blob_key[3] not in active_versions
-                    ):
-                        del self.blobs[blob_key]
-
-        return result
-
-    def delete_thread(self, thread_id: str) -> None:
-        super().delete_thread(thread_id)
-        for thread_namespace_key in [
-            key for key in list(self._latest_ids) if key[0] == thread_id
-        ]:
-            del self._latest_ids[thread_namespace_key]
-
-
 class ScenarioReportService:
     """
     Simulates an N-turn conversation and delivers results via webhook.
@@ -163,7 +103,7 @@ class ScenarioReportService:
         self._termination_event: Optional[BaseEvent] = None
         self._transcripts: list[TranscriptEntry] = []
         self._start_time: Optional[float] = None
-        self._checkpointer = _ReportCheckpointer()
+        self._checkpointer = PruningCheckpointer()
 
     # ------------------------------------------------------------------
     # Callbacks & helpers
@@ -449,8 +389,8 @@ class ScenarioReportService:
             await self._send_webhook(payload)
             logger.info("Report generation completed: report_id=%s", report_id)
 
-        except Exception:
-            logger.exception("Report generation failed: report_id=%s", report_id)
+        except Exception as e:
+            logger.exception(f"Report generation failed: report_id=%s: {e}", report_id)
             await self._send_webhook(
                 ScenarioReportWebhookPayload(
                     metrics={},
@@ -460,4 +400,3 @@ class ScenarioReportService:
             )
         finally:
             self._checkpointer.delete_thread(report_id)
-            logger.info("Checkpointer cleared for report_id=%s", report_id)
