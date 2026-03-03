@@ -209,6 +209,7 @@ const styles = ScaledSheet.create({
   },
   modalContainerFitContent: {
     height: 'auto',
+    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
@@ -245,6 +246,7 @@ const styles = ScaledSheet.create({
   },
   contentContainerFitContent: {
     flex: 0,
+    flexShrink: 1,
   },
   mediaContainer: {
     width: '100%',
@@ -262,6 +264,7 @@ const styles = ScaledSheet.create({
   },
   scrollContainerFitContent: {
     flex: 0,
+    flexShrink: 1,
   },
   scrollContent: {
     paddingHorizontal: '16@ms',
