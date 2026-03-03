@@ -21,10 +21,7 @@ from app.core.events.event_types.interruption.interruption_event import (
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.logger import get_logger
 from app.core.queue import msg_event_queue
-from app.core.queue.utils import (
-    send_deferred_termination_event,
-    send_final_score_to_core,
-)
+from app.core.queue.utils import finalize_session, send_deferred_termination_event
 
 logger = get_logger(__name__)
 
@@ -207,7 +204,7 @@ def create_connection_state_handler(
 
             try:
                 task = asyncio.create_task(
-                    send_final_score_to_core(
+                    finalize_session(
                         room_id=room_name,
                         thread_id=room_name,
                         event_orchestrator=event_orchestrator,
@@ -218,7 +215,7 @@ def create_connection_state_handler(
                 task.add_done_callback(background_tasks.discard)
                 set_final_score_sent(True)
             except Exception as e:
-                logger.error(f"Failed to send final score: {e}")
+                logger.exception(f"Failed to finalize session: {e}")
 
     return on_connection_state_changed
 
@@ -316,19 +313,19 @@ def create_shutdown_handler(
         if event_orchestrator.deferred_termination_event:
             await send_deferred_termination_event(room_name, event_orchestrator)
 
-        # Send final score
+        # Finalize session (send final score and cleanup)
         if not final_score_sent_ref():
             try:
-                await send_final_score_to_core(
+                await finalize_session(
                     room_id=room_name,
                     thread_id=room_name,
                     event_orchestrator=event_orchestrator,
                     score_keeper=score_keeper,
                 )
                 set_final_score_sent(True)
-                logger.info("Final score sent successfully")
+                logger.info("Session finalized successfully")
             except Exception as e:
-                logger.error(f"Failed to send final score: {e}")
+                logger.exception(f"Failed to finalize session: {e}")
 
         # Cleanup background tasks
         await cleanup_background_tasks()

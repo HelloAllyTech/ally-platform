@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,6 +16,13 @@ from app.core.events.event_types.binary_classifier.schemas import (
 
 @pytest.mark.asyncio
 class TestBinaryClassifierEvent:
+    @pytest.fixture(autouse=True)
+    def reset_client(self):
+        """Reset the cached OpenAI client before each test."""
+        BinaryClassifierEvent._CLIENT = None
+        yield
+        BinaryClassifierEvent._CLIENT = None
+
     async def test_create_event(self):
         data = BinaryClassifierData(class_name="greeting")
         event = BinaryClassifierEvent.create(
@@ -28,13 +35,8 @@ class TestBinaryClassifierEvent:
         assert event.score == 10
         assert event.emoji == "👋"
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_detect_event_with_counselor_message(self, mock_async_openai):
+    async def test_detect_event_with_counselor_message(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -44,6 +46,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(class_name="greeting")
         event = BinaryClassifierEvent.create(event_id="greeting_event", data=data)
@@ -76,13 +81,8 @@ class TestBinaryClassifierEvent:
 
         assert result is False
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_returns_false_when_not_class(self, mock_async_openai):
+    async def test_classify_returns_false_when_not_class(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -92,6 +92,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(class_name="greeting")
         event = BinaryClassifierEvent.create(event_id="greeting_event", data=data)
@@ -104,17 +107,15 @@ class TestBinaryClassifierEvent:
 
         assert result is False
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_handles_llm_exception(self, mock_async_openai):
+    async def test_classify_handles_llm_exception(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             side_effect=Exception("LLM API error")
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(class_name="greeting")
         event = BinaryClassifierEvent.create(event_id="greeting_event", data=data)
@@ -157,13 +158,8 @@ class TestBinaryClassifierEvent:
         assert event.data.positive_examples == positive_examples
         assert event.data.negative_examples == negative_examples
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_few_shot_examples(self, mock_async_openai):
+    async def test_classify_with_few_shot_examples(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -173,6 +169,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         positive_examples = [
             Example(text="Hello there!"),
@@ -197,13 +196,8 @@ class TestBinaryClassifierEvent:
         assert result is True
         mock_openai_client.beta.chat.completions.parse.assert_called_once()
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_class_name_only(self, mock_async_openai):
+    async def test_classify_with_class_name_only(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -213,6 +207,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(class_name="empathetic response")
         event = BinaryClassifierEvent.create(event_id="empathy_event", data=data)
@@ -238,15 +235,8 @@ class TestBinaryClassifierEvent:
         assert "Positive examples" not in prompt_content
         assert "Negative examples" not in prompt_content
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_class_name_and_positive_examples_only(
-        self, mock_async_openai
-    ):
+    async def test_classify_with_class_name_and_positive_examples_only(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -256,6 +246,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         positive_examples = [
             Example(text="I understand how you feel."),
@@ -287,15 +280,8 @@ class TestBinaryClassifierEvent:
         assert "I understand how you feel." in prompt_content
         assert "Negative examples" not in prompt_content
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_class_name_and_negative_examples_only(
-        self, mock_async_openai
-    ):
+    async def test_classify_with_class_name_and_negative_examples_only(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -305,6 +291,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         negative_examples = [
             Example(text="Just think positive."),
@@ -336,15 +325,8 @@ class TestBinaryClassifierEvent:
         assert "Just think positive." in prompt_content
         assert "Positive examples" not in prompt_content
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_both_positive_and_negative_examples(
-        self, mock_async_openai
-    ):
+    async def test_classify_with_both_positive_and_negative_examples(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -354,6 +336,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         positive_examples = [
             Example(text="How are you feeling today?"),
@@ -413,13 +398,8 @@ class TestBinaryClassifierEvent:
         assert event.data.positive_examples == []
         assert event.data.negative_examples == []
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_multiple_positive_examples(self, mock_async_openai):
+    async def test_classify_with_multiple_positive_examples(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -429,6 +409,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         positive_examples = [
             Example(text="Example 1"),
@@ -451,15 +434,8 @@ class TestBinaryClassifierEvent:
         assert event.data.positive_examples == positive_examples
         assert len(event.data.positive_examples) == 5
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_with_single_example_in_each_category(
-        self, mock_async_openai
-    ):
+    async def test_classify_with_single_example_in_each_category(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -469,6 +445,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(
             class_name="greeting",
@@ -499,13 +478,8 @@ class TestBinaryClassifierEvent:
 
         assert event.model == "gpt-4o"
 
-    @patch(
-        "app.core.events.event_types.binary_classifier."
-        "binary_classifier_event.AsyncOpenAI"
-    )
-    async def test_classify_uses_correct_model(self, mock_async_openai):
+    async def test_classify_uses_correct_model(self):
         mock_openai_client = AsyncMock()
-        mock_async_openai.return_value = mock_openai_client
 
         mock_completion = MagicMock()
         mock_completion.choices = [MagicMock()]
@@ -515,6 +489,9 @@ class TestBinaryClassifierEvent:
         mock_openai_client.beta.chat.completions.parse = AsyncMock(
             return_value=mock_completion
         )
+
+        # Set the mock client directly
+        BinaryClassifierEvent._CLIENT = mock_openai_client
 
         data = BinaryClassifierData(class_name="test")
         event = BinaryClassifierEvent.create(

@@ -177,9 +177,9 @@ class TestFinalScoreIsScoreKeeperTotal:
         with patch(
             "app.core.queue.utils.send_message_to_queue", new_callable=AsyncMock
         ) as mock_send:
-            from app.core.queue.utils import send_final_score_to_core
+            from app.core.queue.utils import finalize_session
 
-            await send_final_score_to_core(
+            await finalize_session(
                 room_id="room-1",
                 thread_id="room-1",
                 score_keeper=score_keeper,
@@ -198,9 +198,9 @@ class TestFinalScoreIsScoreKeeperTotal:
         with patch(
             "app.core.queue.utils.send_message_to_queue", new_callable=AsyncMock
         ) as mock_send:
-            from app.core.queue.utils import send_final_score_to_core
+            from app.core.queue.utils import finalize_session
 
-            await send_final_score_to_core(
+            await finalize_session(
                 room_id="room-1",
                 thread_id="room-1",
                 score_keeper=score_keeper,
@@ -218,9 +218,9 @@ class TestFinalScoreIsScoreKeeperTotal:
             with patch(
                 "app.core.queue.utils.get_current_score_from_graph", return_value=42
             ):
-                from app.core.queue.utils import send_final_score_to_core
+                from app.core.queue.utils import finalize_session
 
-                await send_final_score_to_core(
+                await finalize_session(
                     room_id="room-1",
                     thread_id="room-1",
                 )

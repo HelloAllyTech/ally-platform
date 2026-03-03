@@ -340,12 +340,21 @@ class AgentWorker:
         - Helper tasks are cleaned up
         - Final scores are sent
         - Conversation logging is ended
+        - Checkpoint data for this session is freed
         """
         logger.info("[AgentWorker] Manual shutdown triggered")
         if hasattr(self, "_shutdown_handler") and self._shutdown_handler:
             await self._shutdown_handler()
         else:
             logger.warning("[AgentWorker] No shutdown handler registered!")
+
+        # Free checkpoint memory for this session
+        try:
+            from app.core.graph import cleanup_simulation_checkpoints
+
+            cleanup_simulation_checkpoints(self.ctx.room.name)
+        except Exception as e:
+            logger.warning("[AgentWorker] Failed to cleanup checkpoints: %s", e)
 
     async def _handle_termination_in_entrypoint_context(self):
         """
