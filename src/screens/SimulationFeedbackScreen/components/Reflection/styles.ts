@@ -48,6 +48,7 @@ export const styles = ScaledSheet.create({
     fontSize: '13@ms',
     color: colors.ds.typography.highEmphasis,
     minHeight: '150@vs',
+    maxHeight: '200@vs',
     textAlignVertical: 'top',
     padding: 0,
   },
