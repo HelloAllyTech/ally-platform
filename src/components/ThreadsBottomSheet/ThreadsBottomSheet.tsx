@@ -1,33 +1,52 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, {useCallback, useEffect} from 'react';
-import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
-import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {
+  BottomSheetFlatList,
+  BottomSheetFooter,
+  BottomSheetFooterProps,
+} from '@gorhom/bottom-sheet';
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
+import {TabBar, TabView} from 'react-native-tab-view';
 
 import {ChevronRight} from '@/assets/icons';
-import {BottomSheet, ReviewComment} from '@/components';
+import {
+  BottomSheet,
+  CommentBottomSheetFooter,
+  ReviewComment,
+} from '@/components';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useTranslate, useUser} from '@/hooks';
-import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {Thread, ThreadsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
+import {GeneralCommentsList} from './GeneralCommentsList';
 import {styles} from './styles';
 import {ThreadsBottomSheetProps} from './types';
 
 const LIMIT = 20;
 
-// Gradient colors constant to avoid recreating on every render
+enum TABS {
+  INLINE = 'INLINE',
+  GENERAL = 'GENERAL',
+}
+
 const GRADIENT_COLORS = [
   colors.whiteTransparent0,
   colors.whiteTransparent40,
   colors.whiteTransparent60,
 ];
 
-// Helper to compute selected text from thread
 const getSelectedText = (thread: Thread): string | null => {
   if (
     !thread.message?.content ||
@@ -46,36 +65,56 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
   onClose,
   reviewId,
+  reviewOwnerId,
   onThreadPress,
+  onAddReactionPress,
+  onReplyPress,
+  onCommentsChanged,
 }) => {
   const {t} = useTranslate();
   const {userData} = useUser();
   const insets = useSafeAreaInsets();
+
+  const layout = useWindowDimensions();
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const routes = useMemo(
+    () => [
+      {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
+      {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
+    ],
+    [t],
+  );
+
+  const handleTabChange = useCallback((index: number) => {
+    setTabIndex(index);
+  }, []);
+
+  const activeTab = routes[tabIndex]?.key as TABS;
+
+  const {useLazyGetThreads} = useReviewApiHooks();
+
+  // --- Inline tab state ---
   const [getThreads, {data: apiData, isLoading, isFetching}] =
-    useLazyGetThreadsQuery();
+    useLazyGetThreads();
 
   const [offset, setOffset] = React.useState(0);
   const [commentsData, setCommentsData] =
     React.useState<ThreadsResponse | null>(null);
   const [hasMore, setHasMore] = React.useState(true);
 
-  // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
     if (visible) {
       setOffset(0);
       setCommentsData(null);
-      getThreads({
-        reviewId,
-        offset: 0,
-        limit: LIMIT,
-      });
+      getThreads({reviewId, offset: 0, limit: LIMIT});
     } else {
       setCommentsData(null);
       setOffset(0);
+      setTabIndex(0);
     }
   }, [visible]);
 
-  // Accumulate API data for pagination
   React.useEffect(() => {
     if (apiData && visible) {
       const newThreads = apiData.data;
@@ -86,7 +125,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         setCommentsData(prev => {
           if (!prev) {
             setHasMore(apiData.count > LIMIT);
-            // If prev is null, just use the new apiData directly
             return apiData;
           }
           const updated = [...prev.data, ...newThreads];
@@ -97,6 +135,72 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     }
   }, [apiData, visible]);
 
+  // --- General tab: ref for functions, state for primitive text value ---
+  const generalFnRef = useRef({
+    setCommentText: (_text: string) => {},
+    onSubmitComment: (_comment: string) => {},
+    isSubmitting: false,
+  });
+  const [generalCommentText, setGeneralCommentText] = React.useState('');
+
+  const footerStateRef = React.useRef({
+    commentText: '',
+    setCommentText: (_text: string) => {},
+    onSubmitComment: (_comment: string) => {},
+    placeholderText: t('ThreadsBottomSheet.addComment'),
+    insetsBottom: insets.bottom,
+    isLoading: false,
+  });
+
+  footerStateRef.current = {
+    commentText: generalCommentText,
+    setCommentText: (text: string) => {
+      generalFnRef.current.setCommentText(text);
+      setGeneralCommentText(text);
+    },
+    onSubmitComment: generalFnRef.current.onSubmitComment,
+    placeholderText: t('ThreadsBottomSheet.addComment'),
+    insetsBottom: insets.bottom,
+    isLoading: generalFnRef.current.isSubmitting,
+  };
+
+  const renderFooterComponent = React.useCallback(
+    (props: BottomSheetFooterProps) => {
+      const current = footerStateRef.current;
+      return (
+        <BottomSheetFooter
+          animatedFooterPosition={props.animatedFooterPosition}
+          bottomInset={0}>
+          <CommentBottomSheetFooter
+            text={current.commentText}
+            setText={current.setCommentText}
+            onSubmit={current.onSubmitComment}
+            placeholder={current.placeholderText}
+            bottomInset={current.insetsBottom}
+            isLoading={current.isLoading}
+          />
+        </BottomSheetFooter>
+      );
+    },
+    [],
+  );
+
+  // --- Tab bar (react-native-tab-view) ---
+  const renderTabBar = useCallback(
+    (props: Parameters<typeof TabBar>[0]) => (
+      <TabBar
+        {...props}
+        indicatorStyle={styles.tabBarIndicator}
+        style={styles.tabBar}
+        tabStyle={styles.tabBarTab}
+        activeColor={colors.ds.theme.primary}
+        inactiveColor={colors.ds.typography.lowEmphasis}
+      />
+    ),
+    [],
+  );
+
+  // --- Inline tab renderers ---
   const renderThreadItem = useCallback(
     ({item: thread}: {item: NonNullable<typeof commentsData>['data'][0]}) => {
       if (!thread.comments || thread.comments.length === 0) {
@@ -113,7 +217,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
           style={styles.threadContainer}
           onPress={() => onThreadPress?.(thread.id)}
           activeOpacity={0.7}>
-          {/* Selected Text Section - if available */}
           {thread.message?.content &&
             thread.selection?.startIndex !== undefined &&
             thread.selection?.endIndex !== undefined && (
@@ -128,7 +231,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
               </View>
             )}
 
-          {/* First Comment */}
           <View style={styles.commentWrapper}>
             <ReviewComment
               name={firstComment.createdBy.name}
@@ -162,7 +264,6 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
             )}
           </View>
 
-          {/* More Comments Indicator */}
           {remainingCount > 0 && (
             <>
               <View style={styles.separatorLine} />
@@ -188,15 +289,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     [onThreadPress, t, userData],
   );
 
-  const renderHeader = useCallback(() => {
-    return (
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('ThreadsBottomSheet.title')}</Text>
-      </View>
-    );
-  }, [t]);
-
-  const renderFooter = useCallback(() => {
+  const renderInlineFooter = useCallback(() => {
     if (!isFetching) return null;
     if (!hasMore) return null;
     return (
@@ -208,21 +301,15 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const loadMore = useCallback(() => {
     if (!visible) return;
-    if (isLoading || isFetching || !hasMore || !reviewId) {
-      return;
-    }
+    if (isLoading || isFetching || !hasMore || !reviewId) return;
     setOffset(prevOffset => {
       const newOffset = prevOffset + LIMIT;
-      getThreads({
-        reviewId,
-        offset: newOffset,
-        limit: LIMIT,
-      });
+      getThreads({reviewId, offset: newOffset, limit: LIMIT});
       return newOffset;
     });
   }, [hasMore, reviewId, isFetching, isLoading]);
 
-  const renderEmpty = useCallback(() => {
+  const renderInlineEmpty = useCallback(() => {
     if (isLoading || isFetching || (visible && !commentsData)) {
       return (
         <View style={styles.emptyContainer}>
@@ -239,38 +326,96 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     );
   }, [isLoading, isFetching, visible, commentsData, t]);
 
+  const renderInlineTab = () => {
+    if ((isLoading || isFetching) && !commentsData) {
+      return renderInlineEmpty();
+    }
+    return (
+      <BottomSheetFlatList
+        data={commentsData?.data || []}
+        renderItem={renderThreadItem}
+        keyExtractor={item => item.id.toString()}
+        ListFooterComponent={renderInlineFooter}
+        ListEmptyComponent={renderInlineEmpty}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        style={styles.listStyle}
+        removeClippedSubviews={false}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+      />
+    );
+  };
+
+  const renderGeneralTab = () => {
+    return (
+      <GeneralCommentsList
+        visible={visible && activeTab === TABS.GENERAL}
+        reviewId={reviewId}
+        reviewOwnerId={reviewOwnerId}
+        onAddReactionPress={onAddReactionPress}
+        onReplyPress={onReplyPress}
+        onCommentsChanged={onCommentsChanged}
+        fnRef={generalFnRef}
+        onCommentTextChange={setGeneralCommentText}
+      />
+    );
+  };
+
+  const renderScene = useCallback(
+    ({route: sceneRoute}: {route: {key: string}}) => {
+      switch (sceneRoute.key) {
+        case TABS.INLINE:
+          return renderInlineTab();
+        case TABS.GENERAL:
+          return renderGeneralTab();
+        default:
+          return null;
+      }
+    },
+    [
+      visible,
+      commentsData,
+      isLoading,
+      isFetching,
+      hasMore,
+      reviewId,
+      reviewOwnerId,
+      activeTab,
+    ],
+  );
+
   return (
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      allowFullExpand
       skipBottomSheetView
       enableContentPanningGesture
-      enableDynamicSizing
+      enableDynamicSizing={false}
+      snapPoints={['80%']}
       enableOverDrag
-      enableHandlePanningGesture>
+      enableHandlePanningGesture
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
+      failOffsetX={[-5, 5]}
+      footerComponent={
+        activeTab === TABS.GENERAL ? renderFooterComponent : undefined
+      }>
       <View style={styles.container}>
-        {(isLoading || isFetching) && !commentsData ? (
-          <>
-            {renderHeader()}
-            {renderEmpty()}
-          </>
-        ) : (
-          <BottomSheetFlatList
-            data={commentsData?.data || []}
-            renderItem={renderThreadItem}
-            keyExtractor={item => item.id.toString()}
-            ListHeaderComponent={renderHeader}
-            ListFooterComponent={renderFooter}
-            ListEmptyComponent={renderEmpty}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            style={styles.listStyle}
-            removeClippedSubviews={false}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-          />
-        )}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {t('ThreadsBottomSheet.title')}
+          </Text>
+        </View>
+        <TabView
+          navigationState={{index: tabIndex, routes}}
+          renderScene={renderScene}
+          renderTabBar={renderTabBar}
+          onIndexChange={handleTabChange}
+          initialLayout={{width: layout.width}}
+          swipeEnabled
+          commonOptions={{labelStyle: styles.tabBarLabel}}
+        />
       </View>
     </BottomSheet>
   );

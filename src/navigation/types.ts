@@ -1,6 +1,7 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
+import type {ReviewType} from '@/contexts/ReviewApiContext';
 import {Scenario, SessionData} from '@/types/simulations';
 
 export type RootStackParamList = {
@@ -31,8 +32,9 @@ export type RootStackParamList = {
   };
   Achievements: undefined;
   ProfileSettings: undefined;
-  Reactions: {reviewId: string | number};
+  Reactions: {reviewId: string | number; reviewType?: ReviewType};
   ReviewDetails: {reviewId: string; isPrivate?: boolean};
+  ScribeReviewDetails: {reviewId: string; isPrivate?: boolean};
 };
 
 export type DrawerParamList = {

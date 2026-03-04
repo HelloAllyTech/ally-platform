@@ -1,6 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -19,8 +19,25 @@ export const styles = ScaledSheet.create({
     color: colors.darkGray2,
     textAlign: 'center',
   },
+  tabBar: {
+    backgroundColor: colors.white,
+  },
+  tabBarTab: {
+    flex: 1,
+  },
+  tabBarLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  tabBarIndicator: {
+    backgroundColor: colors.ds.theme.primary,
+    height: 2,
+  },
   listContent: {
     paddingHorizontal: '24@ms',
+    paddingTop: '16@vs',
     gap: '16@vs',
   },
   listStyle: {
@@ -93,5 +110,8 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '14@ms',
     color: colors.ds.typography.mediumEmphasis,
+  },
+  commentItemContainer: {
+    width: '100%',
   },
 });

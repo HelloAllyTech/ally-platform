@@ -3,8 +3,8 @@ import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CommentIcon} from '@/assets';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {ReactionsCount} from '@/screens/ReviewScreen/components';
-import {useAddReactionToReviewMutation} from '@/services';
 import {
   colors,
   fontFamily,
@@ -35,12 +35,14 @@ export const InteractionsBar = ({
   refreshReactions,
   isPrivate = false,
 }: InteractionsBarProps) => {
+  const {useAddReactionToReview, reviewType} = useReviewApiHooks();
+
   const totalReactions = reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
     : 0;
 
   const [addReactionToReview, {isLoading: isAddingReaction}] =
-    useAddReactionToReviewMutation();
+    useAddReactionToReview();
 
   const handleAddReactionToReview = async (
     currentEmoji: string | null,
@@ -84,6 +86,7 @@ export const InteractionsBar = ({
           reviewId={reviewId}
           reactions={reactions}
           totalReactions={totalReactions}
+          reviewType={reviewType}
         />
       </React.Fragment>
     </View>
