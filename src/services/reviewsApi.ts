@@ -64,7 +64,7 @@ export const reviewsApi = api.injectEndpoints({
           content,
         },
       }),
-      invalidatesTags: ['ReviewDetails', 'ReviewMessages'],
+      invalidatesTags: ['ReviewDetails', 'ReviewMessages', 'Badges'],
     }),
     getMessages: builder.query<GetMessagesResponse, GetMessagesRequest>({
       query: ({reviewId, offset, limit, sortOrder, sortBy}) => {
@@ -139,7 +139,7 @@ export const reviewsApi = api.injectEndpoints({
         url: API_ROUTES.REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['ReviewThreads', 'ReviewDetails'],
+      invalidatesTags: ['ReviewThreads', 'ReviewDetails', 'Badges'],
     }),
   }),
 });
