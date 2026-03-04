@@ -1,3 +1,7 @@
+import {MessageThreadComment} from '@/types/reviews';
+
+import {ThreadCommentChange} from '../CommentThreadBottomSheet/types';
+
 export interface ThreadsBottomSheetProps {
   /**
    * Whether the bottom sheet is visible
@@ -19,4 +23,16 @@ export interface ThreadsBottomSheetProps {
    * Callback when a comment is pressed
    */
   onThreadPress?: (threadId: string) => void;
+  /**
+   * Callback when add reaction is pressed on a general comment
+   */
+  onAddReactionPress?: (commentId: string) => void;
+  /**
+   * Callback when reply is pressed on a general comment
+   */
+  onReplyPress?: (comment: MessageThreadComment) => void;
+  /**
+   * Callback when general comments change (add/edit/delete/hide)
+   */
+  onCommentsChanged?: (change: ThreadCommentChange) => void;
 }

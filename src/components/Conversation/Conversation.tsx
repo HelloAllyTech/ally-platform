@@ -9,18 +9,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {
-  AndroidCommentMessageRow,
-  SelectionChangeEvent,
-  SingleTapEvent,
-} from '@/components/AndroidCommentMessageRow';
-import {
-  CommentableTextInput,
+  AndroidCommentableText,
+  IosCommentableText,
   type AddCommentMenuData,
+  type SelectionChangeEvent,
   type SelectionData,
-} from '@/components/CommentableTextInput/CommentableTextInput';
+  type SingleTapEvent,
+} from '@/components/CommentableText';
 import {Message as MessageComponent} from '@/components/Message';
 import {useTranslate} from '@/hooks';
 import {fontFamily, typography} from '@/theme';
@@ -35,10 +33,6 @@ const formatTimestamp = (startSeconds: number) => {
 
 const isAndroid = Platform.OS === 'android';
 const isIOS = Platform.OS === 'ios';
-
-// iOS floating "Add comment" menu dimensions
-const IOS_MENU_W = 140;
-const IOS_MENU_H = 44;
 
 type FloatingMenuData = {
   position: {x: number; y: number};
@@ -102,7 +96,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     setFloatingMenu(null);
   }, []);
 
-  // Bump to tell ALL native AndroidCommentMessageRow views to clear their
+  // Bump to tell ALL native AndroidCommentableTextInput views to clear their
   // text selection (which also dismisses the native ActionMode toolbar).
   const [clearSelectionSignal, setClearSelectionSignal] = useState(0);
 
@@ -211,7 +205,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     highlightedPartIndices: number[],
   ) => {
     return (
-      <CommentableTextInput
+      <IosCommentableText
         messageId={messageItem.id}
         isActive={activeMenuMessageId === messageItem.id}
         requestCloseSignal={closeSignal}
@@ -291,7 +285,7 @@ export const Conversation: React.FC<ConversationProps> = ({
             </Text>
           </Pressable>
           <View style={styles.androidMessageColumn}>
-            <AndroidCommentMessageRow
+            <AndroidCommentableText
               messageId={String(item.id)}
               onSelectionChange={handleAndroidSelectionChange}
               onSingleTap={handleAndroidSingleTap}
@@ -314,7 +308,7 @@ export const Conversation: React.FC<ConversationProps> = ({
                   );
                 })}
               </Text>
-            </AndroidCommentMessageRow>
+            </AndroidCommentableText>
           </View>
         </View>
       );
@@ -391,8 +385,8 @@ export const Conversation: React.FC<ConversationProps> = ({
               {
                 top: floatingMenu.position.y - conversationOffsetRef.current.y,
                 left: floatingMenu.position.x - conversationOffsetRef.current.x,
-                width: IOS_MENU_W,
-                height: IOS_MENU_H,
+                width: ms(140),
+                height: ms(44),
               },
             ]}>
             <TouchableOpacity

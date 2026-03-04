@@ -204,6 +204,34 @@ export const API_ROUTES = {
     ADD_REACTION_TO_REVIEW: (reviewId: string) =>
       `/reviews/${reviewId}/reactions`,
   },
+  // TODO: Update scribe URL patterns once backend confirms exact paths
+  SCRIBE_REVIEWS: {
+    REVIEW_BY_ID: (reviewId: string) => `/scribe/${reviewId}`,
+    ADD_REVIEW_COMMENT: (reviewId: string) => `/scribe/${reviewId}/comments`,
+    GET_MESSAGES: (reviewId: string) => `/scribe/${reviewId}/messages`,
+    REACTIONS: (reviewId: string | number) => `/scribe/${reviewId}/reactions`,
+    REACTIONS_COUNT: (reviewId: string | number) =>
+      `/scribe/${reviewId}/reactions/count`,
+    THREADS: (reviewId: string | number) => `/scribe/${reviewId}/threads`,
+    GET_THREAD_COMMENTS: (threadId: string) =>
+      `/scribe/threads/${threadId}/comments`,
+    GET_COMMENT_REPLIES: (commentId: string) =>
+      `/scribe/comments/${commentId}/replies`,
+    UPDATE_COMMENT_VISIBILITY: (commentId: string) =>
+      `/scribe/comments/${commentId}/visibility`,
+    UPDATE_COMMENT: (commentId: string) => `/scribe/comments/${commentId}`,
+    DELETE_COMMENT: (commentId: string) => `/scribe/comments/${commentId}`,
+    ADD_REACTION_TO_COMMENT: (commentId: string) =>
+      `/scribe/comments/${commentId}/reactions`,
+    ADD_REACTION_TO_REVIEW: (reviewId: string) =>
+      `/scribe/${reviewId}/reactions`,
+    GENERAL_COMMENTS: (reviewId: string) =>
+      `/scribe/${reviewId}/general-comments`,
+    GENERAL_COMMENT_BY_ID: (commentId: string) =>
+      `/scribe/general-comments/${commentId}`,
+    GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
+      `/scribe/general-comments/${commentId}/visibility`,
+  },
   BADGES: {
     GET_BADGES: `/badges/me`,
     AVAILABLE: '/badges/me/available',

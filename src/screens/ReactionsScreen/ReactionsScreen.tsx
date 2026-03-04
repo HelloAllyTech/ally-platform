@@ -12,6 +12,11 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets';
+import {
+  ReviewApiProvider,
+  scribeApiHooks,
+  simulationApiHooks,
+} from '@/contexts/ReviewApiContext';
 import {useAppNavigation} from '@/hooks';
 import {useReactions} from '@/hooks/useReactions';
 import {RootStackScreenProps} from '@/navigation';
@@ -23,7 +28,20 @@ import {ReactionData} from './types';
 type Props = RootStackScreenProps<'Reactions'>;
 
 export const ReactionsScreen: React.FC<Props> = ({route}) => {
-  const {reviewId} = route.params;
+  const {reviewId, reviewType} = route.params;
+  const apiHooks =
+    reviewType === 'scribe' ? scribeApiHooks : simulationApiHooks;
+
+  return (
+    <ReviewApiProvider value={apiHooks}>
+      <ReactionsContent reviewId={reviewId} />
+    </ReviewApiProvider>
+  );
+};
+
+const ReactionsContent: React.FC<{reviewId: string | number}> = ({
+  reviewId,
+}) => {
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useAppNavigation();

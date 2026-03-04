@@ -8,6 +8,15 @@ const mockGoBack = jest.fn();
 const mockHandleReactionFilter = jest.fn();
 const mockLoadMore = jest.fn();
 
+jest.mock('@/contexts/ReviewApiContext', () => {
+  const React = require('react');
+  return {
+    ReviewApiProvider: ({children}: {children: React.ReactNode}) => children,
+    simulationApiHooks: {},
+    scribeApiHooks: {},
+  };
+});
+
 jest.mock('@/hooks/useReactions', () => ({
   useReactions: jest.fn(() => ({
     reactions: [] as ReactionData[],

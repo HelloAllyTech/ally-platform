@@ -1,4 +1,4 @@
-package com.helloally.app.commentabletext
+package com.helloally.app.commentableText
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Dynamic
@@ -12,14 +12,14 @@ import com.facebook.react.uimanager.annotations.ReactProp
 import com.facebook.react.uimanager.events.RCTEventEmitter
 
 /**
- * React Native ViewGroupManager that bridges [AndroidCommentMessageRowView] to JS.
+ * React Native ViewGroupManager that bridges [CommentableTextView] to JS.
  *
  * Uses **ViewGroupManager** (not SimpleViewManager) so that React Native children
  * (e.g. <Text> elements) are rendered inside the native FrameLayout.  The native
  * view then finds the underlying ReactTextView and enables selection on it –
  * following the exact same pattern as the working SelectableTextView library.
  *
- * JS component name: "AndroidCommentMessageRow"
+ * JS component name: "CommentableTextView"
  *
  * Props:
  *   messageId   : String
@@ -28,18 +28,17 @@ import com.facebook.react.uimanager.events.RCTEventEmitter
  * Events → JS:
  *   onSelectionChange({ messageId, start, end, selectedText })
  */
-class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRowView>() {
+class CommentableTextViewManager : ViewGroupManager<CommentableTextView>() {
 
     companion object {
-        const val REACT_CLASS = "AndroidCommentMessageRow"
+        const val REACT_CLASS = "CommentableTextView"
     }
 
     override fun getName(): String = REACT_CLASS
 
-    override fun createViewInstance(reactContext: ThemedReactContext): AndroidCommentMessageRowView {
-        val view = AndroidCommentMessageRowView(reactContext)
+    override fun createViewInstance(reactContext: ThemedReactContext): CommentableTextView {
+        val view = CommentableTextView(reactContext)
 
-        // Wire native callback → JS event
         view.onSelectionChangeListener = { messageId, start, end, selectedText ->
             val event = Arguments.createMap().apply {
                 putString("messageId", messageId)
@@ -52,7 +51,6 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
                 ?.receiveEvent(view.id, "onSelectionChange", event)
         }
 
-        // Wire single-tap callback → JS event
         view.onSingleTapListener = { messageId, offset ->
             val event = Arguments.createMap().apply {
                 putString("messageId", messageId)
@@ -69,7 +67,7 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
     // ── Props ──────────────────────────────────────────────────────
 
     @ReactProp(name = "messageId")
-    fun setMessageId(view: AndroidCommentMessageRowView, value: Dynamic?) {
+    fun setMessageId(view: CommentableTextView, value: Dynamic?) {
         view.messageId = when (value?.type) {
             ReadableType.String -> value.asString()
             ReadableType.Number -> {
@@ -86,7 +84,7 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
      * so they are relative to the message content only.
      */
     @ReactProp(name = "prefixLength", defaultInt = 0)
-    fun setPrefixLength(view: AndroidCommentMessageRowView, length: Int) {
+    fun setPrefixLength(view: CommentableTextView, length: Int) {
         view.prefixLength = length
     }
 
@@ -96,14 +94,14 @@ class AndroidCommentMessageRowManager : ViewGroupManager<AndroidCommentMessageRo
      * ActionMode floating toolbar ("Add comment").
      */
     @ReactProp(name = "clearSelectionSignal", defaultInt = 0)
-    fun setClearSelectionSignal(view: AndroidCommentMessageRowView, signal: Int) {
+    fun setClearSelectionSignal(view: CommentableTextView, signal: Int) {
         if (signal > 0) {
             view.clearSelection()
         }
     }
 
     @ReactProp(name = "menuOptions")
-    fun setMenuOptions(view: AndroidCommentMessageRowView, menuOptions: ReadableArray?) {
+    fun setMenuOptions(view: CommentableTextView, menuOptions: ReadableArray?) {
         if (menuOptions != null) {
             val options = Array(menuOptions.size()) { i ->
                 menuOptions.getString(i) ?: ""

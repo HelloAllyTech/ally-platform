@@ -22,18 +22,9 @@ import {
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useTranslate, useUser} from '@/hooks';
-import {
-  ReactionAction,
-  useAddReactionToCommentMutation,
-  useAddReviewCommentMutation,
-} from '@/services';
-import {
-  useDeleteCommentMutation,
-  useUpdateCommentMutation,
-  useUpdateCommentVisibilityMutation,
-} from '@/services/reviewsApi';
-import {useLazyGetCommentRepliesQuery} from '@/services/reviewThreadsApi';
+import {ReactionAction} from '@/services';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
@@ -62,8 +53,18 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
+
+  const {
+    useLazyGetCommentReplies,
+    useUpdateCommentVisibility,
+    useUpdateComment,
+    useDeleteComment,
+    useAddReactionToComment,
+    useAddReviewComment,
+  } = useReviewApiHooks();
+
   const [getCommentReplies, {isLoading, isFetching}] =
-    useLazyGetCommentRepliesQuery();
+    useLazyGetCommentReplies();
   const offsetRef = useRef(0);
   const {userData} = useUser();
   const {
@@ -72,10 +73,9 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     profileImageUrl: userProfileImage,
   } = userData || {};
 
-  // Mutations for comment actions
-  const [updateCommentVisibility] = useUpdateCommentVisibilityMutation();
-  const [updateComment] = useUpdateCommentMutation();
-  const [deleteComment] = useDeleteCommentMutation();
+  const [updateCommentVisibility] = useUpdateCommentVisibility();
+  const [updateComment] = useUpdateComment();
+  const [deleteComment] = useDeleteComment();
   const [replies, setReplies] = React.useState<{
     data: MessageThreadComment[];
     count: number;
@@ -85,7 +85,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [deleteReplyId, setDeleteReplyId] = useState<string | null>(null);
   const deleteGobackRef = useRef<(() => void) | null>(null);
-  const [addReaction] = useAddReactionToCommentMutation();
+  const [addReaction] = useAddReactionToComment();
 
   const handleGoback = useCallback(() => {
     hideReplyBottomSheet();
@@ -187,7 +187,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   }, [visible]);
 
   const [addReviewComment, {isLoading: isAddingComment}] =
-    useAddReviewCommentMutation();
+    useAddReviewComment();
 
   // Common function to handle API response and update state
   const handleApiResponse = useCallback(
