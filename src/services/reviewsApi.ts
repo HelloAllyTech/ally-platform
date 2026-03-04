@@ -147,7 +147,7 @@ export const reviewsApi = api.injectEndpoints({
         url: API_ROUTES.REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['ReviewThreads'],
+      invalidatesTags: ['ReviewThreads', 'ReviewDetails'],
     }),
   }),
 });
