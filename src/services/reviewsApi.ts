@@ -141,6 +141,20 @@ export const reviewsApi = api.injectEndpoints({
       }),
       invalidatesTags: ['ReviewThreads', 'ReviewDetails'],
     }),
+    // TODO_M Rename, mention general comments here
+    getReviewComments: builder.query<
+      GetThreadCommentsResponse,
+      {reviewId: string; offset?: number; limit?: number}
+    >({
+      query: ({reviewId, offset, limit}) => ({
+        url: API_ROUTES.REVIEWS.GET_REVIEW_COMMENTS(reviewId),
+        method: API_METHODS.GET,
+        ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
+          ? {params: {offset, limit}}
+          : {}),
+      }),
+      providesTags: ['GeneralComments'],
+    }),
   }),
 });
 
@@ -158,4 +172,6 @@ export const {
   useUpdateCommentVisibilityMutation,
   useUpdateCommentMutation,
   useDeleteCommentMutation,
+  // TODO_M Rename, mention general comments here
+  useLazyGetReviewCommentsQuery,
 } = reviewsApi;

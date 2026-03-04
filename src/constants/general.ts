@@ -186,6 +186,8 @@ export const API_ROUTES = {
     REVIEW_BY_ID: (reviewId: string) => `/reviews/${reviewId}`,
     UPDATE_REVIEW_STATUS: (reviewId: string) => `/reviews/${reviewId}`,
     ADD_REVIEW_COMMENT: (reviewId: string) => `/reviews/${reviewId}/comments`,
+    //TODO_M Rename, mention general comments here
+    GET_REVIEW_COMMENTS: (reviewId: string) => `/reviews/${reviewId}/comments`,
     GET_MESSAGES: (reviewId: string) => `/reviews/${reviewId}/messages`,
     REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
@@ -208,6 +210,8 @@ export const API_ROUTES = {
   SCRIBE_REVIEWS: {
     REVIEW_BY_ID: (reviewId: string) => `/scribe/${reviewId}`,
     ADD_REVIEW_COMMENT: (reviewId: string) => `/scribe/${reviewId}/comments`,
+    // TODO_M Rename, mention general comments here
+    GET_REVIEW_COMMENTS: (reviewId: string) => `/scribe/${reviewId}/comments`,
     GET_MESSAGES: (reviewId: string) => `/scribe/${reviewId}/messages`,
     REACTIONS: (reviewId: string | number) => `/scribe/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
