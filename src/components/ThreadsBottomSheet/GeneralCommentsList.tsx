@@ -53,7 +53,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   const offsetRef = React.useRef(0);
 
   const {
-    useLazyGetReviewComments,
+    useLazyGetGeneralReviewComments,
     useAddReviewComment,
     useUpdateComment,
     useDeleteComment,
@@ -61,8 +61,8 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     useAddReactionToComment,
   } = useReviewApiHooks();
 
-  const [getReviewComments, {isLoading, isFetching}] =
-    useLazyGetReviewComments();
+  const [getGeneralReviewComments, {isLoading, isFetching}] =
+    useLazyGetGeneralReviewComments();
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewComment();
   const [updateComment, {isLoading: isUpdatingComment}] = useUpdateComment();
@@ -127,8 +127,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
         setComments(null);
         setHasMore(false);
         setHasLoadedOnce(false);
-        // TODO_M Rename, mention general comments here
-        const result = await getReviewComments({
+        const result = await getGeneralReviewComments({
           reviewId,
           offset: 0,
           limit: LIMIT,
@@ -262,8 +261,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     if (!visible || isLoading || !hasMore || !reviewId) return;
     const newOffset = offsetRef.current + LIMIT;
     offsetRef.current = newOffset;
-    // TODO_M Rename, mention general comments here
-    const result = await getReviewComments({
+    const result = await getGeneralReviewComments({
       reviewId,
       offset: newOffset,
       limit: LIMIT,
@@ -274,8 +272,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   }, [
     hasMore,
     reviewId,
-    // TODO_M Rename, mention general comments here
-    getReviewComments,
+    getGeneralReviewComments,
     visible,
     handleApiResponse,
     isLoading,
