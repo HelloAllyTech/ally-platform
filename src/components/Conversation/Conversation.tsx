@@ -452,7 +452,7 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   highlightedText: {
-    backgroundColor: colors.ds.amber[50],
+    backgroundColor: 'rgba(255, 248, 225, 0.5)',
     borderBottomWidth: '1@ms',
     borderBottomColor: colors.ds.amber[500],
   },
