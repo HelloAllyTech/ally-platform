@@ -6,15 +6,8 @@ import {ms} from 'react-native-size-matters';
 
 import {ConfirmationModal, ReviewComment} from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useCommentActions, useTranslate} from '@/hooks';
-import {
-  useAddGeneralCommentMutation,
-  useDeleteGeneralCommentMutation,
-  useLazyGetGeneralCommentsQuery,
-  useUpdateGeneralCommentMutation,
-  useUpdateGeneralCommentVisibilityMutation,
-} from '@/services/generalCommentsApi';
-import {useAddReactionToCommentMutation} from '@/services/reactionsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
@@ -56,17 +49,24 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   const insets = useSafeAreaInsets();
   const offsetRef = React.useRef(0);
 
-  const [getGeneralComments, {isLoading, isFetching}] =
-    useLazyGetGeneralCommentsQuery();
+  const {
+    useLazyGetGeneralComments,
+    useAddGeneralComment,
+    useUpdateGeneralComment,
+    useDeleteGeneralComment,
+    useUpdateGeneralCommentVisibility,
+    useAddReactionToComment,
+  } = useReviewApiHooks();
 
+  const [getGeneralComments, {isLoading, isFetching}] =
+    useLazyGetGeneralComments();
   const [addGeneralComment, {isLoading: isAddingComment}] =
-    useAddGeneralCommentMutation();
+    useAddGeneralComment();
   const [updateGeneralComment, {isLoading: isUpdatingComment}] =
-    useUpdateGeneralCommentMutation();
-  const [deleteGeneralComment] = useDeleteGeneralCommentMutation();
-  const [updateGeneralCommentVisibility] =
-    useUpdateGeneralCommentVisibilityMutation();
-  const [addReaction] = useAddReactionToCommentMutation();
+    useUpdateGeneralComment();
+  const [deleteGeneralComment] = useDeleteGeneralComment();
+  const [updateGeneralCommentVisibility] = useUpdateGeneralCommentVisibility();
+  const [addReaction] = useAddReactionToComment();
 
   const {
     comments,

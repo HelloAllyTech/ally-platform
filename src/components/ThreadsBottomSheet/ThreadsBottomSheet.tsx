@@ -23,8 +23,8 @@ import {
   CommentBottomSheetFooter,
   ReviewComment,
 } from '@/components';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useTranslate, useUser} from '@/hooks';
-import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {colors} from '@/theme';
 import {Thread, ThreadsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
@@ -92,9 +92,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const activeTab = routes[tabIndex]?.key as TABS;
 
+  const {useLazyGetThreads} = useReviewApiHooks();
+
   // --- Inline tab state ---
   const [getThreads, {data: apiData, isLoading, isFetching}] =
-    useLazyGetThreadsQuery();
+    useLazyGetThreads();
 
   const [offset, setOffset] = React.useState(0);
   const [commentsData, setCommentsData] =

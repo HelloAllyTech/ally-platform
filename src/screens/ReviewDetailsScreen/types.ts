@@ -27,6 +27,6 @@ export interface ReviewMetadata {
   reviewOwnerId?: number;
 }
 
-export type ReviewType = 'simulation' | 'scribe';
+export type {ReviewType} from '@/contexts/ReviewApiContext';
 
 export type {MessageThreadComment};

@@ -22,15 +22,8 @@ import {
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useCommentActions, useTranslate} from '@/hooks';
-import {useAddReactionToCommentMutation} from '@/services';
-import {
-  useAddReviewCommentMutation,
-  useDeleteCommentMutation,
-  useLazyGetThreadCommentsQuery,
-  useUpdateCommentMutation,
-  useUpdateCommentVisibilityMutation,
-} from '@/services/reviewsApi';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
@@ -59,16 +52,24 @@ export const CommentThreadBottomSheet: React.FC<
   const insets = useSafeAreaInsets();
   const offsetRef = React.useRef(0);
 
-  const [updateCommentVisibility] = useUpdateCommentVisibilityMutation();
-  const [updateComment, {isLoading: isUpdatingComment}] =
-    useUpdateCommentMutation();
-  const [deleteComment] = useDeleteCommentMutation();
+  const {
+    useUpdateCommentVisibility,
+    useUpdateComment,
+    useDeleteComment,
+    useAddReviewComment,
+    useAddReactionToComment,
+    useLazyGetThreadComments,
+  } = useReviewApiHooks();
+
+  const [updateCommentVisibility] = useUpdateCommentVisibility();
+  const [updateComment, {isLoading: isUpdatingComment}] = useUpdateComment();
+  const [deleteComment] = useDeleteComment();
   const [addReviewComment, {isLoading: isAddingComment}] =
-    useAddReviewCommentMutation();
-  const [addReaction] = useAddReactionToCommentMutation();
+    useAddReviewComment();
+  const [addReaction] = useAddReactionToComment();
 
   const [getThreadComments, {isLoading, isFetching}] =
-    useLazyGetThreadCommentsQuery();
+    useLazyGetThreadComments();
 
   const {
     comments,

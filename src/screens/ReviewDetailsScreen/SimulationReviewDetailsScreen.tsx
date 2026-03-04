@@ -1,6 +1,10 @@
 import React, {useMemo} from 'react';
 
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
+import {
+  ReviewApiProvider,
+  simulationApiHooks,
+} from '@/contexts/ReviewApiContext';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
@@ -59,21 +63,23 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
     : undefined;
 
   return (
-    <ReviewDetailsLayout
-      reviewId={reviewId}
-      isPrivate={isPrivate}
-      reviewLogic={reviewLogic}
-      metadata={metadata}
-      onRefreshReactions={refetchReviewData}
-      renderHeader={() =>
-        reviewData ? (
-          <ReviewTranscriptHeader
-            user={reviewData.createdBy}
-            scenario={reviewData.scenario}
-            scenarioSession={reviewData.scenarioSession}
-          />
-        ) : null
-      }
-    />
+    <ReviewApiProvider value={simulationApiHooks}>
+      <ReviewDetailsLayout
+        reviewId={reviewId}
+        isPrivate={isPrivate}
+        reviewLogic={reviewLogic}
+        metadata={metadata}
+        onRefreshReactions={refetchReviewData}
+        renderHeader={() =>
+          reviewData ? (
+            <ReviewTranscriptHeader
+              user={reviewData.createdBy}
+              scenario={reviewData.scenario}
+              scenarioSession={reviewData.scenarioSession}
+            />
+          ) : null
+        }
+      />
+    </ReviewApiProvider>
   );
 };
