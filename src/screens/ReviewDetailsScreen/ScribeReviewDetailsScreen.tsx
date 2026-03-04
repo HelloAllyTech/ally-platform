@@ -2,38 +2,36 @@ import React, {useMemo} from 'react';
 import {Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {ReviewApiProvider, scribeApiHooks} from '@/contexts/ReviewApiContext';
 import {RootStackScreenProps} from '@/navigation';
 import {
-  useAddReviewCommentMutation,
-  useGetReviewByIdQuery,
-  useLazyGetMessagesQuery,
-} from '@/services/reviewsApi';
+  useAddScribeReviewCommentMutation,
+  useGetScribeReviewByIdQuery,
+  useLazyGetScribeMessagesQuery,
+} from '@/services/scribeReviewsApi';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ReviewDetailsLayout} from './components/ReviewDetailsLayout';
 import {useReviewDetailsLogic} from './hooks/useReviewDetailsLogic';
 import {ReviewApiAdapter, ReviewMetadata} from './types';
 
-// TODO: Replace with scribe-specific API hooks when endpoints are ready
-// import { useGetScribeReviewByIdQuery, ... } from '@/services/scribeReviewsApi';
-
 type Props = RootStackScreenProps<'ScribeReviewDetails'>;
 
 export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const {reviewId, isPrivate} = route.params || {};
 
-  // TODO: Swap these with scribe-specific API hooks when available
-  const [fetchMessages, messagesState] = useLazyGetMessagesQuery();
-  const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery(
-    {reviewId},
-    {
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-    },
-  );
+  const [fetchMessages, messagesState] = useLazyGetScribeMessagesQuery();
+  const {data: reviewData, refetch: refetchReviewData} =
+    useGetScribeReviewByIdQuery(
+      {reviewId},
+      {
+        refetchOnMountOrArgChange: true,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+      },
+    );
   const [addReviewComment, {isLoading: isAddingComment}] =
-    useAddReviewCommentMutation();
+    useAddScribeReviewCommentMutation();
 
   const api: ReviewApiAdapter = useMemo(
     () => ({
@@ -65,21 +63,23 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     : undefined;
 
   return (
-    <ReviewDetailsLayout
-      reviewId={reviewId}
-      isPrivate={isPrivate}
-      reviewLogic={reviewLogic}
-      metadata={metadata}
-      onRefreshReactions={refetchReviewData}
-      renderHeader={() =>
-        reviewData ? (
-          // TODO: Replace with ScribeTranscriptHeader when designed
-          <Text style={scribeStyles.headerTitle} numberOfLines={1}>
-            Session Review
-          </Text>
-        ) : null
-      }
-    />
+    <ReviewApiProvider value={scribeApiHooks}>
+      <ReviewDetailsLayout
+        reviewId={reviewId}
+        isPrivate={isPrivate}
+        reviewLogic={reviewLogic}
+        metadata={metadata}
+        onRefreshReactions={refetchReviewData}
+        renderHeader={() =>
+          reviewData ? (
+            // TODO: Replace with ScribeTranscriptHeader when designed
+            <Text style={scribeStyles.headerTitle} numberOfLines={1}>
+              Session Review
+            </Text>
+          ) : null
+        }
+      />
+    </ReviewApiProvider>
   );
 };
 

@@ -4,6 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker';
 import {SCREEN_NAMES} from '@/constants';
+import type {ReviewType} from '@/contexts/ReviewApiContext';
 import {useAppNavigation} from '@/hooks';
 import {
   colors,
@@ -20,11 +21,13 @@ interface ReactionsCountProps {
   reviewId: string;
   reactions: Record<string, number>;
   totalReactions: number;
+  reviewType?: ReviewType;
 }
 export const ReactionsCount = ({
   reviewId,
   reactions,
   totalReactions = 0,
+  reviewType,
 }: ReactionsCountProps) => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
@@ -46,7 +49,7 @@ export const ReactionsCount = ({
   );
 
   const handleReactionsCountPress = () => {
-    navigation.navigate(SCREEN_NAMES.REACTIONS, {reviewId});
+    navigation.navigate(SCREEN_NAMES.REACTIONS, {reviewId, reviewType});
   };
 
   return (

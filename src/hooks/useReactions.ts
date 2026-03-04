@@ -1,11 +1,8 @@
 import {useCallback, useEffect, useState} from 'react';
 
 import {EMOJI_UNICODE_MAP} from '@/components/EmojiPicker/utils';
-import {
-  Reaction,
-  useLazyGetReactionsCountQuery,
-  useLazyGetReactionsQuery,
-} from '@/services/reactionsApi';
+import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
+import {Reaction} from '@/services/reactionsApi';
 
 const LIMIT = 20;
 
@@ -16,6 +13,8 @@ export interface ReactionSummary {
 }
 
 export const useReactions = (reviewId: string | number | null) => {
+  const {useLazyGetReactions, useLazyGetReactionsCount} = useReviewApiHooks();
+
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
@@ -23,8 +22,8 @@ export const useReactions = (reviewId: string | number | null) => {
   const [summary, setSummary] = useState<ReactionSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [getReactions, {isLoading, isFetching}] = useLazyGetReactionsQuery();
-  const [getReactionsCount] = useLazyGetReactionsCountQuery();
+  const [getReactions, {isLoading, isFetching}] = useLazyGetReactions();
+  const [getReactionsCount] = useLazyGetReactionsCount();
 
   const fetchReactionsCount = useCallback(async () => {
     if (!reviewId) return;
