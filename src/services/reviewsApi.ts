@@ -17,14 +17,6 @@ import {
 
 import {api} from './api';
 
-// TODO_M: Remove once dependent changes are merged
-export enum ReviewFilter {
-  ALL = 'ALL',
-  LATEST = 'LATEST',
-  MOST_REVIEWED = 'MOST_REVIEWED',
-  UNDISCOVERED = 'UNDISCOVERED',
-}
-
 export const reviewsApi = api.injectEndpoints({
   endpoints: builder => ({
     createReview: builder.mutation<CreateReviewResponse, CreateReviewRequest>({
