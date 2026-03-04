@@ -611,6 +611,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}
         onThreadPress={onThreadPress}
+        generalCommentsThreadId={reviewData?.generalCommentsThreadId || ''}
       />
       <MessageThreadsBottomSheet
         visible={isMessageThreadsVisible}
