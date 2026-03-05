@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TextStyle, View, ViewStyle} from 'react-native';
+import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
@@ -8,61 +8,70 @@ export type CallTranscriptItemProps = {
   time: string;
   message: string;
   speakerLabel?: string;
-  containerStyle?: ViewStyle;
-  timeStyle?: TextStyle;
-  messageTextStyle?: TextStyle;
-  messageStyle?: TextStyle;
+  counselor?: boolean;
 };
 
 export const CallTranscriptItem: React.FC<CallTranscriptItemProps> = ({
   time,
   message,
   speakerLabel,
-  containerStyle,
-  timeStyle,
-  messageTextStyle,
-  messageStyle,
+  counselor = false,
 }) => {
+  const backgroundColor = counselor
+    ? colors.ds.blueAlpha[25]
+    : colors.ds.deepPurpleAlpha[25];
+  const borderColor = counselor
+    ? colors.ds.theme.primary
+    : colors.ds.deepPurple[500];
+  const speakerColor = counselor
+    ? colors.ds.theme.primary
+    : colors.ds.deepPurple[800];
+
   return (
-    <View style={[styles.messageContainer, containerStyle]}>
-      <View style={styles.timeContainer}>
-        <Text style={[styles.timeText, timeStyle]}>{time}</Text>
+    <View style={[styles.messageContainer, {backgroundColor, borderColor}]}>
+      <View style={styles.speakerRow}>
+        <Text style={styles.timeInline}>{time} </Text>
+        {speakerLabel ? (
+          <Text style={[styles.speakerLabel, {color: speakerColor}]}>
+            {speakerLabel}
+          </Text>
+        ) : null}
       </View>
-      <View style={styles.messageContent}>
-        <Text style={[styles.messageText, messageTextStyle]}>
-          {speakerLabel ? `${speakerLabel}: ` : ''}
-          <Text style={[styles.message, messageStyle]}>{message}</Text>
-        </Text>
-      </View>
+      <Text style={styles.message}>{message}</Text>
     </View>
   );
 };
 
 const styles = ScaledSheet.create({
   messageContainer: {
-    marginVertical: '7@mvs',
+    borderWidth: '0.5@ms',
+    borderRadius: '8@ms',
+    padding: '12@ms',
+    marginBottom: '16@vs',
+  },
+  speakerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+    marginBottom: '4@vs',
   },
-  timeContainer: {
-    width: '60@ms',
-  },
-  timeText: {
+  timeInline: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.mediumGray2,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
+    fontSize: '13@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    letterSpacing: '0.1@ms',
   },
-  messageText: {
+  speakerLabel: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    lineHeight: '20@mvs',
-    color: colors.black,
+    fontSize: '13@ms',
+    letterSpacing: '0.25@ms',
+    lineHeight: '24@vs',
   },
   message: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.charcoal2,
-  },
-  messageContent: {
-    flex: 1,
+    fontSize: '13@ms',
+    color: colors.ds.typography.highEmphasis,
+    letterSpacing: '0.25@ms',
+    lineHeight: '20@vs',
   },
 });

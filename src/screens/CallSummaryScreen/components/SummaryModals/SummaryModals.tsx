@@ -13,12 +13,7 @@ import {FeedbackPopup} from '@/components';
 import {PRIVACY_POLICY_URL} from '@/constants';
 
 import {CustomMenuModalOption} from '../CustomMenuModal/CustomMenuModal';
-import {
-  ArchiveActionModal,
-  CustomMenuModal,
-  DeleteRenameModal,
-  SummaryDropdown,
-} from '../index';
+import {ArchiveActionModal, CustomMenuModal, DeleteRenameModal} from '../index';
 
 type ModalType = 'rename' | 'delete' | null;
 
@@ -32,10 +27,6 @@ interface SummaryModalsProps {
   isMenuVisible: boolean;
   hideMenu: () => void;
   handleExport: () => void;
-  isSummaryDropdownVisible: boolean;
-  hideHeaderDropdown: () => void;
-  showSummary: boolean;
-  setShowSummary: (show: boolean) => void;
   actionType: 'archive' | 'unarchive' | null;
   setActionType: (actionType: 'archive' | 'unarchive' | null) => void;
   showArchiveConfirmation: boolean;
@@ -60,10 +51,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   isMenuVisible,
   hideMenu,
   handleExport,
-  isSummaryDropdownVisible,
-  hideHeaderDropdown,
-  showSummary,
-  setShowSummary,
   actionType,
   setActionType,
   showArchiveConfirmation,
@@ -122,12 +109,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         handleBlur={handleBlur}
         editedName={editedName}
         setEditedName={setEditedName}
-      />
-      <SummaryDropdown
-        visible={isSummaryDropdownVisible}
-        onClose={hideHeaderDropdown}
-        showSummary={showSummary}
-        setShowSummary={setShowSummary}
       />
       <CustomMenuModal
         visible={isMenuVisible}

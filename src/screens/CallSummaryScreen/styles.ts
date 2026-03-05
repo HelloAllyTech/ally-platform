@@ -1,12 +1,38 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {WINDOW_HEIGHT} from '@/constants/general';
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  tabsContainer: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  tabBar: {
+    backgroundColor: colors.white,
+  },
+  tabBarIndicator: {
+    backgroundColor: colors.ds.theme.primary,
+    height: 2,
+  },
+  tabBarTab: {
+    width: 'auto' as const,
+    paddingHorizontal: 10,
+  },
+  tabBarLabel: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  lazyPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,

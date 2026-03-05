@@ -15,11 +15,12 @@ describe('CallTranscriptItem', () => {
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
-  it('renders speaker label when provided', () => {
+  it('renders speaker label as separate element when provided', () => {
     const {getByText} = render(
       <CallTranscriptItem {...defaultProps} speakerLabel="You" />,
     );
-    expect(getByText('You: Hello, this is a test message')).toBeTruthy();
+    expect(getByText('You')).toBeTruthy();
+    expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
   it('does not render speaker label when not provided', () => {
@@ -27,48 +28,7 @@ describe('CallTranscriptItem', () => {
       <CallTranscriptItem {...defaultProps} />,
     );
     expect(getByText('Hello, this is a test message')).toBeTruthy();
-    // Speaker label should not be rendered
-    expect(queryByText(/You:/)).toBeNull();
-  });
-
-  it('renders empty speaker label correctly', () => {
-    const {getByText} = render(
-      <CallTranscriptItem {...defaultProps} speakerLabel="" />,
-    );
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-  });
-
-  it('applies custom container style', () => {
-    const customStyle = {marginTop: 10};
-    const {getByText} = render(
-      <CallTranscriptItem {...defaultProps} containerStyle={customStyle} />,
-    );
-    expect(getByText('00:01')).toBeTruthy();
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-  });
-
-  it('applies custom time style', () => {
-    const customStyle = {color: 'red'};
-    const {getByText} = render(
-      <CallTranscriptItem {...defaultProps} timeStyle={customStyle} />,
-    );
-    expect(getByText('00:01')).toBeTruthy();
-  });
-
-  it('applies custom message style', () => {
-    const customStyle = {fontSize: 16};
-    const {getByText} = render(
-      <CallTranscriptItem {...defaultProps} messageStyle={customStyle} />,
-    );
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-  });
-
-  it('applies custom message text style', () => {
-    const customStyle = {fontWeight: 'bold' as const};
-    const {getByText} = render(
-      <CallTranscriptItem {...defaultProps} messageTextStyle={customStyle} />,
-    );
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
+    expect(queryByText(/You/)).toBeNull();
   });
 
   it('renders correctly with empty message', () => {
@@ -86,13 +46,15 @@ describe('CallTranscriptItem', () => {
     expect(getByText(longMessage)).toBeTruthy();
   });
 
-  it('renders correctly with different speaker labels', () => {
-    const {getByText} = render(
-      <CallTranscriptItem
-        {...defaultProps}
-        speakerLabel="AI Assistant"
-      />,
+  it('renders counselor and client items', () => {
+    const {getByText: getByTextCounselor} = render(
+      <CallTranscriptItem {...defaultProps} counselor speakerLabel="You" />,
     );
-    expect(getByText('AI Assistant: Hello, this is a test message')).toBeTruthy();
+    expect(getByTextCounselor('You')).toBeTruthy();
+
+    const {getByText: getByTextClient} = render(
+      <CallTranscriptItem {...defaultProps} counselor={false} speakerLabel="Client" />,
+    );
+    expect(getByTextClient('Client')).toBeTruthy();
   });
 });
