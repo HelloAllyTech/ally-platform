@@ -21,6 +21,7 @@ import {ChevronRight} from '@/assets/icons';
 import {
   BottomSheet,
   CommentBottomSheetFooter,
+  ConfirmationModal,
   ReviewComment,
 } from '@/components';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
@@ -140,6 +141,13 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     onSubmitComment: (_comment: string) => {},
     isSubmitting: false,
   });
+  const generalDeleteFnRef = useRef({
+    setDeleteCommentId: (_id: string | null) => {},
+    handleConfirmDelete: () => {},
+  });
+  const [generalDeleteCommentId, setGeneralDeleteCommentId] = useState<
+    string | null
+  >(null);
   const [generalCommentText, setGeneralCommentText] = useState('');
 
   const footerStateRef = useRef({
@@ -355,6 +363,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         fnRef={generalFnRef}
         onCommentTextChange={setGeneralCommentText}
         generalCommentsThreadId={generalCommentsThreadId}
+        deleteFnRef={generalDeleteFnRef}
+        onDeleteCommentIdChange={setGeneralDeleteCommentId}
       />
     );
   };
@@ -383,37 +393,49 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   );
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      skipBottomSheetView
-      enableContentPanningGesture
-      enableDynamicSizing={false}
-      snapPoints={['80%']}
-      enableOverDrag
-      enableHandlePanningGesture
-      keyboardBehavior="extend"
-      keyboardBlurBehavior="restore"
-      failOffsetX={[-5, 5]}
-      footerComponent={
-        activeTab === TABS.GENERAL ? renderFooterComponent : undefined
-      }>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {t('ThreadsBottomSheet.title')}
-          </Text>
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        skipBottomSheetView
+        enableContentPanningGesture
+        enableDynamicSizing={false}
+        snapPoints={['80%']}
+        enableOverDrag
+        enableHandlePanningGesture
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
+        failOffsetX={[-5, 5]}
+        footerComponent={
+          activeTab === TABS.GENERAL ? renderFooterComponent : undefined
+        }>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>
+              {t('ThreadsBottomSheet.title')}
+            </Text>
+          </View>
+          <TabView
+            navigationState={{index: tabIndex, routes}}
+            renderScene={renderScene}
+            renderTabBar={renderTabBar}
+            onIndexChange={handleTabChange}
+            initialLayout={{width: layout.width}}
+            swipeEnabled
+            commonOptions={{labelStyle: styles.tabBarLabel}}
+          />
         </View>
-        <TabView
-          navigationState={{index: tabIndex, routes}}
-          renderScene={renderScene}
-          renderTabBar={renderTabBar}
-          onIndexChange={handleTabChange}
-          initialLayout={{width: layout.width}}
-          swipeEnabled
-          commonOptions={{labelStyle: styles.tabBarLabel}}
-        />
-      </View>
-    </BottomSheet>
+      </BottomSheet>
+      <ConfirmationModal
+        visible={!!generalDeleteCommentId}
+        onClose={() => generalDeleteFnRef.current.setDeleteCommentId(null)}
+        onConfirm={generalDeleteFnRef.current.handleConfirmDelete}
+        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
+        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
+        confirmVariant="destructive"
+      />
+    </>
   );
 };
