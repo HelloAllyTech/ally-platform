@@ -48,7 +48,6 @@ export const LeaderboardScreen: React.FC = () => {
     isLoading,
     isRefreshing,
     isLoadingMore,
-    badgeCount,
     loadMore,
     refresh,
   } = useLeaderboard({
@@ -270,7 +269,7 @@ export const LeaderboardScreen: React.FC = () => {
         hitSlop={DEFAULT_HIT_SLOP}>
         <BadgeIcon width={20} height={20} />
         <Text style={styles.badgeCount}>
-          {badgeCount} {t('Leaderboard.badges')}
+          {currentUserEntry?.badgeCount || 0} {t('Leaderboard.badges')}
         </Text>
       </TouchableOpacity>
     );
