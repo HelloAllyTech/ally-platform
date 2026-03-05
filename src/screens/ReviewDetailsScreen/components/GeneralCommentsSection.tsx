@@ -198,7 +198,6 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
             reactions={reactionsArray}
             reactionCount={reactionCount}
             showReplyButton={false}
-            disableAddReactionButton
             onEmojiSelect={(currentEmoji, unicode) =>
               handleEmojiSelect(comment.id, currentEmoji, unicode)
             }
