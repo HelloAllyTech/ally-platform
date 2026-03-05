@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -12,18 +12,22 @@ import {LeftArrow} from '@/assets';
 import {
   CommentInput,
   CommentThreadBottomSheet,
+  ConfirmationModal,
   Conversation,
   MessageThreadsBottomSheet,
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
 import {ReviewMetadata} from '../types';
-import {GeneralCommentsSection} from './GeneralCommentsSection';
+import {
+  DeleteConfirmationState,
+  GeneralCommentsSection,
+} from './GeneralCommentsSection';
 
 interface ReviewDetailsLayoutProps {
   reviewId: string;
@@ -44,6 +48,17 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useAppNavigation();
+  const {t} = useTranslate();
+
+  const [generalDeleteState, setGeneralDeleteState] =
+    useState<DeleteConfirmationState | null>(null);
+
+  const handleDeleteConfirmationChange = useCallback(
+    (state: DeleteConfirmationState | null) => {
+      setGeneralDeleteState(state);
+    },
+    [],
+  );
 
   const {
     conversationMessages,
@@ -87,20 +102,21 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   } = reviewLogic;
 
   const generalCommentsFooter = useMemo(
-    () =>
-      metadata?.generalCommentsThreadId ? (
-        <GeneralCommentsSection
-          reviewId={reviewId}
-          generalCommentsThreadId={metadata.generalCommentsThreadId}
-          reviewOwnerId={metadata.reviewOwnerId}
-          onCommentsChanged={onRefreshReactions}
-        />
-      ) : undefined,
+    () => (
+      <GeneralCommentsSection
+        reviewId={reviewId}
+        generalCommentsThreadId={metadata?.generalCommentsThreadId}
+        reviewOwnerId={metadata?.reviewOwnerId}
+        onCommentsChanged={onRefreshReactions}
+        onDeleteConfirmationChange={handleDeleteConfirmationChange}
+      />
+    ),
     [
       reviewId,
       metadata?.generalCommentsThreadId,
       metadata?.reviewOwnerId,
       onRefreshReactions,
+      handleDeleteConfirmationChange,
     ],
   );
 
@@ -203,6 +219,16 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         isPrivate={isPrivate}
         onCommentsChanged={handleThreadCommentChange}
+      />
+      <ConfirmationModal
+        visible={!!generalDeleteState}
+        onClose={generalDeleteState?.onClose ?? (() => {})}
+        onConfirm={generalDeleteState?.onConfirm ?? (() => {})}
+        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
+        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
+        confirmVariant="destructive"
       />
     </SafeAreaView>
   );

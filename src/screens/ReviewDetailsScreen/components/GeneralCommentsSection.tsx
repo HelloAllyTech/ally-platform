@@ -9,7 +9,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {ConfirmationModal, ReviewComment, UserProfileImage} from '@/components';
+import {ReviewComment, UserProfileImage} from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useCommentActions, useTranslate, useUser} from '@/hooks';
@@ -20,11 +20,17 @@ import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 const LIMIT = 20;
 
+export interface DeleteConfirmationState {
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
 interface GeneralCommentsSectionProps {
   reviewId: string;
-  generalCommentsThreadId: string;
+  generalCommentsThreadId?: string;
   reviewOwnerId?: number;
   onCommentsChanged?: () => void;
+  onDeleteConfirmationChange?: (state: DeleteConfirmationState | null) => void;
 }
 
 export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
@@ -32,6 +38,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
   generalCommentsThreadId,
   reviewOwnerId,
   onCommentsChanged: onCommentsChangedExternal,
+  onDeleteConfirmationChange,
 }) => {
   const {t} = useTranslate();
   const {userData} = useUser();
@@ -84,6 +91,24 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
       }
     },
   });
+
+  const closeDeleteModal = useCallback(
+    () => setDeleteCommentId(null),
+    [setDeleteCommentId],
+  );
+
+  useEffect(() => {
+    onDeleteConfirmationChange?.(
+      deleteCommentId
+        ? {onClose: closeDeleteModal, onConfirm: handleConfirmDelete}
+        : null,
+    );
+  }, [
+    deleteCommentId,
+    onDeleteConfirmationChange,
+    closeDeleteModal,
+    handleConfirmDelete,
+  ]);
 
   const [hasMore, setHasMore] = React.useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
@@ -290,18 +315,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
         </View>
       </View>
 
-      {renderBody()}
-
-      <ConfirmationModal
-        visible={!!deleteCommentId}
-        onClose={() => setDeleteCommentId(null)}
-        onConfirm={handleConfirmDelete}
-        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
-        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
-        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
-        confirmVariant="destructive"
-      />
+      {generalCommentsThreadId ? renderBody() : null}
     </View>
   );
 };
