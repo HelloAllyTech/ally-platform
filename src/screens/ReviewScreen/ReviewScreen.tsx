@@ -110,6 +110,7 @@ export const ReviewScreen: React.FC = () => {
               onCommentPress={handleCommentPress}
               reactions={item.reactions}
               isExpanded={expandedReviewId === item.id}
+              note={item.note}
             />
           )}
           onEndReached={loadMore}

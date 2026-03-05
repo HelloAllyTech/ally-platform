@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
 import {
   ActivityIndicator,
@@ -12,25 +13,34 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
-import {FeedbackPopup, useToast} from '@/components';
+import {CustomSwitch, FeedbackPopup, useToast} from '@/components';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
   SimulationSummaryTabKey,
   USER_PERMISSIONS,
 } from '@/constants';
-import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
+import {
+  useAppNavigation,
+  useHardwareBackPressHandler,
+  useShareReview,
+} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
   useAddSimulationFeedbackMutation,
   useLazyGetReactionsCountQuery,
   useLazyGetSimulationDetailsQuery,
 } from '@/services';
+import {useGetReviewByIdQuery} from '@/services/reviewsApi';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
 import {ReviewStatus} from '@/types';
-import {navigateToLearnTab} from '@/utils';
+import {
+  formatDutationFromStartedAtAndEndedAt,
+  isMinutesPassed,
+  navigateToLearnTab,
+} from '@/utils';
 
 import {
   AskAI,
@@ -61,17 +71,28 @@ export const SimulationFeedbackScreen: React.FC<
     useState<boolean>(false);
   const [reviewId, setReviewId] = useState<string>();
   const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(false);
-  const [isPrivate, setIsPrivate] = useState<boolean>(true);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
   const {showToast} = useToast();
+
+  const {isPrivate, setIsPrivate, handleTogglePrivate} = useShareReview({
+    reviewId,
+    scenarioSessionId,
+  });
 
   const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
+
+  const {data: reviewData} = useGetReviewByIdQuery(
+    {reviewId: reviewId || ''},
+    {
+      skip: !reviewId || activeTabKey !== SimulationSummaryTabKey.TRANSCRIPTION,
+    },
+  );
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
@@ -129,7 +150,25 @@ export const SimulationFeedbackScreen: React.FC<
         setIsPrivate(true);
       }
     }
-  }, [simulationDetails?.reviewId, simulationDetails?.reviewStatus]);
+  }, [
+    simulationDetails?.reviewId,
+    simulationDetails?.reviewStatus,
+    setIsPrivate,
+  ]);
+
+  // Refetch simulation details on screen focus to pick up review changes
+  const isFirstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      if (scenarioSessionId) {
+        getSimulationDetails({id: scenarioSessionId});
+      }
+    }, [scenarioSessionId, getSimulationDetails]),
+  );
 
   // Fetch review threads and reactions to determine if comment icon should be shown
   useEffect(() => {
@@ -236,16 +275,60 @@ export const SimulationFeedbackScreen: React.FC<
     });
   };
 
+  const handleShareSimulation = () => {
+    const scenarioData = {
+      coverImageUrl: simulationDetails?.scenario?.coverImageUrl,
+      coverVideoUrl: simulationDetails?.scenario?.coverVideoUrl,
+      title: simulationDetails?.scenario?.title || '',
+      description: simulationDetails?.scenario?.description || '',
+      createdAt: simulationDetails?.createdAt || '',
+      duration: formatDutationFromStartedAtAndEndedAt(
+        simulationDetails?.startedAt,
+        simulationDetails?.endedAt,
+      ),
+    };
+    navigation.navigate(SCREEN_NAMES.SHARE_SIMULATION, {
+      reviewId: reviewId || '',
+      scenarioSessionId: scenarioSessionId || '',
+      scenarioData: scenarioData,
+      note: reviewData?.note,
+    });
+  };
+
   const renderTitle = () => {
     return (
-      <Text style={styles.title}>
-        {t('SimulationFeedback.title')}{' '}
-        <Text style={styles.titleItalic}>
-          {fromLogs
-            ? t('CallSummary.header.subtitle')
-            : t('SimulationFeedback.titleEnded')}
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>
+          {t('SimulationFeedback.title')}{' '}
+          <Text style={styles.titleItalic}>
+            {fromLogs
+              ? t('CallSummary.header.subtitle')
+              : t('SimulationFeedback.titleEnded')}
+          </Text>
         </Text>
-      </Text>
+        {activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION && (
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>
+              {t('SimulationFeedback.share')}
+            </Text>
+            <CustomSwitch
+              value={!!reviewId && !isPrivate}
+              onToggle={isEnabled => {
+                if (
+                  isEnabled &&
+                  (!reviewId ||
+                    (reviewData?.createdAt &&
+                      !isMinutesPassed(reviewData.createdAt)))
+                ) {
+                  handleShareSimulation();
+                } else if (reviewId) {
+                  handleTogglePrivate(isEnabled);
+                }
+              }}
+            />
+          </View>
+        )}
+      </View>
     );
   };
   const hasScenarioMessagesPermission = permissions?.includes(
@@ -284,6 +367,10 @@ export const SimulationFeedbackScreen: React.FC<
             <SummaryTab
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
+              // pathId={pathId}
+              // caseId={caseId}
+              // fromLogs={fromLogs}
+              // onTryAnother={handleSubmit}
             />
           );
         case SimulationSummaryTabKey.ASK_AI:
@@ -334,6 +421,7 @@ export const SimulationFeedbackScreen: React.FC<
       caseId,
       handleFeedbackAndNavigate,
       isPrivate,
+      setIsPrivate,
       reviewId,
       languageId,
       activeTabKey,
@@ -368,20 +456,9 @@ export const SimulationFeedbackScreen: React.FC<
             style={styles.backArrowButton}>
             <LeftArrowIcon color={colors.black} />
           </TouchableOpacity>
-          <View style={globalStyles.column}>
+          <View style={[globalStyles.fillCol]}>
             {hasScenarioMessagesPermission && renderTitle()}
           </View>
-          {/* Comment icon for transcript tab */}
-          {!!reviewId &&
-            activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
-            !hideReviewDetails && (
-              <TouchableOpacity
-                onPress={handleViewReview}
-                style={styles.reviewIconButton}
-                activeOpacity={0.7}>
-                <CommentIcon width={20} height={20} color={colors.black} />
-              </TouchableOpacity>
-            )}
         </View>
       </View>
       {hasScenarioMessagesPermission && (
@@ -406,6 +483,16 @@ export const SimulationFeedbackScreen: React.FC<
           />
         </View>
       )}
+      {!!reviewId &&
+        activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
+        !hideReviewDetails && (
+          <TouchableOpacity
+            onPress={handleViewReview}
+            style={styles.reviewIconButton}
+            activeOpacity={0.7}>
+            <CommentIcon width={20} height={20} color={colors.black} />
+          </TouchableOpacity>
+        )}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}

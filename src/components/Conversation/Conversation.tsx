@@ -21,6 +21,7 @@ import {
 } from '@/components/CommentableText';
 import {Message as MessageComponent} from '@/components/Message';
 import {useTranslate} from '@/hooks';
+import {ReviewNote} from '@/screens/ReviewDetailsScreen/components';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -55,6 +56,8 @@ export interface ConversationProps {
   onDismissSelection?: () => void;
   /** Rendered below the transcript once all pages have loaded (hasMore = false) */
   listFooterComponent?: React.ReactNode;
+  reviewNote?: string;
+  onEditNote?: () => void;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -70,6 +73,8 @@ export const Conversation: React.FC<ConversationProps> = ({
   reviewOwnerName,
   onDismissSelection,
   listFooterComponent,
+  reviewNote,
+  onEditNote,
 }) => {
   const {t} = useTranslate();
 
@@ -357,6 +362,11 @@ export const Conversation: React.FC<ConversationProps> = ({
         renderItem={renderItem}
         ListEmptyComponent={renderEmptyComponent}
         ListFooterComponent={footerElement}
+        {...(reviewNote && {
+          ListHeaderComponent: (
+            <ReviewNote note={reviewNote} onEditNote={onEditNote} />
+          ),
+        })}
         onEndReached={hasMore ? onLoadMore : undefined}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
@@ -491,5 +501,10 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.ds.grey[200],
+    marginTop: '16@mvs',
   },
 });

@@ -89,3 +89,9 @@ export type {SessionChecklistItem, SessionChecklistProps} from './Checklist';
 export {SimulationTransitionSection} from './SimulationTransitionSection';
 export {ConfirmationModal} from './ConfirmationModal';
 export type {ConfirmationModalProps} from './ConfirmationModal';
+export {
+  SimulationDetailsCard,
+  SimulationDetailRow,
+} from './SimulationDetailsCard';
+export {LineTextInput} from './LineTextInput';
+export {CustomSwitch} from './CustomSwitch';

@@ -1,7 +1,7 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants';
-import {colors, fontFamily, stroke, typography} from '@/theme';
+import {colors, fontFamily, radius, stroke, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -123,7 +123,19 @@ export const styles = ScaledSheet.create({
     zIndex: 10,
   },
   reviewIconButton: {
-    marginLeft: 'auto',
+    position: 'absolute',
+    width: '56@ms',
+    height: '56@ms',
+    right: '20@ms',
+    bottom: '20@vs',
+    backgroundColor: colors.ds.neutral.white,
+    padding: '10@ms',
+    borderWidth: 0.5,
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   checklistContainer: {
     flex: 1,
@@ -133,5 +145,21 @@ export const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  titleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchLabel: {
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.typography.lowEmphasis,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
   },
 });

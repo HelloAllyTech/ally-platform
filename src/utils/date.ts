@@ -366,3 +366,14 @@ export const isMinutesPassed = (
   const diffMinutes = diffMs / (1000 * 60);
   return diffMinutes >= minutes;
 };
+
+export const formatDutationFromStartedAtAndEndedAt = (
+  startedAt?: string,
+  endedAt?: string,
+) => {
+  if (!startedAt || !endedAt) return '-';
+  const startedAtDate = new Date(startedAt);
+  const endedAtDate = new Date(endedAt);
+  const durationInSeconds = endedAtDate.getTime() - startedAtDate.getTime();
+  return formatDurationFromSeconds(durationInSeconds);
+};
