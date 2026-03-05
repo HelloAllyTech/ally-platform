@@ -1,9 +1,9 @@
 import React from 'react';
-import {Image, Text, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {ms} from 'react-native-size-matters';
 
 import {AddReactionIcon, EyeClosedIcon} from '@/assets';
-import {ActionsMenu} from '@/components';
+import {ActionsMenu, UserProfileImage} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
@@ -89,19 +89,11 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
       onPress={onCommentPress}
       activeOpacity={0.7}>
       {/* Avatar */}
-      <View style={styles.avatarContainer}>
-        {profileImageUrl ? (
-          <Image
-            source={{uri: profileImageUrl}}
-            style={styles.avatarImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{initials}</Text>
-          </View>
-        )}
-      </View>
+      <UserProfileImage
+        name={name}
+        profileImageUri={profileImageUrl ?? ''}
+        size={36}
+      />
 
       {/* Content */}
       <View style={styles.contentContainer}>

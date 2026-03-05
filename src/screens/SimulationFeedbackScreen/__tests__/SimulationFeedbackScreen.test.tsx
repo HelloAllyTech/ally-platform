@@ -4,6 +4,13 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SimulationFeedbackScreen} from '../SimulationFeedbackScreen';
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (cb: () => void) => {
+    const React = require('react');
+    React.useEffect(cb, []);
+  },
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -31,6 +38,15 @@ jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string) => key,
     tVariable: (key: string) => key,
+  }),
+  useShareReview: () => ({
+    note: '',
+    setNote: jest.fn(),
+    isPrivate: false,
+    setIsPrivate: jest.fn(),
+    handleTogglePrivate: jest.fn(),
+    handleShare: jest.fn(),
+    handleEditNote: jest.fn(),
   }),
 }));
 
@@ -86,6 +102,13 @@ jest.mock('@/components', () => {
         ))}
       </View>
     ),
+    CustomSwitch: ({onToggle, isEnabled}: any) => (
+      <TouchableOpacity
+        testID="custom-switch"
+        onPress={() => onToggle?.(!isEnabled)}>
+        <Text>{isEnabled ? 'ON' : 'OFF'}</Text>
+      </TouchableOpacity>
+    ),
     useToast: () => ({showToast: showToastMock}),
     __mocks__: {showToastMock},
   };
@@ -138,6 +161,10 @@ jest.mock('@/services/simulationSummaryApi', () => ({
   useGetSimulationSkillsQuery: () => ({data: null, isLoading: false}),
 }));
 
+jest.mock('@/services/reviewsApi', () => ({
+  useGetReviewByIdQuery: () => ({data: null, isLoading: false}),
+}));
+
 jest.mock('@/services/reviewThreadsApi', () => ({
   useLazyGetThreadsQuery: () => [
     jest.fn().mockResolvedValue({data: {data: []}}),
@@ -166,6 +193,8 @@ jest.mock('@/utils', () => ({
       hour12: true,
     }).replace(' at ', ' ');
   },
+  formatDutationFromStartedAtAndEndedAt: () => '0:30',
+  isMinutesPassed: () => true,
   navigateToLearnTab: jest.fn(),
 }));
 

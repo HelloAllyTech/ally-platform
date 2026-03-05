@@ -34,13 +34,14 @@ export const reviewsApi = api.injectEndpoints({
     }),
     updateReviewStatus: builder.mutation<
       UpdateReviewStatusResponse,
-      {reviewId: string; status: UpdateReviewStatusRequest}
+      {reviewId: string; body: UpdateReviewStatusRequest}
     >({
-      query: ({reviewId, status}) => ({
+      query: ({reviewId, body}) => ({
         url: API_ROUTES.REVIEWS.UPDATE_REVIEW_STATUS(reviewId),
         method: API_METHODS.PATCH,
-        body: status,
+        body,
       }),
+      invalidatesTags: ['ReviewDetails'],
     }),
     addReviewComment: builder.mutation<
       AddReviewCommentResponse,

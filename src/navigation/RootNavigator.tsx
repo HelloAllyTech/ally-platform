@@ -25,6 +25,8 @@ import {
   ReactionsScreen,
   ReviewDetailsScreen,
   ScribeReviewDetailsScreen,
+  ShareCallLogScreen,
+  ShareSimulationScreen,
   SimulationAssistantScreen,
   SimulationDetailsScreen,
   SimulationFeedbackScreen,
@@ -258,6 +260,14 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SCRIBE_REVIEW_DETAILS}
             component={ScribeReviewDetailsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SHARE_CALL_LOG}
+            component={ShareCallLogScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.SHARE_SIMULATION}
+            component={ShareSimulationScreen}
           />
         </>
       ) : (

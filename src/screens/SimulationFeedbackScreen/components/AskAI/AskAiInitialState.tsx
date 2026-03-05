@@ -53,6 +53,7 @@ export const AskAiInitialState = ({
       </Text>
       <FlatList
         data={ASK_AI_EMPTY_STATE_QUESTIONS}
+        contentContainerStyle={styles.initialStateItemsContainer}
         horizontal
         showsHorizontalScrollIndicator={false}
         renderItem={renderInitialStateItem}
@@ -66,6 +67,9 @@ const styles = ScaledSheet.create({
   initialStateContainer: {
     gap: '8@ms',
     marginVertical: 'auto',
+  },
+  initialStateItemsContainer: {
+    paddingVertical: '24@ms',
   },
   initialStateItem: {
     paddingHorizontal: '16@ms',

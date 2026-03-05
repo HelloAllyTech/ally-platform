@@ -463,8 +463,12 @@
     "almostThereDescription": "You’re getting closer! You haven’t reached the required score or minimum time yet, but keep going and try again when you’re ready.",
     "keepItPrivate": "Keep it private",
     "shareForReview": "Share for review",
+    "share": "Share",
     "privacyUpdated": "Privacy setting updated",
     "sharedForReview": "Transcript shared for review",
+    "reviewNoteTitle": "NOTE",
+    "shareScreenTitle": "Share this simulation",
+    "editNoteTitle": "Edit note",
     "tabs": {
       "sessionReview": "Session Review",
       "askAI": "Ask AI",

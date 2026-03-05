@@ -1,7 +1,12 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
-import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
+import {
+  useAppNavigation,
+  useHardwareBackPressHandler,
+  useShareReview,
+  useUser,
+} from '@/hooks';
 import {GetMessagesResponse} from '@/types';
 import {
   Message,
@@ -30,6 +35,18 @@ export function useReviewDetailsLogic({
 }: UseReviewDetailsLogicParams) {
   const {fetchMessages, messagesState, addComment, isAddingComment} = api;
   const {isLoading, isFetching, isError} = messagesState;
+
+  const {
+    isPrivate: isPrivateState,
+    setIsPrivate,
+    handleTogglePrivate,
+  } = useShareReview({reviewId});
+
+  useEffect(() => {
+    if (isPrivate !== undefined) {
+      setIsPrivate(isPrivate);
+    }
+  }, [isPrivate, setIsPrivate]);
 
   const navigation = useAppNavigation();
   const currentMessageIdRef = useRef<string | null>(null);
@@ -499,7 +516,8 @@ export function useReviewDetailsLogic({
     isError,
     offset,
     hasMore,
-    isPrivate,
+    isPrivate: isPrivateState,
+    handleTogglePrivate,
 
     comment,
     showCommentInput,
