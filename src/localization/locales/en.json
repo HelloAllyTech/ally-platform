@@ -12,6 +12,7 @@
     "next": "Next",
     "finish": "Finish",
     "community": "Community",
+    "loadMore": "Load more",
     "permissions": {
       "microphoneRequired": "Microphone Permission Required",
       "microphoneMessage": "Please enable microphone access in your device settings to use voice recording.",

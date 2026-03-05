@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -23,6 +23,7 @@ import {colors} from '@/theme';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
 import {ReviewMetadata} from '../types';
+import {GeneralCommentsSection} from './GeneralCommentsSection';
 
 interface ReviewDetailsLayoutProps {
   reviewId: string;
@@ -84,6 +85,24 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     handleThreadClick,
   } = reviewLogic;
 
+  const generalCommentsFooter = useMemo(
+    () =>
+      metadata?.generalCommentsThreadId ? (
+        <GeneralCommentsSection
+          reviewId={reviewId}
+          generalCommentsThreadId={metadata.generalCommentsThreadId}
+          reviewOwnerId={metadata.reviewOwnerId}
+          onCommentsChanged={onRefreshReactions}
+        />
+      ) : undefined,
+    [
+      reviewId,
+      metadata?.generalCommentsThreadId,
+      metadata?.reviewOwnerId,
+      onRefreshReactions,
+    ],
+  );
+
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -120,6 +139,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         isRefreshing={isFetching && offset === 0}
         reviewOwnerName={metadata?.createdBy?.name}
         onDismissSelection={resetCommentInput}
+        listFooterComponent={generalCommentsFooter}
       />
 
       <View style={styles.interactionsBarContainer}>

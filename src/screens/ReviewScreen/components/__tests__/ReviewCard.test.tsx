@@ -15,6 +15,13 @@ jest.mock('@/services/reviewThreadsApi', () => ({
   ],
 }));
 
+jest.mock('@/services/reviewsApi', () => ({
+  useLazyGetGeneralReviewCommentsQuery: () => [
+    jest.fn(),
+    {data: undefined, isLoading: false},
+  ],
+}));
+
 jest.mock('@/assets', () => ({
   ChatAddOnIcon: 'ChatAddOnIcon',
 }));

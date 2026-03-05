@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -53,6 +53,8 @@ export interface ConversationProps {
   reviewOwnerName?: string;
   /** Called when the user taps outside selectable text (e.g. timestamp, empty space) or scrolls */
   onDismissSelection?: () => void;
+  /** Rendered below the transcript once all pages have loaded (hasMore = false) */
+  listFooterComponent?: React.ReactNode;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -67,6 +69,7 @@ export const Conversation: React.FC<ConversationProps> = ({
   isRefreshing = false,
   reviewOwnerName,
   onDismissSelection,
+  listFooterComponent,
 }) => {
   const {t} = useTranslate();
 
@@ -328,14 +331,19 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={colors.ds.theme.primary} />
-      </View>
-    );
-  };
+  const footerElement = useMemo(() => {
+    if (isLoadingMore) {
+      return (
+        <View style={styles.footerLoader}>
+          <ActivityIndicator size="small" color={colors.ds.theme.primary} />
+        </View>
+      );
+    }
+    if (!hasMore && listFooterComponent) {
+      return <>{listFooterComponent}</>;
+    }
+    return null;
+  }, [isLoadingMore, hasMore, listFooterComponent]);
 
   return (
     <View
@@ -348,7 +356,7 @@ export const Conversation: React.FC<ConversationProps> = ({
         contentContainerStyle={styles.listContainer}
         renderItem={renderItem}
         ListEmptyComponent={renderEmptyComponent}
-        ListFooterComponent={renderFooter}
+        ListFooterComponent={footerElement}
         onEndReached={hasMore ? onLoadMore : undefined}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
