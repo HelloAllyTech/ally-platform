@@ -15,7 +15,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ChatAddOnIcon} from '@/assets';
 import {UserProfileImage, VideoPreview} from '@/components';
-import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
+import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
 import {
   colors,
   fontFamily,
@@ -74,15 +74,16 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const isFocused = useIsFocused();
   const {t} = useTranslation();
 
-  // Fetch threads when expanded
-  const [getThreads, {data: threadsData, isLoading: isLoadingThreads}] =
-    useLazyGetThreadsQuery();
+  const [
+    getGeneralComments,
+    {data: generalCommentsData, isLoading: isLoadingGeneral},
+  ] = useLazyGetGeneralReviewCommentsQuery();
 
   useEffect(() => {
-    if (isExpanded && !threadsData) {
-      getThreads({reviewId: id, offset: 0, limit: 2});
+    if (isExpanded && !generalCommentsData) {
+      getGeneralComments({reviewId: id, offset: 0, limit: 2});
     }
-  }, [isExpanded, id, getThreads, threadsData]);
+  }, [isExpanded, id, getGeneralComments, generalCommentsData]);
 
   const totalReactions = Object.values(reactions).reduce(
     (sum, count) => sum + count,
@@ -243,8 +244,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
       <ExpandedComments
         isExpanded={isExpanded}
-        isLoading={isLoadingThreads}
-        threadsData={threadsData}
+        isLoading={isLoadingGeneral}
+        generalCommentsData={generalCommentsData}
         reviewId={id}
         onCollapsePress={() => onCommentPress?.(id)}
         onCommentPress={onReviewPress}

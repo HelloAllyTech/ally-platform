@@ -5,14 +5,14 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {ChevronDown} from '@/assets';
 import {ReviewComment} from '@/components';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import {ThreadsResponse} from '@/types/reviews';
+import {GetThreadCommentsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 interface ExpandedCommentsProps {
   isExpanded: boolean;
   isLoading: boolean;
-  threadsData: ThreadsResponse | undefined;
+  generalCommentsData: GetThreadCommentsResponse | undefined;
   reviewId: string;
   onCollapsePress: () => void;
   onCommentPress: (reviewId: string) => void;
@@ -22,7 +22,7 @@ interface ExpandedCommentsProps {
 export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
   isExpanded,
   isLoading,
-  threadsData,
+  generalCommentsData,
   reviewId,
   onCollapsePress,
   onCommentPress,
@@ -40,39 +40,33 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
         </View>
       ) : (
         <>
-          {threadsData?.data.map(thread => {
-            if (!thread.comments || thread.comments.length === 0) {
-              return null;
-            }
-
-            const firstComment = thread.comments[0];
-            const reactionsArray = getReactionsArray(firstComment.reactions);
-            const reactionCount = getTotalReactionCount(firstComment.reactions);
-
+          {generalCommentsData?.data.map(comment => {
+            const reactionsArray = getReactionsArray(comment.reactions);
+            const reactionCount = getTotalReactionCount(comment.reactions);
             return (
-              <View key={thread.id} style={styles.commentItem}>
+              <View key={comment.id} style={styles.commentItem}>
                 <ReviewComment
-                  name={firstComment.createdBy.name}
+                  name={comment.createdBy.name}
                   time={
-                    firstComment.createdAt
-                      ? formatRelativeTime(firstComment.createdAt)
+                    comment.createdAt
+                      ? formatRelativeTime(comment.createdAt)
                       : ''
                   }
-                  comment={firstComment.content}
-                  profileImageUrl={firstComment.createdBy.profileImage}
+                  comment={comment.content}
+                  profileImageUrl={comment.createdBy.profileImage}
                   reactions={reactionsArray}
                   reactionCount={reactionCount}
-                  replyCount={firstComment.replyCount}
+                  replyCount={comment.replyCount}
                   showReplyButton={false}
                   showAddReactionButton={false}
                   onCommentPress={() => onCommentPress(reviewId)}
-                  hidden={firstComment.hidden}
+                  hidden={comment.hidden}
                 />
               </View>
             );
           })}
 
-          {threadsData?.data.length === 0 && (
+          {(!generalCommentsData || generalCommentsData.data.length === 0) && (
             <View style={styles.emptyCommentsContainer}>
               <Text style={styles.emptyCommentsText}>
                 {t('Review.card.noComments')}
