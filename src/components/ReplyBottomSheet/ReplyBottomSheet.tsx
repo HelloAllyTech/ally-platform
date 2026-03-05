@@ -642,11 +642,14 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
       <BottomSheet
         visible={visible}
         onClose={onClose}
-        allowFullExpand
         skipBottomSheetView
         enableContentPanningGesture={false}
+        enableDynamicSizing={false}
+        snapPoints={['80%']}
         enableOverDrag
         enableHandlePanningGesture
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
         footerComponent={isPrivate ? undefined : renderFooterComponent}>
         <View style={styles.container}>
           {isLoading && !replies ? (
