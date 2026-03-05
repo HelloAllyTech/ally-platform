@@ -117,8 +117,31 @@ export interface ReviewItem {
   commentsCount: number;
 }
 
-export interface GetReviewByIdResponse extends ReviewItem {
+export interface GetReviewByIdResponse {
+  id: string;
+  scenario: {
+    title: string;
+    createdAt: string;
+    description: string;
+    coverImageUrl: string;
+    coverVideoUrl: string;
+  };
+  scenarioSession: {
+    createdAt: string;
+    duration: string;
+  };
+  commentsCount: number;
+  createdBy: {
+    id: number;
+    name: string;
+    profileImage: string;
+  };
+  reactions: Record<string, number>;
   myReaction: string | null;
+  reviewStatus: string;
+  generalCommentsThreadId: string;
+  note: string;
+  noteEditedAt: string;
 }
 export interface ReviewsResponse {
   data: ReviewItem[];

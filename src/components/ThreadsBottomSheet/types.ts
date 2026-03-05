@@ -35,4 +35,8 @@ export interface ThreadsBottomSheetProps {
    * Callback when general comments change (add/edit/delete/hide)
    */
   onCommentsChanged?: (change: ThreadCommentChange) => void;
+  /**
+   * General comments thread ID
+   */
+  generalCommentsThreadId: string;
 }

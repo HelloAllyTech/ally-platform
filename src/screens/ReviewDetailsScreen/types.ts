@@ -25,6 +25,7 @@ export interface ReviewMetadata {
   myReaction: string | null;
   createdBy: {id: number; name: string};
   reviewOwnerId?: number;
+  generalCommentsThreadId: string;
 }
 
 export type {ReviewType} from '@/contexts/ReviewApiContext';

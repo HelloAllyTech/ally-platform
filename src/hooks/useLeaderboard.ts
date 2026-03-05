@@ -1,9 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 
-import {ViewedStatus} from '@/constants';
 import {LeaderboardPeriod} from '@/constants/leaderboard';
-import {useGetBadgeCountQuery} from '@/services';
 import {
   useGetLeaderboardQuery,
   useGetMyRankQuery,
@@ -28,7 +26,6 @@ interface UseLeaderboardResult {
   isError: boolean;
   error: unknown;
   hasMore: boolean;
-  badgeCount: number;
   loadMore: () => void;
   refresh: () => void;
 }
@@ -67,15 +64,10 @@ export const useLeaderboard = ({
     },
   );
 
-  const {data: badgeCount, refetch: refetchBadgeCount} = useGetBadgeCountQuery({
-    viewedStatus: ViewedStatus.VIEWED,
-  });
-
   useFocusEffect(
     useCallback(() => {
       refetchMyRank();
-      refetchBadgeCount();
-    }, [refetchMyRank, refetchBadgeCount]),
+    }, [refetchMyRank]),
   );
 
   // Accumulate data when new page loads (based on leaderboardResponse only)
@@ -156,7 +148,6 @@ export const useLeaderboard = ({
     isError: isLeaderboardError || isMyRankError,
     error: leaderboardError || myRankError,
     hasMore,
-    badgeCount: badgeCount?.count ?? 0,
     loadMore,
     refresh,
   };

@@ -33,6 +33,8 @@ interface GeneralCommentsListProps {
   }>;
   /** Called when commentText changes so the parent can re-render the footer */
   onCommentTextChange: (text: string) => void;
+  /** General comments thread ID */
+  generalCommentsThreadId: string;
 }
 
 export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
@@ -44,28 +46,28 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   onCommentsChanged,
   fnRef,
   onCommentTextChange,
+  generalCommentsThreadId,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const offsetRef = React.useRef(0);
 
   const {
-    useLazyGetGeneralComments,
-    useAddGeneralComment,
-    useUpdateGeneralComment,
-    useDeleteGeneralComment,
-    useUpdateGeneralCommentVisibility,
+    useLazyGetGeneralReviewComments,
+    useAddReviewComment,
+    useUpdateComment,
+    useDeleteComment,
+    useUpdateCommentVisibility,
     useAddReactionToComment,
   } = useReviewApiHooks();
 
-  const [getGeneralComments, {isLoading, isFetching}] =
-    useLazyGetGeneralComments();
-  const [addGeneralComment, {isLoading: isAddingComment}] =
-    useAddGeneralComment();
-  const [updateGeneralComment, {isLoading: isUpdatingComment}] =
-    useUpdateGeneralComment();
-  const [deleteGeneralComment] = useDeleteGeneralComment();
-  const [updateGeneralCommentVisibility] = useUpdateGeneralCommentVisibility();
+  const [getGeneralReviewComments, {isLoading, isFetching}] =
+    useLazyGetGeneralReviewComments();
+  const [addReviewComment, {isLoading: isAddingComment}] =
+    useAddReviewComment();
+  const [updateComment, {isLoading: isUpdatingComment}] = useUpdateComment();
+  const [deleteComment] = useDeleteComment();
+  const [updateCommentVisibility] = useUpdateCommentVisibility();
   const [addReaction] = useAddReactionToComment();
 
   const {
@@ -84,10 +86,10 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     isSubmitting,
     userId,
   } = useCommentActions({
-    deleteCommentFn: deleteGeneralComment,
-    updateCommentFn: updateGeneralComment,
-    updateVisibilityFn: updateGeneralCommentVisibility,
-    addCommentFn: payload => addGeneralComment(payload),
+    deleteCommentFn: deleteComment,
+    updateCommentFn: updateComment,
+    updateVisibilityFn: updateCommentVisibility,
+    addCommentFn: payload => addReviewComment(payload),
     addReactionFn: addReaction,
     isAddingComment,
     isUpdatingComment,
@@ -125,7 +127,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
         setComments(null);
         setHasMore(false);
         setHasLoadedOnce(false);
-        const result = await getGeneralComments({
+        const result = await getGeneralReviewComments({
           reviewId,
           offset: 0,
           limit: LIMIT,
@@ -149,9 +151,11 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
 
   const handleSubmit = useCallback(
     (text: string) => {
-      onSubmitComment(text, reviewId);
+      if (text.trim()) {
+        onSubmitComment(text, reviewId, generalCommentsThreadId);
+      }
     },
-    [onSubmitComment, reviewId],
+    [onSubmitComment, reviewId, generalCommentsThreadId],
   );
 
   // Sync function refs (no re-render) so parent footer can call them
@@ -257,7 +261,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     if (!visible || isLoading || !hasMore || !reviewId) return;
     const newOffset = offsetRef.current + LIMIT;
     offsetRef.current = newOffset;
-    const result = await getGeneralComments({
+    const result = await getGeneralReviewComments({
       reviewId,
       offset: newOffset,
       limit: LIMIT,
@@ -268,7 +272,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   }, [
     hasMore,
     reviewId,
-    getGeneralComments,
+    getGeneralReviewComments,
     visible,
     handleApiResponse,
     isLoading,

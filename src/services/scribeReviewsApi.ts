@@ -104,6 +104,19 @@ export const scribeReviewsApi = api.injectEndpoints({
       }),
       invalidatesTags: ['ReviewThreads'],
     }),
+    getScribeGeneralReviewComments: builder.query<
+      GetThreadCommentsResponse,
+      {reviewId: string; offset?: number; limit?: number}
+    >({
+      query: ({reviewId, offset, limit}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.GET_GENERAL_REVIEW_COMMENTS(reviewId),
+        method: API_METHODS.GET,
+        ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
+          ? {params: {offset, limit}}
+          : {}),
+      }),
+      providesTags: ['GeneralComments'],
+    }),
   }),
 });
 
@@ -115,4 +128,5 @@ export const {
   useUpdateScribeCommentVisibilityMutation,
   useUpdateScribeCommentMutation,
   useDeleteScribeCommentMutation,
+  useLazyGetScribeGeneralReviewCommentsQuery,
 } = scribeReviewsApi;
