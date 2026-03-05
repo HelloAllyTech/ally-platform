@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   BottomSheetFlatList,
   BottomSheetFooter,
@@ -79,13 +79,10 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const layout = useWindowDimensions();
   const [tabIndex, setTabIndex] = useState(0);
 
-  const routes = useMemo(
-    () => [
-      {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
-      {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
-    ],
-    [t],
-  );
+  const routes = [
+    {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
+    {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
+  ];
 
   const handleTabChange = useCallback((index: number) => {
     setTabIndex(index);
@@ -99,37 +96,38 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const [getThreads, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreads();
 
-  const [offset, setOffset] = React.useState(0);
-  const [commentsData, setCommentsData] =
-    React.useState<ThreadsResponse | null>(null);
-  const [hasMore, setHasMore] = React.useState(true);
+  const [inlineThreadsOffset, setInlineThreadsOffset] = useState(0);
+  const [commentsData, setCommentsData] = useState<ThreadsResponse | null>(
+    null,
+  );
+  const [hasMoreInlineThreads, setHasMoreInlineThreads] = useState(true);
 
   useEffect(() => {
     if (visible) {
-      setOffset(0);
+      setInlineThreadsOffset(0);
       setCommentsData(null);
       getThreads({reviewId, offset: 0, limit: LIMIT});
     } else {
       setCommentsData(null);
-      setOffset(0);
+      setInlineThreadsOffset(0);
       setTabIndex(0);
     }
   }, [visible]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (apiData && visible) {
       const newThreads = apiData.data;
-      if (offset === 0) {
+      if (inlineThreadsOffset === 0) {
         setCommentsData(apiData);
-        setHasMore(apiData.count > LIMIT);
+        setHasMoreInlineThreads(apiData.count > LIMIT);
       } else {
         setCommentsData(prev => {
           if (!prev) {
-            setHasMore(apiData.count > LIMIT);
+            setHasMoreInlineThreads(apiData.count > LIMIT);
             return apiData;
           }
           const updated = [...prev.data, ...newThreads];
-          setHasMore(apiData.count > updated.length);
+          setHasMoreInlineThreads(apiData.count > updated.length);
           return {data: updated, count: apiData.count};
         });
       }
@@ -142,9 +140,9 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     onSubmitComment: (_comment: string) => {},
     isSubmitting: false,
   });
-  const [generalCommentText, setGeneralCommentText] = React.useState('');
+  const [generalCommentText, setGeneralCommentText] = useState('');
 
-  const footerStateRef = React.useRef({
+  const footerStateRef = useRef({
     commentText: '',
     setCommentText: (_text: string) => {},
     onSubmitComment: (_comment: string) => {},
@@ -165,26 +163,23 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     isLoading: generalFnRef.current.isSubmitting,
   };
 
-  const renderFooterComponent = React.useCallback(
-    (props: BottomSheetFooterProps) => {
-      const current = footerStateRef.current;
-      return (
-        <BottomSheetFooter
-          animatedFooterPosition={props.animatedFooterPosition}
-          bottomInset={0}>
-          <CommentBottomSheetFooter
-            text={current.commentText}
-            setText={current.setCommentText}
-            onSubmit={current.onSubmitComment}
-            placeholder={current.placeholderText}
-            bottomInset={current.insetsBottom}
-            isLoading={current.isLoading}
-          />
-        </BottomSheetFooter>
-      );
-    },
-    [],
-  );
+  const renderFooterComponent = useCallback((props: BottomSheetFooterProps) => {
+    const current = footerStateRef.current;
+    return (
+      <BottomSheetFooter
+        animatedFooterPosition={props.animatedFooterPosition}
+        bottomInset={0}>
+        <CommentBottomSheetFooter
+          text={current.commentText}
+          setText={current.setCommentText}
+          onSubmit={current.onSubmitComment}
+          placeholder={current.placeholderText}
+          bottomInset={current.insetsBottom}
+          isLoading={current.isLoading}
+        />
+      </BottomSheetFooter>
+    );
+  }, []);
 
   // --- Tab bar (react-native-tab-view) ---
   const renderTabBar = useCallback(
@@ -292,23 +287,23 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const renderInlineFooter = useCallback(() => {
     if (!isFetching) return null;
-    if (!hasMore) return null;
+    if (!hasMoreInlineThreads) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, hasMore]);
+  }, [isFetching, insets.bottom, hasMoreInlineThreads]);
 
-  const loadMore = useCallback(() => {
+  const loadMoreInlineThreads = useCallback(() => {
     if (!visible) return;
-    if (isLoading || isFetching || !hasMore || !reviewId) return;
-    setOffset(prevOffset => {
+    if (isLoading || isFetching || !hasMoreInlineThreads || !reviewId) return;
+    setInlineThreadsOffset(prevOffset => {
       const newOffset = prevOffset + LIMIT;
       getThreads({reviewId, offset: newOffset, limit: LIMIT});
       return newOffset;
     });
-  }, [hasMore, reviewId, isFetching, isLoading]);
+  }, [hasMoreInlineThreads, reviewId, isFetching, isLoading]);
 
   const renderInlineEmpty = useCallback(() => {
     if (isLoading || isFetching || (visible && !commentsData)) {
@@ -342,7 +337,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         showsVerticalScrollIndicator={false}
         style={styles.listStyle}
         removeClippedSubviews={false}
-        onEndReached={loadMore}
+        onEndReached={loadMoreInlineThreads}
         onEndReachedThreshold={0.5}
       />
     );
@@ -380,7 +375,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       commentsData,
       isLoading,
       isFetching,
-      hasMore,
+      hasMoreInlineThreads,
       reviewId,
       reviewOwnerId,
       activeTab,

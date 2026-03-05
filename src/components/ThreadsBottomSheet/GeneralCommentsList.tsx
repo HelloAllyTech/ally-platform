@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -50,7 +50,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
-  const offsetRef = React.useRef(0);
+  const offsetRef = useRef(0);
 
   const {
     useLazyGetGeneralReviewComments,
@@ -96,8 +96,8 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     onCommentsChanged,
   });
 
-  const [hasMore, setHasMore] = React.useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const handleApiResponse = useCallback(
     (
