@@ -69,6 +69,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     selectedThreadId,
     handleHideCommentThreadBottomSheet,
     onReplyPress,
+    onReplyPressFromGeneralComments,
     handleThreadCommentChange,
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,
@@ -148,6 +149,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewId={reviewId}
         reviewOwnerId={metadata?.reviewOwnerId}
         onThreadPress={onThreadPress}
+        onReplyPress={onReplyPressFromGeneralComments}
         onCommentsChanged={handleThreadCommentChange}
         generalCommentsThreadId={metadata?.generalCommentsThreadId || ''}
       />

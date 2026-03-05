@@ -72,6 +72,7 @@ export function useReviewDetailsLogic({
     selectedComment,
     setSelectedComment,
     onReplyPress,
+    onReplyPressFromGeneralComments,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,
@@ -521,6 +522,7 @@ export function useReviewDetailsLogic({
     selectedThreadId,
     handleHideCommentThreadBottomSheet,
     onReplyPress,
+    onReplyPressFromGeneralComments,
     handleThreadCommentChange,
 
     isReplyBottomSheetVisible,
