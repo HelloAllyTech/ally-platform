@@ -1,13 +1,6 @@
 import {createContext, useContext} from 'react';
 
 import {
-  useAddGeneralCommentMutation,
-  useDeleteGeneralCommentMutation,
-  useLazyGetGeneralCommentsQuery,
-  useUpdateGeneralCommentMutation,
-  useUpdateGeneralCommentVisibilityMutation,
-} from '@/services/generalCommentsApi';
-import {
   useAddReactionToCommentMutation,
   useAddReactionToReviewMutation,
   useLazyGetReactionsCountQuery,
@@ -16,6 +9,7 @@ import {
 import {
   useAddReviewCommentMutation,
   useDeleteCommentMutation,
+  useLazyGetGeneralReviewCommentsQuery,
   useLazyGetThreadCommentsQuery,
   useUpdateCommentMutation,
   useUpdateCommentVisibilityMutation,
@@ -25,13 +19,6 @@ import {
   useLazyGetThreadsQuery,
 } from '@/services/reviewThreadsApi';
 import {
-  useAddScribeGeneralCommentMutation,
-  useDeleteScribeGeneralCommentMutation,
-  useLazyGetScribeGeneralCommentsQuery,
-  useUpdateScribeGeneralCommentMutation,
-  useUpdateScribeGeneralCommentVisibilityMutation,
-} from '@/services/scribeGeneralCommentsApi';
-import {
   useAddScribeReactionToCommentMutation,
   useAddScribeReactionToReviewMutation,
   useLazyGetScribeReactionsCountQuery,
@@ -40,6 +27,7 @@ import {
 import {
   useAddScribeReviewCommentMutation,
   useDeleteScribeCommentMutation,
+  useLazyGetScribeGeneralReviewCommentsQuery,
   useLazyGetScribeThreadCommentsQuery,
   useUpdateScribeCommentMutation,
   useUpdateScribeCommentVisibilityMutation,
@@ -71,12 +59,8 @@ export interface ReviewApiHooks {
   useAddReactionToComment: typeof useAddReactionToCommentMutation;
   useAddReactionToReview: typeof useAddReactionToReviewMutation;
 
-  // generalCommentsApi
-  useLazyGetGeneralComments: typeof useLazyGetGeneralCommentsQuery;
-  useAddGeneralComment: typeof useAddGeneralCommentMutation;
-  useDeleteGeneralComment: typeof useDeleteGeneralCommentMutation;
-  useUpdateGeneralComment: typeof useUpdateGeneralCommentMutation;
-  useUpdateGeneralCommentVisibility: typeof useUpdateGeneralCommentVisibilityMutation;
+  // general comments (fetched via reviewsApi)
+  useLazyGetGeneralReviewComments: typeof useLazyGetGeneralReviewCommentsQuery;
 }
 
 export const simulationApiHooks: ReviewApiHooks = {
@@ -92,11 +76,7 @@ export const simulationApiHooks: ReviewApiHooks = {
   useLazyGetReactionsCount: useLazyGetReactionsCountQuery,
   useAddReactionToComment: useAddReactionToCommentMutation,
   useAddReactionToReview: useAddReactionToReviewMutation,
-  useLazyGetGeneralComments: useLazyGetGeneralCommentsQuery,
-  useAddGeneralComment: useAddGeneralCommentMutation,
-  useDeleteGeneralComment: useDeleteGeneralCommentMutation,
-  useUpdateGeneralComment: useUpdateGeneralCommentMutation,
-  useUpdateGeneralCommentVisibility: useUpdateGeneralCommentVisibilityMutation,
+  useLazyGetGeneralReviewComments: useLazyGetGeneralReviewCommentsQuery,
 };
 
 export const scribeApiHooks: ReviewApiHooks = {
@@ -112,12 +92,7 @@ export const scribeApiHooks: ReviewApiHooks = {
   useLazyGetReactionsCount: useLazyGetScribeReactionsCountQuery,
   useAddReactionToComment: useAddScribeReactionToCommentMutation,
   useAddReactionToReview: useAddScribeReactionToReviewMutation,
-  useLazyGetGeneralComments: useLazyGetScribeGeneralCommentsQuery,
-  useAddGeneralComment: useAddScribeGeneralCommentMutation,
-  useDeleteGeneralComment: useDeleteScribeGeneralCommentMutation,
-  useUpdateGeneralComment: useUpdateScribeGeneralCommentMutation,
-  useUpdateGeneralCommentVisibility:
-    useUpdateScribeGeneralCommentVisibilityMutation,
+  useLazyGetGeneralReviewComments: useLazyGetScribeGeneralReviewCommentsQuery,
 };
 
 const ReviewApiContext = createContext<ReviewApiHooks>(simulationApiHooks);

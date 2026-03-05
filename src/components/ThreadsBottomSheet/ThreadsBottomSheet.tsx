@@ -70,6 +70,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   onAddReactionPress,
   onReplyPress,
   onCommentsChanged,
+  generalCommentsThreadId,
 }) => {
   const {t} = useTranslate();
   const {userData} = useUser();
@@ -358,6 +359,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         onCommentsChanged={onCommentsChanged}
         fnRef={generalFnRef}
         onCommentTextChange={setGeneralCommentText}
+        generalCommentsThreadId={generalCommentsThreadId}
       />
     );
   };

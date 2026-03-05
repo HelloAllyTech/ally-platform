@@ -59,6 +59,7 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
         myReaction: reviewData.myReaction,
         createdBy: reviewData.createdBy,
         reviewOwnerId: reviewData.createdBy?.id,
+        generalCommentsThreadId: reviewData.generalCommentsThreadId,
       }
     : undefined;
 

@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 
 import {
@@ -19,6 +20,7 @@ export const useBadgePopup = (
   isLayoutReady: boolean = false,
   autoCloseDelay: number | null = BADGE_AUTO_CLOSE_DELAY,
 ) => {
+  const isFocused = useIsFocused();
   const [currentBadge, setCurrentBadge] = useState<UserBadge | null>(null);
   const [badgeQueue, setBadgeQueue] = useState<UserBadge[]>([]);
   const [isFirstBadge, setIsFirstBadge] = useState(false);
@@ -40,7 +42,7 @@ export const useBadgePopup = (
       pollingInterval: BADGE_POLLING_INTERVAL,
       refetchOnFocus: true,
       refetchOnReconnect: true,
-      skip: !hasViewBadgesPermission,
+      skip: !hasViewBadgesPermission || !isFocused,
     },
   );
   const [markBadgeAsViewed] = useMarkBadgeAsViewedMutation();

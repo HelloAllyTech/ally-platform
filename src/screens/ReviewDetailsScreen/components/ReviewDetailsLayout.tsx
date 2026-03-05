@@ -149,6 +149,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         onThreadPress={onThreadPress}
         onCommentsChanged={handleThreadCommentChange}
+        generalCommentsThreadId={metadata?.generalCommentsThreadId || ''}
       />
       <MessageThreadsBottomSheet
         visible={isMessageThreadsVisible}
