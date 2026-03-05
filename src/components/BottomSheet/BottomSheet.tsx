@@ -41,6 +41,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const bottomSheetRef = useRef<BottomSheetComponent>(null);
   const insets = useSafeAreaInsets();
 
+  // --- Bottomsheet Refs ---
+  // This block creates refs to hold the current index of the BottomSheet and
+  // to always have the latest `onClose` and `onBackdropPress` callbacks.
+  // These refs are used to avoid stale closures inside callbacks or effects.
+  const currentIndexRef = useRef<number>(-1); // Tracks the current BottomSheet index.
+  const onCloseRef = useRef(onClose); // Holds the latest onClose callback.
+  onCloseRef.current = onClose; // Updates the ref to the latest prop.
+  const onBackdropPressRef = useRef(onBackdropPress); // Holds the latest onBackdropPress callback.
+  onBackdropPressRef.current = onBackdropPress; // Updates the ref to the latest prop.
+
   const snapPoints = useMemo(() => {
     if (customSnapPoints) {
       return customSnapPoints;
@@ -68,21 +78,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useEffect(() => {
     if (visible) {
       bottomSheetRef.current?.snapToIndex(initialIndex);
-    } else {
+    } else if (currentIndexRef.current !== -1) {
       bottomSheetRef.current?.close();
     }
   }, [visible, initialIndex]);
 
-  // Handle backdrop press
-  const handleBackdropPress = useCallback(() => {
-    if (onBackdropPress) {
-      onBackdropPress();
-    } else {
-      onClose();
-    }
-  }, [onBackdropPress, onClose]);
-
-  // Render backdrop
   const renderBackdrop = useCallback(
     (props: React.ComponentProps<typeof BottomSheetBackdrop>) => (
       <BottomSheetBackdrop
@@ -91,21 +91,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         appearsOnIndex={0}
         opacity={0.5}
         pressBehavior="close"
-        onPress={handleBackdropPress}
+        onPress={onBackdropPressRef.current}
       />
     ),
-    [handleBackdropPress],
+    [],
   );
 
-  // Handle sheet changes
-  const handleSheetChanges = useCallback(
-    (index: number) => {
-      if (index === -1) {
-        onClose();
-      }
-    },
-    [onClose],
-  );
+  const handleSheetChanges = useCallback((index: number) => {
+    currentIndexRef.current = index;
+    if (index === -1) {
+      onCloseRef.current();
+    }
+  }, []);
 
   // Always render the component, control visibility via index
   // Start closed (-1) and open when visible becomes true
