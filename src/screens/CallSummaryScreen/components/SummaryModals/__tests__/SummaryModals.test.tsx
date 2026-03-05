@@ -59,7 +59,6 @@ jest.mock('@/components', () => {
 
 // Mock the CallSummaryScreen components barrel to avoid deep import chains
 jest.mock('../../index', () => ({
-  SummaryDropdown: () => <>dropdown</>,
   CustomMenuModal: () => <>menu</>,
   DeleteRenameModal: () => <>del</>,
   ArchiveActionModal: () => <>archive</>,
@@ -103,11 +102,6 @@ describe('CallSummaryScreen/SummaryModals', () => {
         isMenuVisible={false}
         hideMenu={() => {}}
         handleExport={() => {}}
-        isSummaryDropdownVisible={false}
-        hideHeaderDropdown={() => {}}
-        showSummary={false}
-        setShowSummary={() => {}}
-        isSummaryAvailable={false}
         isSummaryFeedbackPopup
         hideSummaryFeedbackPopup={() => {}}
         onSubmitSummaryFeedback={() => {}}
