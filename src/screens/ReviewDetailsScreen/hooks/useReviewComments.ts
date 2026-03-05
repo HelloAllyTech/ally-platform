@@ -1,6 +1,6 @@
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 
-import {MessageThreadComment} from '@/types/reviews';
+import {MessageThreadComment, ReplySource} from '@/types/reviews';
 
 export const useReviewComments = () => {
   const [isThreadsBottomSheetVisible, setIsThreadsBottomSheetVisible] =
@@ -14,6 +14,7 @@ export const useReviewComments = () => {
     useState(false);
   const [selectedComment, setSelectedComment] =
     useState<MessageThreadComment | null>(null);
+  const replySourceRef = useRef<ReplySource>(ReplySource.THREAD);
 
   const showThreadsBottomSheet = () => {
     setIsThreadsBottomSheetVisible(true);
@@ -40,14 +41,26 @@ export const useReviewComments = () => {
 
   const onReplyPress = (comment: MessageThreadComment) => {
     setSelectedComment(comment);
+    replySourceRef.current = ReplySource.THREAD;
     setIsCommentThreadBottomSheetVisible(false);
+    setIsReplyBottomSheetVisible(true);
+  };
+
+  const onReplyPressFromGeneralComments = (comment: MessageThreadComment) => {
+    setSelectedComment(comment);
+    replySourceRef.current = ReplySource.GENERAL;
+    setIsThreadsBottomSheetVisible(false);
     setIsReplyBottomSheetVisible(true);
   };
 
   const hideReplyBottomSheet = () => {
     setIsReplyBottomSheetVisible(false);
-    setIsCommentThreadBottomSheetVisible(true);
     setSelectedComment(null);
+    if (replySourceRef.current === ReplySource.GENERAL) {
+      setIsThreadsBottomSheetVisible(true);
+    } else {
+      setIsCommentThreadBottomSheetVisible(true);
+    }
   };
 
   const hideCommentThreadBottomSheet = () => {
@@ -73,6 +86,7 @@ export const useReviewComments = () => {
     selectedComment,
     setSelectedComment,
     onReplyPress,
+    onReplyPressFromGeneralComments,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,

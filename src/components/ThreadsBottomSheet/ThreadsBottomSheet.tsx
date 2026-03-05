@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   BottomSheetFlatList,
   BottomSheetFooter,
@@ -21,6 +21,7 @@ import {ChevronRight} from '@/assets/icons';
 import {
   BottomSheet,
   CommentBottomSheetFooter,
+  ConfirmationModal,
   ReviewComment,
 } from '@/components';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
@@ -79,13 +80,10 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const layout = useWindowDimensions();
   const [tabIndex, setTabIndex] = useState(0);
 
-  const routes = useMemo(
-    () => [
-      {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
-      {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
-    ],
-    [t],
-  );
+  const routes = [
+    {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
+    {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
+  ];
 
   const handleTabChange = useCallback((index: number) => {
     setTabIndex(index);
@@ -99,37 +97,38 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const [getThreads, {data: apiData, isLoading, isFetching}] =
     useLazyGetThreads();
 
-  const [offset, setOffset] = React.useState(0);
-  const [commentsData, setCommentsData] =
-    React.useState<ThreadsResponse | null>(null);
-  const [hasMore, setHasMore] = React.useState(true);
+  const [inlineThreadsOffset, setInlineThreadsOffset] = useState(0);
+  const [commentsData, setCommentsData] = useState<ThreadsResponse | null>(
+    null,
+  );
+  const [hasMoreInlineThreads, setHasMoreInlineThreads] = useState(true);
 
   useEffect(() => {
     if (visible) {
-      setOffset(0);
+      setInlineThreadsOffset(0);
       setCommentsData(null);
       getThreads({reviewId, offset: 0, limit: LIMIT});
     } else {
       setCommentsData(null);
-      setOffset(0);
+      setInlineThreadsOffset(0);
       setTabIndex(0);
     }
   }, [visible]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (apiData && visible) {
       const newThreads = apiData.data;
-      if (offset === 0) {
+      if (inlineThreadsOffset === 0) {
         setCommentsData(apiData);
-        setHasMore(apiData.count > LIMIT);
+        setHasMoreInlineThreads(apiData.count > LIMIT);
       } else {
         setCommentsData(prev => {
           if (!prev) {
-            setHasMore(apiData.count > LIMIT);
+            setHasMoreInlineThreads(apiData.count > LIMIT);
             return apiData;
           }
           const updated = [...prev.data, ...newThreads];
-          setHasMore(apiData.count > updated.length);
+          setHasMoreInlineThreads(apiData.count > updated.length);
           return {data: updated, count: apiData.count};
         });
       }
@@ -142,9 +141,16 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     onSubmitComment: (_comment: string) => {},
     isSubmitting: false,
   });
-  const [generalCommentText, setGeneralCommentText] = React.useState('');
+  const generalDeleteFnRef = useRef({
+    setDeleteCommentId: (_id: string | null) => {},
+    handleConfirmDelete: () => {},
+  });
+  const [generalDeleteCommentId, setGeneralDeleteCommentId] = useState<
+    string | null
+  >(null);
+  const [generalCommentText, setGeneralCommentText] = useState('');
 
-  const footerStateRef = React.useRef({
+  const footerStateRef = useRef({
     commentText: '',
     setCommentText: (_text: string) => {},
     onSubmitComment: (_comment: string) => {},
@@ -165,26 +171,23 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     isLoading: generalFnRef.current.isSubmitting,
   };
 
-  const renderFooterComponent = React.useCallback(
-    (props: BottomSheetFooterProps) => {
-      const current = footerStateRef.current;
-      return (
-        <BottomSheetFooter
-          animatedFooterPosition={props.animatedFooterPosition}
-          bottomInset={0}>
-          <CommentBottomSheetFooter
-            text={current.commentText}
-            setText={current.setCommentText}
-            onSubmit={current.onSubmitComment}
-            placeholder={current.placeholderText}
-            bottomInset={current.insetsBottom}
-            isLoading={current.isLoading}
-          />
-        </BottomSheetFooter>
-      );
-    },
-    [],
-  );
+  const renderFooterComponent = useCallback((props: BottomSheetFooterProps) => {
+    const current = footerStateRef.current;
+    return (
+      <BottomSheetFooter
+        animatedFooterPosition={props.animatedFooterPosition}
+        bottomInset={0}>
+        <CommentBottomSheetFooter
+          text={current.commentText}
+          setText={current.setCommentText}
+          onSubmit={current.onSubmitComment}
+          placeholder={current.placeholderText}
+          bottomInset={current.insetsBottom}
+          isLoading={current.isLoading}
+        />
+      </BottomSheetFooter>
+    );
+  }, []);
 
   // --- Tab bar (react-native-tab-view) ---
   const renderTabBar = useCallback(
@@ -292,23 +295,23 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
 
   const renderInlineFooter = useCallback(() => {
     if (!isFetching) return null;
-    if (!hasMore) return null;
+    if (!hasMoreInlineThreads) return null;
     return (
       <View style={[styles.footer, {paddingBottom: insets.bottom + ms(120)}]}>
         <ActivityIndicator size="small" color={colors.ds.theme.primary} />
       </View>
     );
-  }, [isFetching, insets.bottom, hasMore]);
+  }, [isFetching, insets.bottom, hasMoreInlineThreads]);
 
-  const loadMore = useCallback(() => {
+  const loadMoreInlineThreads = useCallback(() => {
     if (!visible) return;
-    if (isLoading || isFetching || !hasMore || !reviewId) return;
-    setOffset(prevOffset => {
+    if (isLoading || isFetching || !hasMoreInlineThreads || !reviewId) return;
+    setInlineThreadsOffset(prevOffset => {
       const newOffset = prevOffset + LIMIT;
       getThreads({reviewId, offset: newOffset, limit: LIMIT});
       return newOffset;
     });
-  }, [hasMore, reviewId, isFetching, isLoading]);
+  }, [hasMoreInlineThreads, reviewId, isFetching, isLoading]);
 
   const renderInlineEmpty = useCallback(() => {
     if (isLoading || isFetching || (visible && !commentsData)) {
@@ -342,7 +345,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         showsVerticalScrollIndicator={false}
         style={styles.listStyle}
         removeClippedSubviews={false}
-        onEndReached={loadMore}
+        onEndReached={loadMoreInlineThreads}
         onEndReachedThreshold={0.5}
       />
     );
@@ -360,6 +363,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         fnRef={generalFnRef}
         onCommentTextChange={setGeneralCommentText}
         generalCommentsThreadId={generalCommentsThreadId}
+        deleteFnRef={generalDeleteFnRef}
+        onDeleteCommentIdChange={setGeneralDeleteCommentId}
       />
     );
   };
@@ -380,7 +385,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       commentsData,
       isLoading,
       isFetching,
-      hasMore,
+      hasMoreInlineThreads,
       reviewId,
       reviewOwnerId,
       activeTab,
@@ -388,37 +393,49 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   );
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      skipBottomSheetView
-      enableContentPanningGesture
-      enableDynamicSizing={false}
-      snapPoints={['80%']}
-      enableOverDrag
-      enableHandlePanningGesture
-      keyboardBehavior="extend"
-      keyboardBlurBehavior="restore"
-      failOffsetX={[-5, 5]}
-      footerComponent={
-        activeTab === TABS.GENERAL ? renderFooterComponent : undefined
-      }>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {t('ThreadsBottomSheet.title')}
-          </Text>
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        skipBottomSheetView
+        enableContentPanningGesture
+        enableDynamicSizing={false}
+        snapPoints={['80%']}
+        enableOverDrag
+        enableHandlePanningGesture
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
+        failOffsetX={[-5, 5]}
+        footerComponent={
+          activeTab === TABS.GENERAL ? renderFooterComponent : undefined
+        }>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>
+              {t('ThreadsBottomSheet.title')}
+            </Text>
+          </View>
+          <TabView
+            navigationState={{index: tabIndex, routes}}
+            renderScene={renderScene}
+            renderTabBar={renderTabBar}
+            onIndexChange={handleTabChange}
+            initialLayout={{width: layout.width}}
+            swipeEnabled
+            commonOptions={{labelStyle: styles.tabBarLabel}}
+          />
         </View>
-        <TabView
-          navigationState={{index: tabIndex, routes}}
-          renderScene={renderScene}
-          renderTabBar={renderTabBar}
-          onIndexChange={handleTabChange}
-          initialLayout={{width: layout.width}}
-          swipeEnabled
-          commonOptions={{labelStyle: styles.tabBarLabel}}
-        />
-      </View>
-    </BottomSheet>
+      </BottomSheet>
+      <ConfirmationModal
+        visible={!!generalDeleteCommentId}
+        onClose={() => generalDeleteFnRef.current.setDeleteCommentId(null)}
+        onConfirm={generalDeleteFnRef.current.handleConfirmDelete}
+        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
+        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
+        confirmVariant="destructive"
+      />
+    </>
   );
 };

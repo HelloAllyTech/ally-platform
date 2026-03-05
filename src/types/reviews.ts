@@ -237,3 +237,8 @@ export interface GetReviewResponse {
   };
   myReaction?: string;
 }
+
+export enum ReplySource {
+  THREAD = 'thread',
+  GENERAL = 'general',
+}

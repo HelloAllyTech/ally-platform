@@ -1,10 +1,10 @@
-import React, {useCallback, useEffect} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
-import {ConfirmationModal, ReviewComment} from '@/components';
+import {ReviewComment} from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useCommentActions, useTranslate} from '@/hooks';
@@ -35,6 +35,13 @@ interface GeneralCommentsListProps {
   onCommentTextChange: (text: string) => void;
   /** General comments thread ID */
   generalCommentsThreadId: string;
+  /** Ref for delete confirmation callbacks, so the parent can render the modal outside the bottom sheet */
+  deleteFnRef: React.MutableRefObject<{
+    setDeleteCommentId: (id: string | null) => void;
+    handleConfirmDelete: () => void;
+  }>;
+  /** Called when deleteCommentId changes so the parent can show/hide the modal */
+  onDeleteCommentIdChange: (id: string | null) => void;
 }
 
 export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
@@ -47,10 +54,12 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   fnRef,
   onCommentTextChange,
   generalCommentsThreadId,
+  deleteFnRef,
+  onDeleteCommentIdChange,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
-  const offsetRef = React.useRef(0);
+  const offsetRef = useRef(0);
 
   const {
     useLazyGetGeneralReviewComments,
@@ -96,8 +105,8 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     onCommentsChanged,
   });
 
-  const [hasMore, setHasMore] = React.useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const handleApiResponse = useCallback(
     (
@@ -158,7 +167,15 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     [onSubmitComment, reviewId, generalCommentsThreadId],
   );
 
-  // Sync function refs (no re-render) so parent footer can call them
+  deleteFnRef.current = {
+    setDeleteCommentId,
+    handleConfirmDelete,
+  };
+
+  useEffect(() => {
+    onDeleteCommentIdChange(deleteCommentId);
+  }, [deleteCommentId, onDeleteCommentIdChange]);
+
   fnRef.current = {
     setCommentText,
     onSubmitComment: handleSubmit,
@@ -279,30 +296,18 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   ]);
 
   return (
-    <>
-      <BottomSheetFlatList
-        data={comments?.data || []}
-        renderItem={renderCommentItem}
-        keyExtractor={item => item.id.toString()}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[styles.listContent, {paddingBottom: ms(150)}]}
-        showsVerticalScrollIndicator={false}
-        style={styles.listStyle}
-        removeClippedSubviews={false}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
-      />
-      <ConfirmationModal
-        visible={!!deleteCommentId}
-        onClose={() => setDeleteCommentId(null)}
-        onConfirm={handleConfirmDelete}
-        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
-        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
-        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
-        confirmVariant="destructive"
-      />
-    </>
+    <BottomSheetFlatList
+      data={comments?.data || []}
+      renderItem={renderCommentItem}
+      keyExtractor={item => item.id.toString()}
+      ListFooterComponent={renderFooter}
+      ListEmptyComponent={renderEmpty}
+      contentContainerStyle={[styles.listContent, {paddingBottom: ms(150)}]}
+      showsVerticalScrollIndicator={false}
+      style={styles.listStyle}
+      removeClippedSubviews={false}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.3}
+    />
   );
 };
