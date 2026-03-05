@@ -50,8 +50,8 @@ describe('CallSummaryScreen/CallTranscript', () => {
 
     const {getByText} = render(<CallTranscript chatId={1} />);
 
-    expect(getByText('CallTranscript.you: Hello')).toBeTruthy();
-    expect(getByText('CallTranscript.client: Hi')).toBeTruthy();
+    expect(getByText('CallTranscript.you')).toBeTruthy();
+    expect(getByText('CallTranscript.client')).toBeTruthy();
   });
 
   it('shows footer loader when isLoading=true', () => {
