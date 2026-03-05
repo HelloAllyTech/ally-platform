@@ -308,7 +308,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    paddingHorizontal: '24@s',
+    paddingHorizontal: '14@s',
     paddingTop: '24@vs',
     gap: '16@vs',
   },
