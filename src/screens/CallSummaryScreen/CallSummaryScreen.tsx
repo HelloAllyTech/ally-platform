@@ -1,13 +1,15 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   StatusBar,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {TabBar, TabView} from 'react-native-tab-view';
 
 import {Button, useToast} from '@/components';
 import {ChatSummaryStatus, USER_PERMISSIONS} from '@/constants';
@@ -38,6 +40,9 @@ import {
 } from './components';
 import {styles} from './styles';
 
+const SUMMARY_TAB_KEY = 'summary';
+const TRANSCRIPT_TAB_KEY = 'transcript';
+
 export const CallSummaryScreen: React.FC<
   RootStackScreenProps<'CallSummary'>
 > = ({route}) => {
@@ -52,12 +57,11 @@ export const CallSummaryScreen: React.FC<
   const chatId = callId || currentChat?.chatId;
 
   const navigation = useAppNavigation();
+  const layout = useWindowDimensions();
 
-  // Fetch summary fields on mount (follows web approach)
   const {refetch: refetchSummaryFields} = useGetSummaryFieldsQuery();
 
   useEffect(() => {
-    // Refetch when callId changes to ensure fresh data
     refetchSummaryFields();
   }, [callId, refetchSummaryFields]);
 
@@ -66,8 +70,6 @@ export const CallSummaryScreen: React.FC<
     refreshing,
     summaryData,
     summaryError,
-    showSummary,
-    setShowSummary,
     canShowSummary,
     activeModal,
     setActiveModal,
@@ -82,7 +84,7 @@ export const CallSummaryScreen: React.FC<
   );
   const isUnauthorized =
     summaryError && getErrorDetails(summaryError).status === 403;
-  const showTranscriptOption =
+  const showTranscriptTab =
     Boolean(callId) &&
     !isUnauthorized &&
     permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
@@ -102,9 +104,6 @@ export const CallSummaryScreen: React.FC<
     handleGoBack,
     summaryName,
     setSummaryName,
-    onHeaderPress,
-    isSummaryDropdownVisible,
-    hideHeaderDropdown,
     onAddSummaryFeedback,
   } = useCallSummaryActions({
     chatId: chatId || 0,
@@ -142,7 +141,6 @@ export const CallSummaryScreen: React.FC<
   });
 
   const onBackNavigation = () => {
-    // If the summary is not yet generated/ready, allow immediate back navigation
     const summaryGenerated = isSummaryAvailable && canShowSummary;
     if (!summaryGenerated) {
       handleGoBack();
@@ -150,7 +148,7 @@ export const CallSummaryScreen: React.FC<
     }
     const currentTime = Date.now();
     const timeElapsed = currentTime - mountTime;
-    const thresholdMs = 30 * 1000; // 30 seconds
+    const thresholdMs = 30 * 1000;
 
     if (
       (timeElapsed >= thresholdMs || !fromLogs) &&
@@ -240,12 +238,12 @@ export const CallSummaryScreen: React.FC<
     );
   };
 
-  const renderContent = () => {
+  const renderSummaryTab = () => {
     if (isUnauthorized) {
       return <SummaryUnauthorized onGoBack={handleGoBack} />;
     }
 
-    if (showSummary && isSummaryAvailable && canShowSummary) {
+    if (isSummaryAvailable && canShowSummary) {
       const shouldShowSaveButton =
         (!callId || hasChanges) && !isFeedbackPopupVisible;
       return (
@@ -265,28 +263,83 @@ export const CallSummaryScreen: React.FC<
       );
     }
 
-    if (showSummary) {
-      return (
-        <>
-          <KeyboardAwareScrollView
-            style={styles.scrollView}
-            nestedScrollEnabled
-            extraScrollHeight={100}
-            automaticallyAdjustKeyboardInsets
-            keyboardShouldPersistTaps="handled"
-            enableOnAndroid>
-            <SummaryGenerationProgress summaryStatus={summaryStatus} />
-            <AddNotesSection
-              savedNotes={summaryData?.details?.callInfo?.notes || ''}
-              onNoteChange={handleNoteChange}
-            />
-          </KeyboardAwareScrollView>
-          {!isFeedbackPopupVisible && renderSummaryButtons()}
-        </>
-      );
-    }
-    return null;
+    return (
+      <>
+        <KeyboardAwareScrollView
+          style={styles.scrollView}
+          nestedScrollEnabled
+          extraScrollHeight={100}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid>
+          <SummaryGenerationProgress summaryStatus={summaryStatus} />
+          <AddNotesSection
+            savedNotes={summaryData?.details?.callInfo?.notes || ''}
+            onNoteChange={handleNoteChange}
+          />
+        </KeyboardAwareScrollView>
+        {!isFeedbackPopupVisible && renderSummaryButtons()}
+      </>
+    );
   };
+
+  const tabs = useMemo(() => {
+    const result = [
+      {key: SUMMARY_TAB_KEY, title: t('SimulationFeedback.tabs.sessionReview')},
+    ];
+    if (showTranscriptTab) {
+      result.push({
+        key: TRANSCRIPT_TAB_KEY,
+        title: t('SimulationFeedback.tabs.annotatedTranscript'),
+      });
+    }
+    return result;
+  }, [showTranscriptTab, t]);
+
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const renderScene = useCallback(
+    ({route: sceneRoute}: {route: {key: string}}) => {
+      switch (sceneRoute.key) {
+        case SUMMARY_TAB_KEY:
+          return renderSummaryTab();
+        case TRANSCRIPT_TAB_KEY:
+          return <CallTranscript chatId={chatId || 0} />;
+        default:
+          return null;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      chatId,
+      isUnauthorized,
+      isSummaryAvailable,
+      canShowSummary,
+      isLoading,
+      isFeedbackPopupVisible,
+      callId,
+      hasChanges,
+      summaryStatus,
+      summaryData,
+      showSummaryButtonLoader,
+      summaryActionButtonText,
+    ],
+  );
+
+  const renderTabBar = useCallback(
+    (props: Parameters<typeof TabBar>[0]) => (
+      <TabBar
+        {...props}
+        scrollEnabled
+        indicatorStyle={styles.tabBarIndicator}
+        style={styles.tabBar}
+        tabStyle={styles.tabBarTab}
+        activeColor={colors.ds.theme.primary}
+        inactiveColor={colors.ds.typography.lowEmphasis}
+      />
+    ),
+    [],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -307,10 +360,6 @@ export const CallSummaryScreen: React.FC<
         showArchiveConfirmation={showArchiveConfirmation}
         setShowArchiveConfirmation={setShowArchiveConfirmation}
         onArchive={handleArchive}
-        isSummaryDropdownVisible={isSummaryDropdownVisible}
-        hideHeaderDropdown={hideHeaderDropdown}
-        showSummary={showSummary}
-        setShowSummary={setShowSummary}
         showExportOption={isSummaryAvailable}
         isSummaryFeedbackPopup={isFeedbackPopupVisible}
         hideSummaryFeedbackPopup={() => setIsFeedbackPopupVisible(false)}
@@ -321,14 +370,25 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
-        showSummary={showSummary}
-        onHeaderPress={onHeaderPress}
-        showTranscript={showTranscriptOption}
       />
 
-      {renderContent()}
-
-      {!showSummary && <CallTranscript chatId={chatId || 0} />}
+      <View style={styles.tabsContainer}>
+        <TabView
+          navigationState={{index: tabIndex, routes: tabs}}
+          renderScene={renderScene}
+          renderTabBar={renderTabBar}
+          onIndexChange={setTabIndex}
+          initialLayout={{width: layout.width}}
+          lazy
+          renderLazyPlaceholder={() => (
+            <View style={styles.lazyPlaceholder}>
+              <ActivityIndicator size="large" color={colors.ds.theme.primary} />
+            </View>
+          )}
+          swipeEnabled
+          commonOptions={{labelStyle: styles.tabBarLabel}}
+        />
+      </View>
     </SafeAreaView>
   );
 };

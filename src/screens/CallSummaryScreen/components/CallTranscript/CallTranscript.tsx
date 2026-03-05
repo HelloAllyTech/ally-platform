@@ -19,6 +19,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
       <CallTranscriptItem
         time={time}
         message={message}
+        counselor={counselor}
         speakerLabel={
           counselor ? t('CallTranscript.you') : t('CallTranscript.client')
         }

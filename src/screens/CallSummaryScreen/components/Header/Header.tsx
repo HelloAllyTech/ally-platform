@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArrowDown, LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
+import {LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
@@ -16,18 +16,12 @@ interface HeaderProps {
   onBackPress: () => void;
   onMenuPress: () => void;
   summaryName?: string;
-  onHeaderPress: () => void;
-  showSummary: boolean;
-  showTranscript: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
-  onHeaderPress,
-  showSummary,
-  showTranscript,
 }) => {
   const {t} = useTranslate();
 
@@ -42,25 +36,12 @@ export const Header: React.FC<HeaderProps> = ({
               <LeftArrowIcon color={colors.black} />
             </TouchableOpacity>
             <View>
-              <TouchableOpacity
-                style={styles.summaryTitleContainer}
-                onPress={onHeaderPress}
-                activeOpacity={0.8}
-                disabled={!showTranscript}>
-                <Text style={styles.expandedSummaryTitle}>
-                  {t('CallSummary.header.title')}{' '}
-                  <Text style={styles.headerSubtitle}>
-                    {showSummary
-                      ? t('CallSummary.header.subtitle')
-                      : t('CallSummary.header.transcript')}
-                  </Text>
+              <Text style={styles.expandedSummaryTitle}>
+                {t('CallSummary.header.title')}{' '}
+                <Text style={styles.headerSubtitle}>
+                  {t('CallSummary.header.subtitle')}
                 </Text>
-                {showTranscript && (
-                  <View style={styles.arrowDownContainer}>
-                    <ArrowDown width={9} height={5} />
-                  </View>
-                )}
-              </TouchableOpacity>
+              </Text>
               <View style={styles.nameContainer}>
                 <Text numberOfLines={1} style={styles.summaryNameText}>
                   {summaryName ? `#${summaryName}` : '-'}
@@ -81,14 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
 };
 
 const styles = ScaledSheet.create({
-  summaryTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  summaryNameContainer: {
-    width: '100%',
-    padding: '6@ms',
-  },
   headerSubtitle: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
     fontStyle: isIOS ? 'italic' : 'normal',
@@ -105,12 +78,6 @@ const styles = ScaledSheet.create({
     ...typography.headline.tiny,
     color: colors.ds.typography.highEmphasis,
   },
-  arrowDownContainer: {
-    width: '24@ms',
-    height: '24@ms',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   backButtonExpanded: {
     paddingLeft: '4@ms',
     paddingRight: '12@ms',
@@ -118,8 +85,6 @@ const styles = ScaledSheet.create({
   expandedTitleContainer: {
     backgroundColor: colors.white,
     zIndex: 1000,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.ashGray,
   },
   expandedTitleContent: {
     flexDirection: 'row',
@@ -133,7 +98,6 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: isIOS ? '3@ms' : '0@ms',
-    marginBottom: '8@ms',
   },
   summaryNameText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
