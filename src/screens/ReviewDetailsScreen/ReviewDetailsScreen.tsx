@@ -133,6 +133,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
     selectedComment,
     setSelectedComment,
     onReplyPress,
+    onReplyPressFromGeneralComments,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
     hideCommentThreadBottomSheet,
@@ -610,7 +611,9 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}
+        reviewOwnerId={reviewData?.createdBy?.id}
         onThreadPress={onThreadPress}
+        onReplyPress={onReplyPressFromGeneralComments}
         generalCommentsThreadId={reviewData?.generalCommentsThreadId || ''}
       />
       <MessageThreadsBottomSheet

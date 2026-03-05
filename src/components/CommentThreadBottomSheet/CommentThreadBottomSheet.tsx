@@ -352,12 +352,14 @@ export const CommentThreadBottomSheet: React.FC<
       <BottomSheet
         visible={visible}
         onClose={onClose}
-        allowFullExpand
         skipBottomSheetView
         enableContentPanningGesture={false}
-        enableDynamicSizing
+        enableDynamicSizing={false}
+        snapPoints={['80%']}
         enableOverDrag
         enableHandlePanningGesture
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
         footerComponent={
           isPrivate || !threadId ? undefined : renderFooterComponent
         }>
