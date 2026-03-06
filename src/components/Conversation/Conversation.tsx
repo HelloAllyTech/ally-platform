@@ -53,6 +53,8 @@ export interface ConversationProps {
   reviewOwnerName?: string;
   /** Called when the user taps outside selectable text (e.g. timestamp, empty space) or scrolls */
   onDismissSelection?: () => void;
+  /** Rendered above the transcript */
+  listHeaderComponent?: React.ReactNode;
   /** Rendered below the transcript once all pages have loaded (hasMore = false) */
   listFooterComponent?: React.ReactNode;
 }
@@ -69,6 +71,7 @@ export const Conversation: React.FC<ConversationProps> = ({
   isRefreshing = false,
   reviewOwnerName,
   onDismissSelection,
+  listHeaderComponent,
   listFooterComponent,
 }) => {
   const {t} = useTranslate();
@@ -331,6 +334,13 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
+  const headerElement = useMemo(() => {
+    if (listHeaderComponent) {
+      return <>{listHeaderComponent}</>;
+    }
+    return null;
+  }, [listHeaderComponent]);
+
   const footerElement = useMemo(() => {
     if (isLoadingMore) {
       return (
@@ -357,6 +367,7 @@ export const Conversation: React.FC<ConversationProps> = ({
         renderItem={renderItem}
         ListEmptyComponent={renderEmptyComponent}
         ListFooterComponent={footerElement}
+        ListHeaderComponent={headerElement}
         onEndReached={hasMore ? onLoadMore : undefined}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
@@ -441,7 +452,6 @@ const styles = ScaledSheet.create({
   },
   androidRow: {
     flexDirection: 'row',
-    paddingHorizontal: '16@ms',
     paddingVertical: '6@mvs',
     gap: '16@ms',
   },
@@ -492,5 +502,10 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.ds.grey[200],
+    marginTop: '16@mvs',
   },
 });

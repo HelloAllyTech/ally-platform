@@ -26,6 +26,7 @@ export interface DeleteConfirmationState {
 }
 
 interface GeneralCommentsSectionProps {
+  isPrivate?: boolean;
   reviewId: string;
   generalCommentsThreadId?: string;
   reviewOwnerId?: number;
@@ -34,6 +35,7 @@ interface GeneralCommentsSectionProps {
 }
 
 export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
+  isPrivate,
   reviewId,
   generalCommentsThreadId,
   reviewOwnerId,
@@ -296,7 +298,6 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
             reactions={reactionsArray}
             reactionCount={reactionCount}
             showReplyButton={false}
-            disableAddReactionButton
             onEmojiSelect={(currentEmoji, unicode) =>
               handleEmojiSelect(comment.id, currentEmoji, unicode)
             }
@@ -314,7 +315,8 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
             })}
             onDelete={handleDeleteComment}
             onHide={handleHideComment}
-            showActionsMenu
+            showActionsMenu={!isPrivate}
+            disableAddReactionButton={isPrivate}
           />
         </View>
       );
@@ -327,6 +329,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
       handleCancelEdit,
       handleSubmitEdit,
       handleEmojiSelect,
+      isPrivate,
       userId,
       reviewOwnerId,
       handleDeleteComment,
@@ -426,7 +429,6 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    paddingHorizontal: '14@s',
     paddingTop: '24@vs',
     gap: '16@vs',
   },

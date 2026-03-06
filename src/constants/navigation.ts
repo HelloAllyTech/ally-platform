@@ -18,8 +18,9 @@ export const SCREEN_NAMES = {
   PROFILE_SETTINGS: 'ProfileSettings',
   REVIEW_DETAILS: 'ReviewDetails',
   SCRIBE_REVIEW_DETAILS: 'ScribeReviewDetails',
-
   REACTIONS: 'Reactions',
+  SHARE_CALL_LOG: 'ShareCallLog',
+  SHARE_SIMULATION: 'ShareSimulation',
   // Tab Screens
   HOME_TAB: 'HomeTab',
   COMMUNITY: 'Community',

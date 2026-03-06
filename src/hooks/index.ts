@@ -35,3 +35,4 @@ export * from './useReviews';
 export * from './useCommentActions';
 export * from './usePaginatedComments';
 export * from './useStableFooterRenderer';
+export * from './useShareReview';

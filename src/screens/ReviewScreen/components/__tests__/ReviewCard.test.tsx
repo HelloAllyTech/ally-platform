@@ -36,6 +36,25 @@ jest.mock('@/components', () => {
       </View>
     ),
     VideoPreview: () => <View testID="video-preview" />,
+    SimulationDetailsCard: ({title, description}: any) => (
+      <View testID="simulation-details-card">
+        <Text>{title}</Text>
+        <Text>{description}</Text>
+      </View>
+    ),
+  };
+});
+
+jest.mock('@/components/SimulationDetailsCard/SimulationDetailRow', () => {
+  const React = require('react');
+  const {View, Text} = require('react-native');
+  return {
+    SimulationDetailRow: ({label, value}: any) => (
+      <View testID="simulation-detail-row">
+        <Text>{label}</Text>
+        <Text>{value}</Text>
+      </View>
+    ),
   };
 });
 
@@ -83,9 +102,11 @@ const mockScenario: ReviewScenario = {
   description: 'Scenario description',
   coverVideoUrl: undefined,
   coverImageUrl: undefined,
+  createdAt: '2024-01-01T12:00:00Z',
 };
 
 const mockSession: ScenarioSessionData = {
+  id: 'session-1',
   createdAt: '2024-01-01T12:00:00Z',
   duration: '90',
 };
@@ -119,9 +140,8 @@ describe('ReviewCard', () => {
     expect(getByText('Test Scenario')).toBeTruthy();
   });
 
-  it('renders shared simulation heading and detail rows', () => {
+  it('renders detail rows', () => {
     const {getByText} = render(<ReviewCard {...defaultProps} />);
-    expect(getByText('Review.card.sharedSimulationForReview')).toBeTruthy();
     expect(getByText('Review.card.dateAndTime')).toBeTruthy();
     expect(getByText('date-2024-01-01T12:00:00Z')).toBeTruthy();
     expect(getByText('Review.card.duration')).toBeTruthy();

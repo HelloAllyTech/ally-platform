@@ -4,6 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {CommentIcon} from '@/assets';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
+import {useTranslate} from '@/hooks';
 import {ReactionsCount} from '@/screens/ReviewScreen/components';
 import {
   colors,
@@ -15,6 +16,7 @@ import {
 } from '@/theme';
 import {getReactionAction} from '@/utils/reviews';
 
+import {CustomSwitch} from '../CustomSwitch';
 import {EmojiPicker} from '../EmojiPicker';
 
 interface InteractionsBarProps {
@@ -25,6 +27,7 @@ interface InteractionsBarProps {
   onCommentPress?: () => void;
   refreshReactions?: () => void;
   isPrivate?: boolean;
+  onTogglePrivate?: (isEnabled: boolean) => void;
 }
 export const InteractionsBar = ({
   reviewId,
@@ -34,9 +37,11 @@ export const InteractionsBar = ({
   onCommentPress,
   refreshReactions,
   isPrivate = false,
+  onTogglePrivate,
 }: InteractionsBarProps) => {
   const {useAddReactionToReview, reviewType} = useReviewApiHooks();
 
+  const {t} = useTranslate();
   const totalReactions = reactions
     ? Object.values(reactions).reduce((sum, count) => sum + count, 0)
     : 0;
@@ -62,6 +67,18 @@ export const InteractionsBar = ({
 
   return (
     <View style={styles.container}>
+      {onTogglePrivate && (
+        <View style={styles.switchContainer}>
+          <Text style={styles.switchLabel}>
+            {t('SimulationFeedback.share')}
+          </Text>
+          <CustomSwitch
+            value={!isPrivate}
+            onToggle={onTogglePrivate}
+            color={colors.ds.green[200]}
+          />
+        </View>
+      )}
       <TouchableOpacity style={styles.iconContainer} onPress={onCommentPress}>
         <CommentIcon width={20} height={20} />
         {!!commentsCount && (
@@ -150,5 +167,15 @@ const styles = ScaledSheet.create({
     width: '0.5@s',
     height: '100%',
     backgroundColor: colors.ds.stroke.primary,
+  },
+  switchLabel: {
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.typography.lowEmphasis,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
   },
 });

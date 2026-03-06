@@ -91,6 +91,7 @@ export interface GetThreadCommentsResponse {
 }
 
 export interface ScenarioSessionData {
+  id: string;
   duration: string;
   createdAt: string;
 }
@@ -99,6 +100,7 @@ export interface ReviewScenario {
   description: string;
   coverImageUrl?: string;
   coverVideoUrl?: string;
+  createdAt: string;
 }
 export interface User {
   id: number;
@@ -115,6 +117,8 @@ export interface ReviewItem {
   };
   createdBy: User;
   commentsCount: number;
+  note: string;
+  reviewStatus: ReviewStatus;
 }
 
 export interface GetReviewByIdResponse {
@@ -127,6 +131,7 @@ export interface GetReviewByIdResponse {
     coverVideoUrl: string;
   };
   scenarioSession: {
+    id: string;
     createdAt: string;
     duration: string;
   };
@@ -142,6 +147,7 @@ export interface GetReviewByIdResponse {
   generalCommentsThreadId: string;
   note: string;
   noteEditedAt: string;
+  createdAt: string;
 }
 export interface ReviewsResponse {
   data: ReviewItem[];
@@ -198,6 +204,7 @@ export interface RepliesParams {
 export type MessageList = Record<string, MessageData[]> | [];
 export interface CreateReviewRequest {
   scenarioSessionId: string;
+  note: string;
 }
 
 export interface CreateReviewResponse {
@@ -214,6 +221,7 @@ export enum ReviewStatus {
 
 export interface UpdateReviewStatusRequest {
   status: ReviewStatus;
+  note?: string;
 }
 
 export interface UpdateReviewStatusResponse {
@@ -236,6 +244,16 @@ export interface GetReviewResponse {
     [reaction_code: string]: number;
   };
   myReaction?: string;
+  note: string;
+}
+
+export interface ShareScreenScenarioData {
+  coverImageUrl?: string;
+  coverVideoUrl?: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  duration: string;
 }
 
 export enum ReplySource {
