@@ -381,6 +381,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           }
         }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       />
 
       {/* iOS floating "Add comment" menu — rendered OUTSIDE the FlatList
