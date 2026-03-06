@@ -252,28 +252,16 @@ def _build_behavior_conditions_block(
         else:
             classification_prefix = "can be classified as"
 
-        # Build the actor response prefix
-        actor_response_prefix = ""
-        if bi.actors_responses:
-            non_empty_responses = [r for r in bi.actors_responses if r]
-            if non_empty_responses:
-                actor_response_prefix = f'start by saying: "{non_empty_responses[0]}"'
-
         # Build the condition block
         condition = (
             f"If the previous helper utterance {classification_prefix} "
             f"{behaviors_str}"
         )
 
-        if actor_response_prefix:
-            then_clause = f"Then, {actor_response_prefix}"
-            if state_continuation:
-                then_clause += f" and continue with{state_continuation}"
+        if state_continuation:
+            then_clause = f"Then, continue with{state_continuation}"
         else:
-            if state_continuation:
-                then_clause = f"Then, continue with{state_continuation}"
-            else:
-                then_clause = "Then, respond naturally based on your character."
+            then_clause = "Then, respond naturally based on your character."
 
         condition_blocks.append(f"{condition}\n{then_clause}")
 
