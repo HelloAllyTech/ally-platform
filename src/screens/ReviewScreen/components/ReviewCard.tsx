@@ -1,4 +1,4 @@
-import {useEffect} from 'react';
+import {useCallback, useState} from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {useTranslation} from 'react-i18next';
@@ -42,8 +42,6 @@ interface ReviewCardProps {
     [reaction_code: string]: number;
   };
   onReviewPress: (reviewId?: string) => void;
-  onCommentPress?: (reviewId: string) => void;
-  isExpanded?: boolean;
   note?: string;
 }
 
@@ -56,22 +54,35 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   commentsCount = 0,
   reactions = {},
   onReviewPress,
-  onCommentPress,
-  isExpanded = false,
   note,
 }) => {
   const {t} = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [
     getGeneralComments,
     {data: generalCommentsData, isLoading: isLoadingGeneral},
   ] = useLazyGetGeneralReviewCommentsQuery();
 
-  useEffect(() => {
-    if (isExpanded && !generalCommentsData) {
-      getGeneralComments({reviewId: id, offset: 0, limit: 2});
+  const handleCommentPress = useCallback(async () => {
+    if (isExpanded) {
+      setIsExpanded(false);
+      return;
     }
-  }, [isExpanded, id, getGeneralComments, generalCommentsData]);
+    if (commentsCount === 0) return;
+    if (generalCommentsData?.data?.length) {
+      setIsExpanded(true);
+      return;
+    }
+    const result = await getGeneralComments({
+      reviewId: id,
+      offset: 0,
+      limit: 2,
+    });
+    if (result.data?.data?.length) {
+      setIsExpanded(true);
+    }
+  }, [isExpanded, commentsCount, generalCommentsData, getGeneralComments, id]);
 
   const totalReactions = Object.values(reactions).reduce(
     (sum, count) => sum + count,
@@ -121,7 +132,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       />
       <TouchableOpacity
         style={styles.commentCountContainer}
-        onPress={() => onCommentPress?.(id)}>
+        onPress={handleCommentPress}>
         <Text style={styles.commentText}>
           {pluralize(commentsCount, t('Review.card.comment'))}
         </Text>
@@ -171,7 +182,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         isLoading={isLoadingGeneral}
         generalCommentsData={generalCommentsData}
         reviewId={id}
-        onCollapsePress={() => onCommentPress?.(id)}
+        onCollapsePress={handleCommentPress}
         onCommentPress={onReviewPress}
         t={t}
       />
