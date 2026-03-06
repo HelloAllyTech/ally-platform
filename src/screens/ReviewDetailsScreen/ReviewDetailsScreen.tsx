@@ -612,9 +612,6 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         isRefreshing={isFetching && offset === 0}
         reviewOwnerName={reviewData?.createdBy?.name}
         onDismissSelection={resetCommentInput}
-        onEditNote={
-          reviewData?.createdBy?.id === userId ? handleEditNote : undefined
-        }
       />
       {/* Comment input bottom sheet */}
 
