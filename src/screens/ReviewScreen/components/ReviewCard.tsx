@@ -139,7 +139,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         {/* <Text style={styles.simulationDetailsHeading}>
           {t('Review.card.sharedSimulationForReview')}
         </Text> */}
-        <Text style={styles.noteText}>{note}</Text>
+        {note && <Text style={styles.noteText}>{note}</Text>}
         <SimulationDetailRow
           label={t('Review.card.dateAndTime')}
           value={formatDateTime(scenarioSession.createdAt)}

@@ -28,6 +28,7 @@ import {
   DeleteConfirmationState,
   GeneralCommentsSection,
 } from './GeneralCommentsSection';
+import {ReviewNote} from './ReviewNote';
 
 interface ReviewDetailsLayoutProps {
   reviewId: string;
@@ -109,6 +110,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   const generalCommentsFooter = useMemo(
     () => (
       <GeneralCommentsSection
+        isPrivate={isPrivate}
         reviewId={reviewId}
         generalCommentsThreadId={metadata?.generalCommentsThreadId}
         reviewOwnerId={metadata?.reviewOwnerId}
@@ -117,6 +119,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       />
     ),
     [
+      isPrivate,
       reviewId,
       metadata?.generalCommentsThreadId,
       metadata?.reviewOwnerId,
@@ -124,6 +127,20 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       handleDeleteConfirmationChange,
     ],
   );
+
+  const noteElementHeader = useMemo(() => {
+    if (reviewNote) {
+      return (
+        <ReviewNote
+          note={reviewNote}
+          onEditNote={
+            metadata?.reviewOwnerId === userData?.id ? onEditNote : undefined
+          }
+        />
+      );
+    }
+    return null;
+  }, [reviewNote, metadata?.reviewOwnerId, userData?.id, onEditNote]);
 
   if (isLoading) {
     return (
@@ -162,10 +179,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerName={metadata?.createdBy?.name}
         onDismissSelection={resetCommentInput}
         listFooterComponent={generalCommentsFooter}
-        reviewNote={reviewNote}
-        onEditNote={
-          metadata?.reviewOwnerId === userData?.id ? onEditNote : undefined
-        }
+        listHeaderComponent={noteElementHeader}
       />
 
       <View style={styles.interactionsBarContainer}>
