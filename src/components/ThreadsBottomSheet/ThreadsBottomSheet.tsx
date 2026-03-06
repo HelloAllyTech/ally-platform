@@ -1,10 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {
-  BottomSheetFlatList,
-  BottomSheetFooter,
-  BottomSheetFooterProps,
-} from '@gorhom/bottom-sheet';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
 import {
   ActivityIndicator,
   Text,
@@ -18,20 +14,18 @@ import {ms} from 'react-native-size-matters';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {ChevronRight} from '@/assets/icons';
-import {
-  BottomSheet,
-  CommentBottomSheetFooter,
-  ConfirmationModal,
-  ReviewComment,
-} from '@/components';
+import {BottomSheet, ConfirmationModal, ReviewComment} from '@/components';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
-import {useTranslate, useUser} from '@/hooks';
+import {useStableFooterRenderer, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
 import {Thread, ThreadsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils/date';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
-import {GeneralCommentsList} from './GeneralCommentsList';
+import {
+  GeneralCommentsList,
+  GeneralCommentsListRef,
+} from './GeneralCommentsList';
 import {styles} from './styles';
 import {ThreadsBottomSheetProps} from './types';
 
@@ -94,100 +88,82 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const {useLazyGetThreads} = useReviewApiHooks();
 
   // --- Inline tab state ---
-  const [getThreads, {data: apiData, isLoading, isFetching}] =
-    useLazyGetThreads();
+  const [getThreads, {isLoading, isFetching}] = useLazyGetThreads();
 
-  const [inlineThreadsOffset, setInlineThreadsOffset] = useState(0);
+  const inlineOffsetRef = useRef(0);
   const [commentsData, setCommentsData] = useState<ThreadsResponse | null>(
     null,
   );
   const [hasMoreInlineThreads, setHasMoreInlineThreads] = useState(true);
 
   useEffect(() => {
-    if (visible) {
-      setInlineThreadsOffset(0);
-      setCommentsData(null);
-      getThreads({reviewId, offset: 0, limit: LIMIT});
-    } else {
-      setCommentsData(null);
-      setInlineThreadsOffset(0);
-      setTabIndex(0);
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (apiData && visible) {
-      const newThreads = apiData.data;
-      if (inlineThreadsOffset === 0) {
-        setCommentsData(apiData);
-        setHasMoreInlineThreads(apiData.count > LIMIT);
-      } else {
-        setCommentsData(prev => {
-          if (!prev) {
-            setHasMoreInlineThreads(apiData.count > LIMIT);
-            return apiData;
-          }
-          const updated = [...prev.data, ...newThreads];
-          setHasMoreInlineThreads(apiData.count > updated.length);
-          return {data: updated, count: apiData.count};
+    const fetchThreads = async () => {
+      if (visible && reviewId) {
+        setCommentsData(null);
+        inlineOffsetRef.current = 0;
+        setHasMoreInlineThreads(true);
+        const result = await getThreads({
+          reviewId,
+          offset: 0,
+          limit: LIMIT,
         });
+        if (result.data) {
+          setCommentsData(result.data);
+          setHasMoreInlineThreads(result.data.count > LIMIT);
+        }
+      } else {
+        setCommentsData(null);
+        inlineOffsetRef.current = 0;
+        setTabIndex(0);
       }
-    }
-  }, [apiData, visible]);
+    };
+    fetchThreads();
+  }, [visible, reviewId]);
 
-  // --- General tab: ref for functions, state for primitive text value ---
-  const generalFnRef = useRef({
-    setCommentText: (_text: string) => {},
-    onSubmitComment: (_comment: string) => {},
-    isSubmitting: false,
-  });
-  const generalDeleteFnRef = useRef({
-    setDeleteCommentId: (_id: string | null) => {},
+  // --- General tab state ---
+  const generalControlRef = useRef<GeneralCommentsListRef>({
+    setCommentText: () => {},
+    handleSubmit: () => {},
+    handleCancelDelete: () => {},
     handleConfirmDelete: () => {},
+    deleteCommentId: null,
   });
   const [generalDeleteCommentId, setGeneralDeleteCommentId] = useState<
     string | null
   >(null);
   const [generalCommentText, setGeneralCommentText] = useState('');
+  const [isGeneralSubmitting, setIsGeneralSubmitting] = useState(false);
 
-  const footerStateRef = useRef({
-    commentText: '',
-    setCommentText: (_text: string) => {},
-    onSubmitComment: (_comment: string) => {},
-    placeholderText: t('ThreadsBottomSheet.addComment'),
-    insetsBottom: insets.bottom,
-    isLoading: false,
-  });
-
-  footerStateRef.current = {
-    commentText: generalCommentText,
-    setCommentText: (text: string) => {
-      generalFnRef.current.setCommentText(text);
-      setGeneralCommentText(text);
-    },
-    onSubmitComment: generalFnRef.current.onSubmitComment,
-    placeholderText: t('ThreadsBottomSheet.addComment'),
-    insetsBottom: insets.bottom,
-    isLoading: generalFnRef.current.isSubmitting,
-  };
-
-  const renderFooterComponent = useCallback((props: BottomSheetFooterProps) => {
-    const current = footerStateRef.current;
-    return (
-      <BottomSheetFooter
-        animatedFooterPosition={props.animatedFooterPosition}
-        bottomInset={0}>
-        <CommentBottomSheetFooter
-          text={current.commentText}
-          setText={current.setCommentText}
-          onSubmit={current.onSubmitComment}
-          placeholder={current.placeholderText}
-          bottomInset={current.insetsBottom}
-          isLoading={current.isLoading}
-        />
-      </BottomSheetFooter>
-    );
+  const handleSetGeneralCommentText = useCallback((text: string) => {
+    setGeneralCommentText(text);
+    generalControlRef.current.setCommentText(text);
   }, []);
+
+  const handleGeneralSubmit = useCallback((text: string) => {
+    generalControlRef.current.handleSubmit(text);
+  }, []);
+
+  const handleGeneralCommentTextSync = useCallback((text: string) => {
+    setGeneralCommentText(text);
+  }, []);
+
+  const handleGeneralSubmittingSync = useCallback((submitting: boolean) => {
+    setIsGeneralSubmitting(submitting);
+  }, []);
+
+  const generalPlaceholder = useMemo(
+    () => t('ThreadsBottomSheet.addComment'),
+    [t],
+  );
+
+  const renderGeneralFooter = useStableFooterRenderer({
+    text: generalCommentText,
+    setText: handleSetGeneralCommentText,
+    onSubmit: handleGeneralSubmit,
+    placeholder: generalPlaceholder,
+    insetsBottom: insets.bottom,
+    isLoading: isGeneralSubmitting,
+  });
 
   // --- Tab bar (react-native-tab-view) ---
   const renderTabBar = useCallback(
@@ -303,15 +279,42 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     );
   }, [isFetching, insets.bottom, hasMoreInlineThreads]);
 
-  const loadMoreInlineThreads = useCallback(() => {
-    if (!visible) return;
-    if (isLoading || isFetching || !hasMoreInlineThreads || !reviewId) return;
-    setInlineThreadsOffset(prevOffset => {
-      const newOffset = prevOffset + LIMIT;
-      getThreads({reviewId, offset: newOffset, limit: LIMIT});
-      return newOffset;
+  const loadMoreInlineThreads = useCallback(async () => {
+    if (
+      !visible ||
+      isLoading ||
+      isFetching ||
+      !hasMoreInlineThreads ||
+      !reviewId
+    )
+      return;
+    const newOffset = inlineOffsetRef.current + LIMIT;
+    inlineOffsetRef.current = newOffset;
+    const result = await getThreads({
+      reviewId,
+      offset: newOffset,
+      limit: LIMIT,
     });
-  }, [hasMoreInlineThreads, reviewId, isFetching, isLoading]);
+    const responseData = result.data;
+    if (responseData) {
+      setCommentsData(prev => {
+        if (!prev) {
+          setHasMoreInlineThreads(responseData.count > LIMIT);
+          return responseData;
+        }
+        const updated = [...prev.data, ...responseData.data];
+        setHasMoreInlineThreads(responseData.count > updated.length);
+        return {data: updated, count: responseData.count};
+      });
+    }
+  }, [
+    visible,
+    hasMoreInlineThreads,
+    reviewId,
+    isFetching,
+    isLoading,
+    getThreads,
+  ]);
 
   const renderInlineEmpty = useCallback(() => {
     if (isLoading || isFetching || (visible && !commentsData)) {
@@ -360,11 +363,11 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         onAddReactionPress={onAddReactionPress}
         onReplyPress={onReplyPress}
         onCommentsChanged={onCommentsChanged}
-        fnRef={generalFnRef}
-        onCommentTextChange={setGeneralCommentText}
         generalCommentsThreadId={generalCommentsThreadId}
-        deleteFnRef={generalDeleteFnRef}
+        controlRef={generalControlRef}
         onDeleteCommentIdChange={setGeneralDeleteCommentId}
+        onCommentTextChange={handleGeneralCommentTextSync}
+        onSubmittingChange={handleGeneralSubmittingSync}
       />
     );
   };
@@ -407,7 +410,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         keyboardBlurBehavior="restore"
         failOffsetX={[-5, 5]}
         footerComponent={
-          activeTab === TABS.GENERAL ? renderFooterComponent : undefined
+          activeTab === TABS.GENERAL ? renderGeneralFooter : undefined
         }>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -428,8 +431,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
       </BottomSheet>
       <ConfirmationModal
         visible={!!generalDeleteCommentId}
-        onClose={() => generalDeleteFnRef.current.setDeleteCommentId(null)}
-        onConfirm={generalDeleteFnRef.current.handleConfirmDelete}
+        onClose={() => generalControlRef.current.handleCancelDelete()}
+        onConfirm={generalControlRef.current.handleConfirmDelete}
         title={t('ThreadsBottomSheet.deleteConfirmation.title')}
         description={t('ThreadsBottomSheet.deleteConfirmation.description')}
         confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}

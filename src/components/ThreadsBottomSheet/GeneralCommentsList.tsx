@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect} from 'react';
 import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import {ms} from 'react-native-size-matters';
 import {ReviewComment} from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
-import {useCommentActions, useTranslate} from '@/hooks';
+import {useCommentActions, usePaginatedComments, useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
@@ -16,7 +16,13 @@ import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 import {ThreadCommentChange} from '../CommentThreadBottomSheet/types';
 import {styles} from './styles';
 
-const LIMIT = 20;
+export interface GeneralCommentsListRef {
+  setCommentText: (text: string) => void;
+  handleSubmit: (text: string) => void;
+  handleCancelDelete: () => void;
+  handleConfirmDelete: () => void;
+  deleteCommentId: string | null;
+}
 
 interface GeneralCommentsListProps {
   visible: boolean;
@@ -25,23 +31,15 @@ interface GeneralCommentsListProps {
   onAddReactionPress?: (commentId: string) => void;
   onReplyPress?: (comment: MessageThreadComment) => void;
   onCommentsChanged?: (change: ThreadCommentChange) => void;
-  /** Ref for stable function references (setCommentText, onSubmitComment) */
-  fnRef: React.MutableRefObject<{
-    setCommentText: (text: string) => void;
-    onSubmitComment: (comment: string) => void;
-    isSubmitting: boolean;
-  }>;
-  /** Called when commentText changes so the parent can re-render the footer */
-  onCommentTextChange: (text: string) => void;
-  /** General comments thread ID */
   generalCommentsThreadId: string;
-  /** Ref for delete confirmation callbacks, so the parent can render the modal outside the bottom sheet */
-  deleteFnRef: React.MutableRefObject<{
-    setDeleteCommentId: (id: string | null) => void;
-    handleConfirmDelete: () => void;
-  }>;
-  /** Called when deleteCommentId changes so the parent can show/hide the modal */
+  /** Single ref for all parent-needed callbacks and state */
+  controlRef: React.MutableRefObject<GeneralCommentsListRef>;
+  /** Notifies the parent when deleteCommentId changes so the modal can show/hide */
   onDeleteCommentIdChange: (id: string | null) => void;
+  /** Syncs commentText to parent so the parent-owned footer can re-render */
+  onCommentTextChange: (text: string) => void;
+  /** Syncs isSubmitting to parent for the footer loading indicator */
+  onSubmittingChange: (isSubmitting: boolean) => void;
 }
 
 export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
@@ -51,15 +49,14 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   onAddReactionPress,
   onReplyPress,
   onCommentsChanged,
-  fnRef,
-  onCommentTextChange,
   generalCommentsThreadId,
-  deleteFnRef,
+  controlRef,
   onDeleteCommentIdChange,
+  onCommentTextChange,
+  onSubmittingChange,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
-  const offsetRef = useRef(0);
 
   const {
     useLazyGetGeneralReviewComments,
@@ -85,7 +82,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     commentText,
     setCommentText,
     deleteCommentId,
-    setDeleteCommentId,
+    handleCancelDelete,
     handleEditComment,
     handleDeleteComment,
     handleConfirmDelete,
@@ -105,52 +102,29 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     onCommentsChanged,
   });
 
-  const [hasMore, setHasMore] = useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
-  const handleApiResponse = useCallback(
-    (
-      responseData: {data: MessageThreadComment[]; count: number} | undefined,
-    ) => {
-      if (!responseData) return;
-
-      setComments(prev => {
-        const updated = prev
-          ? {
-              data: [...prev.data, ...responseData.data],
-              count: responseData.count,
-            }
-          : responseData;
-        setHasMore(updated.data.length < responseData.count);
-        return updated;
-      });
-      setHasLoadedOnce(true);
-    },
-    [setComments],
-  );
+  const {
+    hasMore,
+    hasLoadedOnce,
+    appendData,
+    reset,
+    getNextOffset,
+    canLoadMore,
+  } = usePaginatedComments({setComments});
 
   useEffect(() => {
     const fetchComments = async () => {
       if (visible && reviewId) {
-        offsetRef.current = 0;
-        setComments(null);
-        setHasMore(false);
-        setHasLoadedOnce(false);
+        reset();
         const result = await getGeneralReviewComments({
           reviewId,
           offset: 0,
-          limit: LIMIT,
+          limit: 20,
         });
         if (result.data) {
-          handleApiResponse(result.data);
-        } else {
-          setHasLoadedOnce(true);
+          appendData(result.data);
         }
       } else {
-        setComments(null);
-        offsetRef.current = 0;
-        setHasMore(false);
-        setHasLoadedOnce(false);
+        reset();
       }
     };
 
@@ -167,25 +141,25 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     [onSubmitComment, reviewId, generalCommentsThreadId],
   );
 
-  deleteFnRef.current = {
-    setDeleteCommentId,
+  controlRef.current = {
+    setCommentText,
+    handleSubmit,
+    handleCancelDelete,
     handleConfirmDelete,
+    deleteCommentId,
   };
 
   useEffect(() => {
     onDeleteCommentIdChange(deleteCommentId);
   }, [deleteCommentId, onDeleteCommentIdChange]);
 
-  fnRef.current = {
-    setCommentText,
-    onSubmitComment: handleSubmit,
-    isSubmitting,
-  };
-
-  // Only sync the primitive text value via state — React short-circuits if unchanged
   useEffect(() => {
     onCommentTextChange(commentText);
   }, [commentText, onCommentTextChange]);
+
+  useEffect(() => {
+    onSubmittingChange(isSubmitting);
+  }, [isSubmitting, onSubmittingChange]);
 
   const handleReplyPress = useCallback(
     (comment: MessageThreadComment) => {
@@ -275,24 +249,24 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   }, [isLoading, hasLoadedOnce, t, reviewId]);
 
   const loadMore = useCallback(async () => {
-    if (!visible || isLoading || !hasMore || !reviewId) return;
-    const newOffset = offsetRef.current + LIMIT;
-    offsetRef.current = newOffset;
+    if (!canLoadMore(visible, isLoading) || !reviewId) return;
+    const newOffset = getNextOffset();
     const result = await getGeneralReviewComments({
       reviewId,
       offset: newOffset,
-      limit: LIMIT,
+      limit: 20,
     });
     if (result.data) {
-      handleApiResponse(result.data);
+      appendData(result.data);
     }
   }, [
-    hasMore,
-    reviewId,
-    getGeneralReviewComments,
+    canLoadMore,
     visible,
-    handleApiResponse,
     isLoading,
+    reviewId,
+    getNextOffset,
+    getGeneralReviewComments,
+    appendData,
   ]);
 
   return (

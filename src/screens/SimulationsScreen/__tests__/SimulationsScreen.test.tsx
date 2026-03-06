@@ -6,6 +6,11 @@ import {SimulationsScreen} from '../SimulationsScreen';
 import {ScenarioStatus, SCREEN_NAMES} from '../../../constants';
 import type {Scenario} from '../../../types';
 
+jest.mock('@gorhom/bottom-sheet', () => ({
+  BottomSheetFooter: 'BottomSheetFooter',
+  BottomSheetFlatList: 'BottomSheetFlatList',
+}));
+
 // Mock Google Sign-In to avoid native module requirement
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
