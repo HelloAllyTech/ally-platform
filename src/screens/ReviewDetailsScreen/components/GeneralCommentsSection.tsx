@@ -68,7 +68,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     commentText,
     setCommentText,
     deleteCommentId,
-    setDeleteCommentId,
+    handleCancelDelete,
     handleEditComment,
     handleDeleteComment,
     handleConfirmDelete,
@@ -92,10 +92,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     },
   });
 
-  const closeDeleteModal = useCallback(
-    () => setDeleteCommentId(null),
-    [setDeleteCommentId],
-  );
+  const closeDeleteModal = handleCancelDelete;
 
   useEffect(() => {
     onDeleteConfirmationChange?.(

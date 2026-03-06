@@ -57,6 +57,7 @@ export {
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {BottomSheetBackHeader} from './BottomSheetBackHeader';
 export {CommentBottomSheetFooter} from './CommentBottomSheetFooter';
 export type {CommentBottomSheetFooterProps} from './CommentBottomSheetFooter';
 export {EmojiPicker} from './EmojiPicker';

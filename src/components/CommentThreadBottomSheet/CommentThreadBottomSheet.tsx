@@ -1,29 +1,23 @@
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {
-  BottomSheetFlatList,
-  BottomSheetFooter,
-  BottomSheetFooterProps,
-} from '@gorhom/bottom-sheet';
-import {
-  ActivityIndicator,
-  Keyboard,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {BottomSheetFlatList} from '@gorhom/bottom-sheet';
+import {ActivityIndicator, Keyboard, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms} from 'react-native-size-matters';
 
-import {LeftArrow} from '@/assets/icons';
 import {
   BottomSheet,
-  CommentBottomSheetFooter,
+  BottomSheetBackHeader,
   ConfirmationModal,
   ReviewComment,
 } from '@/components';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
-import {useCommentActions, useTranslate} from '@/hooks';
+import {
+  useCommentActions,
+  usePaginatedComments,
+  useStableFooterRenderer,
+  useTranslate,
+} from '@/hooks';
 import {colors} from '@/theme';
 import {MessageThreadComment} from '@/types/reviews';
 import {formatRelativeTime, isMinutesPassed} from '@/utils/date';
@@ -31,8 +25,6 @@ import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
 
 import {styles} from './styles';
 import {CommentThreadBottomSheetProps} from './types';
-
-const LIMIT = 20;
 
 export const CommentThreadBottomSheet: React.FC<
   CommentThreadBottomSheetProps
@@ -50,7 +42,6 @@ export const CommentThreadBottomSheet: React.FC<
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
-  const offsetRef = React.useRef(0);
 
   const {
     useUpdateCommentVisibility,
@@ -79,7 +70,7 @@ export const CommentThreadBottomSheet: React.FC<
     editingCommentId: _editingCommentId,
     setEditingCommentId,
     deleteCommentId,
-    setDeleteCommentId,
+    handleCancelDelete,
     handleEditComment,
     handleDeleteComment,
     handleConfirmDelete,
@@ -99,32 +90,15 @@ export const CommentThreadBottomSheet: React.FC<
     onCommentsChanged,
   });
 
-  const [hasMore, setHasMore] = React.useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const {
+    hasMore,
+    hasLoadedOnce,
+    appendData,
+    reset,
+    getNextOffset,
+    canLoadMore,
+  } = usePaginatedComments({setComments});
 
-  const handleApiResponse = useCallback(
-    (
-      responseData: {data: MessageThreadComment[]; count: number} | undefined,
-      responseThreadId: string,
-    ) => {
-      if (!responseData || responseThreadId !== threadId) return;
-
-      setComments(prev => {
-        const updated = prev
-          ? {
-              data: [...prev.data, ...responseData.data],
-              count: responseData.count,
-            }
-          : responseData;
-        setHasMore(updated.data.length < responseData.count);
-        return updated;
-      });
-      setHasLoadedOnce(true);
-    },
-    [threadId, setComments],
-  );
-
-  // Dismiss keyboard when bottom sheet closes
   useEffect(() => {
     if (!visible) {
       Keyboard.dismiss();
@@ -133,34 +107,25 @@ export const CommentThreadBottomSheet: React.FC<
     }
   }, [visible, setCommentText, setEditingCommentId]);
 
-  // Reset offset and data when bottom sheet becomes visible
   useEffect(() => {
     const fetchComments = async () => {
       if (visible && threadId) {
-        offsetRef.current = 0;
-        setComments(null);
-        setHasMore(false);
-        setHasLoadedOnce(false);
+        reset();
         const result = await getThreadComments({
           threadId,
           offset: 0,
-          limit: LIMIT,
+          limit: 20,
         });
         if (result.data) {
-          handleApiResponse(result.data, threadId);
-        } else {
-          setHasLoadedOnce(true);
+          appendData(result.data);
         }
       } else {
-        setComments(null);
-        offsetRef.current = 0;
-        setHasMore(false);
-        setHasLoadedOnce(false);
+        reset();
       }
     };
 
     fetchComments();
-  }, [visible, threadId, getThreadComments, handleApiResponse, setComments]);
+  }, [visible, threadId, getThreadComments, appendData, reset]);
 
   const handleReplyPress = useCallback(
     (comment: MessageThreadComment) => {
@@ -231,26 +196,7 @@ export const CommentThreadBottomSheet: React.FC<
     ],
   );
 
-  const renderHeader = useCallback(() => {
-    return (
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={hideCommentThreadBottomSheet}
-          activeOpacity={0.7}>
-          <LeftArrow
-            width={ms(12)}
-            height={ms(15)}
-            color={colors.ds.typography.highEmphasis}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {t('CommentThreadBottomSheet.title')}
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
-    );
-  }, [hideCommentThreadBottomSheet, t]);
+  const headerTitle = useMemo(() => t('CommentThreadBottomSheet.title'), [t]);
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
@@ -280,25 +226,24 @@ export const CommentThreadBottomSheet: React.FC<
   }, [isLoading, hasLoadedOnce, t, threadId]);
 
   const loadMore = useCallback(async () => {
-    if (!visible) return;
-    if (isLoading || !hasMore || !threadId) return;
-    const newOffset = offsetRef.current + LIMIT;
-    offsetRef.current = newOffset;
+    if (!canLoadMore(visible, isLoading) || !threadId) return;
+    const newOffset = getNextOffset();
     const result = await getThreadComments({
       threadId,
       offset: newOffset,
-      limit: LIMIT,
+      limit: 20,
     });
     if (result.data) {
-      handleApiResponse(result.data, threadId);
+      appendData(result.data);
     }
   }, [
-    hasMore,
-    threadId,
-    getThreadComments,
+    canLoadMore,
     visible,
-    handleApiResponse,
     isLoading,
+    threadId,
+    getNextOffset,
+    getThreadComments,
+    appendData,
   ]);
 
   const placeholderText = useMemo(
@@ -306,46 +251,14 @@ export const CommentThreadBottomSheet: React.FC<
     [t],
   );
 
-  // Store current values in refs - updated synchronously on every render
-  const stateRef = React.useRef({
-    commentText,
-    setCommentText,
-    onSubmitComment: handleSubmit,
-    placeholderText,
+  const renderFooterComponent = useStableFooterRenderer({
+    text: commentText,
+    setText: setCommentText,
+    onSubmit: handleSubmit,
+    placeholder: placeholderText,
     insetsBottom: insets.bottom,
     isLoading: isSubmitting,
   });
-
-  stateRef.current = {
-    commentText,
-    setCommentText,
-    onSubmitComment: handleSubmit,
-    placeholderText,
-    insetsBottom: insets.bottom,
-    isLoading: isSubmitting,
-  };
-
-  // Completely stable callback - reference never changes
-  const renderFooterComponent = React.useCallback(
-    (props: BottomSheetFooterProps) => {
-      const current = stateRef.current;
-      return (
-        <BottomSheetFooter
-          animatedFooterPosition={props.animatedFooterPosition}
-          bottomInset={0}>
-          <CommentBottomSheetFooter
-            text={current.commentText}
-            setText={current.setCommentText}
-            onSubmit={current.onSubmitComment}
-            placeholder={current.placeholderText}
-            bottomInset={current.insetsBottom}
-            isLoading={current.isLoading}
-          />
-        </BottomSheetFooter>
-      );
-    },
-    [],
-  );
 
   return (
     <>
@@ -366,12 +279,18 @@ export const CommentThreadBottomSheet: React.FC<
         <View style={styles.container}>
           {isLoading && !comments ? (
             <>
-              {renderHeader()}
+              <BottomSheetBackHeader
+                title={headerTitle}
+                onBack={hideCommentThreadBottomSheet}
+              />
               {renderEmpty()}
             </>
           ) : (
             <>
-              {renderHeader()}
+              <BottomSheetBackHeader
+                title={headerTitle}
+                onBack={hideCommentThreadBottomSheet}
+              />
               <BottomSheetFlatList
                 data={comments?.data || []}
                 renderItem={renderCommentItem}
@@ -394,7 +313,7 @@ export const CommentThreadBottomSheet: React.FC<
       </BottomSheet>
       <ConfirmationModal
         visible={!!deleteCommentId}
-        onClose={() => setDeleteCommentId(null)}
+        onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
         title={t('CommentThreadBottomSheet.deleteConfirmation.title')}
         description={t(
