@@ -59,6 +59,11 @@ def _make_orchestrator(
     return mock
 
 
+def _mock_load_and_format(prompt_code, backend_prompts=None, **kwargs):
+    """Simulate load_and_format for counselor prompt (formats template with kwargs)."""
+    return "Language: '{language_code}'\n\n{custom_prompt}".format(**kwargs)
+
+
 # ------------------------------------------------------------------
 # _record_transcript
 # ------------------------------------------------------------------
@@ -177,16 +182,38 @@ class TestOnTermination:
 class TestBuildCounselorPrompt:
     """Tests for building the counselor prompt with language injection."""
 
-    @patch("app.core.scenario_report.service.resolve_template")
-    def test_injects_language_code_and_custom_prompt(self, mock_resolve):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+    @patch("app.core.scenario_report.service.load_and_format")
+    def test_injects_language_code_and_custom_prompt(self, mock_load):
+        mock_load.side_effect = _mock_load_and_format
         svc = ScenarioReportService(_make_request())
 
         result = svc._build_counselor_prompt("hi-IN", "You are a therapist")
 
         assert "Language: 'hi-IN'" in result
         assert "You are a therapist" in result
-        mock_resolve.assert_called_once_with("ally_ai_learn_counselor_report")
+        mock_load.assert_called_once_with(
+            "ally_ai_learn_counselor_report_generation_prompt",
+            backend_prompts=None,
+            language_code="hi-IN",
+            custom_prompt="You are a therapist",
+        )
+
+    @patch("app.core.scenario_report.service.load_and_format")
+    def test_forwards_backend_prompts_to_resolver(self, mock_load):
+        mock_load.return_value = "Speak Malayalam.\n\nExtra"
+        svc = ScenarioReportService(_make_request())
+        backend = {
+            "ally_ai_learn_counselor_report_generation_prompt": "Speak Malayalam."
+        }
+
+        svc._build_counselor_prompt("en-IN", "Extra", backend_prompts=backend)
+
+        mock_load.assert_called_once_with(
+            "ally_ai_learn_counselor_report_generation_prompt",
+            backend_prompts=backend,
+            language_code="en-IN",
+            custom_prompt="Extra",
+        )
 
 
 # ------------------------------------------------------------------
@@ -351,7 +378,7 @@ class TestServiceRun:
         return mock_scenario, mock_graph, mock_counselor_llm, mock_orchestrator
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -368,9 +395,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
 
         mock_embed.return_value = MagicMock()
@@ -405,7 +432,7 @@ class TestServiceRun:
             assert len(payload.transcripts) > 0
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -422,9 +449,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
 
         mock_embed.return_value = MagicMock()
@@ -452,7 +479,7 @@ class TestServiceRun:
             assert payload.status == ReportStatus.FAILED
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
@@ -467,9 +494,9 @@ class TestServiceRun:
         mock_create_llm,
         mock_build_graph,
         mock_orch_cls,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         mock_embed.return_value = MagicMock()
         mock_scenario_cls.create.side_effect = RuntimeError("Scenario parse error")
 
@@ -484,7 +511,7 @@ class TestServiceRun:
             assert payload.metrics == {}
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -501,9 +528,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         """Time-based termination fires during counselor turn;
         termination message should be the last CLIENT entry."""
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
@@ -551,7 +578,7 @@ class TestServiceRun:
             assert last.content == "I have to go now."
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -568,9 +595,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         """Event-based termination during graph invocation; termination
         message replaces the graph output."""
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
@@ -615,7 +642,7 @@ class TestServiceRun:
             assert last.content == "Session ending."
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -632,9 +659,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         """Verify that cancel_all is called on the scheduler after the loop."""
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
         orchestrator._scheduler.cancel_all = AsyncMock(return_value=3)
@@ -662,7 +689,7 @@ class TestServiceRun:
             orchestrator._scheduler.cancel_all.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.service.resolve_template")
+    @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
     @patch("app.core.scenario_report.service.build_report_graph")
@@ -679,9 +706,9 @@ class TestServiceRun:
         mock_build_graph,
         mock_orch_cls,
         mock_evaluate,
-        mock_resolve,
+        mock_load,
     ):
-        mock_resolve.return_value = "Language: '{language_code}'\n\n{custom_prompt}"
+        mock_load.side_effect = _mock_load_and_format
         """When graph returns no AI message, the turn is skipped."""
         scenario, graph, counselor_llm, orchestrator = self._setup_mocks()
         graph.ainvoke = AsyncMock(return_value={"messages": []})

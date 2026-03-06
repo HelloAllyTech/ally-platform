@@ -119,6 +119,24 @@ class AgentWorker:
         )
         self.scenario = rm_md_envelope.scenario
         logger.debug(f"Events in scenario: {str(self.scenario.events)}")
+        # Log prompt metadata for debugging dashboard edits
+        prompts = getattr(self.scenario.prompt_data, "prompts", None)
+        if prompts:
+            default_key = "ally_ai_learn_system_default_system_prompt"
+            default_prompt = prompts.get(default_key, "")
+            logger.info(
+                "[METADATA_PROMPTS] scenario has prompt_data.prompts with keys=%s, "
+                "default_system_prompt len=%s, preview=%s",
+                list(prompts.keys())[:15],
+                len(default_prompt),
+                (
+                    (default_prompt[:150] + "...")
+                    if len(default_prompt) > 150
+                    else default_prompt
+                ),
+            )
+        else:
+            logger.info("[METADATA_PROMPTS] scenario has no prompt_data.prompts")
 
         # Configure STT and TTS clients - using utility functions
         self.stt_client = configure_stt_client(self.scenario)

@@ -3,8 +3,9 @@ Base TTS client interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 from langchain_core.tools import BaseTool
 
 from app.core.logger import get_logger
@@ -18,6 +19,7 @@ class AudioResult:
     format: str  # "mp3", "wav", "pcm"
     sample_rate: int
     duration_ms: Optional[int] = None
+
 
 class BaseTTSClient(ABC):
     """

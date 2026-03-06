@@ -3,6 +3,10 @@ set -e  # Exit on any error
 
 echo "Starting application services..."
 
+# Sync prompts to ally-be (runs at deployment; non-fatal if ally-be unreachable)
+echo "Syncing prompts to ally-be..."
+poetry run python scripts/sync_prompts.py || echo "Prompt sync failed (continuing with local prompts)."
+
 # Start uvicorn in background
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 UVICORN_PID=$!

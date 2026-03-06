@@ -133,11 +133,11 @@ When text enhancement is supported, the `apply_voice_expressions` node replaces 
 
 Prosody templates can be overridden per scenario via `promptData.prompts`:
 
-| Backend Key | Local Template | Use |
+| Prompt Code | Local Template | Use |
 |-------------|----------------|-----|
-| `ally_ai_learn_prosody_generation` | `prosody/default_generation_prompt` | Default parameter generation |
-| `ally_ai_learn_prosody_unified` | `prosody/unified_prompt_with_enhancement` | Runtime (params + enhanced text) |
-| `ally_ai_learn_prosody_parameters_only` | `prosody/parameters_only_prompt` | Runtime (params only) |
+| `ally_ai_learn_prosody_default_generation_prompt` | `prosody/default_generation_prompt` | Default parameter generation |
+| `ally_ai_learn_prosody_unified_prompt_with_enhancement` | `prosody/unified_prompt_with_enhancement` | Runtime (params + enhanced text) |
+| `ally_ai_learn_prosody_parameters_only_prompt` | `prosody/parameters_only_prompt` | Runtime (params only) |
 
 When `SYNC_PROMPTS_TO_LOCAL` is true and the backend provides a different template, that template is used instead of the local `.txt` file. See [Prompts System](12-prompts-system.md).
 
@@ -162,4 +162,4 @@ Parameters go **only** to `update_options()`. They never appear in message conte
 - `app/speech_prosody/constants.py` -- `DEFAULT_CONVERSATION_HISTORY_LIMIT`, skip thresholds
 - `app/speech_prosody/utils.py` -- `extract_persona_context_from_prompt_data()`, `build_prosody_prompt()`, `PERSONA_CONTEXT_FIELDS`
 - `app/tts/base.py` -- `BaseTTSClient._validate_parameters_dict()`, `_apply_parameters_dict()`
-- `app/prompts/resolver.py` -- `resolve_template()` for prosody template resolution
+- `app/prompts/resolver.py` -- `load_template()`, `load_and_format()` for prosody template resolution

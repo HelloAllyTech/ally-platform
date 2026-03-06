@@ -13,8 +13,8 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.logger import get_logger
-from app.core.scenario_report.schemas import TranscriptEntry
 from app.core.scenario.base import PromptData
+from app.core.scenario_report.schemas import TranscriptEntry
 from app.llms import create_llm_client
 
 logger = get_logger(__name__)
@@ -106,19 +106,22 @@ You will be given:
 2. A COUNSELOR's role description.
 3. The full conversation transcript between the CLIENT and the COUNSELOR.
 
-Your task is to evaluate how well the CLIENT agent (actor) performed across six metrics, \
-each scored 0-100:
+Your task is to evaluate how well the CLIENT agent (actor) performed across
+six metrics, each scored 0-100:
 
 ### Gradual Disclosure (0-100)
-The extent to which the actor gradually opened up instead of opening up a lot all of a sudden towards the beginning:
+The extent to which the actor gradually opened up instead of opening up a lot
+all of a sudden towards the beginning:
 - Did the actor reveal personal information slowly over time?
 - Was there a natural progression from surface-level to deeper topics?
 - Did the actor avoid dumping all their story at the start?
 - Was the pacing of self-disclosure realistic and appropriate?
 
 ### Difficulty Level (0-100)
-The extent to which the actor made the roleplay practice session challenging for the helper:
-- Did the actor present realistic challenges (resistance, defensiveness, ambivalence)?
+The extent to which the actor made the roleplay practice session challenging
+for the helper:
+- Did the actor present realistic challenges
+  (resistance, defensiveness, ambivalence)?
 - Were there appropriate obstacles for the helper to navigate?
 - Did the actor avoid making it too easy by being overly compliant?
 - Was the level of difficulty appropriate for training purposes?
@@ -131,7 +134,8 @@ The extent to which the dialogues used by the actor were colloquial:
 - Did the language feel authentic to how real people speak?
 
 ### Context Appropriateness (0-100)
-The extent to which the dialogues used by the actor were appropriate representation of the actor's background:
+The extent to which the dialogues used by the actor were appropriate
+representation of the actor's background:
 - Did the language match the character's demographics (age, gender, location)?
 - Were references to social and cultural background appropriate?
 - Did work-related language fit the character's profession?
@@ -191,14 +195,16 @@ def _build_evaluation_prompt(
         character_parts.append(
             f"Behavior guidelines: {prompt_data.session_behavior_guidelines}"
         )
-    
+
     # Include custom fields
     if prompt_data.custom_fields:
         for field in prompt_data.custom_fields:
             if isinstance(field, dict) and field.get("name") and field.get("value"):
                 character_parts.append(f"{field['name']}: {field['value']}")
 
-    character_description = "\n".join(character_parts) or "No character details provided."
+    character_description = (
+        "\n".join(character_parts) or "No character details provided."
+    )
 
     # Format transcript
     transcript_lines = []
@@ -240,12 +246,16 @@ async def evaluate_transcript(
 
     try:
         llm = create_llm_client().llm_instance.with_structured_output(EvaluationResult)
-        user_message = _build_evaluation_prompt(transcripts, prompt_data, counselor_prompt)
+        user_message = _build_evaluation_prompt(
+            transcripts, prompt_data, counselor_prompt
+        )
 
-        result: EvaluationResult = await llm.ainvoke([
-            {"role": "system", "content": _EVALUATION_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ])
+        result: EvaluationResult = await llm.ainvoke(
+            [
+                {"role": "system", "content": _EVALUATION_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ]
+        )
 
         return {field: getattr(result, field) for field in _SCORE_FIELDS}
 

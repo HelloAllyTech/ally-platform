@@ -1,3 +1,5 @@
+# Use DEV for local dev with direct agent dispatch - worker must register agent_name=Agent
+# to receive metadata. LOCAL uses agent_name="" which can cause metadata to be dropped.
 ENV=<ENVIRONMENT>
 LOG_LEVEL="INFO"
 
@@ -24,6 +26,8 @@ DEEPGRAM_API_KEY=<YOUR_DEEPGRAM_API_KEY>
 AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID>
 AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
 AWS_REGION=us-east-1
+# For local dev with LocalStack: use full URL to avoid QueueDoesNotExist
+# e.g. http://host.docker.internal:4566/000000000000/sqs-learn-message-and-event-queue
 SQS_MESSAGE_EVENT_QUEUE_NAME=<YOUR_SQS_MESSAGE_EVENT_QUEUE_NAME>
 
 ELEVEN_API_KEY=<YOUR_ELEVEN_LABS_API_KEY>
@@ -48,9 +52,12 @@ DEFAULT_NON_BINARY_VOICE_MODEL=<NON_BINARY_FALLBACK_VOICE>
 #
 # VLLM_BASE_URL=http://your-gpu-server:8000/v1
 # LOCAL_LLM_MODEL=llama3.2
-# Core service
+# Core service (ally-be)
+# CORE_SERVICE_API_KEY must match ally-be's AI_SERVICE_API_KEY
 CORE_SERVICE_BASE_URL=<YOUR_CORE_SERVICE_BASE_URL>
 CORE_SERVICE_API_KEY=<YOUR_CORE_SERVICE_API_KEY>
+# Inbound API key (ally-be calls with x-api-key; must match ally-be's AI_LEARN_SERVICE_OUTBOUND_API_KEY)
+X_API_KEY=<YOUR_X_API_KEY>
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:8080

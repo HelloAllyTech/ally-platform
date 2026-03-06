@@ -132,6 +132,20 @@ Before running:
 Within the compose network the app reaches LocalStack at `http://localstack:4566`; when running the app outside compose, switch back to `http://localhost:4566`.
 The service is exposed on host port `8002` (`http://localhost:8002`) to avoid clashing with other Ally services.
 
+### Run Alongside ally-be and ally-web
+
+Use `docker-compose.local.yml` when ally-be and ally-web are already running. This reuses ally-be's LocalStack (no port conflicts):
+
+```bash
+# 1. Start ally-be first (infra/dev_env.sh or manually)
+# 2. Start ally-web (optional)
+# 3. Start ally-ai-learn
+cd ally-ai-learn
+docker compose -f docker-compose.local.yml up -d
+```
+
+See [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) for details. Ensure `CORE_SERVICE_API_KEY` matches ally-be's `AI_SERVICE_API_KEY`.
+
 ## API Endpoints
 
 - **Health Check**: `GET /api/health` - Service health status

@@ -131,7 +131,6 @@ class DeepgramTTSClient(BaseTTSClient):
             )
         return self._tts_instance
 
-
     async def generate_preview(
         self,
         text: str = "Hello, this is a preview of how I sound.",
@@ -149,6 +148,7 @@ class DeepgramTTSClient(BaseTTSClient):
             Preview audio as MP3 bytes (for browser compatibility)
         """
         import io
+
         from pydub import AudioSegment
 
         logger.info(f"Generating Deepgram preview with model='{self._model}'")
@@ -176,9 +176,9 @@ class DeepgramTTSClient(BaseTTSClient):
             # Convert PCM (linear16) to MP3 for browser compatibility
             audio = AudioSegment.from_raw(
                 io.BytesIO(pcm_bytes),
-                sample_width=2,      # 16-bit = 2 bytes
+                sample_width=2,  # 16-bit = 2 bytes
                 frame_rate=24000,
-                channels=1,          # mono
+                channels=1,  # mono
             )
 
             mp3_buffer = io.BytesIO()

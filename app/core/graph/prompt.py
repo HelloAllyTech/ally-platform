@@ -10,7 +10,7 @@ from app.core.scenario.base import (
     SimulationStateInstruction,
 )
 from app.prompts.manager import prompt_manager
-from app.prompts.resolver import resolve_template
+from app.prompts.resolver import load_and_format, load_template
 
 logger = get_logger(__name__)
 
@@ -72,7 +72,7 @@ def _get_competency_block(competency: Optional[str]) -> str:
 
 def _format_language_samples(samples: List) -> str:
     """
-    Format sample dialogues for injection into language_sample_instruction template.
+    Format sample dialogues for injection into multilingual_instructions template.
     Supports both formats:
     - List[str]: ["utterance 1", "utterance 2", ...]
     - List[Dict]: [{"counselor": "...", "actor": "..."}, ...] (legacy)
@@ -95,13 +95,22 @@ def _format_language_samples(samples: List) -> str:
     return "\n".join(lines).strip()
 
 
-def _get_language_sample_block(samples: Optional[List], language_code: str) -> str:
+def _get_language_sample_block(
+    samples: Optional[List],
+    language_code: str,
+    backend_prompts: Optional[dict] = None,
+) -> str:
     """
     Build language instruction block for non-English scenarios.
 
     Always includes base instruction. When samples are present and non-empty,
     appends the "Follow the following linguistic style" section. When samples
     are missing or empty, returns the base block only.
+
+    Args:
+        samples: Optional list of language dialogue samples
+        language_code: BCP 47 language code
+        backend_prompts: promptData.prompts from metadata (dashboard edits)
     """
     base = (
         f"**LANGUAGE INSTRUCTION:**\n"
@@ -114,14 +123,16 @@ def _get_language_sample_block(samples: Optional[List], language_code: str) -> s
     if not samples_text.strip():
         return base.strip() + "\n\n"
 
-    template = prompt_manager.get_template("system", "language_sample_instruction")
-    if not template:
+    result = load_and_format(
+        "ally_ai_learn_system_multilingual_instructions",
+        backend_prompts=backend_prompts,
+        language_code=language_code,
+        samples=samples_text,
+    )
+    if not result:
         return base.strip() + "\n\n"
 
-    return (
-        template.format(language_code=language_code, samples=samples_text).strip()
-        + "\n\n"
-    )
+    return result.strip() + "\n\n"
 
 
 def _get_language_block(
@@ -140,8 +151,9 @@ def _get_language_block(
         return ""
 
     samples = prompt_data.language_dialogue_samples
+    backend_prompts = getattr(prompt_data, "prompts", None)
 
-    block = _get_language_sample_block(samples, language_code)
+    block = _get_language_sample_block(samples, language_code, backend_prompts)
     if not block or not block.strip():
         return ""
 
@@ -605,16 +617,38 @@ def generate_system_message(
     Returns:
         A SystemMessage object with the complete, formatted prompt.
     """
-    # Use legacy prompt_data.prompt if set; else resolve from backend or local
-    if prompt_data.prompt:
+    # Prefer editable prompts (prompt_data.prompts) when present; else use
+    # legacy prompt_data.prompt; else resolve from local templates.
+    backend_prompts = getattr(prompt_data, "prompts", None)
+    default_key = "ally_ai_learn_system_default_system_prompt"
+    has_editable = (
+        backend_prompts
+        and default_key in backend_prompts
+        and (backend_prompts.get(default_key) or "").strip()
+    )
+    logger.info(
+        "[PROMPT_SOURCE] generate_system_message: prompt_data.prompt=%s, "
+        "prompt_data.prompts has default=%s",
+        "SET" if prompt_data.prompt else "None",
+        has_editable,
+    )
+    if has_editable:
+        base_system_prompt = (
+            load_template(default_key, backend_prompts) or DEFAULT_PROMPT
+        )
+        logger.info(
+            "[PROMPT_SOURCE] Using editable prompt_data.prompts, len=%d",
+            len(base_system_prompt),
+        )
+    elif prompt_data.prompt:
         base_system_prompt = prompt_data.prompt
+        logger.info(
+            "[PROMPT_SOURCE] Using legacy prompt_data.prompt, len=%d",
+            len(prompt_data.prompt),
+        )
     else:
         base_system_prompt = (
-            resolve_template(
-                "ally_ai_learn_default",
-                getattr(prompt_data, "prompts", None),
-            )
-            or DEFAULT_PROMPT
+            load_template(default_key, backend_prompts) or DEFAULT_PROMPT
         )
 
     if next_instruction:

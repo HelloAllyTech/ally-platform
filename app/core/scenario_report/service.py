@@ -33,7 +33,7 @@ from app.core.scenario_report.schemas import (
     TranscriptEntry,
 )
 from app.llms import create_llm_client
-from app.prompts.resolver import resolve_template
+from app.prompts.resolver import load_and_format
 
 logger = get_logger(__name__)
 
@@ -141,7 +141,12 @@ class ScenarioReportService:
             return term_config.termination_message
         return None
 
-    def _build_counselor_prompt(self, language_code: str, custom_prompt: str) -> str:
+    def _build_counselor_prompt(
+        self,
+        language_code: str,
+        custom_prompt: str,
+        backend_prompts: Optional[dict] = None,
+    ) -> str:
         """
         Build the counselor system prompt with dynamic language code
         and custom prompt injection.
@@ -149,22 +154,25 @@ class ScenarioReportService:
         Args:
             language_code: BCP 47 language code (e.g., 'en-US', 'hi-IN')
             custom_prompt: Custom counselor instructions from the request
+            backend_prompts: promptData.prompts from metadata (dashboard edits)
 
         Returns:
             Complete system prompt with both placeholders injected
         """
-        template = resolve_template("ally_ai_learn_counselor_report")
-        if not template:
+        result = load_and_format(
+            "ally_ai_learn_counselor_report_generation_prompt",
+            backend_prompts=backend_prompts,
+            language_code=language_code,
+            custom_prompt=custom_prompt.strip() if custom_prompt else "",
+        )
+        if not result:
             logger.warning(
                 "Counselor template not found, using custom prompt only (report_id=%s)",
                 self._request.report_id,
             )
             return custom_prompt
 
-        return template.format(
-            language_code=language_code,
-            custom_prompt=custom_prompt.strip() if custom_prompt else "",
-        )
+        return result
 
     async def _send_webhook(self, payload: ScenarioReportWebhookPayload) -> None:
         """PATCH the report payload to the core backend webhook."""
@@ -294,6 +302,9 @@ class ScenarioReportService:
             counselor_system_prompt = self._build_counselor_prompt(
                 language_code=req.language,
                 custom_prompt=req.prompt,
+                backend_prompts=(
+                    scenario.prompt_data.prompts if scenario.prompt_data else None
+                ),
             )
 
             counselor_messages = [
