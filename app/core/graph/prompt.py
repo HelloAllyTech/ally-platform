@@ -103,9 +103,10 @@ def _get_language_sample_block(
     """
     Build language instruction block for non-English scenarios.
 
-    Always includes base instruction. When samples are present and non-empty,
-    appends the "Follow the following linguistic style" section. When samples
-    are missing or empty, returns the base block only.
+    Always uses the multilingual prompt from dashboard (if enabled) or local
+    template, with language_code and samples (or empty string when none), so
+    dashboard edits apply whether or not the scenario has samples. Falls back
+    to a base instruction only when the template is missing or returns empty.
 
     Args:
         samples: Optional list of language dialogue samples
@@ -116,12 +117,7 @@ def _get_language_sample_block(
         f"**LANGUAGE INSTRUCTION:**\n"
         f"Generate next dialogue in the language for code '{language_code}'."
     )
-    if not samples:
-        return base.strip() + "\n\n"
-
-    samples_text = _format_language_samples(samples)
-    if not samples_text.strip():
-        return base.strip() + "\n\n"
+    samples_text = _format_language_samples(samples) if samples else ""
 
     result = load_and_format(
         "ally_ai_learn_system_multilingual_instructions",
@@ -129,7 +125,7 @@ def _get_language_sample_block(
         language_code=language_code,
         samples=samples_text,
     )
-    if not result:
+    if not result or not result.strip():
         return base.strip() + "\n\n"
 
     return result.strip() + "\n\n"

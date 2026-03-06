@@ -277,10 +277,10 @@ class TestPrompt:
         assert "Be anxious" in content
         assert "say something similar to" not in content  # No dialogue options
 
-    def test_generate_system_message_non_english_no_samples_uses_base_language_block(
+    def test_generate_system_message_non_english_no_samples_uses_multilingual_template(
         self,
     ):
-        """Non-English without samples: base language block is injected (no samples)."""
+        """Non-English without samples: multilingual template used (samples empty)."""
         pd = make_prompt_data()
         msg = generate_system_message(prompt_data=pd, language_code="hi-IN")
         content = msg.content
@@ -288,12 +288,11 @@ class TestPrompt:
         assert "Generate next dialogue" in content
         assert "hi-IN" in content
         assert "Example 1:" not in content
-        assert "Follow the following linguistic style" not in content
 
-    def test_generate_system_message_non_english_empty_samples_uses_base_language_block(
+    def test_generate_system_message_non_english_empty_samples_uses_multilingual_tpl(
         self,
     ):
-        """Non-English, empty samples: base block only (no samples section)."""
+        """Non-English, empty samples: template used, no example text."""
         pd = make_prompt_data(language_dialogue_samples=["", "", ""])
         msg = generate_system_message(prompt_data=pd, language_code="ml-IN")
         content = msg.content
