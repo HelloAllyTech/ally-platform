@@ -1,0 +1,4 @@
+{
+  "name": "Prosody With Text Enhancement",
+  "description": "Analyzes response text and generates both prosody parameters and enhanced text. Uses current parameters as baseline with constrained variation; outputs parameters plus improved dialogue."
+}

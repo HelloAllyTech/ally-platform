@@ -1,0 +1,4 @@
+{
+  "name": "Multilingual Style Instructions",
+  "description": "Injects language code and linguistic style samples for the next client dialogue turn. Ensures output matches the scenario language and style (e.g. samples from linguistic style generation)."
+}

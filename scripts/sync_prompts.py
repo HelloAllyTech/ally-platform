@@ -3,8 +3,11 @@
 Sync ally-ai-learn prompts to ally-be via POST /prompts/sync.
 
 Scans app/prompts/**/*.txt, derives promptCode from path with ally_ai_learn_
-prefix (subdir/filename.txt -> ally_ai_learn_subdir_filename). Uses
-CORE_SERVICE_BASE_URL and CORE_SERVICE_API_KEY.
+prefix (subdir/filename.txt -> ally_ai_learn_subdir_filename). Name/description
+are derived from path; optional overrides from subdir/_meta/<stem>.meta.json
+(with "name" and/or "description" keys) are applied when present.
+
+Uses CORE_SERVICE_BASE_URL and CORE_SERVICE_API_KEY.
 
 Run during deployment or manually:
     poetry run python scripts/sync_prompts.py
@@ -12,6 +15,7 @@ Run during deployment or manually:
 """
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -52,6 +56,28 @@ def format_label(text: str) -> str:
     return " ".join(word.capitalize() for word in text.replace("_", " ").split())
 
 
+def load_meta(txt_file: Path) -> dict | None:
+    """
+    Load optional name/description from same dir's _meta/<stem>.meta.json.
+    Returns dict with 'name' and/or 'description' if present, else None.
+    """
+    meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        out = {}
+        if isinstance(data.get("name"), str) and data["name"].strip():
+            out["name"] = data["name"].strip()
+        if isinstance(data.get("description"), str) and data["description"].strip():
+            out["description"] = data["description"].strip()
+        return out if out else None
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def scan_prompts() -> list[dict]:
     """Scan app/prompts/**/*.txt and build sync payload items."""
     items = []
@@ -77,6 +103,13 @@ def scan_prompts() -> list[dict]:
             else:
                 name = formatted_filename
                 description = formatted_filename
+
+            meta = load_meta(txt_file)
+            if meta:
+                if meta.get("name") is not None:
+                    name = meta["name"]
+                if meta.get("description") is not None:
+                    description = meta["description"]
 
             content = txt_file.read_text(encoding="utf-8")
             items.append(
