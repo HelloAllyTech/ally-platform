@@ -34,7 +34,7 @@ import {
 import {
   decodeFeedbackPayloadToJson,
   getTriggerWarningNames,
-  logger,
+  // logger,
   parseMaxTimeSec,
   playNotificationSound,
 } from '@/utils';
@@ -138,20 +138,25 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   const maxTimeSec = parseMaxTimeSec(scenario?.maxTimeValue);
 
-  const ensureSpeakerOutput = useCallback(async () => {
-    // Try a few times with small delays; OEM skins sometimes override routing during focus changes
-    const attempts = 3;
-    for (let currAttempt = 0; currAttempt < attempts; currAttempt++) {
-      try {
-        await AudioSession.startAudioSession();
-        await AudioSession.selectAudioOutput('speaker');
-        break;
-      } catch (error) {
-        logger.error(`Failed to ensure speaker output: ${error}`);
-      }
-      await new Promise(res => setTimeout(res, 200));
-    }
-  }, []);
+  // const ensureCorrectAudioOutput = useCallback(async () => {
+  //   const attempts = 3;
+  //   for (let currAttempt = 0; currAttempt < attempts; currAttempt++) {
+  //     try {
+  //       await AudioSession.startAudioSession();
+  //       const availableOutputs = await AudioSession.getAudioOutputs();
+  //       const hasHeadphones = availableOutputs.some(
+  //         o => o === 'headset' || o === 'bluetooth',
+  //       );
+  //       if (!hasHeadphones) {
+  //         await AudioSession.selectAudioOutput('speaker');
+  //       }
+  //       break;
+  //     } catch (error) {
+  //       logger.error(`Failed to ensure speaker output: ${error}`);
+  //     }
+  //     await new Promise(res => setTimeout(res, 200));
+  //   }
+  // }, []);
 
   const attachRoomListeners = useCallback(() => {
     const onConnected = async () => {
@@ -159,7 +164,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       try {
         room.localParticipant.setMicrophoneEnabled(true);
         setIsMicEnabled(true);
-        await ensureSpeakerOutput();
+        // await ensureCorrectAudioOutput();
       } catch (error) {
         showErrorToast(error, 'Errors.attachListeners');
       }
@@ -232,7 +237,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
   }, [
     room,
-    ensureSpeakerOutput,
+    // ensureCorrectAudioOutput,
     showErrorToast,
     roomStatus,
     navigation,
@@ -252,15 +257,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const configureAudioSession = async () => {
     try {
       await AudioSession.configureAudio({
-        // Keep speaker output but engage inCommunication mode to help AEC
         android: {
-          preferredOutputList: ['speaker'],
-          audioTypeOptions: {
-            ...AndroidAudioTypePresets.media,
-            audioMode: 'inCommunication',
-            forceHandleAudioRouting: true,
-            audioAttributesUsageType: 'voiceCommunication',
-          },
+          preferredOutputList: ['bluetooth', 'headset', 'speaker', 'earpiece'],
+          audioTypeOptions: AndroidAudioTypePresets.media,
         },
         ios: {
           defaultOutput: 'speaker',

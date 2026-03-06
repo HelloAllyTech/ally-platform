@@ -19,7 +19,7 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
-import {useAppNavigation, useTranslate} from '@/hooks';
+import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
@@ -28,22 +28,25 @@ import {
   DeleteConfirmationState,
   GeneralCommentsSection,
 } from './GeneralCommentsSection';
+import {ReviewNote} from './ReviewNote';
 
 interface ReviewDetailsLayoutProps {
   reviewId: string;
-  isPrivate?: boolean;
+  reviewNote?: string;
   reviewLogic: ReturnType<typeof useReviewDetailsLogic>;
   metadata: ReviewMetadata | undefined;
   onRefreshReactions: () => void;
+  onEditNote?: () => void;
   renderHeader: () => React.ReactNode;
 }
 
 export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   reviewId,
-  isPrivate,
+  reviewNote,
   reviewLogic,
   metadata,
   onRefreshReactions,
+  onEditNote,
   renderHeader,
 }) => {
   const insets = useSafeAreaInsets();
@@ -59,6 +62,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     },
     [],
   );
+  const {userData} = useUser();
 
   const {
     conversationMessages,
@@ -67,6 +71,8 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     isFetching,
     offset,
     hasMore,
+    isPrivate,
+    handleTogglePrivate,
     comment,
     showCommentInput,
     isAddingComment,
@@ -104,6 +110,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   const generalCommentsFooter = useMemo(
     () => (
       <GeneralCommentsSection
+        isPrivate={isPrivate}
         reviewId={reviewId}
         generalCommentsThreadId={metadata?.generalCommentsThreadId}
         reviewOwnerId={metadata?.reviewOwnerId}
@@ -112,6 +119,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       />
     ),
     [
+      isPrivate,
       reviewId,
       metadata?.generalCommentsThreadId,
       metadata?.reviewOwnerId,
@@ -119,6 +127,20 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       handleDeleteConfirmationChange,
     ],
   );
+
+  const noteElementHeader = useMemo(() => {
+    if (reviewNote) {
+      return (
+        <ReviewNote
+          note={reviewNote}
+          onEditNote={
+            metadata?.reviewOwnerId === userData?.id ? onEditNote : undefined
+          }
+        />
+      );
+    }
+    return null;
+  }, [reviewNote, metadata?.reviewOwnerId, userData?.id, onEditNote]);
 
   if (isLoading) {
     return (
@@ -157,6 +179,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerName={metadata?.createdBy?.name}
         onDismissSelection={resetCommentInput}
         listFooterComponent={generalCommentsFooter}
+        listHeaderComponent={noteElementHeader}
       />
 
       <View style={styles.interactionsBarContainer}>
@@ -168,6 +191,11 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
           refreshReactions={onRefreshReactions}
           myReaction={metadata?.myReaction || null}
           isPrivate={isPrivate}
+          onTogglePrivate={
+            metadata?.reviewOwnerId === userData?.id
+              ? handleTogglePrivate
+              : undefined
+          }
         />
       </View>
       <CommentInput

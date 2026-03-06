@@ -1,8 +1,10 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {SCREEN_NAMES} from '@/constants';
 import {ReviewApiProvider, scribeApiHooks} from '@/contexts/ReviewApiContext';
+import {useAppNavigation} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddScribeReviewCommentMutation,
@@ -19,6 +21,7 @@ type Props = RootStackScreenProps<'ScribeReviewDetails'>;
 
 export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const {reviewId, isPrivate} = route.params || {};
+  const navigation = useAppNavigation();
 
   const [fetchMessages, messagesState] = useLazyGetScribeMessagesQuery();
   const {data: reviewData, refetch: refetchReviewData} =
@@ -63,14 +66,30 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
       }
     : undefined;
 
+  const handleEditNote = useCallback(() => {
+    navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
+      reviewId,
+      scenarioData: {
+        coverImageUrl: reviewData?.scenario?.coverImageUrl,
+        coverVideoUrl: reviewData?.scenario?.coverVideoUrl,
+        title: reviewData?.scenario?.title || '',
+        description: reviewData?.scenario?.description || '',
+        createdAt: reviewData?.scenarioSession?.createdAt || '',
+        duration: reviewData?.scenarioSession?.duration || '',
+      },
+      isEditNote: true,
+      note: reviewData?.note,
+    });
+  }, [reviewId, navigation, reviewData]);
+
   return (
     <ReviewApiProvider value={scribeApiHooks}>
       <ReviewDetailsLayout
         reviewId={reviewId}
-        isPrivate={isPrivate}
         reviewLogic={reviewLogic}
         metadata={metadata}
         onRefreshReactions={refetchReviewData}
+        onEditNote={handleEditNote}
         renderHeader={() =>
           reviewData ? (
             // TODO: Replace with ScribeTranscriptHeader when designed

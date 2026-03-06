@@ -1,20 +1,13 @@
-import {useEffect, useState} from 'react';
-import {useIsFocused} from '@react-navigation/native';
+import {useEffect} from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {useTranslation} from 'react-i18next';
-import {
-  Image,
-  NativeSyntheticEvent,
-  Text,
-  TextLayoutEventData,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {ChatAddOnIcon} from '@/assets';
-import {UserProfileImage, VideoPreview} from '@/components';
+import {SimulationDetailsCard, UserProfileImage} from '@/components';
+import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
 import {
   colors,
@@ -48,11 +41,10 @@ interface ReviewCardProps {
   reactions?: {
     [reaction_code: string]: number;
   };
-  titleNumberOfLines?: number;
-  descriptionNumberOfLines?: number;
   onReviewPress: (reviewId?: string) => void;
   onCommentPress?: (reviewId: string) => void;
   isExpanded?: boolean;
+  note?: string;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -63,15 +55,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   scenarioSession,
   commentsCount = 0,
   reactions = {},
-  titleNumberOfLines = 1,
-  descriptionNumberOfLines = 2,
   onReviewPress,
   onCommentPress,
   isExpanded = false,
+  note,
 }) => {
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [isTextTruncated, setIsTextTruncated] = useState(false);
-  const isFocused = useIsFocused();
   const {t} = useTranslation();
 
   const [
@@ -93,33 +81,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const handleReviewItemPress = () => {
     onReviewPress?.(id);
   };
-
-  const toggleDescription = () => {
-    setIsDescriptionExpanded(!isDescriptionExpanded);
-  };
-
-  const handleTextLayout = (
-    event: NativeSyntheticEvent<TextLayoutEventData>,
-  ) => {
-    if (isDescriptionExpanded) return;
-    const {lines} = event.nativeEvent;
-    if (lines.length > descriptionNumberOfLines) {
-      setIsTextTruncated(true);
-    }
-  };
-
-  const renderDetailRow = (label: string, value: string) => (
-    <View style={styles.simulationDetailsTextContainer}>
-      <Text
-        style={[styles.simulationDetailsText, styles.simulationDetailsLabel]}>
-        {label}
-      </Text>
-      <Text
-        style={[styles.simulationDetailsText, styles.simulationDetailsValue]}>
-        {value}
-      </Text>
-    </View>
-  );
 
   const renderUserInfo = () => (
     <View style={styles.userInfoContainer}>
@@ -143,50 +104,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   );
 
   const renderSimulationCard = () => (
-    <View style={styles.scenarioContainer}>
-      <View style={styles.coverContainer}>
-        {!!scenario.coverVideoUrl && (
-          <VideoPreview
-            videoUrl={scenario.coverVideoUrl}
-            autoPlay={false}
-            shouldPause={!isFocused}
-            testID="scenario-video-preview"
-          />
-        )}
-
-        {!scenario.coverVideoUrl && !!scenario.coverImageUrl && (
-          <Image source={{uri: scenario.coverImageUrl}} style={styles.cover} />
-        )}
-      </View>
-      <View style={styles.cardBody}>
-        <View style={styles.textContainer}>
-          <Text style={styles.cardTitle} numberOfLines={titleNumberOfLines}>
-            {scenario.title || '-'}
-          </Text>
-          {!!scenario.description && (
-            <View>
-              <Text
-                style={styles.cardDesc}
-                numberOfLines={
-                  isDescriptionExpanded ? undefined : descriptionNumberOfLines
-                }
-                onTextLayout={handleTextLayout}>
-                {scenario.description}
-              </Text>
-              {(isTextTruncated || isDescriptionExpanded) && (
-                <TouchableOpacity onPress={toggleDescription}>
-                  <Text style={styles.viewMoreText}>
-                    {isDescriptionExpanded
-                      ? t('Review.card.viewLess')
-                      : t('Review.card.viewMore')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
+    <SimulationDetailsCard
+      coverImageUrl={scenario.coverImageUrl}
+      coverVideoUrl={scenario.coverVideoUrl}
+      title={scenario.title}
+      description={scenario.description}
+    />
   );
 
   const renderReactionsAndComments = () => (
@@ -213,20 +136,21 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       <View style={styles.separator} />
 
       <View>
-        <Text style={styles.simulationDetailsHeading}>
+        {/* <Text style={styles.simulationDetailsHeading}>
           {t('Review.card.sharedSimulationForReview')}
-        </Text>
-        {renderDetailRow(
-          t('Review.card.dateAndTime'),
-          formatDateTime(scenarioSession.createdAt),
+        </Text> */}
+        {note && <Text style={styles.noteText}>{note}</Text>}
+        <SimulationDetailRow
+          label={t('Review.card.dateAndTime')}
+          value={formatDateTime(scenarioSession.createdAt)}
+        />
+        {scenarioSession.duration !== undefined && (
+          <SimulationDetailRow
+            label={t('Review.card.duration')}
+            value={formatDurationFromSeconds(scenarioSession.duration)}
+          />
         )}
-        {scenarioSession.duration !== undefined &&
-          renderDetailRow(
-            t('Review.card.duration'),
-            formatDurationFromSeconds(scenarioSession.duration),
-          )}
       </View>
-
       {renderSimulationCard()}
 
       <TouchableOpacity
@@ -294,75 +218,15 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.mediumEmphasis,
   },
-  coverContainer: {
-    minHeight: '180@ms',
-    backgroundColor: colors.ds.grey[100],
-    borderRadius: radius.lg,
-    width: '100%',
-  },
-  cover: {
-    minHeight: '180@ms',
-    backgroundColor: colors.ds.grey[100],
-    borderRadius: radius.lg,
-  },
-  cardBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  textContainer: {
-    flex: 1,
-  },
-  cardTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    fontWeight: fontWeights.regular,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '5@ms',
-  },
-  cardDesc: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    fontWeight: fontWeights.regular,
-    color: colors.ds.typography.mediumEmphasis,
-  },
-  viewMoreText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
-  },
   separator: {
     height: '0.5@vs',
     backgroundColor: colors.ds.stroke.primary,
-  },
-  simulationDetailsTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   simulationDetailsHeading: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.highEmphasis,
-  },
-  simulationDetailsText: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.small,
-    fontWeight: fontWeights.regular,
-    color: colors.ds.typography.mediumEmphasis,
-  },
-  simulationDetailsLabel: {
-    width: '100@s',
-  },
-  simulationDetailsValue: {
-    flex: 1,
-  },
-  scenarioContainer: {
-    borderWidth: 0.5,
-    borderColor: stroke.primary,
-    borderRadius: radius.xl2,
-    padding: '8@s',
-    gap: '16@s',
   },
   reviewTranscriptContainer: {
     flexDirection: 'row',
@@ -417,5 +281,11 @@ const styles = ScaledSheet.create({
   emojisContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  noteText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    color: colors.ds.typography.highEmphasis,
+    marginBottom: '8@s',
   },
 });

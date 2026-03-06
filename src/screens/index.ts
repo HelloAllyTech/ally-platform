@@ -23,3 +23,5 @@ export {SimulationReviewDetailsScreen as ReviewDetailsScreen} from './ReviewDeta
 // export {ReviewDetailsScreen} from './ReviewDetailsScreen/ReviewDetailsScreen';
 export {ScribeReviewDetailsScreen} from './ReviewDetailsScreen/ScribeReviewDetailsScreen';
 export {ReactionsScreen} from './ReactionsScreen';
+export {ShareCallLogScreen} from './ShareCallLogScreen';
+export {ShareSimulationScreen} from './ShareSimulationScreen';

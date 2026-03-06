@@ -96,7 +96,7 @@ export interface ReviewCommentProps {
    */
   onHide?: (commentId: string, hidden: boolean) => void;
   /**
-   * Whether to show the actions menu
+   * Whether to show the actions menu (edit, delete, hide/unhide)
    */
   showActionsMenu?: boolean;
 }

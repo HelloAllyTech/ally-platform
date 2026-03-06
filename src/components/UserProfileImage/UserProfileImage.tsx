@@ -56,11 +56,13 @@ export const UserProfileImage: React.FC<UserProfileImageProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    backgroundColor: colors.lightGray2,
+    backgroundColor: colors.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.lightGray17,
   },
   image: {
     borderRadius: radius.full,
