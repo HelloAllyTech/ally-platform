@@ -48,10 +48,14 @@ export const ShareSimulationScreen: React.FC<
 
   const handleEmojiSelected = useCallback(
     (emoji: EmojiType) => {
-      if (Array.from(note).length < MAX_NOTE_LENGTH)
-        setNote(prev => prev + emoji.emoji);
+      setNote(prev => {
+        if (Array.from(prev).length < MAX_NOTE_LENGTH) {
+          return prev + emoji.emoji;
+        }
+        return prev;
+      });
     },
-    [note, setNote],
+    [setNote],
   );
 
   const screenTitle = isEditNote
