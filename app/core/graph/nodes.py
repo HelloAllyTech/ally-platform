@@ -1155,26 +1155,18 @@ async def apply_voice_expressions(
         current_parameters=current_parameters,
     )
 
-    # For providers WITH text enhancement:
-    # - enhanced_text contains text with tags (SSML, etc.)
-    # - We update the message content with the enhanced text
     if enhanced_text is not None:
         # Text was enhanced (provider supports text enhancement)
-        # Update message content with enhanced text
-        updated_messages = state.messages.copy()
-        # Replace the last message with enhanced text
-        updated_messages[-1] = AIMessage(content=enhanced_text)
+        # Preserve the message ID to ensure it's replaced in state history,
+        # not appended, which would cause duplicate speech/history bloat.
+        message_id = getattr(last_message, "id", None)
+        enhanced_message = AIMessage(content=enhanced_text, id=message_id)
 
-        final_state = SimulationState(
-            messages=updated_messages,
-            permitted_events=state.permitted_events,
-            events_accumulator=state.events_accumulator,
-            current_score=state.current_score,
-            new_events=state.new_events,
-            branching_and_feedback_data=(state.branching_and_feedback_data),
-        )
-
-        return final_state
+        # Return only the fields that need updating
+        return {
+            "messages": [enhanced_message],
+            "new_events": state.new_events,
+        }
 
     # Text was not enhanced (provider doesn't support text enhancement, like Hume)
     # Parameters have already been applied via update_options() in
