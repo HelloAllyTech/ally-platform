@@ -965,6 +965,23 @@ async def send_event_feedback(
     }
 
 
+async def sync_events_and_behaviors_node(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Convergence node for parallel execution paths.
+
+    This node acts as a fan-in point where both detect_behaviors and
+    process_events converge before proceeding to resolve_branching_instruction.
+    It serves as a synchronization point in the graph to ensure both parallel
+    branches complete before continuing with the sequential flow.
+
+    Returns:
+        Empty dictionary (pass-through node)
+    """
+    return {}
+
+
 async def clear_events_and_detected_data(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:

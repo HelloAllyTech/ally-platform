@@ -9,6 +9,7 @@ from app.core.graph.nodes import (
     process_events,
     resolve_branching_instruction,
     send_event_feedback,
+    sync_events_and_behaviors_node,
 )
 from app.core.graph.state import SimulationState
 
@@ -69,17 +70,19 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     Build the LangGraph state graph.
 
     Flow:
-    1. process_events: Detects events, updates EventRegistry
-    2. resolve_branching_instruction: Resolves branching instructions with LLM calls
-       (as subgraph)
-    3. generate_response + detect_behaviors (parallel):
-       - generate_response: Generates LLM response based on detected events
+    1. START splits into two parallel paths:
        - detect_behaviors: Detects behaviors from behavior instructions
-    4. apply_voice_expressions: Applies voice expression parameters and text enhancement
+       - process_events: Detects events, updates EventRegistry
+    2. sync_events_and_behaviors_node:
+        Convergence point for detect_behaviors and process_events
+    3. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
-    5. send_event_feedback: Sends event and behavior feedback to the UI and clears
-       transient state. Separated from generate_response so the core nodes (1-3)
-       can be reused by the report graph without UI concerns.
+    4. generate_response: Generates LLM response based on detected events
+    5. apply_voice_expressions: Applies voice expression parameters and text enhancement
+       (as subgraph)
+    6. send_event_feedback: Sends event and behavior feedback to the UI and clears
+       transient state. Separated from generate_response so the core nodes can be
+       reused by the report graph without UI concerns.
 
     Note: resolve_branching_instruction and apply_voice_expressions are subgraphs
     to prevent their LLM outputs from being streamed. With subgraphs=False
@@ -101,19 +104,28 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_node("generate_response", generate_response)
 
     # Add detect_behaviors as a regular node
-    # This runs in parallel with generate_response after resolve_branching_instruction
+    # This runs in parallel with process_events from START
     graph.add_node("detect_behaviors", detect_behaviors)
+
+    # sync_events_and_behaviors_node acts as a convergence point for
+    # detect_behaviors and process_events before resolve_branching_instruction
+    graph.add_node("sync_events_and_behaviors_node", sync_events_and_behaviors_node)
 
     # send_event_feedback runs last — sends event scores/feedback to UI.
     # Kept separate from generate_response so that node stays reusable
     # for contexts that don't need UI feedback (e.g. report generation).
     graph.add_node("send_event_feedback", send_event_feedback)
 
-    graph.add_edge(START, "process_events")
+    # START splits into two parallel paths
     graph.add_edge(START, "detect_behaviors")
+    graph.add_edge(START, "process_events")
 
-    graph.add_edge("process_events", "resolve_branching_instruction")
+    # Both paths converge at sync_events_and_behaviors_node
+    graph.add_edge("detect_behaviors", "sync_events_and_behaviors_node")
+    graph.add_edge("process_events", "sync_events_and_behaviors_node")
 
+    # Continue with sequential flow
+    graph.add_edge("sync_events_and_behaviors_node", "resolve_branching_instruction")
     graph.add_edge("resolve_branching_instruction", "generate_response")
 
     # Build the apply_voice_expressions subgraph and add it as a node
@@ -122,10 +134,7 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     voice_expressions_subgraph = build_voice_expressions_subgraph()
     graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
 
-    # Fan-in: [generate_response, detect_behaviors] → apply_voice_expressions
     graph.add_edge("generate_response", "apply_voice_expressions")
-    graph.add_edge("detect_behaviors", "send_event_feedback")
-
     graph.add_edge("apply_voice_expressions", "send_event_feedback")
     graph.add_edge("send_event_feedback", END)
 
