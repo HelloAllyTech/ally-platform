@@ -8,6 +8,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {ChatAddOnIcon} from '@/assets';
 import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
+import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
 import {
   colors,
@@ -43,6 +44,7 @@ interface ReviewCardProps {
   };
   onReviewPress: (reviewId?: string) => void;
   note?: string;
+  reviewType?: ReviewType;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -55,6 +57,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   reactions = {},
   onReviewPress,
   note,
+  reviewType,
 }) => {
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -116,6 +119,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderSimulationCard = () => (
     <SimulationDetailsCard
+      reviewType={reviewType}
       coverImageUrl={scenario.coverImageUrl}
       coverVideoUrl={scenario.coverVideoUrl}
       title={scenario.title}

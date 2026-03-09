@@ -256,21 +256,26 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
-  const renderDefaultMessage = (messageItem: MessageData) => (
-    <Text>
-      <Text style={styles.userName}>{messageItem.senderId}:</Text>{' '}
-      <Text style={styles.messageContent}>
-        {messageItem.messagePart.map((part, index) => (
-          <Text
-            disabled={part.commentIds.length === 0}
-            key={`${messageItem.id}-${index}`}
-            style={[part.commentIds.length > 0 && styles.highlightedText]}>
-            {part.text}
-          </Text>
-        ))}
+  const renderDefaultMessage = (messageItem: MessageData) => {
+    const isAiClient = messageItem.senderId === -1;
+    return (
+      <Text>
+        <Text style={isAiClient ? styles.clientAgentText : styles.userName}>
+          {getSenderName(isAiClient)}:
+        </Text>{' '}
+        <Text style={styles.messageContent}>
+          {messageItem.messagePart.map((part, index) => (
+            <Text
+              disabled={part.commentIds.length === 0}
+              key={`${messageItem.id}-${index}`}
+              style={[part.commentIds.length > 0 && styles.highlightedText]}>
+              {part.text}
+            </Text>
+          ))}
+        </Text>
       </Text>
-    </Text>
-  );
+    );
+  };
 
   const renderItem = ({item}: {item: MessageData}) => {
     const isAiClient = item.senderId === -1;

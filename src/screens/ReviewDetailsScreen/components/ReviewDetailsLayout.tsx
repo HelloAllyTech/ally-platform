@@ -134,13 +134,21 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         <ReviewNote
           note={reviewNote}
           onEditNote={
-            metadata?.reviewOwnerId === userData?.id ? onEditNote : undefined
+            metadata?.reviewOwnerId === userData?.id && !isPrivate
+              ? onEditNote
+              : undefined
           }
         />
       );
     }
     return null;
-  }, [reviewNote, metadata?.reviewOwnerId, userData?.id, onEditNote]);
+  }, [
+    reviewNote,
+    metadata?.reviewOwnerId,
+    userData?.id,
+    onEditNote,
+    isPrivate,
+  ]);
 
   if (isLoading) {
     return (
@@ -208,6 +216,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         isLoading={isAddingComment}
       />
       <ThreadsBottomSheet
+        isPrivate={isPrivate}
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={reviewId}

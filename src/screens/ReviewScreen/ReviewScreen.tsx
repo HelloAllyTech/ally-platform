@@ -103,6 +103,7 @@ export const ReviewScreen: React.FC = () => {
               onReviewPress={() => handleReviewPress(item.id)}
               reactions={item.reactions}
               note={item.note}
+              reviewType="simulation"
             />
           )}
           onEndReached={loadMore}

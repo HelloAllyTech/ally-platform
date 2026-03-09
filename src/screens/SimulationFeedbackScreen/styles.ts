@@ -1,4 +1,4 @@
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {isIOS} from '@/constants';
 import {colors, fontFamily, radius, stroke, typography} from '@/theme';
@@ -136,6 +136,11 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+    shadowColor: '#A09E9E',
+    shadowOffset: {width: ms(8.52), height: ms(11.36)},
+    shadowOpacity: 0.1,
+    shadowRadius: ms(14.2),
+    elevation: 8,
   },
   checklistContainer: {
     flex: 1,

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {VideoPreview} from '@/components';
+import {ReviewTypeChip, VideoPreview} from '@/components';
+import {ReviewType} from '@/contexts/ReviewApiContext';
 import {
   colors,
   fontFamily,
@@ -22,6 +23,7 @@ import {
 } from '@/theme';
 
 interface SimulationDetailsCardProps {
+  reviewType?: ReviewType;
   coverImageUrl?: string;
   coverVideoUrl?: string;
   title?: string;
@@ -31,6 +33,7 @@ interface SimulationDetailsCardProps {
 }
 
 export const SimulationDetailsCard = ({
+  reviewType,
   coverImageUrl,
   coverVideoUrl,
   title,
@@ -75,6 +78,7 @@ export const SimulationDetailsCard = ({
       </View>
       <View style={styles.cardBody}>
         <View style={styles.textContainer}>
+          {reviewType && <ReviewTypeChip reviewType={reviewType} />}
           <Text style={styles.cardTitle} numberOfLines={titleNumberOfLines}>
             {title || '-'}
           </Text>
