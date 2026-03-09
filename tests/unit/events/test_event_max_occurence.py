@@ -50,6 +50,7 @@ def limited_event():
     config.max_score = None
     config.min_gap_time = None
     config.max_occurrences = 2
+    config.occurrence_interval = None
 
     event.detection_config = config
     return event
@@ -177,3 +178,51 @@ def test_is_event_eligible_respects_zero_max_occurrences(limited_event):
 
     # Case 2: Count is 1 (Blocked - Limit Exceeded)
     assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=1) is False
+
+
+def test_is_event_eligible_ignores_occurrence_interval(limited_event):
+    """is_event_eligible no longer gates on occurrence_interval.
+    Interval logic lives in the orchestrator via detection_count."""
+    limited_event.detection_config.max_occurrences = None
+
+    # interval=None: passes as expected
+    limited_event.detection_config.occurrence_interval = None
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=0) is True
+
+    # interval=3: also passes — is_event_eligible does not check interval
+    limited_event.detection_config.occurrence_interval = 3
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=0) is True
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=1) is True
+    assert is_event_eligible(limited_event, 100, 0, None, occurrence_count=2) is True
+
+
+def test_orchestrator_detection_count_is_independent_of_occurrence_count(orchestrator):
+    """detection_count tracks every detection; occurrence_count only tracks
+    actual fires. The two are independent so occurrence_interval can gate firing
+    without deadlocking.
+    """
+    from app.core.events.schemas import EventRegistryEntry
+
+    event_id = "interval_event"
+    orchestrator.event_registry[event_id] = EventRegistryEntry(
+        happened=False,
+        trigger_multiple=True,
+        occurred_at=None,
+        occurrence_count=0,
+        detection_count=0,
+    )
+
+    # Simulate 3 raw detections without firing (interval suppressed first two)
+    orchestrator.event_registry[event_id].detection_count += 1
+    assert orchestrator.get_detection_count(event_id) == 1
+    assert orchestrator.get_occurrence_count(event_id) == 0
+
+    orchestrator.event_registry[event_id].detection_count += 1
+    assert orchestrator.get_detection_count(event_id) == 2
+    assert orchestrator.get_occurrence_count(event_id) == 0
+
+    # 3rd detection: fires → occurrence_count increments too
+    orchestrator.event_registry[event_id].detection_count += 1
+    orchestrator.set_event_state(event_id, True, DetectionType.SENTENCE_SIMILARITY)
+    assert orchestrator.get_detection_count(event_id) == 3
+    assert orchestrator.get_occurrence_count(event_id) == 1

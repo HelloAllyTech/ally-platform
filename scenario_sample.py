@@ -133,6 +133,7 @@ SCENARIO_SAMPLE = {
                     "Everything happens for a reason",
                 ],
                 "feedbackStatus": "True",
+                "detectionConfig": {"occurrenceInterval": 2},
                 # SEMANTIC_SIMILARITY uses embeddings to distinguish empathy ("that's so bad")
                 # from minimization ("it's not that bad") - avoids false positives
             },

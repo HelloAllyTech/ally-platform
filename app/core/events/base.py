@@ -55,6 +55,12 @@ class DetectionConfig(BaseModel):
     max_occurrences: Optional[int] = Field(
         None, description="Maximum number of times this event can trigger."
     )
+    occurrence_interval: Optional[int] = Field(
+        None,
+        description=(
+            "Event triggers only when occurrence count is a multiple of this value."
+        ),
+    )
 
 
 class BaseEvent(BaseModel, ABC):

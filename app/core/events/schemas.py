@@ -37,7 +37,13 @@ class EventRegistryEntry(BaseModel):
     happened: bool = False
     trigger_multiple: bool = False
     occurred_at: Optional[datetime] = None
+    # Number of times the event actually fired (sent to UI/Core).
+    # Used by max_occurrences to cap how many times the event can trigger.
     occurrence_count: int = 0
+    # Number of times the underlying detection condition was TRUE,
+    # regardless of whether the event actually fired.
+    # Used by occurrence_interval to fire only on every Nth detection.
+    detection_count: int = 0
 
 
 class ExpressionListEntry(TypedDict):

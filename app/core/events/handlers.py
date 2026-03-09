@@ -54,7 +54,7 @@ async def send_event_to_queue(event_data: str) -> None:
     """Safely send event to message queue."""
     try:
         await msg_event_queue.send_message(event_data)
-        logger.debug(f"Sent message: {event_data}")
+        logger.info(f"Sent message to Core: {event_data}")
     except Exception as e:
         logger.error(f"Failed to send event to queue: {e}")
 

@@ -240,7 +240,34 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         if detected_event_ids:
             for event_id in detected_event_ids:
-                self.set_event_state(event_id, True)
+                mapped_event = self._event_map.get(event_id)
+                interval = (
+                    int(mapped_event.detection_config.occurrence_interval)
+                    if (
+                        mapped_event
+                        and mapped_event.detection_config
+                        and mapped_event.detection_config.occurrence_interval
+                        is not None
+                    )
+                    else None
+                )
+
+                if interval is not None:
+                    # Ensure the entry exists before mutating detection_count
+                    if event_id not in self.event_registry:
+                        self.set_event_state(event_id, False)
+
+                    self.event_registry[event_id].detection_count += 1
+                    current_count = self.event_registry[event_id].detection_count
+
+                    if current_count % interval == 0:
+                        self.set_event_state(event_id, True)
+                    else:
+                        # Explicitly mark as not active so combination
+                        # expressions evaluate the correct state
+                        self.event_registry[event_id].happened = False
+                else:
+                    self.set_event_state(event_id, True)
 
         for expr_info in self.expression_list:
             if expr_info["type"] == DetectionType.COMBINATION:
@@ -436,9 +463,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             # If trigger_multiple is False, only send if not sent before
             if trigger_multiple and event.event_id in all_detected_event_ids:
                 events_to_process.append(event)
-                self._sent_events.add(
-                    event.event_id
-                )  # Track sent events even for trigger_multiple=True
+                self._sent_events.add(event.event_id)
                 logger.debug(
                     f"Event {event.event_id} will be sent (trigger_multiple=True)"
                 )
@@ -560,7 +585,6 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
 
         if event_id in self.event_registry:
             self.event_registry[event_id].happened = state
-            # Only run if state is false
             if state:
                 # Get current count (default to 0 just in case) and increment
                 self.event_registry[event_id].occurrence_count += 1
@@ -609,6 +633,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         entry = self.event_registry.get(event_id)
         if entry:
             return entry.occurrence_count
+        return 0
+
+    def get_detection_count(self, event_id: str) -> int:
+        entry = self.event_registry.get(event_id)
+        if entry:
+            return entry.detection_count
         return 0
 
     def _get_elapsed_time(self) -> float:

@@ -78,6 +78,7 @@ def _create_event_by_detection_type(
     max_score_val = raw_config.get("maxScore")
     min_gap_val = raw_config.get("minGapTime")
     max_occ_val = raw_config.get("maxOccurrences")
+    occurrence_interval_val = raw_config.get("occurrenceInterval")
 
     #  Create the Pydantic model instance
     detection_config = DetectionConfig(
@@ -87,6 +88,11 @@ def _create_event_by_detection_type(
         max_score=int(max_score_val) if max_score_val is not None else None,
         min_gap_time=float(min_gap_val) if min_gap_val is not None else None,
         max_occurrences=int(max_occ_val) if max_occ_val is not None else None,
+        occurrence_interval=(
+            float(occurrence_interval_val)
+            if occurrence_interval_val is not None
+            else None
+        ),
     )
 
     # Parse branching instruction if present

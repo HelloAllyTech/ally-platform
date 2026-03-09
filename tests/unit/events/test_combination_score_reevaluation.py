@@ -88,6 +88,8 @@ class TestCombinationScoreBugFix:
         ss1.score = 0
         ss1.detection_type = DetectionType.SENTENCE_SIMILARITY
         ss1.branching_instruction = None
+        ss1.detection_config = MagicMock()
+        ss1.detection_config.occurrence_interval = None
 
         # Create C1: S1 AND SS1
         c1 = CombinationEvent.create(
@@ -147,6 +149,8 @@ class TestCombinationScoreBugFix:
         ss1.score = 0
         ss1.detection_type = DetectionType.SENTENCE_SIMILARITY
         ss1.branching_instruction = None
+        ss1.detection_config = MagicMock()
+        ss1.detection_config.occurrence_interval = None
 
         # Create C1: S1 AND SS1
         c1 = CombinationEvent.create(
@@ -232,6 +236,8 @@ class TestCombinationScoreBugFix:
         ss1.score = 0
         ss1.detection_type = DetectionType.SENTENCE_SIMILARITY
         ss1.branching_instruction = None
+        ss1.detection_config = MagicMock()
+        ss1.detection_config.occurrence_interval = None
 
         # Create C1: S1 AND SS1
         c1 = CombinationEvent.create(
