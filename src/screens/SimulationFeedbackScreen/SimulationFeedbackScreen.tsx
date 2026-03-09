@@ -90,7 +90,7 @@ export const SimulationFeedbackScreen: React.FC<
   const {data: reviewData} = useGetReviewByIdQuery(
     {reviewId: reviewId || ''},
     {
-      skip: !reviewId || activeTabKey !== SimulationSummaryTabKey.TRANSCRIPTION,
+      skip: !reviewId,
     },
   );
 
