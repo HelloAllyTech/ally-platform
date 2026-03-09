@@ -94,5 +94,6 @@ export {
   SimulationDetailsCard,
   SimulationDetailRow,
 } from './SimulationDetailsCard';
+export {ReviewTypeChip} from './ReviewTypeChip';
 export {LineTextInput} from './LineTextInput';
 export {CustomSwitch} from './CustomSwitch';

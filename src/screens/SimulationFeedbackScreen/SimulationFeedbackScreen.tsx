@@ -306,28 +306,27 @@ export const SimulationFeedbackScreen: React.FC<
               : t('SimulationFeedback.titleEnded')}
           </Text>
         </Text>
-        {activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION && (
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>
-              {t('SimulationFeedback.share')}
-            </Text>
-            <CustomSwitch
-              value={!!reviewId && !isPrivate}
-              onToggle={isEnabled => {
-                if (
-                  isEnabled &&
-                  (!reviewId ||
-                    (reviewData?.createdAt &&
-                      !isMinutesPassed(reviewData.createdAt)))
-                ) {
-                  handleShareSimulation();
-                } else if (reviewId) {
-                  handleTogglePrivate(isEnabled);
-                }
-              }}
-            />
-          </View>
-        )}
+
+        <View style={styles.switchContainer}>
+          <Text style={styles.switchLabel}>
+            {t('SimulationFeedback.share')}
+          </Text>
+          <CustomSwitch
+            value={!!reviewId && !isPrivate}
+            onToggle={isEnabled => {
+              if (
+                isEnabled &&
+                (!reviewId ||
+                  (reviewData?.createdAt &&
+                    !isMinutesPassed(reviewData.createdAt)))
+              ) {
+                handleShareSimulation();
+              } else if (reviewId) {
+                handleTogglePrivate(isEnabled);
+              }
+            }}
+          />
+        </View>
       </View>
     );
   };
@@ -484,7 +483,7 @@ export const SimulationFeedbackScreen: React.FC<
         </View>
       )}
       {!!reviewId &&
-        activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
+        activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
         !hideReviewDetails && (
           <TouchableOpacity
             onPress={handleViewReview}

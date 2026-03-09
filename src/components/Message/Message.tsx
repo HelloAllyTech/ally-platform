@@ -32,7 +32,6 @@ export const Message: React.FC<MessageProps> = ({
 const styles = ScaledSheet.create({
   container: {
     flexDirection: 'row',
-    paddingHorizontal: '16@ms',
     paddingVertical: '6@mvs',
     gap: '16@ms',
   },

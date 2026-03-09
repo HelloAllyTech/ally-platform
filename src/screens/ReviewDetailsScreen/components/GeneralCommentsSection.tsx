@@ -381,46 +381,48 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>{t('ThreadsBottomSheet.title')}</Text>
 
-      <View style={styles.inputRow}>
-        <UserProfileImage
-          name={userData?.name}
-          profileImageUri={userData?.profileImageUrl ?? undefined}
-          size={36}
-        />
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('ThreadsBottomSheet.addComment')}
-            placeholderTextColor={colors.ds.typography.mediumEmphasis}
-            value={commentText}
-            onChangeText={setCommentText}
-            onSubmitEditing={handleSubmit}
-            returnKeyType="send"
-            multiline={false}
+      {!isPrivate && (
+        <View style={styles.inputRow}>
+          <UserProfileImage
+            name={userData?.name}
+            profileImageUri={userData?.profileImageUrl ?? undefined}
+            size={36}
           />
-          {!!commentText.trim() && (
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                isSubmitting && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-              activeOpacity={0.7}>
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.white} size="small" />
-              ) : (
-                <LeftArrowIcon
-                  color={colors.white}
-                  width={24}
-                  height={24}
-                  style={styles.arrowIcon}
-                />
-              )}
-            </TouchableOpacity>
-          )}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('ThreadsBottomSheet.addComment')}
+              placeholderTextColor={colors.ds.typography.mediumEmphasis}
+              value={commentText}
+              onChangeText={setCommentText}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="send"
+              multiline={false}
+            />
+            {!!commentText.trim() && (
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  isSubmitting && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                activeOpacity={0.7}>
+                {isSubmitting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <LeftArrowIcon
+                    color={colors.white}
+                    width={24}
+                    height={24}
+                    style={styles.arrowIcon}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {generalCommentsThreadId ? renderBody() : null}
     </View>

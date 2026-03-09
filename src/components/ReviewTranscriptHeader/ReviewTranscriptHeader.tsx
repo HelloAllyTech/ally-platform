@@ -3,7 +3,7 @@ import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {HelpIcon} from '@/assets';
-import {UserProfileImage} from '@/components';
+import {ReviewTypeChip, UserProfileImage} from '@/components';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
@@ -47,6 +47,7 @@ export const ReviewTranscriptHeader = ({
     <>
       <View style={styles.container}>
         <View style={styles.titleContainer}>
+          <ReviewTypeChip reviewType="simulation" />
           <Text numberOfLines={1} style={styles.title}>
             {title}
           </Text>
@@ -114,7 +115,7 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     ...typography.body.medium,
     fontWeight: fontWeights.medium,
-    maxWidth: '80%',
+    maxWidth: '60%',
   },
   subtitleContainer: {
     flexDirection: 'row',

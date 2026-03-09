@@ -58,6 +58,7 @@ const getSelectedText = (thread: Thread): string | null => {
 
 export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   visible,
+  isPrivate = false,
   onClose,
   reviewId,
   reviewOwnerId,
@@ -357,6 +358,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const renderGeneralTab = () => {
     return (
       <GeneralCommentsList
+        isPrivate={isPrivate}
         visible={visible && activeTab === TABS.GENERAL}
         reviewId={reviewId}
         reviewOwnerId={reviewOwnerId}
