@@ -128,6 +128,7 @@ export const reviewsApi = api.injectEndpoints({
         method: API_METHODS.PATCH,
         body: {hidden},
       }),
+      invalidatesTags: ['GeneralComments'],
     }),
     updateComment: builder.mutation<
       {success: boolean},
@@ -138,14 +139,19 @@ export const reviewsApi = api.injectEndpoints({
         method: API_METHODS.PATCH,
         body: {content},
       }),
-      invalidatesTags: ['ReviewThreads'],
+      invalidatesTags: ['ReviewThreads', 'GeneralComments'],
     }),
     deleteComment: builder.mutation<{success: boolean}, {commentId: string}>({
       query: ({commentId}) => ({
         url: API_ROUTES.SIMULATION_REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['ReviewThreads', 'ReviewDetails', 'Badges'],
+      invalidatesTags: [
+        'ReviewThreads',
+        'ReviewDetails',
+        'Badges',
+        'GeneralComments',
+      ],
     }),
     getGeneralReviewComments: builder.query<
       GetThreadCommentsResponse,
@@ -180,4 +186,5 @@ export const {
   useUpdateCommentMutation,
   useDeleteCommentMutation,
   useLazyGetGeneralReviewCommentsQuery,
+  useGetGeneralReviewCommentsQuery,
 } = reviewsApi;

@@ -37,7 +37,6 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   hideReplyBottomSheet,
   isPrivate = false,
   onCommentsChanged,
-  onReplyAdded,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -70,17 +69,9 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
   const onCommentsChangedRef = useRef(onCommentsChanged);
   onCommentsChangedRef.current = onCommentsChanged;
 
-  const onReplyAddedRef = useRef(onReplyAdded);
-  onReplyAddedRef.current = onReplyAdded;
-
   const wrappedOnCommentsChanged = useCallback(
     (change: Parameters<NonNullable<typeof onCommentsChanged>>[0]) => {
       const oc = originalCommentRef.current;
-
-      if (change.action === 'add' && oc?.id) {
-        onReplyAddedRef.current?.(oc.id);
-      }
-
       const isOriginal =
         oc &&
         (('commentId' in change && change.commentId === oc.id) ||

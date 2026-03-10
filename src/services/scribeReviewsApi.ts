@@ -82,6 +82,7 @@ export const scribeReviewsApi = api.injectEndpoints({
         method: API_METHODS.PATCH,
         body: {hidden},
       }),
+      invalidatesTags: ['GeneralComments'],
     }),
     updateScribeComment: builder.mutation<
       {success: boolean},
@@ -92,7 +93,7 @@ export const scribeReviewsApi = api.injectEndpoints({
         method: API_METHODS.PATCH,
         body: {content},
       }),
-      invalidatesTags: ['ReviewThreads'],
+      invalidatesTags: ['ReviewThreads', 'GeneralComments'],
     }),
     deleteScribeComment: builder.mutation<
       {success: boolean},
@@ -102,7 +103,7 @@ export const scribeReviewsApi = api.injectEndpoints({
         url: API_ROUTES.SCRIBE_REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['ReviewThreads'],
+      invalidatesTags: ['ReviewThreads', 'GeneralComments'],
     }),
     getScribeGeneralReviewComments: builder.query<
       GetThreadCommentsResponse,
@@ -129,4 +130,5 @@ export const {
   useUpdateScribeCommentMutation,
   useDeleteScribeCommentMutation,
   useLazyGetScribeGeneralReviewCommentsQuery,
+  useGetScribeGeneralReviewCommentsQuery,
 } = scribeReviewsApi;

@@ -36,6 +36,7 @@ export const scribeReactionsApi = api.injectEndpoints({
         method: API_METHODS.POST,
         body: {reaction, action},
       }),
+      invalidatesTags: ['GeneralComments'],
     }),
     addScribeReactionToReview: builder.mutation<void, AddReactionRequest>({
       query: ({id, reaction, action}) => ({

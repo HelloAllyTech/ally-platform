@@ -83,7 +83,6 @@ export function useReviewDetailsLogic({
     onReplyPressFromInlineGeneral,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
-    replySourceRef,
     hideCommentThreadBottomSheet,
     closeCommentBottomSheet,
   } = useReviewComments();
@@ -535,7 +534,6 @@ export function useReviewDetailsLogic({
     onReplyPressFromGeneralComments,
     onReplyPressFromInlineGeneral,
     handleThreadCommentChange,
-    replySourceRef,
 
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,

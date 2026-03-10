@@ -68,6 +68,7 @@ export const reactionsApi = api.injectEndpoints({
         method: API_METHODS.POST,
         body: {reaction, action},
       }),
+      invalidatesTags: ['GeneralComments'],
     }),
     addReactionToReview: builder.mutation<void, AddReactionRequest>({
       query: ({id, reaction, action}) => ({
