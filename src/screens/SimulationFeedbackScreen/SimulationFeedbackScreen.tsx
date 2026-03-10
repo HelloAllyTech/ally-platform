@@ -39,6 +39,7 @@ import {ReviewStatus} from '@/types';
 import {
   formatDutationFromStartedAtAndEndedAt,
   isMinutesPassed,
+  isShortSession,
   navigateToLearnTab,
 } from '@/utils';
 
@@ -93,6 +94,8 @@ export const SimulationFeedbackScreen: React.FC<
       skip: !reviewId,
     },
   );
+
+  const shortSession = isShortSession(simulationDetails?.details?.callDuration);
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
@@ -342,8 +345,9 @@ export const SimulationFeedbackScreen: React.FC<
       getSimulationSummaryTabs(t, {
         pathId,
         caseId,
+        shortSession,
       }),
-    [t, pathId, caseId],
+    [t, pathId, caseId, shortSession],
   );
 
   const tabIndex = useMemo(() => {
@@ -369,10 +373,6 @@ export const SimulationFeedbackScreen: React.FC<
             <SummaryTab
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
-              // pathId={pathId}
-              // caseId={caseId}
-              // fromLogs={fromLogs}
-              // onTryAnother={handleSubmit}
             />
           );
         case SimulationSummaryTabKey.ASK_AI:

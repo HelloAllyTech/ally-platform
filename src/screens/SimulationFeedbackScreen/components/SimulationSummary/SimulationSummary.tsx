@@ -7,10 +7,11 @@ import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily} from '@/theme';
 import {ExperienceMode, SimulationSummaryData} from '@/types';
-import {formatDateTime} from '@/utils';
+import {formatDateTime, isShortSession} from '@/utils';
 
 import {EventChecklist} from '../EventChecklist';
 import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
+import {ShortSessionUI} from '../ShortSessionUI';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
@@ -49,61 +50,71 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
   const coverImageUrl =
     (data?.scenario as {coverImageUrl?: string})?.coverImageUrl || undefined;
 
-  return (
-    <SummaryCard title={t('SimulationFeedback.sessionFeedback')}>
-      <View style={styles.headerContainer}>
-        {coverImageUrl && (
-          <Image
-            source={{uri: coverImageUrl}}
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-        )}
-        <View style={styles.headerContent}>
-          <View style={styles.idRow}>
-            {!!sessionName && (
-              <Text style={styles.idText}>ID: {sessionName}</Text>
-            )}
-          </View>
-          {data?.scenario?.title && (
-            <View style={styles.titleRow}>
-              <Text style={styles.titleText}>{data.scenario.title}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowSimulationDetailsModal(true);
-                }}>
-                <HelpIcon width={14} height={14} />
-              </TouchableOpacity>
-            </View>
+  const headerContent = (
+    <View style={styles.headerContainer}>
+      {coverImageUrl && (
+        <Image
+          source={{uri: coverImageUrl}}
+          style={styles.coverImage}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.headerContent}>
+        <View style={styles.idRow}>
+          {!!sessionName && (
+            <Text style={styles.idText}>ID: {sessionName}</Text>
           )}
-          <View style={styles.metadataRow}>
-            {data?.startedAt && (
-              <>
-                <Text style={styles.metadataText}>
-                  {formatDateTime(data.startedAt)}
-                </Text>
-                <Text style={styles.bulletSeparator}>•</Text>
-                <Text style={styles.metadataText}>
-                  {formatDurationAsMMSS(data?.startedAt, data?.endedAt)}
-                </Text>
-              </>
-            )}
+        </View>
+        {data?.scenario?.title && (
+          <View style={styles.titleRow}>
+            <Text style={styles.titleText}>{data.scenario.title}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowSimulationDetailsModal(true);
+              }}>
+              <HelpIcon width={14} height={14} />
+            </TouchableOpacity>
           </View>
+        )}
+        <View style={styles.metadataRow}>
+          {data?.startedAt && (
+            <>
+              <Text style={styles.metadataText}>
+                {formatDateTime(data.startedAt)}
+              </Text>
+              <Text style={styles.bulletSeparator}>•</Text>
+              <Text style={styles.metadataText}>
+                {formatDurationAsMMSS(data?.startedAt, data?.endedAt)}
+              </Text>
+            </>
+          )}
         </View>
       </View>
-      {isChecklistMode && data?.id && (
-        <EventChecklist scenarioSessionId={data.id} />
-      )}
-      {!isChecklistMode && (
+    </View>
+  );
+
+  return (
+    <SummaryCard title={t('SimulationFeedback.sessionFeedback')}>
+      {headerContent}
+      {isShortSession(data?.details?.callDuration) ? (
+        <ShortSessionUI />
+      ) : (
         <>
-          <ExpandableFeedbackSection
-            title={t('SimulationFeedback.strengthsAndSkills')}
-            items={positives}
-          />
-          <ExpandableFeedbackSection
-            title={t('SimulationFeedback.areasOfGrowth')}
-            items={improvements}
-          />
+          {isChecklistMode && data?.id && (
+            <EventChecklist scenarioSessionId={data.id} />
+          )}
+          {!isChecklistMode && (
+            <>
+              <ExpandableFeedbackSection
+                title={t('SimulationFeedback.strengthsAndSkills')}
+                items={positives}
+              />
+              <ExpandableFeedbackSection
+                title={t('SimulationFeedback.areasOfGrowth')}
+                items={improvements}
+              />
+            </>
+          )}
         </>
       )}
       <SimulationDetailsModal
