@@ -13,7 +13,7 @@ import {
   TabView,
   useToast,
 } from '@/components';
-import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
+import {REVIEW_FILTERS, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
 import {isReviewerOnly} from '@/navigation/TabNavigator';
@@ -47,6 +47,10 @@ export const ReviewScreen: React.FC = () => {
 
   const permissions = useSelector(
     (state: AppRootState) => state.user.permissions,
+  );
+
+  const canViewSimulationReview = permissions.includes(
+    USER_PERMISSIONS.VIEW_SIMULATION_REVIEW,
   );
 
   // Refresh reviews when screen comes into focus (skip initial mount)
@@ -100,9 +104,14 @@ export const ReviewScreen: React.FC = () => {
               createdAt={item.createdAt}
               scenarioSession={item.scenarioSession}
               commentsCount={item.commentsCount}
-              onReviewPress={() => handleReviewPress(item.id)}
+              onReviewPress={
+                canViewSimulationReview
+                  ? () => handleReviewPress(item.id)
+                  : undefined
+              }
               reactions={item.reactions}
               note={item.note}
+              reviewType="simulation"
             />
           )}
           onEndReached={loadMore}

@@ -115,3 +115,7 @@ export const calculateAverageForObjectArray = <T, K extends keyof T>(
 
   return Math.round(total / arr.length);
 };
+
+export const capitalizeFirstLetter = (string: string) => {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+};

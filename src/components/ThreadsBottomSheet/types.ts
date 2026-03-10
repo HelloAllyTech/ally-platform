@@ -4,6 +4,10 @@ import {ThreadCommentChange} from '../CommentThreadBottomSheet/types';
 
 export interface ThreadsBottomSheetProps {
   /**
+   * Whether the review is private (read only mode)
+   */
+  isPrivate?: boolean;
+  /**
    * Whether the bottom sheet is visible
    */
   visible: boolean;

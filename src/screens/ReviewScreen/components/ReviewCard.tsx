@@ -8,6 +8,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {ChatAddOnIcon} from '@/assets';
 import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
+import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
 import {
   colors,
@@ -41,8 +42,9 @@ interface ReviewCardProps {
   reactions?: {
     [reaction_code: string]: number;
   };
-  onReviewPress: (reviewId?: string) => void;
+  onReviewPress?: (reviewId?: string) => void;
   note?: string;
+  reviewType?: ReviewType;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -55,6 +57,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   reactions = {},
   onReviewPress,
   note,
+  reviewType,
 }) => {
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -116,6 +119,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderSimulationCard = () => (
     <SimulationDetailsCard
+      reviewType={reviewType}
       coverImageUrl={scenario.coverImageUrl}
       coverVideoUrl={scenario.coverVideoUrl}
       title={scenario.title}
@@ -164,14 +168,16 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       </View>
       {renderSimulationCard()}
 
-      <TouchableOpacity
-        style={styles.reviewTranscriptContainer}
-        onPress={handleReviewItemPress}>
-        <ChatAddOnIcon width={16} height={16} />
-        <Text style={styles.reviewTranscriptText}>
-          {t('Review.card.reviewTranscript')}
-        </Text>
-      </TouchableOpacity>
+      {onReviewPress && (
+        <TouchableOpacity
+          style={styles.reviewTranscriptContainer}
+          onPress={handleReviewItemPress}>
+          <ChatAddOnIcon width={16} height={16} />
+          <Text style={styles.reviewTranscriptText}>
+            {t('Review.card.reviewTranscript')}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.separator} />
 
@@ -183,7 +189,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         generalCommentsData={generalCommentsData}
         reviewId={id}
         onCollapsePress={handleCommentPress}
-        onCommentPress={onReviewPress}
+        onCommentPress={onReviewPress ? () => onReviewPress(id) : undefined}
         t={t}
       />
     </View>
