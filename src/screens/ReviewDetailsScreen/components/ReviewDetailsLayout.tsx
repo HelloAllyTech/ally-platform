@@ -117,7 +117,10 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
 
   const handleReplyAdded = useCallback(
     (parentCommentId: string) => {
-      if (replySourceRef.current === ReplySource.INLINE_GENERAL) {
+      if (
+        replySourceRef.current === ReplySource.INLINE_GENERAL ||
+        replySourceRef.current === ReplySource.GENERAL
+      ) {
         generalCommentsSectionRef.current?.incrementReplyCount(parentCommentId);
       }
     },
