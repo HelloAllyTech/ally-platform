@@ -1,0 +1,4 @@
+{
+    "name": "Behavior Conditional Prompt",
+    "description": "System prompt template for AI behavior mode, handling specific behavioral constraints based on dynamic conditions."
+}

@@ -1,0 +1,4 @@
+{
+    "name": "Branching Conditional Prompt",
+    "description": "System prompt template for AI branching mode, dealing with dynamic states and routing dialog flows."
+}
