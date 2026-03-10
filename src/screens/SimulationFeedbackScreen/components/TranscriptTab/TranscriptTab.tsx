@@ -17,8 +17,6 @@ interface TranscriptTabProps {
   scenarioSessionId: string;
   reviewId?: string;
   setReviewId: (reviewId: string) => void;
-  isPrivate: boolean;
-  setIsPrivate: (isPrivate: boolean) => void;
   startedAt?: string;
   agentName?: string;
 }

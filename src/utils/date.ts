@@ -305,7 +305,7 @@ export const formatDurationFromSeconds = (
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const remainingSeconds = totalSeconds % 60;
+  const remainingSeconds = Math.floor(totalSeconds % 60);
 
   return format === 'long'
     ? formatLongDuration(
@@ -374,6 +374,7 @@ export const formatDutationFromStartedAtAndEndedAt = (
   if (!startedAt || !endedAt) return '-';
   const startedAtDate = new Date(startedAt);
   const endedAtDate = new Date(endedAt);
-  const durationInSeconds = endedAtDate.getTime() - startedAtDate.getTime();
+  const durationInSeconds =
+    (endedAtDate.getTime() - startedAtDate.getTime()) / 1000;
   return formatDurationFromSeconds(durationInSeconds);
 };

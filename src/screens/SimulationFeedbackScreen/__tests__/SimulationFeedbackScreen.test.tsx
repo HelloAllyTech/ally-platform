@@ -39,15 +39,7 @@ jest.mock('@/hooks', () => ({
     t: (key: string) => key,
     tVariable: (key: string) => key,
   }),
-  useShareReview: () => ({
-    note: '',
-    setNote: jest.fn(),
-    isPrivate: false,
-    setIsPrivate: jest.fn(),
-    handleTogglePrivate: jest.fn(),
-    handleShare: jest.fn(),
-    handleEditNote: jest.fn(),
-  }),
+  useToggleReviewPrivacy: () => ({handleTogglePrivate: jest.fn()}),
 }));
 
 // Mock Redux hooks
