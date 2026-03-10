@@ -71,7 +71,7 @@ class PromptData(BaseModel):
     prompts: Optional[Dict[str, str]] = Field(
         default=None,
         description="Editable prompt templates from backend (promptData.prompts). "
-        "Keys: ally_ai_learn_system_default_system_prompt, ally_ai_learn_prosody_*, "
+        "Keys: ally_ai_learn_system_base_role_instruction, ally_ai_learn_prosody_*, "
         "etc. Used only when present and different from local prompts.",
     )
     competency: Optional[str] = Field(

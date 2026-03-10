@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 LOG_PREFIX = "[SIMULATION_PROMPT]"
 
 # Fallback when no prompt_data or legacy prompt_data.prompt; resolver used at runtime
-DEFAULT_PROMPT = prompt_manager.get_template("system", "default_system_prompt")
+DEFAULT_PROMPT = prompt_manager.get_template("system", "base_role_instruction")
 
 
 def _get_optional_block(label: str, value: Optional[str]) -> str:
@@ -567,7 +567,7 @@ def generate_system_message(
     # Prefer editable prompts (prompt_data.prompts) when present; else use
     # legacy prompt_data.prompt; else resolve from local templates.
     backend_prompts = getattr(prompt_data, "prompts", None)
-    default_key = "ally_ai_learn_system_default_system_prompt"
+    default_key = "ally_ai_learn_system_base_role_instruction"
     has_editable = (
         backend_prompts
         and default_key in backend_prompts
