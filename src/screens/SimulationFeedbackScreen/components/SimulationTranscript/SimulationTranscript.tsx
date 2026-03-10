@@ -71,7 +71,9 @@ export const SimulationTranscript: React.FC<{
     const {time, message, isLearner, startSeconds, tags} = item;
     const speakerLabel = isLearner
       ? t('CallTranscript.you')
-      : `${agentName} (${t('CallTranscript.aiClient')})`;
+      : agentName
+        ? `${agentName} (${t('CallTranscript.aiClient')})`
+        : t('CallTranscript.aiClient');
 
     return (
       <SimulationTranscriptItem
