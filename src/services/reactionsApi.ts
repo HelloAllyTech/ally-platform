@@ -47,7 +47,7 @@ export const reactionsApi = api.injectEndpoints({
   endpoints: builder => ({
     getReactions: builder.query<ReactionsResponse, ReactionsParams>({
       query: ({reviewId, reaction, offset, limit}) => ({
-        url: API_ROUTES.REVIEWS.REACTIONS(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.REACTIONS(reviewId),
         method: API_METHODS.GET,
         params: {
           ...(reaction && {reaction}),
@@ -58,20 +58,20 @@ export const reactionsApi = api.injectEndpoints({
     }),
     getReactionsCount: builder.query<ReactionsCountResponse, string | number>({
       query: reviewId => ({
-        url: API_ROUTES.REVIEWS.REACTIONS_COUNT(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.REACTIONS_COUNT(reviewId),
         method: API_METHODS.GET,
       }),
     }),
     addReactionToComment: builder.mutation<void, AddReactionRequest>({
       query: ({id, reaction, action}) => ({
-        url: API_ROUTES.REVIEWS.ADD_REACTION_TO_COMMENT(id),
+        url: API_ROUTES.SIMULATION_REVIEWS.ADD_REACTION_TO_COMMENT(id),
         method: API_METHODS.POST,
         body: {reaction, action},
       }),
     }),
     addReactionToReview: builder.mutation<void, AddReactionRequest>({
       query: ({id, reaction, action}) => ({
-        url: API_ROUTES.REVIEWS.ADD_REACTION_TO_REVIEW(id),
+        url: API_ROUTES.SIMULATION_REVIEWS.ADD_REACTION_TO_REVIEW(id),
         method: API_METHODS.POST,
         body: {reaction, action},
       }),

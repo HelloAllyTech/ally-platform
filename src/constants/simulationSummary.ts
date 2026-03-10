@@ -15,14 +15,24 @@ export enum SimulationSummaryTabKey {
 
 export const getSimulationSummaryTabs = (
   t: TFunction,
-  {pathId, caseId}: {pathId?: string; caseId?: string},
+  {
+    pathId,
+    caseId,
+    shortSession,
+  }: {pathId?: string; caseId?: string; shortSession?: boolean},
 ) => {
+  const summaryTab = {
+    key: SimulationSummaryTabKey.SUMMARY,
+    title: t('SimulationFeedback.tabs.sessionReview'),
+    testID: 'tab-0',
+  };
+
+  if (shortSession) {
+    return [summaryTab];
+  }
+
   const tabs = [
-    {
-      key: SimulationSummaryTabKey.SUMMARY,
-      title: t('SimulationFeedback.tabs.sessionReview'),
-      testID: 'tab-0',
-    },
+    summaryTab,
     {
       key: SimulationSummaryTabKey.ASK_AI,
       title: t('SimulationFeedback.tabs.askAI'),

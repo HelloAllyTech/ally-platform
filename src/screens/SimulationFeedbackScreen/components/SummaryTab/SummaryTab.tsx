@@ -38,13 +38,11 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
       {!simulationDetails?.details && !retryLimitReached ? (
         <SimulationSummarySkeleton />
       ) : (
-        <>
-          <SimulationSummary
-            data={simulationDetails ?? null}
-            positives={positives}
-            improvements={improvements}
-          />
-        </>
+        <SimulationSummary
+          data={simulationDetails ?? null}
+          positives={positives}
+          improvements={improvements}
+        />
       )}
     </KeyboardAwareScrollView>
   );

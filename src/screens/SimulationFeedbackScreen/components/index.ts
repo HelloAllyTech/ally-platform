@@ -15,3 +15,4 @@ export {SessionGlimpse} from './SessionGlimpse';
 export {SummaryTab} from './SummaryTab';
 export {TranscriptTab} from './TranscriptTab';
 export {EventChecklist} from './EventChecklist';
+export {ShortSessionUI} from './ShortSessionUI';
