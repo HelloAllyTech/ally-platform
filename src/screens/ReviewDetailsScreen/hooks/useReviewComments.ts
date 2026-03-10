@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 import {MessageThreadComment, ReplySource} from '@/types/reviews';
 
@@ -53,11 +53,22 @@ export const useReviewComments = () => {
     setIsReplyBottomSheetVisible(true);
   };
 
+  const onReplyPressFromInlineGeneral = useCallback(
+    (comment: MessageThreadComment) => {
+      setSelectedComment(comment);
+      replySourceRef.current = ReplySource.INLINE_GENERAL;
+      setIsReplyBottomSheetVisible(true);
+    },
+    [],
+  );
+
   const hideReplyBottomSheet = () => {
     setIsReplyBottomSheetVisible(false);
     setSelectedComment(null);
     if (replySourceRef.current === ReplySource.GENERAL) {
       setIsThreadsBottomSheetVisible(true);
+    } else if (replySourceRef.current === ReplySource.INLINE_GENERAL) {
+      // No bottom sheet to reopen — inline section is always visible
     } else {
       setIsCommentThreadBottomSheetVisible(true);
     }
@@ -87,8 +98,10 @@ export const useReviewComments = () => {
     setSelectedComment,
     onReplyPress,
     onReplyPressFromGeneralComments,
+    onReplyPressFromInlineGeneral,
     showThreadsBottomSheet,
     hideReplyBottomSheet,
+    replySourceRef,
     hideCommentThreadBottomSheet,
     closeCommentBottomSheet,
   };

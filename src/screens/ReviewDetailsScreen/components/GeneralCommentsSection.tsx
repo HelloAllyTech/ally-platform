@@ -1,4 +1,10 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Text,
@@ -25,6 +31,10 @@ export interface DeleteConfirmationState {
   onConfirm: () => void;
 }
 
+export interface GeneralCommentsSectionRef {
+  incrementReplyCount: (commentId: string) => void;
+}
+
 interface GeneralCommentsSectionProps {
   isPrivate?: boolean;
   reviewId: string;
@@ -32,400 +42,438 @@ interface GeneralCommentsSectionProps {
   reviewOwnerId?: number;
   onCommentsChanged?: () => void;
   onDeleteConfirmationChange?: (state: DeleteConfirmationState | null) => void;
+  onReplyPress?: (comment: MessageThreadComment) => void;
 }
 
-export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
-  isPrivate,
-  reviewId,
-  generalCommentsThreadId,
-  reviewOwnerId,
-  onCommentsChanged: onCommentsChangedExternal,
-  onDeleteConfirmationChange,
-}) => {
-  const {t} = useTranslate();
-  const {userData} = useUser();
-  const offsetRef = useRef(0);
-
-  const {
-    useLazyGetGeneralReviewComments,
-    useAddReviewComment,
-    useUpdateComment,
-    useDeleteComment,
-    useUpdateCommentVisibility,
-    useAddReactionToComment,
-  } = useReviewApiHooks();
-
-  const [getGeneralReviewComments, {isLoading, isFetching}] =
-    useLazyGetGeneralReviewComments();
-  const [addReviewComment, {isLoading: isAddingComment}] =
-    useAddReviewComment();
-  const [updateComment, {isLoading: isUpdatingComment}] = useUpdateComment();
-  const [deleteComment] = useDeleteComment();
-  const [updateCommentVisibility] = useUpdateCommentVisibility();
-  const [addReaction] = useAddReactionToComment();
-
-  const {
-    comments,
-    setComments,
-    commentText,
-    setCommentText,
-    editingCommentId,
-    setEditingCommentId,
-    deleteCommentId,
-    handleCancelDelete,
-    handleDeleteComment,
-    handleConfirmDelete,
-    handleHideComment,
-    handleEmojiSelect,
-    onSubmitComment,
-    isSubmitting,
-    userId,
-  } = useCommentActions({
-    deleteCommentFn: deleteComment,
-    updateCommentFn: updateComment,
-    updateVisibilityFn: updateCommentVisibility,
-    addCommentFn: payload => addReviewComment(payload),
-    addReactionFn: addReaction,
-    isAddingComment,
-    isUpdatingComment,
-    onCommentsChanged: change => {
-      if (change.action === 'add' || change.action === 'delete') {
-        onCommentsChangedExternal?.();
-      }
+export const GeneralCommentsSection = React.forwardRef<
+  GeneralCommentsSectionRef,
+  GeneralCommentsSectionProps
+>(
+  (
+    {
+      isPrivate,
+      reviewId,
+      generalCommentsThreadId,
+      reviewOwnerId,
+      onCommentsChanged: onCommentsChangedExternal,
+      onDeleteConfirmationChange,
+      onReplyPress,
     },
-  });
+    ref,
+  ) => {
+    const {t} = useTranslate();
+    const {userData} = useUser();
+    const offsetRef = useRef(0);
 
-  // --- Inline edit state ---
-  const [editText, setEditText] = useState('');
-  const editInputRef = useRef<TextInput>(null);
+    const {
+      useLazyGetGeneralReviewComments,
+      useAddReviewComment,
+      useUpdateComment,
+      useDeleteComment,
+      useUpdateCommentVisibility,
+      useAddReactionToComment,
+    } = useReviewApiHooks();
 
-  const handleEditCommentInline = useCallback(
-    (commentId: string, commentContent: string) => {
-      setEditingCommentId(commentId);
-      setEditText(commentContent);
-    },
-    [setEditingCommentId],
-  );
+    const [getGeneralReviewComments, {isLoading, isFetching}] =
+      useLazyGetGeneralReviewComments();
+    const [addReviewComment, {isLoading: isAddingComment}] =
+      useAddReviewComment();
+    const [updateComment, {isLoading: isUpdatingComment}] = useUpdateComment();
+    const [deleteComment] = useDeleteComment();
+    const [updateCommentVisibility] = useUpdateCommentVisibility();
+    const [addReaction] = useAddReactionToComment();
 
-  const isSubmittingEditRef = useRef(false);
+    const {
+      comments,
+      setComments,
+      commentText,
+      setCommentText,
+      editingCommentId,
+      setEditingCommentId,
+      deleteCommentId,
+      handleCancelDelete,
+      handleDeleteComment,
+      handleConfirmDelete,
+      handleHideComment,
+      handleEmojiSelect,
+      onSubmitComment,
+      isSubmitting,
+      userId,
+    } = useCommentActions({
+      deleteCommentFn: deleteComment,
+      updateCommentFn: updateComment,
+      updateVisibilityFn: updateCommentVisibility,
+      addCommentFn: payload => addReviewComment(payload),
+      addReactionFn: addReaction,
+      isAddingComment,
+      isUpdatingComment,
+      onCommentsChanged: change => {
+        if (change.action === 'add' || change.action === 'delete') {
+          onCommentsChangedExternal?.();
+        }
+      },
+    });
 
-  const handleCancelEdit = useCallback(() => {
-    // Delay to let a pending send-button press fire before cancelling
-    setTimeout(() => {
-      if (!isSubmittingEditRef.current) {
-        setEditingCommentId(null);
+    const [replyCountAdjustments, setReplyCountAdjustments] = useState<
+      Record<string, number>
+    >({});
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        incrementReplyCount: (commentId: string) => {
+          setReplyCountAdjustments(prev => ({
+            ...prev,
+            [commentId]: (prev[commentId] || 0) + 1,
+          }));
+        },
+      }),
+      [],
+    );
+
+    // --- Inline edit state ---
+    const [editText, setEditText] = useState('');
+    const editInputRef = useRef<TextInput>(null);
+
+    const handleEditCommentInline = useCallback(
+      (commentId: string, commentContent: string) => {
+        setEditingCommentId(commentId);
+        setEditText(commentContent);
+      },
+      [setEditingCommentId],
+    );
+
+    const isSubmittingEditRef = useRef(false);
+
+    const handleCancelEdit = useCallback(() => {
+      // Delay to let a pending send-button press fire before cancelling
+      setTimeout(() => {
+        if (!isSubmittingEditRef.current) {
+          setEditingCommentId(null);
+          setEditText('');
+        }
+      }, 150);
+    }, [setEditingCommentId]);
+
+    const handleSubmitEdit = useCallback(() => {
+      if (!editText.trim() || !editingCommentId) return;
+      isSubmittingEditRef.current = true;
+      onSubmitComment(editText, reviewId, generalCommentsThreadId);
+      isSubmittingEditRef.current = false;
+    }, [
+      editText,
+      editingCommentId,
+      onSubmitComment,
+      reviewId,
+      generalCommentsThreadId,
+    ]);
+
+    useEffect(() => {
+      if (!editingCommentId) {
         setEditText('');
       }
-    }, 150);
-  }, [setEditingCommentId]);
+    }, [editingCommentId]);
 
-  const handleSubmitEdit = useCallback(() => {
-    if (!editText.trim() || !editingCommentId) return;
-    isSubmittingEditRef.current = true;
-    onSubmitComment(editText, reviewId, generalCommentsThreadId);
-    isSubmittingEditRef.current = false;
-  }, [
-    editText,
-    editingCommentId,
-    onSubmitComment,
-    reviewId,
-    generalCommentsThreadId,
-  ]);
+    const closeDeleteModal = handleCancelDelete;
 
-  useEffect(() => {
-    if (!editingCommentId) {
-      setEditText('');
-    }
-  }, [editingCommentId]);
+    useEffect(() => {
+      onDeleteConfirmationChange?.(
+        deleteCommentId
+          ? {onClose: closeDeleteModal, onConfirm: handleConfirmDelete}
+          : null,
+      );
+    }, [
+      deleteCommentId,
+      onDeleteConfirmationChange,
+      closeDeleteModal,
+      handleConfirmDelete,
+    ]);
 
-  const closeDeleteModal = handleCancelDelete;
+    const [hasMore, setHasMore] = React.useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
-  useEffect(() => {
-    onDeleteConfirmationChange?.(
-      deleteCommentId
-        ? {onClose: closeDeleteModal, onConfirm: handleConfirmDelete}
-        : null,
+    const appendComments = useCallback(
+      (
+        responseData: {data: MessageThreadComment[]; count: number} | undefined,
+      ) => {
+        if (!responseData) return;
+        setComments(prev => {
+          const updated = prev
+            ? {
+                data: [...prev.data, ...responseData.data],
+                count: responseData.count,
+              }
+            : responseData;
+          setHasMore(updated.data.length < responseData.count);
+          return updated;
+        });
+        setHasLoadedOnce(true);
+      },
+      [setComments],
     );
-  }, [
-    deleteCommentId,
-    onDeleteConfirmationChange,
-    closeDeleteModal,
-    handleConfirmDelete,
-  ]);
 
-  const [hasMore, setHasMore] = React.useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+    useEffect(() => {
+      const fetchComments = async () => {
+        if (!reviewId) return;
+        offsetRef.current = 0;
+        setComments(null);
+        setHasMore(false);
+        setHasLoadedOnce(false);
+        const result = await getGeneralReviewComments({
+          reviewId,
+          offset: 0,
+          limit: LIMIT,
+        });
+        if (result.data) {
+          appendComments(result.data);
+        } else {
+          setHasLoadedOnce(true);
+        }
+      };
+      fetchComments();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reviewId]);
 
-  const appendComments = useCallback(
-    (
-      responseData: {data: MessageThreadComment[]; count: number} | undefined,
-    ) => {
-      if (!responseData) return;
-      setComments(prev => {
-        const updated = prev
-          ? {
-              data: [...prev.data, ...responseData.data],
-              count: responseData.count,
-            }
-          : responseData;
-        setHasMore(updated.data.length < responseData.count);
-        return updated;
-      });
-      setHasLoadedOnce(true);
-    },
-    [setComments],
-  );
+    const handleSubmit = useCallback(() => {
+      if (!commentText.trim()) return;
+      if (editingCommentId) {
+        setEditingCommentId(null);
+      }
+      onSubmitComment(commentText, reviewId, generalCommentsThreadId);
+    }, [
+      commentText,
+      onSubmitComment,
+      reviewId,
+      generalCommentsThreadId,
+      editingCommentId,
+      setEditingCommentId,
+    ]);
 
-  useEffect(() => {
-    const fetchComments = async () => {
-      if (!reviewId) return;
-      offsetRef.current = 0;
-      setComments(null);
-      setHasMore(false);
-      setHasLoadedOnce(false);
+    const handleLoadMore = useCallback(async () => {
+      if (isLoading || isFetching || !hasMore || !reviewId) return;
+      const newOffset = offsetRef.current + LIMIT;
+      offsetRef.current = newOffset;
       const result = await getGeneralReviewComments({
         reviewId,
-        offset: 0,
+        offset: newOffset,
         limit: LIMIT,
       });
       if (result.data) {
         appendComments(result.data);
-      } else {
-        setHasLoadedOnce(true);
       }
-    };
-    fetchComments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewId]);
-
-  const handleSubmit = useCallback(() => {
-    if (!commentText.trim()) return;
-    if (editingCommentId) {
-      setEditingCommentId(null);
-    }
-    onSubmitComment(commentText, reviewId, generalCommentsThreadId);
-  }, [
-    commentText,
-    onSubmitComment,
-    reviewId,
-    generalCommentsThreadId,
-    editingCommentId,
-    setEditingCommentId,
-  ]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (isLoading || isFetching || !hasMore || !reviewId) return;
-    const newOffset = offsetRef.current + LIMIT;
-    offsetRef.current = newOffset;
-    const result = await getGeneralReviewComments({
+    }, [
+      hasMore,
       reviewId,
-      offset: newOffset,
-      limit: LIMIT,
-    });
-    if (result.data) {
-      appendComments(result.data);
-    }
-  }, [
-    hasMore,
-    reviewId,
-    getGeneralReviewComments,
-    appendComments,
-    isLoading,
-    isFetching,
-  ]);
+      getGeneralReviewComments,
+      appendComments,
+      isLoading,
+      isFetching,
+    ]);
 
-  const renderComment = useCallback(
-    (comment: MessageThreadComment) => {
-      if (editingCommentId === comment.id) {
-        return (
-          <View key={comment.id} style={styles.inputRow}>
-            <UserProfileImage
-              name={comment.createdBy.name}
-              profileImageUri={comment.createdBy.profileImage ?? undefined}
-              size={36}
-            />
-            <View style={styles.inputContainer}>
-              <TextInput
-                ref={editInputRef}
-                style={styles.input}
-                value={editText}
-                onChangeText={setEditText}
-                onSubmitEditing={handleSubmitEdit}
-                onBlur={handleCancelEdit}
-                returnKeyType="send"
-                multiline={false}
-                autoFocus
-                placeholder={t('ThreadsBottomSheet.addComment')}
-                placeholderTextColor={colors.ds.typography.mediumEmphasis}
+    const renderComment = useCallback(
+      (comment: MessageThreadComment) => {
+        if (editingCommentId === comment.id) {
+          return (
+            <View key={comment.id} style={styles.inputRow}>
+              <UserProfileImage
+                name={comment.createdBy.name}
+                profileImageUri={comment.createdBy.profileImage ?? undefined}
+                size={36}
               />
-              {!!editText.trim() && (
-                <TouchableOpacity
-                  style={[
-                    styles.sendButton,
-                    isSubmitting && styles.sendButtonDisabled,
-                  ]}
-                  onPress={handleSubmitEdit}
-                  disabled={isSubmitting}
-                  activeOpacity={0.7}>
-                  {isSubmitting ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <LeftArrowIcon
-                      color={colors.white}
-                      width={24}
-                      height={24}
-                      style={styles.arrowIcon}
-                    />
-                  )}
-                </TouchableOpacity>
-              )}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  ref={editInputRef}
+                  style={styles.input}
+                  value={editText}
+                  onChangeText={setEditText}
+                  onSubmitEditing={handleSubmitEdit}
+                  onBlur={handleCancelEdit}
+                  returnKeyType="send"
+                  multiline={false}
+                  autoFocus
+                  placeholder={t('ThreadsBottomSheet.addComment')}
+                  placeholderTextColor={colors.ds.typography.mediumEmphasis}
+                />
+                {!!editText.trim() && (
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      isSubmitting && styles.sendButtonDisabled,
+                    ]}
+                    onPress={handleSubmitEdit}
+                    disabled={isSubmitting}
+                    activeOpacity={0.7}>
+                    {isSubmitting ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <LeftArrowIcon
+                        color={colors.white}
+                        width={24}
+                        height={24}
+                        style={styles.arrowIcon}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
+          );
+        }
+
+        const reactionsArray = getReactionsArray(comment.reactions);
+        const reactionCount = getTotalReactionCount(comment.reactions);
+        const adjustedReplyCount =
+          (comment.replyCount || 0) + (replyCountAdjustments[comment.id] || 0);
+        return (
+          <View key={comment.id}>
+            <ReviewComment
+              name={comment.createdBy.name}
+              time={
+                comment.createdAt ? formatRelativeTime(comment.createdAt) : ''
+              }
+              comment={comment.content}
+              profileImageUrl={comment.createdBy.profileImage}
+              reactions={reactionsArray}
+              reactionCount={reactionCount}
+              replyCount={adjustedReplyCount}
+              showReplyButton={!isPrivate}
+              onReplyPress={
+                onReplyPress ? () => onReplyPress(comment) : undefined
+              }
+              onEmojiSelect={(currentEmoji, unicode) =>
+                handleEmojiSelect(comment.id, currentEmoji, unicode)
+              }
+              selectedEmoji={comment.myReaction}
+              hidden={comment.hidden}
+              currentUserId={userId}
+              commentOwnerId={comment.createdBy.id}
+              reviewOwnerId={reviewOwnerId}
+              commentId={comment.id}
+              {...(!isMinutesPassed(
+                comment.createdAt || '',
+                EDIT_COMMENT_TIME_LIMIT_MINUTES,
+              ) && {
+                onEdit: handleEditCommentInline,
+              })}
+              onDelete={handleDeleteComment}
+              onHide={handleHideComment}
+              showActionsMenu={!isPrivate}
+              disableAddReactionButton={isPrivate}
+            />
+          </View>
+        );
+      },
+      [
+        editingCommentId,
+        editText,
+        isSubmitting,
+        handleEditCommentInline,
+        handleCancelEdit,
+        handleSubmitEdit,
+        handleEmojiSelect,
+        isPrivate,
+        userId,
+        reviewOwnerId,
+        handleDeleteComment,
+        handleHideComment,
+        onReplyPress,
+        replyCountAdjustments,
+        t,
+      ],
+    );
+
+    const renderBody = () => {
+      if (!hasLoadedOnce || (isLoading && !comments?.data.length)) {
+        return (
+          <View style={styles.centeredContainer}>
+            <ActivityIndicator size="large" color={colors.ds.theme.primary} />
           </View>
         );
       }
 
-      const reactionsArray = getReactionsArray(comment.reactions);
-      const reactionCount = getTotalReactionCount(comment.reactions);
+      if (!comments?.data.length) {
+        return (
+          <View style={styles.centeredContainer}>
+            <Text style={styles.emptyText}>
+              {t('ThreadsBottomSheet.noGeneralComments')}
+            </Text>
+          </View>
+        );
+      }
+
       return (
-        <View key={comment.id}>
-          <ReviewComment
-            name={comment.createdBy.name}
-            time={
-              comment.createdAt ? formatRelativeTime(comment.createdAt) : ''
-            }
-            comment={comment.content}
-            profileImageUrl={comment.createdBy.profileImage}
-            reactions={reactionsArray}
-            reactionCount={reactionCount}
-            showReplyButton={false}
-            onEmojiSelect={(currentEmoji, unicode) =>
-              handleEmojiSelect(comment.id, currentEmoji, unicode)
-            }
-            selectedEmoji={comment.myReaction}
-            hidden={comment.hidden}
-            currentUserId={userId}
-            commentOwnerId={comment.createdBy.id}
-            reviewOwnerId={reviewOwnerId}
-            commentId={comment.id}
-            {...(!isMinutesPassed(
-              comment.createdAt || '',
-              EDIT_COMMENT_TIME_LIMIT_MINUTES,
-            ) && {
-              onEdit: handleEditCommentInline,
-            })}
-            onDelete={handleDeleteComment}
-            onHide={handleHideComment}
-            showActionsMenu={!isPrivate}
-            disableAddReactionButton={isPrivate}
-          />
-        </View>
-      );
-    },
-    [
-      editingCommentId,
-      editText,
-      isSubmitting,
-      handleEditCommentInline,
-      handleCancelEdit,
-      handleSubmitEdit,
-      handleEmojiSelect,
-      isPrivate,
-      userId,
-      reviewOwnerId,
-      handleDeleteComment,
-      handleHideComment,
-      t,
-    ],
-  );
-
-  const renderBody = () => {
-    if (!hasLoadedOnce || (isLoading && !comments?.data.length)) {
-      return (
-        <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={colors.ds.theme.primary} />
-        </View>
-      );
-    }
-
-    if (!comments?.data.length) {
-      return (
-        <View style={styles.centeredContainer}>
-          <Text style={styles.emptyText}>
-            {t('ThreadsBottomSheet.noGeneralComments')}
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <>
-        {comments.data.map(renderComment)}
-        {hasMore && (
-          <TouchableOpacity
-            style={styles.loadMoreButton}
-            onPress={handleLoadMore}
-            disabled={isFetching}
-            activeOpacity={0.7}>
-            {isFetching ? (
-              <ActivityIndicator size="small" color={colors.ds.theme.primary} />
-            ) : (
-              <Text style={styles.loadMoreText}>{t('Common.loadMore')}</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </>
-    );
-  };
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t('ThreadsBottomSheet.title')}</Text>
-
-      <View style={styles.inputRow}>
-        <UserProfileImage
-          name={userData?.name}
-          profileImageUri={userData?.profileImageUrl ?? undefined}
-          size={36}
-        />
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('ThreadsBottomSheet.addComment')}
-            placeholderTextColor={colors.ds.typography.mediumEmphasis}
-            value={commentText}
-            onChangeText={setCommentText}
-            onSubmitEditing={handleSubmit}
-            returnKeyType="send"
-            multiline={false}
-          />
-          {!!commentText.trim() && (
+        <>
+          {comments.data.map(renderComment)}
+          {hasMore && (
             <TouchableOpacity
-              style={[
-                styles.sendButton,
-                isSubmitting && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
+              style={styles.loadMoreButton}
+              onPress={handleLoadMore}
+              disabled={isFetching}
               activeOpacity={0.7}>
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.white} size="small" />
-              ) : (
-                <LeftArrowIcon
-                  color={colors.white}
-                  width={24}
-                  height={24}
-                  style={styles.arrowIcon}
+              {isFetching ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.ds.theme.primary}
                 />
+              ) : (
+                <Text style={styles.loadMoreText}>{t('Common.loadMore')}</Text>
               )}
             </TouchableOpacity>
           )}
-        </View>
-      </View>
+        </>
+      );
+    };
 
-      {generalCommentsThreadId ? renderBody() : null}
-    </View>
-  );
-};
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{t('ThreadsBottomSheet.title')}</Text>
+
+        <View style={styles.inputRow}>
+          <UserProfileImage
+            name={userData?.name}
+            profileImageUri={userData?.profileImageUrl ?? undefined}
+            size={36}
+          />
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('ThreadsBottomSheet.addComment')}
+              placeholderTextColor={colors.ds.typography.mediumEmphasis}
+              value={commentText}
+              onChangeText={setCommentText}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="send"
+              multiline={false}
+            />
+            {!!commentText.trim() && (
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  isSubmitting && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                activeOpacity={0.7}>
+                {isSubmitting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <LeftArrowIcon
+                    color={colors.white}
+                    width={24}
+                    height={24}
+                    style={styles.arrowIcon}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {generalCommentsThreadId ? renderBody() : null}
+      </View>
+    );
+  },
+);
 
 const styles = ScaledSheet.create({
   container: {
