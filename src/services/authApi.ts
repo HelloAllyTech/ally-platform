@@ -57,7 +57,7 @@ export const authApi = api.injectEndpoints({
       query: ({email}) => ({
         url: API_ROUTES.AUTH.GENERATE_OTP,
         method: API_METHODS.POST,
-        body: {email, allowedRoles: ALLOWED_ROLES},
+        body: {email, allowedRoles: ALLOWED_ROLES, appType: 'APP'},
       }),
     }),
     verifyOtp: builder.mutation<AuthResponse, VerifyOtpRequest>({
