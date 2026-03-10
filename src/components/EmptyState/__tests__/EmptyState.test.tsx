@@ -1,65 +1,45 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
-import {View} from 'react-native';
 
 import {EmptyState} from '../EmptyState';
 
-// Mock icon component
-const MockIcon = () => <View testID="mock-icon" />;
-
 describe('EmptyState', () => {
-  const defaultProps = {
-    icon: MockIcon,
-    title: 'No data found',
-    description: 'Your data will appear here when available.',
-  };
-
-  it('renders correctly with required props', () => {
-    const {getByText, getByTestId} = render(<EmptyState {...defaultProps} />);
-    
-    expect(getByTestId('mock-icon')).toBeTruthy();
-    expect(getByText('No data found')).toBeTruthy();
-    expect(getByText('Your data will appear here when available.')).toBeTruthy();
+  it('renders title', () => {
+    const {getByText} = render(<EmptyState title="No items" />);
+    expect(getByText('No items')).toBeTruthy();
   });
 
-  it('applies custom icon props', () => {
-    const customIconProps = {width: 200, height: 150, testID: 'custom-icon'};
-    
-    render(
-      <EmptyState
-        {...defaultProps}
-        iconProps={customIconProps}
-      />
-    );
-    
-    // The icon should receive the custom props
-    // Note: We can't directly test the props passed to the icon component
-    // but we can test that the component renders without errors
-  });
-
-  it('applies custom container style', () => {
-    const customStyle = {backgroundColor: 'red'};
-    
+  it('renders description when provided', () => {
     const {getByText} = render(
-      <EmptyState
-        {...defaultProps}
-        containerStyle={customStyle}
-      />
+      <EmptyState title="Empty" description="Add something to get started." />,
     );
-    
-    expect(getByText('No data found')).toBeTruthy();
+    expect(getByText('Add something to get started.')).toBeTruthy();
   });
 
-  it('handles multiline descriptions', () => {
-    const multilineDescription = 'Line 1\nLine 2\nLine 3';
-    
-    const {getByText} = render(
-      <EmptyState
-        {...defaultProps}
-        description={multilineDescription}
-      />
+  it('does not render description when not provided', () => {
+    const {queryByText} = render(<EmptyState title="Empty" />);
+    expect(queryByText('Add something')).toBeNull();
+  });
+
+  it('renders icon when provided', () => {
+    const React = require('react');
+    const {Text} = require('react-native');
+    const Icon = () => React.createElement(Text, {testID: 'empty-icon'}, 'Icon');
+    const {getByTestId} = render(
+      <EmptyState title="Empty" icon={Icon} />,
     );
-    
-    expect(getByText(multilineDescription)).toBeTruthy();
+    expect(getByTestId('empty-icon')).toBeTruthy();
+  });
+
+  it('does not render icon when not provided', () => {
+    const {queryByTestId} = render(<EmptyState title="Empty" />);
+    expect(queryByTestId('empty-icon')).toBeNull();
+  });
+
+  it('applies containerStyle when provided', () => {
+    const {toJSON} = render(
+      <EmptyState title="Empty" containerStyle={{padding: 20}} />,
+    );
+    expect(toJSON()).not.toBeNull();
   });
 });
