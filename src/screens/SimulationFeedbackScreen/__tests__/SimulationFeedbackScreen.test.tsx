@@ -195,6 +195,7 @@ jest.mock('@/utils', () => ({
   },
   formatDutationFromStartedAtAndEndedAt: () => '0:30',
   isMinutesPassed: () => true,
+  isShortSession: () => false,
   navigateToLearnTab: jest.fn(),
 }));
 
