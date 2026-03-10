@@ -90,7 +90,7 @@ export const SimulationFeedbackScreen: React.FC<
   const {data: reviewData} = useGetReviewByIdQuery(
     {reviewId: reviewId || ''},
     {
-      skip: !reviewId || activeTabKey !== SimulationSummaryTabKey.TRANSCRIPTION,
+      skip: !reviewId,
     },
   );
 
@@ -306,33 +306,35 @@ export const SimulationFeedbackScreen: React.FC<
               : t('SimulationFeedback.titleEnded')}
           </Text>
         </Text>
-        {activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION && (
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>
-              {t('SimulationFeedback.share')}
-            </Text>
-            <CustomSwitch
-              value={!!reviewId && !isPrivate}
-              onToggle={isEnabled => {
-                if (
-                  isEnabled &&
-                  (!reviewId ||
-                    (reviewData?.createdAt &&
-                      !isMinutesPassed(reviewData.createdAt)))
-                ) {
-                  handleShareSimulation();
-                } else if (reviewId) {
-                  handleTogglePrivate(isEnabled);
-                }
-              }}
-            />
-          </View>
-        )}
+
+        <View style={styles.switchContainer}>
+          <Text style={styles.switchLabel}>
+            {t('SimulationFeedback.share')}
+          </Text>
+          <CustomSwitch
+            value={!!reviewId && !isPrivate}
+            onToggle={isEnabled => {
+              if (
+                isEnabled &&
+                (!reviewId ||
+                  (reviewData?.createdAt &&
+                    !isMinutesPassed(reviewData.createdAt)))
+              ) {
+                handleShareSimulation();
+              } else if (reviewId) {
+                handleTogglePrivate(isEnabled);
+              }
+            }}
+          />
+        </View>
       </View>
     );
   };
   const hasScenarioMessagesPermission = permissions?.includes(
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+  );
+  const hasSimulationReviewPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SIMULATION_REVIEW,
   );
 
   const tabs = useMemo(
@@ -484,8 +486,9 @@ export const SimulationFeedbackScreen: React.FC<
         </View>
       )}
       {!!reviewId &&
-        activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
-        !hideReviewDetails && (
+        activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
+        !hideReviewDetails &&
+        hasSimulationReviewPermission && (
           <TouchableOpacity
             onPress={handleViewReview}
             style={styles.reviewIconButton}

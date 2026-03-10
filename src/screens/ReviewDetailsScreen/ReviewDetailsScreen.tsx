@@ -639,6 +639,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         isLoading={isAddingComment}
       />
       <ThreadsBottomSheet
+        isPrivate={isPrivate}
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}

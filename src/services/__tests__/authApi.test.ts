@@ -93,7 +93,7 @@ describe('authApi endpoints', () => {
         UserRole.CLIENT,
         UserRole.COUNSELOR,
         UserRole.LEARNER,
-        UserRole.REVIEWER,
+        UserRole.SIMULATION_REVIEWER,
         UserRole.ADMIN,
         UserRole.SUPER_ADMIN,
       ];

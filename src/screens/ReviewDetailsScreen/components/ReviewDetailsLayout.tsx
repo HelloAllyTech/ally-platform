@@ -41,6 +41,9 @@ interface ReviewDetailsLayoutProps {
   onRefreshReactions: () => void;
   onEditNote?: () => void;
   renderHeader: () => React.ReactNode;
+  canEditReview?: boolean;
+  canViewThreads?: boolean;
+  canEditThread?: boolean;
 }
 
 export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
@@ -51,6 +54,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   onRefreshReactions,
   onEditNote,
   renderHeader,
+  canEditReview = true,
+  canViewThreads = true,
+  canEditThread = true,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useAppNavigation();
@@ -164,13 +170,21 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         <ReviewNote
           note={reviewNote}
           onEditNote={
-            metadata?.reviewOwnerId === userData?.id ? onEditNote : undefined
+            metadata?.reviewOwnerId === userData?.id && !isPrivate
+              ? onEditNote
+              : undefined
           }
         />
       );
     }
     return null;
-  }, [reviewNote, metadata?.reviewOwnerId, userData?.id, onEditNote]);
+  }, [
+    reviewNote,
+    metadata?.reviewOwnerId,
+    userData?.id,
+    onEditNote,
+    isPrivate,
+  ]);
 
   if (isLoading) {
     return (
@@ -198,9 +212,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       </View>
       <Conversation
         messages={conversationMessages}
-        isSelectable={!isPrivate}
+        isSelectable={!isPrivate && canEditThread}
         onSelection={handleSelection}
-        onThreadClick={handleThreadClick}
+        onThreadClick={canViewThreads ? handleThreadClick : undefined}
         onLoadMore={loadMoreMessages}
         isLoadingMore={isFetching && offset > 0}
         hasMore={hasMore}
@@ -217,12 +231,12 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
           reviewId={reviewId}
           reactions={metadata?.reactions || {}}
           commentsCount={metadata?.commentsCount || 0}
-          onCommentPress={showThreadsBottomSheet}
+          onCommentPress={canViewThreads ? showThreadsBottomSheet : undefined}
           refreshReactions={onRefreshReactions}
           myReaction={metadata?.myReaction || null}
           isPrivate={isPrivate}
           onTogglePrivate={
-            metadata?.reviewOwnerId === userData?.id
+            canEditReview && metadata?.reviewOwnerId === userData?.id
               ? handleTogglePrivate
               : undefined
           }
@@ -238,6 +252,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         isLoading={isAddingComment}
       />
       <ThreadsBottomSheet
+        isPrivate={isPrivate}
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={reviewId}

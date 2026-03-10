@@ -26,6 +26,7 @@ export interface GeneralCommentsListRef {
 
 interface GeneralCommentsListProps {
   visible: boolean;
+  isPrivate: boolean;
   reviewId: string;
   reviewOwnerId?: number;
   onAddReactionPress?: (commentId: string) => void;
@@ -44,6 +45,7 @@ interface GeneralCommentsListProps {
 
 export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
   visible,
+  isPrivate,
   reviewId,
   reviewOwnerId,
   onAddReactionPress,
@@ -205,7 +207,8 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
             })}
             onDelete={handleDeleteComment}
             onHide={handleHideComment}
-            showActionsMenu
+            showActionsMenu={!isPrivate}
+            disableAddReactionButton={isPrivate}
           />
         </View>
       );
@@ -214,6 +217,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
       onAddReactionPress,
       handleReplyPress,
       handleEmojiSelect,
+      isPrivate,
       userId,
       reviewOwnerId,
       handleEditComment,
