@@ -37,7 +37,7 @@ import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
 import {ReviewStatus} from '@/types';
 import {
-  formatDutationFromStartedAtAndEndedAt,
+  formatDurationAsMMSS,
   isMinutesPassed,
   isShortSession,
   navigateToLearnTab,
@@ -273,7 +273,7 @@ export const SimulationFeedbackScreen: React.FC<
       title: simulationDetails?.scenario?.title || '',
       description: simulationDetails?.scenario?.description || '',
       createdAt: simulationDetails?.createdAt || '',
-      duration: formatDutationFromStartedAtAndEndedAt(
+      duration: formatDurationAsMMSS(
         simulationDetails?.startedAt,
         simulationDetails?.endedAt,
       ),

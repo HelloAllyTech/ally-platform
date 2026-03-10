@@ -367,14 +367,12 @@ export const isMinutesPassed = (
   return diffMinutes >= minutes;
 };
 
-export const formatDutationFromStartedAtAndEndedAt = (
-  startedAt?: string,
-  endedAt?: string,
-) => {
+export const formatDurationAsMMSS = (startedAt?: string, endedAt?: string) => {
   if (!startedAt || !endedAt) return '-';
   const startedAtDate = new Date(startedAt);
   const endedAtDate = new Date(endedAt);
-  const durationInSeconds =
-    (endedAtDate.getTime() - startedAtDate.getTime()) / 1000;
-  return formatDurationFromSeconds(durationInSeconds);
+  const duration = endedAtDate.getTime() - startedAtDate.getTime();
+  const minutes = Math.floor(duration / (1000 * 60));
+  const seconds = Math.floor((duration % (1000 * 60)) / 1000);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} Min`;
 };
