@@ -9,11 +9,11 @@ Logic:
   so "enabled from Dashboard" prompts override local; others always use local.
 
 Prompt codes use ally_ai_learn_ prefix: ally_ai_learn_subdir_filename
-(e.g. ally_ai_learn_system_default_system_prompt).
+(e.g. ally_ai_learn_system_base_role_instruction).
 Local lookup strips the prefix and uses subdir/filename from app/prompts/.
 """
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from app.core.logger import get_logger
 from app.prompts.manager import prompt_manager
@@ -29,7 +29,7 @@ def _prompt_code_to_path(prompt_code: str) -> tuple[str, str]:
 
     Strips ally_ai_learn_ prefix, then converts path-based remainder to
     folder structure.
-    E.g. ally_ai_learn_system_default_system_prompt -> (system, default_system_prompt)
+    E.g. ally_ai_learn_system_base_role_instruction -> (system, base_role_instruction)
     """
     code = prompt_code
     if code.startswith(PROMPT_CODE_PREFIX):
@@ -61,7 +61,7 @@ def resolve_template(
     Otherwise use local .txt.
 
     Args:
-        prompt_code: Prefixed code (e.g. ally_ai_learn_system_default_system_prompt)
+        prompt_code: Prefixed code (e.g. ally_ai_learn_system_base_role_instruction)
         backend_prompts: promptData.prompts from metadata, or None
 
     Returns:
@@ -96,8 +96,8 @@ def resolve_template(
 
 
 def load_template(
-    prompt_code: str,
-    backend_prompts: Optional[Dict[str, str]] = None,
+    internal_path: str,
+    prompt_data: Any = None,
 ) -> str:
     """
     Resolve template with fallback to local. Use when caller will format manually.
@@ -106,18 +106,26 @@ def load_template(
     Use load_and_format() when you have format kwargs ready.
 
     Args:
-        prompt_code: Prefixed code (e.g. ally_ai_learn_system_default_system_prompt)
-        backend_prompts: promptData.prompts from metadata, or None
+        internal_path: Local path (e.g. 'system/base_role_instruction')
+        prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
+            dict, or None
 
     Returns:
         Template string, or "" if not found
     """
+    prompt_code = f"ally_ai_learn_{internal_path.replace('/', '_')}"
+
+    if isinstance(prompt_data, dict):
+        backend_prompts = prompt_data
+    else:
+        backend_prompts = getattr(prompt_data, "prompts", None) if prompt_data else None
+
     return resolve_template(prompt_code, backend_prompts) or ""
 
 
 def load_and_format(
-    prompt_code: str,
-    backend_prompts: Optional[Dict[str, str]] = None,
+    internal_path: str,
+    prompt_data: Any = None,
     **kwargs,
 ) -> str:
     """
@@ -127,15 +135,16 @@ def load_and_format(
     all format kwargs (e.g. language_code, custom_prompt).
 
     Args:
-        prompt_code: Prefixed code
-            (e.g. ally_ai_learn_counselor_report_generation_prompt)
-        backend_prompts: promptData.prompts from metadata, or None
+        internal_path: Local path (e.g. 'system/base_role_instruction' or
+            'prosody/default_generation_prompt')
+        prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
+            dict, or None
         **kwargs: Passed to template.format(**kwargs). Omit for raw template.
 
     Returns:
         Formatted string if kwargs provided, else raw template. "" if not found.
     """
-    template = load_template(prompt_code, backend_prompts)
+    template = load_template(internal_path, prompt_data)
     if not template:
         return ""
     if kwargs:

@@ -1,0 +1,30 @@
+Role instruction: {base_system_prompt}
+
+## Your Client Persona Details
+Character details: {character_details}
+{gender_details_block}
+{profession_block}
+{language_block}
+
+{backstory_block}
+{life_history}
+{guidelines_block}
+{previous_memory_block}
+{core_memories_block}
+{personality_block}
+{starting_state_block}
+{emotional_needs_block}
+{tone_block}
+
+{custom_context_block}
+{response_length}
+{agent_dialogues}
+
+{competency_block}
+Conversation history: Use the conversation history provided in the messages.
+
+Instruction: Use following conditions to generate next dialogue
+Previous helper utterance: Use the last helper message from history.
+{conditions_section}
+
+Generate the next dialogue.

@@ -58,7 +58,7 @@ Defines the simulated client persona:
 | `agent_dialogues` | No | Pre-scripted dialogue options |
 | `language_dialogue_samples` | No | Sample utterances for linguistic style; when present for non-English, injected into prompt |
 | `previous_memory` | No | Summary from a previous session |
-| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_system_default_system_prompt`, etc.) |
+| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_system_base_role_instruction`, etc.) |
 | `competency` | No | Counseling competency being trained; shapes the simulation |
 
 ### ScenarioVoice and VoiceConfig

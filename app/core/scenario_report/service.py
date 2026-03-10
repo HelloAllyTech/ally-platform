@@ -160,8 +160,8 @@ class ScenarioReportService:
             Complete system prompt with both placeholders injected
         """
         result = load_and_format(
-            "ally_ai_learn_counselor_report_generation_prompt",
-            backend_prompts=backend_prompts,
+            "counselor/report_generation_prompt",
+            prompt_data=backend_prompts,
             language_code=language_code,
             custom_prompt=custom_prompt.strip() if custom_prompt else "",
         )

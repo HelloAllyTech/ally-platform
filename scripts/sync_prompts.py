@@ -49,7 +49,7 @@ def parse_variables_from_prompt(text: str) -> list[str]:
 def format_label(text: str) -> str:
     """
     Replace underscores with spaces and capitalize first letter of each word.
-    E.g. 'default_system_prompt' -> 'Default System Prompt'
+    E.g. 'base_role_instruction' -> 'Base Role Instruction'
     """
     if not text:
         return ""

@@ -45,7 +45,7 @@ app/prompts/
 ├── manager.py              # PromptManager singleton, loads .txt files
 ├── resolver.py             # resolve_template(), path-based lookup
 ├── system/                 # System prompts for simulation
-│   ├── default_system_prompt.txt
+│   ├── base_role_instruction.txt
 │   └── multilingual_instructions.txt
 ├── prosody/                # Prosody generation prompts
 │   ├── default_generation_prompt.txt
@@ -61,7 +61,7 @@ Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_lea
 
 | Prompt Code | Local Template | Used By |
 |-------------|----------------|---------|
-| `ally_ai_learn_system_default_system_prompt` | `system/default_system_prompt` | System prompt |
+| `ally_ai_learn_system_base_role_instruction` | `system/base_role_instruction` | System prompt |
 | `ally_ai_learn_system_multilingual_instructions` | `system/multilingual_instructions` | Language samples for non-English |
 | `ally_ai_learn_prosody_default_generation_prompt` | `prosody/default_generation_prompt` | Prosody default params |
 | `ally_ai_learn_prosody_unified_prompt_with_enhancement` | `prosody/unified_prompt_with_enhancement` | Prosody runtime (params + text) |

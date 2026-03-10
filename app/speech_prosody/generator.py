@@ -70,8 +70,8 @@ async def generate_default_parameters(
 
         # Create generation prompt with metadata (resolve from backend or local)
         generation_prompt = load_and_format(
-            "ally_ai_learn_prosody_default_generation_prompt",
-            backend_prompts=getattr(scenario.prompt_data, "prompts", None),
+            "prosody/default_generation_prompt",
+            prompt_data=scenario.prompt_data,
             prompt_content=prompt_content,
             opening_statements_section=opening_statements_section,
             parameter_metadata=parameter_metadata_json,
@@ -143,11 +143,11 @@ async def generate_runtime_parameters(
 
         # Resolve prosody templates from backend or local
         prompt_with_enhancement = load_template(
-            "ally_ai_learn_prosody_unified_prompt_with_enhancement",
+            "prosody/unified_prompt_with_enhancement",
             backend_prompts,
         )
         prompt_parameters_only = load_template(
-            "ally_ai_learn_prosody_parameters_only_prompt",
+            "prosody/parameters_only_prompt",
             backend_prompts,
         )
 

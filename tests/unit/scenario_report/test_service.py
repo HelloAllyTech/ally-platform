@@ -59,7 +59,7 @@ def _make_orchestrator(
     return mock
 
 
-def _mock_load_and_format(prompt_code, backend_prompts=None, **kwargs):
+def _mock_load_and_format(internal_path, prompt_data=None, **kwargs):
     """Simulate load_and_format for counselor prompt (formats template with kwargs)."""
     return "Language: '{language_code}'\n\n{custom_prompt}".format(**kwargs)
 
@@ -192,8 +192,8 @@ class TestBuildCounselorPrompt:
         assert "Language: 'hi-IN'" in result
         assert "You are a therapist" in result
         mock_load.assert_called_once_with(
-            "ally_ai_learn_counselor_report_generation_prompt",
-            backend_prompts=None,
+            "counselor/report_generation_prompt",
+            prompt_data=None,
             language_code="hi-IN",
             custom_prompt="You are a therapist",
         )
@@ -209,8 +209,8 @@ class TestBuildCounselorPrompt:
         svc._build_counselor_prompt("en-IN", "Extra", backend_prompts=backend)
 
         mock_load.assert_called_once_with(
-            "ally_ai_learn_counselor_report_generation_prompt",
-            backend_prompts=backend,
+            "counselor/report_generation_prompt",
+            prompt_data=backend,
             language_code="en-IN",
             custom_prompt="Extra",
         )

@@ -1,4 +1,3 @@
-from textwrap import dedent
 from typing import List, Optional
 
 from langchain_core.messages import SystemMessage
@@ -120,8 +119,8 @@ def _get_language_sample_block(
     samples_text = _format_language_samples(samples) if samples else ""
 
     result = load_and_format(
-        "ally_ai_learn_system_multilingual_instructions",
-        backend_prompts=backend_prompts,
+        "system/multilingual_instructions",
+        prompt_data=backend_prompts,
         language_code=language_code,
         samples=samples_text,
     )
@@ -296,23 +295,18 @@ def _build_branching_prompt(
     if prompt_data.context:
         backstory_block = f"Backstory: {prompt_data.context}\n\n"
 
-    branching_prompt = dedent(
-        f"""
-        Role: You are the client {prompt_data.name}. Stay in character.
+    branching_prompt = load_and_format(
+        "system/branching_prompt",
+        prompt_data=prompt_data,
+        name=prompt_data.name or "",
+        character_details=character_details,
+        language_block=language_block,
+        backstory_block=backstory_block,
+        competency_block=competency_block,
+        next_instruction=next_instruction,
+    )
 
-        ## Character Context
-        {character_details}
-        {language_block}
-        {backstory_block}
-        {competency_block}
-        ## Current Task
-        Generate next dialogue as per the conversation history and instruction below.
-
-        Important Instruction: {next_instruction}
-    """
-    ).strip()
-
-    return SystemMessage(content=branching_prompt)
+    return SystemMessage(content=(branching_prompt or "").strip())
 
 
 def _build_behavior_prompt(
@@ -414,42 +408,31 @@ def _build_behavior_prompt(
 
     competency_block = _get_competency_block(prompt_data.competency)
 
-    behavior_prompt = dedent(
-        f"""
-        Role instruction: {base_system_prompt.strip()}
+    behavior_prompt = load_and_format(
+        "system/behavior_prompt",
+        prompt_data=prompt_data,
+        base_system_prompt=base_system_prompt.strip(),
+        character_details=character_details,
+        gender_details_block=gender_details_block,
+        profession_block=profession_block,
+        language_block=language_block,
+        backstory_block=backstory_block,
+        life_history=life_history,
+        guidelines_block=guidelines_block,
+        previous_memory_block=previous_memory_block,
+        core_memories_block=core_memories_block,
+        personality_block=personality_block,
+        starting_state_block=starting_state_block,
+        emotional_needs_block=emotional_needs_block,
+        tone_block=tone_block,
+        custom_context_block=custom_context_block,
+        response_length=response_length,
+        agent_dialogues=agent_dialogues,
+        competency_block=competency_block,
+        conditions_section=conditions_section,
+    )
 
-        ## Your Client Persona Details
-        Character details: {character_details}
-        {gender_details_block}
-        {profession_block}
-        {language_block}
-
-        {backstory_block}
-        {life_history}
-        {guidelines_block}
-        {previous_memory_block}
-        {core_memories_block}
-        {personality_block}
-        {starting_state_block}
-        {emotional_needs_block}
-        {tone_block}
-
-        {custom_context_block}
-        {response_length}
-        {agent_dialogues}
-
-        {competency_block}
-        Conversation history: Use the conversation history provided in the messages.
-
-        Instruction: Use following conditions to generate next dialogue
-        Previous helper utterance: Use the last helper message from history.
-        {conditions_section}
-
-        Generate the next dialogue.
-    """
-    ).strip()
-
-    return SystemMessage(content=behavior_prompt)
+    return SystemMessage(content=(behavior_prompt or "").strip())
 
 
 def _build_full_prompt(
@@ -512,53 +495,33 @@ def _build_full_prompt(
     competency_block = _get_competency_block(prompt_data.competency)
 
     # Assemble the full detailed prompt
-    system_prompt = dedent(
-        f"""
-    {base_system_prompt.strip()}
-
-    ## Your Client Persona Details
-    This is the background information for your character.
-
-    **Your name:**
-    {prompt_data.name}
-
-    **Your age:**
-    {prompt_data.age}
-
-    **Your gender:**
-    {prompt_data.gender}
-
-    {gender_details_block}
-
-    **Your current location:**
-    {prompt_data.current_location}
-
-    {profession_block}
-
-    {language_block}
-
-    {_get_optional_block("Your current context", prompt_data.context)}
-    {guidelines_block}
-
-    {previous_memory_block}
-
-    {life_history}
-
-    {core_memories_block}
-    {personality_block}
-    {starting_state_block}
-    {emotional_needs_block}
-    {tone_block}
-    {custom_fields_block}
-
-    {response_length}
-    {agent_dialogues}
-
-    {competency_block}
-    """
+    system_prompt = load_and_format(
+        "system/full_prompt",
+        prompt_data=prompt_data,
+        base_system_prompt=base_system_prompt.strip(),
+        name=prompt_data.name or "",
+        age=prompt_data.age or "",
+        gender=prompt_data.gender or "",
+        gender_details_block=gender_details_block,
+        current_location=prompt_data.current_location or "",
+        profession_block=profession_block,
+        language_block=language_block,
+        context_block=_get_optional_block("Your current context", prompt_data.context),
+        guidelines_block=guidelines_block,
+        previous_memory_block=previous_memory_block,
+        life_history=life_history,
+        core_memories_block=core_memories_block,
+        personality_block=personality_block,
+        starting_state_block=starting_state_block,
+        emotional_needs_block=emotional_needs_block,
+        tone_block=tone_block,
+        custom_fields_block=custom_fields_block,
+        response_length=response_length,
+        agent_dialogues=agent_dialogues,
+        competency_block=competency_block,
     )
 
-    return SystemMessage(content=system_prompt.strip())
+    return SystemMessage(content=(system_prompt or "").strip())
 
 
 # --- Main Prompt Generator Function ---
