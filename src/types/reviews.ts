@@ -259,4 +259,5 @@ export interface ShareScreenScenarioData {
 export enum ReplySource {
   THREAD = 'thread',
   GENERAL = 'general',
+  INLINE_GENERAL = 'inline_general',
 }

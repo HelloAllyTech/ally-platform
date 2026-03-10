@@ -16,4 +16,5 @@ export interface ReplyBottomSheetProps {
   reviewId: string;
   isPrivate?: boolean;
   onCommentsChanged?: (change: ThreadCommentChange) => void;
+  onReplyAdded?: (parentCommentId: string) => void;
 }

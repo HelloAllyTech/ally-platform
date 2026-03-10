@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -21,12 +21,14 @@ import {
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
+import {ReplySource} from '@/types/reviews';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
 import {ReviewMetadata} from '../types';
 import {
   DeleteConfirmationState,
   GeneralCommentsSection,
+  GeneralCommentsSectionRef,
 } from './GeneralCommentsSection';
 import {ReviewNote} from './ReviewNote';
 
@@ -62,6 +64,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     },
     [],
   );
+
+  const generalCommentsSectionRef = useRef<GeneralCommentsSectionRef>(null);
+
   const {userData} = useUser();
 
   const {
@@ -92,7 +97,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     handleHideCommentThreadBottomSheet,
     onReplyPress,
     onReplyPressFromGeneralComments,
+    onReplyPressFromInlineGeneral,
     handleThreadCommentChange,
+    replySourceRef,
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,
     selectedComment,
@@ -107,15 +114,26 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     handleThreadClick,
   } = reviewLogic;
 
+  const handleReplyAdded = useCallback(
+    (parentCommentId: string) => {
+      if (replySourceRef.current === ReplySource.INLINE_GENERAL) {
+        generalCommentsSectionRef.current?.incrementReplyCount(parentCommentId);
+      }
+    },
+    [replySourceRef],
+  );
+
   const generalCommentsFooter = useMemo(
     () => (
       <GeneralCommentsSection
+        ref={generalCommentsSectionRef}
         isPrivate={isPrivate}
         reviewId={reviewId}
         generalCommentsThreadId={metadata?.generalCommentsThreadId}
         reviewOwnerId={metadata?.reviewOwnerId}
         onCommentsChanged={onRefreshReactions}
         onDeleteConfirmationChange={handleDeleteConfirmationChange}
+        onReplyPress={onReplyPressFromInlineGeneral}
       />
     ),
     [
@@ -125,6 +143,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       metadata?.reviewOwnerId,
       onRefreshReactions,
       handleDeleteConfirmationChange,
+      onReplyPressFromInlineGeneral,
     ],
   );
 
@@ -247,6 +266,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         isPrivate={isPrivate}
         onCommentsChanged={handleThreadCommentChange}
+        onReplyAdded={handleReplyAdded}
       />
       <ConfirmationModal
         visible={!!generalDeleteState}
