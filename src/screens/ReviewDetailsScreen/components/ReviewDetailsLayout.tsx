@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -18,18 +18,15 @@ import {
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
-import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
-import {ReplySource} from '@/types/reviews';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
 import {ReviewMetadata} from '../types';
 import {
   DeleteConfirmationState,
   GeneralCommentsSection,
-  GeneralCommentsSectionRef,
 } from './GeneralCommentsSection';
 import {ReviewNote} from './ReviewNote';
 
@@ -72,8 +69,6 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     [],
   );
 
-  const generalCommentsSectionRef = useRef<GeneralCommentsSectionRef>(null);
-
   const {userData} = useUser();
 
   const {
@@ -106,7 +101,6 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     onReplyPressFromGeneralComments,
     onReplyPressFromInlineGeneral,
     handleThreadCommentChange,
-    replySourceRef,
     isReplyBottomSheetVisible,
     closeReplyBottomSheet,
     selectedComment,
@@ -121,29 +115,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
     handleThreadClick,
   } = reviewLogic;
 
-  const handleReplyAdded = useCallback(
-    (parentCommentId: string) => {
-      if (
-        replySourceRef.current === ReplySource.INLINE_GENERAL ||
-        replySourceRef.current === ReplySource.GENERAL
-      ) {
-        generalCommentsSectionRef.current?.incrementReplyCount(parentCommentId);
-      }
-    },
-    [replySourceRef],
-  );
-
-  const handleGeneralCommentChange = useCallback(
-    (change: ThreadCommentChange) => {
-      generalCommentsSectionRef.current?.syncCommentChange(change);
-    },
-    [],
-  );
-
   const generalCommentsFooter = useMemo(
     () => (
       <GeneralCommentsSection
-        ref={generalCommentsSectionRef}
         isPrivate={isPrivate}
         reviewId={reviewId}
         generalCommentsThreadId={metadata?.generalCommentsThreadId}
@@ -259,7 +233,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         onThreadPress={onThreadPress}
         onReplyPress={onReplyPressFromGeneralComments}
-        onCommentsChanged={handleGeneralCommentChange}
+        onCommentsChanged={handleThreadCommentChange}
         generalCommentsThreadId={metadata?.generalCommentsThreadId || ''}
       />
       <MessageThreadsBottomSheet
@@ -292,7 +266,6 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         isPrivate={isPrivate}
         onCommentsChanged={handleThreadCommentChange}
-        onReplyAdded={handleReplyAdded}
       />
       <ConfirmationModal
         visible={!!generalDeleteState}
