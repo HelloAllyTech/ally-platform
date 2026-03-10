@@ -34,7 +34,7 @@ export const ReviewTranscriptHeader = ({
     <View style={styles.subtitleContainer}>
       {isSeparatorRequired && <Text style={styles.separator}>•</Text>}
       <Text style={styles.subtitle}>{label}</Text>
-      {value && (
+      {!!value && (
         <Text style={styles.subtitle}>
           {': '}
           {value}
@@ -76,13 +76,13 @@ export const ReviewTranscriptHeader = ({
                   })}
             />
           </View>
-          {user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
+          {!!user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
           {scenarioSession?.createdAt &&
             renderSubtitleItem(
               true,
               formatDateTime(scenarioSession?.createdAt),
             )}
-          {scenarioSession?.duration &&
+          {!!scenarioSession?.duration &&
             renderSubtitleItem(
               true,
               t('Review.card.duration'),
