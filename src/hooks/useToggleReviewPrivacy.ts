@@ -1,0 +1,34 @@
+import {useCallback} from 'react';
+import {useTranslation} from 'react-i18next';
+
+import {useToast} from '@/components';
+import {useUpdateReviewStatusMutation} from '@/services';
+import {ReviewStatus} from '@/types';
+
+export const useToggleReviewPrivacy = (reviewId?: string) => {
+  const {t} = useTranslation();
+  const {showToast} = useToast();
+  const [updateReviewStatus] = useUpdateReviewStatusMutation();
+
+  const handleTogglePrivate = useCallback(
+    async (isEnabled: boolean) => {
+      if (!reviewId) return;
+      try {
+        const newStatus = isEnabled
+          ? ReviewStatus.IN_REVIEW
+          : ReviewStatus.HIDDEN;
+        await updateReviewStatus({
+          reviewId,
+          body: {status: newStatus},
+        }).unwrap();
+        showToast(t('SimulationFeedback.privacyUpdated'), 'success');
+      } catch (error) {
+        console.error('Error updating review status:', error);
+        showToast(t('Errors.updatePrivacy'), 'error');
+      }
+    },
+    [reviewId, updateReviewStatus, showToast, t],
+  );
+
+  return {handleTogglePrivate};
+};

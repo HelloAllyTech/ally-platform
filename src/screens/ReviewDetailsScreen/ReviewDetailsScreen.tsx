@@ -21,12 +21,7 @@ import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
 import {SCREEN_NAMES} from '@/constants';
-import {
-  useAppNavigation,
-  useHardwareBackPressHandler,
-  useShareReview,
-  useUser,
-} from '@/hooks';
+import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
@@ -51,18 +46,18 @@ type Props = RootStackScreenProps<'ReviewDetails'>;
 
 export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const insets = useSafeAreaInsets();
-  const {reviewId: _reviewId, isPrivate: initialIsPrivate} = route.params || {};
+  const {reviewId: _reviewId, isPrivate} = route.params || {};
   const currentMessageIdRef = useRef<string | null>(null);
 
-  const {isPrivate, setIsPrivate, handleTogglePrivate} = useShareReview({
-    reviewId: _reviewId,
-  });
+  // const {isPrivate, setIsPrivate, handleTogglePrivate} = useShareReview({
+  //   reviewId: _reviewId,
+  // });
 
-  useEffect(() => {
-    if (initialIsPrivate !== undefined) {
-      setIsPrivate(initialIsPrivate);
-    }
-  }, [initialIsPrivate, setIsPrivate]);
+  // useEffect(() => {
+  //   if (initialIsPrivate !== undefined) {
+  //     setIsPrivate(initialIsPrivate);
+  //   }
+  // }, [initialIsPrivate, setIsPrivate]);
 
   // State management
   const [offset, setOffset] = useState(0);
@@ -626,7 +621,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
           }}
           myReaction={reviewData?.myReaction || null}
           isPrivate={isPrivate}
-          onTogglePrivate={handleTogglePrivate}
+          // onTogglePrivate={handleTogglePrivate}
         />
       </View>
       <CommentInput
