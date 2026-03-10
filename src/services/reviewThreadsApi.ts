@@ -18,7 +18,7 @@ export const reviewThreadsApi = api.injectEndpoints({
         baseQuery,
       ) => {
         const result = await baseQuery({
-          url: API_ROUTES.REVIEWS.THREADS(reviewId),
+          url: API_ROUTES.SIMULATION_REVIEWS.THREADS(reviewId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
             ? {params: {offset, limit, includeMessage: true}}
@@ -41,7 +41,7 @@ export const reviewThreadsApi = api.injectEndpoints({
         baseQuery,
       ) => {
         const result = await baseQuery({
-          url: API_ROUTES.REVIEWS.GET_COMMENT_REPLIES(String(commentId)),
+          url: API_ROUTES.SIMULATION_REVIEWS.GET_COMMENT_REPLIES(commentId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
             ? {params: {offset, limit}}

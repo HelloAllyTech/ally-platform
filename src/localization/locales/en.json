@@ -467,6 +467,10 @@
     "privacyUpdated": "Privacy setting updated",
     "sharedForReview": "Transcript shared for review",
     "reviewNoteTitle": "NOTE",
+    "shortSession": {
+      "title": "Session ended too soon",
+      "description": "We need more interaction data to provide meaningful feedback."
+    },
     "shareScreenTitle": "Share this simulation",
     "editNoteTitle": "Edit note",
     "tabs": {
@@ -516,9 +520,11 @@
     "submitFeedback": "Failed to submit feedback",
     "uploadProfileImage": "Failed to upload profile image",
     "removeProfileImage": "Failed to remove profile image",
-    "updatePrivacy": "Failed to update privacy settings"
+    "updatePrivacy": "Failed to update privacy settings",
+    "editNoteExpired": "Editing time has expired. Notes can only be edited within 10 minutes of sharing."
   },
   "Success": {
+    "editNoteSuccess": "Note updated successfully",
     "submitFeedback": "Feedback submitted successfully"
   },
   "FeedbackPopup": {

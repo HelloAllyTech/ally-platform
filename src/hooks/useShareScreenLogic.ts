@@ -1,0 +1,135 @@
+import {useCallback, useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {type EmojiType} from 'rn-emoji-keyboard';
+
+import {useToast} from '@/components';
+import {
+  useCreateReviewMutation,
+  useUpdateReviewStatusMutation,
+} from '@/services';
+import {ReviewStatus} from '@/types';
+
+import {useAppNavigation} from './useAppNavigation';
+
+const MAX_NOTE_LENGTH = 250;
+
+interface UseShareScreenLogicParams {
+  reviewId?: string;
+  scenarioSessionId?: string;
+  isEditNote?: boolean;
+  initialNote?: string;
+}
+
+export const useShareScreenLogic = ({
+  reviewId,
+  scenarioSessionId,
+  isEditNote,
+  initialNote,
+}: UseShareScreenLogicParams) => {
+  const {t} = useTranslation();
+  const navigation = useAppNavigation();
+  const {showToast} = useToast();
+
+  const [note, setNote] = useState<string>('');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  const [createReview] = useCreateReviewMutation();
+  const [updateReviewStatus] = useUpdateReviewStatusMutation();
+
+  useEffect(() => {
+    if (initialNote) {
+      setNote(initialNote);
+    }
+  }, [initialNote]);
+
+  const handleEmojiSelected = useCallback(
+    (emoji: EmojiType) => {
+      setNote(prev => {
+        if (Array.from(prev).length < MAX_NOTE_LENGTH) {
+          return prev + emoji.emoji;
+        }
+        return prev;
+      });
+    },
+    [setNote],
+  );
+
+  const handleShare = useCallback(async () => {
+    try {
+      if (reviewId) {
+        await updateReviewStatus({
+          reviewId,
+          body: {status: ReviewStatus.IN_REVIEW, note},
+        }).unwrap();
+      } else if (scenarioSessionId) {
+        await createReview({
+          scenarioSessionId,
+          note,
+        }).unwrap();
+      }
+
+      showToast(t('SimulationFeedback.sharedForReview'), 'success');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error sharing simulation:', error);
+      const serverMessage = (error as {data?: {message?: string}})?.data
+        ?.message;
+      showToast(serverMessage || t('Errors.editNoteExpired'), 'error');
+      if (serverMessage) {
+        navigation.goBack();
+      }
+    }
+  }, [
+    reviewId,
+    scenarioSessionId,
+    createReview,
+    updateReviewStatus,
+    showToast,
+    t,
+    navigation,
+    note,
+  ]);
+
+  const handleEditNote = useCallback(async () => {
+    if (!reviewId) return;
+    try {
+      await updateReviewStatus({
+        reviewId,
+        body: {status: ReviewStatus.IN_REVIEW, note},
+      }).unwrap();
+      showToast(t('Success.editNoteSuccess'), 'success');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error editing note:', error);
+      const serverMessage = (error as {data?: {message?: string}})?.data
+        ?.message;
+      showToast(serverMessage || t('Errors.editNoteExpired'), 'error');
+      if (serverMessage) {
+        navigation.goBack();
+      }
+    }
+  }, [reviewId, updateReviewStatus, note, navigation, showToast, t]);
+
+  const screenTitle = isEditNote
+    ? t('SimulationFeedback.editNoteTitle')
+    : t('SimulationFeedback.shareScreenTitle');
+
+  const buttonLabel = isEditNote ? t('save') : t('SimulationFeedback.share');
+
+  const onSubmit = isEditNote ? handleEditNote : handleShare;
+
+  const goBack = useCallback(() => navigation.goBack(), [navigation]);
+
+  return {
+    note,
+    setNote,
+    onSubmit,
+    screenTitle,
+    buttonLabel,
+    isEmojiPickerOpen,
+    setIsEmojiPickerOpen,
+    handleEmojiSelected,
+    goBack,
+    maxNoteLength: MAX_NOTE_LENGTH,
+  };
+};

@@ -4,7 +4,7 @@ import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
-  useShareReview,
+  useToggleReviewPrivacy,
   useUser,
 } from '@/hooks';
 import {GetMessagesResponse} from '@/types';
@@ -36,17 +36,7 @@ export function useReviewDetailsLogic({
   const {fetchMessages, messagesState, addComment, isAddingComment} = api;
   const {isLoading, isFetching, isError} = messagesState;
 
-  const {
-    isPrivate: isPrivateState,
-    setIsPrivate,
-    handleTogglePrivate,
-  } = useShareReview({reviewId});
-
-  useEffect(() => {
-    if (isPrivate !== undefined) {
-      setIsPrivate(isPrivate);
-    }
-  }, [isPrivate, setIsPrivate]);
+  const {handleTogglePrivate} = useToggleReviewPrivacy(reviewId);
 
   const navigation = useAppNavigation();
   const currentMessageIdRef = useRef<string | null>(null);
@@ -518,7 +508,7 @@ export function useReviewDetailsLogic({
     isError,
     offset,
     hasMore,
-    isPrivate: isPrivateState,
+    isPrivate,
     handleTogglePrivate,
 
     comment,

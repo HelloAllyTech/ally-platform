@@ -47,6 +47,7 @@ jest.mock('@/utils', () => ({
       })
       .replace(' at ', ' ');
   },
+  isShortSession: () => false,
 }));
 
 import {SimulationSummary} from '../SimulationSummary';

@@ -23,7 +23,7 @@ import {
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
-  useShareReview,
+  useToggleReviewPrivacy,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
 import {
@@ -37,8 +37,9 @@ import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
 import {ReviewStatus} from '@/types';
 import {
-  formatDutationFromStartedAtAndEndedAt,
+  formatDurationAsMMSS,
   isMinutesPassed,
+  isShortSession,
   navigateToLearnTab,
 } from '@/utils';
 
@@ -76,10 +77,7 @@ export const SimulationFeedbackScreen: React.FC<
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
   const {showToast} = useToast();
 
-  const {isPrivate, setIsPrivate, handleTogglePrivate} = useShareReview({
-    reviewId,
-    scenarioSessionId,
-  });
+  const {handleTogglePrivate} = useToggleReviewPrivacy(reviewId);
 
   const [retryLimitReached, setRetryLimitReached] = useState<boolean>(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -93,6 +91,9 @@ export const SimulationFeedbackScreen: React.FC<
       skip: !reviewId,
     },
   );
+
+  const shortSession = isShortSession(simulationDetails?.details?.callDuration);
+  const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 
   const [getReviewThreadComments] = useLazyGetThreadsQuery();
   const [getReactionsCount] = useLazyGetReactionsCountQuery();
@@ -140,21 +141,11 @@ export const SimulationFeedbackScreen: React.FC<
     };
   }, [fetchSimulationDetailsWithRetry]);
 
-  // Set reviewId and isPrivate from simulation details
   useEffect(() => {
     if (simulationDetails?.reviewId) {
       setReviewId(simulationDetails.reviewId);
-      if (simulationDetails.reviewStatus === ReviewStatus.IN_REVIEW) {
-        setIsPrivate(false);
-      } else if (simulationDetails.reviewStatus === ReviewStatus.HIDDEN) {
-        setIsPrivate(true);
-      }
     }
-  }, [
-    simulationDetails?.reviewId,
-    simulationDetails?.reviewStatus,
-    setIsPrivate,
-  ]);
+  }, [simulationDetails?.reviewId]);
 
   // Refetch simulation details on screen focus to pick up review changes
   const isFirstFocus = useRef(true);
@@ -282,7 +273,7 @@ export const SimulationFeedbackScreen: React.FC<
       title: simulationDetails?.scenario?.title || '',
       description: simulationDetails?.scenario?.description || '',
       createdAt: simulationDetails?.createdAt || '',
-      duration: formatDutationFromStartedAtAndEndedAt(
+      duration: formatDurationAsMMSS(
         simulationDetails?.startedAt,
         simulationDetails?.endedAt,
       ),
@@ -342,8 +333,9 @@ export const SimulationFeedbackScreen: React.FC<
       getSimulationSummaryTabs(t, {
         pathId,
         caseId,
+        shortSession,
       }),
-    [t, pathId, caseId],
+    [t, pathId, caseId, shortSession],
   );
 
   const tabIndex = useMemo(() => {
@@ -369,10 +361,6 @@ export const SimulationFeedbackScreen: React.FC<
             <SummaryTab
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
-              // pathId={pathId}
-              // caseId={caseId}
-              // fromLogs={fromLogs}
-              // onTryAnother={handleSubmit}
             />
           );
         case SimulationSummaryTabKey.ASK_AI:
@@ -380,8 +368,6 @@ export const SimulationFeedbackScreen: React.FC<
         case SimulationSummaryTabKey.TRANSCRIPTION:
           return (
             <TranscriptTab
-              isPrivate={isPrivate}
-              setIsPrivate={setIsPrivate}
               reviewId={reviewId}
               setReviewId={setReviewId}
               scenarioSessionId={scenarioSessionId}
@@ -422,8 +408,6 @@ export const SimulationFeedbackScreen: React.FC<
       pathId,
       caseId,
       handleFeedbackAndNavigate,
-      isPrivate,
-      setIsPrivate,
       reviewId,
       languageId,
       activeTabKey,
