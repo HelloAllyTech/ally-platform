@@ -135,7 +135,7 @@ export const GeneralCommentsSection = React.forwardRef<
             switch (change.action) {
               case 'add':
                 return {
-                  data: [...prev.data, change.comment],
+                  data: [change.comment, ...prev.data],
                   count: prev.count + 1,
                 };
               case 'delete':

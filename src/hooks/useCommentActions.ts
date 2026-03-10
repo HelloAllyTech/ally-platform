@@ -246,7 +246,7 @@ export function useCommentActions(config: UseCommentActionsConfig) {
             setComments(prev => {
               if (prev) {
                 return {
-                  data: [...prev.data, newCommentObj],
+                  data: [newCommentObj, ...prev.data],
                   count: prev.count + 1,
                 };
               }
