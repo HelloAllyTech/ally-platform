@@ -127,6 +127,7 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # Continue with sequential flow
     graph.add_edge("sync_events_and_behaviors_node", "resolve_branching_instruction")
     graph.add_edge("resolve_branching_instruction", "generate_response")
+    graph.add_edge("resolve_branching_instruction", "send_event_feedback")
 
     # Build the apply_voice_expressions subgraph and add it as a node
     # This prevents its LLM outputs (for voice expression parameters) from being
@@ -135,7 +136,7 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
 
     graph.add_edge("generate_response", "apply_voice_expressions")
-    graph.add_edge("apply_voice_expressions", "send_event_feedback")
+    graph.add_edge("apply_voice_expressions", END)
     graph.add_edge("send_event_feedback", END)
 
     return graph

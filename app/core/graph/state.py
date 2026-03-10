@@ -178,12 +178,14 @@ def add_behavior_feedback_data(
     """
     Reducer for behavior_feedback_data.
 
-    When data is provided (right has items), accumulate with existing data.
+    Always replaces with the new value (right). This prevents double-accumulation
+    when subgraphs propagate their full state back to the parent graph — the parent
+    reducer would otherwise run add(parent_current, subgraph_output), doubling the
+    list at every subgraph boundary.
+
     When an empty list is provided (right is empty), clear all data.
     """
-    if not right:
-        return []
-    return left + right
+    return right
 
 
 def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional[str]:

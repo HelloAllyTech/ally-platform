@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional, cast
+from typing import Dict, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -857,30 +857,38 @@ async def send_event_feedback(
             non_branching_count = len(
                 [ed for ed in state.non_branching_feedback_data if ed.feedback]
             )
+            behavior_count = (
+                len(state.behavior_feedback_data) if state.behavior_feedback_data else 0
+            )
+
             logger.info(
                 f"     ACTIVE events count: {len(all_active_events_data)} "
                 f"({branching_count} branching + {non_branching_count} non-branching)"
             )
-            # Send score if there are ACTIVE events (matches old behavior)
-            # Cumulative score includes ALL ACTIVE events, even if they don't
-            # have feedback messages
-            # Old behavior: process_events_for_ui would return None only if
-            # no events
-            # If events exist, score is always sent even if message/emoji are None
-            if all_active_events_data:
-                # Cumulative score: sum of scores from all ACTIVE events
-                # (both branching and non-branching)
-                cumulative_score = sum(ed.score for ed in all_active_events_data)
-                individual_scores = [ed.score for ed in all_active_events_data]
-                logger.info(f"     Individual scores: {individual_scores}")
+            logger.info(f"     Behavior feedback count: {behavior_count}")
+
+            # Accumulate behavior scores with event scores
+            behavior_scores = []
+            if state.behavior_feedback_data:
+                behavior_scores = [
+                    bf_data.score for bf_data in state.behavior_feedback_data
+                ]
+
+            # Send combined feedback if there are events OR behaviors
+            if all_active_events_data or behavior_scores:
+                # Cumulative score: sum of scores from all ACTIVE events + behaviors
+                event_scores = [ed.score for ed in all_active_events_data]
+                cumulative_score = sum(event_scores) + sum(behavior_scores)
+
+                logger.info(f"     Event scores: {event_scores}")
+                logger.info(f"     Behavior scores: {behavior_scores}")
                 logger.info(f"     ➜ Cumulative score: {cumulative_score}")
 
                 detected_event_ids = [ed.event_id for ed in all_active_events_data]
-                # Handle feedback message - assign empty string if not present
-                # Even if ACTIVE events exist, they may not have feedback
 
+                # Handle feedback message - only from events
+                # (behaviors don't have messages)
                 if feedback_to_send:
-                    # Feedback object exists, but message might be None
                     feedback_message = (
                         feedback_to_send.message
                         if feedback_to_send.message is not None
@@ -890,16 +898,11 @@ async def send_event_feedback(
                     show_feedback = feedback_to_send.show_feedback
                 else:
                     # No feedback selected, but we still send the score
-                    # (matches old behavior)
-                    # This can happen if ACTIVE events exist but none were
-                    # selected for feedback
                     feedback_message = ""
                     feedback_emoji = None
                     show_feedback = True
 
-                # Create UI message with cumulative score and selected feedback
-                # Score is always sent if there are ACTIVE events,
-                # even if message is empty
+                # Create UI message with cumulative score (events + behaviors)
                 ui_message = CustomUIEventMessageType.create(
                     score=cumulative_score,
                     emoji=feedback_emoji,
@@ -911,11 +914,11 @@ async def send_event_feedback(
                     detected_event_ids=detected_event_ids,
                 )
 
-                logger.info("Sending feedback to UI:")
+                logger.info("Sending combined feedback to UI:")
                 await send_event_to_ui(ui_message, room)
                 logger.info("UI feedback sent successfully")
 
-    # Send behavior feedback to UI and BE
+    # Send behavior feedback to BE (backend only, UI already handled above)
     if state.behavior_feedback_data:
         room = None
         if config and "configurable" in config:
@@ -923,21 +926,10 @@ async def send_event_feedback(
 
         if room is not None:
             logger.info(
-                f"Processing {len(state.behavior_feedback_data)} "
-                f"behavior feedback entries"
+                f"Sending {len(state.behavior_feedback_data)} "
+                f"behavior feedback entries to BE"
             )
             for bf_data in state.behavior_feedback_data:
-                behavior_ui_message = CustomUIEventMessageType.create(
-                    score=bf_data.score,
-                    emoji=None,
-                    message="",
-                    timestamp=datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%dT%H:%M:%S.%fZ"
-                    ),
-                    show_feedback=True,
-                )
-                await send_event_to_ui(behavior_ui_message, room)
-
                 behavior_data = {
                     "behaviorInstructionId": bf_data.behavior_instruction_id,
                     "score": bf_data.score,
@@ -953,7 +945,7 @@ async def send_event_feedback(
                     message_body=core_behavior_message.model_dump_json()
                 )
 
-            logger.info("Behavior feedback sent to UI and BE successfully")
+            logger.info("Behavior feedback sent to BE successfully")
         else:
             logger.warning("No room available, skipping behavior feedback sending")
 
@@ -1005,7 +997,7 @@ async def clear_events_and_detected_data(
 
 async def apply_voice_expressions(
     state: SimulationState, config: Optional[RunnableConfig] = None
-) -> SimulationState:
+) -> Dict:
     """
     Generate and apply voice expressions based on the generated response.
 
@@ -1041,7 +1033,7 @@ async def apply_voice_expressions(
             "No TTS client or LLM client available, "
             "skipping voice expression application"
         )
-        return state
+        return {}
 
     # Early return if provider doesn't support voice expression parameters
     # This avoids unnecessary processing for providers like Deepgram
@@ -1051,11 +1043,11 @@ async def apply_voice_expressions(
             "Provider does not support voice expression parameters, "
             "skipping voice expression node"
         )
-        return state
+        return {}
 
     # Get the last message (the generated response)
     if not state.messages:
-        return state
+        return {}
 
     last_message = state.messages[-1]
     response_text = None
@@ -1070,7 +1062,7 @@ async def apply_voice_expressions(
             "[apply_voice_expressions] No response text found, "
             "skipping voice expression application"
         )
-        return state
+        return {}
 
     # Skip runtime prosody when under pressure (keeps last params, reduces latency)
     # IMPORTANT: Do NOT skip when provider supports text enhancement (SSML/audio tags).
@@ -1107,7 +1099,7 @@ async def apply_voice_expressions(
         # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
         if hasattr(tts_client, "_current_params") and tts_client._current_params:
             tts_client._apply_parameters_dict(tts_client._current_params.copy())
-        return state
+        return {}
 
     # Extract conversation history (last N messages, excluding the current response)
     conversation_history = []
@@ -1182,11 +1174,10 @@ async def apply_voice_expressions(
         # Return only the fields that need updating
         return {
             "messages": [enhanced_message],
-            "new_events": state.new_events,
         }
 
     # Text was not enhanced (provider doesn't support text enhancement, like Hume)
     # Parameters have already been applied via update_options() in
     # generate_and_apply_voice_expressions()
     # Message content remains unchanged
-    return state
+    return {}

@@ -532,16 +532,14 @@ class TestSendEventFeedback:
         ):
             result = await send_event_feedback(state, config=config)
 
-            # Should send 2 UI messages (one per behavior)
-            assert mock_send_ui.call_count == 2
+            # Should send 1 UI message (one for all behaviors)
+            assert mock_send_ui.call_count == 1
 
-            # Verify first behavior UI message
-            ui_call_1 = mock_send_ui.call_args_list[0][0][0]
-            assert ui_call_1.data.score == 5
-
-            # Verify second behavior UI message
-            ui_call_2 = mock_send_ui.call_args_list[1][0][0]
-            assert ui_call_2.data.score == -3
+            # Verify combined behavior UI message with total score
+            ui_call = mock_send_ui.call_args_list[0][0][0]
+            assert ui_call.data.score == 2  # 5 + (-3) = 2
+            assert ui_call.data.message == ""
+            assert ui_call.data.emoji is None
 
             # Should send 2 BE messages
             assert mock_send_be.call_count == 2
@@ -586,18 +584,13 @@ class TestSendEventFeedback:
         ):
             result = await send_event_feedback(state, config=config)
 
-            # Should send 2 UI messages: 1 for event, 1 for behavior
-            assert mock_send_ui.call_count == 2
+            # Should send 1 UI message combining event and behavior scores
+            assert mock_send_ui.call_count == 1
 
-            # First call: event feedback
-            event_ui_call = mock_send_ui.call_args_list[0][0][0]
-            assert event_ui_call.data.score == 10
-            assert event_ui_call.data.message == "Event feedback"
-
-            # Second call: behavior feedback
-            behavior_ui_call = mock_send_ui.call_args_list[1][0][0]
-            assert behavior_ui_call.data.score == 7
-            assert behavior_ui_call.data.message == ""
+            # Verify combined UI message with total score and event feedback message
+            ui_call = mock_send_ui.call_args_list[0][0][0]
+            assert ui_call.data.score == 17  # 10 + 7 = 17
+            assert ui_call.data.message == "Event feedback"
 
             # Should send 1 BE message (only for behavior)
             assert mock_send_be.call_count == 1
