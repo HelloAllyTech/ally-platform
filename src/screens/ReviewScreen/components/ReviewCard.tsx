@@ -41,7 +41,7 @@ interface ReviewCardProps {
   reactions?: {
     [reaction_code: string]: number;
   };
-  onReviewPress: (reviewId?: string) => void;
+  onReviewPress?: (reviewId?: string) => void;
   onCommentPress?: (reviewId: string) => void;
   isExpanded?: boolean;
   note?: string;
@@ -153,14 +153,16 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       </View>
       {renderSimulationCard()}
 
-      <TouchableOpacity
-        style={styles.reviewTranscriptContainer}
-        onPress={handleReviewItemPress}>
-        <ChatAddOnIcon width={16} height={16} />
-        <Text style={styles.reviewTranscriptText}>
-          {t('Review.card.reviewTranscript')}
-        </Text>
-      </TouchableOpacity>
+      {onReviewPress && (
+        <TouchableOpacity
+          style={styles.reviewTranscriptContainer}
+          onPress={handleReviewItemPress}>
+          <ChatAddOnIcon width={16} height={16} />
+          <Text style={styles.reviewTranscriptText}>
+            {t('Review.card.reviewTranscript')}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.separator} />
 
@@ -172,7 +174,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         generalCommentsData={generalCommentsData}
         reviewId={id}
         onCollapsePress={() => onCommentPress?.(id)}
-        onCommentPress={onReviewPress}
+        onCommentPress={onCommentPress ? () => onCommentPress(id) : undefined}
         t={t}
       />
     </View>

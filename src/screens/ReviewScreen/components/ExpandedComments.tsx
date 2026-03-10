@@ -15,7 +15,7 @@ interface ExpandedCommentsProps {
   generalCommentsData: GetThreadCommentsResponse | undefined;
   reviewId: string;
   onCollapsePress: () => void;
-  onCommentPress: (reviewId: string) => void;
+  onCommentPress?: (reviewId: string) => void;
   t: (key: string) => string;
 }
 
@@ -59,7 +59,9 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
                   replyCount={comment.replyCount}
                   showReplyButton={false}
                   showAddReactionButton={false}
-                  onCommentPress={() => onCommentPress(reviewId)}
+                  onCommentPress={
+                    onCommentPress ? () => onCommentPress(reviewId) : undefined
+                  }
                   hidden={comment.hidden}
                 />
               </View>
