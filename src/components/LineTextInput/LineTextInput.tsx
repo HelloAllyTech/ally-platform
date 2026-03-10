@@ -21,6 +21,7 @@ interface LineTextInputProps {
   containerStyle?: StyleProp<ViewStyle>;
   showSendButton?: boolean;
   onSend?: () => void;
+  maxLength?: number;
 }
 
 export const LineTextInput: React.FC<LineTextInputProps> = ({
@@ -33,6 +34,7 @@ export const LineTextInput: React.FC<LineTextInputProps> = ({
   showSendButton = false,
   onSend,
   containerStyle,
+  maxLength,
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
@@ -44,6 +46,7 @@ export const LineTextInput: React.FC<LineTextInputProps> = ({
         style={[styles.input, style]}
         placeholder={placeholder}
         placeholderTextColor={colors.ds.typography.mediumEmphasis}
+        maxLength={maxLength}
       />
       {showSendButton && (
         <TouchableOpacity style={styles.sendButton} onPress={onSend}>

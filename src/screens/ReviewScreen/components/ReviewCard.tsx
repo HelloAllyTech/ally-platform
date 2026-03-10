@@ -1,4 +1,4 @@
-import {useEffect} from 'react';
+import {useCallback, useState} from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {useTranslation} from 'react-i18next';
@@ -8,6 +8,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {ChatAddOnIcon} from '@/assets';
 import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
+import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
 import {
   colors,
@@ -42,9 +43,8 @@ interface ReviewCardProps {
     [reaction_code: string]: number;
   };
   onReviewPress?: (reviewId?: string) => void;
-  onCommentPress?: (reviewId: string) => void;
-  isExpanded?: boolean;
   note?: string;
+  reviewType?: ReviewType;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -56,22 +56,36 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   commentsCount = 0,
   reactions = {},
   onReviewPress,
-  onCommentPress,
-  isExpanded = false,
   note,
+  reviewType,
 }) => {
   const {t} = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [
     getGeneralComments,
     {data: generalCommentsData, isLoading: isLoadingGeneral},
   ] = useLazyGetGeneralReviewCommentsQuery();
 
-  useEffect(() => {
-    if (isExpanded && !generalCommentsData) {
-      getGeneralComments({reviewId: id, offset: 0, limit: 2});
+  const handleCommentPress = useCallback(async () => {
+    if (isExpanded) {
+      setIsExpanded(false);
+      return;
     }
-  }, [isExpanded, id, getGeneralComments, generalCommentsData]);
+    if (commentsCount === 0) return;
+    if (generalCommentsData?.data?.length) {
+      setIsExpanded(true);
+      return;
+    }
+    const result = await getGeneralComments({
+      reviewId: id,
+      offset: 0,
+      limit: 2,
+    });
+    if (result.data?.data?.length) {
+      setIsExpanded(true);
+    }
+  }, [isExpanded, commentsCount, generalCommentsData, getGeneralComments, id]);
 
   const totalReactions = Object.values(reactions).reduce(
     (sum, count) => sum + count,
@@ -105,6 +119,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderSimulationCard = () => (
     <SimulationDetailsCard
+      reviewType={reviewType}
       coverImageUrl={scenario.coverImageUrl}
       coverVideoUrl={scenario.coverVideoUrl}
       title={scenario.title}
@@ -121,7 +136,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       />
       <TouchableOpacity
         style={styles.commentCountContainer}
-        onPress={() => onCommentPress?.(id)}>
+        onPress={handleCommentPress}>
         <Text style={styles.commentText}>
           {pluralize(commentsCount, t('Review.card.comment'))}
         </Text>
@@ -139,7 +154,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         {/* <Text style={styles.simulationDetailsHeading}>
           {t('Review.card.sharedSimulationForReview')}
         </Text> */}
-        <Text style={styles.noteText}>{note}</Text>
+        {note && <Text style={styles.noteText}>{note}</Text>}
         <SimulationDetailRow
           label={t('Review.card.dateAndTime')}
           value={formatDateTime(scenarioSession.createdAt)}
@@ -173,8 +188,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         isLoading={isLoadingGeneral}
         generalCommentsData={generalCommentsData}
         reviewId={id}
-        onCollapsePress={() => onCommentPress?.(id)}
-        onCommentPress={onCommentPress ? () => onCommentPress(id) : undefined}
+        onCollapsePress={handleCommentPress}
+        onCommentPress={onReviewPress ? () => onReviewPress(id) : undefined}
         t={t}
       />
     </View>

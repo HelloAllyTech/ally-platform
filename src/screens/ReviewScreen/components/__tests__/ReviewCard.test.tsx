@@ -15,10 +15,13 @@ jest.mock('@/services/reviewThreadsApi', () => ({
   ],
 }));
 
+const mockGetGeneralComments = jest.fn();
+let mockGeneralCommentsData: any = undefined;
+
 jest.mock('@/services/reviewsApi', () => ({
   useLazyGetGeneralReviewCommentsQuery: () => [
-    jest.fn(),
-    {data: undefined, isLoading: false},
+    mockGetGeneralComments,
+    {data: mockGeneralCommentsData, isLoading: false},
   ],
 }));
 
@@ -120,8 +123,6 @@ const defaultProps = {
   commentsCount: 2,
   reactions: {'1f44d': 3, '2764-fe0f': 1},
   onReviewPress: jest.fn(),
-  onCommentPress: jest.fn(),
-  isExpanded: false,
 };
 
 describe('ReviewCard', () => {
@@ -168,24 +169,29 @@ describe('ReviewCard', () => {
     expect(getByText('2 Review.card.comments')).toBeTruthy();
   });
 
-  it('calls onCommentPress when comment count is pressed', () => {
-    const onCommentPress = jest.fn();
-    const {getByText} = render(
-      <ReviewCard {...defaultProps} onCommentPress={onCommentPress} />,
+  it('expands on press when generalCommentsData has items', () => {
+    mockGeneralCommentsData = {data: [{id: 'c1', content: 'test', createdBy: {name: 'User', profileImage: ''}, reactions: {}, replyCount: 0, createdAt: '', hidden: false}], count: 1};
+    const {getByText, getByTestId} = render(
+      <ReviewCard {...defaultProps} commentsCount={2} />,
     );
     fireEvent.press(getByText('2 Review.card.comments'));
-    expect(onCommentPress).toHaveBeenCalledWith('review-1');
-  });
-
-  it('renders ExpandedComments when isExpanded is true', () => {
-    const {getByTestId} = render(
-      <ReviewCard {...defaultProps} isExpanded />,
-    );
     expect(getByTestId('expanded-comments')).toBeTruthy();
+    mockGeneralCommentsData = undefined;
   });
 
-  it('does not render ExpandedComments when isExpanded is false', () => {
-    const {queryByTestId} = render(<ReviewCard {...defaultProps} />);
+  it('does not expand when commentsCount > 0 but no data yet', () => {
+    mockGeneralCommentsData = undefined;
+    const {queryByTestId} = render(
+      <ReviewCard {...defaultProps} commentsCount={2} />,
+    );
+    expect(queryByTestId('expanded-comments')).toBeNull();
+  });
+
+  it('does not expand when commentsCount is 0', () => {
+    mockGeneralCommentsData = undefined;
+    const {queryByTestId} = render(
+      <ReviewCard {...defaultProps} commentsCount={0} />,
+    );
     expect(queryByTestId('expanded-comments')).toBeNull();
   });
 
