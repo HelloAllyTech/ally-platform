@@ -334,6 +334,9 @@ export const SimulationFeedbackScreen: React.FC<
   const hasScenarioMessagesPermission = permissions?.includes(
     USER_PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
   );
+  const hasSimulationReviewPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SIMULATION_REVIEW,
+  );
 
   const tabs = useMemo(
     () =>
@@ -485,7 +488,8 @@ export const SimulationFeedbackScreen: React.FC<
       )}
       {!!reviewId &&
         activeTabKey === SimulationSummaryTabKey.TRANSCRIPTION &&
-        !hideReviewDetails && (
+        !hideReviewDetails &&
+        hasSimulationReviewPermission && (
           <TouchableOpacity
             onPress={handleViewReview}
             style={styles.reviewIconButton}

@@ -78,6 +78,10 @@ jest.mock('@/constants', () => ({
     {value: 'pending', label: 'Pending'},
   ],
   SCREEN_NAMES: {REVIEW_DETAILS: 'ReviewDetails'},
+  USER_PERMISSIONS: {
+    VIEW_SIMULATION_REVIEW: 'view:simulation-review',
+    VIEW_REVIEWS: 'view:reviews',
+  },
 }));
 
 jest.mock('@/navigation/TabNavigator', () => ({
@@ -85,7 +89,7 @@ jest.mock('@/navigation/TabNavigator', () => ({
 }));
 
 jest.mock('react-redux', () => ({
-  useSelector: () => ({}),
+  useSelector: () => [],
 }));
 
 jest.mock('@react-navigation/native', () => ({

@@ -1,7 +1,7 @@
 import React, {useCallback, useMemo} from 'react';
 
 import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
-import {SCREEN_NAMES} from '@/constants';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   ReviewApiProvider,
   simulationApiHooks,
@@ -13,6 +13,7 @@ import {
   useGetReviewByIdQuery,
   useLazyGetMessagesQuery,
 } from '@/services/reviewsApi';
+import {useAppSelector} from '@/store/hooks';
 import {ReviewStatus} from '@/types';
 import {isMinutesPassed} from '@/utils';
 
@@ -25,6 +26,17 @@ type Props = RootStackScreenProps<'ReviewDetails'>;
 export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const {reviewId} = route.params || {};
   const navigation = useAppNavigation();
+
+  const permissions = useAppSelector(state => state.user.permissions);
+  const canEditReview = permissions.includes(
+    USER_PERMISSIONS.EDIT_SIMULATION_REVIEW,
+  );
+  const canViewThreads = permissions.includes(
+    USER_PERMISSIONS.VIEW_SIMULATION_REVIEW_THREADS,
+  );
+  const canEditThread = permissions.includes(
+    USER_PERMISSIONS.EDIT_SIMULATION_REVIEW_THREAD,
+  );
 
   const [fetchMessages, messagesState] = useLazyGetMessagesQuery();
   const {data: reviewData, refetch: refetchReviewData} = useGetReviewByIdQuery(
@@ -101,6 +113,9 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
             ? handleEditNote
             : undefined
         }
+        canEditReview={canEditReview}
+        canViewThreads={canViewThreads}
+        canEditThread={canEditThread}
         renderHeader={() =>
           reviewData ? (
             <ReviewTranscriptHeader
