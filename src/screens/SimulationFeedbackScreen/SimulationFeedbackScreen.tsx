@@ -298,26 +298,28 @@ export const SimulationFeedbackScreen: React.FC<
           </Text>
         </Text>
 
-        <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>
-            {t('SimulationFeedback.share')}
-          </Text>
-          <CustomSwitch
-            value={!!reviewId && !isPrivate}
-            onToggle={isEnabled => {
-              if (
-                isEnabled &&
-                (!reviewId ||
-                  (reviewData?.createdAt &&
-                    !isMinutesPassed(reviewData.createdAt)))
-              ) {
-                handleShareSimulation();
-              } else if (reviewId) {
-                handleTogglePrivate(isEnabled);
-              }
-            }}
-          />
-        </View>
+        {!shortSession && (
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>
+              {t('SimulationFeedback.share')}
+            </Text>
+            <CustomSwitch
+              value={!!reviewId && !isPrivate}
+              onToggle={isEnabled => {
+                if (
+                  isEnabled &&
+                  (!reviewId ||
+                    (reviewData?.createdAt &&
+                      !isMinutesPassed(reviewData.createdAt)))
+                ) {
+                  handleShareSimulation();
+                } else if (reviewId) {
+                  handleTogglePrivate(isEnabled);
+                }
+              }}
+            />
+          </View>
+        )}
       </View>
     );
   };

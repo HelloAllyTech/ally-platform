@@ -166,25 +166,10 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
 
   const noteElementHeader = useMemo(() => {
     if (reviewNote) {
-      return (
-        <ReviewNote
-          note={reviewNote}
-          onEditNote={
-            metadata?.reviewOwnerId === userData?.id && !isPrivate
-              ? onEditNote
-              : undefined
-          }
-        />
-      );
+      return <ReviewNote note={reviewNote} onEditNote={onEditNote} />;
     }
     return null;
-  }, [
-    reviewNote,
-    metadata?.reviewOwnerId,
-    userData?.id,
-    onEditNote,
-    isPrivate,
-  ]);
+  }, [reviewNote, onEditNote]);
 
   if (isLoading) {
     return (

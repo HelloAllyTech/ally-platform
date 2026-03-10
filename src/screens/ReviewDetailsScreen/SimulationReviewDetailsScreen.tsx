@@ -6,7 +6,7 @@ import {
   ReviewApiProvider,
   simulationApiHooks,
 } from '@/contexts/ReviewApiContext';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useUser} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddReviewCommentMutation,
@@ -15,7 +15,7 @@ import {
 } from '@/services/reviewsApi';
 import {useAppSelector} from '@/store/hooks';
 import {ReviewStatus} from '@/types';
-import {isMinutesPassed} from '@/utils';
+import {formatDurationFromSeconds, isMinutesPassed} from '@/utils';
 
 import {ReviewDetailsLayout} from './components/ReviewDetailsLayout';
 import {useReviewDetailsLogic} from './hooks/useReviewDetailsLogic';
@@ -26,6 +26,7 @@ type Props = RootStackScreenProps<'ReviewDetails'>;
 export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const {reviewId} = route.params || {};
   const navigation = useAppNavigation();
+  const {userData} = useUser();
 
   const permissions = useAppSelector(state => state.user.permissions);
   const canEditReview = permissions.includes(
@@ -93,7 +94,9 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
         title: reviewData?.scenario?.title || '',
         description: reviewData?.scenario?.description || '',
         createdAt: reviewData?.scenarioSession?.createdAt || '',
-        duration: reviewData?.scenarioSession?.duration || '',
+        duration: formatDurationFromSeconds(
+          reviewData?.scenarioSession?.duration || 0,
+        ),
       },
       isEditNote: true,
       note: reviewData?.note,
@@ -109,7 +112,10 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
         metadata={metadata}
         onRefreshReactions={refetchReviewData}
         onEditNote={
-          reviewData && !isMinutesPassed(reviewData.createdAt)
+          reviewData &&
+          !isMinutesPassed(reviewData.createdAt) &&
+          userData?.id === reviewData.createdBy?.id &&
+          reviewData.reviewStatus !== ReviewStatus.HIDDEN
             ? handleEditNote
             : undefined
         }
