@@ -372,7 +372,7 @@ export function useReviewDetailsLogic({
                 }
                 return {
                   ...thread,
-                  comments: [...thread.comments, change.comment],
+                  comments: [change.comment, ...thread.comments],
                 };
               });
               break;
