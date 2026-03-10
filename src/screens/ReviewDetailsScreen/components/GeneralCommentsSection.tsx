@@ -16,6 +16,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {ReviewComment, UserProfileImage} from '@/components';
+import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {EDIT_COMMENT_TIME_LIMIT_MINUTES} from '@/constants';
 import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {useCommentActions, useTranslate, useUser} from '@/hooks';
@@ -33,6 +34,7 @@ export interface DeleteConfirmationState {
 
 export interface GeneralCommentsSectionRef {
   incrementReplyCount: (commentId: string) => void;
+  syncCommentChange: (change: ThreadCommentChange) => void;
 }
 
 interface GeneralCommentsSectionProps {
@@ -127,8 +129,45 @@ export const GeneralCommentsSection = React.forwardRef<
             [commentId]: (prev[commentId] || 0) + 1,
           }));
         },
+        syncCommentChange: (change: ThreadCommentChange) => {
+          setComments(prev => {
+            if (!prev) return prev;
+            switch (change.action) {
+              case 'add':
+                return {
+                  data: [...prev.data, change.comment],
+                  count: prev.count + 1,
+                };
+              case 'delete':
+                return {
+                  data: prev.data.filter(c => c.id !== change.commentId),
+                  count: Math.max(0, prev.count - 1),
+                };
+              case 'edit':
+                return {
+                  ...prev,
+                  data: prev.data.map(c =>
+                    c.id === change.commentId
+                      ? {...c, content: change.content}
+                      : c,
+                  ),
+                };
+              case 'hide':
+                return {
+                  ...prev,
+                  data: prev.data.map(c =>
+                    c.id === change.commentId
+                      ? {...c, hidden: change.hidden}
+                      : c,
+                  ),
+                };
+              default:
+                return prev;
+            }
+          });
+        },
       }),
-      [],
+      [setComments],
     );
 
     // --- Inline edit state ---

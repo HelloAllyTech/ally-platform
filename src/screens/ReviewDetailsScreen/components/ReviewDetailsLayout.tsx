@@ -18,6 +18,7 @@ import {
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
+import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
 import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
@@ -121,6 +122,13 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       }
     },
     [replySourceRef],
+  );
+
+  const handleGeneralCommentChange = useCallback(
+    (change: ThreadCommentChange) => {
+      generalCommentsSectionRef.current?.syncCommentChange(change);
+    },
+    [],
   );
 
   const generalCommentsFooter = useMemo(
@@ -233,7 +241,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerId={metadata?.reviewOwnerId}
         onThreadPress={onThreadPress}
         onReplyPress={onReplyPressFromGeneralComments}
-        onCommentsChanged={handleThreadCommentChange}
+        onCommentsChanged={handleGeneralCommentChange}
         generalCommentsThreadId={metadata?.generalCommentsThreadId || ''}
       />
       <MessageThreadsBottomSheet

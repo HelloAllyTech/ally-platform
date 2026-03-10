@@ -65,7 +65,12 @@ export const reviewsApi = api.injectEndpoints({
           content,
         },
       }),
-      invalidatesTags: ['ReviewDetails', 'ReviewMessages', 'Badges'],
+      invalidatesTags: [
+        'ReviewDetails',
+        'ReviewMessages',
+        'Badges',
+        'GeneralComments',
+      ],
     }),
     getMessages: builder.query<GetMessagesResponse, GetMessagesRequest>({
       query: ({reviewId, offset, limit, sortOrder, sortBy}) => {
