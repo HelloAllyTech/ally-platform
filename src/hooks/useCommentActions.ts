@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {Keyboard} from 'react-native';
 
 import {useUser} from '@/hooks/useUser';
@@ -8,7 +8,10 @@ import {getReactionAction} from '@/utils/reviews';
 
 import {ThreadCommentChange} from '../components/CommentThreadBottomSheet/types';
 
-type CommentsState = {data: MessageThreadComment[]; count: number} | null;
+export type CommentsState = {
+  data: MessageThreadComment[];
+  count: number;
+} | null;
 
 interface AddCommentPayload {
   reviewId: string;
@@ -62,6 +65,7 @@ export function useCommentActions(config: UseCommentActionsConfig) {
   const [commentText, setCommentText] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
+  const deleteGobackRef = useRef<(() => void) | null>(null);
 
   const handleEditComment = useCallback(
     (commentId: string, commentContent: string) => {
@@ -71,8 +75,17 @@ export function useCommentActions(config: UseCommentActionsConfig) {
     [],
   );
 
-  const handleDeleteComment = useCallback((commentId: string) => {
-    setDeleteCommentId(commentId);
+  const handleDeleteComment = useCallback(
+    (commentId: string, goback?: () => void) => {
+      setDeleteCommentId(commentId);
+      deleteGobackRef.current = goback || null;
+    },
+    [],
+  );
+
+  const handleCancelDelete = useCallback(() => {
+    deleteGobackRef.current = null;
+    setDeleteCommentId(null);
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -91,6 +104,8 @@ export function useCommentActions(config: UseCommentActionsConfig) {
     } catch (error) {
       console.error('Failed to delete comment:', error);
     } finally {
+      deleteGobackRef.current?.();
+      deleteGobackRef.current = null;
       setDeleteCommentId(null);
     }
   }, [deleteCommentFn, deleteCommentId, onCommentsChanged]);
@@ -275,6 +290,7 @@ export function useCommentActions(config: UseCommentActionsConfig) {
     setDeleteCommentId,
     handleEditComment,
     handleDeleteComment,
+    handleCancelDelete,
     handleConfirmDelete,
     handleHideComment,
     handleEmojiSelect,

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -45,8 +45,6 @@ export const ReviewScreen: React.FC = () => {
     setSelectedFilter,
   } = useReviews();
 
-  // State for expanded cards
-  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const permissions = useSelector(
     (state: AppRootState) => state.user.permissions,
   );
@@ -75,10 +73,6 @@ export const ReviewScreen: React.FC = () => {
 
   const handleReviewPress = (reviewId: string) => {
     navigation.navigate(SCREEN_NAMES.REVIEW_DETAILS, {reviewId});
-  };
-
-  const handleCommentPress = (reviewId: string) => {
-    setExpandedReviewId(prevId => (prevId === reviewId ? null : reviewId));
   };
 
   return (
@@ -115,10 +109,9 @@ export const ReviewScreen: React.FC = () => {
                   ? () => handleReviewPress(item.id)
                   : undefined
               }
-              onCommentPress={handleCommentPress}
               reactions={item.reactions}
-              isExpanded={expandedReviewId === item.id}
               note={item.note}
+              reviewType="simulation"
             />
           )}
           onEndReached={loadMore}

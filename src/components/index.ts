@@ -57,6 +57,7 @@ export {
 export {Checkbox} from './Checkbox';
 export {BottomSheet} from './BottomSheet';
 export type {BottomSheetProps, BottomSheetRef} from './BottomSheet';
+export {BottomSheetBackHeader} from './BottomSheetBackHeader';
 export {CommentBottomSheetFooter} from './CommentBottomSheetFooter';
 export type {CommentBottomSheetFooterProps} from './CommentBottomSheetFooter';
 export {EmojiPicker} from './EmojiPicker';
@@ -93,5 +94,6 @@ export {
   SimulationDetailsCard,
   SimulationDetailRow,
 } from './SimulationDetailsCard';
+export {ReviewTypeChip} from './ReviewTypeChip';
 export {LineTextInput} from './LineTextInput';
 export {CustomSwitch} from './CustomSwitch';

@@ -21,7 +21,6 @@ import {
 } from '@/components/CommentableText';
 import {Message as MessageComponent} from '@/components/Message';
 import {useTranslate} from '@/hooks';
-import {ReviewNote} from '@/screens/ReviewDetailsScreen/components';
 import {fontFamily, typography} from '@/theme';
 import {colors} from '@/theme/colors';
 import {MessageData, TextSelection} from '@/types/reviews';
@@ -54,10 +53,10 @@ export interface ConversationProps {
   reviewOwnerName?: string;
   /** Called when the user taps outside selectable text (e.g. timestamp, empty space) or scrolls */
   onDismissSelection?: () => void;
+  /** Rendered above the transcript */
+  listHeaderComponent?: React.ReactNode;
   /** Rendered below the transcript once all pages have loaded (hasMore = false) */
   listFooterComponent?: React.ReactNode;
-  reviewNote?: string;
-  onEditNote?: () => void;
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
@@ -72,9 +71,8 @@ export const Conversation: React.FC<ConversationProps> = ({
   isRefreshing = false,
   reviewOwnerName,
   onDismissSelection,
+  listHeaderComponent,
   listFooterComponent,
-  reviewNote,
-  onEditNote,
 }) => {
   const {t} = useTranslate();
 
@@ -258,21 +256,26 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
-  const renderDefaultMessage = (messageItem: MessageData) => (
-    <Text>
-      <Text style={styles.userName}>{messageItem.senderId}:</Text>{' '}
-      <Text style={styles.messageContent}>
-        {messageItem.messagePart.map((part, index) => (
-          <Text
-            disabled={part.commentIds.length === 0}
-            key={`${messageItem.id}-${index}`}
-            style={[part.commentIds.length > 0 && styles.highlightedText]}>
-            {part.text}
-          </Text>
-        ))}
+  const renderDefaultMessage = (messageItem: MessageData) => {
+    const isAiClient = messageItem.senderId === -1;
+    return (
+      <Text>
+        <Text style={isAiClient ? styles.clientAgentText : styles.userName}>
+          {getSenderName(isAiClient)}:
+        </Text>{' '}
+        <Text style={styles.messageContent}>
+          {messageItem.messagePart.map((part, index) => (
+            <Text
+              disabled={part.commentIds.length === 0}
+              key={`${messageItem.id}-${index}`}
+              style={[part.commentIds.length > 0 && styles.highlightedText]}>
+              {part.text}
+            </Text>
+          ))}
+        </Text>
       </Text>
-    </Text>
-  );
+    );
+  };
 
   const renderItem = ({item}: {item: MessageData}) => {
     const isAiClient = item.senderId === -1;
@@ -336,6 +339,13 @@ export const Conversation: React.FC<ConversationProps> = ({
     );
   };
 
+  const headerElement = useMemo(() => {
+    if (listHeaderComponent) {
+      return <>{listHeaderComponent}</>;
+    }
+    return null;
+  }, [listHeaderComponent]);
+
   const footerElement = useMemo(() => {
     if (isLoadingMore) {
       return (
@@ -362,11 +372,7 @@ export const Conversation: React.FC<ConversationProps> = ({
         renderItem={renderItem}
         ListEmptyComponent={renderEmptyComponent}
         ListFooterComponent={footerElement}
-        {...(reviewNote && {
-          ListHeaderComponent: (
-            <ReviewNote note={reviewNote} onEditNote={onEditNote} />
-          ),
-        })}
+        ListHeaderComponent={headerElement}
         onEndReached={hasMore ? onLoadMore : undefined}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
@@ -391,6 +397,7 @@ export const Conversation: React.FC<ConversationProps> = ({
           }
         }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       />
 
       {/* iOS floating "Add comment" menu — rendered OUTSIDE the FlatList
@@ -450,7 +457,6 @@ const styles = ScaledSheet.create({
   },
   androidRow: {
     flexDirection: 'row',
-    paddingHorizontal: '16@ms',
     paddingVertical: '6@mvs',
     gap: '16@ms',
   },

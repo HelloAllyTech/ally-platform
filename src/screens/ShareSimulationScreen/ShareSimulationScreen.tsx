@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
+import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import EmojiKeyboard, {type EmojiType} from 'rn-emoji-keyboard';
@@ -16,6 +16,8 @@ import {useAppNavigation, useShareReview} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {colors, fontFamily, typography} from '@/theme';
 import {formatDateTime, formatDurationFromSeconds} from '@/utils';
+
+const MAX_NOTE_LENGTH = 250;
 
 export const ShareSimulationScreen: React.FC<
   RootStackScreenProps<'ShareSimulation'>
@@ -46,7 +48,12 @@ export const ShareSimulationScreen: React.FC<
 
   const handleEmojiSelected = useCallback(
     (emoji: EmojiType) => {
-      setNote(prev => prev + emoji.emoji);
+      setNote(prev => {
+        if (Array.from(prev).length < MAX_NOTE_LENGTH) {
+          return prev + emoji.emoji;
+        }
+        return prev;
+      });
     },
     [setNote],
   );
@@ -71,13 +78,21 @@ export const ShareSimulationScreen: React.FC<
   };
 
   return (
-    <SafeAreaView style={[{paddingTop: insets.top}, styles.container]}>
+    <ScrollView
+      style={[{paddingTop: insets.top}, styles.scrollView]}
+      contentContainerStyle={[styles.container]}>
       {renderScreenHeader()}
       <LineTextInput
         placeholder="Add a note..."
         value={note}
         onChangeText={setNote}
+        maxLength={MAX_NOTE_LENGTH}
       />
+      <View>
+        <Text style={styles.noteLength}>
+          {Array.from(note).length}/{MAX_NOTE_LENGTH}
+        </Text>
+      </View>
       <View>
         <SimulationDetailRow
           label={t('Review.card.dateAndTime')}
@@ -91,6 +106,7 @@ export const ShareSimulationScreen: React.FC<
         )}
       </View>
       <SimulationDetailsCard
+        reviewType="simulation"
         coverImageUrl={scenarioData.coverImageUrl}
         coverVideoUrl={scenarioData.coverVideoUrl}
         title={scenarioData.title}
@@ -108,18 +124,25 @@ export const ShareSimulationScreen: React.FC<
         open={isEmojiPickerOpen}
         onClose={() => setIsEmojiPickerOpen(false)}
         onEmojiSelected={handleEmojiSelected}
+        allowMultipleSelections
+        enableRecentlyUsed
+        enableSearchBar
+        hideHeader
       />
-    </SafeAreaView>
+    </ScrollView>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
-    paddingVertical: '32@ms',
-    paddingHorizontal: '24@ms',
     backgroundColor: colors.ds.neutral.white,
+  },
+  container: {
+    paddingBottom: '32@ms',
+    paddingHorizontal: '24@ms',
     gap: '16@ms',
+    flexGrow: 1,
   },
   screenHeader: {
     flexDirection: 'row',
@@ -134,5 +157,11 @@ const styles = ScaledSheet.create({
   },
   button: {
     marginTop: 'auto',
+  },
+  noteLength: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.tiny,
+    color: colors.ds.typography.lowEmphasis,
+    marginLeft: 'auto',
   },
 });

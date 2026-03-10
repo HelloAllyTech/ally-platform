@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Text,
@@ -26,6 +26,7 @@ export interface DeleteConfirmationState {
 }
 
 interface GeneralCommentsSectionProps {
+  isPrivate?: boolean;
   reviewId: string;
   generalCommentsThreadId?: string;
   reviewOwnerId?: number;
@@ -34,6 +35,7 @@ interface GeneralCommentsSectionProps {
 }
 
 export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
+  isPrivate,
   reviewId,
   generalCommentsThreadId,
   reviewOwnerId,
@@ -67,9 +69,10 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     setComments,
     commentText,
     setCommentText,
+    editingCommentId,
+    setEditingCommentId,
     deleteCommentId,
-    setDeleteCommentId,
-    handleEditComment,
+    handleCancelDelete,
     handleDeleteComment,
     handleConfirmDelete,
     handleHideComment,
@@ -92,10 +95,50 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     },
   });
 
-  const closeDeleteModal = useCallback(
-    () => setDeleteCommentId(null),
-    [setDeleteCommentId],
+  // --- Inline edit state ---
+  const [editText, setEditText] = useState('');
+  const editInputRef = useRef<TextInput>(null);
+
+  const handleEditCommentInline = useCallback(
+    (commentId: string, commentContent: string) => {
+      setEditingCommentId(commentId);
+      setEditText(commentContent);
+    },
+    [setEditingCommentId],
   );
+
+  const isSubmittingEditRef = useRef(false);
+
+  const handleCancelEdit = useCallback(() => {
+    // Delay to let a pending send-button press fire before cancelling
+    setTimeout(() => {
+      if (!isSubmittingEditRef.current) {
+        setEditingCommentId(null);
+        setEditText('');
+      }
+    }, 150);
+  }, [setEditingCommentId]);
+
+  const handleSubmitEdit = useCallback(() => {
+    if (!editText.trim() || !editingCommentId) return;
+    isSubmittingEditRef.current = true;
+    onSubmitComment(editText, reviewId, generalCommentsThreadId);
+    isSubmittingEditRef.current = false;
+  }, [
+    editText,
+    editingCommentId,
+    onSubmitComment,
+    reviewId,
+    generalCommentsThreadId,
+  ]);
+
+  useEffect(() => {
+    if (!editingCommentId) {
+      setEditText('');
+    }
+  }, [editingCommentId]);
+
+  const closeDeleteModal = handleCancelDelete;
 
   useEffect(() => {
     onDeleteConfirmationChange?.(
@@ -157,9 +200,18 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
   const handleSubmit = useCallback(() => {
     if (!commentText.trim()) return;
+    if (editingCommentId) {
+      setEditingCommentId(null);
+    }
     onSubmitComment(commentText, reviewId, generalCommentsThreadId);
-    // useCommentActions clears commentText and dismisses keyboard in its finally block
-  }, [commentText, onSubmitComment, reviewId, generalCommentsThreadId]);
+  }, [
+    commentText,
+    onSubmitComment,
+    reviewId,
+    generalCommentsThreadId,
+    editingCommentId,
+    setEditingCommentId,
+  ]);
 
   const handleLoadMore = useCallback(async () => {
     if (isLoading || isFetching || !hasMore || !reviewId) return;
@@ -184,6 +236,54 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
   const renderComment = useCallback(
     (comment: MessageThreadComment) => {
+      if (editingCommentId === comment.id) {
+        return (
+          <View key={comment.id} style={styles.inputRow}>
+            <UserProfileImage
+              name={comment.createdBy.name}
+              profileImageUri={comment.createdBy.profileImage ?? undefined}
+              size={36}
+            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                ref={editInputRef}
+                style={styles.input}
+                value={editText}
+                onChangeText={setEditText}
+                onSubmitEditing={handleSubmitEdit}
+                onBlur={handleCancelEdit}
+                returnKeyType="send"
+                multiline={false}
+                autoFocus
+                placeholder={t('ThreadsBottomSheet.addComment')}
+                placeholderTextColor={colors.ds.typography.mediumEmphasis}
+              />
+              {!!editText.trim() && (
+                <TouchableOpacity
+                  style={[
+                    styles.sendButton,
+                    isSubmitting && styles.sendButtonDisabled,
+                  ]}
+                  onPress={handleSubmitEdit}
+                  disabled={isSubmitting}
+                  activeOpacity={0.7}>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <LeftArrowIcon
+                      color={colors.white}
+                      width={24}
+                      height={24}
+                      style={styles.arrowIcon}
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        );
+      }
+
       const reactionsArray = getReactionsArray(comment.reactions);
       const reactionCount = getTotalReactionCount(comment.reactions);
       return (
@@ -211,22 +311,30 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
               comment.createdAt || '',
               EDIT_COMMENT_TIME_LIMIT_MINUTES,
             ) && {
-              onEdit: handleEditComment,
+              onEdit: handleEditCommentInline,
             })}
             onDelete={handleDeleteComment}
             onHide={handleHideComment}
-            showActionsMenu
+            showActionsMenu={!isPrivate}
+            disableAddReactionButton={isPrivate}
           />
         </View>
       );
     },
     [
+      editingCommentId,
+      editText,
+      isSubmitting,
+      handleEditCommentInline,
+      handleCancelEdit,
+      handleSubmitEdit,
       handleEmojiSelect,
+      isPrivate,
       userId,
       reviewOwnerId,
-      handleEditComment,
       handleDeleteComment,
       handleHideComment,
+      t,
     ],
   );
 
@@ -273,46 +381,48 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>{t('ThreadsBottomSheet.title')}</Text>
 
-      <View style={styles.inputRow}>
-        <UserProfileImage
-          name={userData?.name}
-          profileImageUri={userData?.profileImageUrl ?? undefined}
-          size={36}
-        />
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('ThreadsBottomSheet.addComment')}
-            placeholderTextColor={colors.ds.typography.mediumEmphasis}
-            value={commentText}
-            onChangeText={setCommentText}
-            onSubmitEditing={handleSubmit}
-            returnKeyType="send"
-            multiline={false}
+      {!isPrivate && (
+        <View style={styles.inputRow}>
+          <UserProfileImage
+            name={userData?.name}
+            profileImageUri={userData?.profileImageUrl ?? undefined}
+            size={36}
           />
-          {!!commentText.trim() && (
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                isSubmitting && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-              activeOpacity={0.7}>
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.white} size="small" />
-              ) : (
-                <LeftArrowIcon
-                  color={colors.white}
-                  width={24}
-                  height={24}
-                  style={styles.arrowIcon}
-                />
-              )}
-            </TouchableOpacity>
-          )}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('ThreadsBottomSheet.addComment')}
+              placeholderTextColor={colors.ds.typography.mediumEmphasis}
+              value={commentText}
+              onChangeText={setCommentText}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="send"
+              multiline={false}
+            />
+            {!!commentText.trim() && (
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  isSubmitting && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                activeOpacity={0.7}>
+                {isSubmitting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <LeftArrowIcon
+                    color={colors.white}
+                    width={24}
+                    height={24}
+                    style={styles.arrowIcon}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {generalCommentsThreadId ? renderBody() : null}
     </View>
@@ -321,7 +431,6 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
 const styles = ScaledSheet.create({
   container: {
-    paddingHorizontal: '14@s',
     paddingTop: '24@vs',
     gap: '16@vs',
   },

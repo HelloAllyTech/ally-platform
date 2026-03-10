@@ -28,6 +28,7 @@ import {
   DeleteConfirmationState,
   GeneralCommentsSection,
 } from './GeneralCommentsSection';
+import {ReviewNote} from './ReviewNote';
 
 interface ReviewDetailsLayoutProps {
   reviewId: string;
@@ -115,6 +116,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   const generalCommentsFooter = useMemo(
     () => (
       <GeneralCommentsSection
+        isPrivate={isPrivate}
         reviewId={reviewId}
         generalCommentsThreadId={metadata?.generalCommentsThreadId}
         reviewOwnerId={metadata?.reviewOwnerId}
@@ -123,6 +125,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       />
     ),
     [
+      isPrivate,
       reviewId,
       metadata?.generalCommentsThreadId,
       metadata?.reviewOwnerId,
@@ -130,6 +133,28 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
       handleDeleteConfirmationChange,
     ],
   );
+
+  const noteElementHeader = useMemo(() => {
+    if (reviewNote) {
+      return (
+        <ReviewNote
+          note={reviewNote}
+          onEditNote={
+            metadata?.reviewOwnerId === userData?.id && !isPrivate
+              ? onEditNote
+              : undefined
+          }
+        />
+      );
+    }
+    return null;
+  }, [
+    reviewNote,
+    metadata?.reviewOwnerId,
+    userData?.id,
+    onEditNote,
+    isPrivate,
+  ]);
 
   if (isLoading) {
     return (
@@ -168,12 +193,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         reviewOwnerName={metadata?.createdBy?.name}
         onDismissSelection={resetCommentInput}
         listFooterComponent={generalCommentsFooter}
-        reviewNote={reviewNote}
-        onEditNote={
-          canEditReview && metadata?.reviewOwnerId === userData?.id
-            ? onEditNote
-            : undefined
-        }
+        listHeaderComponent={noteElementHeader}
       />
 
       <View style={styles.interactionsBarContainer}>
@@ -202,6 +222,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         isLoading={isAddingComment}
       />
       <ThreadsBottomSheet
+        isPrivate={isPrivate}
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={reviewId}

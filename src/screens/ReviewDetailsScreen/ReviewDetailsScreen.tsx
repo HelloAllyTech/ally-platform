@@ -612,9 +612,6 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         isRefreshing={isFetching && offset === 0}
         reviewOwnerName={reviewData?.createdBy?.name}
         onDismissSelection={resetCommentInput}
-        onEditNote={
-          reviewData?.createdBy?.id === userId ? handleEditNote : undefined
-        }
       />
       {/* Comment input bottom sheet */}
 
@@ -642,6 +639,7 @@ export const ReviewDetailsScreen: React.FC<Props> = ({route}) => {
         isLoading={isAddingComment}
       />
       <ThreadsBottomSheet
+        isPrivate={isPrivate}
         visible={isThreadsBottomSheetVisible}
         onClose={closeThreadsBottomSheet}
         reviewId={_reviewId}

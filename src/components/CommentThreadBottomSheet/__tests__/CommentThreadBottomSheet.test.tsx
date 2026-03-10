@@ -45,7 +45,7 @@ jest.mock('@/hooks', () => ({
     editingCommentId: null,
     setEditingCommentId: jest.fn(),
     deleteCommentId: null,
-    setDeleteCommentId: jest.fn(),
+    handleCancelDelete: jest.fn(),
     handleEditComment: jest.fn(),
     handleDeleteComment: jest.fn(),
     handleConfirmDelete: jest.fn(),
@@ -55,6 +55,15 @@ jest.mock('@/hooks', () => ({
     isSubmitting: false,
     userId: 1,
   }),
+  usePaginatedComments: () => ({
+    hasMore: false,
+    hasLoadedOnce: false,
+    appendData: jest.fn(),
+    reset: jest.fn(),
+    getNextOffset: jest.fn(),
+    canLoadMore: jest.fn(() => false),
+  }),
+  useStableFooterRenderer: () => jest.fn(),
 }));
 
 const mockGetThreadComments = jest.fn().mockResolvedValue({
@@ -96,6 +105,16 @@ jest.mock('@/components', () => {
             }),
           )
         : null,
+    BottomSheetBackHeader: ({title, onBack}: any) =>
+      React.createElement(
+        View,
+        {testID: 'bottom-sheet-back-header'},
+        React.createElement(Text, null, title),
+        React.createElement(TouchableOpacity, {
+          testID: 'back-button',
+          onPress: onBack,
+        }),
+      ),
     CommentBottomSheetFooter: () =>
       React.createElement(View, {testID: 'comment-bottom-sheet-footer'}),
     ConfirmationModal: ({visible}: any) =>
@@ -171,16 +190,11 @@ describe('CommentThreadBottomSheet', () => {
   });
 
   it('calls hideCommentThreadBottomSheet when back button is pressed', () => {
-    const {UNSAFE_getAllByType} = render(
+    const {getByTestId} = render(
       <CommentThreadBottomSheet {...defaultProps} />,
     );
-    const {TouchableOpacity} = require('react-native');
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const backButton = touchables[0];
-    if (backButton) {
-      fireEvent.press(backButton);
-      expect(mockHideCommentThreadBottomSheet).toHaveBeenCalledTimes(1);
-    }
+    fireEvent.press(getByTestId('back-button'));
+    expect(mockHideCommentThreadBottomSheet).toHaveBeenCalledTimes(1);
   });
 
   it('shows loading state while fetching comments', () => {
