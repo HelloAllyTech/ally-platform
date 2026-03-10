@@ -1,5 +1,5 @@
-// TODO: Replace placeholder URLs with actual backend endpoints once available
-import {API_METHODS} from '@/constants';
+// Scenario session reviews – general comments
+import {API_METHODS, API_ROUTES} from '@/constants';
 import {
   AddReviewCommentRequest,
   AddReviewCommentResponse,
@@ -20,9 +20,8 @@ export const generalCommentsApi = api.injectEndpoints({
       GetThreadCommentsResponse,
       GetGeneralCommentsParams
     >({
-      // TODO: Update URL when backend endpoint is finalized
       query: ({reviewId, offset, limit}) => ({
-        url: `/reviews/${reviewId}/general-comments`,
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENTS(reviewId),
         method: API_METHODS.GET,
         ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
           ? {params: {offset, limit}}
@@ -34,9 +33,8 @@ export const generalCommentsApi = api.injectEndpoints({
       AddReviewCommentResponse,
       Pick<AddReviewCommentRequest, 'reviewId' | 'content'>
     >({
-      // TODO: Update URL when backend endpoint is finalized
       query: ({reviewId, content}) => ({
-        url: `/reviews/${reviewId}/general-comments`,
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENTS(reviewId),
         method: API_METHODS.POST,
         body: {content},
       }),
@@ -46,9 +44,8 @@ export const generalCommentsApi = api.injectEndpoints({
       {success: boolean},
       {commentId: string}
     >({
-      // TODO: Update URL when backend endpoint is finalized
       query: ({commentId}) => ({
-        url: `/reviews/general-comments/${commentId}`,
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENT_BY_ID(commentId),
         method: API_METHODS.DELETE,
       }),
       invalidatesTags: ['GeneralComments'],
@@ -57,9 +54,8 @@ export const generalCommentsApi = api.injectEndpoints({
       {success: boolean},
       {commentId: string; content: string}
     >({
-      // TODO: Update URL when backend endpoint is finalized
       query: ({commentId, content}) => ({
-        url: `/reviews/general-comments/${commentId}`,
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENT_BY_ID(commentId),
         method: API_METHODS.PATCH,
         body: {content},
       }),
@@ -69,9 +65,10 @@ export const generalCommentsApi = api.injectEndpoints({
       {success: boolean},
       {commentId: string; hidden: boolean}
     >({
-      // TODO: Update URL when backend endpoint is finalized
       query: ({commentId, hidden}) => ({
-        url: `/reviews/general-comments/${commentId}/visibility`,
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENT_VISIBILITY(
+          commentId,
+        ),
         method: API_METHODS.PATCH,
         body: {hidden},
       }),

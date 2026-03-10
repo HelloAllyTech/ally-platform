@@ -21,14 +21,14 @@ export const reviewsApi = api.injectEndpoints({
   endpoints: builder => ({
     createReview: builder.mutation<CreateReviewResponse, CreateReviewRequest>({
       query: body => ({
-        url: API_ROUTES.REVIEWS.CREATE_REVIEW,
+        url: API_ROUTES.SIMULATION_REVIEWS.CREATE_REVIEW,
         method: API_METHODS.POST,
         body,
       }),
     }),
     getReview: builder.query<GetReviewResponse, {reviewId: string}>({
       query: ({reviewId}) => ({
-        url: API_ROUTES.REVIEWS.GET_REVIEW(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.GET_REVIEW(reviewId),
         method: API_METHODS.GET,
       }),
     }),
@@ -37,7 +37,7 @@ export const reviewsApi = api.injectEndpoints({
       {reviewId: string; body: UpdateReviewStatusRequest}
     >({
       query: ({reviewId, body}) => ({
-        url: API_ROUTES.REVIEWS.UPDATE_REVIEW_STATUS(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.UPDATE_REVIEW_STATUS(reviewId),
         method: API_METHODS.PATCH,
         body,
       }),
@@ -55,7 +55,7 @@ export const reviewsApi = api.injectEndpoints({
         selection,
         content,
       }) => ({
-        url: API_ROUTES.REVIEWS.ADD_REVIEW_COMMENT(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.ADD_REVIEW_COMMENT(reviewId),
         method: API_METHODS.POST,
         body: {
           threadId,
@@ -75,7 +75,7 @@ export const reviewsApi = api.injectEndpoints({
     getMessages: builder.query<GetMessagesResponse, GetMessagesRequest>({
       query: ({reviewId, offset, limit, sortOrder, sortBy}) => {
         return {
-          url: API_ROUTES.REVIEWS.GET_MESSAGES(reviewId),
+          url: API_ROUTES.SIMULATION_REVIEWS.GET_MESSAGES(reviewId),
           method: API_METHODS.GET,
           params: {
             offset,
@@ -93,7 +93,7 @@ export const reviewsApi = api.injectEndpoints({
     >({
       query: ({threadId, offset, limit}) => {
         return {
-          url: API_ROUTES.REVIEWS.GET_THREAD_COMMENTS(threadId),
+          url: API_ROUTES.SIMULATION_REVIEWS.GET_THREAD_COMMENTS(threadId),
           method: API_METHODS.GET,
           ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
             ? {params: {offset, limit}}
@@ -106,14 +106,14 @@ export const reviewsApi = api.injectEndpoints({
       {sortBy: string; limit: number; offset: number}
     >({
       query: ({sortBy, limit, offset}) => ({
-        url: API_ROUTES.REVIEWS.REVIEWS,
+        url: API_ROUTES.SIMULATION_REVIEWS.REVIEWS,
         method: API_METHODS.GET,
         params: {sortBy, limit, offset, order: SortOrder.DESC},
       }),
     }),
     getReviewById: builder.query<GetReviewByIdResponse, {reviewId: string}>({
       query: ({reviewId}) => ({
-        url: API_ROUTES.REVIEWS.REVIEW_BY_ID(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.REVIEW_BY_ID(reviewId),
         method: API_METHODS.GET,
       }),
       providesTags: ['ReviewDetails'],
@@ -124,7 +124,7 @@ export const reviewsApi = api.injectEndpoints({
       {commentId: string; hidden: boolean}
     >({
       query: ({commentId, hidden}) => ({
-        url: API_ROUTES.REVIEWS.UPDATE_COMMENT_VISIBILITY(commentId),
+        url: API_ROUTES.SIMULATION_REVIEWS.UPDATE_COMMENT_VISIBILITY(commentId),
         method: API_METHODS.PATCH,
         body: {hidden},
       }),
@@ -134,7 +134,7 @@ export const reviewsApi = api.injectEndpoints({
       {commentId: string; content: string}
     >({
       query: ({commentId, content}) => ({
-        url: API_ROUTES.REVIEWS.UPDATE_COMMENT(commentId),
+        url: API_ROUTES.SIMULATION_REVIEWS.UPDATE_COMMENT(commentId),
         method: API_METHODS.PATCH,
         body: {content},
       }),
@@ -142,7 +142,7 @@ export const reviewsApi = api.injectEndpoints({
     }),
     deleteComment: builder.mutation<{success: boolean}, {commentId: string}>({
       query: ({commentId}) => ({
-        url: API_ROUTES.REVIEWS.DELETE_COMMENT(commentId),
+        url: API_ROUTES.SIMULATION_REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
       invalidatesTags: ['ReviewThreads', 'ReviewDetails', 'Badges'],
@@ -152,7 +152,9 @@ export const reviewsApi = api.injectEndpoints({
       {reviewId: string; offset?: number; limit?: number}
     >({
       query: ({reviewId, offset, limit}) => ({
-        url: API_ROUTES.REVIEWS.GET_GENERAL_REVIEW_COMMENTS(reviewId),
+        url: API_ROUTES.SIMULATION_REVIEWS.GET_GENERAL_REVIEW_COMMENTS(
+          reviewId,
+        ),
         method: API_METHODS.GET,
         ...(typeof offset !== 'undefined' && typeof limit !== 'undefined'
           ? {params: {offset, limit}}

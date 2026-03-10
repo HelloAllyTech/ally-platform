@@ -180,62 +180,81 @@ export const API_ROUTES = {
     ) =>
       `/learn/scenario-session/${scenarioSessionId}/reflection-prompts/${reflectionPromptId}`,
   },
-  REVIEWS: {
-    REVIEWS: '/reviews',
-    CREATE_REVIEW: '/reviews',
-    GET_REVIEW: (reviewId: string) => `/reviews/${reviewId}`,
-    REVIEW_BY_ID: (reviewId: string) => `/reviews/${reviewId}`,
-    UPDATE_REVIEW_STATUS: (reviewId: string) => `/reviews/${reviewId}`,
-    ADD_REVIEW_COMMENT: (reviewId: string) => `/reviews/${reviewId}/comments`,
+  SIMULATION_REVIEWS: {
+    REVIEWS: '/scenario-session-reviews',
+    CREATE_REVIEW: '/scenario-session-reviews',
+    GET_REVIEW: (reviewId: string) => `/scenario-session-reviews/${reviewId}`,
+    REVIEW_BY_ID: (reviewId: string) => `/scenario-session-reviews/${reviewId}`,
+    UPDATE_REVIEW_STATUS: (reviewId: string) =>
+      `/scenario-session-reviews/${reviewId}`,
+    ADD_REVIEW_COMMENT: (reviewId: string) =>
+      `/scenario-session-reviews/${reviewId}/comments`,
     GET_GENERAL_REVIEW_COMMENTS: (reviewId: string) =>
-      `/reviews/${reviewId}/comments`,
-    GET_MESSAGES: (reviewId: string) => `/reviews/${reviewId}/messages`,
-    REACTIONS: (reviewId: string | number) => `/reviews/${reviewId}/reactions`,
+      `/scenario-session-reviews/${reviewId}/comments`,
+    GET_MESSAGES: (reviewId: string) =>
+      `/scenario-session-reviews/${reviewId}/messages`,
+    REACTIONS: (reviewId: string | number) =>
+      `/scenario-session-reviews/${reviewId}/reactions`,
     REACTIONS_COUNT: (reviewId: string | number) =>
-      `/reviews/${reviewId}/reactions/count`,
-    THREADS: (reviewId: string | number) => `/reviews/${reviewId}/threads`,
+      `/scenario-session-reviews/${reviewId}/reactions/count`,
+    THREADS: (reviewId: string | number) =>
+      `/scenario-session-reviews/${reviewId}/threads`,
     GET_THREAD_COMMENTS: (threadId: string) =>
-      `/reviews/threads/${threadId}/comments`,
+      `/scenario-session-reviews/threads/${threadId}/comments`,
     GET_COMMENT_REPLIES: (commentId: string) =>
-      `/reviews/comments/${commentId}/replies`,
+      `/scenario-session-reviews/comments/${commentId}/replies`,
     UPDATE_COMMENT_VISIBILITY: (commentId: string) =>
-      `/reviews/comments/${commentId}/visibility`,
-    UPDATE_COMMENT: (commentId: string) => `/reviews/comments/${commentId}`,
-    DELETE_COMMENT: (commentId: string) => `/reviews/comments/${commentId}`,
+      `/scenario-session-reviews/comments/${commentId}/visibility`,
+    UPDATE_COMMENT: (commentId: string) =>
+      `/scenario-session-reviews/comments/${commentId}`,
+    DELETE_COMMENT: (commentId: string) =>
+      `/scenario-session-reviews/comments/${commentId}`,
     ADD_REACTION_TO_COMMENT: (commentId: string) =>
-      `/reviews/comments/${commentId}/reactions`,
+      `/scenario-session-reviews/comments/${commentId}/reactions`,
     ADD_REACTION_TO_REVIEW: (reviewId: string) =>
-      `/reviews/${reviewId}/reactions`,
-  },
-  // TODO: Update scribe URL patterns once backend confirms exact paths
-  SCRIBE_REVIEWS: {
-    REVIEW_BY_ID: (reviewId: string) => `/scribe/${reviewId}`,
-    ADD_REVIEW_COMMENT: (reviewId: string) => `/scribe/${reviewId}/comments`,
-    GET_GENERAL_REVIEW_COMMENTS: (reviewId: string) =>
-      `/scribe/${reviewId}/comments`,
-    GET_MESSAGES: (reviewId: string) => `/scribe/${reviewId}/messages`,
-    REACTIONS: (reviewId: string | number) => `/scribe/${reviewId}/reactions`,
-    REACTIONS_COUNT: (reviewId: string | number) =>
-      `/scribe/${reviewId}/reactions/count`,
-    THREADS: (reviewId: string | number) => `/scribe/${reviewId}/threads`,
-    GET_THREAD_COMMENTS: (threadId: string) =>
-      `/scribe/threads/${threadId}/comments`,
-    GET_COMMENT_REPLIES: (commentId: string) =>
-      `/scribe/comments/${commentId}/replies`,
-    UPDATE_COMMENT_VISIBILITY: (commentId: string) =>
-      `/scribe/comments/${commentId}/visibility`,
-    UPDATE_COMMENT: (commentId: string) => `/scribe/comments/${commentId}`,
-    DELETE_COMMENT: (commentId: string) => `/scribe/comments/${commentId}`,
-    ADD_REACTION_TO_COMMENT: (commentId: string) =>
-      `/scribe/comments/${commentId}/reactions`,
-    ADD_REACTION_TO_REVIEW: (reviewId: string) =>
-      `/scribe/${reviewId}/reactions`,
+      `/scenario-session-reviews/${reviewId}/reactions`,
     GENERAL_COMMENTS: (reviewId: string) =>
-      `/scribe/${reviewId}/general-comments`,
+      `/scenario-session-reviews/${reviewId}/general-comments`,
     GENERAL_COMMENT_BY_ID: (commentId: string) =>
-      `/scribe/general-comments/${commentId}`,
+      `/scenario-session-reviews/general-comments/${commentId}`,
     GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
-      `/scribe/general-comments/${commentId}/visibility`,
+      `/scenario-session-reviews/general-comments/${commentId}/visibility`,
+  },
+  // Scribe session reviews
+  SCRIBE_REVIEWS: {
+    REVIEW_BY_ID: (reviewId: string) => `/scribe-session-reviews/${reviewId}`,
+    ADD_REVIEW_COMMENT: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/comments`,
+    GET_GENERAL_REVIEW_COMMENTS: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/comments`,
+    GET_MESSAGES: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/messages`,
+    REACTIONS: (reviewId: string | number) =>
+      `/scribe-session-reviews/${reviewId}/reactions`,
+    REACTIONS_COUNT: (reviewId: string | number) =>
+      `/scribe-session-reviews/${reviewId}/reactions/count`,
+    THREADS: (reviewId: string | number) =>
+      `/scribe-session-reviews/${reviewId}/threads`,
+    GET_THREAD_COMMENTS: (threadId: string) =>
+      `/scribe-session-reviews/threads/${threadId}/comments`,
+    GET_COMMENT_REPLIES: (commentId: string) =>
+      `/scribe-session-reviews/comments/${commentId}/replies`,
+    UPDATE_COMMENT_VISIBILITY: (commentId: string) =>
+      `/scribe-session-reviews/comments/${commentId}/visibility`,
+    UPDATE_COMMENT: (commentId: string) =>
+      `/scribe-session-reviews/comments/${commentId}`,
+    DELETE_COMMENT: (commentId: string) =>
+      `/scribe-session-reviews/comments/${commentId}`,
+    ADD_REACTION_TO_COMMENT: (commentId: string) =>
+      `/scribe-session-reviews/comments/${commentId}/reactions`,
+    ADD_REACTION_TO_REVIEW: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/reactions`,
+    GENERAL_COMMENTS: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/general-comments`,
+    GENERAL_COMMENT_BY_ID: (commentId: string) =>
+      `/scribe-session-reviews/general-comments/${commentId}`,
+    GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
+      `/scribe-session-reviews/general-comments/${commentId}/visibility`,
   },
   BADGES: {
     GET_BADGES: `/badges/me`,
