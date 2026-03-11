@@ -139,6 +139,55 @@ class TestMetadataParsingIntegration:
         assert "🇧🇷" in scenario.prompt_data.current_location
 
     @pytest.mark.integration
+    def test_custom_fields_filtering_integration(self):
+        """Test that custom fields include useInDefaultPrompt flag correctly."""
+        payload = create_room_metadata_envelope_payload(
+            scenario={
+                "promptData": {
+                    "customFields": [
+                        {
+                            "name": "Field 1",
+                            "value": "Visible",
+                            "useInDefaultPrompt": True,
+                        },
+                        {
+                            "name": "Field 2",
+                            "value": "Hidden",
+                            "useInDefaultPrompt": False,
+                        },
+                        {
+                            "name": "Field 3",
+                            "value": "Default Visible",
+                        },  # No flag, should default to True
+                    ]
+                }
+            }
+        )
+
+        json_metadata = json.dumps(payload)
+        envelope = parse_room_metadata(json_metadata)
+        scenario = envelope.scenario
+
+        # Verify parsing
+        custom_fields = scenario.prompt_data.custom_fields
+        assert len(custom_fields) == 3
+        assert custom_fields[0]["useInDefaultPrompt"] is True
+        assert custom_fields[1]["useInDefaultPrompt"] is False
+        assert "useInDefaultPrompt" not in custom_fields[2]
+
+        # Verify prompt generation filtering
+        from app.core.graph.prompt import _format_custom_fields
+
+        formatted = _format_custom_fields(custom_fields)
+
+        assert "Field 1" in formatted
+        assert "Visible" in formatted
+        assert "Field 2" not in formatted
+        assert "Hidden" not in formatted
+        assert "Field 3" in formatted
+        assert "Default Visible" in formatted
+
+    @pytest.mark.integration
     @pytest.mark.parametrize("provider", ["deepgram", "elevenlabs", "sarvam"])
     def test_voice_provider_integration(self, provider):
         """Test integration with different voice providers."""

@@ -6,7 +6,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from app.core.logger import get_logger
-from app.core.scenario.base import Scenario
+from app.core.scenario.base import PromptData, Scenario
 from app.llms import BaseLLMClient
 from app.prompts.resolver import load_and_format, load_template
 from app.speech_prosody.constants import DEFAULT_CONVERSATION_HISTORY_LIMIT
@@ -18,6 +18,35 @@ from app.speech_prosody.utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def _get_prosody_identity_context(prompt_data: PromptData) -> str:
+    """
+    Get a minimized identity context for prosody generation to avoid OOM.
+    Includes only essential fields for emotional/vocal baseline analysis.
+    """
+    parts = []
+    if prompt_data.name:
+        parts.append(f"NAME: {prompt_data.name}")
+    if prompt_data.age:
+        parts.append(f"AGE: {prompt_data.age}")
+    if prompt_data.gender:
+        parts.append(f"GENDER: {prompt_data.gender}")
+    if prompt_data.personality:
+        parts.append(f"PERSONALITY: {prompt_data.personality}")
+    if prompt_data.tone:
+        parts.append(f"TONE: {prompt_data.tone}")
+    if prompt_data.starting_state:
+        parts.append(f"STARTING STATE: {prompt_data.starting_state}")
+
+    # Life history can be very large; provide a truncated version
+    if prompt_data.life_history_summary:
+        history = prompt_data.life_history_summary
+        if len(history) > 500:
+            history = history[:500] + "..."
+        parts.append(f"LIFE HISTORY: {history}")
+
+    return "\n".join(parts)
 
 
 async def generate_default_parameters(
@@ -37,21 +66,9 @@ async def generate_default_parameters(
         Dict with parameter names as keys and default values, or None if failed
     """
     try:
-        # Get prompt content (same as agent LLM uses)
-        # Import here to avoid circular dependency with app.core.graph
-        from app.core.constants import DEFAULT_LANGUAGE_CODE
-        from app.core.graph.prompt import generate_prompt_content
-
-        language_code = (
-            scenario.language_config.language_code
-            if scenario.language_config
-            else DEFAULT_LANGUAGE_CODE
-        )
-        prompt_content = generate_prompt_content(
-            prompt_data=scenario.prompt_data,
-            next_instruction=None,
-            language_code=language_code,
-        )
+        # Use minimized identity context instead of fully expanded prompt_content
+        # to avoid triggering OOM on resource-constrained environments.
+        prompt_content = _get_prosody_identity_context(scenario.prompt_data)
 
         parameter_metadata_json = json.dumps(parameter_metadata, indent=2)
 

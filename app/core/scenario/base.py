@@ -58,7 +58,7 @@ class PromptData(BaseModel):
     tone: Optional[str] = Field(default=None)
     opening_statements: List[str] = Field(...)
     agent_goal: Optional[str] = Field(default=None)
-    custom_fields: Optional[List[Dict[str, str]]] = Field(
+    custom_fields: Optional[List[Dict[str, Any]]] = Field(
         default_factory=list, description="Dynamic custom fields"
     )
     prompt: Optional[str] = Field(default=None)

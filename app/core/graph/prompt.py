@@ -179,10 +179,12 @@ def _format_custom_fields(custom_fields: list) -> str:
     formatted_blocks = []
     for field in custom_fields:
         if isinstance(field, dict) and "name" in field and "value" in field:
-            field_name = field["name"]
-            field_value = field["value"]
-            if field_value:
-                formatted_blocks.append(f"**{field_name}:**\n{field_value}\n\n")
+            # Only include if useInDefaultPrompt is not explicitly False
+            if field.get("useInDefaultPrompt", True) is not False:
+                field_name = field["name"]
+                field_value = field["value"]
+                if field_value:
+                    formatted_blocks.append(f"**{field_name}:**\n{field_value}\n\n")
 
     return "".join(formatted_blocks)
 
