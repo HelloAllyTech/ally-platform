@@ -247,13 +247,13 @@ export interface GetReviewResponse {
   note: string;
 }
 
-export interface ShareScreenScenarioData {
+export interface ShareScreenSessionData {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   title: string;
-  description: string;
+  description?: string;
   createdAt: string;
-  duration: string;
+  duration?: string;
 }
 
 export enum ReplySource {

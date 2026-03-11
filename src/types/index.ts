@@ -56,6 +56,9 @@ export * from './badges';
 // Review types
 export * from './reviews';
 
+// Scribe Review types
+export * from './scribeReviews';
+
 // Leaderboard types
 export * from './leaderboard';
 

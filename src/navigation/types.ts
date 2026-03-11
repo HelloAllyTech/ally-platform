@@ -2,7 +2,7 @@ import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 import type {ReviewType} from '@/contexts/ReviewApiContext';
-import {ShareScreenScenarioData} from '@/types';
+import {ShareScreenSessionData} from '@/types';
 import {Scenario, SessionData} from '@/types/simulations';
 
 export type RootStackParamList = {
@@ -38,15 +38,15 @@ export type RootStackParamList = {
   ScribeReviewDetails: {reviewId: string; isPrivate?: boolean};
   ShareCallLog: {
     reviewId?: string;
-    scenarioSessionId?: string;
-    scenarioData: ShareScreenScenarioData;
+    scribeSessionId?: number;
+    sessionData: ShareScreenSessionData;
     isEditNote?: boolean;
     note?: string;
   };
   ShareSimulation: {
     reviewId?: string;
     scenarioSessionId?: string;
-    scenarioData: ShareScreenScenarioData;
+    scenarioData: ShareScreenSessionData;
     isEditNote?: boolean;
     note?: string;
   };

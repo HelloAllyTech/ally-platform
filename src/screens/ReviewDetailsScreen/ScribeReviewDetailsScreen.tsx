@@ -69,13 +69,12 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const handleEditNote = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
       reviewId,
-      scenarioData: {
-        coverImageUrl: reviewData?.scenario?.coverImageUrl,
-        coverVideoUrl: reviewData?.scenario?.coverVideoUrl,
-        title: reviewData?.scenario?.title || '',
-        description: reviewData?.scenario?.description || '',
-        createdAt: reviewData?.scenarioSession?.createdAt || '',
-        duration: reviewData?.scenarioSession?.duration || '',
+      sessionData: {
+        title: 'Session Review',
+        createdAt: reviewData?.scribeSession?.createdAt || '',
+        duration: reviewData?.scribeSession?.duration
+          ? String(reviewData.scribeSession.duration)
+          : undefined,
       },
       isEditNote: true,
       note: reviewData?.note,
@@ -86,6 +85,7 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     <ReviewApiProvider value={scribeApiHooks}>
       <ReviewDetailsLayout
         reviewId={reviewId}
+        reviewNote={reviewData?.note}
         reviewLogic={reviewLogic}
         metadata={metadata}
         onRefreshReactions={refetchReviewData}

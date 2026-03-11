@@ -12,7 +12,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {Button, useToast} from '@/components';
-import {ChatSummaryStatus, USER_PERMISSIONS} from '@/constants';
+import {ChatSummaryStatus, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
@@ -27,7 +27,11 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme';
-import {getErrorDetails, navigateToCallLogTab} from '@/utils';
+import {
+  formatDurationFromSeconds,
+  getErrorDetails,
+  navigateToCallLogTab,
+} from '@/utils';
 
 import {
   AddNotesSection,
@@ -117,6 +121,20 @@ export const CallSummaryScreen: React.FC<
   const hasEditFeedbackPermission = permissions?.includes(
     USER_PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
   );
+
+  const handleShareForReview = useCallback(() => {
+    if (!callId || !summaryData?.details) return;
+    const details = summaryData.details;
+    navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
+      scribeSessionId: callId,
+      sessionData: {
+        title:
+          callInfo.summaryName || t('Review.card.sharedSimulationForReview'),
+        createdAt: details.startTime || summaryData.createdAt || '',
+        duration: formatDurationFromSeconds(details.callDuration ?? 0),
+      },
+    });
+  }, [callId, summaryData, callInfo.summaryName, navigation, t]);
 
   const [mountTime] = useState<number>(Date.now());
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
@@ -370,6 +388,8 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
+        showShareSwitch={Boolean(callId) && isSummaryAvailable}
+        onShareForReview={handleShareForReview}
       />
 
       <View style={styles.tabsContainer}>

@@ -3,11 +3,6 @@ import {useTranslation} from 'react-i18next';
 import {type EmojiType} from 'rn-emoji-keyboard';
 
 import {useToast} from '@/components';
-import {
-  useCreateReviewMutation,
-  useUpdateReviewStatusMutation,
-} from '@/services';
-import {ReviewStatus} from '@/types';
 
 import {useAppNavigation} from './useAppNavigation';
 
@@ -15,16 +10,20 @@ const MAX_NOTE_LENGTH = 250;
 
 interface UseShareScreenLogicParams {
   reviewId?: string;
-  scenarioSessionId?: string;
   isEditNote?: boolean;
   initialNote?: string;
+  onCreateReview: (note: string) => Promise<{id?: string} | void>;
+  onUpdateStatus: (reviewId: string, note: string) => Promise<void>;
+  onShareSuccess?: (result?: {id?: string} | void) => void;
 }
 
 export const useShareScreenLogic = ({
   reviewId,
-  scenarioSessionId,
   isEditNote,
   initialNote,
+  onCreateReview,
+  onUpdateStatus,
+  onShareSuccess,
 }: UseShareScreenLogicParams) => {
   const {t} = useTranslation();
   const navigation = useAppNavigation();
@@ -32,9 +31,6 @@ export const useShareScreenLogic = ({
 
   const [note, setNote] = useState<string>('');
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-
-  const [createReview] = useCreateReviewMutation();
-  const [updateReviewStatus] = useUpdateReviewStatusMutation();
 
   useEffect(() => {
     if (initialNote) {
@@ -57,21 +53,22 @@ export const useShareScreenLogic = ({
   const handleShare = useCallback(async () => {
     try {
       if (reviewId) {
-        await updateReviewStatus({
-          reviewId,
-          body: {status: ReviewStatus.IN_REVIEW, note},
-        }).unwrap();
-      } else if (scenarioSessionId) {
-        await createReview({
-          scenarioSessionId,
-          note,
-        }).unwrap();
+        await onUpdateStatus(reviewId, note);
+      } else {
+        const result = await onCreateReview(note);
+        showToast(t('SimulationFeedback.sharedForReview'), 'success');
+        if (onShareSuccess) {
+          onShareSuccess(result);
+        } else {
+          navigation.goBack();
+        }
+        return;
       }
 
       showToast(t('SimulationFeedback.sharedForReview'), 'success');
       navigation.goBack();
     } catch (error) {
-      console.error('Error sharing simulation:', error);
+      console.error('Error sharing for review:', error);
       const serverMessage = (error as {data?: {message?: string}})?.data
         ?.message;
       showToast(serverMessage || t('Errors.editNoteExpired'), 'error');
@@ -81,9 +78,9 @@ export const useShareScreenLogic = ({
     }
   }, [
     reviewId,
-    scenarioSessionId,
-    createReview,
-    updateReviewStatus,
+    onCreateReview,
+    onUpdateStatus,
+    onShareSuccess,
     showToast,
     t,
     navigation,
@@ -93,10 +90,7 @@ export const useShareScreenLogic = ({
   const handleEditNote = useCallback(async () => {
     if (!reviewId) return;
     try {
-      await updateReviewStatus({
-        reviewId,
-        body: {status: ReviewStatus.IN_REVIEW, note},
-      }).unwrap();
+      await onUpdateStatus(reviewId, note);
       showToast(t('Success.editNoteSuccess'), 'success');
       navigation.goBack();
     } catch (error) {
@@ -108,7 +102,7 @@ export const useShareScreenLogic = ({
         navigation.goBack();
       }
     }
-  }, [reviewId, updateReviewStatus, note, navigation, showToast, t]);
+  }, [reviewId, onUpdateStatus, note, navigation, showToast, t]);
 
   const screenTitle = isEditNote
     ? t('SimulationFeedback.editNoteTitle')
