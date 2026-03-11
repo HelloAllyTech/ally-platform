@@ -1,9 +1,15 @@
+import {useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
 import {View} from 'react-native';
 
 import {SimulationDetailRow, SimulationDetailsCard} from '@/components';
 import {useShareScreenLogic} from '@/hooks/useShareScreenLogic';
 import {RootStackScreenProps} from '@/navigation';
+import {
+  useCreateReviewMutation,
+  useUpdateReviewStatusMutation,
+} from '@/services';
+import {ReviewStatus} from '@/types';
 import {formatDateTime} from '@/utils';
 
 import {ShareReviewLayout} from './components/ShareReviewLayout';
@@ -13,6 +19,30 @@ export const ShareSimulationScreen: React.FC<
 > = ({route}) => {
   const {scenarioData, ...shareParams} = route.params;
   const {t} = useTranslation();
+
+  const [createReview] = useCreateReviewMutation();
+  const [updateReviewStatus] = useUpdateReviewStatusMutation();
+
+  const onCreateReview = useCallback(
+    async (note: string) => {
+      if (!shareParams.scenarioSessionId) return;
+      await createReview({
+        scenarioSessionId: shareParams.scenarioSessionId,
+        note,
+      }).unwrap();
+    },
+    [createReview, shareParams.scenarioSessionId],
+  );
+
+  const onUpdateStatus = useCallback(
+    async (reviewId: string, note: string) => {
+      await updateReviewStatus({
+        reviewId,
+        body: {status: ReviewStatus.IN_REVIEW, note},
+      }).unwrap();
+    },
+    [updateReviewStatus],
+  );
 
   const {
     note,
@@ -27,9 +57,10 @@ export const ShareSimulationScreen: React.FC<
     maxNoteLength,
   } = useShareScreenLogic({
     reviewId: shareParams.reviewId,
-    scenarioSessionId: shareParams.scenarioSessionId,
     isEditNote: shareParams.isEditNote,
     initialNote: shareParams.note,
+    onCreateReview,
+    onUpdateStatus,
   });
 
   return (

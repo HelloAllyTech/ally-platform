@@ -287,6 +287,19 @@ const formatShortDuration = (
   return `${seconds} sec`;
 };
 
+/**
+ * Formats duration from seconds into a human-readable string
+ * @param seconds - Duration in seconds (string or number)
+ * @param options - Formatting options
+ * @param options.t - Translation function for localized labels
+ * @param options.includeSeconds - Whether to include seconds in the output (default: true)
+ * @param options.format - Output format: 'short' (e.g., "1:30 min") or 'long' (e.g., "1 hour 30 minutes") (default: 'short')
+ * @returns Formatted duration string, or '-' if input is invalid
+ * @example
+ * formatDurationFromSeconds(90) // returns "1:30 min"
+ * formatDurationFromSeconds(3665, {format: 'long'}) // returns "1 hour 1 minute 5 seconds"
+ * formatDurationFromSeconds(7200, {format: 'short'}) // returns "2:00:00 hr"
+ */
 export const formatDurationFromSeconds = (
   seconds: string | number,
   options?: {
