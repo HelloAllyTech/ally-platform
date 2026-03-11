@@ -2,13 +2,13 @@ import {SESSION_AUTO_END_MINUTES} from '@/constants';
 import type {TriggerWarning} from '@/types';
 import {tryParseJson, uint8ToString} from '@/utils';
 
-const SHORT_SESSION_THRESHOLD_MS = 30000;
+const SHORT_SESSION_THRESHOLD_SECONDS = 30;
 
 export const isShortSession = (callDuration?: number): boolean => {
   if (callDuration === null || callDuration === undefined) {
     return false;
   }
-  return callDuration <= SHORT_SESSION_THRESHOLD_MS;
+  return callDuration <= SHORT_SESSION_THRESHOLD_SECONDS;
 };
 
 export const decodeFeedbackPayloadToJson = (payload: unknown): unknown => {
