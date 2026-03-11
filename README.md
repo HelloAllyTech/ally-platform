@@ -137,7 +137,7 @@ The service is exposed on host port `8002` (`http://localhost:8002`) to avoid cl
 Use `docker-compose.local.yml` when ally-be and ally-web are already running. This reuses ally-be's LocalStack (no port conflicts):
 
 ```bash
-# 1. Start ally-be first (infra/dev_env.sh or manually)
+# 1. Start ally-be first (manually or via docker compose)
 # 2. Start ally-web (optional)
 # 3. Start ally-ai-learn
 cd ally-ai-learn

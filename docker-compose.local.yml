@@ -1,6 +1,6 @@
 # docker-compose.local.yml - Run ally-ai-learn alongside ally-be and ally-web
 #
-# Prerequisites: Start ally-be and ally-web first (e.g. via infra/dev_env.sh).
+# Prerequisites: Start ally-be and ally-web first.
 # This compose uses the SAME LocalStack and connects to ally-be on the host.
 #
 # Usage:
