@@ -98,7 +98,7 @@ export interface ScenarioSessionData {
 export interface ScribeSessionData {
   id: number;
   createdAt: string;
-  duration: number;
+  duration: string;
 }
 
 export interface ReviewScenario {
