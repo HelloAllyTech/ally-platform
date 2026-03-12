@@ -1,10 +1,4 @@
-import {ReviewStatus, User} from './reviews';
-
-export interface ScribeSessionData {
-  id: number;
-  duration: number;
-  createdAt: string;
-}
+import {ReviewStatus, ScribeSessionData, User} from './reviews';
 
 export interface ScribeReviewItem {
   id: string;

@@ -9,7 +9,7 @@ import {
   GetScribeReviewByIdResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
-  ScribeReviewsResponse,
+  ReviewsResponse,
   UpdateReviewStatusRequest,
   UpdateReviewStatusResponse,
 } from '@/types';
@@ -19,7 +19,7 @@ import {api} from './api';
 export const scribeReviewsApi = api.injectEndpoints({
   endpoints: builder => ({
     getScribeReviews: builder.query<
-      ScribeReviewsResponse | null,
+      ReviewsResponse | null,
       {sortBy: string; limit: number; offset: number}
     >({
       query: ({sortBy, limit, offset}) => ({
@@ -158,6 +158,7 @@ export const scribeReviewsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetScribeReviewsQuery,
   useLazyGetScribeReviewsQuery,
   useCreateScribeReviewMutation,
   useUpdateScribeReviewStatusMutation,

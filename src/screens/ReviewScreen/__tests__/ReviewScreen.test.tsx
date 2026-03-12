@@ -1,34 +1,25 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {render} from '@testing-library/react-native';
 
-jest.mock('@/screens/ReviewScreen/components', () => ({
-  ReviewCard: () => null,
-}));
+jest.mock('@/screens/ReviewScreen/components', () => {
+  const React = require('react');
+  const {View, Text} = require('react-native');
+  return {
+    ReviewList: ({reviewType}: any) => (
+      <View testID={`review-list-${reviewType}`}>
+        <Text>ReviewList</Text>
+      </View>
+    ),
+    ReviewCard: () => null,
+  };
+});
 
 import {ReviewScreen} from '../ReviewScreen';
 
-const mockNavigate = jest.fn();
-const mockSetSelectedFilter = jest.fn();
-const mockLoadMore = jest.fn();
-const mockRefresh = jest.fn();
 const mockShowToast = jest.fn();
 
-jest.mock('@/hooks/useReviews', () => ({
-  useReviews: () => ({
-    reviews: [],
-    isLoading: false,
-    isFetching: false,
-    error: null,
-    hasMore: false,
-    selectedFilter: 'all',
-    loadMore: mockLoadMore,
-    refresh: mockRefresh,
-    setSelectedFilter: mockSetSelectedFilter,
-  }),
-}));
-
 jest.mock('@/hooks', () => ({
-  useAppNavigation: () => ({navigate: mockNavigate}),
+  useAppNavigation: () => ({navigate: jest.fn()}),
   useTranslate: () => ({t: (key: string) => key}),
 }));
 
@@ -41,24 +32,6 @@ jest.mock('@/components', () => {
         <Text>{title}</Text>
       </View>
     ),
-    TabView: ({tabs, activeTab, onTabChange}: any) => (
-      <View testID="tab-view">
-        {tabs?.map((tab: any, i: number) => (
-          <Text
-            key={i}
-            testID={`tab-${tab.value}`}
-            onPress={() => onTabChange?.(tab.value)}>
-            {tab.label}
-          </Text>
-        ))}
-      </View>
-    ),
-    EmptyState: ({title, description}: any) => (
-      <View testID="empty-state">
-        <Text>{title}</Text>
-        <Text>{description}</Text>
-      </View>
-    ),
     BadgePopup: () => <View testID="badge-popup" />,
     useToast: () => ({showToast: mockShowToast}),
   };
@@ -68,19 +41,46 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 0, bottom: 0, left: 0, right: 0}),
 }));
 
-jest.mock('@/assets', () => ({
-  EmptyReviewIcon: 'EmptyReviewIcon',
+jest.mock('react-native-tab-view', () => {
+  const React = require('react');
+  const {View, Text} = require('react-native');
+  return {
+    TabView: ({renderScene, navigationState}: any) => (
+      <View testID="rn-tab-view">
+        {navigationState.routes.map((route: any) => (
+          <View key={route.key} testID={`tab-scene-${route.key}`}>
+            {renderScene({route})}
+          </View>
+        ))}
+      </View>
+    ),
+    TabBar: (props: any) => <View testID="rn-tab-bar" />,
+  };
+});
+
+jest.mock('@/services/reviewsApi', () => ({
+  useLazyGetReviewsQuery: jest.fn(),
+}));
+
+jest.mock('@/services/scribeReviewsApi', () => ({
+  useLazyGetScribeReviewsQuery: jest.fn(),
+}));
+
+jest.mock('@/config/env', () => ({
+  env: {SCRIBE_REVIEW_ENABLED: true},
 }));
 
 jest.mock('@/constants', () => ({
-  REVIEW_FILTERS: [
-    {value: 'all', label: 'All'},
-    {value: 'pending', label: 'Pending'},
+  REVIEW_TYPE_TABS: [
+    {key: 'simulation', title: 'Simulations'},
+    {key: 'scribe', title: 'Scribe'},
   ],
-  SCREEN_NAMES: {REVIEW_DETAILS: 'ReviewDetails'},
+  ReviewType: {SIMULATION: 'simulation', SCRIBE: 'scribe'},
   USER_PERMISSIONS: {
     VIEW_SIMULATION_REVIEW: 'view:simulation-review',
-    VIEW_REVIEWS: 'view:reviews',
+    VIEW_SIMULATION_REVIEWS: 'view:simulation-reviews',
+    VIEW_SCRIBE_REVIEW: 'view:scribe-review',
+    VIEW_SCRIBE_REVIEWS: 'view:scribe-reviews',
   },
 }));
 
@@ -89,7 +89,12 @@ jest.mock('@/navigation/TabNavigator', () => ({
 }));
 
 jest.mock('react-redux', () => ({
-  useSelector: () => [],
+  useSelector: () => [
+    'view:simulation-reviews',
+    'view:scribe-reviews',
+    'view:simulation-review',
+    'view:scribe-review',
+  ],
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -109,21 +114,14 @@ describe('ReviewScreen', () => {
     expect(getByText('Review.header.title')).toBeTruthy();
   });
 
-  it('renders TabView with filters', () => {
+  it('renders tab view when user has both permissions', () => {
     const {getByTestId} = render(<ReviewScreen />);
-    expect(getByTestId('tab-view')).toBeTruthy();
+    expect(getByTestId('rn-tab-view')).toBeTruthy();
   });
 
-  it('renders empty state when no reviews and not loading', () => {
-    const {getByTestId, getByText} = render(<ReviewScreen />);
-    expect(getByTestId('empty-state')).toBeTruthy();
-    expect(getByText('Review.empty.title')).toBeTruthy();
-    expect(getByText('Review.empty.description')).toBeTruthy();
-  });
-
-  it('calls setSelectedFilter when tab is changed', () => {
+  it('renders simulation and scribe review lists', () => {
     const {getByTestId} = render(<ReviewScreen />);
-    fireEvent.press(getByTestId('tab-pending'));
-    expect(mockSetSelectedFilter).toHaveBeenCalledWith('pending');
+    expect(getByTestId('review-list-simulation')).toBeTruthy();
+    expect(getByTestId('review-list-scribe')).toBeTruthy();
   });
 });
