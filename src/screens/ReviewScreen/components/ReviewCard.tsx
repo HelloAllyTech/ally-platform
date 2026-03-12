@@ -195,7 +195,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const renderScribeDetails = () => (
     <SimulationDetailsCard
       reviewType={reviewType}
-      // title={scenario.title}
+      // TODO: Add the right session title after backend changes
+      title={session?.createdAt}
       description={renderDetailRows()}
     />
   );

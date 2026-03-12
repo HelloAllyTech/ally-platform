@@ -30,6 +30,6 @@ export enum ReviewType {
 }
 
 export const REVIEW_TYPE_TABS = [
-  {key: ReviewType.SIMULATION, title: 'Simulations'},
   {key: ReviewType.SCRIBE, title: 'Scribe'},
+  {key: ReviewType.SIMULATION, title: 'Simulations'},
 ];
