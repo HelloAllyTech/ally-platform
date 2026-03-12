@@ -104,6 +104,7 @@ export const ReviewList: React.FC<ReviewListProps> = ({
             reactions={item.reactions}
             note={item.note}
             reviewType={reviewType}
+            summaryName={item.summaryName}
           />
         )}
         onEndReached={loadMore}

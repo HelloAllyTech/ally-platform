@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ThreadCommentChange} from '@/components/CommentThreadBottomSheet/types';
-import {useReviewApiHooks} from '@/contexts/ReviewApiContext';
+import {ReviewApiHooks, useReviewApiHooks} from '@/contexts/ReviewApiContext';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
@@ -27,20 +27,24 @@ interface UseReviewDetailsLogicParams {
   reviewId: string;
   isPrivate?: boolean;
   api: ReviewApiAdapter;
+  useUpdateReviewStatus?: ReviewApiHooks['useUpdateReviewStatus'];
 }
 
 export function useReviewDetailsLogic({
   reviewId,
   isPrivate,
   api,
+  useUpdateReviewStatus: useUpdateReviewStatusOverride,
 }: UseReviewDetailsLogicParams) {
   const {fetchMessages, messagesState, addComment, isAddingComment} = api;
   const {isLoading, isFetching, isError} = messagesState;
 
-  const {useUpdateReviewStatus} = useReviewApiHooks();
+  const contextHooks = useReviewApiHooks();
+  const updateMutation =
+    useUpdateReviewStatusOverride ?? contextHooks.useUpdateReviewStatus;
   const {handleTogglePrivate} = useToggleReviewPrivacy(
     reviewId,
-    useUpdateReviewStatus,
+    updateMutation,
   );
 
   const navigation = useAppNavigation();

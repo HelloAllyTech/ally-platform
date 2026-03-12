@@ -52,6 +52,7 @@ interface ReviewCardProps {
   onReviewPress?: (reviewId?: string) => void;
   note?: string;
   reviewType?: ReviewType;
+  summaryName?: string;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -66,6 +67,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   onReviewPress,
   note,
   reviewType,
+  summaryName,
 }) => {
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -195,8 +197,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const renderScribeDetails = () => (
     <SimulationDetailsCard
       reviewType={reviewType}
-      // TODO: Add the right session title after backend changes
-      title={session?.createdAt}
+      title={summaryName}
       description={renderDetailRows()}
     />
   );

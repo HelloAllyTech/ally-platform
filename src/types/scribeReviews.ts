@@ -11,6 +11,7 @@ export interface ScribeReviewItem {
   commentsCount: number;
   note: string;
   reviewStatus: ReviewStatus;
+  summaryName?: string;
 }
 
 export interface GetScribeReviewByIdResponse {
@@ -26,6 +27,7 @@ export interface GetScribeReviewByIdResponse {
   noteEditedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  summaryName?: string;
 }
 
 export interface ScribeReviewsResponse {
