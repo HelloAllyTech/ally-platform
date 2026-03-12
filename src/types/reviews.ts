@@ -95,6 +95,10 @@ export interface ScenarioSessionData {
   duration: string;
   createdAt: string;
 }
+export interface ScribeSessionData {
+  createdAt: string;
+  duration: number;
+}
 export interface ReviewScenario {
   title: string;
   description: string;
@@ -110,15 +114,16 @@ export interface User {
 export interface ReviewItem {
   id: string;
   createdAt: string;
-  scenario: ReviewScenario;
-  scenarioSession: ScenarioSessionData;
+  scenario?: ReviewScenario;
+  scenarioSession?: ScenarioSessionData;
+  scribeSession?: ScribeSessionData;
   reactions: {
     [reaction_code: string]: number;
   };
   createdBy: User;
   commentsCount: number;
   note: string;
-  reviewStatus: ReviewStatus;
+  reviewStatus?: ReviewStatus;
 }
 
 export interface GetReviewByIdResponse {
