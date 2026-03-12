@@ -27,6 +27,24 @@ SCENARIO_SAMPLE = {
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
             "previousMemory": "In our last session, we discussed your fear of disappointing your parents and you mentioned feeling trapped between meeting their expectations and being true to yourself. You were working on building confidence to have an honest conversation with them.",
+            "knowledgeBase": [
+                {
+                    "key": "school memories",
+                    "description": "Ahana was bullied in 8th grade by a group of classmates who mocked her appearance and academic struggles. This experience made her anxious about peer judgment and contributed to her perfectionism as a coping mechanism.",
+                },
+                {
+                    "key": "family dynamics",
+                    "description": "Her parents often compare her academic performance to her cousin Rohan, who is studying at IIT Delhi. They have explicitly stated that poor grades could result in being sent to boarding school.",
+                },
+                {
+                    "key": "sibling relationships",
+                    "description": "Ahana is the oldest of three siblings. Her younger brother (13) and sister (10) look up to her as a role model. She feels pressure to set a good example but also resents the additional responsibility.",
+                },
+                {
+                    "key": "academic history",
+                    "description": "Ahana has consistently been a top performer until 10th grade. She scored 92% in 9th grade and was ranked 3rd in her class. However, in 10th grade, she struggled with mathematics and chemistry.",
+                },
+            ],
             "customFields": [
                 {"field": "favourite colour", "value": "Sky Blue"},
                 {"field": "occupation", "value": "Engineer"},

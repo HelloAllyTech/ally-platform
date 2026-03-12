@@ -10,6 +10,10 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
+from app.core.graph.knowledge_retrieval import (
+    build_knowledge_map,
+    retrieve_relevant_knowledge,
+)
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import (
     BehaviorInstructionFeedbackData,
@@ -699,6 +703,7 @@ async def generate_response(
             language_code=language_code,
             behavior_instructions=scenario.behavior_instructions,
             current_state=current_state,
+            retrieved_context=state.retrieved_context,
         )
 
         room_name = ""
@@ -789,6 +794,7 @@ async def generate_response(
         "messages": [AIMessage(content=response.content)],
         "new_events": [],
         "next_instruction": None,
+        "retrieved_context": None,
     }
 
 
@@ -957,6 +963,44 @@ async def send_event_feedback(
     }
 
 
+async def retrieve_knowledge(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Retrieve relevant knowledge context based on the conversation.
+
+    This node runs in parallel with process_events and detect_behaviors.
+    It uses the scenario's knowledge_base to identify which topics are
+    relevant to the current conversation via a structured LLM call, then
+    stores the formatted descriptions in state for prompt enrichment.
+
+    Wrapped in a subgraph in the graph builder to prevent its LLM outputs
+    from being streamed to TTS/UI.
+    """
+    scenario = None
+    llm_client = None
+    if config and "configurable" in config:
+        scenario = config["configurable"].get("scenario")
+        llm_client = config["configurable"].get("llm_client")
+
+    if not scenario or not llm_client:
+        return {"retrieved_context": None}
+
+    knowledge_base = getattr(scenario.prompt_data, "knowledge_base", None)
+    if not knowledge_base:
+        return {"retrieved_context": None}
+
+    knowledge_map = build_knowledge_map(knowledge_base)
+    if not knowledge_map:
+        return {"retrieved_context": None}
+
+    retrieved_context = await retrieve_relevant_knowledge(
+        llm_client, state.messages, knowledge_map
+    )
+
+    return {"retrieved_context": retrieved_context or None}
+
+
 async def sync_events_and_behaviors_node(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -992,6 +1036,7 @@ async def clear_events_and_detected_data(
         "non_branching_feedback_data": [],
         "feedback_to_send": None,
         "behavior_feedback_data": [],
+        "retrieved_context": None,
     }
 
 

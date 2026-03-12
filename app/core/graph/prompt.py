@@ -272,6 +272,7 @@ def _build_branching_prompt(
     prompt_data: PromptData,
     next_instruction: str,
     language_code: Optional[str] = None,
+    retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     """
     Build a branching prompt that includes core persona context.
@@ -297,6 +298,10 @@ def _build_branching_prompt(
     if prompt_data.context:
         backstory_block = f"Backstory: {prompt_data.context}\n\n"
 
+    retrieved_context_block = (
+        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
+    )
+
     branching_prompt = load_and_format(
         "system/branching_prompt",
         prompt_data=prompt_data,
@@ -304,6 +309,7 @@ def _build_branching_prompt(
         character_details=character_details,
         language_block=language_block,
         backstory_block=backstory_block,
+        retrieved_context_block=retrieved_context_block,
         competency_block=competency_block,
         next_instruction=next_instruction,
     )
@@ -317,6 +323,7 @@ def _build_behavior_prompt(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
     language_code: Optional[str] = None,
+    retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     """
     Build a behavior-conditioned prompt using helper behavior classifications.
@@ -359,6 +366,10 @@ def _build_behavior_prompt(
     backstory_block = ""
     if prompt_data.context:
         backstory_block = f"Character backstory: {prompt_data.context}\n\n"
+
+    retrieved_context_block = (
+        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
+    )
 
     # Build additional context from custom fields
     custom_context_block = ""
@@ -419,6 +430,7 @@ def _build_behavior_prompt(
         profession_block=profession_block,
         language_block=language_block,
         backstory_block=backstory_block,
+        retrieved_context_block=retrieved_context_block,
         life_history=life_history,
         guidelines_block=guidelines_block,
         previous_memory_block=previous_memory_block,
@@ -441,6 +453,7 @@ def _build_full_prompt(
     prompt_data: PromptData,
     base_system_prompt: str,
     language_code: Optional[str] = None,
+    retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     """
     Build a comprehensive prompt with full character details, personality,
@@ -496,6 +509,10 @@ def _build_full_prompt(
 
     competency_block = _get_competency_block(prompt_data.competency)
 
+    retrieved_context_block = (
+        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
+    )
+
     # Assemble the full detailed prompt
     system_prompt = load_and_format(
         "system/full_prompt",
@@ -509,6 +526,7 @@ def _build_full_prompt(
         profession_block=profession_block,
         language_block=language_block,
         context_block=_get_optional_block("Your current context", prompt_data.context),
+        retrieved_context_block=retrieved_context_block,
         guidelines_block=guidelines_block,
         previous_memory_block=previous_memory_block,
         life_history=life_history,
@@ -535,6 +553,7 @@ def generate_system_message(
     language_code: Optional[str] = None,
     behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
     current_state: Optional[SimulationStateInstruction] = None,
+    retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -601,7 +620,9 @@ def generate_system_message(
         )
 
     if next_instruction:
-        msg = _build_branching_prompt(prompt_data, next_instruction, language_code)
+        msg = _build_branching_prompt(
+            prompt_data, next_instruction, language_code, retrieved_context
+        )
         logger.info(
             "%s BUILT branching prompt: language_code=%s",
             LOG_PREFIX,
@@ -621,6 +642,7 @@ def generate_system_message(
             behavior_instructions,
             current_state,
             language_code,
+            retrieved_context,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -632,7 +654,9 @@ def generate_system_message(
     # TODO: Deprecated, remove in future versions
     # Full prompt generation when neither next_instruction nor
     # behavior_instructions provided
-    msg = _build_full_prompt(prompt_data, base_system_prompt, language_code)
+    msg = _build_full_prompt(
+        prompt_data, base_system_prompt, language_code, retrieved_context
+    )
     logger.info(
         "%s BUILT full prompt: language_code=%s",
         LOG_PREFIX,
@@ -647,6 +671,7 @@ def generate_prompt_content(
     language_code: Optional[str] = None,
     behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
     current_state: Optional[SimulationStateInstruction] = None,
+    retrieved_context: Optional[str] = None,
 ) -> str:
     """
     Generate prompt content string from PromptData.
@@ -672,5 +697,6 @@ def generate_prompt_content(
         language_code,
         behavior_instructions=behavior_instructions,
         current_state=current_state,
+        retrieved_context=retrieved_context,
     )
     return system_message.content

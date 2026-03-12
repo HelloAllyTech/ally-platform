@@ -90,6 +90,15 @@ class PromptData(BaseModel):
             '[{"counselor": "...", "actor": "..."}, ...].'
         ),
     )
+    knowledge_base: Optional[List[Dict[str, str]]] = Field(
+        default=None,
+        description=(
+            "Key-description pairs for RAG-like retrieval. "
+            'Format: [{"key": "topic name", "description": "detailed info"}, ...]. '
+            "The system uses an LLM to identify relevant keys per utterance "
+            "and injects the corresponding descriptions into the prompt."
+        ),
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -312,6 +321,7 @@ class Scenario(BaseModel):
                     "languageDialogueSamples"
                 )
                 or prompt_data_dict.get("language_dialogue_samples"),
+                "knowledge_base": prompt_data_dict.get("knowledgeBase"),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

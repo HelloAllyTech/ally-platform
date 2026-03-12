@@ -8,6 +8,7 @@ from app.core.graph.nodes import (
     generate_response,
     process_events,
     resolve_branching_instruction,
+    retrieve_knowledge,
     send_event_feedback,
     sync_events_and_behaviors_node,
 )
@@ -65,16 +66,43 @@ def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
     return subgraph.compile()
 
 
+def build_retrieve_knowledge_subgraph() -> CompiledStateGraph[SimulationState]:
+    """
+    Build a subgraph for knowledge retrieval.
+
+    This subgraph is isolated from the main graph's streaming output.
+    When subgraphs=False (default in LLMAdapter), the LLM outputs from
+    this subgraph will NOT be streamed to TTS/UI.
+
+    Although retrieve_knowledge uses with_structured_output, LiveKit's
+    LLMAdapter still intercepts the underlying LLM stream before the
+    structured-output parser runs. Wrapping in a subgraph is the same
+    workaround used for resolve_branching_instruction.
+
+    This is a workaround for LiveKit issue #2836:
+    https://github.com/livekit/agents/issues/2836
+
+    Returns:
+        Compiled subgraph that retrieves relevant knowledge context
+    """
+    subgraph = StateGraph(SimulationState)
+    subgraph.add_node("retrieve_knowledge", retrieve_knowledge)
+    subgraph.add_edge(START, "retrieve_knowledge")
+    subgraph.add_edge("retrieve_knowledge", END)
+    return subgraph.compile()
+
+
 def build_simulation_graph() -> StateGraph[SimulationState]:
     """
     Build the LangGraph state graph.
 
     Flow:
-    1. START splits into two parallel paths:
+    1. START splits into three parallel paths:
        - detect_behaviors: Detects behaviors from behavior instructions
        - process_events: Detects events, updates EventRegistry
+       - retrieve_knowledge: Retrieves relevant knowledge context (as subgraph)
     2. sync_events_and_behaviors_node:
-        Convergence point for detect_behaviors and process_events
+        Convergence point for all three parallel paths
     3. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
     4. generate_response: Generates LLM response based on detected events
@@ -84,9 +112,10 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
        transient state. Separated from generate_response so the core nodes can be
        reused by the report graph without UI concerns.
 
-    Note: resolve_branching_instruction and apply_voice_expressions are subgraphs
-    to prevent their LLM outputs from being streamed. With subgraphs=False
-    (default in LLMAdapter), only root graph outputs are streamed.
+    Note: resolve_branching_instruction, retrieve_knowledge, and
+    apply_voice_expressions are subgraphs to prevent their LLM outputs from
+    being streamed. With subgraphs=False (default in LLMAdapter), only root
+    graph outputs are streamed.
 
     This is a workaround for LiveKit issue #2836:
     https://github.com/livekit/agents/issues/2836
@@ -107,8 +136,14 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # This runs in parallel with process_events from START
     graph.add_node("detect_behaviors", detect_behaviors)
 
+    # Build the retrieve_knowledge subgraph and add it as a node
+    # This prevents its LLM outputs from being streamed to TTS/UI
+    retrieve_knowledge_subgraph = build_retrieve_knowledge_subgraph()
+    graph.add_node("retrieve_knowledge", retrieve_knowledge_subgraph)
+
     # sync_events_and_behaviors_node acts as a convergence point for
-    # detect_behaviors and process_events before resolve_branching_instruction
+    # detect_behaviors, process_events, and retrieve_knowledge
+    # before resolve_branching_instruction
     graph.add_node("sync_events_and_behaviors_node", sync_events_and_behaviors_node)
 
     # send_event_feedback runs last — sends event scores/feedback to UI.
@@ -116,13 +151,15 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # for contexts that don't need UI feedback (e.g. report generation).
     graph.add_node("send_event_feedback", send_event_feedback)
 
-    # START splits into two parallel paths
+    # START splits into three parallel paths
     graph.add_edge(START, "detect_behaviors")
     graph.add_edge(START, "process_events")
+    graph.add_edge(START, "retrieve_knowledge")
 
-    # Both paths converge at sync_events_and_behaviors_node
+    # All three paths converge at sync_events_and_behaviors_node
     graph.add_edge("detect_behaviors", "sync_events_and_behaviors_node")
     graph.add_edge("process_events", "sync_events_and_behaviors_node")
+    graph.add_edge("retrieve_knowledge", "sync_events_and_behaviors_node")
 
     # Continue with sequential flow
     graph.add_edge("sync_events_and_behaviors_node", "resolve_branching_instruction")
@@ -147,7 +184,8 @@ def build_report_graph() -> StateGraph:
     Build the report-specific LangGraph.
 
     Reuses the core simulation nodes (process_events, resolve_branching_instruction,
-    generate_response, detect_behaviors) but omits the LiveKit/TTS/UI-only nodes:
+    generate_response, detect_behaviors, retrieve_knowledge) but omits the
+    LiveKit/TTS/UI-only nodes:
     - apply_voice_expressions  (TTS voice parameter injection)
     - send_event_feedback  (UI score/emoji feedback sending)
 
@@ -156,39 +194,51 @@ def build_report_graph() -> StateGraph:
     behavior_feedback_data) carry their defaults and are simply never sent to UI.
 
     Flow:
-        START → process_events → resolve_branching_instruction
-              → [generate_response, detect_behaviors] (parallel)
+        START → [process_events, retrieve_knowledge (subgraph),
+        detect_behaviors] (parallel)
+              → sync_events_and_behaviors_node
+              → resolve_branching_instruction (subgraph)
+              → generate_response
               → clear_events_and_detected_data → END
     """
     graph = StateGraph(SimulationState)
 
     graph.add_node("process_events", process_events)
 
-    # Reuse the same resolve_branching_instruction subgraph so that LLM
-    # calls for tag resolution are never streamed (same reason as main graph).
+    # Subgraph prevents streaming of branching resolution LLM text output
     resolve_branching_subgraph = build_resolve_branching_subgraph()
     graph.add_node("resolve_branching_instruction", resolve_branching_subgraph)
 
+    # Subgraph prevents streaming of knowledge retrieval LLM output
+    retrieve_knowledge_subgraph = build_retrieve_knowledge_subgraph()
+    graph.add_node("retrieve_knowledge", retrieve_knowledge_subgraph)
+
     graph.add_node("generate_response", generate_response)
 
-    # Add detect_behaviors as a regular node
-    # This runs in parallel with generate_response after resolve_branching_instruction
-    # Behavior detection is valuable for report generation to track user behaviors
+    # detect_behaviors runs in parallel with process_events
+    # and retrieve_knowledge from START
     graph.add_node("detect_behaviors", detect_behaviors)
+
+    # Sync node for fan-in of all three parallel paths before
+    # resolve_branching_instruction
+    graph.add_node("sync_events_and_behaviors_node", sync_events_and_behaviors_node)
 
     # Add clear_events_and_detected_data node to clean up event data
     graph.add_node("clear_events_and_detected_data", clear_events_and_detected_data)
 
+    # START fans out to all three parallel paths
     graph.add_edge(START, "process_events")
-    graph.add_edge("process_events", "resolve_branching_instruction")
+    graph.add_edge(START, "retrieve_knowledge")
+    graph.add_edge(START, "detect_behaviors")
 
-    # Fan-out: resolve_branching_instruction → [generate_response, detect_behaviors]
+    # All three converge at sync node
+    graph.add_edge("process_events", "sync_events_and_behaviors_node")
+    graph.add_edge("retrieve_knowledge", "sync_events_and_behaviors_node")
+    graph.add_edge("detect_behaviors", "sync_events_and_behaviors_node")
+
+    graph.add_edge("sync_events_and_behaviors_node", "resolve_branching_instruction")
     graph.add_edge("resolve_branching_instruction", "generate_response")
-    graph.add_edge("resolve_branching_instruction", "detect_behaviors")
-
-    # Fan-in: [generate_response, detect_behaviors] → clear_events_and_detected_data
     graph.add_edge("generate_response", "clear_events_and_detected_data")
-    graph.add_edge("detect_behaviors", "clear_events_and_detected_data")
 
     # Clear events data and lead to END
     graph.add_edge("clear_events_and_detected_data", END)

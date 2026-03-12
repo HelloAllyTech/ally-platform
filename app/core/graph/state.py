@@ -198,6 +198,16 @@ def replace_next_instruction(_: Optional[str], right: Optional[str]) -> Optional
     return right
 
 
+def replace_retrieved_context(_: Optional[str], right: Optional[str]) -> Optional[str]:
+    """
+    Reducer to replace retrieved_context.
+
+    Always replaces with the new value (right).
+    This allows nodes to set or clear the retrieved knowledge context.
+    """
+    return right
+
+
 def replace_feedback_to_send(
     _: Optional[EventFeedback], right: Optional[EventFeedback]
 ) -> Optional[EventFeedback]:
@@ -247,3 +257,6 @@ class SimulationState(BaseModel):
     behavior_feedback_data: Annotated[
         List[BehaviorInstructionFeedbackData], add_behavior_feedback_data
     ] = []  # Behavior detection results (from detect_behaviors node)
+    retrieved_context: Annotated[Optional[str], replace_retrieved_context] = (
+        None  # Retrieved knowledge context for prompt enrichment
+    )

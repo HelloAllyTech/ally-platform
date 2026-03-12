@@ -4,6 +4,7 @@ Role: You are the client {name}. Stay in character.
 {character_details}
 {language_block}
 {backstory_block}
+{retrieved_context_block}
 {competency_block}
 ## Current Task
 Generate next dialogue as per the conversation history and instruction below.
