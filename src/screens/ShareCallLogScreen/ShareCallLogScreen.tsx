@@ -73,6 +73,7 @@ export const ShareCallLogScreen: React.FC<
     reviewId: shareParams.reviewId,
     isEditNote: shareParams.isEditNote,
     initialNote: shareParams.note,
+    shareTitle: t('SimulationFeedback.shareForReviewTitle'),
     onCreateReview,
     onUpdateStatus,
     onShareSuccess,

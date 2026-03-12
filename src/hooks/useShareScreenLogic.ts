@@ -12,6 +12,7 @@ interface UseShareScreenLogicParams {
   reviewId?: string;
   isEditNote?: boolean;
   initialNote?: string;
+  shareTitle?: string;
   onCreateReview: (note: string) => Promise<{id?: string} | void>;
   onUpdateStatus: (reviewId: string, note: string) => Promise<void>;
   onShareSuccess?: (result?: {id?: string} | void) => void;
@@ -21,6 +22,7 @@ export const useShareScreenLogic = ({
   reviewId,
   isEditNote,
   initialNote,
+  shareTitle,
   onCreateReview,
   onUpdateStatus,
   onShareSuccess,
@@ -106,7 +108,7 @@ export const useShareScreenLogic = ({
 
   const screenTitle = isEditNote
     ? t('SimulationFeedback.editNoteTitle')
-    : t('SimulationFeedback.shareScreenTitle');
+    : shareTitle || t('SimulationFeedback.shareScreenTitle');
 
   const buttonLabel = isEditNote ? t('save') : t('SimulationFeedback.share');
 

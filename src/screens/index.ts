@@ -19,8 +19,6 @@ export {AchievementsScreen} from './AchievementsScreen';
 export {ProfileSettingsScreen} from './ProfileSettingsScreen';
 export {ReviewScreen} from './ReviewScreen';
 export {SimulationReviewDetailsScreen as ReviewDetailsScreen} from './ReviewDetailsScreen/SimulationReviewDetailsScreen';
-// TODO: Replace with ReviewDetailsScreen migration is complete
-// export {ReviewDetailsScreen} from './ReviewDetailsScreen/ReviewDetailsScreen';
 export {ScribeReviewDetailsScreen} from './ReviewDetailsScreen/ScribeReviewDetailsScreen';
 export {ReactionsScreen} from './ReactionsScreen';
 export {ShareCallLogScreen} from './ShareCallLogScreen';

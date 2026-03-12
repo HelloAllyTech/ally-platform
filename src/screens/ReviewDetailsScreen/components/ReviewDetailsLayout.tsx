@@ -41,6 +41,7 @@ interface ReviewDetailsLayoutProps {
   canEditReview?: boolean;
   canViewThreads?: boolean;
   canEditThread?: boolean;
+  toggleInHeader?: boolean;
 }
 
 export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
@@ -54,6 +55,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   canEditReview = true,
   canViewThreads = true,
   canEditThread = true,
+  toggleInHeader = false,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useAppNavigation();
@@ -195,7 +197,9 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
           myReaction={metadata?.myReaction || null}
           isPrivate={isPrivate}
           onTogglePrivate={
-            canEditReview && metadata?.reviewOwnerId === userData?.id
+            !toggleInHeader &&
+            canEditReview &&
+            metadata?.reviewOwnerId === userData?.id
               ? handleTogglePrivate
               : undefined
           }
