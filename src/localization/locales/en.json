@@ -635,7 +635,11 @@
       "title": "No shared sessions yet",
       "description": "Shared user transcripts will be available here for review."
     },
-    "fetchError" : "Failed to fetch reviews"
+    "fetchError" : "Failed to fetch reviews",
+    "tabs": {
+      "simulations": "Simulations",
+      "scribe": "Scribe"
+    }
   },
   "ReviewComment": {
     "like": "Like",

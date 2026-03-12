@@ -112,6 +112,7 @@ import ReviewActiveIcon from './reviewActive.svg';
 import ReviewInactiveIcon from './reviewInactive.svg';
 import RightArrow from './rightArrow.svg';
 import RunningSimulationIcon from './runningSimulation.svg';
+import ScribeReviewIcon from './scribeReview.svg';
 import SearchIcon from './search.svg';
 import SearchActiveIcon from './searchActive.svg';
 import SearchInactiveIcon from './searchInactive.svg';
@@ -252,6 +253,7 @@ export {
   ReviewInactiveIcon,
   RightArrow,
   RunningSimulationIcon,
+  ScribeReviewIcon,
   SearchActiveIcon,
   SearchIcon,
   SearchInactiveIcon,

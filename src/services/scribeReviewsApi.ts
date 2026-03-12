@@ -1,4 +1,4 @@
-import {API_METHODS, API_ROUTES} from '@/constants';
+import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {
   AddReviewCommentRequest,
   AddReviewCommentResponse,
@@ -7,12 +7,23 @@ import {
   GetReviewByIdResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
+  ReviewsResponse,
 } from '@/types';
 
 import {api} from './api';
 
 export const scribeReviewsApi = api.injectEndpoints({
   endpoints: builder => ({
+    getScribeReviews: builder.query<
+      ReviewsResponse | null,
+      {sortBy: string; limit: number; offset: number}
+    >({
+      query: ({sortBy, limit, offset}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.REVIEWS,
+        method: API_METHODS.GET,
+        params: {sortBy, limit, offset, order: SortOrder.DESC},
+      }),
+    }),
     getScribeReviewById: builder.query<
       GetReviewByIdResponse,
       {reviewId: string}
@@ -122,6 +133,8 @@ export const scribeReviewsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetScribeReviewsQuery,
+  useLazyGetScribeReviewsQuery,
   useGetScribeReviewByIdQuery,
   useLazyGetScribeMessagesQuery,
   useAddScribeReviewCommentMutation,

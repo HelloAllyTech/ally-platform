@@ -23,3 +23,13 @@ export const REVIEW_FILTERS = [
     label: 'Undiscovered',
   },
 ];
+
+export enum ReviewType {
+  SIMULATION = 'simulation',
+  SCRIBE = 'scribe',
+}
+
+export const REVIEW_TYPE_TABS = [
+  {key: ReviewType.SIMULATION, title: 'Simulations'},
+  {key: ReviewType.SCRIBE, title: 'Scribe'},
+];

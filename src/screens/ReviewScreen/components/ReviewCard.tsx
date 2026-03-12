@@ -10,6 +10,7 @@ import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
+import {useLazyGetScribeGeneralReviewCommentsQuery} from '@/services/scribeReviewsApi';
 import {
   colors,
   fontFamily,
@@ -19,7 +20,12 @@ import {
   theme,
   typography,
 } from '@/theme';
-import {ReviewScenario, ScenarioSessionData, User} from '@/types/reviews';
+import {
+  ReviewScenario,
+  ScenarioSessionData,
+  ScribeSessionData,
+  User,
+} from '@/types/reviews';
 import {
   formatDateTime,
   formatDurationFromSeconds,
@@ -35,9 +41,10 @@ dayjs.extend(relativeTime);
 interface ReviewCardProps {
   id: string;
   user: User;
-  scenario: ReviewScenario;
+  scenario?: ReviewScenario;
   createdAt: string;
-  scenarioSession: ScenarioSessionData;
+  scenarioSession?: ScenarioSessionData;
+  scribeSession?: ScribeSessionData;
   commentsCount?: number;
   reactions?: {
     [reaction_code: string]: number;
@@ -53,6 +60,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   scenario,
   createdAt,
   scenarioSession,
+  scribeSession,
   commentsCount = 0,
   reactions = {},
   onReviewPress,
@@ -62,10 +70,26 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const isScribe = reviewType === 'scribe';
+  const session = scenarioSession ?? scribeSession;
+
   const [
-    getGeneralComments,
-    {data: generalCommentsData, isLoading: isLoadingGeneral},
+    getSimGeneralComments,
+    {data: simGeneralData, isLoading: isLoadingSimGeneral},
   ] = useLazyGetGeneralReviewCommentsQuery();
+
+  const [
+    getScribeGeneralComments,
+    {data: scribeGeneralData, isLoading: isLoadingScribeGeneral},
+  ] = useLazyGetScribeGeneralReviewCommentsQuery();
+
+  const getGeneralComments = isScribe
+    ? getScribeGeneralComments
+    : getSimGeneralComments;
+  const generalCommentsData = isScribe ? scribeGeneralData : simGeneralData;
+  const isLoadingGeneral = isScribe
+    ? isLoadingScribeGeneral
+    : isLoadingSimGeneral;
 
   const handleCommentPress = useCallback(async () => {
     if (isExpanded) {
@@ -117,14 +141,22 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
     </View>
   );
 
-  const renderSimulationCard = () => (
-    <SimulationDetailsCard
-      reviewType={reviewType}
-      coverImageUrl={scenario.coverImageUrl}
-      coverVideoUrl={scenario.coverVideoUrl}
-      title={scenario.title}
-      description={scenario.description}
-    />
+  const renderDetailRows = () => (
+    <>
+      {!!note && <Text style={styles.noteText}>{note}</Text>}
+      {!!session?.createdAt && (
+        <SimulationDetailRow
+          label={t('Review.card.dateAndTime')}
+          value={formatDateTime(session.createdAt)}
+        />
+      )}
+      {session?.duration !== undefined && (
+        <SimulationDetailRow
+          label={t('Review.card.duration')}
+          value={formatDurationFromSeconds(session.duration)}
+        />
+      )}
+    </>
   );
 
   const renderReactionsAndComments = () => (
@@ -133,6 +165,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         reviewId={id}
         reactions={reactions}
         totalReactions={totalReactions}
+        reviewType={reviewType}
       />
       <TouchableOpacity
         style={styles.commentCountContainer}
@@ -144,29 +177,36 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
     </View>
   );
 
+  const renderSimulationDetails = () => (
+    <>
+      <View>{renderDetailRows()}</View>
+      {!!scenario && (
+        <SimulationDetailsCard
+          reviewType={reviewType}
+          coverImageUrl={scenario.coverImageUrl}
+          coverVideoUrl={scenario.coverVideoUrl}
+          title={scenario.title}
+          description={scenario.description}
+        />
+      )}
+    </>
+  );
+
+  const renderScribeDetails = () => (
+    <SimulationDetailsCard
+      reviewType={reviewType}
+      // title={scenario.title}
+      description={renderDetailRows()}
+    />
+  );
+
   return (
     <View style={styles.reviewItem}>
       {renderUserInfo()}
 
       <View style={styles.separator} />
 
-      <View>
-        {/* <Text style={styles.simulationDetailsHeading}>
-          {t('Review.card.sharedSimulationForReview')}
-        </Text> */}
-        {note && <Text style={styles.noteText}>{note}</Text>}
-        <SimulationDetailRow
-          label={t('Review.card.dateAndTime')}
-          value={formatDateTime(scenarioSession.createdAt)}
-        />
-        {scenarioSession.duration !== undefined && (
-          <SimulationDetailRow
-            label={t('Review.card.duration')}
-            value={formatDurationFromSeconds(scenarioSession.duration)}
-          />
-        )}
-      </View>
-      {renderSimulationCard()}
+      {isScribe ? renderScribeDetails() : renderSimulationDetails()}
 
       {onReviewPress && (
         <TouchableOpacity

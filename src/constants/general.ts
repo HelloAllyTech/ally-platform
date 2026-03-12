@@ -222,6 +222,8 @@ export const API_ROUTES = {
   },
   // Scribe session reviews
   SCRIBE_REVIEWS: {
+    REVIEWS: '/scribe-session-reviews',
+    CREATE_REVIEW: '/scribe-session-reviews',
     REVIEW_BY_ID: (reviewId: string) => `/scribe-session-reviews/${reviewId}`,
     ADD_REVIEW_COMMENT: (reviewId: string) =>
       `/scribe-session-reviews/${reviewId}/comments`,
