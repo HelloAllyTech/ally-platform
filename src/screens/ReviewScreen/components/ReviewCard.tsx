@@ -10,7 +10,6 @@ import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
-import {useLazyGetScribeGeneralReviewCommentsQuery} from '@/services/scribeReviewsApi';
 import {
   colors,
   fontFamily,
@@ -38,6 +37,8 @@ import {ReactionsCount} from './ReactionsCount';
 
 dayjs.extend(relativeTime);
 
+type LazyGeneralCommentsQuery = typeof useLazyGetGeneralReviewCommentsQuery;
+
 interface ReviewCardProps {
   id: string;
   user: User;
@@ -52,6 +53,7 @@ interface ReviewCardProps {
   onReviewPress?: (reviewId?: string) => void;
   note?: string;
   reviewType?: ReviewType;
+  useLazyGeneralCommentsQuery?: LazyGeneralCommentsQuery;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
@@ -66,6 +68,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   onReviewPress,
   note,
   reviewType,
+  useLazyGeneralCommentsQuery = useLazyGetGeneralReviewCommentsQuery,
 }) => {
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -74,22 +77,9 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const session = scenarioSession ?? scribeSession;
 
   const [
-    getSimGeneralComments,
-    {data: simGeneralData, isLoading: isLoadingSimGeneral},
-  ] = useLazyGetGeneralReviewCommentsQuery();
-
-  const [
-    getScribeGeneralComments,
-    {data: scribeGeneralData, isLoading: isLoadingScribeGeneral},
-  ] = useLazyGetScribeGeneralReviewCommentsQuery();
-
-  const getGeneralComments = isScribe
-    ? getScribeGeneralComments
-    : getSimGeneralComments;
-  const generalCommentsData = isScribe ? scribeGeneralData : simGeneralData;
-  const isLoadingGeneral = isScribe
-    ? isLoadingScribeGeneral
-    : isLoadingSimGeneral;
+    getGeneralComments,
+    {data: generalCommentsData, isLoading: isLoadingGeneral},
+  ] = useLazyGeneralCommentsQuery();
 
   const handleCommentPress = useCallback(async () => {
     if (isExpanded) {
@@ -143,7 +133,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const renderDetailRows = () => (
     <>
-      {!!note && <Text style={styles.noteText}>{note}</Text>}
       {!!session?.createdAt && (
         <SimulationDetailRow
           label={t('Review.card.dateAndTime')}
@@ -206,6 +195,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       {renderUserInfo()}
 
       <View style={styles.separator} />
+
+      {!!note && <Text style={styles.noteText}>{note}</Text>}
 
       {isScribe ? renderScribeDetails() : renderSimulationDetails()}
 
