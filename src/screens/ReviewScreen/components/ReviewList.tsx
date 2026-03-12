@@ -9,7 +9,11 @@ import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
-import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
+import {
+  useLazyGetGeneralReviewCommentsQuery,
+  useLazyGetReviewsQuery,
+} from '@/services/reviewsApi';
+import {useLazyGetScribeGeneralReviewCommentsQuery} from '@/services/scribeReviewsApi';
 import {colors} from '@/theme';
 
 import {ReviewCard} from './ReviewCard';
@@ -62,10 +66,15 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     }
   }, [error, showToast, t]);
 
-  const screenName =
-    reviewType === 'scribe'
-      ? SCREEN_NAMES.SCRIBE_REVIEW_DETAILS
-      : SCREEN_NAMES.REVIEW_DETAILS;
+  const isScribe = reviewType === 'scribe';
+
+  const screenName = isScribe
+    ? SCREEN_NAMES.SCRIBE_REVIEW_DETAILS
+    : SCREEN_NAMES.REVIEW_DETAILS;
+
+  const lazyGeneralCommentsQuery = isScribe
+    ? useLazyGetScribeGeneralReviewCommentsQuery
+    : useLazyGetGeneralReviewCommentsQuery;
 
   const handleReviewPress = useCallback(
     (reviewId: string) => {
@@ -88,9 +97,9 @@ export const ReviewList: React.FC<ReviewListProps> = ({
       <FlatList
         contentContainerStyle={styles.list}
         data={reviews}
+        keyExtractor={item => item.id}
         renderItem={({item}) => (
           <ReviewCard
-            key={item.id}
             id={item.id}
             user={item.createdBy}
             scenario={item.scenario}
@@ -105,6 +114,7 @@ export const ReviewList: React.FC<ReviewListProps> = ({
             note={item.note}
             reviewType={reviewType}
             summaryName={item.summaryName}
+            useLazyGeneralCommentsQuery={lazyGeneralCommentsQuery}
           />
         )}
         onEndReached={loadMore}
