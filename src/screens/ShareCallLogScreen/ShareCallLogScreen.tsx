@@ -1,8 +1,7 @@
 import {useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
-import {View} from 'react-native';
 
-import {SimulationDetailRow} from '@/components';
+import {SimulationDetailRow, SimulationDetailsCard} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useShareScreenLogic} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
@@ -92,18 +91,24 @@ export const ShareCallLogScreen: React.FC<
       isEmojiPickerOpen={isEmojiPickerOpen}
       setIsEmojiPickerOpen={setIsEmojiPickerOpen}
       onEmojiSelected={handleEmojiSelected}>
-      <View>
-        <SimulationDetailRow
-          label={t('Review.card.dateAndTime')}
-          value={formatDateTime(sessionData.createdAt)}
-        />
-        {sessionData.duration !== undefined && (
-          <SimulationDetailRow
-            label={t('Review.card.duration')}
-            value={sessionData.duration}
-          />
-        )}
-      </View>
+      <SimulationDetailsCard
+        reviewType="scribe"
+        title={sessionData.title}
+        description={
+          <>
+            <SimulationDetailRow
+              label={t('Review.card.dateAndTime')}
+              value={formatDateTime(sessionData.createdAt)}
+            />
+            {sessionData.duration !== undefined && (
+              <SimulationDetailRow
+                label={t('Review.card.duration')}
+                value={sessionData.duration}
+              />
+            )}
+          </>
+        }
+      />
     </ShareReviewLayout>
   );
 };

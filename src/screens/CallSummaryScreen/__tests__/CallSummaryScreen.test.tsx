@@ -65,6 +65,10 @@ jest.mock('@/store/slices/summarySlice', () => ({
 jest.mock('@/utils', () => ({navigateToCallLogTab: jest.fn()}));
 
 // Services
+jest.mock('@/services/scribeReviewsApi', () => ({
+  useUpdateScribeReviewStatusMutation: () => [jest.fn(), {isLoading: false}],
+}));
+
 jest.mock('@/services/settingsApi', () => ({
   useGetSummaryFieldsQuery: () => ({
     data: [],
