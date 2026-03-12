@@ -21,7 +21,7 @@ const chipColorsByType = ScaledSheet.create({
 
 const chipTextColorsByType = ScaledSheet.create({
   simulation: {
-    color: colors.ds.deepPurple[900],
+    color: colors.ds.deepPurple[400],
   },
   scribe: {
     color: colors.ds.orange[900],
@@ -47,7 +47,7 @@ const styles = ScaledSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: '4@ms',
     paddingHorizontal: '8@ms',
-    borderRadius: radius.full,
+    borderRadius: radius.sm,
   },
   chipText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

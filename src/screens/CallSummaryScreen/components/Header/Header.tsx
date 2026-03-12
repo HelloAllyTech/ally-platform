@@ -18,7 +18,8 @@ interface HeaderProps {
   onMenuPress: () => void;
   summaryName?: string;
   showShareSwitch?: boolean;
-  onShareForReview?: () => void;
+  isSharedForReview?: boolean;
+  onShareToggle?: (isEnabled: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,7 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   onMenuPress,
   summaryName = '',
   showShareSwitch = false,
-  onShareForReview,
+  isSharedForReview = false,
+  onShareToggle,
 }) => {
   const {t} = useTranslate();
 
@@ -54,14 +56,14 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
             </View>
           </View>
-          {showShareSwitch && onShareForReview && (
+          {showShareSwitch && onShareToggle && (
             <View style={styles.shareSwitchContainer}>
               <Text style={styles.shareSwitchLabel}>
                 {t('SimulationFeedback.share')}
               </Text>
               <CustomSwitch
-                value={false}
-                onToggle={isEnabled => isEnabled && onShareForReview()}
+                value={isSharedForReview}
+                onToggle={onShareToggle}
               />
             </View>
           )}

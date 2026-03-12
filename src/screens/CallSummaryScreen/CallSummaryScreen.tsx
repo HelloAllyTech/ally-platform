@@ -1,4 +1,5 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {
   ActivityIndicator,
   StatusBar,
@@ -19,6 +20,7 @@ import {
   useCallSummaryForm,
   useHardwareBackPressHandler,
   useSummaryState,
+  useToggleReviewPrivacy,
   useTranslate,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
@@ -27,9 +29,11 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme';
+import {ReviewStatus} from '@/types';
 import {
   formatDurationFromSeconds,
   getErrorDetails,
+  isMinutesPassed,
   navigateToCallLogTab,
 } from '@/utils';
 
@@ -135,6 +139,46 @@ export const CallSummaryScreen: React.FC<
       },
     });
   }, [callId, summaryData, callInfo.summaryName, navigation, t]);
+
+  const scribeReviewId = summaryData?.reviewId ?? undefined;
+  const isSharedForReview =
+    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+
+  const {handleTogglePrivate: handleToggleScribePrivate} =
+    useToggleReviewPrivacy(scribeReviewId);
+
+  const handleShareToggle = useCallback(
+    (isEnabled: boolean) => {
+      if (
+        isEnabled &&
+        (!scribeReviewId ||
+          (summaryData?.reviewCreatedAt &&
+            !isMinutesPassed(summaryData.reviewCreatedAt)))
+      ) {
+        handleShareForReview();
+      } else if (scribeReviewId) {
+        handleToggleScribePrivate(isEnabled).then(() => handleRefresh());
+      }
+    },
+    [
+      scribeReviewId,
+      summaryData?.reviewCreatedAt,
+      handleShareForReview,
+      handleToggleScribePrivate,
+      handleRefresh,
+    ],
+  );
+
+  const isFirstFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocusRef.current) {
+        isFirstFocusRef.current = false;
+        return;
+      }
+      handleRefresh();
+    }, [handleRefresh]),
+  );
 
   const [mountTime] = useState<number>(Date.now());
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
@@ -389,7 +433,8 @@ export const CallSummaryScreen: React.FC<
         onMenuPress={showMenu}
         summaryName={summaryName}
         showShareSwitch={Boolean(callId) && isSummaryAvailable}
-        onShareForReview={handleShareForReview}
+        isSharedForReview={isSharedForReview}
+        onShareToggle={handleShareToggle}
       />
 
       <View style={styles.tabsContainer}>

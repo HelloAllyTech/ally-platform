@@ -472,6 +472,7 @@
       "description": "We need more interaction data to provide meaningful feedback."
     },
     "shareScreenTitle": "Share this simulation",
+    "shareForReviewTitle": "Share this for review",
     "editNoteTitle": "Edit note",
     "tabs": {
       "sessionReview": "Session Review",
