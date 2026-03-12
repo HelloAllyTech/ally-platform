@@ -126,6 +126,7 @@ export interface ReviewItem {
   commentsCount: number;
   note: string;
   reviewStatus?: ReviewStatus;
+  summaryName?: string;
 }
 
 export interface GetReviewByIdResponse {

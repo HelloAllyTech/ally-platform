@@ -9,6 +9,7 @@ import {
   useAddScribeReviewCommentMutation,
   useGetScribeReviewByIdQuery,
   useLazyGetScribeMessagesQuery,
+  useUpdateScribeReviewStatusMutation,
 } from '@/services/scribeReviewsApi';
 import {useAppSelector} from '@/store/hooks';
 import {ReviewStatus} from '@/types';
@@ -66,6 +67,7 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     reviewId,
     isPrivate,
     api,
+    useUpdateReviewStatus: useUpdateScribeReviewStatusMutation,
   });
 
   const metadata: ReviewMetadata | undefined = reviewData
@@ -83,7 +85,7 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
       reviewId,
       sessionData: {
-        title: 'Session Review',
+        title: reviewData?.summaryName || 'Session Review',
         createdAt: reviewData?.scribeSession?.createdAt || '',
         duration: reviewData?.scribeSession?.duration
           ? formatDurationFromSeconds(reviewData.scribeSession.duration)
@@ -116,7 +118,10 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
           reviewData ? (
             <ReviewTranscriptHeader
               reviewType="scribe"
-              title={`CALL-${reviewData.scribeSession?.id || ''}`}
+              title={
+                reviewData.summaryName ||
+                `CALL-${reviewData.scribeSession?.id || ''}`
+              }
               user={reviewData.createdBy}
               createdAt={reviewData.scribeSession?.createdAt}
               duration={reviewData.scribeSession?.duration}
