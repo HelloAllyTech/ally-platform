@@ -24,6 +24,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
@@ -145,7 +146,7 @@ export const CallSummaryScreen: React.FC<
     !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
 
   const {handleTogglePrivate: handleToggleScribePrivate} =
-    useToggleReviewPrivacy(scribeReviewId);
+    useToggleReviewPrivacy(scribeReviewId, useUpdateScribeReviewStatusMutation);
 
   const handleShareToggle = useCallback(
     (isEnabled: boolean) => {
