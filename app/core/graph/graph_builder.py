@@ -179,9 +179,9 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     return graph
 
 
-def build_report_graph() -> StateGraph:
+def _build_report_graph() -> StateGraph:
     """
-    Build the report-specific LangGraph.
+    Construct the report-specific StateGraph (topology only, not compiled).
 
     Reuses the core simulation nodes (process_events, resolve_branching_instruction,
     generate_response, detect_behaviors, retrieve_knowledge) but omits the
@@ -200,6 +200,8 @@ def build_report_graph() -> StateGraph:
               → resolve_branching_instruction (subgraph)
               → generate_response
               → clear_events_and_detected_data → END
+
+    Not called directly — use ``get_report_graph()`` which caches the result.
     """
     graph = StateGraph(SimulationState)
 
@@ -244,3 +246,13 @@ def build_report_graph() -> StateGraph:
     graph.add_edge("clear_events_and_detected_data", END)
 
     return graph
+
+
+# Module-level cache: the graph topology is static, so it is built once and
+# reused. Only .compile(checkpointer=...) is called per-report, which is cheap.
+_report_graph: StateGraph = _build_report_graph()
+
+
+def get_report_graph() -> StateGraph:
+    """Return the cached report StateGraph (built once at import time)."""
+    return _report_graph

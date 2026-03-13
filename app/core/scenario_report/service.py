@@ -22,7 +22,7 @@ from app.core.embeddings import OpenAIEmbeddingClient
 from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.graph.checkpointer import PruningCheckpointer
-from app.core.graph.graph_builder import build_report_graph
+from app.core.graph.graph_builder import get_report_graph
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.core.scenario_report.evaluator import evaluate_transcript
@@ -239,12 +239,29 @@ class ScenarioReportService:
 
         try:
             # -- Setup
+            # Two independent tracks run concurrently:
+            #   A) scenario chain  : create embedding client → build scenario
+            #  → configure client LLM
+            #   B) counselor LLM   : create_llm_client (no scenario dependency)
+            #
+            # get_report_graph() returns the module-level cached StateGraph
+            # (built once at import time); only .compile() runs per-report.
             embedding_client = OpenAIEmbeddingClient()
 
-            scenario = Scenario.create(req.metadata, embedding_client=embedding_client)
+            async def _build_scenario_track():
+                scenario = Scenario.create(
+                    req.metadata, embedding_client=embedding_client
+                )
+                client_llm = configure_llm_client(scenario)
+                return scenario, client_llm
 
-            client_llm = configure_llm_client(scenario)
-            counselor_llm = create_llm_client(language_code=req.language)
+            async def _build_counselor_track():
+                return create_llm_client(language_code=req.language)
+
+            (scenario, client_llm), counselor_llm = await asyncio.gather(
+                _build_scenario_track(),
+                _build_counselor_track(),
+            )
 
             event_orchestrator = EventOrchestrator(
                 scenario=scenario,
@@ -254,7 +271,7 @@ class ScenarioReportService:
                 is_report_mode=True,
             )
 
-            report_graph = build_report_graph().compile(checkpointer=self._checkpointer)
+            report_graph = get_report_graph().compile(checkpointer=self._checkpointer)
 
             config = {
                 "configurable": {

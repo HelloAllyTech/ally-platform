@@ -381,7 +381,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -392,7 +392,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -404,7 +404,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 80,
@@ -435,7 +435,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -446,7 +446,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -458,7 +458,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 0,
@@ -481,7 +481,7 @@ class TestServiceRun:
     @pytest.mark.asyncio
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -492,7 +492,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_load,
     ):
@@ -514,7 +514,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -525,7 +525,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -542,7 +542,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 70,
@@ -581,7 +581,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -592,7 +592,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -609,7 +609,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 70,
@@ -645,7 +645,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -656,7 +656,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -670,7 +670,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 80,
@@ -692,7 +692,7 @@ class TestServiceRun:
     @patch("app.core.scenario_report.service.load_and_format")
     @patch("app.core.scenario_report.service.evaluate_transcript")
     @patch("app.core.scenario_report.service.EventOrchestrator")
-    @patch("app.core.scenario_report.service.build_report_graph")
+    @patch("app.core.scenario_report.service.get_report_graph")
     @patch("app.core.scenario_report.service.create_llm_client")
     @patch("app.core.scenario_report.service.configure_llm_client")
     @patch("app.core.scenario_report.service.Scenario")
@@ -703,7 +703,7 @@ class TestServiceRun:
         mock_scenario_cls,
         mock_configure_llm,
         mock_create_llm,
-        mock_build_graph,
+        mock_get_graph,
         mock_orch_cls,
         mock_evaluate,
         mock_load,
@@ -717,7 +717,7 @@ class TestServiceRun:
         mock_scenario_cls.create.return_value = scenario
         mock_configure_llm.return_value = MagicMock()
         mock_create_llm.return_value = counselor_llm
-        mock_build_graph.return_value.compile.return_value = graph
+        mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
             "gradual_disclosure": 50,
