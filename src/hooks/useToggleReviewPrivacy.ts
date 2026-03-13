@@ -5,10 +5,15 @@ import {useToast} from '@/components';
 import {useUpdateReviewStatusMutation} from '@/services';
 import {ReviewStatus} from '@/types';
 
-export const useToggleReviewPrivacy = (reviewId?: string) => {
+type UpdateReviewStatusHook = typeof useUpdateReviewStatusMutation;
+
+export const useToggleReviewPrivacy = (
+  reviewId?: string,
+  useUpdateMutation: UpdateReviewStatusHook = useUpdateReviewStatusMutation,
+) => {
   const {t} = useTranslation();
   const {showToast} = useToast();
-  const [updateReviewStatus] = useUpdateReviewStatusMutation();
+  const [updateReviewStatus] = useUpdateMutation();
 
   const handleTogglePrivate = useCallback(
     async (isEnabled: boolean) => {

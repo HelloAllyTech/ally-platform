@@ -8,6 +8,7 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon, ThreeDotsIcon} from '@/assets/icons';
+import {CustomSwitch} from '@/components';
 import {DEFAULT_HIT_SLOP, isIOS} from '@/constants/general';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
@@ -16,12 +17,18 @@ interface HeaderProps {
   onBackPress: () => void;
   onMenuPress: () => void;
   summaryName?: string;
+  showShareSwitch?: boolean;
+  isSharedForReview?: boolean;
+  onShareToggle?: (isEnabled: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
+  showShareSwitch = false,
+  isSharedForReview = false,
+  onShareToggle,
 }) => {
   const {t} = useTranslate();
 
@@ -49,6 +56,17 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
             </View>
           </View>
+          {showShareSwitch && onShareToggle && (
+            <View style={styles.shareSwitchContainer}>
+              <Text style={styles.shareSwitchLabel}>
+                {t('SimulationFeedback.share')}
+              </Text>
+              <CustomSwitch
+                value={isSharedForReview}
+                onToggle={onShareToggle}
+              />
+            </View>
+          )}
           <TouchableOpacity
             hitSlop={DEFAULT_HIT_SLOP}
             style={styles.moreOptionsContainer}
@@ -104,5 +122,15 @@ const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.typography.mediumEmphasis,
     marginRight: '10@ms',
+  },
+  shareSwitchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+  },
+  shareSwitchLabel: {
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.typography.lowEmphasis,
   },
 });

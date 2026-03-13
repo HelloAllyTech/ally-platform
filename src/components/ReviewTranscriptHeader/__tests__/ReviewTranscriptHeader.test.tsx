@@ -69,68 +69,57 @@ const defaultUser = {
   profileImage: '',
 };
 
-const defaultScenario = {
+const defaultSessionDetails = {
   title: 'Scenario Title',
   description: 'Scenario description',
   coverImageUrl: 'https://example.com/cover.jpg',
   coverVideoUrl: undefined,
-  createdAt: '2024-01-01T00:00:00Z',
 };
 
-const defaultSession = {
-  id: 'session-1',
-  createdAt: '2024-01-01T12:00:00Z',
-  duration: '120',
+const defaultProps = {
+  reviewType: 'simulation' as const,
+  title: 'Scenario Title',
+  user: defaultUser,
 };
 
 describe('ReviewTranscriptHeader', () => {
-  it('renders scenario title', () => {
+  it('renders title', () => {
     const {getByText} = render(
-      <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
-      />,
+      <ReviewTranscriptHeader {...defaultProps} />,
     );
     expect(getByText('Scenario Title')).toBeTruthy();
   });
 
   it('renders review type chip', () => {
     const {getByTestId} = render(
-      <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
-      />,
+      <ReviewTranscriptHeader {...defaultProps} />,
     );
     expect(getByTestId('review-type-chip')).toBeTruthy();
   });
 
   it('renders user name in subtitle when provided', () => {
     const {getByText} = render(
-      <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
-      />,
+      <ReviewTranscriptHeader {...defaultProps} />,
     );
     expect(getByText(/By Test User/)).toBeTruthy();
   });
 
-  it('renders session date when scenarioSession is provided', () => {
+  it('renders session date when createdAt is provided', () => {
     const {getByText} = render(
       <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
-        scenarioSession={defaultSession}
+        {...defaultProps}
+        createdAt="2024-01-01T12:00:00Z"
       />,
     );
     expect(getByText(/formatted-2024-01-01T12:00:00Z/)).toBeTruthy();
   });
 
-  it('renders duration when scenarioSession has duration', () => {
+  it('renders duration when duration is provided', () => {
     const {getByText} = render(
       <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
-        scenarioSession={defaultSession}
+        {...defaultProps}
+        createdAt="2024-01-01T12:00:00Z"
+        duration={120}
       />,
     );
     expect(getByText(/Review.card.duration/)).toBeTruthy();
@@ -140,8 +129,8 @@ describe('ReviewTranscriptHeader', () => {
   it('opens simulation details modal when help icon is pressed', () => {
     const {getByTestId, queryByTestId, UNSAFE_getAllByType} = render(
       <ReviewTranscriptHeader
-        user={defaultUser}
-        scenario={defaultScenario}
+        {...defaultProps}
+        sessionDetails={defaultSessionDetails}
       />,
     );
     expect(queryByTestId('simulation-details-modal')).toBeNull();
@@ -153,18 +142,19 @@ describe('ReviewTranscriptHeader', () => {
     expect(getByTestId('simulation-details-modal')).toBeTruthy();
   });
 
-  it('renders without scenario', () => {
-    const {queryByText} = render(
-      <ReviewTranscriptHeader user={defaultUser} />,
+  it('renders without session details', () => {
+    const {getByText, queryByTestId} = render(
+      <ReviewTranscriptHeader {...defaultProps} />,
     );
-    expect(queryByText('Scenario Title')).toBeNull();
+    expect(getByText('Scenario Title')).toBeTruthy();
+    expect(queryByTestId('simulation-details-modal')).toBeNull();
   });
 
   it('renders without user name when user has no name', () => {
     const {queryByText} = render(
       <ReviewTranscriptHeader
+        {...defaultProps}
         user={{...defaultUser, name: ''}}
-        scenario={defaultScenario}
       />,
     );
     expect(queryByText(/By/)).toBeNull();

@@ -1,20 +1,56 @@
-import {API_METHODS, API_ROUTES} from '@/constants';
+import {API_METHODS, API_ROUTES, SortOrder} from '@/constants';
 import {
   AddReviewCommentRequest,
   AddReviewCommentResponse,
+  CreateScribeReviewRequest,
+  CreateScribeReviewResponse,
   GetMessagesRequest,
   GetMessagesResponse,
-  GetReviewByIdResponse,
+  GetScribeReviewByIdResponse,
   GetThreadCommentsRequest,
   GetThreadCommentsResponse,
+  ReviewsResponse,
+  UpdateReviewStatusRequest,
+  UpdateReviewStatusResponse,
 } from '@/types';
 
 import {api} from './api';
 
 export const scribeReviewsApi = api.injectEndpoints({
   endpoints: builder => ({
+    getScribeReviews: builder.query<
+      ReviewsResponse | null,
+      {sortBy: string; limit: number; offset: number}
+    >({
+      query: ({sortBy, limit, offset}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.REVIEWS,
+        method: API_METHODS.GET,
+        params: {sortBy, limit, offset, order: SortOrder.DESC},
+      }),
+    }),
+    createScribeReview: builder.mutation<
+      CreateScribeReviewResponse,
+      CreateScribeReviewRequest
+    >({
+      query: body => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.CREATE_REVIEW,
+        method: API_METHODS.POST,
+        body,
+      }),
+    }),
+    updateScribeReviewStatus: builder.mutation<
+      UpdateReviewStatusResponse,
+      {reviewId: string; body: UpdateReviewStatusRequest}
+    >({
+      query: ({reviewId, body}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.UPDATE_REVIEW_STATUS(reviewId),
+        method: API_METHODS.PATCH,
+        body,
+      }),
+      invalidatesTags: ['ReviewDetails'],
+    }),
     getScribeReviewById: builder.query<
-      GetReviewByIdResponse,
+      GetScribeReviewByIdResponse,
       {reviewId: string}
     >({
       query: ({reviewId}) => ({
@@ -122,6 +158,10 @@ export const scribeReviewsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetScribeReviewsQuery,
+  useLazyGetScribeReviewsQuery,
+  useCreateScribeReviewMutation,
+  useUpdateScribeReviewStatusMutation,
   useGetScribeReviewByIdQuery,
   useLazyGetScribeMessagesQuery,
   useAddScribeReviewCommentMutation,

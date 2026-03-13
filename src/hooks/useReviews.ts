@@ -6,14 +6,16 @@ import {ReviewItem} from '@/types/reviews';
 
 const LIMIT = 10;
 
-export const useReviews = () => {
+type LazyReviewsQuery = typeof useLazyGetReviewsQuery;
+
+export const useReviews = (useLazyQuery: LazyReviewsQuery) => {
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<ReviewFilter>(
     ReviewFilter.ALL,
   );
-  const [getReviews, {isLoading, isFetching, error}] = useLazyGetReviewsQuery();
+  const [getReviews, {isLoading, isFetching, error}] = useLazyQuery();
   const fetchReviews = useCallback(
     async (currentOffset: number, reset: boolean = false) => {
       try {

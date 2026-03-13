@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
+import {ScribeReviewIcon} from '@/assets';
 import {ReviewTypeChip, VideoPreview} from '@/components';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {
@@ -75,6 +76,10 @@ export const SimulationDetailsCard = ({
         {!coverVideoUrl && !!coverImageUrl && (
           <Image source={{uri: coverImageUrl}} style={styles.cover} />
         )}
+
+        {reviewType === 'scribe' && (
+          <ScribeReviewIcon width="100%" height={ms(180)} />
+        )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.textContainer}>
@@ -118,8 +123,8 @@ const styles = ScaledSheet.create({
     gap: '16@s',
   },
   coverContainer: {
-    minHeight: '180@ms',
-    backgroundColor: colors.ds.grey[100],
+    height: '180@ms',
+    backgroundColor: colors.ds.grey[50],
     borderRadius: radius.lg,
     width: '100%',
   },

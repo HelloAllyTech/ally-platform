@@ -172,6 +172,11 @@ export interface CallSummaryResponse {
   archivedAt: string;
   details: CallDetails;
   summaryStatus: ChatSummaryStatus;
+  reviewId?: string | null;
+  reviewStatus?: string | null;
+  reviewNote?: string | null;
+  reviewCreatedAt?: string | null;
+  reviewUpdatedAt?: string | null;
 }
 
 export interface Tag {

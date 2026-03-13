@@ -125,9 +125,17 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
         renderHeader={() =>
           reviewData ? (
             <ReviewTranscriptHeader
+              reviewType="simulation"
+              title={reviewData.scenario?.title || ''}
               user={reviewData.createdBy}
-              scenario={reviewData.scenario}
-              scenarioSession={reviewData.scenarioSession}
+              createdAt={reviewData.scenarioSession?.createdAt}
+              duration={reviewData.scenarioSession?.duration}
+              sessionDetails={{
+                title: reviewData.scenario?.title,
+                description: reviewData.scenario?.description,
+                coverImageUrl: reviewData.scenario?.coverImageUrl,
+                coverVideoUrl: reviewData.scenario?.coverVideoUrl,
+              }}
             />
           ) : null
         }
