@@ -14,6 +14,7 @@ import {
   useLazyGetThreadCommentsQuery,
   useUpdateCommentMutation,
   useUpdateCommentVisibilityMutation,
+  useUpdateReviewStatusMutation,
 } from '@/services/reviewsApi';
 import {
   useLazyGetCommentRepliesQuery,
@@ -33,6 +34,7 @@ import {
   useLazyGetScribeThreadCommentsQuery,
   useUpdateScribeCommentMutation,
   useUpdateScribeCommentVisibilityMutation,
+  useUpdateScribeReviewStatusMutation,
 } from '@/services/scribeReviewsApi';
 import {
   useLazyGetScribeCommentRepliesQuery,
@@ -50,6 +52,7 @@ export interface ReviewApiHooks {
   useDeleteComment: typeof useDeleteCommentMutation;
   useUpdateComment: typeof useUpdateCommentMutation;
   useUpdateCommentVisibility: typeof useUpdateCommentVisibilityMutation;
+  useUpdateReviewStatus: typeof useUpdateReviewStatusMutation;
 
   // reviewThreadsApi — threads list + comment replies
   useLazyGetThreads: typeof useLazyGetThreadsQuery;
@@ -73,6 +76,7 @@ export const simulationApiHooks: ReviewApiHooks = {
   useDeleteComment: useDeleteCommentMutation,
   useUpdateComment: useUpdateCommentMutation,
   useUpdateCommentVisibility: useUpdateCommentVisibilityMutation,
+  useUpdateReviewStatus: useUpdateReviewStatusMutation,
   useLazyGetThreads: useLazyGetThreadsQuery,
   useLazyGetCommentReplies: useLazyGetCommentRepliesQuery,
   useLazyGetReactions: useLazyGetReactionsQuery,
@@ -90,6 +94,7 @@ export const scribeApiHooks: ReviewApiHooks = {
   useDeleteComment: useDeleteScribeCommentMutation,
   useUpdateComment: useUpdateScribeCommentMutation,
   useUpdateCommentVisibility: useUpdateScribeCommentVisibilityMutation,
+  useUpdateReviewStatus: useUpdateScribeReviewStatusMutation,
   useLazyGetThreads: useLazyGetScribeThreadsQuery,
   useLazyGetCommentReplies: useLazyGetScribeCommentRepliesQuery,
   useLazyGetReactions: useLazyGetScribeReactionsQuery,

@@ -1,6 +1,13 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
+// Mock react-navigation focus effect so screen doesn't need NavigationContainer
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (cb: () => void) => {
+    if (typeof cb === 'function') cb();
+  },
+}));
+
 // Mock react-native-tab-view to avoid native module issues
 jest.mock('react-native-tab-view', () => {
   const React = require('react');
@@ -58,6 +65,10 @@ jest.mock('@/store/slices/summarySlice', () => ({
 jest.mock('@/utils', () => ({navigateToCallLogTab: jest.fn()}));
 
 // Services
+jest.mock('@/services/scribeReviewsApi', () => ({
+  useUpdateScribeReviewStatusMutation: () => [jest.fn(), {isLoading: false}],
+}));
+
 jest.mock('@/services/settingsApi', () => ({
   useGetSummaryFieldsQuery: () => ({
     data: [],
@@ -107,6 +118,7 @@ jest.mock('@/hooks', () => {
     useCallSummaryForm: () => ({hasChanges: mockHasChanges}),
     useHardwareBackPressHandler: () => {},
     useSummaryState: () => mockSummaryState,
+    useToggleReviewPrivacy: () => ({handleTogglePrivate: jest.fn()}),
     useTranslate: () => ({t: (k: string) => k}),
     __setHooksMock: (state: any, hasChanges: boolean) => {
       mockSummaryState = state;

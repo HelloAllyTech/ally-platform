@@ -1,17 +1,19 @@
 import React, {useCallback, useMemo} from 'react';
-import {Text} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
 
-import {SCREEN_NAMES} from '@/constants';
+import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
+import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {ReviewApiProvider, scribeApiHooks} from '@/contexts/ReviewApiContext';
-import {useAppNavigation} from '@/hooks';
+import {useAppNavigation, useUser} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddScribeReviewCommentMutation,
   useGetScribeReviewByIdQuery,
   useLazyGetScribeMessagesQuery,
+  useUpdateScribeReviewStatusMutation,
 } from '@/services/scribeReviewsApi';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {useAppSelector} from '@/store/hooks';
+import {ReviewStatus} from '@/types';
+import {formatDurationFromSeconds, isMinutesPassed} from '@/utils';
 
 import {ReviewDetailsLayout} from './components/ReviewDetailsLayout';
 import {useReviewDetailsLogic} from './hooks/useReviewDetailsLogic';
@@ -20,8 +22,14 @@ import {ReviewApiAdapter, ReviewMetadata} from './types';
 type Props = RootStackScreenProps<'ScribeReviewDetails'>;
 
 export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
-  const {reviewId, isPrivate} = route.params || {};
+  const {reviewId} = route.params || {};
   const navigation = useAppNavigation();
+  const {userData} = useUser();
+
+  const permissions = useAppSelector(state => state.user.permissions);
+  const canEditReview = permissions.includes(
+    USER_PERMISSIONS.EDIT_SCRIBE_REVIEW,
+  );
 
   const [fetchMessages, messagesState] = useLazyGetScribeMessagesQuery();
   const {data: reviewData, refetch: refetchReviewData} =
@@ -35,6 +43,8 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     );
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddScribeReviewCommentMutation();
+
+  const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 
   const api: ReviewApiAdapter = useMemo(
     () => ({
@@ -53,7 +63,12 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     ],
   );
 
-  const reviewLogic = useReviewDetailsLogic({reviewId, isPrivate, api});
+  const reviewLogic = useReviewDetailsLogic({
+    reviewId,
+    isPrivate,
+    api,
+    useUpdateReviewStatus: useUpdateScribeReviewStatusMutation,
+  });
 
   const metadata: ReviewMetadata | undefined = reviewData
     ? {
@@ -69,13 +84,12 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const handleEditNote = useCallback(() => {
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
       reviewId,
-      scenarioData: {
-        coverImageUrl: reviewData?.scenario?.coverImageUrl,
-        coverVideoUrl: reviewData?.scenario?.coverVideoUrl,
-        title: reviewData?.scenario?.title || '',
-        description: reviewData?.scenario?.description || '',
-        createdAt: reviewData?.scenarioSession?.createdAt || '',
-        duration: reviewData?.scenarioSession?.duration || '',
+      sessionData: {
+        title: reviewData?.summaryName || 'Session Review',
+        createdAt: reviewData?.scribeSession?.createdAt || '',
+        duration: reviewData?.scribeSession?.duration
+          ? formatDurationFromSeconds(reviewData.scribeSession.duration)
+          : undefined,
       },
       isEditNote: true,
       note: reviewData?.note,
@@ -86,29 +100,41 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     <ReviewApiProvider value={scribeApiHooks}>
       <ReviewDetailsLayout
         reviewId={reviewId}
+        reviewNote={reviewData?.note}
         reviewLogic={reviewLogic}
         metadata={metadata}
         onRefreshReactions={refetchReviewData}
-        onEditNote={handleEditNote}
+        onEditNote={
+          reviewData &&
+          !isMinutesPassed(reviewData.createdAt) &&
+          userData?.id === reviewData.createdBy?.id &&
+          reviewData.reviewStatus !== ReviewStatus.HIDDEN
+            ? handleEditNote
+            : undefined
+        }
+        canEditReview={canEditReview}
+        toggleInHeader
         renderHeader={() =>
           reviewData ? (
-            // TODO: Replace with ScribeTranscriptHeader when designed
-            <Text style={scribeStyles.headerTitle} numberOfLines={1}>
-              Session Review
-            </Text>
+            <ReviewTranscriptHeader
+              reviewType="scribe"
+              title={
+                reviewData.summaryName ||
+                `CALL-${reviewData.scribeSession?.id || ''}`
+              }
+              user={reviewData.createdBy}
+              createdAt={reviewData.scribeSession?.createdAt}
+              duration={reviewData.scribeSession?.duration}
+              isPrivate={isPrivate}
+              onTogglePrivate={
+                canEditReview && metadata?.reviewOwnerId === userData?.id
+                  ? reviewLogic.handleTogglePrivate
+                  : undefined
+              }
+            />
           ) : null
         }
       />
     </ReviewApiProvider>
   );
 };
-
-const scribeStyles = ScaledSheet.create({
-  headerTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.ds.typography.highEmphasis,
-    ...typography.body.medium,
-    fontWeight: fontWeights.medium,
-    paddingHorizontal: '8@s',
-  },
-});

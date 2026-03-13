@@ -1,16 +1,61 @@
+import {useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
 
 import {SimulationDetailRow, SimulationDetailsCard} from '@/components';
-import {useShareScreenLogic} from '@/hooks/useShareScreenLogic';
+import {SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useShareScreenLogic} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
 import {ShareReviewLayout} from '@/screens/ShareSimulationScreen/components/ShareReviewLayout';
+import {
+  useCreateScribeReviewMutation,
+  useUpdateScribeReviewStatusMutation,
+} from '@/services/scribeReviewsApi';
+import {ReviewStatus} from '@/types';
 import {formatDateTime} from '@/utils';
 
 export const ShareCallLogScreen: React.FC<
   RootStackScreenProps<'ShareCallLog'>
 > = ({route}) => {
-  const {scenarioData, ...shareParams} = route.params;
+  const {sessionData, ...shareParams} = route.params;
   const {t} = useTranslation();
+  const navigation = useAppNavigation();
+
+  const [createScribeReview] = useCreateScribeReviewMutation();
+  const [updateScribeReviewStatus] = useUpdateScribeReviewStatusMutation();
+
+  const onCreateReview = useCallback(
+    async (note: string) => {
+      if (shareParams.scribeSessionId === undefined) return;
+      return createScribeReview({
+        scribeSessionId: Number(shareParams.scribeSessionId),
+        note,
+      }).unwrap();
+    },
+    [createScribeReview, shareParams.scribeSessionId],
+  );
+
+  const onUpdateStatus = useCallback(
+    async (reviewId: string, note: string) => {
+      await updateScribeReviewStatus({
+        reviewId,
+        body: {status: ReviewStatus.IN_REVIEW, note},
+      }).unwrap();
+    },
+    [updateScribeReviewStatus],
+  );
+
+  const onShareSuccess = useCallback(
+    (result?: {id?: string} | void) => {
+      if (result && result.id) {
+        navigation.replace(SCREEN_NAMES.SCRIBE_REVIEW_DETAILS, {
+          reviewId: result.id,
+        });
+      } else {
+        navigation.goBack();
+      }
+    },
+    [navigation],
+  );
 
   const {
     note,
@@ -25,9 +70,12 @@ export const ShareCallLogScreen: React.FC<
     maxNoteLength,
   } = useShareScreenLogic({
     reviewId: shareParams.reviewId,
-    scenarioSessionId: shareParams.scenarioSessionId,
     isEditNote: shareParams.isEditNote,
     initialNote: shareParams.note,
+    shareTitle: t('SimulationFeedback.shareForReviewTitle'),
+    onCreateReview,
+    onUpdateStatus,
+    onShareSuccess,
   });
 
   return (
@@ -44,19 +92,18 @@ export const ShareCallLogScreen: React.FC<
       setIsEmojiPickerOpen={setIsEmojiPickerOpen}
       onEmojiSelected={handleEmojiSelected}>
       <SimulationDetailsCard
-        coverImageUrl={scenarioData.coverImageUrl}
-        coverVideoUrl={scenarioData.coverVideoUrl}
-        title={scenarioData.title}
+        reviewType="scribe"
+        title={sessionData.title}
         description={
           <>
             <SimulationDetailRow
               label={t('Review.card.dateAndTime')}
-              value={formatDateTime(scenarioData.createdAt)}
+              value={formatDateTime(sessionData.createdAt)}
             />
-            {scenarioData.duration !== undefined && (
+            {sessionData.duration !== undefined && (
               <SimulationDetailRow
                 label={t('Review.card.duration')}
-                value={scenarioData.duration}
+                value={sessionData.duration}
               />
             )}
           </>

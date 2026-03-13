@@ -95,6 +95,12 @@ export interface ScenarioSessionData {
   duration: string;
   createdAt: string;
 }
+export interface ScribeSessionData {
+  id: number;
+  createdAt: string;
+  duration: string;
+}
+
 export interface ReviewScenario {
   title: string;
   description: string;
@@ -110,15 +116,17 @@ export interface User {
 export interface ReviewItem {
   id: string;
   createdAt: string;
-  scenario: ReviewScenario;
-  scenarioSession: ScenarioSessionData;
+  scenario?: ReviewScenario;
+  scenarioSession?: ScenarioSessionData;
+  scribeSession?: ScribeSessionData;
   reactions: {
     [reaction_code: string]: number;
   };
   createdBy: User;
   commentsCount: number;
   note: string;
-  reviewStatus: ReviewStatus;
+  reviewStatus?: ReviewStatus;
+  summaryName?: string;
 }
 
 export interface GetReviewByIdResponse {
@@ -247,13 +255,13 @@ export interface GetReviewResponse {
   note: string;
 }
 
-export interface ShareScreenScenarioData {
+export interface ShareScreenSessionData {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   title: string;
-  description: string;
+  description?: string;
   createdAt: string;
-  duration: string;
+  duration?: string;
 }
 
 export enum ReplySource {

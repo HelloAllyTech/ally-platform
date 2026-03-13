@@ -1,4 +1,5 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {
   ActivityIndicator,
   StatusBar,
@@ -12,22 +13,30 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {Button, useToast} from '@/components';
-import {ChatSummaryStatus, USER_PERMISSIONS} from '@/constants';
+import {ChatSummaryStatus, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   useAppNavigation,
   useCallSummaryActions,
   useCallSummaryForm,
   useHardwareBackPressHandler,
   useSummaryState,
+  useToggleReviewPrivacy,
   useTranslate,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
 import {selectCallInfo} from '@/store/slices/summarySlice';
 import {colors} from '@/theme';
-import {getErrorDetails, navigateToCallLogTab} from '@/utils';
+import {ReviewStatus} from '@/types';
+import {
+  formatDurationFromSeconds,
+  getErrorDetails,
+  isMinutesPassed,
+  navigateToCallLogTab,
+} from '@/utils';
 
 import {
   AddNotesSection,
@@ -116,6 +125,60 @@ export const CallSummaryScreen: React.FC<
   const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
   const hasEditFeedbackPermission = permissions?.includes(
     USER_PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
+  );
+
+  const handleShareForReview = useCallback(() => {
+    if (!callId || !summaryData?.details) return;
+    const details = summaryData.details;
+    navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
+      scribeSessionId: callId,
+      sessionData: {
+        title:
+          callInfo.summaryName || t('Review.card.sharedSimulationForReview'),
+        createdAt: details.startTime || summaryData.createdAt || '',
+        duration: formatDurationFromSeconds(details.callDuration ?? 0),
+      },
+    });
+  }, [callId, summaryData, callInfo.summaryName, navigation, t]);
+
+  const scribeReviewId = summaryData?.reviewId ?? undefined;
+  const isSharedForReview =
+    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+
+  const {handleTogglePrivate: handleToggleScribePrivate} =
+    useToggleReviewPrivacy(scribeReviewId, useUpdateScribeReviewStatusMutation);
+
+  const handleShareToggle = useCallback(
+    (isEnabled: boolean) => {
+      if (
+        isEnabled &&
+        (!scribeReviewId ||
+          (summaryData?.reviewCreatedAt &&
+            !isMinutesPassed(summaryData.reviewCreatedAt)))
+      ) {
+        handleShareForReview();
+      } else if (scribeReviewId) {
+        handleToggleScribePrivate(isEnabled).then(() => handleRefresh());
+      }
+    },
+    [
+      scribeReviewId,
+      summaryData?.reviewCreatedAt,
+      handleShareForReview,
+      handleToggleScribePrivate,
+      handleRefresh,
+    ],
+  );
+
+  const isFirstFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocusRef.current) {
+        isFirstFocusRef.current = false;
+        return;
+      }
+      handleRefresh();
+    }, [handleRefresh]),
   );
 
   const [mountTime] = useState<number>(Date.now());
@@ -370,6 +433,9 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
+        showShareSwitch={Boolean(callId) && isSummaryAvailable}
+        isSharedForReview={isSharedForReview}
+        onShareToggle={handleShareToggle}
       />
 
       <View style={styles.tabsContainer}>

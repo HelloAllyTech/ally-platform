@@ -50,6 +50,7 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '32@ms',
   },
   contentContainer: {
+    paddingTop: '16@mvs',
     paddingBottom: '48@mvs',
   },
 });
