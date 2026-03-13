@@ -56,23 +56,25 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
             </View>
           </View>
-          {showShareSwitch && onShareToggle && (
-            <View style={styles.shareSwitchContainer}>
-              <Text style={styles.shareSwitchLabel}>
-                {t('SimulationFeedback.share')}
-              </Text>
-              <CustomSwitch
-                value={isSharedForReview}
-                onToggle={onShareToggle}
-              />
-            </View>
-          )}
-          <TouchableOpacity
-            hitSlop={DEFAULT_HIT_SLOP}
-            style={styles.moreOptionsContainer}
-            onPress={onMenuPress}>
-            <ThreeDotsIcon />
-          </TouchableOpacity>
+          <View style={styles.headerRightContainer}>
+            {showShareSwitch && onShareToggle && (
+              <View style={styles.shareSwitchContainer}>
+                <Text style={styles.shareSwitchLabel}>
+                  {t('SimulationFeedback.share')}
+                </Text>
+                <CustomSwitch
+                  value={isSharedForReview}
+                  onToggle={onShareToggle}
+                />
+              </View>
+            )}
+            <TouchableOpacity
+              hitSlop={DEFAULT_HIT_SLOP}
+              style={styles.moreOptionsContainer}
+              onPress={onMenuPress}>
+              <ThreeDotsIcon />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableWithoutFeedback>
@@ -132,5 +134,10 @@ const styles = ScaledSheet.create({
     ...typography.body.small,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     color: colors.ds.typography.lowEmphasis,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '16@ms',
   },
 });
