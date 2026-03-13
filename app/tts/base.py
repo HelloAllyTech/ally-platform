@@ -45,18 +45,6 @@ class BaseTTSClient(ABC):
         """
         pass
 
-    @abstractmethod
-    async def generate_preview(self, text: str) -> bytes:
-        """
-        Generate a preview audio for the given text.
-
-        Args:
-            text: The text to generate a preview for
-
-        Returns:
-            Preview audio as bytes
-        """
-
     def get_parameter_metadata(self) -> Dict[str, Any]:
         """
         Get metadata about available voice parameters.
