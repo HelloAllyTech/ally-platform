@@ -59,12 +59,27 @@ jest.mock('@/store/hooks', () => ({
 
 jest.mock('@/store/slices/summarySlice', () => ({
   selectCallInfo: () => ({summaryName: ''}),
+  clearSummaryStates: jest.fn(),
+}));
+
+jest.mock('@/store/slices/chatSlice', () => ({
+  clearCurrentChat: jest.fn(),
 }));
 
 // Utils
-jest.mock('@/utils', () => ({navigateToCallLogTab: jest.fn()}));
+jest.mock('@/utils', () => ({
+  navigateToCallLogTab: jest.fn(),
+  formatDurationFromSeconds: jest.fn(() => '0:00'),
+  getErrorDetails: jest.fn(() => ({status: 500})),
+  isMinutesPassed: jest.fn(() => false),
+}));
 
 // Services
+jest.mock('@/services', () => ({
+  useLazyGetScribeReactionsCountQuery: () => [jest.fn(), {data: undefined}],
+  useLazyGetScribeThreadsQuery: () => [jest.fn(), {data: undefined}],
+}));
+
 jest.mock('@/services/scribeReviewsApi', () => ({
   useUpdateScribeReviewStatusMutation: () => [jest.fn(), {isLoading: false}],
 }));
@@ -79,10 +94,19 @@ jest.mock('@/services/settingsApi', () => ({
 
 // Constants
 jest.mock('@/constants', () => ({
-  ChatSummaryStatus: {FAILED: 'FAILED', NO_AUDIO: 'NO_AUDIO'},
+  ChatSummaryStatus: {
+    FAILED: 'FAILED',
+    NO_AUDIO: 'NO_AUDIO',
+    SUCCESS: 'SUCCESS',
+  },
+  SCREEN_NAMES: {
+    SHARE_CALL_LOG: 'ShareCallLog',
+    SCRIBE_REVIEW_DETAILS: 'ScribeReviewDetails',
+  },
   USER_PERMISSIONS: {
     EDIT_SUMMARY_FEEDBACK: 'edit:summary:feedback',
     VIEW_MESSAGES: 'view:messages',
+    VIEW_SCRIBE_REVIEW: 'view:scribe-review',
   },
 }));
 

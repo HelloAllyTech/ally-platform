@@ -12,6 +12,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
+import {CommentIcon} from '@/assets';
 import {Button, useToast} from '@/components';
 import {ChatSummaryStatus, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
@@ -24,6 +25,10 @@ import {
   useTranslate,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
+import {
+  useLazyGetScribeReactionsCountQuery,
+  useLazyGetScribeThreadsQuery,
+} from '@/services';
 import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
@@ -69,6 +74,8 @@ export const CallSummaryScreen: React.FC<
   const layout = useWindowDimensions();
 
   const {refetch: refetchSummaryFields} = useGetSummaryFieldsQuery();
+  const [getScribeReviewThreadComments] = useLazyGetScribeThreadsQuery();
+  const [getScribeReviewReactionsCount] = useLazyGetScribeReactionsCountQuery();
 
   useEffect(() => {
     refetchSummaryFields();
@@ -122,6 +129,10 @@ export const CallSummaryScreen: React.FC<
 
   const {showToast} = useToast();
 
+  const scribeReviewId = summaryData?.reviewId ?? undefined;
+  const isSharedForReview =
+    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+
   const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
   const hasEditFeedbackPermission = permissions?.includes(
     USER_PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
@@ -132,18 +143,23 @@ export const CallSummaryScreen: React.FC<
     const details = summaryData.details;
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
       scribeSessionId: callId,
+      reviewId: scribeReviewId,
       sessionData: {
         title:
           callInfo.summaryName || t('Review.card.sharedSimulationForReview'),
         createdAt: details.startTime || summaryData.createdAt || '',
         duration: formatDurationFromSeconds(details.callDuration ?? 0),
       },
+      note: summaryData?.reviewNote || '',
     });
-  }, [callId, summaryData, callInfo.summaryName, navigation, t]);
-
-  const scribeReviewId = summaryData?.reviewId ?? undefined;
-  const isSharedForReview =
-    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+  }, [
+    callId,
+    summaryData,
+    callInfo.summaryName,
+    navigation,
+    t,
+    scribeReviewId,
+  ]);
 
   const {handleTogglePrivate: handleToggleScribePrivate} =
     useToggleReviewPrivacy(scribeReviewId, useUpdateScribeReviewStatusMutation);
@@ -189,6 +205,46 @@ export const CallSummaryScreen: React.FC<
   const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
     null,
   );
+  const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchReviewThreadComments = async () => {
+      if (!scribeReviewId) return;
+      if (summaryData?.reviewStatus !== ReviewStatus.HIDDEN) {
+        setHideReviewDetails(false);
+        return;
+      }
+      try {
+        const threads = await getScribeReviewThreadComments({
+          reviewId: scribeReviewId,
+          offset: 0,
+          limit: 1,
+        });
+        if (threads.data?.data?.length === 0) {
+          const reactionsCount =
+            await getScribeReviewReactionsCount(scribeReviewId);
+          if (
+            reactionsCount.data &&
+            Object.keys(reactionsCount.data.reactions).length === 0
+          ) {
+            setHideReviewDetails(true);
+          } else {
+            setHideReviewDetails(false);
+          }
+        } else {
+          setHideReviewDetails(false);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchReviewThreadComments();
+  }, [
+    scribeReviewId,
+    getScribeReviewThreadComments,
+    getScribeReviewReactionsCount,
+    summaryData?.reviewStatus,
+  ]);
 
   useEffect(() => {
     if (isArchived) {
@@ -255,6 +311,16 @@ export const CallSummaryScreen: React.FC<
     setIsFeedbackPopupVisible(false);
     handleGoBack();
   };
+  const handleViewReview = () => {
+    navigation.navigate(SCREEN_NAMES.SCRIBE_REVIEW_DETAILS, {
+      reviewId: scribeReviewId || '',
+      isPrivate: summaryData?.reviewStatus === ReviewStatus.HIDDEN,
+    });
+  };
+
+  const hasScribeReviewPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SCRIBE_REVIEW,
+  );
 
   const showSummaryButtonLoader =
     (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
@@ -433,7 +499,11 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
-        showShareSwitch={Boolean(callId) && isSummaryAvailable}
+        showShareSwitch={
+          Boolean(callId) &&
+          isSummaryAvailable &&
+          summaryStatus === ChatSummaryStatus.SUCCESS
+        }
         isSharedForReview={isSharedForReview}
         onShareToggle={handleShareToggle}
       />
@@ -455,6 +525,14 @@ export const CallSummaryScreen: React.FC<
           commonOptions={{labelStyle: styles.tabBarLabel}}
         />
       </View>
+      {!!scribeReviewId && !hideReviewDetails && hasScribeReviewPermission && (
+        <TouchableOpacity
+          onPress={handleViewReview}
+          style={styles.reviewIconButton}
+          activeOpacity={0.7}>
+          <CommentIcon width={20} height={20} color={colors.black} />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };

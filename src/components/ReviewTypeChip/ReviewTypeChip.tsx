@@ -47,7 +47,7 @@ const styles = ScaledSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: '4@ms',
     paddingHorizontal: '8@ms',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   chipText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,

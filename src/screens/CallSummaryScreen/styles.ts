@@ -1,7 +1,7 @@
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {WINDOW_HEIGHT} from '@/constants/general';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, radius, typography} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -138,5 +138,25 @@ export const styles = ScaledSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.white,
+  },
+  reviewIconButton: {
+    position: 'absolute',
+    width: '56@ms',
+    height: '56@ms',
+    right: '20@ms',
+    bottom: '20@vs',
+    backgroundColor: colors.ds.neutral.white,
+    padding: '10@ms',
+    borderWidth: 0.5,
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#A09E9E',
+    shadowOffset: {width: ms(8.52), height: ms(11.36)},
+    shadowOpacity: 0.1,
+    shadowRadius: ms(14.2),
+    elevation: 8,
   },
 });
