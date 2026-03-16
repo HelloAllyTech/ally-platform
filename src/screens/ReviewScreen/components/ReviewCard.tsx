@@ -186,7 +186,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   const renderScribeDetails = () => (
     <SimulationDetailsCard
       reviewType={reviewType}
-      title={summaryName}
+      title={scribeSession?.summaryName}
       description={renderDetailRows()}
     />
   );
