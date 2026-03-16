@@ -27,6 +27,7 @@ import {useAskAIChat} from './useAskAIChat';
 
 interface AskAIProps {
   scenarioSessionId?: string;
+  clientName?: string;
 }
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -41,60 +42,70 @@ const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
   ),
 );
 
-const getSpeakerLabel = (senderId: number) =>
-  senderId === -1 ? 'Client' : 'Counselor';
+const getSpeakerLabel = (
+  senderId: number,
+  clientLabel: string,
+  youLabel?: string,
+) => (senderId === -1 ? clientLabel : youLabel);
 
-const CitationsTable: React.FC<{citations: Citation[]}> = React.memo(
-  ({citations}) => (
-    <View style={styles.citationsContainer}>
-      <Text style={styles.citationsHeader}>References</Text>
-      {citations.map((citation, index) => (
-        <View
-          key={citation.transcriptId}
-          style={[
-            styles.citationRow,
-            index % 2 === 1 && styles.citationRowAlt,
-          ]}>
-          <Text style={styles.citationTimestamp}>{citation.timestamp}</Text>
-          <Text style={styles.citationContent}>
-            <Text style={styles.citationSpeaker}>
-              {getSpeakerLabel(citation.senderId)}:{' '}
-            </Text>
-            {citation.content}
+const CitationsTable: React.FC<{
+  citations: Citation[];
+  clientLabel: string;
+  youLabel: string;
+}> = React.memo(({citations, clientLabel, youLabel}) => (
+  <View style={styles.citationsContainer}>
+    <Text style={styles.citationsHeader}>References</Text>
+    {citations.map((citation, index) => (
+      <View
+        key={citation.transcriptId}
+        style={[styles.citationRow, index % 2 === 1 && styles.citationRowAlt]}>
+        <Text style={styles.citationTimestamp}>{citation.timestamp}</Text>
+        <Text style={styles.citationContent}>
+          <Text style={styles.citationSpeaker}>
+            {getSpeakerLabel(citation.senderId, clientLabel, youLabel)}:{' '}
           </Text>
-        </View>
-      ))}
-    </View>
-  ),
-);
-
-const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
-  ({message}) => {
-    const showCitations =
-      !message.isStreaming && message.citations && message.citations.length > 0;
-
-    return (
-      <View style={styles.responseContainer}>
-        <View style={styles.rankBadgeContainer}>
-          <LinearGradient
-            colors={[colors.ds.blue[50], colors.white]}
-            start={{x: 0, y: 0}}
-            end={{x: 0, y: 1}}
-            style={styles.rankBadgeGradient}>
-            <RankBadgeIcon width={9} height={9} />
-          </LinearGradient>
-        </View>
-        <View style={styles.responseTextContainer}>
-          <Text style={styles.responseText}>
-            {message.content}
-            {message.isStreaming ? '▍' : ''}
-          </Text>
-          {showCitations && <CitationsTable citations={message.citations!} />}
-        </View>
+          {citation.content}
+        </Text>
       </View>
-    );
-  },
-);
+    ))}
+  </View>
+));
+
+const AIMessageBubble: React.FC<{
+  message: AskAIChatMessage;
+  clientLabel: string;
+  youLabel: string;
+}> = React.memo(({message, clientLabel, youLabel}) => {
+  const showCitations =
+    !message.isStreaming && message.citations && message.citations.length > 0;
+
+  return (
+    <View style={styles.responseContainer}>
+      <View style={styles.rankBadgeContainer}>
+        <LinearGradient
+          colors={[colors.ds.blue[50], colors.white]}
+          start={{x: 0, y: 0}}
+          end={{x: 0, y: 1}}
+          style={styles.rankBadgeGradient}>
+          <RankBadgeIcon width={9} height={9} />
+        </LinearGradient>
+      </View>
+      <View style={styles.responseTextContainer}>
+        <Text style={styles.responseText}>
+          {message.content}
+          {message.isStreaming ? '▍' : ''}
+        </Text>
+        {showCitations && (
+          <CitationsTable
+            citations={message.citations!}
+            clientLabel={clientLabel}
+            youLabel={youLabel}
+          />
+        )}
+      </View>
+    </View>
+  );
+});
 
 const ThinkingIndicator: React.FC = () => (
   <View style={styles.responseContainer}>
@@ -110,11 +121,18 @@ const ThinkingIndicator: React.FC = () => (
 
 // ── Main Component ──────────────────────────────────────────────
 
-export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
+export const AskAI: React.FC<AskAIProps> = ({
+  scenarioSessionId,
+  clientName,
+}) => {
   const {t} = useTranslate();
   const [inputText, setInputText] = useState('');
   const insets = useSafeAreaInsets();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const clientLabel = clientName
+    ? `${clientName} (${t('CallTranscript.aiClient')})`
+    : t('CallTranscript.aiClient');
+  const youLabel = t('CallTranscript.you');
 
   const {
     messages,
@@ -200,12 +218,21 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   const isOverLimit = inputText.length > MAX_MESSAGE_LENGTH;
   const canSend = inputText.trim().length > 0 && !isStreaming && !isOverLimit;
 
-  const renderMessage = useCallback(({item}: {item: AskAIChatMessage}) => {
-    if (item.role === ChatMessageRole.USER) {
-      return <UserMessageBubble message={item} />;
-    }
-    return <AIMessageBubble message={item} />;
-  }, []);
+  const renderMessage = useCallback(
+    ({item}: {item: AskAIChatMessage}) => {
+      if (item.role === ChatMessageRole.USER) {
+        return <UserMessageBubble message={item} />;
+      }
+      return (
+        <AIMessageBubble
+          message={item}
+          clientLabel={clientLabel}
+          youLabel={youLabel}
+        />
+      );
+    },
+    [clientLabel, youLabel],
+  );
 
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
 
