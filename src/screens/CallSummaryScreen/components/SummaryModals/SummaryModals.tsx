@@ -28,7 +28,6 @@ interface SummaryModalsProps {
   hideMenu: () => void;
   handleExport: () => void;
   actionType: 'archive' | 'unarchive' | null;
-  setActionType: (actionType: 'archive' | 'unarchive' | null) => void;
   showArchiveConfirmation: boolean;
   setShowArchiveConfirmation: (show: boolean) => void;
   onArchive: (archive: boolean) => void;
@@ -52,7 +51,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
   hideMenu,
   handleExport,
   actionType,
-  setActionType,
   showArchiveConfirmation,
   setShowArchiveConfirmation,
   onArchive,
@@ -126,7 +124,6 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
           visible={showArchiveConfirmation}
           onClose={() => setShowArchiveConfirmation(false)}
           actionType={actionType}
-          setActionType={setActionType}
           onArchive={onArchive}
         />
       )}
