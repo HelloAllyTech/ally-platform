@@ -90,6 +90,7 @@ export const CallSummaryScreen: React.FC<
     handleRefresh,
     handleNoteChange,
     summaryStatus,
+    isTranscriptAvailable,
   } = useSummaryState(chatId, callId);
 
   const hasFeedbackAlready = Boolean(
@@ -102,13 +103,13 @@ export const CallSummaryScreen: React.FC<
     !isUnauthorized &&
     permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
-  const isArchived = !!summaryData?.archivedAt;
-
   const dispatch = useAppDispatch();
 
   const {
     handleSummaryNameChange,
     isMenuVisible,
+    isArchived,
+    actionType,
     hideMenu,
     showMenu,
     handleExport,
@@ -122,6 +123,7 @@ export const CallSummaryScreen: React.FC<
     chatId: chatId || 0,
     name: callInfo.summaryName || '',
     isCallLogSummaryFlow: Boolean(callId),
+    archived: !!summaryData?.archivedAt,
   });
 
   const {showToast} = useToast();
@@ -199,9 +201,6 @@ export const CallSummaryScreen: React.FC<
     useState<boolean>(false);
   const [showArchiveConfirmation, setShowArchiveConfirmation] =
     useState<boolean>(false);
-  const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
-    null,
-  );
 
   const {hideReviewDetails} = useHideReviewDetails({
     reviewId: scribeReviewId,
@@ -209,14 +208,6 @@ export const CallSummaryScreen: React.FC<
     useLazyThreadsQuery: useLazyGetScribeThreadsQuery,
     useLazyReactionsQuery: useLazyGetScribeReactionsCountQuery,
   });
-
-  useEffect(() => {
-    if (isArchived) {
-      setActionType('unarchive');
-    } else {
-      setActionType('archive');
-    }
-  }, [isArchived]);
 
   useHardwareBackPressHandler(() => {
     onBackNavigation();
@@ -449,7 +440,6 @@ export const CallSummaryScreen: React.FC<
         hideMenu={hideMenu}
         handleExport={handleExport}
         actionType={actionType}
-        setActionType={setActionType}
         showArchiveConfirmation={showArchiveConfirmation}
         setShowArchiveConfirmation={setShowArchiveConfirmation}
         onArchive={handleArchive}
@@ -466,7 +456,9 @@ export const CallSummaryScreen: React.FC<
         showShareSwitch={
           Boolean(callId) &&
           isSummaryAvailable &&
-          summaryStatus === ChatSummaryStatus.SUCCESS
+          summaryStatus === ChatSummaryStatus.SUCCESS &&
+          isTranscriptAvailable &&
+          !isArchived
         }
         isSharedForReview={isSharedForReview}
         onShareToggle={handleShareToggle}
@@ -489,14 +481,17 @@ export const CallSummaryScreen: React.FC<
           commonOptions={{labelStyle: styles.tabBarLabel}}
         />
       </View>
-      {!!scribeReviewId && !hideReviewDetails && hasScribeReviewPermission && (
-        <TouchableOpacity
-          onPress={handleViewReview}
-          style={styles.reviewIconButton}
-          activeOpacity={0.7}>
-          <CommentIcon width={20} height={20} color={colors.black} />
-        </TouchableOpacity>
-      )}
+      {!!scribeReviewId &&
+        !hideReviewDetails &&
+        hasScribeReviewPermission &&
+        !isArchived && (
+          <TouchableOpacity
+            onPress={handleViewReview}
+            style={styles.reviewIconButton}
+            activeOpacity={0.7}>
+            <CommentIcon width={20} height={20} color={colors.black} />
+          </TouchableOpacity>
+        )}
     </SafeAreaView>
   );
 };
