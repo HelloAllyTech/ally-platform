@@ -1,3 +1,13 @@
+// ── Citation ────────────────────────────────────────────────────
+
+export interface Citation {
+  timestamp: string;
+  content: string;
+  /** -1 = Client, positive = Counselor */
+  senderId: number;
+  transcriptId: number;
+}
+
 // ── Chat Message ────────────────────────────────────────────────
 
 export enum ChatMessageRole {
@@ -12,6 +22,7 @@ export interface AskAIChatMessage {
   content: string;
   createdAt: string;
   updatedAt: string;
+  citations?: Citation[];
   /** Frontend-only: true while the AI response is being streamed */
   isStreaming?: boolean;
 }
@@ -19,9 +30,15 @@ export interface AskAIChatMessage {
 // ── SSE Events ──────────────────────────────────────────────────
 
 export enum SSEEventType {
+  START = 'start',
   TOKEN = 'token',
+  CITATIONS = 'citations',
   DONE = 'done',
   ERROR = 'error',
+}
+
+export interface SSEStartEvent {
+  type: SSEEventType.START;
 }
 
 export interface SSETokenEvent {
@@ -29,8 +46,15 @@ export interface SSETokenEvent {
   content: string;
 }
 
+export interface SSECitationsEvent {
+  type: SSEEventType.CITATIONS;
+  citations: Citation[];
+}
+
 export interface SSEDoneEvent {
   type: SSEEventType.DONE;
+  content?: string;
+  citations?: Citation[];
 }
 
 export interface SSEErrorEvent {
@@ -38,7 +62,12 @@ export interface SSEErrorEvent {
   error: string;
 }
 
-export type SSEEvent = SSETokenEvent | SSEDoneEvent | SSEErrorEvent;
+export type SSEEvent =
+  | SSEStartEvent
+  | SSETokenEvent
+  | SSECitationsEvent
+  | SSEDoneEvent
+  | SSEErrorEvent;
 
 // ── Hook Props ──────────────────────────────────────────────────
 

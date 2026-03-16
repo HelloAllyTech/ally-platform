@@ -211,6 +211,50 @@ export const styles = ScaledSheet.create({
     color: colors.white,
   },
 
+  // ── Citations Table ─────────────────────────────────────────
+  citationsContainer: {
+    marginTop: '10@vs',
+    borderWidth: 1,
+    borderColor: colors.ds.blue[100],
+    borderRadius: '8@ms',
+    overflow: 'hidden',
+  },
+  citationsHeader: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    color: colors.ds.typography.lowEmphasis,
+    paddingHorizontal: '10@ms',
+    paddingVertical: '6@vs',
+    backgroundColor: colors.ds.blue[50],
+  },
+  citationRow: {
+    flexDirection: 'row',
+    paddingHorizontal: '10@ms',
+    paddingVertical: '8@vs',
+    gap: '8@ms',
+  },
+  citationRowAlt: {
+    backgroundColor: colors.ds.blue[50],
+  },
+  citationTimestamp: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    color: colors.ds.blue[500],
+    minWidth: '36@ms',
+  },
+  citationContent: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.highEmphasis,
+    lineHeight: '15@vs',
+    flex: 1,
+  },
+  citationSpeaker: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    color: colors.ds.typography.highEmphasis,
+  },
+
   // ── Loading ───────────────────────────────────────────────────
   loadingContainer: {
     flex: 1,
