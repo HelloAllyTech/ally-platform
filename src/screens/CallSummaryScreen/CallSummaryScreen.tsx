@@ -12,6 +12,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
+import {CommentIcon} from '@/assets';
 import {Button, useToast} from '@/components';
 import {ChatSummaryStatus, SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
@@ -23,8 +24,11 @@ import {
   useToggleReviewPrivacy,
   useTranslate,
 } from '@/hooks';
+import {useHideReviewDetails} from '@/hooks/useHideReviewDetails';
 import {RootStackScreenProps} from '@/navigation';
+import {useLazyGetScribeReactionsCountQuery} from '@/services/scribeReactionsApi';
 import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
+import {useLazyGetScribeThreadsQuery} from '@/services/scribeReviewThreadsApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
@@ -122,6 +126,10 @@ export const CallSummaryScreen: React.FC<
 
   const {showToast} = useToast();
 
+  const scribeReviewId = summaryData?.reviewId ?? undefined;
+  const isSharedForReview =
+    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+
   const hasSummaryFailed = summaryStatus === ChatSummaryStatus.FAILED;
   const hasEditFeedbackPermission = permissions?.includes(
     USER_PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
@@ -132,18 +140,23 @@ export const CallSummaryScreen: React.FC<
     const details = summaryData.details;
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
       scribeSessionId: callId,
+      reviewId: scribeReviewId,
       sessionData: {
         title:
           callInfo.summaryName || t('Review.card.sharedSimulationForReview'),
         createdAt: details.startTime || summaryData.createdAt || '',
         duration: formatDurationFromSeconds(details.callDuration ?? 0),
       },
+      note: summaryData?.reviewNote || '',
     });
-  }, [callId, summaryData, callInfo.summaryName, navigation, t]);
-
-  const scribeReviewId = summaryData?.reviewId ?? undefined;
-  const isSharedForReview =
-    !!scribeReviewId && summaryData?.reviewStatus !== ReviewStatus.HIDDEN;
+  }, [
+    callId,
+    summaryData,
+    callInfo.summaryName,
+    navigation,
+    t,
+    scribeReviewId,
+  ]);
 
   const {handleTogglePrivate: handleToggleScribePrivate} =
     useToggleReviewPrivacy(scribeReviewId, useUpdateScribeReviewStatusMutation);
@@ -189,6 +202,13 @@ export const CallSummaryScreen: React.FC<
   const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
     null,
   );
+
+  const {hideReviewDetails} = useHideReviewDetails({
+    reviewId: scribeReviewId,
+    isPrivate: summaryData?.reviewStatus === ReviewStatus.HIDDEN,
+    useLazyThreadsQuery: useLazyGetScribeThreadsQuery,
+    useLazyReactionsQuery: useLazyGetScribeReactionsCountQuery,
+  });
 
   useEffect(() => {
     if (isArchived) {
@@ -255,6 +275,16 @@ export const CallSummaryScreen: React.FC<
     setIsFeedbackPopupVisible(false);
     handleGoBack();
   };
+  const handleViewReview = () => {
+    navigation.navigate(SCREEN_NAMES.SCRIBE_REVIEW_DETAILS, {
+      reviewId: scribeReviewId || '',
+      isPrivate: summaryData?.reviewStatus === ReviewStatus.HIDDEN,
+    });
+  };
+
+  const hasScribeReviewPermission = permissions?.includes(
+    USER_PERMISSIONS.VIEW_SCRIBE_REVIEW,
+  );
 
   const showSummaryButtonLoader =
     (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
@@ -433,7 +463,11 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
-        showShareSwitch={Boolean(callId) && isSummaryAvailable}
+        showShareSwitch={
+          Boolean(callId) &&
+          isSummaryAvailable &&
+          summaryStatus === ChatSummaryStatus.SUCCESS
+        }
         isSharedForReview={isSharedForReview}
         onShareToggle={handleShareToggle}
       />
@@ -455,6 +489,14 @@ export const CallSummaryScreen: React.FC<
           commonOptions={{labelStyle: styles.tabBarLabel}}
         />
       </View>
+      {!!scribeReviewId && !hideReviewDetails && hasScribeReviewPermission && (
+        <TouchableOpacity
+          onPress={handleViewReview}
+          style={styles.reviewIconButton}
+          activeOpacity={0.7}>
+          <CommentIcon width={20} height={20} color={colors.black} />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };

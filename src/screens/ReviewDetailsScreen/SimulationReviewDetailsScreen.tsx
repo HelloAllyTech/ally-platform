@@ -1,6 +1,6 @@
 import React, {useCallback, useMemo} from 'react';
 
-import {ReviewTranscriptHeader} from '@/components/ReviewTranscriptHeader/ReviewTranscriptHeader';
+import {ReviewTranscriptHeader} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {
   ReviewApiProvider,

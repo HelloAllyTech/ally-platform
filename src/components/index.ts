@@ -97,3 +97,5 @@ export {
 export {ReviewTypeChip} from './ReviewTypeChip';
 export {LineTextInput} from './LineTextInput';
 export {CustomSwitch} from './CustomSwitch';
+export {ReviewTranscriptHeader} from './ReviewTranscriptDetails';
+export {InteractionsBar} from './ReviewTranscriptDetails';
