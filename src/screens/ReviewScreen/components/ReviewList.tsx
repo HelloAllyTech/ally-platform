@@ -9,11 +9,9 @@ import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
-import {
-  useLazyGetGeneralReviewCommentsQuery,
-  useLazyGetReviewsQuery,
-} from '@/services/reviewsApi';
-import {useLazyGetScribeGeneralReviewCommentsQuery} from '@/services/scribeReviewsApi';
+import {useLazyGetGeneralCommentsOverviewQuery} from '@/services/generalCommentsApi';
+import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
+import {useLazyGetScribeGeneralCommentsOverviewQuery} from '@/services/scribeGeneralCommentsApi';
 import {colors} from '@/theme';
 
 import {ReviewCard} from './ReviewCard';
@@ -73,8 +71,8 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     : SCREEN_NAMES.REVIEW_DETAILS;
 
   const lazyGeneralCommentsQuery = isScribe
-    ? useLazyGetScribeGeneralReviewCommentsQuery
-    : useLazyGetGeneralReviewCommentsQuery;
+    ? useLazyGetScribeGeneralCommentsOverviewQuery
+    : useLazyGetGeneralCommentsOverviewQuery;
 
   const handleReviewPress = useCallback(
     (reviewId: string) => {
