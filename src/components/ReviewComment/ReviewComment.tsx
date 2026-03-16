@@ -54,7 +54,8 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
       currentUserId &&
       commentOwnerId &&
       currentUserId === commentOwnerId &&
-      onEdit
+      onEdit &&
+      !hidden
     ) {
       options.push({
         label: t('ReviewComment.edit'),
@@ -63,7 +64,12 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
     }
 
     // Delete - only if user owns the comment
-    if (currentUserId && commentOwnerId && currentUserId === commentOwnerId) {
+    if (
+      currentUserId &&
+      commentOwnerId &&
+      currentUserId === commentOwnerId &&
+      !hidden
+    ) {
       options.push({
         label: t('ReviewComment.delete'),
         onPress: () => onDelete?.(commentId || ''),

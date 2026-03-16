@@ -40,6 +40,7 @@ jest.mock('@/hooks', () => ({
     tVariable: (key: string) => key,
   }),
   useToggleReviewPrivacy: () => ({handleTogglePrivate: jest.fn()}),
+  useHideReviewDetails: () => ({hideReviewDetails: true}),
 }));
 
 // Mock Redux hooks

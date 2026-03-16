@@ -99,6 +99,7 @@ export interface ScribeSessionData {
   id: number;
   createdAt: string;
   duration: string;
+  summaryName: string;
 }
 
 export interface ReviewScenario {

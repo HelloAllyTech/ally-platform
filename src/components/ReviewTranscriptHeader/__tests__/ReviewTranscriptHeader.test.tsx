@@ -1,7 +1,7 @@
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
-import {ReviewTranscriptHeader} from '../ReviewTranscriptHeader';
+import {ReviewTranscriptHeader} from '../../ReviewTranscriptDetails/ReviewTranscriptHeader';
 
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({

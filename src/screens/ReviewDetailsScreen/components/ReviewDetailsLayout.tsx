@@ -14,11 +14,11 @@ import {
   CommentThreadBottomSheet,
   ConfirmationModal,
   Conversation,
+  InteractionsBar,
   MessageThreadsBottomSheet,
   ReplyBottomSheet,
   ThreadsBottomSheet,
 } from '@/components';
-import {InteractionsBar} from '@/components/ReviewTranscriptHeader/InteractionsBar';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {colors} from '@/theme';
 

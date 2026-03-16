@@ -23,6 +23,7 @@ import {
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
+  useHideReviewDetails,
   useToggleReviewPrivacy,
 } from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
@@ -71,7 +72,6 @@ export const SimulationFeedbackScreen: React.FC<
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
   const [reviewId, setReviewId] = useState<string>();
-  const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(false);
 
   const navigation = useAppNavigation();
   const [addSimulationFeedback] = useAddSimulationFeedbackMutation();
@@ -95,8 +95,12 @@ export const SimulationFeedbackScreen: React.FC<
   const shortSession = isShortSession(simulationDetails?.details?.callDuration);
   const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 
-  const [getReviewThreadComments] = useLazyGetThreadsQuery();
-  const [getReactionsCount] = useLazyGetReactionsCountQuery();
+  const {hideReviewDetails} = useHideReviewDetails({
+    reviewId,
+    isPrivate,
+    useLazyThreadsQuery: useLazyGetThreadsQuery,
+    useLazyReactionsQuery: useLazyGetReactionsCountQuery,
+  });
 
   const fetchSimulationDetailsWithRetry = useCallback(
     async (retryCount = 0) => {
@@ -160,40 +164,6 @@ export const SimulationFeedbackScreen: React.FC<
       }
     }, [scenarioSessionId, getSimulationDetails]),
   );
-
-  // Fetch review threads and reactions to determine if comment icon should be shown
-  useEffect(() => {
-    const fetchReviewThreadComments = async () => {
-      if (!reviewId) return;
-      if (!isPrivate) {
-        setHideReviewDetails(false);
-        return;
-      }
-      try {
-        const threads = await getReviewThreadComments({
-          reviewId: reviewId,
-          offset: 0,
-          limit: 1,
-        });
-        if (threads.data?.data?.length === 0) {
-          const reactionsCount = await getReactionsCount(reviewId);
-          if (
-            reactionsCount.data &&
-            Object.keys(reactionsCount.data.reactions).length === 0
-          ) {
-            setHideReviewDetails(true);
-          } else {
-            setHideReviewDetails(false);
-          }
-        } else {
-          setHideReviewDetails(false);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchReviewThreadComments();
-  }, [isPrivate, reviewId, getReviewThreadComments, getReactionsCount]);
 
   const handleBack = useCallback(() => {
     if (pathId || caseId) {
