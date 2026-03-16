@@ -215,6 +215,8 @@ export const API_ROUTES = {
       `/scenario-session-reviews/${reviewId}/reactions`,
     GENERAL_COMMENTS: (reviewId: string) =>
       `/scenario-session-reviews/${reviewId}/general-comments`,
+    GENERAL_COMMENTS_OVERVIEW: (reviewId: string) =>
+      `/scenario-session-reviews/${reviewId}/comments-overview`,
     GENERAL_COMMENT_BY_ID: (commentId: string) =>
       `/scenario-session-reviews/general-comments/${commentId}`,
     GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
@@ -255,6 +257,8 @@ export const API_ROUTES = {
       `/scribe-session-reviews/${reviewId}/reactions`,
     GENERAL_COMMENTS: (reviewId: string) =>
       `/scribe-session-reviews/${reviewId}/general-comments`,
+    GENERAL_COMMENTS_OVERVIEW: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/comments-overview`,
     GENERAL_COMMENT_BY_ID: (commentId: string) =>
       `/scribe-session-reviews/general-comments/${commentId}`,
     GENERAL_COMMENT_VISIBILITY: (commentId: string) =>

@@ -29,6 +29,16 @@ export const generalCommentsApi = api.injectEndpoints({
       }),
       providesTags: ['GeneralComments'],
     }),
+    getGeneralCommentsOverview: builder.query<
+      GetThreadCommentsResponse,
+      GetGeneralCommentsParams
+    >({
+      query: ({reviewId, offset = 0, limit = 2}) => ({
+        url: API_ROUTES.SIMULATION_REVIEWS.GENERAL_COMMENTS_OVERVIEW(reviewId),
+        method: API_METHODS.GET,
+        params: {offset, limit, sortOrder: 'DESC', sortBy: 'createdAt'},
+      }),
+    }),
     addGeneralComment: builder.mutation<
       AddReviewCommentResponse,
       Pick<AddReviewCommentRequest, 'reviewId' | 'content'>
@@ -79,6 +89,7 @@ export const generalCommentsApi = api.injectEndpoints({
 
 export const {
   useLazyGetGeneralCommentsQuery,
+  useLazyGetGeneralCommentsOverviewQuery,
   useAddGeneralCommentMutation,
   useDeleteGeneralCommentMutation,
   useUpdateGeneralCommentMutation,
