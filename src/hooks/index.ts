@@ -37,3 +37,4 @@ export * from './usePaginatedComments';
 export * from './useStableFooterRenderer';
 export * from './useToggleReviewPrivacy';
 export * from './useShareScreenLogic';
+export * from './useHideReviewDetails';

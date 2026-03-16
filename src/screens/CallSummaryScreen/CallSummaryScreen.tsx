@@ -24,12 +24,11 @@ import {
   useToggleReviewPrivacy,
   useTranslate,
 } from '@/hooks';
+import {useHideReviewDetails} from '@/hooks/useHideReviewDetails';
 import {RootStackScreenProps} from '@/navigation';
-import {
-  useLazyGetScribeReactionsCountQuery,
-  useLazyGetScribeThreadsQuery,
-} from '@/services';
+import {useLazyGetScribeReactionsCountQuery} from '@/services/scribeReactionsApi';
 import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
+import {useLazyGetScribeThreadsQuery} from '@/services/scribeReviewThreadsApi';
 import {useGetSummaryFieldsQuery} from '@/services/settingsApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
@@ -74,8 +73,6 @@ export const CallSummaryScreen: React.FC<
   const layout = useWindowDimensions();
 
   const {refetch: refetchSummaryFields} = useGetSummaryFieldsQuery();
-  const [getScribeReviewThreadComments] = useLazyGetScribeThreadsQuery();
-  const [getScribeReviewReactionsCount] = useLazyGetScribeReactionsCountQuery();
 
   useEffect(() => {
     refetchSummaryFields();
@@ -205,46 +202,13 @@ export const CallSummaryScreen: React.FC<
   const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
     null,
   );
-  const [hideReviewDetails, setHideReviewDetails] = useState<boolean>(true);
 
-  useEffect(() => {
-    const fetchReviewThreadComments = async () => {
-      if (!scribeReviewId) return;
-      if (summaryData?.reviewStatus !== ReviewStatus.HIDDEN) {
-        setHideReviewDetails(false);
-        return;
-      }
-      try {
-        const threads = await getScribeReviewThreadComments({
-          reviewId: scribeReviewId,
-          offset: 0,
-          limit: 1,
-        });
-        if (threads.data?.data?.length === 0) {
-          const reactionsCount =
-            await getScribeReviewReactionsCount(scribeReviewId);
-          if (
-            reactionsCount.data &&
-            Object.keys(reactionsCount.data.reactions).length === 0
-          ) {
-            setHideReviewDetails(true);
-          } else {
-            setHideReviewDetails(false);
-          }
-        } else {
-          setHideReviewDetails(false);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchReviewThreadComments();
-  }, [
-    scribeReviewId,
-    getScribeReviewThreadComments,
-    getScribeReviewReactionsCount,
-    summaryData?.reviewStatus,
-  ]);
+  const {hideReviewDetails} = useHideReviewDetails({
+    reviewId: scribeReviewId,
+    isPrivate: summaryData?.reviewStatus === ReviewStatus.HIDDEN,
+    useLazyThreadsQuery: useLazyGetScribeThreadsQuery,
+    useLazyReactionsQuery: useLazyGetScribeReactionsCountQuery,
+  });
 
   useEffect(() => {
     if (isArchived) {
