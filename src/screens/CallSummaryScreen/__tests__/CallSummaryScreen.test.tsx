@@ -66,6 +66,10 @@ jest.mock('@/store/slices/chatSlice', () => ({
   clearCurrentChat: jest.fn(),
 }));
 
+jest.mock('@/hooks/useHideReviewDetails', () => ({
+  useHideReviewDetails: () => ({hideReviewDetails: true}),
+}));
+
 // Utils
 jest.mock('@/utils', () => ({
   navigateToCallLogTab: jest.fn(),
@@ -77,6 +81,14 @@ jest.mock('@/utils', () => ({
 // Services
 jest.mock('@/services', () => ({
   useLazyGetScribeReactionsCountQuery: () => [jest.fn(), {data: undefined}],
+  useLazyGetScribeThreadsQuery: () => [jest.fn(), {data: undefined}],
+}));
+
+jest.mock('@/services/scribeReactionsApi', () => ({
+  useLazyGetScribeReactionsCountQuery: () => [jest.fn(), {data: undefined}],
+}));
+
+jest.mock('@/services/scribeReviewThreadsApi', () => ({
   useLazyGetScribeThreadsQuery: () => [jest.fn(), {data: undefined}],
 }));
 
