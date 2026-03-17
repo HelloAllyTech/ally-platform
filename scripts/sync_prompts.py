@@ -132,11 +132,15 @@ def sync_prompts(dry_run: bool = False) -> dict:
     Sync prompts to ally-be. Returns {added, updated} or empty on error.
     """
     base_url = settings.CORE_SERVICE_BASE_URL.rstrip("/")
-    api_key = getattr(settings, "CORE_SERVICE_API_KEY", None) or getattr(
-        settings, "X_API_KEY", None
+    api_key = (
+        getattr(settings, "PROMPT_SERVICE_API_KEY", None)
+        or getattr(settings, "CORE_SERVICE_API_KEY", None)
+        or getattr(settings, "X_API_KEY", None)
     )
     if not api_key:
-        logger.error("CORE_SERVICE_API_KEY or X_API_KEY not set")
+        logger.error(
+            "PROMPT_SERVICE_API_KEY, CORE_SERVICE_API_KEY, or X_API_KEY not set"
+        )
         return {}
 
     items = scan_prompts()

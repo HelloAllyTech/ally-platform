@@ -124,6 +124,10 @@ class Settings(BaseSettings):
         default="dummy-key",
         description="API key sent as x-api-key header when calling the core service",
     )
+    PROMPT_SERVICE_API_KEY: str = Field(
+        default="dummy-key",
+        description="Key used specifically for prompt synchronization and retrieval",
+    )
     X_API_KEY: str = Field(
         default="dummy-key",
         description=(
