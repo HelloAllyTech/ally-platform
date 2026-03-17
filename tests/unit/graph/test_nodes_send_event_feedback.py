@@ -67,8 +67,8 @@ class TestSendEventFeedback:
             assert call_args.data.message == "Branch feedback"
             assert call_args.data.score == 15  # 5 + 10
 
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
         assert result["behavior_feedback_data"] == []
 
@@ -117,8 +117,8 @@ class TestSendEventFeedback:
             assert call_args.data.message == "Non-branch feedback"
             assert call_args.data.score == 8  # 5 + 3
 
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_calculates_cumulative_score_from_all_active_events(self):
@@ -258,8 +258,8 @@ class TestSendEventFeedback:
             assert not mock_send.called
 
         # Should still clear state
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_no_ui_send_when_no_room(self):
@@ -291,7 +291,7 @@ class TestSendEventFeedback:
             assert not mock_send.called
 
         # Should still clear state
-        assert result["branching_and_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_includes_detected_event_ids(self):
@@ -444,8 +444,8 @@ class TestSendEventFeedback:
             result = await send_event_feedback(state, config=config)
 
         # All transient fields should be cleared
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
         assert result["behavior_feedback_data"] == []
 
@@ -596,8 +596,8 @@ class TestSendEventFeedback:
             assert mock_send_be.call_count == 1
 
         # All transient state cleared
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
         assert result["behavior_feedback_data"] == []
 

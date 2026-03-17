@@ -298,6 +298,9 @@ def _build_state_update_dict(
         "current_score": new_current_score,
     }
 
+    # Always write these fields so the reducer runs and clears stale data
+    # from the previous turn. Use None (not []) as the intentional-clear signal
+    # so subgraph no-ops (which pass []) are distinguished from real clears.
     if branching_and_feedback_data:
         update_dict["branching_and_feedback_data"] = branching_and_feedback_data
         mode_text = (
@@ -306,6 +309,8 @@ def _build_state_update_dict(
             else "events for sequential processing (legacy mode)"
         )
         logger.info(f"Stored {len(branching_and_feedback_data)} {mode_text}")
+    else:
+        update_dict["branching_and_feedback_data"] = None
 
     if non_branching_feedback_data:
         update_dict["non_branching_feedback_data"] = non_branching_feedback_data
@@ -313,6 +318,8 @@ def _build_state_update_dict(
             f"Stored {len(non_branching_feedback_data)} non-branching events "
             f"(processed asynchronously, no blocking)"
         )
+    else:
+        update_dict["non_branching_feedback_data"] = None
 
     return update_dict
 
@@ -375,7 +382,6 @@ async def process_events(
             new_current_score = _calculate_score_updates(
                 state, new_events, additional_score
             )
-
         # 5. Build state update dict
         with timing.operation("State update dict building"):
             result = _build_state_update_dict(
@@ -388,6 +394,7 @@ async def process_events(
             )
 
         timing.log_summary()
+
         return result
 
 
@@ -956,8 +963,8 @@ async def send_event_feedback(
             logger.warning("No room available, skipping behavior feedback sending")
 
     return {
-        "branching_and_feedback_data": [],
-        "non_branching_feedback_data": [],
+        "branching_and_feedback_data": None,
+        "non_branching_feedback_data": None,
         "feedback_to_send": None,
         "behavior_feedback_data": [],
     }
@@ -1032,8 +1039,8 @@ async def clear_events_and_detected_data(
         Dictionary with cleared event data structures
     """
     return {
-        "branching_and_feedback_data": [],
-        "non_branching_feedback_data": [],
+        "branching_and_feedback_data": None,
+        "non_branching_feedback_data": None,
         "feedback_to_send": None,
         "behavior_feedback_data": [],
         "retrieved_context": None,

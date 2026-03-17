@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, Callable, Iterable, List, Optional, Tuple, TypeVar
+from typing import Annotated, Callable, Iterable, List, Optional, Tuple, TypeVar, Union
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
@@ -100,59 +100,62 @@ class BranchingAndFeedbackData:
 
 
 def add_branching_and_feedback_data(
-    left: List[BranchingAndFeedbackData], right: List[BranchingAndFeedbackData]
+    left: List[BranchingAndFeedbackData],
+    right: Union[List[BranchingAndFeedbackData], None],
 ) -> List[BranchingAndFeedbackData]:
     """
-    Reducer for `branching_and_feedback_data` that
-     handles both accumulation and clearing.
+    Reducer for `branching_and_feedback_data` that handles accumulation and clearing.
 
     Behaviors:
-    1. Clear State: If `right` is an empty list, the state is reset to an empty list.
-       This is typically used by `generate_response` to clear processed data after use.
-    2. Accumulate & Deduplicate: If `right`contains data,
-       it is merged with `left`.
-       The result is deduplicated by `event_id` (keeping the first occurrence)
-       to prevent duplicate entries if the graph execution loops
-        or processes redundant events.
+    1. No-op: If `right` is an empty list `[]`, return `left` unchanged.
+       This handles the case where a subgraph node didn't return this field —
+       LangGraph passes `[]` for missing Annotated list fields, and we must NOT
+       clear existing data in that case.
+    2. Clear State: If `right` is `None`, reset to an empty list.
+       Nodes that intentionally want to clear must pass `None`, not `[]`.
+    3. Accumulate & Deduplicate: If `right` contains data, merge with `left`
+       and deduplicate by `event_id` (keeping first occurrence).
 
     Args:
         left: The existing list of data in the state.
-        right: The new list of data to merge, or an empty list to trigger a clear.
+        right: New data to merge, `None` to clear, or `[]` for no-op.
 
     Returns:
-        List[BranchingAndFeedbackData]: The unified,
-        deduplicated list, or an empty list.
-
+        List[BranchingAndFeedbackData]: The unified, deduplicated list.
     """
-    if not right:
+    if right is None:
         return []
-    # TODO: find the duplication and remove unique by
+    if not right:
+        return left
     return unique_by(left + right, key=lambda x: x.event_id)
 
 
 def add_non_branching_feedback_data(
-    left: List[BranchingAndFeedbackData], right: List[BranchingAndFeedbackData]
+    left: List[BranchingAndFeedbackData],
+    right: Union[List[BranchingAndFeedbackData], None],
 ) -> List[BranchingAndFeedbackData]:
     """
     Reducer for non-branching feedback data.
 
-    Non-branching events are processed asynchronously
-    and don't block the conversation.
-    When data is provided (right has items), accumulate with existing data.
-    When an empty list is provided (right is empty), clear all data.
+    Behaviors:
+    1. No-op: If `right` is an empty list `[]`, return `left` unchanged.
+       Handles subgraph nodes that didn't return this field.
+    2. Clear State: If `right` is `None`, reset to an empty list.
+       Nodes that intentionally want to clear must pass `None`, not `[]`.
+    3. Accumulate & Deduplicate: If `right` contains data, merge with `left`
+       and deduplicate by `event_id`.
 
     Args:
         left: Existing non-branching feedback data in state
-        right: New data to add (or empty list to clear)
+        right: New data to add, `None` to clear, or `[]` for no-op.
 
     Returns:
-        List[BranchingAndFeedbackData]: The unified,
-        deduplicated list, or an empty list.
-
+        List[BranchingAndFeedbackData]: The unified, deduplicated list.
     """
-    if not right:
+    if right is None:
         return []
-    # TODO: find the duplication and remove unique by
+    if not right:
+        return left
     return unique_by(left + right, key=lambda x: x.event_id)
 
 

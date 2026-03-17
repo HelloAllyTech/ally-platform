@@ -53,8 +53,8 @@ class TestProcessEvents:
         assert ev.event_id == "e1"
         # timestamp is ISO-like string ending with 'Z'
         assert ts.endswith("Z")
-        # branching_and_feedback_data key should not be present when empty
-        assert "branching_and_feedback_data" not in new_state
+        # branching_and_feedback_data is None when no branching events detected
+        assert new_state["branching_and_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_process_events_with_event_orchestrator_integration(self):
@@ -211,8 +211,8 @@ class TestProcessEvents:
         assert new_state["new_events"] == []
         assert new_state["current_score"] == 10  # No change
         assert len(new_state["events_accumulator"]) == 0
-        # branching_and_feedback_data key should not be present when empty
-        assert "branching_and_feedback_data" not in new_state
+        # branching_and_feedback_data is None when no branching events detected
+        assert new_state["branching_and_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_process_events_handles_events_with_no_score(self):
@@ -233,8 +233,8 @@ class TestProcessEvents:
 
         assert len(new_state["new_events"]) == 1
         assert new_state["current_score"] == 10  # No score change
-        # branching_and_feedback_data key should not be present when empty
-        assert "branching_and_feedback_data" not in new_state
+        # branching_and_feedback_data is None when no branching events detected
+        assert new_state["branching_and_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_process_events_multiple_detected_events(self):
@@ -258,8 +258,8 @@ class TestProcessEvents:
         event_ids = {e.event_id for e in new_state["new_events"]}
         assert event_ids == {"e1", "e2"}
         assert new_state["current_score"] == 8  # 3 + 5
-        # branching_and_feedback_data key should not be present when empty
-        assert "branching_and_feedback_data" not in new_state
+        # branching_and_feedback_data is None when no branching events detected
+        assert new_state["branching_and_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_process_events_with_empty_branching_instructions_from_registry(self):
@@ -300,5 +300,5 @@ class TestProcessEvents:
         new_state = await process_events(state, config=config)
 
         assert new_state["current_score"] == 7  # 0 + 2 + 5
-        # branching_and_feedback_data key should not be present when empty
-        assert "branching_and_feedback_data" not in new_state
+        # branching_and_feedback_data is None when no branching events detected
+        assert new_state["branching_and_feedback_data"] is None

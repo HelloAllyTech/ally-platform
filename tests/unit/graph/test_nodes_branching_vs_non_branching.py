@@ -262,8 +262,8 @@ class TestBranchingVsNonBranchingSeparation:
             call_args = mock_send.call_args[0][0]
             assert call_args.data.message == "Non-branch feedback"
 
-        assert result["branching_and_feedback_data"] == []
-        assert result["non_branching_feedback_data"] == []
+        assert result["branching_and_feedback_data"] is None
+        assert result["non_branching_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_cumulative_score_includes_both_branching_and_non_branching(self):
@@ -378,11 +378,13 @@ class TestBranchingVsNonBranchingSeparation:
             new_events=[],
             current_score=0,
             branching_and_feedback_data=processed_state.get(
-                "branching_and_feedback_data", []
-            ),
+                "branching_and_feedback_data"
+            )
+            or [],
             non_branching_feedback_data=processed_state.get(
-                "non_branching_feedback_data", []
-            ),
+                "non_branching_feedback_data"
+            )
+            or [],
         )
 
         resolve_result = await resolve_branching_instruction(resolve_state)
@@ -573,4 +575,4 @@ class TestBranchingVsNonBranchingSeparation:
 
         # Should handle gracefully without errors
         result = await send_event_feedback(state, config=config)
-        assert result["non_branching_feedback_data"] == []
+        assert result["non_branching_feedback_data"] is None

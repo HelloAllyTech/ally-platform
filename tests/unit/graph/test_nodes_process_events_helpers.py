@@ -183,7 +183,7 @@ class TestBuildStateUpdateDict:
             assert update_dict["current_score"] == 15
             assert "branching_and_feedback_data" in update_dict
             assert len(update_dict["branching_and_feedback_data"]) == 1
-            assert "non_branching_feedback_data" not in update_dict
+            assert update_dict["non_branching_feedback_data"] is None
 
     def test_build_state_update_dict_with_non_branching_events(self):
         """Test building state update dict with non-branching events."""
@@ -216,7 +216,7 @@ class TestBuildStateUpdateDict:
 
         assert "non_branching_feedback_data" in update_dict
         assert len(update_dict["non_branching_feedback_data"]) == 1
-        assert "branching_and_feedback_data" not in update_dict
+        assert update_dict["branching_and_feedback_data"] is None
 
     def test_build_state_update_dict_empty_events(self):
         """Test building state update dict with no events."""
@@ -233,8 +233,8 @@ class TestBuildStateUpdateDict:
         update_dict = _build_state_update_dict(state, [], [], 10, [], [])
 
         assert update_dict["current_score"] == 10
-        assert "branching_and_feedback_data" not in update_dict
-        assert "non_branching_feedback_data" not in update_dict
+        assert update_dict["branching_and_feedback_data"] is None
+        assert update_dict["non_branching_feedback_data"] is None
 
 
 class TestLogEventData:
