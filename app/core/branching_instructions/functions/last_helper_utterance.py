@@ -1,4 +1,4 @@
-"""Function to extract the last helper (AI) utterance from conversation state."""
+"""Function to extract the last helper (counselor) utterance from conversation state."""
 
 from typing import List, Optional
 
@@ -12,13 +12,17 @@ logger = get_logger(__name__)
 
 def get_last_helper_utterance(messages: List[BaseMessage]) -> Optional[str]:
     """
-    Extracts the content of the most recent AI message from the state.
+    Extracts the content of the most recent counselor (helper) message from the state.
+
+    In this simulation, the counselor's turns are represented as HumanMessage
+    because the AI plays the client role and the human plays the counselor role.
 
     Args:
         messages: The current simulation message history.
 
     Returns:
-        The content string of the last AI message, or None if no AI message is found.
+        The content string of the last HumanMessage (counselor turn), or None if
+        no counselor message is found.
     """
     if not messages:
         return None
