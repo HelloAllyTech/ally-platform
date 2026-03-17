@@ -41,6 +41,32 @@ logger = get_logger(__name__)
 # Prevents memory spikes from too many simultaneous reports
 _report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
 
+# --------------- Anti-stagnation prompt fragments ---------------
+# Appended once to the counselor system prompt (permanent guidance)
+_ANTI_REPETITION_GUIDANCE = (
+    "\n\nWhen responding:\n"
+    "- Do not repeat phrases used earlier in the conversation.\n"
+    "- Prefer asking a new question or exploring a new perspective.\n"
+    "- Move the conversation forward rather than only validating feelings."
+)
+
+# Baked into the base prompt once at setup alongside anti-repetition guidance
+_CONVERSATION_GOAL_REMINDER = (
+    "Conversation Objective: Help the client explore underlying emotions. "
+    "Avoid repeating validation. Introduce new insights or probing questions. "
+    "Progress the discussion forward."
+)
+
+# Injected only when a repetition loop is detected
+_STAGNATION_STEERING = (
+    "The conversation is repeating validation statements. "
+    "Shift toward exploring causes, coping strategies, or new questions."
+)
+
+_REPETITION_JACCARD_THRESHOLD = 0.5
+_REPETITION_LOOKBACK = 3
+_MAX_CONTEXT_MESSAGES = 20
+
 
 async def run_report_with_concurrency_limit(
     service: "ScenarioReportService",
@@ -209,6 +235,66 @@ class ScenarioReportService:
                 self._request.report_id,
             )
 
+    @staticmethod
+    def _detect_repetition_loop(
+        messages: list,
+        lookback: int = _REPETITION_LOOKBACK,
+        threshold: float = _REPETITION_JACCARD_THRESHOLD,
+    ) -> bool:
+        """
+        Return True when the last *lookback* counselor (AI) messages are
+        pairwise similar above *threshold* (word-set Jaccard).
+
+        Lightweight check — no extra model calls.
+        """
+        counselor_texts = [
+            msg.content.lower() for msg in messages if isinstance(msg, AIMessage)
+        ]
+        if len(counselor_texts) < lookback:
+            return False
+
+        recent = counselor_texts[-lookback:]
+        for i in range(len(recent) - 1):
+            words_a = set(recent[i].split())
+            words_b = set(recent[i + 1].split())
+            if not words_a or not words_b:
+                return False
+            similarity = len(words_a & words_b) / len(words_a | words_b)
+            if similarity < threshold:
+                return False
+        return True
+
+    def _prepare_counselor_context(
+        self,
+        full_messages: list,
+        base_system_content: str,
+    ) -> list:
+        """
+        Build the message list actually sent to the counselor LLM:
+
+        1. Sliding window — keeps only the last K conversation messages.
+        2. Stagnation steering — appended to the system prompt only when
+           a repetition loop is detected.
+
+        The *full_messages* list is never mutated.
+        """
+        conversation = full_messages[1:]  # everything after the system message
+
+        if len(conversation) > _MAX_CONTEXT_MESSAGES:
+            conversation = conversation[-_MAX_CONTEXT_MESSAGES:]
+
+        system_content = base_system_content
+
+        if self._detect_repetition_loop(full_messages):
+            system_content += "\n\n" + _STAGNATION_STEERING
+            logger.debug(
+                "Repetition loop detected — injecting stagnation steering "
+                "(report_id=%s)",
+                self._request.report_id,
+            )
+
+        return [SystemMessage(content=system_content)] + conversation
+
     def _extract_client_reply(self, graph_output: dict) -> str:
         """Pull the last AIMessage content from a graph invocation result."""
         if graph_output and "messages" in graph_output:
@@ -230,6 +316,7 @@ class ScenarioReportService:
         """
         req = self._request
         report_id = req.report_id
+        _run_start = time.perf_counter()
         logger.info(
             "Starting report generation: report_id=%s, scenario_id=%s, turns=%s",
             report_id,
@@ -324,16 +411,28 @@ class ScenarioReportService:
                 ),
             )
 
+            # Anti-repetition guidance and goal reminder are baked into the
+            # base prompt once at setup. The original prompt is kept clean
+            # for evaluation.
+            counselor_base_prompt = (
+                counselor_system_prompt
+                + _ANTI_REPETITION_GUIDANCE
+                + "\n\n"
+                + _CONVERSATION_GOAL_REMINDER
+            )
+
             counselor_messages = [
-                SystemMessage(content=counselor_system_prompt),
+                SystemMessage(content=counselor_base_prompt),
                 HumanMessage(content=opening),
             ]
 
             for turn in range(req.turns):
-                # Counselor speaks
-                counselor_resp = await counselor_llm.llm_instance.ainvoke(
-                    counselor_messages
+                # Counselor speaks — windowed context with goal reminder
+                windowed = self._prepare_counselor_context(
+                    counselor_messages,
+                    counselor_base_prompt,
                 )
+                counselor_resp = await counselor_llm.llm_instance.ainvoke(windowed)
                 counselor_text = counselor_resp.content
                 self._record_transcript(counselor_text, "COUNSELOR")
                 counselor_messages.append(AIMessage(content=counselor_text))
@@ -428,13 +527,14 @@ class ScenarioReportService:
                     transcripts=self._transcripts,
                 )
 
+            elapsed = time.perf_counter() - _run_start
             logger.info(
-                "Report result (report_id=%s): status=%s, "
-                "metrics=%s, transcript_entries=%d",
+                "Report complete | report_id=%s | status=%s | turns=%d | "
+                "time=%.1fs\n",
                 report_id,
                 payload.status,
-                payload.metrics,
                 len(self._transcripts),
+                elapsed,
             )
 
             await self._send_webhook(payload)
