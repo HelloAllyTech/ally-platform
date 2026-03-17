@@ -99,7 +99,7 @@ export const CallSummaryScreen: React.FC<
   const isUnauthorized =
     summaryError && getErrorDetails(summaryError).status === 403;
   const showTranscriptTab =
-    Boolean(callId) &&
+    Boolean(chatId) &&
     !isUnauthorized &&
     permissions?.includes(USER_PERMISSIONS.VIEW_MESSAGES);
 
