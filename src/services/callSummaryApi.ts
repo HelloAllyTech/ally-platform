@@ -7,8 +7,10 @@ import {api} from './api';
 export interface CallInfo {
   summaryName: string;
   isSummaryFeedbackAdded: boolean;
+  clientWordCount?: number;
   clientTalkingTime: number;
   wordCountByLanguage: Record<string, number>;
+  counselorWordCount?: number;
   counselorTalkingTime: number;
   clientTalkingPercentage: string;
   counselorTalkingPercentage: string;
