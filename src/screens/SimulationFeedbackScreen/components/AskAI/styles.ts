@@ -1,6 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typographyColors} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -209,6 +209,47 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '12@ms',
     color: colors.white,
+  },
+
+  // ── Citations Table ─────────────────────────────────────────
+  citationsContainer: {
+    marginTop: '10@vs',
+    borderWidth: 1,
+    borderColor: colors.ds.blue[500],
+    borderRadius: '8@ms',
+    overflow: 'hidden',
+  },
+  citationsHeader: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.highEmphasis,
+    paddingHorizontal: '10@ms',
+    paddingVertical: '10@vs',
+    backgroundColor: colors.ds.blueAlpha[50],
+  },
+  citationRow: {
+    flexDirection: 'row',
+    paddingHorizontal: '10@ms',
+    paddingVertical: '8@vs',
+    gap: '8@ms',
+  },
+  citationTimestamp: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    color: typographyColors.mediumEmphasis,
+    minWidth: '36@ms',
+  },
+  citationContent: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.highEmphasis,
+    lineHeight: '15@vs',
+    flex: 1,
+  },
+  citationSpeaker: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    color: colors.ds.typography.highEmphasis,
   },
 
   // ── Loading ───────────────────────────────────────────────────
