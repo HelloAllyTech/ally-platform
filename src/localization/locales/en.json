@@ -493,6 +493,7 @@
     },
     "askAIInitialStateDescription": "Select a prompt or ask your own.",
     "askAIMaxMessages": "Please shorten your message to {{maxMessageLength}} characters or less.",
+    "askAICitationsHeader": "Transcript References",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
     "checklistHeader": "Evaluation Checklist",

@@ -339,7 +339,7 @@ export const SimulationFeedbackScreen: React.FC<
           return (
             <AskAI
               scenarioSessionId={scenarioSessionId || ''}
-              clientName={simulationDetails?.scenario?.metadata?.name}
+              clientName={simulationDetails?.scenario?.metadata?.name ?? ''}
             />
           );
         case SimulationSummaryTabKey.TRANSCRIPTION:

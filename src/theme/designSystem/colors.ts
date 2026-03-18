@@ -97,6 +97,7 @@ export const blue = {
  */
 export const blueAlpha = {
   25: 'rgba(226, 242, 255, 0.25)',
+  50: 'rgba(226, 242, 255, 0.5)',
 } as const;
 
 /**

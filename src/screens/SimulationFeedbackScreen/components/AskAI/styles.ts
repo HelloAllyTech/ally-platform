@@ -1,6 +1,6 @@
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {colors, fontFamily} from '@/theme';
+import {colors, fontFamily, typographyColors} from '@/theme';
 
 export const styles = ScaledSheet.create({
   container: {
@@ -215,17 +215,17 @@ export const styles = ScaledSheet.create({
   citationsContainer: {
     marginTop: '10@vs',
     borderWidth: 1,
-    borderColor: colors.ds.blue[100],
+    borderColor: colors.ds.blue[500],
     borderRadius: '8@ms',
     overflow: 'hidden',
   },
   citationsHeader: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '11@ms',
-    color: colors.ds.typography.lowEmphasis,
+    color: colors.ds.typography.highEmphasis,
     paddingHorizontal: '10@ms',
-    paddingVertical: '6@vs',
-    backgroundColor: colors.ds.blue[50],
+    paddingVertical: '10@vs',
+    backgroundColor: colors.ds.blueAlpha[50],
   },
   citationRow: {
     flexDirection: 'row',
@@ -233,13 +233,10 @@ export const styles = ScaledSheet.create({
     paddingVertical: '8@vs',
     gap: '8@ms',
   },
-  citationRowAlt: {
-    backgroundColor: colors.ds.blue[50],
-  },
   citationTimestamp: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '11@ms',
-    color: colors.ds.blue[500],
+    color: typographyColors.mediumEmphasis,
     minWidth: '36@ms',
   },
   citationContent: {
