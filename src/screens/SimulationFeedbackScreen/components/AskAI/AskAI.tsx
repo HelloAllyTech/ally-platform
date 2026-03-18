@@ -1,5 +1,4 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import LottieView from 'lottie-react-native';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,70 +13,31 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import {animations, RankBadgeIcon, UpArrowIcon} from '@/assets';
+import {UpArrowIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 
 import {AskAiInitialState} from './AskAiInitialState';
+import {
+  AIMessageBubble,
+  ThinkingIndicator,
+  UserMessageBubble,
+} from './chatElements';
 import {styles} from './styles';
 import {AskAIChatMessage, ChatMessageRole} from './types';
 import {useAskAIChat} from './useAskAIChat';
 
-// ── Props ───────────────────────────────────────────────────────
-
 interface AskAIProps {
   scenarioSessionId?: string;
+  clientName: string;
 }
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-// ── Sub-components ──────────────────────────────────────────────
-
-const UserMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
-  ({message}) => (
-    <View style={styles.questionBubble}>
-      <Text style={styles.questionText}>{message.content}</Text>
-    </View>
-  ),
-);
-
-const AIMessageBubble: React.FC<{message: AskAIChatMessage}> = React.memo(
-  ({message}) => (
-    <View style={styles.responseContainer}>
-      <View style={styles.rankBadgeContainer}>
-        <LinearGradient
-          colors={[colors.ds.blue[50], colors.white]}
-          start={{x: 0, y: 0}}
-          end={{x: 0, y: 1}}
-          style={styles.rankBadgeGradient}>
-          <RankBadgeIcon width={9} height={9} />
-        </LinearGradient>
-      </View>
-      <View style={styles.responseTextContainer}>
-        <Text style={styles.responseText}>
-          {message.content}
-          {message.isStreaming ? '▍' : ''}
-        </Text>
-      </View>
-    </View>
-  ),
-);
-
-const ThinkingIndicator: React.FC = () => (
-  <View style={styles.responseContainer}>
-    <LottieView
-      source={animations.thinking}
-      style={styles.thinkingLottie}
-      autoPlay
-      loop
-      resizeMode="contain"
-    />
-  </View>
-);
-
-// ── Main Component ──────────────────────────────────────────────
-
-export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
+export const AskAI: React.FC<AskAIProps> = ({
+  scenarioSessionId,
+  clientName,
+}) => {
   const {t} = useTranslate();
   const [inputText, setInputText] = useState('');
   const insets = useSafeAreaInsets();
@@ -167,12 +127,15 @@ export const AskAI: React.FC<AskAIProps> = ({scenarioSessionId}) => {
   const isOverLimit = inputText.length > MAX_MESSAGE_LENGTH;
   const canSend = inputText.trim().length > 0 && !isStreaming && !isOverLimit;
 
-  const renderMessage = useCallback(({item}: {item: AskAIChatMessage}) => {
-    if (item.role === ChatMessageRole.USER) {
-      return <UserMessageBubble message={item} />;
-    }
-    return <AIMessageBubble message={item} />;
-  }, []);
+  const renderMessage = useCallback(
+    ({item}: {item: AskAIChatMessage}) => {
+      if (item.role === ChatMessageRole.USER) {
+        return <UserMessageBubble message={item} />;
+      }
+      return <AIMessageBubble message={item} clientName={clientName} />;
+    },
+    [clientName],
+  );
 
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
 

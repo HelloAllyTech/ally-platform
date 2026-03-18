@@ -336,7 +336,12 @@ export const SimulationFeedbackScreen: React.FC<
             />
           );
         case SimulationSummaryTabKey.ASK_AI:
-          return <AskAI scenarioSessionId={scenarioSessionId || ''} />;
+          return (
+            <AskAI
+              scenarioSessionId={scenarioSessionId || ''}
+              clientName={simulationDetails?.scenario?.metadata?.name ?? ''}
+            />
+          );
         case SimulationSummaryTabKey.TRANSCRIPTION:
           return (
             <TranscriptTab

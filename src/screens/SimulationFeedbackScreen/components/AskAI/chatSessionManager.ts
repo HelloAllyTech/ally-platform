@@ -400,6 +400,9 @@ const startStream = async (
 
     for (const event of events) {
       switch (event.type) {
+        case SSEEventType.START:
+          break;
+
         case SSEEventType.TOKEN:
           if (session.streamingMessage) {
             session.streamingMessage = {
@@ -410,10 +413,23 @@ const startStream = async (
           }
           break;
 
+        case SSEEventType.CITATIONS:
+          if (session.streamingMessage) {
+            const existing = session.streamingMessage.citations || [];
+            session.streamingMessage = {
+              ...session.streamingMessage,
+              citations: [...existing, ...event.citations],
+            };
+            notifyListeners(sessionId);
+          }
+          break;
+
         case SSEEventType.DONE: {
           streamComplete = true;
           const finalMsg = {
             ...session.streamingMessage!,
+            content: event.content || session.streamingMessage!.content,
+            citations: event.citations || session.streamingMessage?.citations,
             isStreaming: false,
           };
           session.messages = [...session.messages, finalMsg];
@@ -482,6 +498,18 @@ const startStream = async (
           session.streamingMessage = {
             ...session.streamingMessage,
             content: session.streamingMessage.content + event.content,
+          };
+        } else if (event.type === SSEEventType.CITATIONS) {
+          const existing = session.streamingMessage.citations || [];
+          session.streamingMessage = {
+            ...session.streamingMessage,
+            citations: [...existing, ...event.citations],
+          };
+        } else if (event.type === SSEEventType.DONE) {
+          session.streamingMessage = {
+            ...session.streamingMessage,
+            content: event.content || session.streamingMessage.content,
+            citations: event.citations || session.streamingMessage.citations,
           };
         }
       }
