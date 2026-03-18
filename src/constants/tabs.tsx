@@ -59,7 +59,10 @@ export const TAB_CONFIG: TabConfig[] = [
   },
   {
     name: SCREEN_NAMES.REVIEW,
-    requiredPermissions: [USER_PERMISSIONS.VIEW_SIMULATION_REVIEWS],
+    requiredPermissions: [
+      USER_PERMISSIONS.VIEW_SIMULATION_REVIEWS,
+      USER_PERMISSIONS.VIEW_SCRIBE_REVIEWS,
+    ],
     component: ReviewScreen,
     focusedIcon: <ReviewActiveIcon />,
     unfocusedIcon: <ReviewInactiveIcon />,

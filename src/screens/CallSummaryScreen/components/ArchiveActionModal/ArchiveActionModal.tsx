@@ -1,40 +1,26 @@
 import React, {useCallback} from 'react';
 
-import {ConfirmationModal, useErrorToast} from '@/components';
+import {ConfirmationModal} from '@/components';
 import {useTranslate} from '@/hooks';
 
 interface ArchiveActionModalProps {
   visible: boolean;
   onClose: () => void;
   actionType: 'archive' | 'unarchive' | null;
-  setActionType: (actionType: 'archive' | 'unarchive' | null) => void;
   onArchive: (archive: boolean) => void;
 }
 
 export const ArchiveActionModal = React.memo(
-  ({
-    visible,
-    onClose,
-    actionType,
-    setActionType,
-    onArchive,
-  }: ArchiveActionModalProps) => {
+  ({visible, onClose, actionType, onArchive}: ArchiveActionModalProps) => {
     const {t} = useTranslate();
-    const {showErrorToast} = useErrorToast();
 
     const isArchive = actionType === 'archive';
     const key = isArchive ? 'archive' : 'unarchive';
 
     const onConfirm = useCallback(async () => {
-      try {
-        await onArchive(isArchive);
-        setActionType(isArchive ? 'unarchive' : 'archive');
-      } catch (error) {
-        showErrorToast(error, `CallSummary.archiveActionModal.${key}.failed`);
-      } finally {
-        onClose();
-      }
-    }, [isArchive, key, onClose, onArchive, showErrorToast, setActionType]);
+      await onArchive(isArchive);
+      onClose();
+    }, [isArchive, onClose, onArchive]);
 
     return (
       <ConfirmationModal

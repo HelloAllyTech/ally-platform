@@ -28,6 +28,16 @@ export const scribeGeneralCommentsApi = api.injectEndpoints({
       }),
       providesTags: ['GeneralComments'],
     }),
+    getScribeGeneralCommentsOverview: builder.query<
+      GetThreadCommentsResponse,
+      GetGeneralCommentsParams
+    >({
+      query: ({reviewId, offset = 0, limit = 2}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.GENERAL_COMMENTS_OVERVIEW(reviewId),
+        method: API_METHODS.GET,
+        params: {offset, limit, sortOrder: 'DESC', sortBy: 'createdAt'},
+      }),
+    }),
     addScribeGeneralComment: builder.mutation<
       AddReviewCommentResponse,
       Pick<AddReviewCommentRequest, 'reviewId' | 'content'>
@@ -76,6 +86,7 @@ export const scribeGeneralCommentsApi = api.injectEndpoints({
 
 export const {
   useLazyGetScribeGeneralCommentsQuery,
+  useLazyGetScribeGeneralCommentsOverviewQuery,
   useAddScribeGeneralCommentMutation,
   useDeleteScribeGeneralCommentMutation,
   useUpdateScribeGeneralCommentMutation,

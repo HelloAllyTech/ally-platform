@@ -21,10 +21,12 @@ export const useCallSummaryActions = ({
   chatId,
   name,
   isCallLogSummaryFlow,
+  archived,
 }: {
   chatId: number;
   name: string;
   isCallLogSummaryFlow: boolean;
+  archived?: boolean;
 }) => {
   const [updateCallInfo] = useUpdateCallInfoMutation();
   const [exportCallSummary] = useLazyExportCallSummaryQuery();
@@ -39,10 +41,21 @@ export const useCallSummaryActions = ({
   const [isSummaryDropdownVisible, setIsSummaryDropdownVisible] =
     useState(false);
   const [summaryName, setSummaryName] = useState(name);
+  const [isArchived, setIsArchived] = useState(false);
+
+  const [actionType, setActionType] = useState<'archive' | 'unarchive' | null>(
+    null,
+  );
 
   const {t} = useTranslate();
   const {showToast} = useToast();
   const {showErrorToast} = useErrorToast();
+
+  useEffect(() => {
+    setIsArchived(!!archived);
+    setActionType(archived ? 'unarchive' : 'archive');
+  }, [archived]);
+
   useEffect(() => {
     if (name) {
       setSummaryName(name);
@@ -114,6 +127,8 @@ export const useCallSummaryActions = ({
         ),
         'success',
       );
+      setIsArchived(archive);
+      setActionType(archive ? 'unarchive' : 'archive');
     } catch (error) {
       showErrorToast(
         error,
@@ -206,6 +221,8 @@ export const useCallSummaryActions = ({
     handleSummaryNameChange,
     onUpdateSummary,
     isMenuVisible,
+    isArchived,
+    actionType,
     hideMenu,
     showMenu,
     handleExport,

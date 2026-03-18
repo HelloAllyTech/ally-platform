@@ -8,27 +8,13 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 
-jest.mock('@/services/reviewThreadsApi', () => ({
-  useLazyGetThreadsQuery: () => [
-    jest.fn(),
-    {data: undefined, isLoading: false},
-  ],
-}));
-
 const mockGetGeneralComments = jest.fn();
 let mockGeneralCommentsData: any = undefined;
 
-jest.mock('@/services/reviewsApi', () => ({
-  useLazyGetGeneralReviewCommentsQuery: () => [
+jest.mock('@/services/generalCommentsApi', () => ({
+  useLazyGetGeneralCommentsOverviewQuery: () => [
     mockGetGeneralComments,
     {data: mockGeneralCommentsData, isLoading: false},
-  ],
-}));
-
-jest.mock('@/services/scribeReviewsApi', () => ({
-  useLazyGetScribeGeneralReviewCommentsQuery: () => [
-    jest.fn(),
-    {data: undefined, isLoading: false},
   ],
 }));
 

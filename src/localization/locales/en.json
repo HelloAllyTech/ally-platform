@@ -625,6 +625,7 @@
       "simulationDetails": "Simulation Details",
       "collapse": "Collapse",
       "noComments": "No comments yet",
+      "showMore": "Show more",
       "reviewType":"{{reviewType}}"
     },
     "filters": {
