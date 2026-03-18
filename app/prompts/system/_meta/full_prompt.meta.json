@@ -1,4 +1,16 @@
 {
     "name": "Full AI System Prompt",
-    "description": "Legacy full prompt combining context, parameters, behavior rules, and constraints into one block."
+    "description": "Legacy full prompt combining context, parameters, behavior rules, and constraints into one block.",
+    "uses_blocks": [
+        "optional_section",
+        "gender_identity",
+        "sexual_orientation",
+        "session_behavior_guidelines",
+        "competency_block",
+        "language_instruction_fallback",
+        "custom_field_item",
+        "retrieved_context_section",
+        "backstory",
+        "character_backstory"
+    ]
 }

@@ -1,0 +1,5 @@
+{
+    "name": "Language instruction fallback",
+    "description": "Fallback when multilingual_instructions template is missing or empty.",
+    "kind": "block"
+}

@@ -1,0 +1,2 @@
+**LANGUAGE INSTRUCTION:**
+Generate next dialogue in the language for code '{language_code}'.

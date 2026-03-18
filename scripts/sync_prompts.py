@@ -58,8 +58,7 @@ def format_label(text: str) -> str:
 
 def load_meta(txt_file: Path) -> dict | None:
     """
-    Load optional name/description from same dir's _meta/<stem>.meta.json.
-    Returns dict with 'name' and/or 'description' if present, else None.
+    Load name, description, kind, uses_blocks from _meta/<stem>.meta.json.
     """
     meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
     if not meta_path.exists():
@@ -73,6 +72,10 @@ def load_meta(txt_file: Path) -> dict | None:
             out["name"] = data["name"].strip()
         if isinstance(data.get("description"), str) and data["description"].strip():
             out["description"] = data["description"].strip()
+        if isinstance(data.get("kind"), str) and data["kind"].strip():
+            out["kind"] = data["kind"].strip()
+        if isinstance(data.get("uses_blocks"), list):
+            out["uses_blocks"] = data["uses_blocks"]
         return out if out else None
     except (json.JSONDecodeError, OSError):
         return None
@@ -112,15 +115,37 @@ def scan_prompts() -> list[dict]:
                     description = meta["description"]
 
             content = txt_file.read_text(encoding="utf-8")
-            items.append(
-                {
-                    "promptCode": prompt_code,
-                    "name": name,
-                    "description": description,
-                    "prompt": content,
-                    "availableVariables": parse_variables_from_prompt(content),
-                }
-            )
+            item = {
+                "promptCode": prompt_code,
+                "name": name,
+                "description": description,
+                "prompt": content,
+                "availableVariables": parse_variables_from_prompt(content),
+            }
+
+            if meta:
+                if meta.get("kind"):
+                    item["kind"] = meta["kind"]
+                if meta.get("uses_blocks"):
+                    # block name -> ally_ai_learn_subdir_blockname.
+                    # Note: only handles blocks in same dir as the prompt for now.
+                    # e.g. system/competency_block.txt ->
+                    # ally_ai_learn_system_competency_block.
+                    # prompt: system/full_prompt -> item rel.parent: system.
+                    subdir_prefix = (
+                        str(rel.parent).replace("/", "_")
+                        if str(rel.parent) != "."
+                        else ""
+                    )
+                    codes = []
+                    for b in meta["uses_blocks"]:
+                        if subdir_prefix:
+                            codes.append(f"{PROMPT_CODE_PREFIX}{subdir_prefix}_{b}")
+                        else:
+                            codes.append(f"{PROMPT_CODE_PREFIX}{b}")
+                    item["usesBlocks"] = codes
+
+            items.append(item)
         except Exception as e:
             logger.error("Failed to read %s: %s", txt_file, e)
 

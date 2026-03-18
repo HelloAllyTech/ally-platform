@@ -20,34 +20,60 @@ LOG_PREFIX = "[SIMULATION_PROMPT]"
 DEFAULT_PROMPT = prompt_manager.get_template("system", "base_role_instruction")
 
 
-def _get_optional_block(label: str, value: Optional[str]) -> str:
+def _get_optional_block(
+    label: str, value: Optional[str], prompt_data: Optional[PromptData] = None
+) -> str:
     """Wraps an optional value in a simple formatted block if it exists."""
-    if value:
-        return f"**{label}:**\n{value}\n\n"
-    return ""
+    if not value:
+        return ""
+    result = load_and_format(
+        "system/optional_section",
+        prompt_data=prompt_data,
+        label=label,
+        value=value,
+    )
+    return result + "\n" if result and not result.endswith("\n\n") else result or ""
 
 
 def _get_gender_details(prompt_data: PromptData) -> str:
     """Creates formatted blocks for optional gender identity and orientation."""
     content = ""
     if prompt_data.gender_identity:
-        content += f"**Your gender identity:**\n{prompt_data.gender_identity}\n\n"
+        block = load_and_format(
+            "system/gender_identity",
+            prompt_data=prompt_data,
+            value=prompt_data.gender_identity,
+        )
+        content += (
+            (block + "\n\n") if block and not block.endswith("\n\n") else block or ""
+        )
     if prompt_data.sexual_orientation:
-        content += f"**Your sexual orientation:**\n{prompt_data.sexual_orientation}\n\n"
+        block = load_and_format(
+            "system/sexual_orientation",
+            prompt_data=prompt_data,
+            value=prompt_data.sexual_orientation,
+        )
+        content += (
+            (block + "\n\n") if block and not block.endswith("\n\n") else block or ""
+        )
     return content
 
 
 def _get_behavioral_guidelines(prompt_data: PromptData) -> str:
     """Returns specific session guidelines if provided."""
-    if prompt_data.session_behavior_guidelines:
-        return (
-            f"**How will you behave in this session:**\n"
-            f"{prompt_data.session_behavior_guidelines}\n\n"
-        )
-    return ""
+    if not prompt_data.session_behavior_guidelines:
+        return ""
+    result = load_and_format(
+        "system/session_behavior_guidelines",
+        prompt_data=prompt_data,
+        value=prompt_data.session_behavior_guidelines,
+    )
+    return (result + "\n\n") if result and not result.endswith("\n\n") else result or ""
 
 
-def _get_competency_block(competency: Optional[str]) -> str:
+def _get_competency_block(
+    competency: Optional[str], prompt_data: Optional[PromptData] = None
+) -> str:
     """
     Returns a formatted counselor competency instruction block.
 
@@ -57,16 +83,22 @@ def _get_competency_block(competency: Optional[str]) -> str:
     """
     if not competency:
         return ""
-    return (
-        f"## Counselor Training Competency\n"
-        f"The counselor attending this simulation is being trained on the following"
-        f" competency:\n"
-        f"**{competency}**\n\n"
-        f"Shape your responses to create natural opportunities for the counselor to"
-        f" practice and demonstrate this competency. Do not make it obvious or"
-        f" forced — let it emerge "
-        f"organically through the conversation.\n\n"
+    result = load_and_format(
+        "system/competency_block",
+        prompt_data=prompt_data,
+        competency=competency,
     )
+    if not result or not result.strip():
+        return (
+            "## Counselor Training Competency\n"
+            "The counselor attending this simulation is being trained on the following"
+            " competency:\n"
+            f"**{competency}**\n\n"
+            "Shape your responses to create natural opportunities for the counselor to"
+            " practice and demonstrate this competency. Do not make it obvious or"
+            " forced — let it emerge organically through the conversation.\n\n"
+        )
+    return (result + "\n\n") if result and not result.endswith("\n\n") else result
 
 
 def _format_language_samples(samples: List) -> str:
@@ -112,10 +144,6 @@ def _get_language_sample_block(
         language_code: BCP 47 language code
         backend_prompts: promptData.prompts from metadata (dashboard edits)
     """
-    base = (
-        f"**LANGUAGE INSTRUCTION:**\n"
-        f"Generate next dialogue in the language for code '{language_code}'."
-    )
     samples_text = _format_language_samples(samples) if samples else ""
 
     result = load_and_format(
@@ -125,7 +153,17 @@ def _get_language_sample_block(
         samples=samples_text,
     )
     if not result or not result.strip():
-        return base.strip() + "\n\n"
+        fallback = load_and_format(
+            "system/language_instruction_fallback",
+            prompt_data=backend_prompts,
+            language_code=language_code,
+        )
+        if fallback and fallback.strip():
+            return fallback.strip() + "\n\n"
+        return (
+            f"**LANGUAGE INSTRUCTION:**\n"
+            f"Generate next dialogue in the language for code '{language_code}'.\n\n"
+        )
 
     return result.strip() + "\n\n"
 
@@ -162,12 +200,15 @@ def _get_language_block(
     return block
 
 
-def _format_custom_fields(custom_fields: list) -> str:
+def _format_custom_fields(
+    custom_fields: list, prompt_data: Optional[PromptData] = None
+) -> str:
     """
     Formats custom fields into markdown sections for prompt injection.
 
     Args:
         custom_fields: List of dicts with 'name' and 'value' keys
+        prompt_data: Optional PromptData for template resolution (dashboard override)
 
     Returns:
         Formatted markdown string with custom field sections,
@@ -179,12 +220,21 @@ def _format_custom_fields(custom_fields: list) -> str:
     formatted_blocks = []
     for field in custom_fields:
         if isinstance(field, dict) and "name" in field and "value" in field:
-            # Only include if useInDefaultPrompt is not explicitly False
             if field.get("useInDefaultPrompt", True) is not False:
                 field_name = field["name"]
                 field_value = field["value"]
                 if field_value:
-                    formatted_blocks.append(f"**{field_name}:**\n{field_value}\n\n")
+                    block = load_and_format(
+                        "system/custom_field_item",
+                        prompt_data=prompt_data,
+                        field_name=field_name,
+                        field_value=field_value,
+                    )
+                    formatted_blocks.append(
+                        (block + "\n\n")
+                        if block and not block.endswith("\n\n")
+                        else block or f"**{field_name}:**\n{field_value}\n\n"
+                    )
 
     return "".join(formatted_blocks)
 
@@ -192,6 +242,7 @@ def _format_custom_fields(custom_fields: list) -> str:
 def _build_behavior_conditions_block(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
+    prompt_data: Optional[PromptData] = None,
 ) -> str:
     """
     Build the behavior-based conditions block for the prompt.
@@ -203,6 +254,7 @@ def _build_behavior_conditions_block(
         behavior_instructions: List of behavior instructions with categories,
             behaviors, and actor responses.
         current_state: Optional current state instruction (resolved by score).
+        prompt_data: Optional PromptData for template resolution (dashboard override).
 
     Returns:
         Formatted conditions block string for prompt injection.
@@ -215,7 +267,6 @@ def _build_behavior_conditions_block(
     if current_state:
         state_label = f"State {current_state.state_id}"
 
-        # Check if dialogues exist and are not empty
         dialogue_options = []
         if current_state.dialogues:
             dialogue_options = [d for d in current_state.dialogues if d and d.strip()]
@@ -232,35 +283,42 @@ def _build_behavior_conditions_block(
     # Build condition blocks from behavior instructions
     condition_blocks = []
     for bi in behavior_instructions:
-        # Skip if behaviors list is empty or None
         if not bi.behaviors:
             continue
 
-        # Filter out empty strings and join behaviors with OR
         non_empty_behaviors = [b for b in bi.behaviors if b]
         if not non_empty_behaviors:
             continue
 
         behaviors_str = " OR ".join([f'"{b}"' for b in non_empty_behaviors])
 
-        # Determine the classification context based on category
-        if bi.category.value == "SHOULD_DO":
-            classification_prefix = "can be classified as"
-        else:
-            classification_prefix = "can be classified as"
-
-        # Build the condition block
-        condition = (
-            f"If the previous helper utterance {classification_prefix} "
-            f"{behaviors_str}"
+        condition = load_and_format(
+            "system/behavior_condition_if",
+            prompt_data=prompt_data,
+            behaviors_str=behaviors_str,
         )
+        if not condition or not condition.strip():
+            condition = (
+                f"If the previous helper utterance can be classified as {behaviors_str}"
+            )
 
         if state_continuation:
-            then_clause = f"Then, continue with{state_continuation}"
+            then_clause = load_and_format(
+                "system/behavior_condition_then_state",
+                prompt_data=prompt_data,
+                state_continuation=state_continuation,
+            )
+            if not then_clause or not then_clause.strip():
+                then_clause = f"Then, continue with{state_continuation}"
         else:
-            then_clause = "Then, respond naturally based on your character."
+            then_clause = load_and_format(
+                "system/behavior_condition_then_natural",
+                prompt_data=prompt_data,
+            )
+            if not then_clause or not then_clause.strip():
+                then_clause = "Then, respond naturally based on your character."
 
-        condition_blocks.append(f"{condition}\n{then_clause}")
+        condition_blocks.append(f"{condition.strip()}\n{then_clause.strip()}")
 
     return "\n\n".join(condition_blocks)
 
@@ -291,16 +349,34 @@ def _build_branching_prompt(
     character_details = ", ".join(character_details_parts)
 
     language_block = _get_language_block(prompt_data, language_code)
-    competency_block = _get_competency_block(prompt_data.competency)
+    competency_block = _get_competency_block(prompt_data.competency, prompt_data)
 
     # Only include backstory if context is provided
     backstory_block = ""
     if prompt_data.context:
-        backstory_block = f"Backstory: {prompt_data.context}\n\n"
+        block = load_and_format(
+            "system/backstory",
+            prompt_data=prompt_data,
+            context=prompt_data.context,
+        )
+        backstory_block = (
+            (block + "\n\n")
+            if block and not block.endswith("\n\n")
+            else block or f"Backstory: {prompt_data.context}\n\n"
+        )
 
-    retrieved_context_block = (
-        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
-    )
+    retrieved_context_block = ""
+    if retrieved_context:
+        block = load_and_format(
+            "system/retrieved_context_section",
+            prompt_data=prompt_data,
+            retrieved_context=retrieved_context,
+        )
+        retrieved_context_block = (
+            (block + "\n\n")
+            if block and not block.endswith("\n\n")
+            else block or f"## Additional Context\n{retrieved_context}\n\n"
+        )
 
     branching_prompt = load_and_format(
         "system/branching_prompt",
@@ -342,7 +418,7 @@ def _build_behavior_prompt(
         A SystemMessage with the behavior-conditioned prompt.
     """
     conditions_block = _build_behavior_conditions_block(
-        behavior_instructions, current_state
+        behavior_instructions, current_state, prompt_data
     )
 
     # Build character details summary
@@ -365,11 +441,29 @@ def _build_behavior_prompt(
     # Build character backstory from context (only if provided)
     backstory_block = ""
     if prompt_data.context:
-        backstory_block = f"Character backstory: {prompt_data.context}\n\n"
+        block = load_and_format(
+            "system/character_backstory",
+            prompt_data=prompt_data,
+            context=prompt_data.context,
+        )
+        backstory_block = (
+            (block + "\n\n")
+            if block and not block.endswith("\n\n")
+            else block or f"Character backstory: {prompt_data.context}\n\n"
+        )
 
-    retrieved_context_block = (
-        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
-    )
+    retrieved_context_block = ""
+    if retrieved_context:
+        block = load_and_format(
+            "system/retrieved_context_section",
+            prompt_data=prompt_data,
+            retrieved_context=retrieved_context,
+        )
+        retrieved_context_block = (
+            (block + "\n\n")
+            if block and not block.endswith("\n\n")
+            else block or f"## Additional Context\n{retrieved_context}\n\n"
+        )
 
     # Build additional context from custom fields
     custom_context_block = ""
@@ -379,7 +473,12 @@ def _build_behavior_prompt(
             if isinstance(cf, dict) and cf.get("name") and cf.get("value"):
                 custom_parts.append(f"{cf['name']}: {cf['value']}")
         if custom_parts:
-            custom_context_block = (
+            block = load_and_format(
+                "system/custom_context_intro",
+                prompt_data=prompt_data,
+                custom_parts="\n".join(custom_parts),
+            )
+            custom_context_block = block or (
                 "\nRefer to the following additional context:\n"
                 + "\n".join(custom_parts)
             )
@@ -387,39 +486,54 @@ def _build_behavior_prompt(
     # Only include Conditions section if there are actual conditions
     conditions_section = ""
     if conditions_block.strip():
-        conditions_section = f"\n        Conditions:\n        {conditions_block}"
+        block = load_and_format(
+            "system/conditions_section_wrapper",
+            prompt_data=prompt_data,
+            conditions_block=conditions_block,
+        )
+        conditions_section = (
+            block or f"\n        Conditions:\n        {conditions_block}"
+        )
 
     # Build ALL optional blocks to ensure full context is present
     gender_details_block = _get_gender_details(prompt_data)
-    profession_block = _get_optional_block("Your profession", prompt_data.profession)
+    profession_block = _get_optional_block(
+        "Your profession", prompt_data.profession, prompt_data
+    )
     guidelines_block = _get_behavioral_guidelines(prompt_data)
     previous_memory_block = _get_optional_block(
-        "Summary from your previous session", prompt_data.previous_memory
+        "Summary from your previous session", prompt_data.previous_memory, prompt_data
     )
     core_memories_block = _get_optional_block(
         "Your core memories influencing your beliefs & actions",
         prompt_data.core_memories,
+        prompt_data,
     )
-    personality_block = _get_optional_block("Your personality", prompt_data.personality)
+    personality_block = _get_optional_block(
+        "Your personality", prompt_data.personality, prompt_data
+    )
     starting_state_block = _get_optional_block(
-        "Your current thoughts", prompt_data.starting_state
+        "Your current thoughts", prompt_data.starting_state, prompt_data
     )
     emotional_needs_block = _get_optional_block(
         "Your emotional needs from this counselling session",
         prompt_data.emotional_needs,
+        prompt_data,
     )
-    tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
+    tone_block = _get_optional_block(
+        "Your talking style/tone", prompt_data.tone, prompt_data
+    )
     life_history = _get_optional_block(
-        "your life history is", prompt_data.life_history_summary
+        "your life history is", prompt_data.life_history_summary, prompt_data
     )
     response_length = _get_optional_block(
-        "your response length should be", prompt_data.response_length
+        "your response length should be", prompt_data.response_length, prompt_data
     )
     agent_dialogues = _get_optional_block(
-        "use these dialogues for reference", prompt_data.agent_dialogues
+        "use these dialogues for reference", prompt_data.agent_dialogues, prompt_data
     )
 
-    competency_block = _get_competency_block(prompt_data.competency)
+    competency_block = _get_competency_block(prompt_data.competency, prompt_data)
 
     behavior_prompt = load_and_format(
         "system/behavior_prompt",
@@ -471,47 +585,67 @@ def _build_full_prompt(
     """
     # Use helper functions to build optional sections
     gender_details_block = _get_gender_details(prompt_data)
-    profession_block = _get_optional_block("Your profession", prompt_data.profession)
+    profession_block = _get_optional_block(
+        "Your profession", prompt_data.profession, prompt_data
+    )
     guidelines_block = _get_behavioral_guidelines(prompt_data)
     previous_memory_block = _get_optional_block(
         "Summary from your previous session",
         prompt_data.previous_memory,
+        prompt_data,
     )
     core_memories_block = _get_optional_block(
         "Your core memories influencing your beliefs & actions",
         prompt_data.core_memories,
+        prompt_data,
     )
-    personality_block = _get_optional_block("Your personality", prompt_data.personality)
+    personality_block = _get_optional_block(
+        "Your personality", prompt_data.personality, prompt_data
+    )
     starting_state_block = _get_optional_block(
-        "Your current thoughts", prompt_data.starting_state
+        "Your current thoughts", prompt_data.starting_state, prompt_data
     )
     emotional_needs_block = _get_optional_block(
         "Your emotional needs from this counselling session",
         prompt_data.emotional_needs,
+        prompt_data,
     )
-    tone_block = _get_optional_block("Your talking style/tone", prompt_data.tone)
+    tone_block = _get_optional_block(
+        "Your talking style/tone", prompt_data.tone, prompt_data
+    )
 
     # Build language block (samples or instruction for non-English)
     language_block = _get_language_block(prompt_data, language_code)
 
     # Format custom fields dynamically
-    custom_fields_block = _format_custom_fields(prompt_data.custom_fields or [])
+    custom_fields_block = _format_custom_fields(
+        prompt_data.custom_fields or [], prompt_data
+    )
 
     life_history = _get_optional_block(
-        "your life history is", prompt_data.life_history_summary
+        "your life history is", prompt_data.life_history_summary, prompt_data
     )
     response_length = _get_optional_block(
-        "your response length should be", prompt_data.response_length
+        "your response length should be", prompt_data.response_length, prompt_data
     )
     agent_dialogues = _get_optional_block(
-        "use these dialogues for reference", prompt_data.agent_dialogues
+        "use these dialogues for reference", prompt_data.agent_dialogues, prompt_data
     )
 
-    competency_block = _get_competency_block(prompt_data.competency)
+    competency_block = _get_competency_block(prompt_data.competency, prompt_data)
 
-    retrieved_context_block = (
-        f"## Additional Context\n{retrieved_context}\n\n" if retrieved_context else ""
-    )
+    retrieved_context_block = ""
+    if retrieved_context:
+        block = load_and_format(
+            "system/retrieved_context_section",
+            prompt_data=prompt_data,
+            retrieved_context=retrieved_context,
+        )
+        retrieved_context_block = (
+            (block + "\n\n")
+            if block and not block.endswith("\n\n")
+            else block or f"## Additional Context\n{retrieved_context}\n\n"
+        )
 
     # Assemble the full detailed prompt
     system_prompt = load_and_format(
@@ -525,7 +659,9 @@ def _build_full_prompt(
         current_location=prompt_data.current_location or "",
         profession_block=profession_block,
         language_block=language_block,
-        context_block=_get_optional_block("Your current context", prompt_data.context),
+        context_block=_get_optional_block(
+            "Your current context", prompt_data.context, prompt_data
+        ),
         retrieved_context_block=retrieved_context_block,
         guidelines_block=guidelines_block,
         previous_memory_block=previous_memory_block,
