@@ -9,7 +9,7 @@ import {ChatAddOnIcon} from '@/assets';
 import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
 import {ReviewType} from '@/contexts/ReviewApiContext';
-import {useLazyGetGeneralReviewCommentsQuery} from '@/services/reviewsApi';
+import {useLazyGetGeneralCommentsOverviewQuery} from '@/services/generalCommentsApi';
 import {
   colors,
   fontFamily,
@@ -37,7 +37,7 @@ import {ReactionsCount} from './ReactionsCount';
 
 dayjs.extend(relativeTime);
 
-type LazyGeneralCommentsQuery = typeof useLazyGetGeneralReviewCommentsQuery;
+type LazyGeneralCommentsQuery = typeof useLazyGetGeneralCommentsOverviewQuery;
 
 interface ReviewCardProps {
   id: string;
@@ -70,7 +70,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   note,
   reviewType,
   summaryName,
-  useLazyGeneralCommentsQuery = useLazyGetGeneralReviewCommentsQuery,
+  useLazyGeneralCommentsQuery = useLazyGetGeneralCommentsOverviewQuery,
 }) => {
   const {t} = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -89,18 +89,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       return;
     }
     if (commentsCount === 0) return;
-    if (generalCommentsData?.data?.length) {
+    if (generalCommentsData !== undefined) {
       setIsExpanded(true);
       return;
     }
-    const result = await getGeneralComments({
-      reviewId: id,
-      offset: 0,
-      limit: 2,
-    });
-    if (result.data?.data?.length) {
-      setIsExpanded(true);
-    }
+    await getGeneralComments({reviewId: id, offset: 0, limit: 2});
+    setIsExpanded(true);
   }, [isExpanded, commentsCount, generalCommentsData, getGeneralComments, id]);
 
   const totalReactions = Object.values(reactions).reduce(

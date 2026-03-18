@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChevronDown} from '@/assets';
 import {ReviewComment} from '@/components';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, theme, typography} from '@/theme';
 import {GetThreadCommentsResponse} from '@/types/reviews';
 import {formatRelativeTime} from '@/utils';
 import {getReactionsArray, getTotalReactionCount} from '@/utils/reviews';
@@ -29,6 +29,8 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
   t,
 }) => {
   if (!isExpanded) return null;
+
+  const hasComments = !!generalCommentsData?.data?.length;
 
   return (
     <View style={styles.expandedCommentsContainer}>
@@ -68,7 +70,7 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
             );
           })}
 
-          {(!generalCommentsData || generalCommentsData.data.length === 0) && (
+          {!hasComments && (
             <View style={styles.emptyCommentsContainer}>
               <Text style={styles.emptyCommentsText}>
                 {t('Review.card.noComments')}
@@ -76,6 +78,14 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
             </View>
           )}
         </>
+      )}
+
+      {hasComments && generalCommentsData?.count > 2 && onCommentPress && (
+        <TouchableOpacity
+          style={styles.showMoreButton}
+          onPress={() => onCommentPress(reviewId)}>
+          <Text style={styles.showMoreText}>{t('Review.card.showMore')}</Text>
+        </TouchableOpacity>
       )}
 
       <TouchableOpacity style={styles.collapseButton} onPress={onCollapsePress}>
@@ -114,6 +124,16 @@ const styles = ScaledSheet.create({
     ...typography.body.small,
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  showMoreButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: '4@s',
+  },
+  showMoreText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.small,
+    fontWeight: fontWeights.medium,
+    color: theme.primary,
   },
   collapseButton: {
     flexDirection: 'row',

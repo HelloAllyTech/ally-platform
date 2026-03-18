@@ -29,6 +29,7 @@ export const useSummaryState = (
   const [refreshing, setRefreshing] = useState(false);
   const [shouldShowFeedbackPopup, setShouldShowFeedbackPopup] = useState(false);
   const [isEndReached, setIsEndReached] = useState(false);
+  const [isTranscriptAvailable, setIsTranscriptAvailable] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -42,6 +43,12 @@ export const useSummaryState = (
     if (summaryData?.details?.summary) {
       setIsSummaryAvailable(true);
     }
+    setIsTranscriptAvailable(
+      !!(
+        summaryData?.details?.callInfo?.clientWordCount ||
+        summaryData?.details?.callInfo?.counselorWordCount
+      ),
+    );
   }, [summaryData]);
 
   // After the summary becomes available, keep showing loader for 3 seconds,
@@ -102,5 +109,6 @@ export const useSummaryState = (
     isEndReached,
     setIsEndReached,
     summaryStatus: summaryData?.summaryStatus,
+    isTranscriptAvailable,
   };
 };
