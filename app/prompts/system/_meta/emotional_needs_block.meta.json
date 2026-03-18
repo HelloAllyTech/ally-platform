@@ -1,0 +1,6 @@
+{
+    "name": "Actor Emotional Needs",
+    "kind": "block",
+    "description": "Block describing the actor's emotional needs for the session.",
+    "data_field": "emotional_needs"
+}

@@ -1,5 +1,6 @@
 {
     "name": "Branching Conditional Prompt",
+    "kind": "prompt",
     "description": "System prompt template for AI branching mode, dealing with dynamic states and routing dialog flows.",
     "uses_blocks": [
         "backstory",

@@ -1,0 +1,6 @@
+{
+    "name": "Actor Sexual Orientation",
+    "kind": "block",
+    "description": "Block describing the actor's sexual orientation.",
+    "data_field": "sexual_orientation"
+}

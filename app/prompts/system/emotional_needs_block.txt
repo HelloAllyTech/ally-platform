@@ -1,0 +1,2 @@
+**Your emotional needs from this counseling session:**
+{emotional_needs}

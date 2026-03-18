@@ -1,0 +1,9 @@
+{
+    "name": "Gender & Orientation Details",
+    "kind": "block",
+    "description": "Composite block combining gender identity and sexual orientation.",
+    "uses_blocks": [
+        "gender_identity",
+        "sexual_orientation"
+    ]
+}

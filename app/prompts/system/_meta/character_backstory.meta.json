@@ -1,0 +1,5 @@
+{
+  "name": "System: Character Backstory",
+  "kind": "block",
+  "description": "Template for rendering the character backstory from scenario context."
+}

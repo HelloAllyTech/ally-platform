@@ -1,0 +1,6 @@
+{
+    "name": "Actor Response Length",
+    "kind": "block",
+    "description": "Block describing the expected length of the actor's response.",
+    "data_field": "response_length"
+}

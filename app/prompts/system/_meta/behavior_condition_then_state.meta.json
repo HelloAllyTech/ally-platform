@@ -1,0 +1,5 @@
+{
+  "name": "System: Behavior Condition Then State",
+  "kind": "block",
+  "description": "Template for the THEN clause when continuing a specific state instruction."
+}

@@ -1,0 +1,6 @@
+{
+    "name": "Actor Personality",
+    "kind": "block",
+    "description": "Block describing the actor's personality characteristics.",
+    "data_field": "personality"
+}

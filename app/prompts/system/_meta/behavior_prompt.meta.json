@@ -1,10 +1,9 @@
 {
     "name": "Behavior Conditional Prompt",
+    "kind": "prompt",
     "description": "System prompt template for AI behavior mode, handling specific behavioral constraints based on dynamic conditions.",
     "uses_blocks": [
-        "optional_section",
-        "gender_identity",
-        "sexual_orientation",
+        "gender_details_block",
         "session_behavior_guidelines",
         "competency_block",
         "language_instruction_fallback",
@@ -12,9 +11,15 @@
         "retrieved_context_section",
         "custom_context_intro",
         "conditions_section_wrapper",
-        "character_backstory",
-        "behavior_condition_if",
-        "behavior_condition_then_natural",
-        "behavior_condition_then_state"
+        "profession_block",
+        "previous_memory_block",
+        "life_history",
+        "core_memories_block",
+        "personality_block",
+        "starting_state_block",
+        "emotional_needs_block",
+        "tone_block",
+        "agent_dialogues",
+        "response_length"
     ]
 }

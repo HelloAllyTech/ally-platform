@@ -1,4 +1,5 @@
-from typing import List, Optional
+from enum import Enum
+from typing import Any, List, Optional
 
 from langchain_core.messages import SystemMessage
 
@@ -20,19 +21,55 @@ LOG_PREFIX = "[SIMULATION_PROMPT]"
 DEFAULT_PROMPT = prompt_manager.get_template("system", "base_role_instruction")
 
 
-def _get_optional_block(
-    label: str, value: Optional[str], prompt_data: Optional[PromptData] = None
-) -> str:
-    """Wraps an optional value in a simple formatted block if it exists."""
-    if not value:
+def _coerce_block_value(value: Any) -> str:
+    if value is None:
         return ""
-    result = load_and_format(
-        "system/optional_section",
-        prompt_data=prompt_data,
-        label=label,
-        value=value,
-    )
-    return result + "\n" if result and not result.endswith("\n\n") else result or ""
+    if isinstance(value, Enum):
+        return str(value.value).strip()
+    if isinstance(value, (list, tuple, set)):
+        parts = [str(v).strip() for v in value if v is not None and str(v).strip()]
+        return "\n".join(parts).strip()
+    return str(value).strip()
+
+
+def _build_dynamic_blocks(prompt_data: PromptData) -> dict:
+    """
+    Builds all automated blocks by looking at Prompt metadata.
+
+    Iterates through all prompt templates in the 'system' category.
+    If a prompt has 'data_field' in its metadata, it is considered a block
+    that should be resolved if the corresponding data exists in PromptData.
+    """
+    blocks = {}
+    system_prompts = prompt_manager._prompts.get("system", {})
+
+    for prompt_key in system_prompts.keys():
+        meta = prompt_manager.get_meta("system", prompt_key)
+        field_name = meta.get("data_field")
+
+        if not field_name:
+            continue
+
+        raw_value = getattr(prompt_data, field_name, None)
+        value = _coerce_block_value(raw_value)
+        if not value:
+            blocks[prompt_key] = ""
+            continue
+
+        # e.g. load 'system/personality_block' with personality=value, value=value
+        result = load_and_format(
+            f"system/{prompt_key}",
+            prompt_data=prompt_data,
+            value=value,
+            **{field_name: value},
+        )
+        blocks[prompt_key] = (
+            (result + "\n\n")
+            if result and not result.endswith("\n\n")
+            else result or ""
+        )
+
+    return blocks
 
 
 def _get_gender_details(prompt_data: PromptData) -> str:
@@ -495,44 +532,12 @@ def _build_behavior_prompt(
             block or f"\n        Conditions:\n        {conditions_block}"
         )
 
-    # Build ALL optional blocks to ensure full context is present
-    gender_details_block = _get_gender_details(prompt_data)
-    profession_block = _get_optional_block(
-        "Your profession", prompt_data.profession, prompt_data
-    )
-    guidelines_block = _get_behavioral_guidelines(prompt_data)
-    previous_memory_block = _get_optional_block(
-        "Summary from your previous session", prompt_data.previous_memory, prompt_data
-    )
-    core_memories_block = _get_optional_block(
-        "Your core memories influencing your beliefs & actions",
-        prompt_data.core_memories,
-        prompt_data,
-    )
-    personality_block = _get_optional_block(
-        "Your personality", prompt_data.personality, prompt_data
-    )
-    starting_state_block = _get_optional_block(
-        "Your current thoughts", prompt_data.starting_state, prompt_data
-    )
-    emotional_needs_block = _get_optional_block(
-        "Your emotional needs from this counselling session",
-        prompt_data.emotional_needs,
-        prompt_data,
-    )
-    tone_block = _get_optional_block(
-        "Your talking style/tone", prompt_data.tone, prompt_data
-    )
-    life_history = _get_optional_block(
-        "your life history is", prompt_data.life_history_summary, prompt_data
-    )
-    response_length = _get_optional_block(
-        "your response length should be", prompt_data.response_length, prompt_data
-    )
-    agent_dialogues = _get_optional_block(
-        "use these dialogues for reference", prompt_data.agent_dialogues, prompt_data
-    )
+    # Build automated blocks from PromptData mapping
+    dynamic_blocks = _build_dynamic_blocks(prompt_data)
 
+    # Legacy/Computed blocks not in the auto-mapping
+    gender_details_block = _get_gender_details(prompt_data)
+    guidelines_block = _get_behavioral_guidelines(prompt_data)
     competency_block = _get_competency_block(prompt_data.competency, prompt_data)
 
     behavior_prompt = load_and_format(
@@ -541,23 +546,14 @@ def _build_behavior_prompt(
         base_system_prompt=base_system_prompt.strip(),
         character_details=character_details,
         gender_details_block=gender_details_block,
-        profession_block=profession_block,
         language_block=language_block,
         backstory_block=backstory_block,
         retrieved_context_block=retrieved_context_block,
-        life_history=life_history,
         guidelines_block=guidelines_block,
-        previous_memory_block=previous_memory_block,
-        core_memories_block=core_memories_block,
-        personality_block=personality_block,
-        starting_state_block=starting_state_block,
-        emotional_needs_block=emotional_needs_block,
-        tone_block=tone_block,
         custom_context_block=custom_context_block,
-        response_length=response_length,
-        agent_dialogues=agent_dialogues,
         competency_block=competency_block,
         conditions_section=conditions_section,
+        **dynamic_blocks,
     )
 
     return SystemMessage(content=(behavior_prompt or "").strip())
@@ -583,36 +579,8 @@ def _build_full_prompt(
     Returns:
         A SystemMessage with the comprehensive prompt.
     """
-    # Use helper functions to build optional sections
     gender_details_block = _get_gender_details(prompt_data)
-    profession_block = _get_optional_block(
-        "Your profession", prompt_data.profession, prompt_data
-    )
     guidelines_block = _get_behavioral_guidelines(prompt_data)
-    previous_memory_block = _get_optional_block(
-        "Summary from your previous session",
-        prompt_data.previous_memory,
-        prompt_data,
-    )
-    core_memories_block = _get_optional_block(
-        "Your core memories influencing your beliefs & actions",
-        prompt_data.core_memories,
-        prompt_data,
-    )
-    personality_block = _get_optional_block(
-        "Your personality", prompt_data.personality, prompt_data
-    )
-    starting_state_block = _get_optional_block(
-        "Your current thoughts", prompt_data.starting_state, prompt_data
-    )
-    emotional_needs_block = _get_optional_block(
-        "Your emotional needs from this counselling session",
-        prompt_data.emotional_needs,
-        prompt_data,
-    )
-    tone_block = _get_optional_block(
-        "Your talking style/tone", prompt_data.tone, prompt_data
-    )
 
     # Build language block (samples or instruction for non-English)
     language_block = _get_language_block(prompt_data, language_code)
@@ -620,16 +588,6 @@ def _build_full_prompt(
     # Format custom fields dynamically
     custom_fields_block = _format_custom_fields(
         prompt_data.custom_fields or [], prompt_data
-    )
-
-    life_history = _get_optional_block(
-        "your life history is", prompt_data.life_history_summary, prompt_data
-    )
-    response_length = _get_optional_block(
-        "your response length should be", prompt_data.response_length, prompt_data
-    )
-    agent_dialogues = _get_optional_block(
-        "use these dialogues for reference", prompt_data.agent_dialogues, prompt_data
     )
 
     competency_block = _get_competency_block(prompt_data.competency, prompt_data)
@@ -647,7 +605,14 @@ def _build_full_prompt(
             else block or f"## Additional Context\n{retrieved_context}\n\n"
         )
 
-    # Assemble the full detailed prompt
+    dynamic_blocks = _build_dynamic_blocks(prompt_data)
+
+    context_block = ""
+    if prompt_data.context and str(prompt_data.context).strip():
+        context_block = (
+            f"**Your current context:**\n{str(prompt_data.context).strip()}\n\n"
+        )
+
     system_prompt = load_and_format(
         "system/full_prompt",
         prompt_data=prompt_data,
@@ -657,24 +622,13 @@ def _build_full_prompt(
         gender=prompt_data.gender or "",
         gender_details_block=gender_details_block,
         current_location=prompt_data.current_location or "",
-        profession_block=profession_block,
         language_block=language_block,
-        context_block=_get_optional_block(
-            "Your current context", prompt_data.context, prompt_data
-        ),
+        context_block=context_block,
         retrieved_context_block=retrieved_context_block,
         guidelines_block=guidelines_block,
-        previous_memory_block=previous_memory_block,
-        life_history=life_history,
-        core_memories_block=core_memories_block,
-        personality_block=personality_block,
-        starting_state_block=starting_state_block,
-        emotional_needs_block=emotional_needs_block,
-        tone_block=tone_block,
         custom_fields_block=custom_fields_block,
-        response_length=response_length,
-        agent_dialogues=agent_dialogues,
         competency_block=competency_block,
+        **dynamic_blocks,
     )
 
     return SystemMessage(content=(system_prompt or "").strip())

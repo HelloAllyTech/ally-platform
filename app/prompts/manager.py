@@ -30,6 +30,7 @@ class PromptManager:
         e.g. system/base_role_instruction.txt under app/prompts/
         """
         self._prompts = {}
+        self._meta: Dict[str, Dict[str, dict]] = {}
         if not self.templates_dir.exists():
             logger.warning(f"Templates directory not found: {self.templates_dir}")
             return
@@ -39,11 +40,22 @@ class PromptManager:
                 continue
             file_key = subdir.name
             self._prompts[file_key] = {}
+            self._meta[file_key] = {}
+
+            # Load .txt templates
             for txt_file in subdir.glob("*.txt"):
                 prompt_key = txt_file.stem
                 try:
                     content = txt_file.read_text(encoding="utf-8")
                     self._prompts[file_key][prompt_key] = content
+                    # Load optional metadata if exists
+                    import json
+
+                    meta_path = subdir / "_meta" / f"{prompt_key}.meta.json"
+                    if meta_path.exists():
+                        self._meta[file_key][prompt_key] = json.loads(
+                            meta_path.read_text(encoding="utf-8")
+                        )
                     logger.info(f"Loaded prompt {file_key}/{prompt_key}.txt")
                 except Exception as e:
                     logger.error(f"Failed to load {txt_file}: {e}")
@@ -61,6 +73,10 @@ class PromptManager:
             return ""
 
         return template
+
+    def get_meta(self, file_key: str, prompt_key: str) -> dict:
+        """Retrieves metadata for a prompt."""
+        return self._meta.get(file_key, {}).get(prompt_key, {})
 
     def reload(self):
         """Reloads all prompts from disk."""

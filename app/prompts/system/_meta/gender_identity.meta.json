@@ -1,0 +1,6 @@
+{
+    "name": "Actor Gender Identity",
+    "kind": "block",
+    "description": "Block describing the actor's gender identity.",
+    "data_field": "gender_identity"
+}

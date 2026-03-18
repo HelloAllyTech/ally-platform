@@ -1,0 +1,6 @@
+{
+    "name": "Actor Profession",
+    "kind": "block",
+    "description": "Block describing the actor's profession.",
+    "data_field": "profession"
+}

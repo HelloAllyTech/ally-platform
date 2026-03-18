@@ -1,0 +1,5 @@
+{
+  "name": "System: Custom Field Item",
+  "kind": "block",
+  "description": "Template for rendering a single custom field (name/value) inside larger prompts."
+}

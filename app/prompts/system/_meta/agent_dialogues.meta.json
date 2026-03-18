@@ -1,0 +1,6 @@
+{
+    "name": "Actor Reference Dialogues",
+    "kind": "block",
+    "description": "Block describing reference dialogues for the agent.",
+    "data_field": "agent_dialogues"
+}

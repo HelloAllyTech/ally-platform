@@ -1,0 +1,5 @@
+{
+  "name": "System: Custom Context Intro",
+  "kind": "block",
+  "description": "Intro template for additional custom context fields included in the prompt."
+}

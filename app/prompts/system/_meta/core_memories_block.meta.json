@@ -1,0 +1,6 @@
+{
+    "name": "Actor Core Memories",
+    "kind": "block",
+    "description": "Block describing the actor's core memories.",
+    "data_field": "core_memories"
+}
