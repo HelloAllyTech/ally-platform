@@ -43,13 +43,13 @@ export const useSummaryState = (
     if (summaryData?.details?.summary) {
       setIsSummaryAvailable(true);
     }
-    setIsTranscriptAvailable(
-      !!(
-        summaryData?.details?.callInfo?.clientWordCount ||
-        summaryData?.details?.callInfo?.counselorWordCount
-      ),
-    );
   }, [summaryData]);
+
+  useEffect(() => {
+    if (summaryData?.details?.transcript) {
+      setIsTranscriptAvailable(true);
+    }
+  }, [summaryData?.details?.transcript]);
 
   // After the summary becomes available, keep showing loader for 3 seconds,
   // then reveal the summary content automatically.

@@ -454,7 +454,6 @@ export const CallSummaryScreen: React.FC<
         onMenuPress={showMenu}
         summaryName={summaryName}
         showShareSwitch={
-          Boolean(callId) &&
           isSummaryAvailable &&
           summaryStatus === ChatSummaryStatus.SUCCESS &&
           isTranscriptAvailable &&
