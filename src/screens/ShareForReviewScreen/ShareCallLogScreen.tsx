@@ -5,13 +5,14 @@ import {SimulationDetailRow, SimulationDetailsCard} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useShareScreenLogic} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation';
-import {ShareReviewLayout} from '@/screens/ShareSimulationScreen/components/ShareReviewLayout';
 import {
   useCreateScribeReviewMutation,
   useUpdateScribeReviewStatusMutation,
 } from '@/services/scribeReviewsApi';
 import {ReviewStatus} from '@/types';
 import {formatDateTime} from '@/utils';
+
+import {ShareReviewLayout} from './components';
 
 export const ShareCallLogScreen: React.FC<
   RootStackScreenProps<'ShareCallLog'>
