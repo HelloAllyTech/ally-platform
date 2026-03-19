@@ -5,6 +5,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {SimulationSummaryData} from '@/types';
 
 import {SimulationSummary, SimulationSummarySkeleton} from '../';
+import {getImprovementsWithRecommendations} from '../../utils/simulationSummary';
 
 interface SummaryTabProps {
   simulationDetails: SimulationSummaryData | null;
@@ -21,9 +22,10 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
     () => simulationDetails?.details?.summary?.feedback?.positives ?? [],
     [simulationDetails?.details?.summary?.feedback?.positives],
   );
+
   const improvements = useMemo(
-    () => simulationDetails?.details?.summary?.feedback?.improvements ?? [],
-    [simulationDetails?.details?.summary?.feedback?.improvements],
+    () => getImprovementsWithRecommendations(simulationDetails),
+    [simulationDetails],
   );
 
   return (

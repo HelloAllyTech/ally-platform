@@ -1,10 +1,28 @@
-import {SimulationEvent, SimulationSummaryData} from '@/types';
+import {FeedbackItem, SimulationEvent, SimulationSummaryData} from '@/types';
 import {formatDiffAsMMSS} from '@/utils';
 
 export type FormattedEvent = {
   time: string;
   event: string;
   score: number | null;
+};
+
+export const getImprovementsWithRecommendations = (
+  data: SimulationSummaryData | null,
+): (string | FeedbackItem)[] => {
+  const feedback = data?.details?.summary?.feedback;
+  const areasOfGrowth = feedback?.areasOfGrowth;
+
+  if (areasOfGrowth?.length) {
+    return areasOfGrowth
+      .filter(item => item.improvement)
+      .map(item => ({
+        text: item.improvement,
+        ...(item.recommendation ? {recommendation: item.recommendation} : {}),
+      }));
+  }
+
+  return feedback?.improvements ?? [];
 };
 
 export const formatSimulationKeyEvents = (
