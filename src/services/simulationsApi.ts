@@ -88,7 +88,7 @@ export const simulationsApi = api.injectEndpoints({
     getSimulationDetails: builder.query<SimulationSummaryData, {id: string}>({
       query: ({id}) => ({
         url: API_ROUTES.LEARN.SIMULATION_DETAILS(id),
-        // params: {enableRecommendations: true},
+        params: {enableRecommendations: true},
       }),
     }),
 
@@ -135,7 +135,7 @@ export const simulationsApi = api.injectEndpoints({
       query: ({scenarioSessionId}) => ({
         url: API_ROUTES.LEARN.END_SCENARIO_SESSION(scenarioSessionId),
         method: API_METHODS.POST,
-        // body: {enableRecommendations: true},
+        body: {enableRecommendations: true},
       }),
       invalidatesTags: [
         'SimulationCredits',

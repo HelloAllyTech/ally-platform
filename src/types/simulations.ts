@@ -202,6 +202,16 @@ export interface UpcomingScenarioResponse {
   currentSession?: CurrentSessionInfo;
 }
 
+export interface AreaOfGrowth {
+  improvement: string;
+  recommendation: string;
+}
+
+export interface FeedbackItem {
+  text: string;
+  recommendation?: string;
+}
+
 export interface SimulationDetails {
   createdAt?: string;
   updatedAt?: string;
@@ -213,6 +223,7 @@ export interface SimulationDetails {
     feedback?: {
       positives?: string[];
       improvements?: string[];
+      areasOfGrowth?: AreaOfGrowth[];
     };
     errorMessage?: string;
   };
