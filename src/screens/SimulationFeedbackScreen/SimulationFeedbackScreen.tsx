@@ -13,7 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
-import {CustomSwitch, FeedbackPopup, useToast} from '@/components';
+import {Button, CustomSwitch, FeedbackPopup, useToast} from '@/components';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
@@ -256,6 +256,16 @@ export const SimulationFeedbackScreen: React.FC<
     });
   };
 
+  const renderTryAnotherSimulation = () => {
+    return (
+      <Button
+        label={t('SimulationFeedback.tryAnother')}
+        onPress={handleSubmit}
+        customContainerStyle={styles.tryAnotherSimulationButton}
+      />
+    );
+  };
+
   const renderTitle = () => {
     return (
       <View style={styles.titleContainer}>
@@ -457,6 +467,12 @@ export const SimulationFeedbackScreen: React.FC<
             <CommentIcon width={20} height={20} color={colors.black} />
           </TouchableOpacity>
         )}
+      {activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
+        !fromLogs &&
+        !pathId &&
+        !caseId &&
+        simulationDetails &&
+        renderTryAnotherSimulation()}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
         onClose={hideFeedbackPopup}
