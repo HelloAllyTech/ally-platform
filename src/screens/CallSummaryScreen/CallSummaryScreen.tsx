@@ -369,12 +369,12 @@ export const CallSummaryScreen: React.FC<
 
   const tabs = useMemo(() => {
     const result = [
-      {key: SUMMARY_TAB_KEY, title: t('SimulationFeedback.tabs.sessionReview')},
+      {key: SUMMARY_TAB_KEY, title: t('CallSummary.header.subtitle')},
     ];
     if (showTranscriptTab) {
       result.push({
         key: TRANSCRIPT_TAB_KEY,
-        title: t('SimulationFeedback.tabs.annotatedTranscript'),
+        title: t('CallSummary.header.transcript'),
       });
     }
     return result;
@@ -414,7 +414,7 @@ export const CallSummaryScreen: React.FC<
     (props: Parameters<typeof TabBar>[0]) => (
       <TabBar
         {...props}
-        scrollEnabled
+        scrollEnabled={false}
         indicatorStyle={styles.tabBarIndicator}
         style={styles.tabBar}
         tabStyle={styles.tabBarTab}

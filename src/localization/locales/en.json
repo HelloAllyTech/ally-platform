@@ -226,7 +226,7 @@
   "CallSummary": {
     "enterDetail": "Enter detail",
     "header": {
-      "title": "Call",
+      "title": "Session",
       "subtitle": "Summary",
       "callSummary": "Call summary",
       "transcript": "Transcript",
