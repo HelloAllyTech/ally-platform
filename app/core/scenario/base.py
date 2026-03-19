@@ -90,7 +90,7 @@ class PromptData(BaseModel):
             '[{"counselor": "...", "actor": "..."}, ...].'
         ),
     )
-    knowledge_base: Optional[List[Dict[str, str]]] = Field(
+    knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
             "Key-description pairs for RAG-like retrieval. "
@@ -321,7 +321,7 @@ class Scenario(BaseModel):
                     "languageDialogueSamples"
                 )
                 or prompt_data_dict.get("language_dialogue_samples"),
-                "knowledge_base": prompt_data_dict.get("knowledgeBase"),
+                "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

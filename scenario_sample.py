@@ -27,7 +27,7 @@ SCENARIO_SAMPLE = {
             "sexualOrientation": "Heterosexual (straight)",
             "sessionBehaviorGuidelines": "Ahana should express her fears and anxieties openly. She may be hesitant at first but will gradually open up. She should show vulnerability about academic pressure and family expectations.",
             "previousMemory": "In our last session, we discussed your fear of disappointing your parents and you mentioned feeling trapped between meeting their expectations and being true to yourself. You were working on building confidence to have an honest conversation with them.",
-            "knowledgeBase": [
+            "knowledgeSources": [
                 {
                     "key": "school memories",
                     "description": "Ahana was bullied in 8th grade by a group of classmates who mocked her appearance and academic struggles. This experience made her anxious about peer judgment and contributed to her perfectionism as a coping mechanism.",

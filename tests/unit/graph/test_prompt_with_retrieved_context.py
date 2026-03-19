@@ -24,7 +24,7 @@ def _pd(**overrides):
         agent_goal=None,
         custom_fields=[],
         previous_memory=None,
-        knowledge_base=None,
+        knowledge_sources=None,
     )
     base.update(overrides)
     return PromptData(**base)

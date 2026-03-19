@@ -984,7 +984,7 @@ async def retrieve_knowledge(
     Retrieve relevant knowledge context based on the conversation.
 
     This node runs in parallel with process_events and detect_behaviors.
-    It uses the scenario's knowledge_base to identify which topics are
+    It uses the scenario's knowledge_sources to identify which topics are
     relevant to the current conversation via a structured LLM call, then
     stores the formatted descriptions in state for prompt enrichment.
 
@@ -1000,11 +1000,11 @@ async def retrieve_knowledge(
     if not scenario or not llm_client:
         return {"retrieved_context": None}
 
-    knowledge_base = getattr(scenario.prompt_data, "knowledge_base", None)
-    if not knowledge_base:
+    knowledge_sources = getattr(scenario.prompt_data, "knowledge_sources", None)
+    if not knowledge_sources:
         return {"retrieved_context": None}
 
-    knowledge_map = build_knowledge_map(knowledge_base)
+    knowledge_map = build_knowledge_map(knowledge_sources)
     if not knowledge_map:
         return {"retrieved_context": None}
 

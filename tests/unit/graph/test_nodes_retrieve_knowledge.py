@@ -52,7 +52,7 @@ class TestRetrieveKnowledgeNode:
 
     @pytest.mark.asyncio
     async def test_no_llm_client_returns_none(self):
-        pd = type("PD", (), {"knowledge_base": [{"key": "a", "description": "b"}]})()
+        pd = type("PD", (), {"knowledge_sources": [{"key": "a", "description": "b"}]})()
         scenario = type("S", (), {"prompt_data": pd})()
         result = await retrieve_knowledge(
             _make_state(), {"configurable": {"scenario": scenario}}
@@ -60,8 +60,8 @@ class TestRetrieveKnowledgeNode:
         assert result == {"retrieved_context": None}
 
     @pytest.mark.asyncio
-    async def test_no_knowledge_base_returns_none(self):
-        pd = type("PD", (), {"knowledge_base": None})()
+    async def test_no_knowledge_sources_returns_none(self):
+        pd = type("PD", (), {"knowledge_sources": None})()
         scenario = type("S", (), {"prompt_data": pd})()
         result = await retrieve_knowledge(
             _make_state(),
@@ -70,8 +70,8 @@ class TestRetrieveKnowledgeNode:
         assert result == {"retrieved_context": None}
 
     @pytest.mark.asyncio
-    async def test_empty_knowledge_base_returns_none(self):
-        pd = type("PD", (), {"knowledge_base": []})()
+    async def test_empty_knowledge_sources_returns_none(self):
+        pd = type("PD", (), {"knowledge_sources": []})()
         scenario = type("S", (), {"prompt_data": pd})()
         result = await retrieve_knowledge(
             _make_state(),
@@ -85,7 +85,7 @@ class TestRetrieveKnowledgeNode:
             {"key": "school memories", "description": "Bullied in 8th grade"},
             {"key": "family dynamics", "description": "Parents are strict"},
         ]
-        pd = type("PD", (), {"knowledge_base": kb})()
+        pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
 
         state = _make_state(
@@ -112,7 +112,7 @@ class TestRetrieveKnowledgeNode:
     @pytest.mark.asyncio
     async def test_no_relevant_keys_returns_none(self):
         kb = [{"key": "school memories", "description": "Bullied in 8th grade"}]
-        pd = type("PD", (), {"knowledge_base": kb})()
+        pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
 
         result = await retrieve_knowledge(
@@ -145,7 +145,7 @@ class TestRetrieveKnowledgeNodeErrorHandling:
     @pytest.mark.asyncio
     async def test_llm_failure_returns_none(self):
         kb = [{"key": "k", "description": "d"}]
-        pd = type("PD", (), {"knowledge_base": kb})()
+        pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
 
         result = await retrieve_knowledge(

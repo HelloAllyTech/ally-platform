@@ -18,7 +18,7 @@ class RelevantKeys(BaseModel):
 
 
 def build_knowledge_map(
-    knowledge_base: Optional[List[Dict[str, str]]],
+    knowledge_sources: Optional[List[Dict[str, str]]],
 ) -> Dict[str, str]:
     """
     Convert a list of key-description dicts into a lookup map.
@@ -26,11 +26,11 @@ def build_knowledge_map(
     Entries missing either ``key`` or ``description`` (or with empty values)
     are silently skipped so the caller never has to guard against bad data.
     """
-    if not knowledge_base:
+    if not knowledge_sources:
         return {}
 
     knowledge_map: Dict[str, str] = {}
-    for entry in knowledge_base:
+    for entry in knowledge_sources:
         if not isinstance(entry, dict):
             continue
         key = entry.get("key", "")
