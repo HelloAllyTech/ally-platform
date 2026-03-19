@@ -4,7 +4,10 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
-from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
+from app.core.scenario.simulation_instructions import (
+    SimulationBehaviorCategory,
+    StateMatchedInstruction,
+)
 
 
 def make_prompt_data(**overrides):
@@ -206,7 +209,10 @@ class TestPrompt:
         assert '""' not in content  # Empty strings should be filtered out
 
     def test_generate_system_message_empty_dialogues_in_state(self):
-        """Test state instruction with empty dialogues list."""
+        """
+        [Deprecated path] State with empty dialogues falls back to
+        instruction only.
+        """
         pd = make_prompt_data()
         behavior_instruction = SimulationBehaviorInstruction(
             category=SimulationBehaviorCategory.SHOULD_DO,
@@ -228,7 +234,10 @@ class TestPrompt:
         assert "say something similar to" not in content  # No dialogue options
 
     def test_generate_system_message_state_with_empty_string_dialogues(self):
-        """Test state instruction with empty string dialogues."""
+        """
+        [Deprecated path] Dialogues are no longer used (removed to prevent
+        repetition); only instruction is used.
+        """
         pd = make_prompt_data()
         behavior_instruction = SimulationBehaviorInstruction(
             category=SimulationBehaviorCategory.SHOULD_DO,
@@ -238,7 +247,7 @@ class TestPrompt:
         state_instruction = SimulationStateInstruction(
             state_id="1",
             instruction="Be anxious",
-            dialogues=["", "Valid dialogue", "", ""],  # Mixed empty and valid
+            dialogues=["", "Valid dialogue", "", ""],  # Dialogues are ignored
         )
         msg = generate_system_message(
             prompt_data=pd,
@@ -246,12 +255,17 @@ class TestPrompt:
             current_state=state_instruction,
         )
         content = msg.content
-        # Should only include non-empty dialogues
-        assert '"Valid dialogue"' in content
-        assert '""' not in content  # Empty strings should be filtered out
+        # Dialogues should NOT appear (removed to prevent repetition)
+        assert '"Valid dialogue"' not in content
+        assert "say something similar to" not in content
+        # Only instruction should be used
+        assert "Be anxious" in content
 
     def test_generate_system_message_none_values_handling(self):
-        """Test handling of None values in optional fields."""
+        """
+        [Deprecated path] None actors_responses and None dialogues are
+        handled without errors.
+        """
         pd = make_prompt_data()
         behavior_instruction = SimulationBehaviorInstruction(
             category=SimulationBehaviorCategory.SHOULD_DO,
@@ -276,6 +290,211 @@ class TestPrompt:
         assert "State 1" in content
         assert "Be anxious" in content
         assert "say something similar to" not in content  # No dialogue options
+
+    def test_state_matched_instructions_used_for_matching_state(self):
+        """
+        state_matched_instructions entry matching current state_id is
+        injected into the prompt.
+        """
+        pd = make_prompt_data()
+        bi = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_DO,
+            behaviors=["Validated experience"],
+            score=10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="1", agentInstruction="Stay guarded and withdrawn."
+                ),
+                StateMatchedInstruction(
+                    stateId="2", agentInstruction="Show cautious relief."
+                ),
+            ],
+        )
+        state = SimulationStateInstruction(stateId="2", scoreLower=0, scoreUpper=4)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=state
+        )
+        content = msg.content
+        assert "State 2" in content
+        assert "Show cautious relief." in content
+        assert "Stay guarded and withdrawn." not in content
+        assert "say something similar to" not in content
+
+    def test_state_matched_instructions_takes_precedence_over_deprecated_instruction(
+        self,
+    ):
+        """
+        state_matched_instructions overrides the deprecated state
+        instruction and dialogues.
+        """
+        pd = make_prompt_data()
+        bi = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_DO,
+            behaviors=["Validated experience"],
+            score=10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="1", agentInstruction="New per-behavior guidance."
+                ),
+            ],
+        )
+        state = SimulationStateInstruction(
+            stateId="1",
+            instruction="Old deprecated instruction",
+            dialogues=["Old deprecated dialogue"],
+        )
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=state
+        )
+        content = msg.content
+        assert "New per-behavior guidance." in content
+        assert "Old deprecated instruction" not in content
+        assert "Old deprecated dialogue" not in content
+
+    def test_state_matched_instructions_no_match_falls_back_to_deprecated_instruction(
+        self,
+    ):
+        """
+        When state_matched_instructions has no entry for current state,
+        falls back to deprecated state instruction.
+        """
+        pd = make_prompt_data()
+        bi = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_DO,
+            behaviors=["Validated experience"],
+            score=10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="3", agentInstruction="Instruction for state 3."
+                ),
+            ],
+        )
+        state = SimulationStateInstruction(
+            stateId="2",
+            instruction="Fallback deprecated instruction",
+        )
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=state
+        )
+        content = msg.content
+        assert "Fallback deprecated instruction" in content
+        assert "Instruction for state 3." not in content
+
+    def test_different_bis_use_their_own_state_matched_instructions(self):
+        """
+        Each behavior instruction resolves its own state_matched_instructions
+        independently.
+        """
+        pd = make_prompt_data()
+        bi_should_do = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_DO,
+            behaviors=["Validated experience"],
+            score=10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="1", agentInstruction="Respond with cautious warmth."
+                ),
+            ],
+        )
+        bi_should_not_do = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_NOT_DO,
+            behaviors=["Invalidated feelings"],
+            score=-10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="1", agentInstruction="Shut down and become defensive."
+                ),
+            ],
+        )
+        state = SimulationStateInstruction(stateId="1", scoreLower=None, scoreUpper=-1)
+        msg = generate_system_message(
+            prompt_data=pd,
+            behavior_instructions=[bi_should_do, bi_should_not_do],
+            current_state=state,
+        )
+        content = msg.content
+        assert "Respond with cautious warmth." in content
+        assert "Shut down and become defensive." in content
+
+    def test_state_matched_instructions_resolved_from_score(self):
+        """
+        Test that score-based state resolution works with
+        state_matched_instructions.
+        """
+        from app.core.graph.nodes import _resolve_current_state
+
+        pd = make_prompt_data()
+        bi = SimulationBehaviorInstruction(
+            category=SimulationBehaviorCategory.SHOULD_DO,
+            behaviors=["Validated experience"],
+            score=10,
+            state_matched_instructions=[
+                StateMatchedInstruction(
+                    stateId="1", agentInstruction="Stay guarded and withdrawn."
+                ),
+                StateMatchedInstruction(
+                    stateId="2", agentInstruction="Show cautious relief."
+                ),
+                StateMatchedInstruction(
+                    stateId="3", agentInstruction="Begin to open up slightly."
+                ),
+            ],
+        )
+
+        # Define state instructions with score ranges matching scenario_sample2
+        state_instructions = [
+            SimulationStateInstruction(stateId="1", scoreLower=None, scoreUpper=-1),
+            SimulationStateInstruction(stateId="2", scoreLower=0, scoreUpper=4),
+            SimulationStateInstruction(stateId="3", scoreLower=5, scoreUpper=9),
+        ]
+
+        # Test score -5 resolves to state 1
+        current_state = _resolve_current_state(state_instructions, -5)
+        assert current_state.state_id == "1"
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=current_state
+        )
+        content = msg.content
+        assert "State 1" in content
+        assert "Stay guarded and withdrawn." in content
+        assert "Show cautious relief." not in content
+        assert "Begin to open up slightly." not in content
+
+        # Test score 2 resolves to state 2
+        current_state = _resolve_current_state(state_instructions, 2)
+        assert current_state.state_id == "2"
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=current_state
+        )
+        content = msg.content
+        assert "State 2" in content
+        assert "Show cautious relief." in content
+        assert "Stay guarded and withdrawn." not in content
+        assert "Begin to open up slightly." not in content
+
+        # Test score 7 resolves to state 3
+        current_state = _resolve_current_state(state_instructions, 7)
+        assert current_state.state_id == "3"
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=current_state
+        )
+        content = msg.content
+        assert "State 3" in content
+        assert "Begin to open up slightly." in content
+        assert "Stay guarded and withdrawn." not in content
+        assert "Show cautious relief." not in content
+
+        # Test score 10 (outside all ranges) returns None and uses natural fallback
+        current_state = _resolve_current_state(state_instructions, 10)
+        assert current_state is None
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[bi], current_state=current_state
+        )
+        content = msg.content
+        assert "State" not in content  # No state label when no state
+        assert (
+            "respond naturally based on your character" in content
+        )  # Natural fallback
 
     def test_generate_system_message_non_english_no_samples_uses_multilingual_template(
         self,

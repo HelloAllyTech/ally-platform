@@ -27,8 +27,35 @@ class SimulationBehaviorCategory(str, Enum):
     SHOULD_NOT_DO = "SHOULD_NOT_DO"
 
 
+class StateMatchedInstruction(BaseModel):
+    """Agent response instruction for a specific state, scoped to one behavior."""
+
+    state_id: str = Field(
+        ...,
+        alias="stateId",
+        description=(
+            "The state ID this instruction applies to "
+            "(matches SimulationStateInstruction.state_id)"
+        ),
+    )
+    agent_instruction: str = Field(
+        ...,
+        alias="agentInstruction",
+        description=(
+            "How the agent should respond when this behavior is detected "
+            "in this state. Use open-ended behavioral guidance to avoid "
+            "repetitive responses."
+        ),
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class SimulationBehaviorInstruction(BaseModel):
-    """Describes what the helper should or should not do, and the actor's response."""
+    """
+    Describes what the helper should or should not do, and the
+    agent's response per state.
+    """
 
     behavior_instruction_id: Optional[str] = Field(
         default=None,
@@ -43,10 +70,20 @@ class SimulationBehaviorInstruction(BaseModel):
         ..., description="List of behavior labels (e.g. 'Validated experience')"
     )
     score: int = Field(..., description="Score assigned to this behavior instruction")
+    state_matched_instructions: Optional[List[StateMatchedInstruction]] = Field(
+        default=None,
+        alias="stateMatchedInstructions",
+        description=(
+            "Per-state agent instructions. When this behavior is detected, "
+            "the entry matching the current state_id is injected into the "
+            "prompt."
+        ),
+    )
     actors_responses: Optional[List[str]] = Field(
         default=None,
         alias="actorsResponses",
-        description="The actor's responses when these behaviors are exhibited",
+        description="[DEPRECATED] Use state_matched_instructions instead. "
+        "Will be removed in a future version.",
     )
     model: str = Field(
         default="gpt-4o-mini",
@@ -187,12 +224,14 @@ class SimulationBehaviorInstruction(BaseModel):
 
 
 class SimulationStateInstruction(BaseModel):
-    """Describes an ordered agent state with instruction and optional dialogues."""
+    """
+    Defines a score-bounded state. Agent response instructions live on
+    SimulationBehaviorInstruction.
+    """
 
     state_id: str = Field(
         ..., alias="stateId", description="State identifier (e.g. '1')"
     )
-    instruction: str = Field(..., description="What the agent should do in this state")
     score_lower: Optional[int] = Field(
         default=None,
         alias="scoreLower",
@@ -203,9 +242,21 @@ class SimulationStateInstruction(BaseModel):
         alias="scoreUpper",
         description="Upper score limit for this state (None represents +infinity)",
     )
+    instruction: Optional[str] = Field(
+        default=None,
+        description=(
+            "[DEPRECATED] Use StateMatchedInstruction on each "
+            "SimulationBehaviorInstruction instead. Will be removed in a "
+            "future version."
+        ),
+    )
     dialogues: Optional[List[str]] = Field(
         default=None,
-        description="Specific dialogue lines the agent can use in this state",
+        description=(
+            "[DEPRECATED] Use StateMatchedInstruction on each "
+            "SimulationBehaviorInstruction instead. Will be removed in a "
+            "future version."
+        ),
     )
 
     model_config = ConfigDict(populate_by_name=True)

@@ -677,6 +677,11 @@ async def generate_response(
     """
     logger.info("Generating response")
 
+    # Get score_keeper at the start for accurate score tracking
+    score_keeper = None
+    if config and "configurable" in config:
+        score_keeper = config["configurable"].get("score_keeper")
+
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
 
@@ -698,9 +703,11 @@ async def generate_response(
     if scenario is not None:
         # Log prompt mode for observability
         if not next_instruction:
-            # Resolve current state for behavior/default modes
+            # Resolve current state for behavior/default modes using ScoreKeeper
+            current_score = score_keeper.get_total_score() if score_keeper else 0
+
             current_state = _resolve_current_state(
-                scenario.state_instructions, state.current_score
+                scenario.state_instructions, current_score
             )
 
         # Let generate_system_message handle routing based on parameters

@@ -71,7 +71,24 @@ SCENARIO_SAMPLE = {
                     "Explained confidentiality",
                 ],
                 "score": 10,
-                "actorsResponses": ["I am open to exploring therapy..."],
+                "stateMatchedInstructions": [
+                    {
+                        "stateId": "1",
+                        "agentInstruction": "Acknowledge the counselor's effort but remain withdrawn. Express cautious, guarded acceptance rather than warmth.",
+                    },
+                    {
+                        "stateId": "2",
+                        "agentInstruction": "Respond with mild relief. Let a hint of openness show but stay somewhat uncertain about where the conversation is going.",
+                    },
+                    {
+                        "stateId": "3",
+                        "agentInstruction": "Respond with visible appreciation. Share a small personal detail to signal growing trust in the counselor.",
+                    },
+                    {
+                        "stateId": "4",
+                        "agentInstruction": "Respond warmly and with genuine gratitude. Show that the counselor's approach has made a real difference.",
+                    },
+                ],
             },
             {
                 "category": "SHOULD_NOT_DO",
@@ -80,7 +97,24 @@ SCENARIO_SAMPLE = {
                     "Asked closed ended questions",
                 ],
                 "score": -10,
-                "actorsResponses": ["I am open to exploring therapy..."],
+                "stateMatchedInstructions": [
+                    {
+                        "stateId": "1",
+                        "agentInstruction": "Become more closed off and monosyllabic. Make it clear the counselor is not connecting with you.",
+                    },
+                    {
+                        "stateId": "2",
+                        "agentInstruction": "Pull back from the slight openness you had. Express that you feel misunderstood.",
+                    },
+                    {
+                        "stateId": "3",
+                        "agentInstruction": "Show disappointment and retreat slightly. Indicate you were opening up but this response set you back.",
+                    },
+                    {
+                        "stateId": "4",
+                        "agentInstruction": "Express hurt or confusion. Signal that the counselor's response felt dismissive despite the progress made.",
+                    },
+                ],
             },
             {
                 "category": "SHOULD_NOT_DO",
@@ -90,42 +124,46 @@ SCENARIO_SAMPLE = {
                     "Rushed client",
                 ],
                 "score": -10,
-                "actorsResponses": ["Why are you talking to me like that?"],
+                "stateMatchedInstructions": [
+                    {
+                        "stateId": "1",
+                        "agentInstruction": "Shut down completely. Respond with minimal words and clear discomfort.",
+                    },
+                    {
+                        "stateId": "2",
+                        "agentInstruction": "Become defensive. Express that you feel pushed or dismissed.",
+                    },
+                    {
+                        "stateId": "3",
+                        "agentInstruction": "React with visible hurt. Pull back the progress you had made and become guarded again.",
+                    },
+                    {
+                        "stateId": "4",
+                        "agentInstruction": "Respond with shock or sadness. Make clear this behavior feels like a betrayal of the trust built so far.",
+                    },
+                ],
             },
         ],
         "stateInstructions": [
             {
                 "stateId": "1",
-                "instruction": "Become shut down",
                 "scoreLower": None,
                 "scoreUpper": -1,
-                "dialogues": [
-                    "Uh... I don't really get how just talking is supposed to... help.",
-                    "I mean... I'm saying things, but I don't know what this is doing.",
-                    "Maybe I'm missing something, but... I don't see how this works.",
-                    "I thought there'd be, um... more than just me talking.",
-                ],
             },
             {
                 "stateId": "2",
-                "instruction": "Express mild doubt about if talking is helping",
                 "scoreLower": 0,
                 "scoreUpper": 4,
-                "dialogues": [],
             },
             {
                 "stateId": "3",
-                "instruction": "Express mild willingness to disclose and give talk therapy a shot",
                 "scoreLower": 5,
                 "scoreUpper": 9,
-                "dialogues": [],
             },
             {
                 "stateId": "4",
-                "instruction": "Express strong commitment towards continuing therapy for long term improvement",
                 "scoreLower": 10,
                 "scoreUpper": None,
-                "dialogues": [],
             },
         ],
         "events": [

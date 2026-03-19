@@ -276,6 +276,98 @@ def _format_custom_fields(
     return "".join(formatted_blocks)
 
 
+def _resolve_state_continuation(
+    bi: SimulationBehaviorInstruction,
+    current_state: Optional[SimulationStateInstruction],
+) -> str:
+    """
+    Resolve the state_continuation string for a single behavior instruction.
+
+    Resolution priority:
+    1. state_matched_instructions on the behavior instruction matched by
+       current state_id (new approach — per behavior-state pair).
+    2. instruction on the state instruction
+       (deprecated fallback for backward compatibility;
+       dialogues removed to prevent repetition).
+    3. Empty string — caller should use the natural fallback.
+
+    The returned string is formatted as ` - (State N) <text>`
+    to match the behavior_condition_then_state.txt template:
+    `Then, continue with{state_continuation}`.
+
+    Args:
+        bi: The behavior instruction being evaluated.
+        current_state: The current state resolved from the cumulative score.
+
+    Returns:
+        state_continuation string, or empty string if no state guidance applies.
+    """
+    if current_state is None:
+        return ""
+
+    state_label = f"State {current_state.state_id}"
+
+    # New approach: look up agent_instruction for the current state in this BI
+    if bi.state_matched_instructions:
+        matched = next(
+            (
+                smi
+                for smi in bi.state_matched_instructions
+                if smi.state_id == current_state.state_id
+            ),
+            None,
+        )
+        if matched:
+            return f" - ({state_label}) {matched.agent_instruction}"
+
+    # Deprecated fallback: use instruction from the state
+    # (dialogues removed to prevent repetition)
+    if current_state.instruction:
+        return f" - ({state_label}) {current_state.instruction}"
+
+    return ""
+
+
+def _get_then_clause(
+    bi: SimulationBehaviorInstruction,
+    current_state: Optional[SimulationStateInstruction],
+    prompt_data: Optional[PromptData] = None,
+) -> str:
+    """
+    Build the 'then' clause for a behavior condition block.
+
+    Resolves state_continuation per-BI via _resolve_state_continuation (using
+    state_matched_instructions), then delegates to the appropriate prompt template.
+
+    Args:
+        bi: The behavior instruction being evaluated.
+        current_state: The current state resolved from the cumulative score.
+        prompt_data: Optional PromptData for template resolution (dashboard override).
+
+    Returns:
+        Formatted 'Then' clause string.
+    """
+    state_continuation = _resolve_state_continuation(bi, current_state)
+
+    if state_continuation:
+        then_clause = load_and_format(
+            "system/behavior_condition_then_state",
+            prompt_data=prompt_data,
+            state_continuation=state_continuation,
+        )
+        if not then_clause or not then_clause.strip():
+            then_clause = f"Then, continue with{state_continuation}"
+        return then_clause
+
+    then_clause = load_and_format(
+        "system/behavior_condition_then_natural",
+        prompt_data=prompt_data,
+    )
+    if not then_clause or not then_clause.strip():
+        then_clause = "Then, respond naturally based on your character."
+    return then_clause
+
+
 def _build_behavior_conditions_block(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
@@ -284,12 +376,13 @@ def _build_behavior_conditions_block(
     """
     Build the behavior-based conditions block for the prompt.
 
-    Generates conditional instructions based on helper behaviors and actor responses,
-    combined with the current state's dialogues.
+    For each behavior instruction, generates a condition/then pair:
+    - Condition: classifies the helper's previous utterance against the behaviors list.
+    - Then: resolved per-BI via _get_then_clause (state_matched_instructions first,
+      deprecated instruction/dialogues as fallback).
 
     Args:
-        behavior_instructions: List of behavior instructions with categories,
-            behaviors, and actor responses.
+        behavior_instructions: List of behavior instructions to evaluate.
         current_state: Optional current state instruction (resolved by score).
         prompt_data: Optional PromptData for template resolution (dashboard override).
 
@@ -299,25 +392,6 @@ def _build_behavior_conditions_block(
     if not behavior_instructions:
         return ""
 
-    # Build the state continuation text from the current state
-    state_continuation = ""
-    if current_state:
-        state_label = f"State {current_state.state_id}"
-
-        dialogue_options = []
-        if current_state.dialogues:
-            dialogue_options = [d for d in current_state.dialogues if d and d.strip()]
-
-        if dialogue_options:
-            dialogues_str = " OR ".join([f'"{d}"' for d in dialogue_options])
-            state_continuation = (
-                f" - ({state_label}) {current_state.instruction} "
-                f"and say something similar to: {dialogues_str}"
-            )
-        elif current_state.instruction:
-            state_continuation = f" - ({state_label}) {current_state.instruction}"
-
-    # Build condition blocks from behavior instructions
     condition_blocks = []
     for bi in behavior_instructions:
         if not bi.behaviors:
@@ -339,21 +413,7 @@ def _build_behavior_conditions_block(
                 f"If the previous helper utterance can be classified as {behaviors_str}"
             )
 
-        if state_continuation:
-            then_clause = load_and_format(
-                "system/behavior_condition_then_state",
-                prompt_data=prompt_data,
-                state_continuation=state_continuation,
-            )
-            if not then_clause or not then_clause.strip():
-                then_clause = f"Then, continue with{state_continuation}"
-        else:
-            then_clause = load_and_format(
-                "system/behavior_condition_then_natural",
-                prompt_data=prompt_data,
-            )
-            if not then_clause or not then_clause.strip():
-                then_clause = "Then, respond naturally based on your character."
+        then_clause = _get_then_clause(bi, current_state, prompt_data)
 
         condition_blocks.append(f"{condition.strip()}\n{then_clause.strip()}")
 
