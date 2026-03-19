@@ -15,6 +15,10 @@ from app.core.scenario.simulation_instructions import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
+from app.core.constants import VisibilityType
+from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
+from app.core.events.event_types.guardrail.schemas import GuardrailData
+from app.core.branching_instructions.base import BranchingInstruction
 
 logger = get_logger(__name__)
 
@@ -218,6 +222,48 @@ class Scenario(BaseModel):
         # Parse simulation instructions (same level as events)
         behavior_instructions = raw.get("behaviorInstructions")
         state_instructions = raw.get("stateInstructions")
+        
+        # Parse guardrails array and build one GuardrailEvent per entry
+        guardrail_events = []
+        guardrails_raw = raw.get("guardrails") or []
+        if isinstance(guardrails_raw, list):
+            for i, g in enumerate(guardrails_raw):
+                try:
+                    helper_dialogue = g.get("helperDialogue", "")
+                    actor_dialogue = g.get("actorDialogue", "")
+
+                    if not helper_dialogue or not actor_dialogue:
+                        logger.warning(
+                            f"Skipping guardrail at index {i}: "
+                            f"missing helperDialogue or actorDialogue"
+                        )
+                        continue
+
+                    g_event = GuardrailEvent.create(
+                        event_id=f"guardrail-{i}",
+                        data=GuardrailData(
+                            helper_dialogue=helper_dialogue,
+                            actor_dialogue=actor_dialogue,
+                        ),
+                        embedding_client=embedding_client,
+                        branching_instruction=BranchingInstruction.create(
+                            actor_dialogue, prompt_data=None
+                        ),
+                        score=0,
+                        visibility_type=VisibilityType.PASSIVE,
+                        emoji=None,
+                        emoji_message=None,
+                    )
+                    guardrail_events.append(g_event)
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to build guardrail event at index {i}: {e}"
+                    )
+
+            if guardrail_events:
+                logger.info(f"Built {len(guardrail_events)} guardrail events")
+                built_events = built_events + guardrail_events
 
         return cls(
             scenarioName=normalized["scenarioName"],
