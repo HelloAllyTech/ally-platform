@@ -88,6 +88,7 @@ export const simulationsApi = api.injectEndpoints({
     getSimulationDetails: builder.query<SimulationSummaryData, {id: string}>({
       query: ({id}) => ({
         url: API_ROUTES.LEARN.SIMULATION_DETAILS(id),
+        params: {enableRecommendations: true},
       }),
     }),
 
