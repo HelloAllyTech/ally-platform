@@ -176,6 +176,21 @@ class Settings(BaseSettings):
             "no cache, no timeout (old behavior)."
         ),
     )
+    EVENT_DETECTION_CONCURRENCY_LIMIT: int = Field(
+        default=8,
+        description=(
+            "Maximum number of event or behavior detection coroutines to run "
+            "concurrently. Prevents remote model and embedding requests from "
+            "spiking tail latency under heavy scenarios."
+        ),
+    )
+    KNOWLEDGE_RETRIEVAL_CACHE_SIZE: int = Field(
+        default=256,
+        description=(
+            "Maximum number of recent knowledge retrieval results to cache in "
+            "memory per worker process."
+        ),
+    )
 
     # Scenario report generation settings
     REPORT_CONCURRENCY_LIMIT: int = Field(

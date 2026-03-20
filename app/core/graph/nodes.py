@@ -114,6 +114,9 @@ async def _detect_events(
         - new_events: List of detected events (without timestamps)
     """
 
+    concurrency_limit = max(1, settings.EVENT_DETECTION_CONCURRENCY_LIMIT)
+    semaphore = asyncio.Semaphore(concurrency_limit)
+
     async def detect_single_event(event: BaseEvent):
         """
         Detect a single event with error handling and timeout.
@@ -122,17 +125,19 @@ async def _detect_events(
         This improves reliability and prevents cascading delays.
         """
         try:
-            if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
-                # Add timeout to prevent slow API calls from blocking everything
-                # 10 seconds is reasonable for API calls (binary classifier, embeddings)
-                result = await asyncio.wait_for(
-                    event.detect_event(chat_messages), timeout=10.0
-                )
-            else:
-                # Old behavior: no timeout
-                result = await event.detect_event(chat_messages)
-            if result:
-                return event
+            async with semaphore:
+                if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
+                    # Add timeout to prevent slow API calls from blocking everything
+                    # 10s is reasonable to prevent slow API calls (binary classifier,
+                    # embeddings) from blocking the simulation flow.
+                    result = await asyncio.wait_for(
+                        event.detect_event(chat_messages), timeout=10.0
+                    )
+                else:
+                    # Old behavior: no timeout
+                    result = await event.detect_event(chat_messages)
+                if result:
+                    return event
         except asyncio.TimeoutError:
             logger.warning(
                 f"Event {event.event_id} detection timed out after 10s, skipping"
@@ -457,12 +462,17 @@ async def resolve_branching_instruction(
                     # falling back to llm_config if not specified
                     language_code = DEFAULT_LANGUAGE_CODE
                     llm_config_for_branching = None
+                    branching_llm_client = None
                     if config and "configurable" in config:
                         scenario = config["configurable"].get("scenario")
                         if scenario and hasattr(scenario, "language_config"):
                             language_code = scenario.language_config.language_code
                             llm_config_for_branching = (
                                 scenario.language_config.branching_llm_config
+                            )
+                        if llm_config_for_branching is None:
+                            branching_llm_client = config["configurable"].get(
+                                "llm_client"
                             )
 
                     # Lazily resolve llm_response tags if present (BLOCKING operation)
@@ -472,18 +482,26 @@ async def resolve_branching_instruction(
                             "(this may block on LLM call)"
                         )
                         with timing.operation("LLM resolution (blocking)"):
-                            await instruction.resolve_llm_responses(
-                                llm_config=llm_config_for_branching,
-                                language_code=language_code,
-                            )
+                            resolve_kwargs = {
+                                "llm_config": llm_config_for_branching,
+                                "language_code": language_code,
+                            }
+                            if branching_llm_client is not None:
+                                resolve_kwargs["llm_client"] = branching_llm_client
+                            await instruction.resolve_llm_responses(**resolve_kwargs)
 
                     # Use the branching instruction content
                     # (with llm_response tags resolved)
+                    dynamic_kwargs = {
+                        "messages": state.messages,
+                        "llm_config": llm_config_for_branching,
+                        "language_code": language_code,
+                    }
+                    if branching_llm_client is not None:
+                        dynamic_kwargs["llm_client"] = branching_llm_client
                     next_instruction = (
                         await instruction.resolve_dynamic_branching_instruction(
-                            messages=state.messages,
-                            llm_config=llm_config_for_branching,
-                            language_code=language_code,
+                            **dynamic_kwargs
                         )
                     )
 
@@ -569,14 +587,18 @@ async def _detect_behavior_instructions(
         List of BehaviorInstructionFeedbackData for detected behaviors
     """
 
+    concurrency_limit = max(1, settings.EVENT_DETECTION_CONCURRENCY_LIMIT)
+    semaphore = asyncio.Semaphore(concurrency_limit)
+
     async def detect_with_timeout(
         bi: SimulationBehaviorInstruction,
     ) -> Optional[BehaviorInstructionFeedbackData]:
         try:
-            return await asyncio.wait_for(
-                _detect_single_behavior_instruction(bi, chat_messages),
-                timeout=10.0,
-            )
+            async with semaphore:
+                return await asyncio.wait_for(
+                    _detect_single_behavior_instruction(bi, chat_messages),
+                    timeout=10.0,
+                )
         except asyncio.TimeoutError:
             logger.warning(
                 f"Behavior instruction {bi.behavior_instruction_id or ''} "

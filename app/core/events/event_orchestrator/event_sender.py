@@ -3,6 +3,7 @@ Event sending logic for external communication.
 Handles sending events to UI and Core messaging systems.
 """
 
+import asyncio
 from typing import TYPE_CHECKING, List, Optional, Set
 
 from livekit import rtc
@@ -311,6 +312,8 @@ class EventSender:
                 f"Sending {len(events_to_send_to_core)} events to "
                 f"Core messaging system"
             )
+
+            send_tasks = []
             for event in events_to_send_to_core:
                 logger.debug(
                     f"Sending event to core: {event.event_id} "
@@ -322,6 +325,11 @@ class EventSender:
                 core_event_message = CoreEventMessageType.create(
                     room_id=room.name, event_data=event_dict
                 )
-                await msg_event_queue.send_message(
-                    message_body=core_event_message.model_dump_json()
+                send_tasks.append(
+                    msg_event_queue.send_message(
+                        message_body=core_event_message.model_dump_json()
+                    )
                 )
+
+            if send_tasks:
+                await asyncio.gather(*send_tasks, return_exceptions=True)

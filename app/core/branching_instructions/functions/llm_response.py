@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.logger import get_logger
 from app.llms import create_llm_client
+from app.llms.base import BaseLLMClient
 
 logger = get_logger(__name__)
 
@@ -24,6 +25,7 @@ async def generate_llm_response(
     content: str,
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
+    llm_client: Optional[BaseLLMClient] = None,
 ) -> str:
     """
     Generate an LLM response for the given content.
@@ -55,11 +57,11 @@ async def generate_llm_response(
         return ""
 
     try:
-        # Create LLM client with provided config or defaults
-        llm_client = create_llm_client(
-            llm_config=llm_config,
-            language_code=language_code,
-        )
+        if llm_client is None:
+            llm_client = create_llm_client(
+                llm_config=llm_config,
+                language_code=language_code,
+            )
         llm_instance = llm_client.llm_instance
 
         logger.debug(f"Generating LLM response for content: {content[:100]}...")
