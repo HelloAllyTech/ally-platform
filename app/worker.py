@@ -437,8 +437,6 @@ class AgentWorker:
             # Step 2: Interrupt any current speech to prevent other utterances
             # from playing
             try:
-                import asyncio
-
                 await asyncio.wait_for(self.session.interrupt(), timeout=2.0)
             except (asyncio.TimeoutError, Exception) as e:
                 logger.warning(f"Error interrupting speech: {e}. Continuing anyway.")

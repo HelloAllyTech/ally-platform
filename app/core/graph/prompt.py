@@ -562,13 +562,14 @@ def _build_behavior_prompt(
             else block or f"## Additional Context\n{retrieved_context}\n\n"
         )
 
-    # Build additional context from custom fields
+    # Build additional context from custom fields (respect useInDefaultPrompt)
     custom_context_block = ""
     if prompt_data.custom_fields:
         custom_parts = []
         for cf in prompt_data.custom_fields:
             if isinstance(cf, dict) and cf.get("name") and cf.get("value"):
-                custom_parts.append(f"{cf['name']}: {cf['value']}")
+                if cf.get("useInDefaultPrompt", True) is not False:
+                    custom_parts.append(f"{cf['name']}: {cf['value']}")
         if custom_parts:
             block = load_and_format(
                 "system/custom_context_intro",
