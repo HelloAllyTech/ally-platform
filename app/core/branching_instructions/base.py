@@ -3,7 +3,7 @@ Data models for branching instructions.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import BaseMessage
 
@@ -19,6 +19,9 @@ from app.core.branching_instructions.parser import (
 )
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.logger import get_logger
+
+if TYPE_CHECKING:
+    from app.llms.base import BaseLLMClient
 
 logger = get_logger(__name__)
 
@@ -167,6 +170,7 @@ class BranchingInstruction:
         self,
         llm_config: Optional[Dict[str, Any]] = None,
         language_code: str = "en-US",
+        llm_client: Optional["BaseLLMClient"] = None,
     ) -> None:
         """
         Lazily substitute llm_response tags in the branching instruction.
@@ -202,11 +206,14 @@ class BranchingInstruction:
         for full_tag, parameter in llm_tags.items():
             try:
                 # Generate LLM response for the parameter
-                llm_response = await generate_llm_response(
-                    content=parameter,
-                    language_code=language_code,
-                    llm_config=llm_config,
-                )
+                call_kwargs = {
+                    "content": parameter,
+                    "language_code": language_code,
+                    "llm_config": llm_config,
+                }
+                if llm_client is not None:
+                    call_kwargs["llm_client"] = llm_client
+                llm_response = await generate_llm_response(**call_kwargs)
 
                 # Replace the tag with the LLM response
                 self.content = self.content.replace(f"<{full_tag}>", llm_response)
@@ -222,6 +229,7 @@ class BranchingInstruction:
         messages: List[BaseMessage],
         language_code: str = DEFAULT_LANGUAGE_CODE,
         llm_config: Optional[dict] = None,
+        llm_client: Optional["BaseLLMClient"] = None,
     ) -> str:
         """
         Returns the content with dynamic placeholders resolved against the chat history.
@@ -236,11 +244,14 @@ class BranchingInstruction:
             resolved_content = resolve_last_helper_utterance(resolved_content, messages)
 
         if ReservedBranchingVariable.CHAT_SUMMARY in resolved_content:
-            resolved_content = await resolve_chat_summary(
-                content=resolved_content,
-                messages=messages,
-                language_code=language_code,
-                llm_config=llm_config,
-            )
+            call_kwargs = {
+                "content": resolved_content,
+                "messages": messages,
+                "language_code": language_code,
+                "llm_config": llm_config,
+            }
+            if llm_client is not None:
+                call_kwargs["llm_client"] = llm_client
+            resolved_content = await resolve_chat_summary(**call_kwargs)
 
         return resolved_content

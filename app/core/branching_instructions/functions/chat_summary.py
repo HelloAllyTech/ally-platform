@@ -9,6 +9,7 @@ from app.core.branching_instructions.constants import ReservedBranchingVariable
 from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.logger import get_logger
 from app.llms import create_llm_client
+from app.llms.base import BaseLLMClient
 
 logger = get_logger(__name__)
 
@@ -27,6 +28,7 @@ async def generate_chat_summary(
     messages: List[BaseMessage],
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
+    llm_client: Optional[BaseLLMClient] = None,
 ) -> str:
     """
     Generate a concise summary of the conversation using an LLM.
@@ -43,11 +45,11 @@ async def generate_chat_summary(
         return "No conversation history available."
 
     try:
-        # Create LLM client using the centralized factory
-        llm_client = create_llm_client(
-            llm_config=llm_config,
-            language_code=language_code,
-        )
+        if llm_client is None:
+            llm_client = create_llm_client(
+                llm_config=llm_config,
+                language_code=language_code,
+            )
         llm_instance = llm_client.llm_instance
 
         # Specific definition for structured output
@@ -99,6 +101,7 @@ async def resolve_chat_summary(
     messages: List[BaseMessage],
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
+    llm_client: Optional[BaseLLMClient] = None,
 ) -> str:
     """
     Specific logic to replace the <chat_summary> tag.
@@ -119,7 +122,10 @@ async def resolve_chat_summary(
 
     # 2. Generate the summary
     summary = await generate_chat_summary(
-        messages=messages, language_code=language_code, llm_config=llm_config
+        messages=messages,
+        language_code=language_code,
+        llm_config=llm_config,
+        llm_client=llm_client,
     )
 
     # 3. Perform replacement
