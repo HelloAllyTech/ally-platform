@@ -118,11 +118,11 @@ class BranchingInstruction:
         if "context" in prompt_data:
             mapping["your context".casefold()] = str(prompt_data["context"])
 
-        # Handle custom fields
+        # Handle custom fields (supports both "field" and "name" keys)
         custom_fields = prompt_data.get("customFields", [])
         if isinstance(custom_fields, list):
             for item in custom_fields:
-                key = item.get("field")
+                key = item.get("field") or item.get("name")
                 val = item.get("value")
 
                 if key and val:
