@@ -27,7 +27,7 @@ RUN poetry install --no-interaction --no-ansi
 # Copy code
 COPY . /app/
 
-RUN python -m app.worker download-files
+RUN python -m app.download_files
 
 # Startup script
 COPY start.sh /app/start.sh

@@ -520,7 +520,7 @@ See [Event Termination Documentation](docs/13-event-termination.md) for detailed
 
 ### Worker not starting
 - Verify LiveKit credentials in `.env`
-- Check `poetry run python -m app.worker download-files` completed successfully
+- Check `poetry run python -m app.download_files` completed successfully
 
 ### No audio output
 - Verify TTS API key is valid (or Google Cloud credentials are configured)
