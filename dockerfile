@@ -29,7 +29,7 @@ RUN poetry install --no-interaction --no-ansi
 COPY . /app/
 
 # Run the download command to get all required files
-RUN poetry run python -m app.worker download-files
+RUN poetry run python -m app.download_files
 
 # Copy and make startup script executable
 COPY start.sh /app/start.sh

@@ -589,14 +589,6 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
-    # Handle download-files command for Docker build
-    if len(sys.argv) > 1 and sys.argv[1] == "download-files":
-        # Pre-download VAD model files
-        logger.info("Downloading required model files...")
-        silero.VAD.load(activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD)
-        logger.info("Model files downloaded successfully")
-        sys.exit(0)
-
     agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME
     agents.cli.run_app(
         agents.WorkerOptions(
