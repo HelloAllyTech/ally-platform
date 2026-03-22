@@ -30,9 +30,9 @@ COPY . /app/
 RUN python -m app.download_files
 
 # Startup script
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+COPY startpu.sh /app/startpu.sh
+RUN chmod +x /app/startpu.sh
 
 EXPOSE 8000
 
-CMD ["./start.sh"]
+CMD ["./startpu.sh"]
