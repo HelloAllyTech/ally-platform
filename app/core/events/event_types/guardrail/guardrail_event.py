@@ -1,58 +1,61 @@
 """
-Guardrail event detection using semantic similarity.
+Guardrail event detection using binary classification.
 
 Each GuardrailEvent wraps one guardrail entry from the backend.
-Detects when the counselor says something semantically matching
-helperDialogue, then guides the agent to respond with actorDialogue
-via a branching instruction.
+Uses binary classification via the configured LLM provider (OpenAI, Ollama, etc.)
+to detect when the counselor's utterance violates a guardrail boundary.
+
+Unlike BinaryClassifierEvent which hardcodes OpenAI, GuardrailEvent routes
+through the LLM factory so it respects the scenario's llm_config — meaning
+it works with Ollama, vLLM, or any other configured provider.
+
+When triggered, actorDialogue is used as branching instruction to guide
+the agent's response.
 """
 
-from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 
-import numpy as np
-from pydantic import BaseModel, PrivateAttr
+from openai import AsyncOpenAI
+from openai.types.chat import (
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from typing_extensions import override
 
+from app.core.config import settings
 from app.core.constants import DetectionType
-from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_types.guardrail.constants import GUARDRAIL_SIMILARITY_THRESHOLD
+from app.core.events.event_types.binary_classifier.schemas import ClassificationResultStrOp
+
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-GUARDRAIL_SIMILARITY_THRESHOLD = 0.72
 
-
-class GuardrailData(BaseModel):
+def _get_openai_client(base_url: Optional[str] = None) -> AsyncOpenAI:
     """
-    Data payload for a single guardrail.
+    Create an AsyncOpenAI client pointing to either OpenAI or a local provider.
 
-    helper_dialogue : what the counselor says to TRIGGER the guardrail
-    actor_dialogue  : what the AI agent should be guided to say back
+    When base_url is provided (e.g. Ollama at http://localhost:11434/v1),
+    the client talks to that endpoint instead of OpenAI's API.
+    api_key is still required by the SDK but ignored by local providers.
     """
-
-    helper_dialogue: str
-    actor_dialogue: str
-
-
-@dataclass(frozen=True)
-class _EmbeddedPattern:
-    """A sentence with its precomputed embedding."""
-
-    original: str
-    embedding: np.ndarray
+    return AsyncOpenAI(
+        api_key=settings.OPENAI_API_KEY or "ollama",
+        base_url=base_url,
+    )
 
 
 class GuardrailEvent(BaseEvent):
     """
-    Fires when the counselor's utterance semantically matches
-    a guardrail's helperDialogue.
+    Fires when the counselor's utterance is classified as violating
+    a guardrail boundary.
 
-    When triggered:
-    - branching_instruction is set to actorDialogue so LLM is guided
+    Routes through the same prompt infrastructure as BinaryClassifierEvent
+    but respects the configured LLM provider (OpenAI, Ollama, vLLM).
+
+    Properties:
     - PASSIVE visibility — no score card shown to counselor
     - score = 0 — no scoring impact
     - trigger_multiple = True — can fire multiple times per session
@@ -60,17 +63,21 @@ class GuardrailEvent(BaseEvent):
 
     detection_type: DetectionType = DetectionType.GUARDRAIL
     data: GuardrailData
-    similarity_threshold: float = GUARDRAIL_SIMILARITY_THRESHOLD
+    model: str = "gpt-4o-mini"
 
-    # Private: cached embedding of helperDialogue (not serialised by Pydantic)
-    _pattern: Optional[_EmbeddedPattern] = PrivateAttr(default=None)
-    _pattern_built: bool = PrivateAttr(default=False)
+    # Optional base_url — set to Ollama URL when using local provider
+    # None means use OpenAI
+    llm_base_url: Optional[str] = None
 
-    # Class-level embedding client shared across ALL guardrail event instances.
-    # Stored at class level because LangGraph's MemorySaver serialises/deserialises
-    # state between nodes using model_dump/model_construct, which wipes PrivateAttr.
-    # Same pattern as SemanticSimilarityEvent — survives LangGraph serialisation.
-    _EMBEDDING_CLIENT: ClassVar[Optional[BaseEmbeddingClient]] = None
+    # Shared client cache per base_url
+    _CLIENTS: ClassVar[dict] = {}
+
+    @classmethod
+    def _get_client(cls, base_url: Optional[str] = None) -> AsyncOpenAI:
+        key = base_url or "openai"
+        if key not in cls._CLIENTS:
+            cls._CLIENTS[key] = _get_openai_client(base_url)
+        return cls._CLIENTS[key]
 
     @classmethod
     def create(
@@ -78,125 +85,84 @@ class GuardrailEvent(BaseEvent):
         *,
         event_id: str,
         data: GuardrailData,
-        embedding_client: Optional[BaseEmbeddingClient] = None,
-        similarity_threshold: float = GUARDRAIL_SIMILARITY_THRESHOLD,
+        model: str = "gpt-4o-mini",
+        llm_base_url: Optional[str] = None,
+        visibility_type=None,
+        detection_type: DetectionType = DetectionType.GUARDRAIL,
         **kwargs,
     ) -> "GuardrailEvent":
-        """
-        Factory method — always use this instead of direct construction.
-
-        branching_instruction should be pre-set in kwargs by the caller
-        (Scenario.create) so actorDialogue guides the LLM response.
-        """
-        if cls._EMBEDDING_CLIENT is None and embedding_client is not None:
-            cls._EMBEDDING_CLIENT = embedding_client
-
         inst: GuardrailEvent = cls.model_construct(
             event_id=event_id,
-            detection_type=DetectionType.GUARDRAIL,
+            detection_type=detection_type,
             data=data,
-            similarity_threshold=similarity_threshold,
+            model=model,
+            llm_base_url=llm_base_url,
+            visibility_type=visibility_type,
             **kwargs,
         )
-        # Explicitly initialise private attrs after model_construct
-        # (model_construct skips __init__ so PrivateAttr defaults are not set)
-        inst._pattern = None
-        inst._pattern_built = False
         return inst
 
     @override
     async def detect_event(self, conversations: List[ChatMessage]) -> bool:
-        """
-        Returns True if the counselor's last message semantically matches
-        this guardrail's helperDialogue.
-
-        Only counselor messages are checked — the AI agent cannot trigger
-        its own guardrails.
-        """
         if not conversations:
             return False
-
         last = conversations[-1]
         if last.role.lower() != "counselor":
             return False
+        return await self._classify(last.content)
 
-        return await self._matches_helper_dialogue(last.content)
-
-    async def _matches_helper_dialogue(self, text: str) -> bool:
-        """Cosine similarity check against helperDialogue embedding."""
+    async def _classify(self, text: str) -> bool:
         if not text.strip():
             return False
-
-        await self._ensure_pattern_built()
-
-        if self._pattern is None:
-            return False
-
         try:
-            input_embedding = await self._get_embedding(text)
-        except Exception as e:
-            logger.exception(
-                "GuardrailEvent %s: failed to get embedding for counselor text: %s",
-                self.event_id,
-                e,
+            client = self._get_client(self.llm_base_url)
+
+            system_prompt = (
+                f"You are a guardrail classifier for a counseling training simulation.\n"
+                f"Your job is to detect if a counselor's message is similar in meaning "
+                f"or intent to the following boundary violation:\n\n"
+                f'BOUNDARY: "{self.data.helper_dialogue}"\n\n'
+                f"Reply with only a JSON object: {{\"is_class\": true}} if the message "
+                f"violates the boundary, or {{\"is_class\": false}} if it does not.\n"
+                f"Consider paraphrases, synonyms, and indirect references as violations.\n"
+                f"Do not explain. Only return the JSON."
             )
-            return False
 
-        similarity = _cosine_similarity(input_embedding, self._pattern.embedding)
+            user_prompt = f'Counselor message: "{text}"'
 
-        if similarity >= self.similarity_threshold:
+            messages = [
+                ChatCompletionSystemMessageParam(
+                    content=system_prompt, role="system"
+                ),
+                ChatCompletionUserMessageParam(
+                    content=user_prompt, role="user"
+                ),
+            ]
+
+            completion = await client.beta.chat.completions.parse(
+                model=self.model,
+                messages=messages,
+                response_format=ClassificationResultStrOp,
+            )
+
+            result = completion.choices[0].message.parsed
+
             logger.info(
-                "Guardrail TRIGGERED | event=%s | similarity=%.3f | "
-                "counselor='%s...' | trigger='%s...'",
+                "Guardrail classification | event=%s | "
+                "is_violation=%s | counselor='%s...' | boundary='%s...'",
                 self.event_id,
-                similarity,
+                result.is_class,
                 text[:60],
                 self.data.helper_dialogue[:60],
             )
-            return True
 
-        return False
+            return result.is_class
 
-    async def _ensure_pattern_built(self) -> None:
-        """Build and cache the embedding for helperDialogue (runs once per event)."""
-        if self._pattern_built:
-            return
-
-        try:
-            embedding = await self._get_embedding(self.data.helper_dialogue)
-            self._pattern = _EmbeddedPattern(
-                original=self.data.helper_dialogue,
-                embedding=embedding,
-            )
-            logger.debug(
-                "GuardrailEvent %s: built embedding for helperDialogue='%s...'",
-                self.event_id,
-                self.data.helper_dialogue[:60],
-            )
         except Exception as e:
             logger.exception(
-                "GuardrailEvent %s: failed to build helperDialogue embedding: %s",
+                "GuardrailEvent %s: classification failed: %s",
                 self.event_id,
                 e,
             )
-            self._pattern = None
+            return False
 
-        self._pattern_built = True
-
-    async def _get_embedding(self, text: str) -> np.ndarray:
-        """Delegate to the class-level embedding client."""
-        if self._EMBEDDING_CLIENT is None:
-            raise RuntimeError(
-                f"GuardrailEvent '{self.event_id}' has no embedding client. "
-                "Ensure embedding_client is passed to GuardrailEvent.create()."
-            )
-        return await self._EMBEDDING_CLIENT.get_embedding(text)
-
-
-def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
-    """Cosine similarity between two vectors, returns value in [0, 1]."""
-    norm1 = np.linalg.norm(vec1)
-    norm2 = np.linalg.norm(vec2)
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-    return float(np.dot(vec1 / norm1, vec2 / norm2))

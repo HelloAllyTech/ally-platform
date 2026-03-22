@@ -19,6 +19,7 @@ from app.core.constants import VisibilityType
 from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.branching_instructions.base import BranchingInstruction
+from app.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -239,13 +240,24 @@ class Scenario(BaseModel):
                         )
                         continue
 
+                    # Determine LLM base URL for guardrail classification
+                    # Use Ollama if configured, otherwise default to OpenAI
+                    guardrail_llm_base_url = None
+                    if settings.OLLAMA_BASE_URL and settings.LOCAL_LLM_MODEL:
+                        guardrail_llm_base_url = settings.OLLAMA_BASE_URL
+                        guardrail_model = settings.LOCAL_LLM_MODEL
+                    else:
+                        guardrail_model = "gpt-4o-mini"
+
+                    # Then in GuardrailEvent.create():
                     g_event = GuardrailEvent.create(
                         event_id=f"guardrail-{i}",
                         data=GuardrailData(
                             helper_dialogue=helper_dialogue,
                             actor_dialogue=actor_dialogue,
                         ),
-                        embedding_client=embedding_client,
+                        model=guardrail_model,
+                        llm_base_url=guardrail_llm_base_url,
                         branching_instruction=BranchingInstruction.create(
                             actor_dialogue, prompt_data=None
                         ),
@@ -253,7 +265,7 @@ class Scenario(BaseModel):
                         visibility_type=VisibilityType.PASSIVE,
                         emoji=None,
                         emoji_message=None,
-                    )
+)
                     guardrail_events.append(g_event)
 
                 except Exception as e:
@@ -264,6 +276,9 @@ class Scenario(BaseModel):
             if guardrail_events:
                 logger.info(f"Built {len(guardrail_events)} guardrail events")
                 built_events = built_events + guardrail_events
+                trigger_events = list(trigger_events) + [
+                    e.event_id for e in guardrail_events
+                ]
 
         return cls(
             scenarioName=normalized["scenarioName"],

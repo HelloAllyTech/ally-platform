@@ -177,3 +177,38 @@ class TestScenarioGuardrailParsing:
         ]
         assert len(guardrail_events) == 1
         assert len(regular_events) == 1
+
+    def test_guardrail_event_ids_added_to_trigger_events(self):
+        """Guardrail event IDs must be in trigger_events so orchestrator processes them."""
+        payload = make_payload_with_guardrails([
+            {"helperDialogue": "trigger 1", "actorDialogue": "response 1"},
+            {"helperDialogue": "trigger 2", "actorDialogue": "response 2"},
+        ])
+        scenario = Scenario.create(payload)
+
+        assert "guardrail-0" in scenario.trigger_events
+        assert "guardrail-1" in scenario.trigger_events
+
+    def test_existing_trigger_events_preserved_after_guardrails_added(self):
+        """Original triggerEvents from metadata must not be lost."""
+        payload = make_payload_with_guardrails([
+            {"helperDialogue": "trigger", "actorDialogue": "response"},
+        ])
+        payload["scenario"]["events"] = [
+            {
+                "id": "existing-event",
+                "name": "Existing",
+                "score": 5,
+                "emoji": "🎯",
+                "message": "test",
+                "detectionType": "SENTENCE_SIMILARITY",
+                "sentences": ["hello"],
+                "feedbackStatus": True,
+            }
+        ]
+        payload["scenario"]["triggerEvents"] = ["existing-event"]
+        scenario = Scenario.create(payload)
+
+        # both original and guardrail trigger events must be present
+        assert "existing-event" in scenario.trigger_events
+        assert "guardrail-0" in scenario.trigger_events

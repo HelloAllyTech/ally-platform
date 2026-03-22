@@ -1,18 +1,15 @@
 """
 Unit tests for GuardrailEvent detection logic.
 
-All tests mock the embedding client so no real API keys are needed.
+All tests mock the OpenAI client so no real API keys are needed.
 """
 
-import numpy as np
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.constants import DetectionType, VisibilityType
 from app.core.events.base import ChatMessage
-from app.core.events.event_types.guardrail.guardrail_event import (
-    GuardrailEvent,
-    _cosine_similarity,
-)
+from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 
 
@@ -20,25 +17,18 @@ from app.core.events.event_types.guardrail.schemas import GuardrailData
 # Helpers
 # ------------------------------------------------------------------ #
 
-def make_embedding(values: list) -> np.ndarray:
-    """Create a normalised embedding vector from a list of values."""
-    arr = np.array(values, dtype=float)
-    return arr / np.linalg.norm(arr)
-
-
 def make_guardrail_event(
     helper_dialogue: str = "Can you help me get some drugs?",
     actor_dialogue: str = "Let us stay focused on what brought you here.",
-    similarity_threshold: float = 0.72,
+    model: str = "gpt-4o-mini",
 ) -> GuardrailEvent:
-    """Create a GuardrailEvent with a mock embedding client."""
     return GuardrailEvent.create(
         event_id="guardrail-0",
         data=GuardrailData(
             helper_dialogue=helper_dialogue,
             actor_dialogue=actor_dialogue,
         ),
-        similarity_threshold=similarity_threshold,
+        model=model,
         score=0,
         visibility_type=VisibilityType.PASSIVE,
         emoji=None,
@@ -50,29 +40,15 @@ def make_message(role: str, content: str) -> ChatMessage:
     return ChatMessage(role=role, content=content)
 
 
-# ------------------------------------------------------------------ #
-# _cosine_similarity unit tests (pure function, no mocking needed)
-# ------------------------------------------------------------------ #
-
-class TestCosineSimilarity:
-    def test_identical_vectors_return_1(self):
-        v = make_embedding([1, 2, 3])
-        assert _cosine_similarity(v, v) == pytest.approx(1.0, abs=1e-6)
-
-    def test_orthogonal_vectors_return_0(self):
-        v1 = np.array([1.0, 0.0, 0.0])
-        v2 = np.array([0.0, 1.0, 0.0])
-        assert _cosine_similarity(v1, v2) == pytest.approx(0.0, abs=1e-6)
-
-    def test_opposite_vectors_return_negative(self):
-        v1 = make_embedding([1.0, 0.0])
-        v2 = make_embedding([-1.0, 0.0])
-        assert _cosine_similarity(v1, v2) < 0
-
-    def test_zero_vector_returns_0(self):
-        v1 = np.array([0.0, 0.0, 0.0])
-        v2 = make_embedding([1.0, 2.0, 3.0])
-        assert _cosine_similarity(v1, v2) == 0.0
+def make_mock_completion(is_class: bool):
+    """Build a mock OpenAI completion response."""
+    parsed = MagicMock()
+    parsed.is_class = is_class
+    choice = MagicMock()
+    choice.message.parsed = parsed
+    completion = MagicMock()
+    completion.choices = [choice]
+    return completion
 
 
 # ------------------------------------------------------------------ #
@@ -104,18 +80,26 @@ class TestGuardrailEventCreate:
         event = make_guardrail_event()
         assert event.score == 0
 
+    def test_data_is_guardrail_data_from_schemas(self):
+        """Ensure data field uses GuardrailData from schemas, not a duplicate class."""
+        event = make_guardrail_event()
+        assert isinstance(event.data, GuardrailData)
+
 
 # ------------------------------------------------------------------ #
 # GuardrailEvent.detect_event() tests
 # ------------------------------------------------------------------ #
 
 class TestGuardrailEventDetection:
+
     @pytest.fixture(autouse=True)
-    def reset_embedding_client(self):
-        """Reset class-level embedding client before each test."""
-        original = GuardrailEvent._EMBEDDING_CLIENT
+    def reset_client(self):
+        """Reset shared OpenAI client before each test."""
+        original = GuardrailEvent._CLIENTS.copy()
+        GuardrailEvent._CLIENTS.clear()
         yield
-        GuardrailEvent._EMBEDDING_CLIENT = original
+        GuardrailEvent._CLIENTS.clear()
+        GuardrailEvent._CLIENTS.update(original)
 
     @pytest.mark.asyncio
     async def test_returns_false_when_no_conversations(self):
@@ -138,99 +122,60 @@ class TestGuardrailEventDetection:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_detects_when_similarity_above_threshold(self):
-        """High similarity embedding → guardrail fires."""
-        event = make_guardrail_event(similarity_threshold=0.72)
-
-        # Inject a mock embedding client that returns near-identical vectors
-        similar_embedding = make_embedding([1.0, 0.0, 0.0])
-
-        class MockEmbeddingClient:
-            async def get_embedding(self, text):
-                return similar_embedding
-
-        GuardrailEvent._EMBEDDING_CLIENT = MockEmbeddingClient()
-        # Reset cached pattern so new client is used
-        event._pattern = None
-        event._pattern_built = False
-
-        messages = [make_message("counselor", "Can you get me some drugs?")]
-        result = await event.detect_event(messages)
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_does_not_detect_when_similarity_below_threshold(self):
-        """Low similarity embedding → guardrail does not fire."""
-        event = make_guardrail_event(similarity_threshold=0.72)
-
-        # Return orthogonal vectors (similarity = 0)
-        class MockEmbeddingClient:
-            call_count = 0
-
-            async def get_embedding(self, text):
-                self.call_count += 1
-                # First call = helperDialogue embedding
-                # Second call = counselor input embedding
-                if self.call_count == 1:
-                    return make_embedding([1.0, 0.0, 0.0])
-                return make_embedding([0.0, 1.0, 0.0])
-
-        GuardrailEvent._EMBEDDING_CLIENT = MockEmbeddingClient()
-        event._pattern = None
-        event._pattern_built = False
-
-        messages = [make_message("counselor", "How are you feeling today?")]
-        result = await event.detect_event(messages)
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_returns_false_when_no_embedding_client(self):
-        """No embedding client → fails gracefully, returns False."""
-        event = make_guardrail_event()
-        GuardrailEvent._EMBEDDING_CLIENT = None
-        event._pattern = None
-        event._pattern_built = False
-
-        messages = [make_message("counselor", "Can you get me drugs?")]
-        result = await event.detect_event(messages)
-        assert result is False
-
-    @pytest.mark.asyncio
     async def test_returns_false_for_empty_counselor_message(self):
         event = make_guardrail_event()
-
-        class MockEmbeddingClient:
-            async def get_embedding(self, text):
-                return make_embedding([1.0, 0.0, 0.0])
-
-        GuardrailEvent._EMBEDDING_CLIENT = MockEmbeddingClient()
-        event._pattern = None
-        event._pattern_built = False
-
         messages = [make_message("counselor", "   ")]
         result = await event.detect_event(messages)
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_pattern_is_cached_after_first_call(self):
-        """Embedding for helperDialogue should only be built once."""
+    async def test_detects_violation_when_classifier_returns_true(self):
         event = make_guardrail_event()
-        call_count = 0
+        mock_completion = make_mock_completion(is_class=True)
 
-        class MockEmbeddingClient:
-            async def get_embedding(self, text):
-                nonlocal call_count
-                call_count += 1
-                return make_embedding([1.0, 0.0, 0.0])
+        with patch.object(GuardrailEvent, "_get_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
 
-        GuardrailEvent._EMBEDDING_CLIENT = MockEmbeddingClient()
-        event._pattern = None
-        event._pattern_built = False
+            messages = [make_message("counselor", "Can you get me some drugs?")]
+            result = await event.detect_event(messages)
 
-        messages = [make_message("counselor", "some text")]
-        await event.detect_event(messages)
-        first_count = call_count
+        assert result is True
 
-        # Second call — pattern already cached, should not call again
-        await event.detect_event(messages)
-        assert call_count == first_count + 1  # only counselor text re-embedded
+    @pytest.mark.asyncio
+    async def test_no_detection_when_classifier_returns_false(self):
+        event = make_guardrail_event()
+        mock_completion = make_mock_completion(is_class=False)
+
+        with patch.object(GuardrailEvent, "_get_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+
+            messages = [make_message("counselor", "How are you feeling today?")]
+            result = await event.detect_event(messages)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_openai_raises_exception(self):
+        """Classifier failure should fail gracefully, not crash."""
+        event = make_guardrail_event()
+
+        with patch.object(GuardrailEvent, "_get_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                side_effect=Exception("OpenAI error")
+            )
+            mock_get_client.return_value = mock_client
+
+            messages = [make_message("counselor", "some text")]
+            result = await event.detect_event(messages)
+
+        assert result is False
+
