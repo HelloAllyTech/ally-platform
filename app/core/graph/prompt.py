@@ -307,7 +307,7 @@ def _resolve_state_continuation(
 
     state_label = f"State {current_state.state_id}"
 
-    # New approach: look up agent_instruction for the current state in this BI
+    # New approach: look up instruction for the current state in this BI
     if bi.state_matched_instructions:
         matched = next(
             (
@@ -318,7 +318,7 @@ def _resolve_state_continuation(
             None,
         )
         if matched:
-            return f" - ({state_label}) {matched.agent_instruction}"
+            return f" - ({state_label}) {matched.instruction}"
 
     # Deprecated fallback: use instruction from the state
     # (dialogues removed to prevent repetition)

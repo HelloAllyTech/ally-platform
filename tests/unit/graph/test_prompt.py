@@ -303,10 +303,10 @@ class TestPrompt:
             score=10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="1", agentInstruction="Stay guarded and withdrawn."
+                    stateId="1", instruction="Stay guarded and withdrawn."
                 ),
                 StateMatchedInstruction(
-                    stateId="2", agentInstruction="Show cautious relief."
+                    stateId="2", instruction="Show cautious relief."
                 ),
             ],
         )
@@ -334,7 +334,7 @@ class TestPrompt:
             score=10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="1", agentInstruction="New per-behavior guidance."
+                    stateId="1", instruction="New per-behavior guidance."
                 ),
             ],
         )
@@ -365,7 +365,7 @@ class TestPrompt:
             score=10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="3", agentInstruction="Instruction for state 3."
+                    stateId="3", instruction="Instruction for state 3."
                 ),
             ],
         )
@@ -392,7 +392,7 @@ class TestPrompt:
             score=10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="1", agentInstruction="Respond with cautious warmth."
+                    stateId="1", instruction="Respond with cautious warmth."
                 ),
             ],
         )
@@ -402,7 +402,7 @@ class TestPrompt:
             score=-10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="1", agentInstruction="Shut down and become defensive."
+                    stateId="1", instruction="Shut down and become defensive."
                 ),
             ],
         )
@@ -430,13 +430,13 @@ class TestPrompt:
             score=10,
             state_matched_instructions=[
                 StateMatchedInstruction(
-                    stateId="1", agentInstruction="Stay guarded and withdrawn."
+                    stateId="1", instruction="Stay guarded and withdrawn."
                 ),
                 StateMatchedInstruction(
-                    stateId="2", agentInstruction="Show cautious relief."
+                    stateId="2", instruction="Show cautious relief."
                 ),
                 StateMatchedInstruction(
-                    stateId="3", agentInstruction="Begin to open up slightly."
+                    stateId="3", instruction="Begin to open up slightly."
                 ),
             ],
         )

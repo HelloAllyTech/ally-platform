@@ -38,9 +38,9 @@ class StateMatchedInstruction(BaseModel):
             "(matches SimulationStateInstruction.state_id)"
         ),
     )
-    agent_instruction: str = Field(
+    instruction: str = Field(
         ...,
-        alias="agentInstruction",
+        alias="instruction",
         description=(
             "How the agent should respond when this behavior is detected "
             "in this state. Use open-ended behavioral guidance to avoid "

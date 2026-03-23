@@ -74,19 +74,19 @@ SCENARIO_SAMPLE = {
                 "stateMatchedInstructions": [
                     {
                         "stateId": "1",
-                        "agentInstruction": "Acknowledge the counselor's effort but remain withdrawn. Express cautious, guarded acceptance rather than warmth.",
+                        "instruction": "Acknowledge the counselor's effort but remain withdrawn. Express cautious, guarded acceptance rather than warmth.",
                     },
                     {
                         "stateId": "2",
-                        "agentInstruction": "Respond with mild relief. Let a hint of openness show but stay somewhat uncertain about where the conversation is going.",
+                        "instruction": "Respond with mild relief. Let a hint of openness show but stay somewhat uncertain about where the conversation is going.",
                     },
                     {
                         "stateId": "3",
-                        "agentInstruction": "Respond with visible appreciation. Share a small personal detail to signal growing trust in the counselor.",
+                        "instruction": "Respond with visible appreciation. Share a small personal detail to signal growing trust in the counselor.",
                     },
                     {
                         "stateId": "4",
-                        "agentInstruction": "Respond warmly and with genuine gratitude. Show that the counselor's approach has made a real difference.",
+                        "instruction": "Respond warmly and with genuine gratitude. Show that the counselor's approach has made a real difference.",
                     },
                 ],
             },
@@ -100,19 +100,19 @@ SCENARIO_SAMPLE = {
                 "stateMatchedInstructions": [
                     {
                         "stateId": "1",
-                        "agentInstruction": "Become more closed off and monosyllabic. Make it clear the counselor is not connecting with you.",
+                        "instruction": "Become more closed off and monosyllabic. Make it clear the counselor is not connecting with you.",
                     },
                     {
                         "stateId": "2",
-                        "agentInstruction": "Pull back from the slight openness you had. Express that you feel misunderstood.",
+                        "instruction": "Pull back from the slight openness you had. Express that you feel misunderstood.",
                     },
                     {
                         "stateId": "3",
-                        "agentInstruction": "Show disappointment and retreat slightly. Indicate you were opening up but this response set you back.",
+                        "instruction": "Show disappointment and retreat slightly. Indicate you were opening up but this response set you back.",
                     },
                     {
                         "stateId": "4",
-                        "agentInstruction": "Express hurt or confusion. Signal that the counselor's response felt dismissive despite the progress made.",
+                        "instruction": "Express hurt or confusion. Signal that the counselor's response felt dismissive despite the progress made.",
                     },
                 ],
             },
@@ -127,19 +127,19 @@ SCENARIO_SAMPLE = {
                 "stateMatchedInstructions": [
                     {
                         "stateId": "1",
-                        "agentInstruction": "Shut down completely. Respond with minimal words and clear discomfort.",
+                        "instruction": "Shut down completely. Respond with minimal words and clear discomfort.",
                     },
                     {
                         "stateId": "2",
-                        "agentInstruction": "Become defensive. Express that you feel pushed or dismissed.",
+                        "instruction": "Become defensive. Express that you feel pushed or dismissed.",
                     },
                     {
                         "stateId": "3",
-                        "agentInstruction": "React with visible hurt. Pull back the progress you had made and become guarded again.",
+                        "instruction": "React with visible hurt. Pull back the progress you had made and become guarded again.",
                     },
                     {
                         "stateId": "4",
-                        "agentInstruction": "Respond with shock or sadness. Make clear this behavior feels like a betrayal of the trust built so far.",
+                        "instruction": "Respond with shock or sadness. Make clear this behavior feels like a betrayal of the trust built so far.",
                     },
                 ],
             },
