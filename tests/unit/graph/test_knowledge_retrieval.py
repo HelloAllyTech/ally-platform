@@ -15,8 +15,8 @@ class TestBuildKnowledgeMap:
 
     def test_valid_entries(self):
         kb = [
-            {"key": "school memories", "description": "Bullied in 8th grade"},
-            {"key": "family dynamics", "description": "Parents compare to cousin"},
+            {"title": "school memories", "content": "Bullied in 8th grade"},
+            {"title": "family dynamics", "content": "Parents compare to cousin"},
         ]
         result = build_knowledge_map(kb)
         assert len(result) == 2
@@ -25,11 +25,11 @@ class TestBuildKnowledgeMap:
 
     def test_missing_fields_skipped(self):
         kb = [
-            {"key": "valid", "description": "Valid entry"},
-            {"key": "missing_desc"},
-            {"description": "missing_key"},
-            {"key": "", "description": "empty_key"},
-            {"key": "empty_desc", "description": ""},
+            {"title": "valid", "content": "Valid entry"},
+            {"title": "missing_content"},
+            {"content": "missing_title"},
+            {"title": "", "content": "empty_title"},
+            {"title": "empty_content", "content": ""},
         ]
         result = build_knowledge_map(kb)
         assert len(result) == 1
@@ -37,7 +37,7 @@ class TestBuildKnowledgeMap:
 
     def test_non_dict_entries_skipped(self):
         kb = [
-            {"key": "valid", "description": "Valid entry"},
+            {"title": "valid", "content": "Valid entry"},
             "invalid string",
             123,
             None,
@@ -48,24 +48,24 @@ class TestBuildKnowledgeMap:
 
 
 class FakeStructuredLLM:
-    def __init__(self, keys: list):
-        self._keys = keys
+    def __init__(self, titles: list):
+        self._titles = titles
 
     async def ainvoke(self, messages):
-        return RelevantKeys(keys=self._keys)
+        return RelevantKeys(titles=self._titles)
 
 
 class FakeLLMInstance:
-    def __init__(self, keys: list):
-        self._keys = keys
+    def __init__(self, titles: list):
+        self._titles = titles
 
     def with_structured_output(self, schema):
-        return FakeStructuredLLM(self._keys)
+        return FakeStructuredLLM(self._titles)
 
 
 class FakeLLMClient:
-    def __init__(self, keys: list):
-        self._llm_instance = FakeLLMInstance(keys)
+    def __init__(self, titles: list):
+        self._llm_instance = FakeLLMInstance(titles)
 
     @property
     def llm_instance(self):

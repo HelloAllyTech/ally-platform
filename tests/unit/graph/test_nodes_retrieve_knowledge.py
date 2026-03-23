@@ -7,24 +7,24 @@ from app.core.graph.state import SimulationState
 
 
 class FakeStructuredLLM:
-    def __init__(self, keys: list):
-        self._keys = keys
+    def __init__(self, titles: list):
+        self._titles = titles
 
     async def ainvoke(self, messages):
-        return RelevantKeys(keys=self._keys)
+        return RelevantKeys(titles=self._titles)
 
 
 class FakeLLMInstance:
-    def __init__(self, keys: list):
-        self._keys = keys
+    def __init__(self, titles: list):
+        self._titles = titles
 
     def with_structured_output(self, schema):
-        return FakeStructuredLLM(self._keys)
+        return FakeStructuredLLM(self._titles)
 
 
 class FakeLLMClient:
-    def __init__(self, keys: list):
-        self._llm_instance = FakeLLMInstance(keys)
+    def __init__(self, titles: list):
+        self._llm_instance = FakeLLMInstance(titles)
 
     @property
     def llm_instance(self):
@@ -52,7 +52,7 @@ class TestRetrieveKnowledgeNode:
 
     @pytest.mark.asyncio
     async def test_no_llm_client_returns_none(self):
-        pd = type("PD", (), {"knowledge_sources": [{"key": "a", "description": "b"}]})()
+        pd = type("PD", (), {"knowledge_sources": [{"title": "a", "content": "b"}]})()
         scenario = type("S", (), {"prompt_data": pd})()
         result = await retrieve_knowledge(
             _make_state(), {"configurable": {"scenario": scenario}}
@@ -82,8 +82,8 @@ class TestRetrieveKnowledgeNode:
     @pytest.mark.asyncio
     async def test_successful_retrieval(self):
         kb = [
-            {"key": "school memories", "description": "Bullied in 8th grade"},
-            {"key": "family dynamics", "description": "Parents are strict"},
+            {"title": "school memories", "content": "Bullied in 8th grade"},
+            {"title": "family dynamics", "content": "Parents are strict"},
         ]
         pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
@@ -111,7 +111,7 @@ class TestRetrieveKnowledgeNode:
 
     @pytest.mark.asyncio
     async def test_no_relevant_keys_returns_none(self):
-        kb = [{"key": "school memories", "description": "Bullied in 8th grade"}]
+        kb = [{"title": "school memories", "content": "Bullied in 8th grade"}]
         pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
 
@@ -144,7 +144,7 @@ class FakeFailingClient:
 class TestRetrieveKnowledgeNodeErrorHandling:
     @pytest.mark.asyncio
     async def test_llm_failure_returns_none(self):
-        kb = [{"key": "k", "description": "d"}]
+        kb = [{"title": "k", "content": "d"}]
         pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
 

@@ -18,8 +18,8 @@ _RETRIEVAL_CACHE: "OrderedDict[str, str]" = OrderedDict()
 class RelevantKeys(BaseModel):
     """Structured output schema for knowledge retrieval."""
 
-    keys: List[str] = Field(
-        description="List of relevant knowledge topic keys from the available topics"
+    titles: List[str] = Field(
+        description="List of relevant knowledge topic titles from the available topics"
     )
 
 
@@ -27,9 +27,9 @@ def build_knowledge_map(
     knowledge_sources: Optional[List[Dict[str, str]]],
 ) -> Dict[str, str]:
     """
-    Convert a list of key-description dicts into a lookup map.
+    Convert a list of title-content dicts into a lookup map.
 
-    Entries missing either ``key`` or ``description`` (or with empty values)
+    Entries missing either ``title`` or ``content`` (or with empty values)
     are silently skipped so the caller never has to guard against bad data.
     """
     if not knowledge_sources:
@@ -39,23 +39,23 @@ def build_knowledge_map(
     for entry in knowledge_sources:
         if not isinstance(entry, dict):
             continue
-        key = entry.get("key", "")
-        description = entry.get("description", "")
-        if key and description:
-            knowledge_map[key] = description
+        title = entry.get("title", "")
+        content = entry.get("content", "")
+        if title and content:
+            knowledge_map[title] = content
 
     return knowledge_map
 
 
 def _format_retrieved_context(
-    relevant_keys: List[str],
+    relevant_titles: List[str],
     knowledge_map: Dict[str, str],
 ) -> str:
     """Format matched knowledge entries as a markdown block."""
     sections: List[str] = []
-    for key in relevant_keys:
-        if key in knowledge_map:
-            sections.append(f"**{key}:**\n{knowledge_map[key]}")
+    for title in relevant_titles:
+        if title in knowledge_map:
+            sections.append(f"**{title}:**\n{knowledge_map[title]}")
 
     return "\n\n".join(sections)
 
@@ -116,9 +116,9 @@ async def retrieve_relevant_knowledge(
     knowledge_map: Dict[str, str],
 ) -> str:
     """
-    Use the scenario LLM to identify which knowledge-base keys are
+    Use the scenario LLM to identify which knowledge-base titles are
     relevant to the recent conversation, then return the formatted
-    descriptions for those keys.
+    content for those titles.
 
     Returns an empty string when nothing is relevant or on any error.
     """
@@ -142,14 +142,14 @@ async def retrieve_relevant_knowledge(
             f"{msg.role}: {msg.content}" for msg in chat_messages if msg.content
         )
 
-        available_keys = list(knowledge_map.keys())
+        available_titles = list(knowledge_map.keys())
 
         system_prompt = (
             "You are a knowledge retrieval assistant. Given a conversation between "
             "a counselor and a client, identify which knowledge topics are relevant "
             "to the current conversation.\n\n"
-            f"Available topics: {available_keys}\n\n"
-            "Return ONLY the keys that are directly relevant to what is being "
+            f"Available topics: {available_titles}\n\n"
+            "Return ONLY the titles that are directly relevant to what is being "
             "discussed. If none are relevant, return an empty list."
         )
 
@@ -161,11 +161,11 @@ async def retrieve_relevant_knowledge(
             ]
         )
 
-        if not result or not result.keys:
+        if not result or not result.titles:
             _store_cached_retrieval(cache_key, "")
             return ""
 
-        formatted_context = _format_retrieved_context(result.keys, knowledge_map)
+        formatted_context = _format_retrieved_context(result.titles, knowledge_map)
         _store_cached_retrieval(cache_key, formatted_context)
         return formatted_context
 
