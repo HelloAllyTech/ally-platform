@@ -451,10 +451,20 @@ async def resolve_branching_instruction(
                 ]
 
                 if events_with_branching:
-                    # Use highest score event with branching instruction for LLM
-                    selected_branching_event_data = max(
-                        events_with_branching, key=lambda e: abs(e.score)
-                    )
+                    # Check for guardrail events first (they always take priority)
+                    guardrail_events = [
+                        e
+                        for e in events_with_branching
+                        if getattr(e, "event_id", "").startswith("guardrail-")
+                    ]
+
+                    if guardrail_events:
+                        selected_branching_event_data = guardrail_events[0]
+                    else:
+                        # Use highest score event with branching instruction for LLM
+                        selected_branching_event_data = max(
+                            events_with_branching, key=lambda e: abs(e.score)
+                        )
                     instruction = selected_branching_event_data.branching_instruction
 
                     # Get language_code and branching_llm_config from scenario
