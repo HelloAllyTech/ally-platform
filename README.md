@@ -70,8 +70,9 @@ Edit `.env` with your configuration:
 
 **Optional Settings:**
 - `ELEVEN_API_KEY` - ElevenLabs TTS (if using ElevenLabs voices)
-- `SARVAM_API_KEY` - Sarvam TTS (if using Sarvam voices)
-- `GOOGLE_APPLICATION_CREDENTIALS` - Google Cloud TTS credentials file path (optional, uses Application Default Credentials if not set)
+- `SARVAM_API_KEY` - Sarvam TTS/STT (if using Sarvam voices or speech-to-text)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Google Cloud TTS/STT credentials file path (optional, uses Application Default Credentials if not set)
+- `GOOGLE_API_KEY` - Google API key for Gemini LLM (alternative to `GOOGLE_APPLICATION_CREDENTIALS`)
 - `SLACK_ALERTS_ENABLED`, `SLACK_ALERTS_API_TOKEN` - Slack notifications
 - `LLM_TEMPERATURE` - LLM temperature (default: 0.7)
 - `DEFAULT_MALE_VOICE_MODEL`, `DEFAULT_FEMALE_VOICE_MODEL`, `DEFAULT_NON_BINARY_VOICE_MODEL` - Fallback voice models
@@ -149,7 +150,7 @@ See [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) for details. Ensure `CORE_SERVICE_API
 ## API Endpoints
 
 - **Health Check**: `GET /api/health` - Service health status
-- **API v1** (prefix `/api/v1`): Voice preview, scenario report generation (see `app/api/`)
+- **API v1** (prefix `/api/v1`): Scenario report generation (see `app/api/`)
 
 ## Project Structure
 
@@ -158,24 +159,31 @@ ally-learn-core/
 ├── app/
 │   ├── api/                             # FastAPI routers
 │   │   ├── scenario_report.py           # Scenario report generation
-│   │   ├── voice_preview.py             # Voice preview endpoint
 │   │   └── dependencies.py              # Auth, token verification
 │   ├── core/
 │   │   ├── agent/                       # Agent setup and utilities
 │   │   │   └── factory.py               # parse_room_metadata, client config, agent creation
+│   │   ├── branching_instructions/      # Branching instruction parsing and resolution
 │   │   ├── config.py                    # Application configuration
 │   │   ├── constants.py                 # Constants and enums
 │   │   ├── embeddings/                 # Embedding clients (OpenAI)
 │   │   ├── events/                      # Event detection and processing
 │   │   │   ├── base.py                  # Base event class
+│   │   │   ├── event_processor.py       # Event processing logic
 │   │   │   ├── factory.py               # Event factory
 │   │   │   ├── handlers.py              # Conversation event handlers, send_event_to_ui
+│   │   │   ├── schedulers.py            # Event scheduling utilities
+│   │   │   ├── schemas.py               # Event schemas
+│   │   │   ├── utils.py                 # Event utilities
 │   │   │   ├── event_orchestrator/      # Orchestrator, sender, score evaluator
-│   │   │   └── event_types/             # Event implementations (9 types)
+│   │   │   └── event_types/             # Event implementations (10 types)
 │   │   ├── graph/                       # LangGraph workflow
+│   │   │   ├── checkpointer.py          # Graph state checkpointing
 │   │   │   ├── graph_builder.py         # build_simulation_graph, build_report_graph
+│   │   │   ├── knowledge_retrieval.py   # Knowledge retrieval for context
 │   │   │   ├── nodes.py                 # Graph nodes
 │   │   │   ├── state.py                 # SimulationState
+│   │   │   ├── utils.py                 # Graph utilities
 │   │   │   └── prompt.py               # System prompt generation
 │   │   ├── livekit/                     # LiveKit models
 │   │   ├── queue/                       # AWS SQS integration
@@ -184,6 +192,7 @@ ally-learn-core/
 │   │   │   └── simulation_instructions.py  # Behavior and state instructions
 │   │   ├── scenario_report/             # Report generation service
 │   │   └── scoring/                    # ScoreKeeper for behavior scores
+│   ├── evaluation/                      # Evaluation logging
 │   ├── prompts/                         # Prompt templates
 │   │   ├── manager.py                  # Template loading
 │   │   ├── resolver.py                  # Backend override resolution
@@ -195,9 +204,9 @@ ally-learn-core/
 │   ├── speech_prosody/                  # Voice expression parameters
 │   ├── main.py                          # FastAPI application
 │   ├── middleware.py                    # Request logging and CORS
-│   ├── worker.py                        # LiveKit agent worker
-│   └── scenario_sample.py               # Sample scenario data
+│   └── worker.py                        # LiveKit agent worker
 ├── docs/                                # Developer documentation
+├── scenario_sample.py                   # Sample scenario data
 ├── dockerfile
 ├── docker-compose.yml
 ├── start.sh
@@ -218,13 +227,12 @@ ally-learn-core/
 
 2. **Conversation Loop**
    - User (counselor) speaks → STT (configured from metadata or default) → Text
-   - LangGraph processes (6 nodes with parallel execution):
-     - **Event Detection**: Analyzes conversation for counseling events
+   - LangGraph processes (8 nodes with 3 parallel paths from start):
+     - **Event Detection + Behavior Detection + Knowledge Retrieval** (parallel): Analyzes conversation for counseling events, classifies behavior instructions, and retrieves relevant knowledge context
+     - **Sync**: Convergence point for all three parallel paths
      - **Branching Resolution**: Resolves branching instructions (LLM tags, dynamic variables)
-     - **Response + Behaviors** (parallel): LLM generates client response; behavior instructions are classified
+     - **Response + UI Feedback** (parallel): LLM generates client response; event and behavior scores/feedback are sent to frontend
      - **Voice Expressions**: Applies prosody parameters and text enhancement
-     - **UI Feedback**: Sends event and behavior scores/feedback to frontend
-     - **Core Event Publishing**: Publishes to SQS
    - Client response → TTS → Audio → Played to user
 
 3. **Event System**
@@ -385,6 +393,43 @@ DEEPGRAM_API_KEY=your_key
 
 If not specified in metadata, the system uses the default Deepgram configuration from environment settings.
 
+**Google Cloud STT:**
+```env
+# Option 1: Use Application Default Credentials (recommended)
+# Run: gcloud auth application-default login
+
+# Option 2: Use credentials file
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# Use in scenario metadata:
+# {
+#   "stt": {
+#     "provider": "google",
+#     "config": {
+#       "model": "chirp"
+#     }
+#   }
+# }
+# Supported models: "chirp" (default, recommended), "chirp_2", "chirp_3",
+# "latest_long", "latest_short", "long", "short"
+```
+
+**Sarvam STT (Indian languages):**
+```env
+SARVAM_API_KEY=your_key
+# Use in scenario metadata:
+# {
+#   "stt": {
+#     "provider": "sarvam",
+#     "config": {
+#       "model": "saarika:v2.5"
+#     }
+#   }
+# }
+# Note: Sarvam supports Indian languages (hi-IN, ta-IN, etc.)
+# and maps language codes to its own format automatically.
+```
+
 ### LLM Providers
 
 LLM (Language Model) providers can be configured per scenario via metadata or fallback to environment defaults.
@@ -473,6 +518,30 @@ Configure the scenario metadata to use vLLM:
 ```
 
 Scenarios that do not specify `"provider": "ollama"` or `"provider": "vllm"` in their metadata will continue to use OpenAI as the LLM provider.
+
+**Google Gemini:**
+```env
+# Option 1: Use Google API key
+GOOGLE_API_KEY=your_google_api_key
+
+# Option 2: Use Application Default Credentials
+# Run: gcloud auth application-default login
+# (GOOGLE_APPLICATION_CREDENTIALS also accepted)
+
+# Use in scenario metadata:
+# {
+#   "llm": {
+#     "provider": "gemini",
+#     "config": {
+#       "model": "gemini-2.0-flash-exp",
+#       "temperature": 0.7
+#     }
+#   }
+# }
+```
+
+Note: `"google"` is also accepted as a provider name (alias for `"gemini"`).
+`OPENAI_API_KEY` is still required even when using Gemini, because binary classifiers and embeddings always run on OpenAI.
 
 ### Logging
 
