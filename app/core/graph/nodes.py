@@ -1040,6 +1040,11 @@ async def retrieve_knowledge(
     if not knowledge_map:
         return {"retrieved_context": None}
 
+    knowledge_summary = ", ".join(
+        [f"{k}: {v[:20]}..." for k, v in knowledge_map.items()]
+    )
+    logger.info(f"Knowledge sources: {knowledge_summary}")
+
     retrieved_context = await retrieve_relevant_knowledge(
         llm_client, state.messages, knowledge_map
     )
