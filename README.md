@@ -238,6 +238,7 @@ ally-learn-core/
 3. **Event System**
    - **ACTIVE Events**: Visible to UI with emoji and message
    - **PASSIVE Events**: Logged for analytics only
+   - **Guardrail Events**: Detect boundary violations in counselor utterances using binary classification; PASSIVE visibility, trigger agent redirect via `actorDialogue` branching instruction
    - **Scoring**: Cumulative score calculation with polarity-based event selection
    - **Publishing**: All events sent to SQS for downstream processing
    - **Termination**: Events can trigger automatic session termination (see [Event Termination](docs/13-event-termination.md))
