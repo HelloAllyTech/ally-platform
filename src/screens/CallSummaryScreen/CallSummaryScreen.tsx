@@ -138,10 +138,10 @@ export const CallSummaryScreen: React.FC<
   );
 
   const handleShareForReview = useCallback(() => {
-    if (!callId || !summaryData?.details) return;
+    if (!summaryData?.details) return;
     const details = summaryData.details;
     navigation.navigate(SCREEN_NAMES.SHARE_CALL_LOG, {
-      scribeSessionId: callId,
+      scribeSessionId: summaryData.id,
       reviewId: scribeReviewId,
       sessionData: {
         title:
@@ -151,14 +151,7 @@ export const CallSummaryScreen: React.FC<
       },
       note: summaryData?.reviewNote || '',
     });
-  }, [
-    callId,
-    summaryData,
-    callInfo.summaryName,
-    navigation,
-    t,
-    scribeReviewId,
-  ]);
+  }, [summaryData, callInfo.summaryName, navigation, t, scribeReviewId]);
 
   const {handleTogglePrivate: handleToggleScribePrivate} =
     useToggleReviewPrivacy(scribeReviewId, useUpdateScribeReviewStatusMutation);
