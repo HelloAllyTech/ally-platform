@@ -445,6 +445,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                     DetectionType.BINARY_CLASSIFIER,
                     DetectionType.HELPER_INTERRUPTED,
                     DetectionType.HELPER_PARAPHRASED,
+                    DetectionType.GUARDRAIL,
                 )
 
             # Special case: termination events should only be sent once,
@@ -601,6 +602,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 DetectionType.BINARY_CLASSIFIER,
                 DetectionType.HELPER_INTERRUPTED,
                 DetectionType.HELPER_PARAPHRASED,
+                DetectionType.GUARDRAIL,
             )
             # If we are setting it to True immediately, count is 1.
             # If False, count is 0.
