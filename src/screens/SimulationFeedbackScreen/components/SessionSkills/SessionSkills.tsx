@@ -29,6 +29,7 @@ import {colors, fontFamily, radius, typography} from '@/theme';
 import {ExperienceMode, SimulationSummaryData, SkillCoverage} from '@/types';
 import {calculateAverageForObjectArray, formatSecondsToMMSS} from '@/utils';
 
+import {getImprovementsWithRecommendations} from '../../utils/simulationSummary';
 import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
 import {SummaryCard} from '../SummaryCard';
 
@@ -136,8 +137,9 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
     ExperienceMode.CHECKLIST;
   const positives =
     simulationDetails?.details?.summary?.feedback?.positives ?? [];
-  const improvements =
-    simulationDetails?.details?.summary?.feedback?.improvements ?? [];
+  const improvements = getImprovementsWithRecommendations(
+    simulationDetails ?? null,
+  );
 
   if (isLoading || isFetching) {
     return (
