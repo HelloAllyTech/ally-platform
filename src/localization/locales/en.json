@@ -136,7 +136,8 @@
     },
     "focus": "Focus",
     "focused": "Focused",
-    "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call."
+    "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call.",
+    "muteTooltip": "Need notes captured? AI can't hear you right now. Resume to let it listen."
   },
   "SuspendedAccount": {
     "title": "Account Suspended",

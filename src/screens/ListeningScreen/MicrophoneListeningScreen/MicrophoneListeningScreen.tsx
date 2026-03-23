@@ -48,7 +48,8 @@ export const MicrophoneListeningScreen = () => {
   const {userData} = useUser();
 
   const [isFocusModeLocal, setIsFocusModeLocal] = useState(true);
-  const [isCallPaused, setIsCallPaused] = useState(false);
+  const [isCallPaused, setIsCallPaused] = useState(true);
+  const [isMuteTooltipOpen, setIsMuteTooltipOpen] = useState(true);
   const [isAudioChatEmitted, setIsAudioChatEmitted] = useState(false);
   const [isMicrophoneModeSessionCreated, setIsMicrophoneModeSessionCreated] =
     useState(false);
@@ -115,6 +116,15 @@ export const MicrophoneListeningScreen = () => {
   useEffect(() => {
     isCallPausedRef.current = isCallPaused;
   }, [isCallPaused]);
+
+  useEffect(() => {
+    if (!isCallPaused) {
+      setIsMuteTooltipOpen(false);
+    }
+  }, [isCallPaused]);
+
+  const showMuteTooltip =
+    isCallPaused && !isWebMicrophoneMode && isMuteTooltipOpen;
 
   useEffect(() => {
     isWebMicrophoneModeRef.current = isWebMicrophoneMode;
@@ -416,6 +426,8 @@ export const MicrophoneListeningScreen = () => {
         showEndSessionButton
         isPauseResumeDisabled={isWebMicrophoneMode}
         showFocusModeButton={canShowFocusModeButton}
+        showMuteTooltip={showMuteTooltip}
+        onDismissMuteTooltip={() => setIsMuteTooltipOpen(false)}
       />
     </View>
   );

@@ -18,6 +18,7 @@ export const CollapsibleButtonGroup: React.FC<CollapsibleButtonGroupProps> = ({
   customButtonStyle,
   customButtonTextStyle,
   customToggleContainerStyle,
+  headerContent,
   children,
   testID,
 }) => {
@@ -78,6 +79,7 @@ export const CollapsibleButtonGroup: React.FC<CollapsibleButtonGroupProps> = ({
               setContentHeight(height);
             }
           }}>
+          {headerContent}
           <ButtonGroup
             buttons={buttons}
             customButtonStyle={customButtonStyle}
