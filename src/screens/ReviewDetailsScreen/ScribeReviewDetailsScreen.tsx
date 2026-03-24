@@ -99,6 +99,7 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   return (
     <ReviewApiProvider value={scribeApiHooks}>
       <ReviewDetailsLayout
+        isScribeReview
         reviewId={reviewId}
         reviewNote={reviewData?.note}
         reviewLogic={reviewLogic}
