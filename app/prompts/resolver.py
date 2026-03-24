@@ -13,7 +13,7 @@ Prompt codes use ally_ai_learn_ prefix: ally_ai_learn_subdir_filename
 Local lookup strips the prefix and uses subdir/filename from app/prompts/.
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from app.core.logger import get_logger
 from app.prompts.manager import prompt_manager
@@ -49,6 +49,50 @@ def _get_local_template(prompt_code: str) -> str:
     return prompt_manager.get_template(file_key, prompt_key) or ""
 
 
+def _get_backend_prompts(prompt_data: Any) -> Optional[dict]:
+    if isinstance(prompt_data, dict):
+        return prompt_data
+
+    if hasattr(prompt_data, "prompts"):
+        prompts = getattr(prompt_data, "prompts", None)
+        if isinstance(prompts, dict):
+            return prompts
+
+    return None
+
+
+def _get_backend_prompt_entry(prompt_data: Any, prompt_code: str) -> Any:
+    backend_prompts = _get_backend_prompts(prompt_data)
+    if not backend_prompts:
+        return None
+    return backend_prompts.get(prompt_code)
+
+
+def _extract_backend_template(entry: Any) -> Optional[str]:
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        prompt = entry.get("prompt")
+        if isinstance(prompt, str):
+            return prompt
+    return None
+
+
+def _extract_allowed_variables(entry: Any) -> Optional[set[str]]:
+    if not isinstance(entry, dict):
+        return None
+
+    raw_variables = entry.get("availableVariables")
+    if not isinstance(raw_variables, list):
+        return None
+
+    return {
+        value.strip()
+        for value in raw_variables
+        if isinstance(value, str) and value.strip()
+    }
+
+
 class SafeFormatter(dict):
     """
     Custom dictionary for str.format_map that records missing keys and
@@ -58,11 +102,21 @@ class SafeFormatter(dict):
     without breaking prompt rendering.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        allowed_variables: Optional[set[str]] = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.missing_keys: set[str] = set()
+        self.literal_keys: set[str] = set()
+        self.allowed_variables = allowed_variables
 
     def __missing__(self, key):
+        if self.allowed_variables is not None and key not in self.allowed_variables:
+            self.literal_keys.add(key)
+            return "{" + key + "}"
         self.missing_keys.add(key)
         return ""
 
@@ -86,17 +140,8 @@ def resolve_template(
     Returns:
         The resolved template string
     """
-    if isinstance(prompt_data, dict):
-        backend_prompts = prompt_data
-    else:
-        # Check for .prompts in PromptData or similar object
-        backend_prompts = (
-            getattr(prompt_data, "prompts", None)
-            if hasattr(prompt_data, "prompts")
-            else None
-        )
-
-    backend_template = backend_prompts.get(prompt_code) if backend_prompts else None
+    backend_entry = _get_backend_prompt_entry(prompt_data, prompt_code)
+    backend_template = _extract_backend_template(backend_entry)
     if backend_template and backend_template.strip():
         logger.info(
             "[PROMPT_SOURCE] %s: using METADATA (ally-be, dashboard enabled), "
@@ -173,7 +218,12 @@ def load_and_format(
     # Always use SafeFormatter to ensure the application never crashes
     # due to a template mismatch (e.g. if a variable is added to a local
     # file but the code hasn't been updated to provide it yet).
-    formatter = SafeFormatter(**kwargs)
+    prompt_code = f"ally_ai_learn_{internal_path.replace('/', '_')}"
+    backend_entry = _get_backend_prompt_entry(prompt_data, prompt_code)
+    formatter = SafeFormatter(
+        **kwargs,
+        allowed_variables=_extract_allowed_variables(backend_entry),
+    )
     formatted = template.format_map(formatter)
 
     if formatter.missing_keys:
@@ -183,6 +233,13 @@ def load_and_format(
             internal_path,
             sorted(formatter.missing_keys),
             sorted(kwargs.keys()),
+        )
+
+    if formatter.literal_keys:
+        logger.info(
+            "[PROMPT_FORMAT] %s: unknown placeholders left as literal text: %s",
+            internal_path,
+            sorted(formatter.literal_keys),
         )
 
     return formatted
