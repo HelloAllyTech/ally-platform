@@ -2512,30 +2512,6 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - SelectableText (2.1.0):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.11.18.00)
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-hermes
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Yoga
   - SocketRocket (0.7.1)
   - SwiftUIIntrospect (1.3.0)
   - WebRTC-SDK (137.7151.02)
@@ -2651,7 +2627,6 @@ DEPENDENCIES:
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSoundPlayer (from `../node_modules/react-native-sound-player`)
   - RNSVG (from `../node_modules/react-native-svg`)
-  - "SelectableText (from `../node_modules/@rob117/react-native-selectable-text`)"
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2879,8 +2854,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-sound-player"
   RNSVG:
     :path: "../node_modules/react-native-svg"
-  SelectableText:
-    :path: "../node_modules/@rob117/react-native-selectable-text"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -3005,7 +2978,6 @@ SPEC CHECKSUMS:
   RNScreens: 5621e3ad5a329fbd16de683344ac5af4192b40d3
   RNSoundPlayer: 7961678d02c7339d9e9cfb78b9f3e8fde17f9df2
   RNSVG: 794f269526df9ddc1f79b3d1a202b619df0368e3
-  SelectableText: f8d7da4fc62a751a90bda27404aacffdba10c9fd
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   SwiftUIIntrospect: fee9aa07293ee280373a591e1824e8ddc869ba5d
   WebRTC-SDK: d20de357dcbf7c9696b124b39f3ff62125107e4b
