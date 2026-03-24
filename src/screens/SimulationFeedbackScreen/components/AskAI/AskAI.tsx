@@ -22,7 +22,7 @@ import {
   AIMessageBubble,
   ThinkingIndicator,
   UserMessageBubble,
-} from './chatElements';
+} from './ChatElements';
 import {styles} from './styles';
 import {AskAIChatMessage, ChatMessageRole} from './types';
 import {useAskAIChat} from './useAskAIChat';
