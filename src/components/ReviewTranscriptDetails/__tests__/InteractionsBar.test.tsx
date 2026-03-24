@@ -1,7 +1,7 @@
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
-import {InteractionsBar} from '../../ReviewTranscriptDetails/InteractionsBar';
+import {InteractionsBar} from '../InteractionsBar';
 
 const mockAddReactionToReview = jest.fn().mockResolvedValue({});
 

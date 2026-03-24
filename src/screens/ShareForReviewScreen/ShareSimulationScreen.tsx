@@ -12,7 +12,7 @@ import {
 import {ReviewStatus} from '@/types';
 import {formatDateTime} from '@/utils';
 
-import {ShareReviewLayout} from './components/ShareReviewLayout';
+import {ShareReviewLayout} from './components';
 
 export const ShareSimulationScreen: React.FC<
   RootStackScreenProps<'ShareSimulation'>

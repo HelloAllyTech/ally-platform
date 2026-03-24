@@ -3,6 +3,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscript} from '@/components';
 import {useCallTranscriptDetails, useTranslate} from '@/hooks';
+import {SummaryCard} from '@/screens/SimulationFeedbackScreen/components/SummaryCard';
 import {CallTranscriptMessage} from '@/types';
 
 import {CallTranscriptItem} from '../CallTranscriptItem';
@@ -29,28 +30,24 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
 
   const renderEmptyComponent = () => <EmptyTranscript />;
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      ref={listRef}
-      data={formattedMessages}
-      keyExtractor={item => item.id.toString()}
-      renderItem={renderItem}
-      ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
-      onEndReached={handleEndReached}
-      onEndReachedThreshold={0.1}
-      ListEmptyComponent={renderEmptyComponent}
-    />
+    <SummaryCard title={t('CallSummary.header.transcript')}>
+      <FlatList
+        contentContainerStyle={styles.contentContainer}
+        ref={listRef}
+        data={formattedMessages}
+        keyExtractor={item => item.id.toString()}
+        renderItem={renderItem}
+        ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.1}
+        ListEmptyComponent={renderEmptyComponent}
+      />
+    </SummaryCard>
   );
 };
 
 const styles = ScaledSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: '32@ms',
-  },
   contentContainer: {
-    paddingTop: '16@mvs',
     paddingBottom: '48@mvs',
   },
 });
