@@ -237,6 +237,7 @@ export const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     fontSize: '11@ms',
     color: typographyColors.mediumEmphasis,
+    lineHeight: '15@vs',
     minWidth: '36@ms',
   },
   citationContent: {

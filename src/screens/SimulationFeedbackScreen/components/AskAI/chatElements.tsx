@@ -38,7 +38,7 @@ export const CitationsTable: React.FC<{
           <Text style={styles.citationTimestamp}>{citation.timestamp}</Text>
           <Text style={styles.citationContent}>
             <Text style={styles.citationSpeaker}>
-              {citation.senderId !== -1 ? clientLabel : youLabel}:{' '}
+              {citation.senderId === -1 ? clientLabel : youLabel}:{' '}
             </Text>
             {citation.content}
           </Text>
