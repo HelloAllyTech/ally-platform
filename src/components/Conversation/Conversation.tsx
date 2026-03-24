@@ -41,6 +41,7 @@ type FloatingMenuData = {
 };
 
 export interface ConversationProps {
+  isScribeReview?: boolean;
   messages: MessageData[];
   isSelectable?: boolean;
   onSelection?: (selection: TextSelection, messageId: string) => void;
@@ -60,6 +61,7 @@ export interface ConversationProps {
 }
 
 export const Conversation: React.FC<ConversationProps> = ({
+  isScribeReview = false,
   messages,
   isSelectable = true,
   onSelection,
@@ -199,15 +201,20 @@ export const Conversation: React.FC<ConversationProps> = ({
   );
 
   const getSenderName = useCallback(
-    (isAiClient: boolean) =>
-      isAiClient ? 'AI Client' : (reviewOwnerName ?? t('CallTranscript.you')),
-    [reviewOwnerName, t],
+    (isClient: boolean) => {
+      const clientLabel = isScribeReview
+        ? t('CallTranscript.client')
+        : t('CallTranscript.aiClient');
+      const reviewOwnerLabel = reviewOwnerName ?? t('CallTranscript.you');
+      return isClient ? clientLabel : reviewOwnerLabel;
+    },
+    [reviewOwnerName, t, isScribeReview],
   );
 
   // ── iOS selection component ─────────────────────────────────
   const selectionTextIOSComponent = (
     messageItem: MessageData,
-    isAiClient: boolean,
+    isClient: boolean,
     highlightedPartIndices: number[],
   ) => {
     return (
@@ -220,8 +227,8 @@ export const Conversation: React.FC<ConversationProps> = ({
           setActiveMenuMessageId(id);
         }}
         onRequestClose={dismissAnyMenu}
-        prefixText={`${getSenderName(isAiClient)}:`}
-        prefixTextStyle={isAiClient ? styles.clientAgentText : styles.userName}
+        prefixText={`${getSenderName(isClient)}:`}
+        prefixTextStyle={isClient ? styles.clientAgentText : styles.userName}
         parts={messageItem.messagePart}
         highlightedPartIndices={highlightedPartIndices}
         highlightStyle={styles.highlightedText}
@@ -247,21 +254,21 @@ export const Conversation: React.FC<ConversationProps> = ({
       .map((part, index) => (part.commentIds.length > 0 ? index : -1))
       .filter(index => index !== -1);
 
-    const isAiClient = messageItem.senderId === -1;
+    const isClient = messageItem.senderId === -1;
 
     return selectionTextIOSComponent(
       messageItem,
-      isAiClient,
+      isClient,
       highlightedPartIndices,
     );
   };
 
   const renderDefaultMessage = (messageItem: MessageData) => {
-    const isAiClient = messageItem.senderId === -1;
+    const isClient = messageItem.senderId === -1;
     return (
       <Text>
-        <Text style={isAiClient ? styles.clientAgentText : styles.userName}>
-          {getSenderName(isAiClient)}:
+        <Text style={isClient ? styles.clientAgentText : styles.userName}>
+          {getSenderName(isClient)}:
         </Text>{' '}
         <Text style={styles.messageContent}>
           {messageItem.messagePart.map((part, index) => (
@@ -278,7 +285,7 @@ export const Conversation: React.FC<ConversationProps> = ({
   };
 
   const renderItem = ({item}: {item: MessageData}) => {
-    const isAiClient = item.senderId === -1;
+    const isClient = item.senderId === -1;
 
     // ── Android + selectable → native selection wrapper around RN <Text> ──
     // Layout is built manually (not using MessageComponent) so that only
@@ -301,12 +308,12 @@ export const Conversation: React.FC<ConversationProps> = ({
               onSelectionChange={handleAndroidSelectionChange}
               onSingleTap={handleAndroidSingleTap}
               clearSelectionSignal={clearSelectionSignal}
-              prefixLength={`${getSenderName(isAiClient)}: `.length}
+              prefixLength={`${getSenderName(isClient)}: `.length}
               style={styles.selectableWrapper}>
               <Text style={styles.messageContent}>
                 <Text
-                  style={isAiClient ? styles.clientAgentText : styles.userName}>
-                  {getSenderName(isAiClient)}:{' '}
+                  style={isClient ? styles.clientAgentText : styles.userName}>
+                  {getSenderName(isClient)}:{' '}
                 </Text>
                 {item.messagePart.map((part, index) => {
                   const hasThread = part.commentIds.length > 0;

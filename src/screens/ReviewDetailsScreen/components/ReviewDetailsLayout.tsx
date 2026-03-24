@@ -31,6 +31,7 @@ import {
 import {ReviewNote} from './ReviewNote';
 
 interface ReviewDetailsLayoutProps {
+  isScribeReview?: boolean;
   reviewId: string;
   reviewNote?: string;
   reviewLogic: ReturnType<typeof useReviewDetailsLogic>;
@@ -45,6 +46,7 @@ interface ReviewDetailsLayoutProps {
 }
 
 export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
+  isScribeReview = false,
   reviewId,
   reviewNote,
   reviewLogic,
@@ -172,6 +174,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         {renderHeader()}
       </View>
       <Conversation
+        isScribeReview={isScribeReview}
         messages={conversationMessages}
         isSelectable={!isPrivate && canEditThread}
         onSelection={handleSelection}
