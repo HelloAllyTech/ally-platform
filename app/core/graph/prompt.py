@@ -255,17 +255,19 @@ def _build_branching_prompt(
     retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     branching_prompt = load_and_format(
-        "system/branching_prompt",
+        "system/branching_agent_prompt",
         prompt_data=prompt_data,
         name=getattr(prompt_data, "name", "") or "",
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
         current_location=getattr(prompt_data, "current_location", "") or "",
-        context_line=_optional_field_line(
+        character_context_line=_optional_field_line(
             "The context for this character is", getattr(prompt_data, "context", None)
         ),
         language_block=_get_language_block(prompt_data, language_code),
-        retrieved_context=_get_retrieved_context_text(retrieved_context),
+        retrieved_context_section=_optional_section(
+            "Additional Context", _get_retrieved_context_text(retrieved_context)
+        ),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
     )
@@ -281,7 +283,7 @@ def _build_behavior_prompt(
     retrieved_context: Optional[str] = None,
 ) -> SystemMessage:
     behavior_prompt = load_and_format(
-        "system/behavior_prompt",
+        "system/main_agent_prompt",
         prompt_data=prompt_data,
         name=getattr(prompt_data, "name", "") or "",
         age=getattr(prompt_data, "age", "") or "",

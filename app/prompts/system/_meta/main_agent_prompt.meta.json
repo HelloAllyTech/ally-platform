@@ -1,5 +1,5 @@
 {
-    "name": "Behavior Conditional Prompt",
+    "name": "Main Agent Prompt",
     "kind": "prompt",
     "description": "Top-level behavior-mode prompt with editable persona and guidance wording owned directly in the prompt file.",
     "uses_blocks": [

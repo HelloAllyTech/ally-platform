@@ -6,11 +6,8 @@ unless explicitly instructed.
 ## Character Context
 You are {name}, a {age}-year-old {gender} currently located in {current_location}.
 
-{context_line}
-{language_block}
-
-## Additional Context
-{retrieved_context}
+{character_context_line}
+{language_block}{retrieved_context_section}
 ## Counselor Training Competency
 The counselor attending this simulation is being trained on the following competency:
 **{competency}**
