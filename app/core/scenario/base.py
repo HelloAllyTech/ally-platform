@@ -3,23 +3,23 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, Field
 
+from app.core.branching_instructions.base import BranchingInstruction
+from app.core.config import settings
 from app.core.constants import (
     DEFAULT_LANGUAGE_CODE,
+    VisibilityType,
     normalize_language_code_for_providers,
 )
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent
+from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
+from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.events.factory import build_events_from_metadata
 from app.core.logger import get_logger
 from app.core.scenario.simulation_instructions import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
-from app.core.constants import VisibilityType
-from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
-from app.core.events.event_types.guardrail.schemas import GuardrailData
-from app.core.branching_instructions.base import BranchingInstruction
-from app.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -53,6 +53,7 @@ class PromptData(BaseModel):
     sexual_orientation: Optional[str] = Field(default=None)
     current_location: str = Field(...)
     profession: Optional[str] = Field(default=None)
+    character_profile_text: Optional[str] = Field(default=None)
     context: Optional[str] = Field(default=None)
     session_behavior_guidelines: Optional[str] = Field(default=None)
     life_history_summary: Optional[str] = Field(default=None)
@@ -223,7 +224,7 @@ class Scenario(BaseModel):
         # Parse simulation instructions (same level as events)
         behavior_instructions = raw.get("behaviorInstructions")
         state_instructions = raw.get("stateInstructions")
-        
+
         # Parse guardrails array and build one GuardrailEvent per entry
         guardrail_events = []
         guardrails_raw = raw.get("guardrails") or []
@@ -265,13 +266,11 @@ class Scenario(BaseModel):
                         visibility_type=VisibilityType.PASSIVE,
                         emoji=None,
                         emoji_message=None,
-)
+                    )
                     guardrail_events.append(g_event)
 
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to build guardrail event at index {i}: {e}"
-                    )
+                    logger.warning(f"Failed to build guardrail event at index {i}: {e}")
 
             if guardrail_events:
                 logger.info(f"Built {len(guardrail_events)} guardrail events")
@@ -358,6 +357,9 @@ class Scenario(BaseModel):
                 "sexual_orientation": prompt_data_dict.get("sexualOrientation", None),
                 "current_location": prompt_data_dict.get("currentLocation"),
                 "profession": prompt_data_dict.get("profession", None),
+                "character_profile_text": prompt_data_dict.get(
+                    "characterProfileText", None
+                ),
                 "context": prompt_data_dict.get("context"),
                 "session_behavior_guidelines": prompt_data_dict.get(
                     "sessionBehaviorGuidelines", None

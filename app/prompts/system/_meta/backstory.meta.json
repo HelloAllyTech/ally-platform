@@ -1,5 +1,0 @@
-{
-  "name": "System: Backstory",
-  "kind": "block",
-  "description": "Template for rendering scenario backstory/context when present."
-}

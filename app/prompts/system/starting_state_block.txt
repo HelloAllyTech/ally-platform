@@ -1,2 +1,0 @@
-**Your current thoughts:**
-{starting_state}

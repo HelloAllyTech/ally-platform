@@ -1,25 +1,10 @@
 {
     "name": "Behavior Conditional Prompt",
     "kind": "prompt",
-    "description": "System prompt template for AI behavior mode, handling specific behavioral constraints based on dynamic conditions.",
+    "description": "Top-level behavior-mode prompt with editable persona and guidance wording owned directly in the prompt file.",
     "uses_blocks": [
-        "gender_details_block",
-        "session_behavior_guidelines",
-        "competency_block",
-        "language_instruction_fallback",
-        "custom_field_item",
-        "retrieved_context_section",
-        "custom_context_intro",
-        "conditions_section_wrapper",
-        "profession_block",
-        "previous_memory_block",
-        "life_history",
-        "core_memories_block",
-        "personality_block",
-        "starting_state_block",
-        "emotional_needs_block",
-        "tone_block",
-        "agent_dialogues",
-        "response_length"
+        "behavior_prompt_profession_block",
+        "behavior_prompt_previous_memory_block",
+        "multilingual_instructions"
     ]
 }

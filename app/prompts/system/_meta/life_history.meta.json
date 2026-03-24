@@ -1,6 +1,0 @@
-{
-    "name": "Actor Life History",
-    "kind": "block",
-    "description": "Block describing the actor's life history.",
-    "data_field": "life_history_summary"
-}

@@ -1,6 +1,0 @@
-{
-    "name": "Previous Session Memory",
-    "kind": "block",
-    "description": "Block describing summary from the previous session for continuity.",
-    "data_field": "previous_memory"
-}

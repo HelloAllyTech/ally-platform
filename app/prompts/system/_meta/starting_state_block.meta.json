@@ -1,6 +1,0 @@
-{
-    "name": "Actor Current Thoughts",
-    "kind": "block",
-    "description": "Block describing the actor's current thoughts and mental state.",
-    "data_field": "starting_state"
-}

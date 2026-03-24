@@ -1,6 +1,0 @@
-{
-    "name": "Actor Tone",
-    "kind": "block",
-    "description": "Block describing the actor's talking style and tone.",
-    "data_field": "tone"
-}

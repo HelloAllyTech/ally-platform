@@ -1,11 +1,5 @@
 {
     "name": "Branching Conditional Prompt",
     "kind": "prompt",
-    "description": "System prompt template for AI branching mode, dealing with dynamic states and routing dialog flows.",
-    "uses_blocks": [
-        "backstory",
-        "retrieved_context_section",
-        "competency_block",
-        "language_instruction_fallback"
-    ]
+    "description": "Minimal branching prompt that keeps direct editable wording in the top-level template."
 }

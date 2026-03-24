@@ -176,9 +176,9 @@ class TestMetadataParsingIntegration:
         assert "useInDefaultPrompt" not in custom_fields[2]
 
         # Verify prompt generation filtering
-        from app.core.graph.prompt import _format_custom_fields
+        from app.core.graph.prompt import _format_custom_fields_text
 
-        formatted = _format_custom_fields(custom_fields)
+        formatted = _format_custom_fields_text(custom_fields)
 
         assert "Field 1" in formatted
         assert "Visible" in formatted

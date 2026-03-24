@@ -1,2 +1,0 @@
-{gender_identity}
-{sexual_orientation}

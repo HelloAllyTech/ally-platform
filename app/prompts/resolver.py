@@ -13,7 +13,7 @@ Prompt codes use ally_ai_learn_ prefix: ally_ai_learn_subdir_filename
 Local lookup strips the prefix and uses subdir/filename from app/prompts/.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.logger import get_logger
 from app.prompts.manager import prompt_manager
@@ -49,9 +49,27 @@ def _get_local_template(prompt_code: str) -> str:
     return prompt_manager.get_template(file_key, prompt_key) or ""
 
 
+class SafeFormatter(dict):
+    """
+    Custom dictionary for str.format_map that records missing keys and
+    resolves them to an empty string instead of raising KeyError.
+
+    This lets dashboard-edited prompts omit optional fields or blocks
+    without breaking prompt rendering.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.missing_keys: set[str] = set()
+
+    def __missing__(self, key):
+        self.missing_keys.add(key)
+        return ""
+
+
 def resolve_template(
     prompt_code: str,
-    backend_prompts: Optional[Dict[str, str]] = None,
+    prompt_data: Any = None,
 ) -> str:
     """
     Resolve a prompt template.
@@ -62,11 +80,22 @@ def resolve_template(
 
     Args:
         prompt_code: Prefixed code (e.g. ally_ai_learn_system_base_role_instruction)
-        backend_prompts: promptData.prompts from metadata, or None
+        prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
+            dict, or None
 
     Returns:
         The resolved template string
     """
+    if isinstance(prompt_data, dict):
+        backend_prompts = prompt_data
+    else:
+        # Check for .prompts in PromptData or similar object
+        backend_prompts = (
+            getattr(prompt_data, "prompts", None)
+            if hasattr(prompt_data, "prompts")
+            else None
+        )
+
     backend_template = backend_prompts.get(prompt_code) if backend_prompts else None
     if backend_template and backend_template.strip():
         logger.info(
@@ -114,13 +143,7 @@ def load_template(
         Template string, or "" if not found
     """
     prompt_code = f"ally_ai_learn_{internal_path.replace('/', '_')}"
-
-    if isinstance(prompt_data, dict):
-        backend_prompts = prompt_data
-    else:
-        backend_prompts = getattr(prompt_data, "prompts", None) if prompt_data else None
-
-    return resolve_template(prompt_code, backend_prompts) or ""
+    return resolve_template(prompt_code, prompt_data)
 
 
 def load_and_format(
@@ -129,24 +152,37 @@ def load_and_format(
     **kwargs,
 ) -> str:
     """
-    Load template and optionally format with Python str.format().
+    Load template and format with SafeFormatter to prevent KeyErrors.
 
-    Single entry point for resolve + fallback + format. Use when you have
-    all format kwargs (e.g. language_code, custom_prompt).
+    Single entry point for resolve + fallback + safe format.
 
     Args:
-        internal_path: Local path (e.g. 'system/base_role_instruction' or
-            'prosody/default_generation_prompt')
+        internal_path: Local path (e.g. 'system/full_prompt')
         prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
             dict, or None
-        **kwargs: Passed to template.format(**kwargs). Omit for raw template.
+        **kwargs: Passed to template.format_map(SafeFormatter(**kwargs)).
+            Unspecified template variables will resolve to "" and be logged.
 
     Returns:
-        Formatted string if kwargs provided, else raw template. "" if not found.
+        Formatted string, or "" if not found.
     """
     template = load_template(internal_path, prompt_data)
     if not template:
         return ""
-    if kwargs:
-        return template.format(**kwargs)
-    return template
+
+    # Always use SafeFormatter to ensure the application never crashes
+    # due to a template mismatch (e.g. if a variable is added to a local
+    # file but the code hasn't been updated to provide it yet).
+    formatter = SafeFormatter(**kwargs)
+    formatted = template.format_map(formatter)
+
+    if formatter.missing_keys:
+        logger.warning(
+            "[PROMPT_FORMAT] %s: missing placeholders resolved to empty string: %s. "
+            "Provided kwargs: %s",
+            internal_path,
+            sorted(formatter.missing_keys),
+            sorted(kwargs.keys()),
+        )
+
+    return formatted

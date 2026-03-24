@@ -1,5 +1,0 @@
-{
-  "name": "System: Retrieved Context Section",
-  "kind": "block",
-  "description": "Template for rendering retrieved knowledge/context injected into the prompt."
-}

@@ -1,5 +1,0 @@
-{
-  "name": "Base Role Instruction",
-  "kind": "prompt",
-  "description": "Defines the AI as the main role in a simulation. Sets basic personality traits and constraints, acting as the foundation."
-}

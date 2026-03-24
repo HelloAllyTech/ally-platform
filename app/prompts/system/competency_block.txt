@@ -1,5 +1,0 @@
-## Counselor Training Competency
-The counselor attending this simulation is being trained on the following competency:
-**{competency}**
-
-Shape your responses to create natural opportunities for the counselor to practice and demonstrate this competency. Do not make it obvious or forced — let it emerge organically through the conversation.

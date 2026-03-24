@@ -1,5 +1,0 @@
-{
-  "name": "System: Behavior Condition Then Natural",
-  "kind": "block",
-  "description": "Template for the THEN clause when no explicit state continuation is present."
-}
