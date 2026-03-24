@@ -536,7 +536,7 @@ export const CallLogScreen: React.FC = () => {
             <TabView
               tabs={[
                 {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
-                {key: LogType.SIMULATION, label: t('CallLogs.simulations')},
+                {key: LogType.SIMULATION, label: t('Simulations.simulation')},
               ]}
               activeTab={activeTab}
               onTabChange={setActiveTab}

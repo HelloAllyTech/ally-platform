@@ -167,4 +167,11 @@ export const styles = ScaledSheet.create({
     alignItems: 'center',
     gap: '8@ms',
   },
+  tryAnotherSimulationButton: {
+    position: 'absolute',
+    bottom: '20@vs',
+    width: '90%',
+    alignSelf: 'center',
+    paddingVertical: '8@vs',
+  },
 });

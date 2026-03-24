@@ -20,7 +20,7 @@ export const styles = ScaledSheet.create({
     height: 2,
   },
   tabBarTab: {
-    width: 'auto' as const,
+    flex: 1,
     paddingHorizontal: 10,
   },
   tabBarLabel: {

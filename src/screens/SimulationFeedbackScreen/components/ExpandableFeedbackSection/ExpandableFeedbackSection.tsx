@@ -1,16 +1,22 @@
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowDown} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
+import {FeedbackItem} from '@/types';
+
+import {RecommendationBox} from '../RecommendationBox';
 
 interface ExpandableFeedbackSectionProps {
   title: string;
-  items: string[];
+  items: (string | FeedbackItem)[];
   collapsedItemCount?: number;
 }
+
+const normalizeItem = (item: string | FeedbackItem): FeedbackItem =>
+  typeof item === 'string' ? {text: item} : item;
 
 export const ExpandableFeedbackSection: React.FC<
   ExpandableFeedbackSectionProps
@@ -20,6 +26,24 @@ export const ExpandableFeedbackSection: React.FC<
 
   const displayItems = isExpanded ? items : items.slice(0, collapsedItemCount);
 
+  const renderFeedbackItem = useCallback(
+    (rawItem: string | FeedbackItem, index: number) => {
+      const item = normalizeItem(rawItem);
+      return (
+        <View key={index} style={styles.itemGroup}>
+          <View style={styles.itemRow}>
+            <Text style={styles.bullet}>{'\u2022'}</Text>
+            <Text style={styles.itemText}>{item.text}</Text>
+          </View>
+          {!!item.recommendation && (
+            <RecommendationBox recommendation={item.recommendation} />
+          )}
+        </View>
+      );
+    },
+    [],
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -27,11 +51,7 @@ export const ExpandableFeedbackSection: React.FC<
       </View>
       <View style={styles.content}>
         {displayItems.length > 0 ? (
-          displayItems.map((item, index) => (
-            <View key={index} style={styles.itemRow}>
-              <Text style={styles.itemText}>{item}</Text>
-            </View>
-          ))
+          displayItems.map(renderFeedbackItem)
         ) : (
           <Text style={styles.noDataText}>
             {t('SimulationFeedback.noDataAvailable')}
@@ -86,10 +106,19 @@ const styles = ScaledSheet.create({
     borderBottomWidth: '0.5@ms',
     borderBottomColor: colors.ds.stroke.lightGray,
   },
+  itemGroup: {
+    gap: '8@vs',
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: '8@ms',
+  },
+  bullet: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    lineHeight: '20@ms',
+    color: colors.black,
   },
   itemText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,

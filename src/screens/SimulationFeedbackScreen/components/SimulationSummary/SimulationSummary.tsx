@@ -6,7 +6,7 @@ import {HelpIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily} from '@/theme';
-import {ExperienceMode, SimulationSummaryData} from '@/types';
+import {ExperienceMode, FeedbackItem, SimulationSummaryData} from '@/types';
 import {formatDateTime, isShortSession} from '@/utils';
 
 import {EventChecklist} from '../EventChecklist';
@@ -17,7 +17,7 @@ import {SummaryCard} from '../SummaryCard';
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
   positives?: string[];
-  improvements?: string[];
+  improvements?: (string | FeedbackItem)[];
 }
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({

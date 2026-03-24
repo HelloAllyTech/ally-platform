@@ -136,7 +136,8 @@
     },
     "focus": "Focus",
     "focused": "Focused",
-    "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call."
+    "scribeStopTakingNotesBanner": "The scribe will stop taking notes once you end the call.",
+    "muteTooltip": "Need notes captured? AI can't hear you right now. Resume to let it listen."
   },
   "SuspendedAccount": {
     "title": "Account Suspended",
@@ -226,7 +227,7 @@
   "CallSummary": {
     "enterDetail": "Enter detail",
     "header": {
-      "title": "Call",
+      "title": "Session",
       "subtitle": "Summary",
       "callSummary": "Call summary",
       "transcript": "Transcript",
@@ -455,6 +456,7 @@
     "keyEvents": "Key events",
     "strengthsAndSkills": "Strengths & skills demonstrated",
     "areasOfGrowth": "Areas of growth",
+    "recommended": "Recommended",
     "noDataAvailable": "No Data Available",
     "benchmark": "(Benchmark: {{benchmark}})",
     "upNext": "Up next",
