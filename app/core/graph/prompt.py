@@ -70,13 +70,6 @@ def _optional_prompt_block(
     return content + " "
 
 
-def _optional_section(title: str, body: str) -> str:
-    normalized = (body or "").strip()
-    if not normalized:
-        return ""
-    return f"## {title}\n{normalized}\n\n"
-
-
 def _format_language_samples(samples: List) -> str:
     """
     Format sample dialogues for injection into multilingual_instructions template.
@@ -261,13 +254,12 @@ def _build_branching_prompt(
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
         current_location=getattr(prompt_data, "current_location", "") or "",
-        character_context_line=_optional_field_line(
-            "The context for this character is", getattr(prompt_data, "context", None)
+        character_profile_text=_coerce_block_value(
+            getattr(prompt_data, "character_profile_text", None)
+            or getattr(prompt_data, "context", None)
         ),
         language_block=_get_language_block(prompt_data, language_code),
-        retrieved_context_section=_optional_section(
-            "Additional Context", _get_retrieved_context_text(retrieved_context)
-        ),
+        retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
     )
