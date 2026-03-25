@@ -203,6 +203,8 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[behavior_instruction]
         )
         assert "## Conditions" in msg.content
+        assert '"trigger_behaviors": [' in msg.content
+        assert '"Valid behavior"' in msg.content
 
     def test_generate_system_behavior_instruction_with_empty_strings(self):
         """Test behavior instruction with empty string behaviors."""
@@ -248,9 +250,8 @@ class TestPrompt:
         )
         content = msg.content
         # Should include state instruction but not dialogues
-        assert "State 1" in content
         assert "Be anxious" in content
-        assert "say something similar to" not in content  # No dialogue options
+        assert '"current_state_guidance": "Be anxious"' in content
 
     def test_generate_system_message_state_with_empty_string_dialogues(self):
         """
@@ -276,7 +277,6 @@ class TestPrompt:
         content = msg.content
         # Dialogues should NOT appear (removed to prevent repetition)
         assert '"Valid dialogue"' not in content
-        assert "say something similar to" not in content
         # Only instruction should be used
         assert "Be anxious" in content
 
@@ -305,9 +305,8 @@ class TestPrompt:
         # Check for core persona data rather than rigid header names
         assert "Alex" in content
         assert "Alex" in content
-        assert "State 1" in content
         assert "Be anxious" in content
-        assert "say something similar to" not in content  # No dialogue options
+        assert '"current_state_guidance": "Be anxious"' in content
 
     def test_state_matched_instructions_used_for_matching_state(self):
         """
@@ -333,10 +332,9 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[bi], current_state=state
         )
         content = msg.content
-        assert "State 2" in content
+        assert '"current_state_guidance": "Show cautious relief."' in content
         assert "Show cautious relief." in content
         assert "Stay guarded and withdrawn." not in content
-        assert "say something similar to" not in content
 
     def test_state_matched_instructions_takes_precedence_over_deprecated_instruction(
         self,
@@ -473,7 +471,7 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
-        assert "State 1" in content
+        assert '"current_state_guidance": "Stay guarded and withdrawn."' in content
         assert "Stay guarded and withdrawn." in content
         assert "Show cautious relief." not in content
         assert "Begin to open up slightly." not in content
@@ -485,7 +483,7 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
-        assert "State 2" in content
+        assert '"current_state_guidance": "Show cautious relief."' in content
         assert "Show cautious relief." in content
         assert "Stay guarded and withdrawn." not in content
         assert "Begin to open up slightly." not in content
@@ -497,7 +495,7 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
-        assert "State 3" in content
+        assert '"current_state_guidance": "Begin to open up slightly."' in content
         assert "Begin to open up slightly." in content
         assert "Stay guarded and withdrawn." not in content
         assert "Show cautious relief." not in content
@@ -509,10 +507,7 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
-        assert "State" not in content  # No state label when no state
-        assert (
-            "respond naturally based on your character" in content
-        )  # Natural fallback
+        assert '"current_state_guidance": null' in content
 
     def test_generate_system_message_non_english_no_samples_uses_multilingual_template(
         self,

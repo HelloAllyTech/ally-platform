@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from typing import Any, List, Optional
 
@@ -162,14 +163,12 @@ def _format_custom_fields_text(custom_fields: list) -> str:
     return " ".join(formatted_blocks)
 
 
-def _resolve_state_continuation(
+def _resolve_state_guidance(
     bi: SimulationBehaviorInstruction,
     current_state: Optional[SimulationStateInstruction],
 ) -> str:
     if current_state is None:
         return ""
-
-    state_label = f"State {current_state.state_id}"
 
     if bi.state_matched_instructions:
         matched = next(
@@ -180,65 +179,41 @@ def _resolve_state_continuation(
             ),
             None,
         )
-        if matched:
-            return f" - ({state_label}) {matched.instruction}"
+        if matched and matched.instruction:
+            return matched.instruction.strip()
 
     if current_state.instruction:
-        return f" - ({state_label}) {current_state.instruction}"
+        return current_state.instruction.strip()
 
     return ""
 
 
-def _get_then_clause(
-    bi: SimulationBehaviorInstruction,
-    current_state: Optional[SimulationStateInstruction],
-) -> str:
-    state_continuation = _resolve_state_continuation(bi, current_state)
-
-    if state_continuation:
-        return f"continue with{state_continuation}"
-
-    return "respond naturally based on your character."
-
-
-def _build_behavior_conditions_text(
+def _build_behavior_instructions_json(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
-    prompt_data: Optional[PromptData] = None,
 ) -> str:
     if not behavior_instructions:
-        return ""
+        return "[]"
 
-    condition_blocks = []
+    rules = []
     for bi in behavior_instructions:
         if not bi.behaviors:
             continue
 
-        non_empty_behaviors = [b for b in bi.behaviors if b]
+        non_empty_behaviors = [b.strip() for b in bi.behaviors if b and b.strip()]
         if not non_empty_behaviors:
             continue
 
-        behaviors_str = " OR ".join([f'"{b}"' for b in non_empty_behaviors])
-        then_body = _get_then_clause(bi, current_state)
-        condition_blocks.append(
-            (
-                "If the previous helper utterance can be classified as "
-                f"{behaviors_str}\nThen, {then_body}"
-            ).strip()
+        state_guidance = _resolve_state_guidance(bi, current_state)
+
+        rules.append(
+            {
+                "trigger_behaviors": non_empty_behaviors,
+                "current_state_guidance": state_guidance or None,
+            }
         )
 
-    return "\n\n".join(condition_blocks)
-
-
-def _build_conditions_section(
-    behavior_instructions: List[SimulationBehaviorInstruction],
-    current_state: Optional[SimulationStateInstruction] = None,
-    prompt_data: Optional[PromptData] = None,
-) -> str:
-    conditions_text = _build_behavior_conditions_text(
-        behavior_instructions, current_state, prompt_data
-    )
-    return conditions_text.strip()
+    return json.dumps(rules, indent=2, ensure_ascii=False)
 
 
 def _build_branching_prompt(
@@ -306,8 +281,8 @@ def _build_behavior_prompt(
             getattr(prompt_data, "custom_fields", []) or []
         ),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
-        behavior_condition_entries=_build_conditions_section(
-            behavior_instructions, current_state, prompt_data
+        behavior_instructions_json=_build_behavior_instructions_json(
+            behavior_instructions, current_state
         ),
     )
 

@@ -66,8 +66,27 @@ Shape your responses to create natural opportunities for the counselor to practi
 Conversation history: Use the conversation history provided in the messages.
 
 ## Conditions
-Use the following behavior-triggered rules to generate the next dialogue.
+You will receive behavior rules as structured JSON.
 Evaluate these rules against the last helper message from the conversation history.
-{behavior_condition_entries}
+
+Each rule uses this structure:
+```json
+[
+  {{
+    "trigger_behaviors": ["Behavior name"],
+    "current_state_guidance": "Optional guidance for the client response in the current state, or null"
+  }}
+]
+```
+
+How to use these rules:
+- Compare the last helper message against each rule's `trigger_behaviors`.
+- If a rule matches and `current_state_guidance` is present, use that guidance when generating the next client reply.
+- If a matching rule has `current_state_guidance` set to `null`, respond naturally based on your character.
+- If no rule matches, respond naturally based on your character.
+- Do not mention the JSON, rules, or matching process explicitly in your response.
+
+Behavior rules for this simulation:
+{behavior_instructions_json}
 
 Generate the next dialogue.
