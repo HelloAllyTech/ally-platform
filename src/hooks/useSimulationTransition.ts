@@ -26,15 +26,19 @@ interface UseSimulationTransitionReturn {
   currentSession?: CurrentSessionInfo;
   upcomingScenario?: UpNextSimulation;
   isEventCompleted: boolean;
-  isFlowCompleted: boolean; // Renamed from isPathCompleted - works for both paths and cases
+  isFlowCompleted: boolean;
   hasUpcoming: boolean;
-  canRetryCurrentSession: boolean; // Renamed from canRetryCurrent for clarity
+  canRetryCurrentSession: boolean;
   isCurrentSessionCompleted: boolean;
   isLoading: boolean;
   // Actions
   retrySimulation: () => void;
   startNextSimulation: () => void;
   isStartingSimulation: boolean;
+  // 429 retry modal
+  showRetryModal: boolean;
+  retryStartSimulation: () => Promise<boolean>;
+  closeRetryModal: () => void;
 }
 
 /**
@@ -71,9 +75,13 @@ export const useSimulationTransition = ({
   const [pollingInterval, setPollingInterval] = useState<number>(RETRY_DELAY);
   const nextSimulationPollingAttemptsRef = useRef<number>(0);
 
-  // Use the startSimulation hook for retry and next actions
-  const {startSimulation, isCreatingRoom: isStartingSimulation} =
-    useStartSimulation();
+  const {
+    startSimulation,
+    isCreatingRoom: isStartingSimulation,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
+  } = useStartSimulation();
 
   // Resolve languageId: use explicit param, fall back to user preference, then first available
   const {data: preferencesData} = useGetUserPreferencesQuery();
@@ -246,5 +254,8 @@ export const useSimulationTransition = ({
     retrySimulation,
     startNextSimulation,
     isStartingSimulation,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
   };
 };

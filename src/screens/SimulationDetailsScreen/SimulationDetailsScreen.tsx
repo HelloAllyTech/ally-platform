@@ -31,6 +31,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {RetrySessionModal} from '@/screens/CallLog/components';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
@@ -53,6 +54,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     activeSimulationId,
     startSimulation,
     closeActiveSimulationModal,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
   } = useStartSimulation();
 
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
@@ -242,6 +246,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         visible={showNotification}
         onConfirm={handleConfirmSimulation}
         onClose={() => setShowNotification(false)}
+      />
+      <RetrySessionModal
+        visible={showRetryModal}
+        onRetry={retryStartSimulation}
+        onClose={closeRetryModal}
       />
     </View>
   );

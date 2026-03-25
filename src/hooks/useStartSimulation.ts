@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {check, openSettings, request, RESULTS} from 'react-native-permissions';
 
 import {useErrorToast} from '@/components';
@@ -17,13 +17,19 @@ interface StartSimulationParams {
   caseId?: string;
   languageId?: number;
 }
+
+const HTTP_TOO_MANY_REQUESTS = 429;
+
 interface UseStartSimulationReturn {
   isCreatingRoom: boolean;
   isMicPermissionGranted: boolean;
   activeSimulationId: string | null;
   showActiveSimulationModal: boolean;
+  showRetryModal: boolean;
   startSimulation: (params: StartSimulationParams) => Promise<void>;
+  retryStartSimulation: () => Promise<boolean>;
   closeActiveSimulationModal: () => void;
+  closeRetryModal: () => void;
   setShowActiveSimulationModal: (show: boolean) => void;
 }
 
@@ -49,6 +55,9 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
   );
   const [showActiveSimulationModal, setShowActiveSimulationModal] =
     useState(false);
+  const [showRetryModal, setShowRetryModal] = useState(false);
+
+  const retryParamsRef = useRef<StartSimulationParams | null>(null);
 
   const [startScenarioSession] = useStartScenarioSessionMutation();
 
@@ -61,6 +70,49 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
   const closeActiveSimulationModal = () => {
     setShowActiveSimulationModal(false);
     setActiveSimulationId(null);
+  };
+
+  const closeRetryModal = useCallback(() => {
+    setShowRetryModal(false);
+    retryParamsRef.current = null;
+  }, []);
+
+  const callSessionStart = useCallback(
+    async (params: StartSimulationParams) => {
+      const startResp = await startScenarioSession({
+        scenarioId: params.scenarioId,
+        ...(params.scenarioPathSessionItemId && {
+          scenarioPathSessionItemId: params.scenarioPathSessionItemId,
+        }),
+        ...(params.caseSessionItemId && {
+          caseSessionItemId: params.caseSessionItemId,
+        }),
+        ...(params.languageId && {languageId: params.languageId}),
+      }).unwrap();
+
+      if (startResp) {
+        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
+          sessionData: {
+            id: startResp.scenarioSession.id,
+            accessToken: startResp.accessToken.token,
+            liveKitServerUrl: startResp.accessToken.serverUrl,
+          },
+          scenario: startResp.scenario,
+          ...(params.scenarioPathSessionItemId && {
+            pathSessionItemId: params.scenarioPathSessionItemId,
+          }),
+          ...(params.pathId && {pathId: params.pathId}),
+          ...(params.caseId && {caseId: params.caseId}),
+          ...(params.languageId && {languageId: params.languageId}),
+        });
+      }
+    },
+    [navigation, startScenarioSession],
+  );
+
+  const isRateLimitError = (error: unknown): boolean => {
+    const err = error as {status?: number};
+    return err?.status === HTTP_TOO_MANY_REQUESTS;
   };
 
   const startSimulation = async (
@@ -93,53 +145,69 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
       }
 
       setIsCreatingRoom(true);
-      const startResp = await startScenarioSession({
-        scenarioId: params.scenarioId,
-        ...(params.scenarioPathSessionItemId && {
-          scenarioPathSessionItemId: params.scenarioPathSessionItemId,
-        }),
-        ...(params.caseSessionItemId && {
-          caseSessionItemId: params.caseSessionItemId,
-        }),
-        ...(params.languageId && {languageId: params.languageId}),
-      }).unwrap();
-
-      if (startResp) {
-        navigation.navigate(SCREEN_NAMES.SIMULATION_ASSISTANT, {
-          sessionData: {
-            id: startResp.scenarioSession.id,
-            accessToken: startResp.accessToken.token,
-            liveKitServerUrl: startResp.accessToken.serverUrl,
-          },
-          scenario: startResp.scenario,
-          ...(params.scenarioPathSessionItemId && {
-            pathSessionItemId: params.scenarioPathSessionItemId,
-          }),
-          ...(params.pathId && {pathId: params.pathId}),
-          ...(params.caseId && {caseId: params.caseId}),
-          ...(params.languageId && {languageId: params.languageId}),
-        });
-      }
+      await callSessionStart(params);
     } catch (error) {
-      const err = error as {data?: {entityId?: string}};
-      if (err.data?.entityId) {
-        setActiveSimulationId(err.data?.entityId || null);
-        setShowActiveSimulationModal(true);
+      if (isRateLimitError(error)) {
+        retryParamsRef.current = params;
+        setShowRetryModal(true);
       } else {
-        showErrorToast(error, 'Errors.startSimulation');
+        const err = error as {data?: {entityId?: string}};
+        if (err.data?.entityId) {
+          setActiveSimulationId(err.data?.entityId || null);
+          setShowActiveSimulationModal(true);
+        } else {
+          showErrorToast(error, 'Errors.startSimulation');
+        }
       }
     } finally {
       setIsCreatingRoom(false);
     }
   };
 
+  /**
+   * Retry the session start with the previously stored params.
+   * Returns true on success, false if still rate-limited.
+   */
+  const retryStartSimulation = useCallback(async (): Promise<boolean> => {
+    const params = retryParamsRef.current;
+    if (!params) {
+      return false;
+    }
+
+    try {
+      await callSessionStart(params);
+      setShowRetryModal(false);
+      retryParamsRef.current = null;
+      return true;
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return false;
+      }
+      const err = error as {data?: {entityId?: string}};
+      if (err.data?.entityId) {
+        setShowRetryModal(false);
+        retryParamsRef.current = null;
+        setActiveSimulationId(err.data?.entityId || null);
+        setShowActiveSimulationModal(true);
+      } else {
+        setShowRetryModal(false);
+        retryParamsRef.current = null;
+        showErrorToast(error, 'Errors.startSimulation');
+      }
+      return false;
+    }
+  }, [callSessionStart, showErrorToast]);
+
   return {
     isCreatingRoom,
     isMicPermissionGranted,
     activeSimulationId,
     showActiveSimulationModal,
+    showRetryModal,
     startSimulation,
+    retryStartSimulation,
     closeActiveSimulationModal,
+    closeRetryModal,
     setShowActiveSimulationModal,
   };
 };
