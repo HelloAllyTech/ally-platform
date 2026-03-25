@@ -108,6 +108,7 @@ import RemoveImageIcon from './removeImage.svg';
 import ReplayIcon from './replay.svg';
 import Replay10Icon from './replay10.svg';
 import ResumeIcon from './resume.svg';
+import RetrySessionIcon from './retrySession.svg';
 import ReviewActiveIcon from './reviewActive.svg';
 import ReviewInactiveIcon from './reviewInactive.svg';
 import RightArrow from './rightArrow.svg';
@@ -249,6 +250,7 @@ export {
   RemoveImageIcon,
   ReplayIcon,
   ResumeIcon,
+  RetrySessionIcon,
   ReviewActiveIcon,
   ReviewInactiveIcon,
   RightArrow,

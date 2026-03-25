@@ -27,6 +27,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {RetrySessionModal} from '@/screens/CallLog/components';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {PathSimulationCard} from '@/screens/SimulationPathDetailsScreen/components/PathSimulationCard';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
@@ -95,6 +96,9 @@ export const CaseDetailsScreen: React.FC<
     showActiveSimulationModal,
     activeSimulationId,
     closeActiveSimulationModal,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
   } = useStartSimulation();
 
   const nextSimulation = data?.scenarios?.find(
@@ -331,6 +335,12 @@ export const CaseDetailsScreen: React.FC<
           illustration={<NoCreditsIcon />}
         />
       )}
+
+      <RetrySessionModal
+        visible={showRetryModal}
+        onRetry={retryStartSimulation}
+        onClose={closeRetryModal}
+      />
     </View>
   );
 };

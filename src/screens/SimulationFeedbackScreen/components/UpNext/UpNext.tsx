@@ -4,6 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {Button, SimulationTransitionSection} from '@/components';
 import {useSimulationTransition, useTranslate} from '@/hooks';
+import {RetrySessionModal} from '@/screens/CallLog/components';
 
 import {SessionGlimpse} from '../SessionGlimpse';
 import {SummaryCard} from '../SummaryCard';
@@ -39,6 +40,9 @@ export const UpNext: React.FC<UpNextProps> = ({
     retrySimulation,
     startNextSimulation,
     isStartingSimulation,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
   } = useSimulationTransition({
     scenarioSessionId,
     pathId,
@@ -128,6 +132,11 @@ export const UpNext: React.FC<UpNextProps> = ({
         />
         {renderButtons()}
       </SummaryCard>
+      <RetrySessionModal
+        visible={showRetryModal}
+        onRetry={retryStartSimulation}
+        onClose={closeRetryModal}
+      />
     </ScrollView>
   );
 };

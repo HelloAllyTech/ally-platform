@@ -27,6 +27,7 @@ import {
   useTranslate,
 } from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
+import {RetrySessionModal} from '@/screens/CallLog/components';
 import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/components';
 import {colors} from '@/theme';
 import {PathScenario, SessionItemStatus} from '@/types';
@@ -96,6 +97,9 @@ export const SimulationPathDetailsScreen: React.FC<
     showActiveSimulationModal,
     activeSimulationId,
     closeActiveSimulationModal,
+    showRetryModal,
+    retryStartSimulation,
+    closeRetryModal,
   } = useStartSimulation();
 
   const nextSimulation = pathData?.scenarios?.find(
@@ -345,6 +349,12 @@ export const SimulationPathDetailsScreen: React.FC<
           illustration={<NoCreditsIcon />}
         />
       )}
+
+      <RetrySessionModal
+        visible={showRetryModal}
+        onRetry={retryStartSimulation}
+        onClose={closeRetryModal}
+      />
     </View>
   );
 };

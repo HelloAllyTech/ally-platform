@@ -81,6 +81,16 @@
       "header":{
         "title":"Archives"
       }
+    },
+    "retrySession": {
+      "header":{
+          "title":"We're at capacity ",
+          "subtitle":"Right now"
+      },
+    "description": "We're currently handling the maximum number of active users. Please wait a moment and try again access usually frees up shortly.",
+    "button": "Retry",
+    "retryDescription": "You can retry in",
+    "autoRetryDescription": "We'll automatically retry in"
     }
   },
   "Logout": {
