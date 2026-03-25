@@ -58,7 +58,7 @@ def format_label(text: str) -> str:
 
 def load_meta(txt_file: Path) -> dict | None:
     """
-    Load name, description, kind, uses_blocks from _meta/<stem>.meta.json.
+    Load name, description, category, kind, uses_blocks from _meta/<stem>.meta.json.
     """
     meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
     if not meta_path.exists():
@@ -72,6 +72,8 @@ def load_meta(txt_file: Path) -> dict | None:
             out["name"] = data["name"].strip()
         if isinstance(data.get("description"), str) and data["description"].strip():
             out["description"] = data["description"].strip()
+        if isinstance(data.get("category"), str) and data["category"].strip():
+            out["category"] = data["category"].strip()
         if isinstance(data.get("kind"), str) and data["kind"].strip():
             out["kind"] = data["kind"].strip()
         if isinstance(data.get("uses_blocks"), list):
@@ -95,10 +97,14 @@ def scan_prompts() -> list[dict]:
             path_part = str(rel.with_suffix("")).replace("/", "_")
             prompt_code = f"{PROMPT_CODE_PREFIX}{path_part}"
 
+            top_level_dir = rel.parts[0] if len(rel.parts) > 1 else ""
             subdir = rel.parent.name if rel.parent and rel.parent != Path(".") else ""
             filename = rel.stem
             formatted_filename = format_label(filename)
             formatted_subdir = format_label(subdir) if subdir else ""
+            formatted_category = (
+                format_label(top_level_dir) if top_level_dir else "General"
+            )
 
             if formatted_subdir:
                 name = f"{formatted_subdir}: {formatted_filename}"
@@ -113,12 +119,18 @@ def scan_prompts() -> list[dict]:
                     name = meta["name"]
                 if meta.get("description") is not None:
                     description = meta["description"]
+            category = (
+                meta.get("category")
+                if meta and meta.get("category") is not None
+                else formatted_category
+            )
 
             content = txt_file.read_text(encoding="utf-8")
             item = {
                 "promptCode": prompt_code,
                 "name": name,
                 "description": description,
+                "category": category,
                 "prompt": content,
                 "availableVariables": parse_variables_from_prompt(content),
             }
