@@ -1,0 +1,8 @@
+{
+    "name": "Behavior Detection User Prompt",
+    "kind": "prompt",
+    "description": "User prompt for behavior detection containing the counselor message text to be classified.",
+    "availableVariables": [
+        "message"
+    ]
+}

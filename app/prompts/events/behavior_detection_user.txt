@@ -1,0 +1,2 @@
+Counselor's message to classify:
+<text>{message}</text>

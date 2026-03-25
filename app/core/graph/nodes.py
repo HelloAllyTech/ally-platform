@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, Optional, cast
+from typing import Any, Dict, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -548,6 +548,7 @@ async def resolve_branching_instruction(
 async def _detect_single_behavior_instruction(
     behavior_instruction: SimulationBehaviorInstruction,
     chat_messages: list,
+    prompt_data: Optional[Any] = None,
 ) -> Optional[BehaviorInstructionFeedbackData]:
     """
     Detect a single behavior instruction by delegating to its detect method.
@@ -563,7 +564,9 @@ async def _detect_single_behavior_instruction(
         BehaviorInstructionFeedbackData if detected, None otherwise
     """
     try:
-        detected = await behavior_instruction.detect(chat_messages)
+        detected = await behavior_instruction.detect(
+            chat_messages, prompt_data=prompt_data
+        )
         if detected:
             return BehaviorInstructionFeedbackData(
                 behavior_instruction_id=behavior_instruction.behavior_instruction_id,
@@ -582,6 +585,7 @@ async def _detect_single_behavior_instruction(
 async def _detect_behavior_instructions(
     behavior_instructions: list[SimulationBehaviorInstruction],
     chat_messages: list,
+    prompt_data: Optional[Any] = None,
 ) -> list[BehaviorInstructionFeedbackData]:
     """
     Detect all behavior instructions in parallel.
@@ -606,7 +610,9 @@ async def _detect_behavior_instructions(
         try:
             async with semaphore:
                 return await asyncio.wait_for(
-                    _detect_single_behavior_instruction(bi, chat_messages),
+                    _detect_single_behavior_instruction(
+                        bi, chat_messages, prompt_data=prompt_data
+                    ),
                     timeout=10.0,
                 )
         except asyncio.TimeoutError:
@@ -676,7 +682,9 @@ async def detect_behaviors(
 
     # Detect all behavior instructions in parallel
     behavior_feedback = await _detect_behavior_instructions(
-        scenario.behavior_instructions, chat_messages
+        scenario.behavior_instructions,
+        chat_messages,
+        prompt_data=scenario.prompt_data,
     )
 
     # Accumulate behavior scores in ScoreKeeper
