@@ -33,7 +33,7 @@ from app.core.scenario_report.schemas import (
     TranscriptEntry,
 )
 from app.llms import create_llm_client
-from app.prompts.resolver import load_and_format
+from app.prompts.resolver import load_and_format, load_template
 
 logger = get_logger(__name__)
 
@@ -42,26 +42,13 @@ logger = get_logger(__name__)
 _report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
 
 # --------------- Anti-stagnation prompt fragments ---------------
-# Appended once to the counselor system prompt (permanent guidance)
-_ANTI_REPETITION_GUIDANCE = (
-    "\n\nWhen responding:\n"
-    "- Do not repeat phrases used earlier in the conversation.\n"
-    "- Prefer asking a new question or exploring a new perspective.\n"
-    "- Move the conversation forward rather than only validating feelings."
-)
-
-# Baked into the base prompt once at setup alongside anti-repetition guidance
-_CONVERSATION_GOAL_REMINDER = (
-    "Conversation Objective: Help the client explore underlying emotions. "
-    "Avoid repeating validation. Introduce new insights or probing questions. "
-    "Progress the discussion forward."
-)
-
-# Injected only when a repetition loop is detected
-_STAGNATION_STEERING = (
-    "The conversation is repeating validation statements. "
-    "Shift toward exploring causes, coping strategies, or new questions."
-)
+# Loaded from .txt so they can be edited via the dashboard override system.
+# strip() removes any trailing newline from the file.
+_ANTI_REPETITION_GUIDANCE = load_template("counselor/anti_repetition_guidance").strip()
+_CONVERSATION_GOAL_REMINDER = load_template(
+    "counselor/conversation_goal_reminder"
+).strip()
+_STAGNATION_STEERING = load_template("counselor/stagnation_steering").strip()
 
 _REPETITION_JACCARD_THRESHOLD = 0.5
 _REPETITION_LOOKBACK = 3
@@ -416,6 +403,7 @@ class ScenarioReportService:
             # for evaluation.
             counselor_base_prompt = (
                 counselor_system_prompt
+                + "\n\n"
                 + _ANTI_REPETITION_GUIDANCE
                 + "\n\n"
                 + _CONVERSATION_GOAL_REMINDER

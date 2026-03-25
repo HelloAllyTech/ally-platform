@@ -1,0 +1,5 @@
+{
+    "name": "Binary Classifier User Prompt",
+    "kind": "prompt",
+    "description": "User-turn prompt wrapping the message to classify inside an XML tag for the binary classifier."
+}

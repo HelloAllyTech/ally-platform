@@ -1,0 +1,5 @@
+{
+    "name": "Conversation Goal Reminder",
+    "kind": "prompt",
+    "description": "Objective reminder baked into the counselor base prompt in report mode, keeping focus on exploring emotions and progressing the session forward."
+}

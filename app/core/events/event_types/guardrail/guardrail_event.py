@@ -25,10 +25,12 @@ from typing_extensions import override
 from app.core.config import settings
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent, ChatMessage
-from app.core.events.event_types.binary_classifier.schemas import ClassificationResultStrOp
-
+from app.core.events.event_types.binary_classifier.schemas import (
+    ClassificationResultStrOp,
+)
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.logger import get_logger
+from app.prompts.resolver import load_and_format
 
 logger = get_logger(__name__)
 
@@ -117,26 +119,19 @@ class GuardrailEvent(BaseEvent):
         try:
             client = self._get_client(self.llm_base_url)
 
-            system_prompt = (
-                f"You are a guardrail classifier for a counseling training simulation.\n"
-                f"Your job is to detect if a counselor's message is similar in meaning "
-                f"or intent to the following boundary violation:\n\n"
-                f'BOUNDARY: "{self.data.helper_dialogue}"\n\n'
-                f"Reply with only a JSON object: {{\"is_class\": true}} if the message "
-                f"violates the boundary, or {{\"is_class\": false}} if it does not.\n"
-                f"Consider paraphrases, synonyms, and indirect references as violations.\n"
-                f"Do not explain. Only return the JSON."
+            system_prompt = load_and_format(
+                "events/guardrail_system",
+                helper_dialogue=self.data.helper_dialogue,
             )
 
-            user_prompt = f'Counselor message: "{text}"'
+            user_prompt = load_and_format(
+                "events/guardrail_user",
+                counselor_message=text,
+            )
 
             messages = [
-                ChatCompletionSystemMessageParam(
-                    content=system_prompt, role="system"
-                ),
-                ChatCompletionUserMessageParam(
-                    content=user_prompt, role="user"
-                ),
+                ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
+                ChatCompletionUserMessageParam(content=user_prompt, role="user"),
             ]
 
             completion = await client.beta.chat.completions.parse(
@@ -165,4 +160,3 @@ class GuardrailEvent(BaseEvent):
                 e,
             )
             return False
-

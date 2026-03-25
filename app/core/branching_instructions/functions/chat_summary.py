@@ -10,18 +10,9 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.logger import get_logger
 from app.llms import create_llm_client
 from app.llms.base import BaseLLMClient
+from app.prompts.resolver import load_template
 
 logger = get_logger(__name__)
-
-# System prompt optimized for summarization
-SUMMARY_SYSTEM_PROMPT = (
-    "You are an expert clinical supervisor summarizing a role-play session. "
-    "The conversation is between a 'COUNSELLOR'  and a 'CLIENT'. "
-    "Summarize the interaction concisely in 2-3 sentences. "
-    "Focus on the clinical issues raised by the Client and the therapeutic "
-    "interventions or questions used by the Counsellor. "
-    "Do not include introductory text."
-)
 
 
 async def generate_chat_summary(
@@ -82,7 +73,7 @@ async def generate_chat_summary(
             ChatSummaryResponse
         ).ainvoke(
             [
-                SystemMessage(content=SUMMARY_SYSTEM_PROMPT),
+                SystemMessage(content=load_template("branching/chat_summary_system")),
                 HumanMessage(content=f"Conversation History:\n\n{conversation_text}"),
             ]
         )

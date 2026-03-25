@@ -1,0 +1,5 @@
+{
+    "name": "Stagnation Steering Injection",
+    "kind": "prompt",
+    "description": "Short steering fragment injected into the counselor system prompt only when a repetition loop is detected, redirecting the counselor toward new questions or coping strategies."
+}

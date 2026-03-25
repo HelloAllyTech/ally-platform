@@ -1,0 +1,5 @@
+{
+    "name": "Transcript Evaluator System Prompt",
+    "kind": "prompt",
+    "description": "LLM-as-a-judge system prompt that scores the client agent's performance across six metrics (gradual disclosure, difficulty level, colloquialism, context appropriateness, consistency, resistance) on a 0-100 scale."
+}

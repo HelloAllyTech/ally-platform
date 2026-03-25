@@ -16,6 +16,7 @@ from app.core.logger import get_logger
 from app.core.scenario.base import PromptData
 from app.core.scenario_report.schemas import TranscriptEntry
 from app.llms import create_llm_client
+from app.prompts.resolver import load_template
 
 logger = get_logger(__name__)
 
@@ -97,69 +98,6 @@ class EvaluationResult(BaseModel):
 # ------------------------------------------------------------------
 # Prompt construction
 # ------------------------------------------------------------------
-
-_EVALUATION_SYSTEM_PROMPT = """\
-You are an expert evaluator for AI-simulated counseling training sessions.
-
-You will be given:
-1. A CLIENT character description (the persona the client agent was supposed to play).
-2. A COUNSELOR's role description.
-3. The full conversation transcript between the CLIENT and the COUNSELOR.
-
-Your task is to evaluate how well the CLIENT agent (actor) performed across
-six metrics, each scored 0-100:
-
-### Gradual Disclosure (0-100)
-The extent to which the actor gradually opened up instead of opening up a lot
-all of a sudden towards the beginning:
-- Did the actor reveal personal information slowly over time?
-- Was there a natural progression from surface-level to deeper topics?
-- Did the actor avoid dumping all their story at the start?
-- Was the pacing of self-disclosure realistic and appropriate?
-
-### Difficulty Level (0-100)
-The extent to which the actor made the roleplay practice session challenging
-for the helper:
-- Did the actor present realistic challenges
-  (resistance, defensiveness, ambivalence)?
-- Were there appropriate obstacles for the helper to navigate?
-- Did the actor avoid making it too easy by being overly compliant?
-- Was the level of difficulty appropriate for training purposes?
-
-### Colloquialism (0-100)
-The extent to which the dialogues used by the actor were colloquial:
-- Did the actor use natural, everyday language?
-- Were the responses conversational rather than formal or scripted?
-- Did the actor use appropriate slang, contractions, and informal expressions?
-- Did the language feel authentic to how real people speak?
-
-### Context Appropriateness (0-100)
-The extent to which the dialogues used by the actor were appropriate
-representation of the actor's background:
-- Did the language match the character's demographics (age, gender, location)?
-- Were references to social and cultural background appropriate?
-- Did work-related language fit the character's profession?
-- Was socioeconomic background reflected appropriately in speech patterns?
-
-### Consistency (0-100)
-The extent to which the actor displayed consistency in their personality:
-- Did the actor maintain the same personality traits throughout?
-- Were emotional responses consistent with the character?
-- Did the actor stay true to the established persona?
-- Were there no contradictions in behavior or statements?
-
-### Resistance (0-100)
-The extent to which the actor resisted the helper's attempts to help:
-- Did the actor show appropriate reluctance or defensiveness?
-- Were there realistic barriers to accepting help?
-- Did the actor challenge the helper's suggestions when appropriate?
-- Was resistance displayed in a believable, human way?
-
-Score strictly. A perfect 100 means indistinguishable from a real human client. \
-Typical good performance is 60-85.
-
-Return your evaluation as structured JSON.\
-"""
 
 
 def _build_evaluation_prompt(
@@ -252,7 +190,10 @@ async def evaluate_transcript(
 
         result: EvaluationResult = await llm.ainvoke(
             [
-                {"role": "system", "content": _EVALUATION_SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": load_template("evaluation/evaluator_system"),
+                },
                 {"role": "user", "content": user_message},
             ]
         )

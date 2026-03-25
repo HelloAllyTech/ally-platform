@@ -9,16 +9,9 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.logger import get_logger
 from app.llms import create_llm_client
 from app.llms.base import BaseLLMClient
+from app.prompts.resolver import load_template
 
 logger = get_logger(__name__)
-
-# System prompt for LLM content generation
-SYSTEM_PROMPT = (
-    "You are a helpful AI assistant tasked with generating content based on user "
-    "requests. Provide clear, concise, and relevant responses that directly address "
-    "the user's input. Generate content that is appropriate for the given context "
-    "and deliver it in a natural, helpful, and professional manner."
-)
 
 
 async def generate_llm_response(
@@ -69,8 +62,9 @@ async def generate_llm_response(
         class LLMResponse(BaseModel):
             content: str
 
-        # Create system message with instructions for content generation
-        system_message = SystemMessage(content=SYSTEM_PROMPT)
+        system_message = SystemMessage(
+            content=load_template("branching/llm_response_system")
+        )
 
         # Create user message with only the content
         user_message = HumanMessage(content=content)
