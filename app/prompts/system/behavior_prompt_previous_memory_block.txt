@@ -1,1 +1,0 @@
-Here is a summary from your previous session: {value}

@@ -3,6 +3,6 @@
     "kind": "prompt",
     "description": "Minimal branching prompt that keeps direct editable wording in the top-level template.",
     "uses_blocks": [
-        "multilingual_instructions"
+        "multilingual_instructions_block"
     ]
 }

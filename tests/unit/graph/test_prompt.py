@@ -528,8 +528,8 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
         )
         content = msg.content
-        assert "**LANGUAGE INSTRUCTION:**" in content
-        assert "Generate next dialogue" in content
+        assert "Output language: hi-IN" in content
+        assert "Generate the next dialogue" in content
         assert "hi-IN" in content
         assert "Example 1:" not in content
 
@@ -542,7 +542,7 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[], language_code="ml-IN"
         )
         content = msg.content
-        assert "**LANGUAGE INSTRUCTION:**" in content
+        assert "Output language: ml-IN" in content
         assert "ml-IN" in content
         assert "Example 1:" not in content
 
@@ -556,8 +556,8 @@ class TestPrompt:
             prompt_data=pd, behavior_instructions=[], language_code="en-US"
         )
 
-        assert "**LANGUAGE INSTRUCTION:**" not in msg_en_in.content
-        assert "**LANGUAGE INSTRUCTION:**" not in msg_en_us.content
+        assert "Output language:" not in msg_en_in.content
+        assert "Output language:" not in msg_en_us.content
 
     def test_generate_system_message_samples_present_injects_sample_block(self):
         """When samples present for non-English, use sample block."""
@@ -571,7 +571,7 @@ class TestPrompt:
         )
         content = msg.content
         # Sample block should be present
-        assert "Generate next dialogue" in content
+        assert "Generate the next dialogue" in content
         assert "ml-IN" in content
         assert "Example 1:" in content
         assert "Counselor:" in content

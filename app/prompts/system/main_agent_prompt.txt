@@ -10,7 +10,7 @@ Your character backstory is {character_profile_text}.
 
 {previous_memory_block}
 
-{language_block}
+{multilingual_instructions_block}
 
 ## Additional Context
 {retrieved_context}

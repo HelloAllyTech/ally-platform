@@ -104,7 +104,7 @@ def _get_language_sample_block(
     samples_text = _format_language_samples(samples) if samples else ""
 
     result = load_and_format(
-        "system/multilingual_instructions",
+        "system/multilingual_instructions_block",
         prompt_data=backend_prompts,
         language_code=language_code,
         samples=samples_text,
@@ -112,6 +112,8 @@ def _get_language_sample_block(
     if not result or not result.strip():
         logger.error(
             "%s multilingual_instructions template resolved empty for language_code=%s",
+            # log token kept for grep stability;
+            # template file is multilingual_instructions_block
             LOG_PREFIX,
             language_code,
         )
@@ -233,7 +235,7 @@ def _build_branching_prompt(
             getattr(prompt_data, "character_profile_text", None)
             or getattr(prompt_data, "context", None)
         ),
-        language_block=_get_language_block(prompt_data, language_code),
+        multilingual_instructions_block=_get_language_block(prompt_data, language_code),
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
@@ -266,19 +268,19 @@ def _build_behavior_prompt(
             getattr(prompt_data, "sexual_orientation", None)
         ),
         profession_block=_optional_prompt_block(
-            "system/behavior_prompt_profession_block",
+            "system/profession_block",
             getattr(prompt_data, "profession", None),
             prompt_data,
         ),
         previous_memory_block=_optional_prompt_block(
-            "system/behavior_prompt_previous_memory_block",
+            "system/previous_memory_block",
             getattr(prompt_data, "previous_memory", None),
             prompt_data,
         ),
         character_profile_text=_coerce_block_value(
             getattr(prompt_data, "character_profile_text", None)
         ),
-        language_block=_get_language_block(prompt_data, language_code),
+        multilingual_instructions_block=_get_language_block(prompt_data, language_code),
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []

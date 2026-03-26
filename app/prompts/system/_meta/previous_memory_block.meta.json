@@ -1,0 +1,5 @@
+{
+    "name": "Previous Memory Block",
+    "kind": "block",
+    "description": "Optional session-memory sentence carrying forward prior-session summary into the main prompt."
+}

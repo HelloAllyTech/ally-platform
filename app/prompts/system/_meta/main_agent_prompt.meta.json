@@ -3,8 +3,8 @@
     "kind": "prompt",
     "description": "Top-level behavior-mode prompt with editable persona and guidance wording owned directly in the prompt file.",
     "uses_blocks": [
-        "behavior_prompt_profession_block",
-        "behavior_prompt_previous_memory_block",
-        "multilingual_instructions"
+        "profession_block",
+        "previous_memory_block",
+        "multilingual_instructions_block"
     ]
 }

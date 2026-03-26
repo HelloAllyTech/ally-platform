@@ -7,7 +7,7 @@ unless explicitly instructed.
 You are {name}, a {age}-year-old {gender} currently located in {current_location}.
 
 Your character backstory is {character_profile_text}.
-{language_block}
+{multilingual_instructions_block}
 
 ## Additional Context
 {retrieved_context}

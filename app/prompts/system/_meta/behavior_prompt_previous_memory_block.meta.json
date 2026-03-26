@@ -1,5 +1,0 @@
-{
-    "name": "Behavior Prompt Previous Memory Block",
-    "kind": "block",
-    "description": "Optional session-memory sentence carrying forward prior-session summary into the behavior prompt."
-}
