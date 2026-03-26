@@ -49,6 +49,7 @@ class PromptData(BaseModel):
     name: str = Field(...)
     age: str = Field(...)
     gender: str = Field(...)
+    role_instructions: Optional[str] = Field(default=None)
     gender_identity: Optional[str] = Field(default=None)
     sexual_orientation: Optional[str] = Field(default=None)
     current_location: str = Field(...)
@@ -354,6 +355,7 @@ class Scenario(BaseModel):
                 "name": prompt_data_dict.get("name"),
                 "age": str(prompt_data_dict.get("age")),
                 "gender": prompt_data_dict.get("gender"),
+                "role_instructions": prompt_data_dict.get("roleInstructions", None),
                 "gender_identity": prompt_data_dict.get("genderIdentity", None),
                 "sexual_orientation": prompt_data_dict.get("sexualOrientation", None),
                 "current_location": prompt_data_dict.get("currentLocation"),

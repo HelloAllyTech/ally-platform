@@ -15,6 +15,7 @@ def make_prompt_data(**overrides):
         name="Alex",
         age="28",
         gender="Male",
+        role_instructions="Act only as the client in this simulation.",
         gender_identity=None,
         sexual_orientation=None,
         current_location="NYC",
@@ -46,6 +47,15 @@ class TestPrompt:
         assert "Male" in content
         assert "NYC" in content
         assert "Starting therapy for anxiety." in content
+        assert "Act only as the client in this simulation." in content
+
+    def test_generate_system_message_uses_role_instructions_from_prompt_data(self):
+        pd = make_prompt_data(
+            role_instructions="You are a difficult customer. Stay in that role."
+        )
+        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+
+        assert "You are a difficult customer. Stay in that role." in msg.content
 
     def test_generate_system_message_optional_blocks_and_next_instruction(self):
         pd = make_prompt_data(
