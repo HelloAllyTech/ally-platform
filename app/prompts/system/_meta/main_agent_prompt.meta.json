@@ -2,6 +2,10 @@
     "name": "Main Agent Prompt",
     "kind": "prompt",
     "description": "Top-level behavior-mode prompt with editable persona and guidance wording owned directly in the prompt file.",
+    "availableVariables": [
+        "title",
+        "description"
+    ],
     "uses_blocks": [
         "profession_block",
         "previous_memory_block",

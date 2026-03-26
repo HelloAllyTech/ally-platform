@@ -2,6 +2,10 @@
     "name": "Branching Agent Prompt",
     "kind": "prompt",
     "description": "Minimal branching prompt that keeps direct editable wording in the top-level template.",
+    "availableVariables": [
+        "title",
+        "description"
+    ],
     "uses_blocks": [
         "multilingual_instructions_block"
     ]

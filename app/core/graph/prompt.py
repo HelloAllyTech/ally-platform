@@ -227,6 +227,8 @@ def _build_branching_prompt(
     branching_prompt = load_and_format(
         "system/branching_agent_prompt",
         prompt_data=prompt_data,
+        title=_coerce_block_value(getattr(prompt_data, "title", None)),
+        description=_coerce_block_value(getattr(prompt_data, "description", None)),
         name=getattr(prompt_data, "name", "") or "",
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
@@ -254,6 +256,8 @@ def _build_behavior_prompt(
     behavior_prompt = load_and_format(
         "system/main_agent_prompt",
         prompt_data=prompt_data,
+        title=_coerce_block_value(getattr(prompt_data, "title", None)),
+        description=_coerce_block_value(getattr(prompt_data, "description", None)),
         role_instructions=_coerce_block_value(
             getattr(prompt_data, "role_instructions", None)
         ),

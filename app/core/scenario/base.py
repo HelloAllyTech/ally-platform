@@ -46,6 +46,8 @@ class ScenarioResponseLength(str, Enum):
 
 
 class PromptData(BaseModel):
+    title: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None)
     name: str = Field(...)
     age: str = Field(...)
     gender: str = Field(...)
@@ -352,6 +354,9 @@ class Scenario(BaseModel):
 
         try:
             mapped_data = {
+                "title": prompt_data_dict.get("title") or raw.get("title"),
+                "description": prompt_data_dict.get("description")
+                or raw.get("description"),
                 "name": prompt_data_dict.get("name"),
                 "age": str(prompt_data_dict.get("age")),
                 "gender": prompt_data_dict.get("gender"),
