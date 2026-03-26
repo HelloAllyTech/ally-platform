@@ -46,6 +46,16 @@ def parse_variables_from_prompt(text: str) -> list[str]:
     return sorted(set(matches))
 
 
+def merge_available_variables(*variable_lists: list[str]) -> list[str]:
+    merged = {
+        value.strip()
+        for values in variable_lists
+        for value in values
+        if isinstance(value, str) and value.strip()
+    }
+    return sorted(merged)
+
+
 def format_label(text: str) -> str:
     """
     Replace underscores with spaces and capitalize first letter of each word.
@@ -78,6 +88,8 @@ def load_meta(txt_file: Path) -> dict | None:
             out["kind"] = data["kind"].strip()
         if isinstance(data.get("uses_blocks"), list):
             out["uses_blocks"] = data["uses_blocks"]
+        if isinstance(data.get("availableVariables"), list):
+            out["availableVariables"] = data["availableVariables"]
         return out if out else None
     except (json.JSONDecodeError, OSError):
         return None
@@ -132,7 +144,10 @@ def scan_prompts() -> list[dict]:
                 "description": description,
                 "category": category,
                 "prompt": content,
-                "availableVariables": parse_variables_from_prompt(content),
+                "availableVariables": merge_available_variables(
+                    parse_variables_from_prompt(content),
+                    meta.get("availableVariables", []) if meta else [],
+                ),
             }
 
             if meta:
