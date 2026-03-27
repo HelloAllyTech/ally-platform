@@ -95,7 +95,7 @@ export const scribeReviewsApi = api.injectEndpoints({
           content,
         },
       }),
-      invalidatesTags: ['ReviewDetails', 'ReviewMessages'],
+      invalidatesTags: ['ReviewDetails', 'ReviewMessages', 'GeneralComments'],
     }),
     getScribeThreadComments: builder.query<
       GetThreadCommentsResponse,
@@ -139,7 +139,7 @@ export const scribeReviewsApi = api.injectEndpoints({
         url: API_ROUTES.SCRIBE_REVIEWS.DELETE_COMMENT(commentId),
         method: API_METHODS.DELETE,
       }),
-      invalidatesTags: ['ReviewThreads', 'GeneralComments'],
+      invalidatesTags: ['ReviewThreads', 'GeneralComments', 'ReviewDetails'],
     }),
     getScribeGeneralReviewComments: builder.query<
       GetThreadCommentsResponse,
