@@ -9,15 +9,20 @@ type MockableResponse = {
 
 /**
  * Minimal fetch Response for tests; RTK Query calls `response.clone()` and reads both
- * `json()` and `clone().text()` in parallel.
+ * `json()` and `clone().text()` in parallel. RTK's default JSON handler parses via
+ * `response.text()` (not `json()`), so `text()` must return serialized JSON.
  */
 export function mockOkJsonResponse(jsonBody: unknown = {}): Response {
+  const serialized = JSON.stringify(jsonBody);
   const r: MockableResponse = {
     ok: true,
     status: 200,
-    json: async () => jsonBody,
-    text: async () => '',
-    headers: {get: () => null},
+    json: async () => JSON.parse(serialized),
+    text: async () => serialized,
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === 'content-type' ? 'application/json' : null,
+    },
     clone(): Response {
       return r as unknown as Response;
     },
