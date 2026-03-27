@@ -1,114 +1,172 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
-// Mock Google Sign-In to avoid native module requirement
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  GoogleSignin: {
-    configure: jest.fn(),
-    hasPlayServices: jest.fn(),
-    signIn: jest.fn(),
-  },
-  statusCodes: {
-    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
-    IN_PROGRESS: 'IN_PROGRESS',
-    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
-  },
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({t: (k: string) => k}),
 }));
 
-// Mock RTK Query api to avoid circular import issues in tests
-jest.mock('@/services/api', () => ({
-  api: {
-    reducerPath: 'api',
-    reducer: (state: any = {}) => state,
-    middleware: () => (next: any) => (action: any) => next(action),
-    injectEndpoints: () => ({
-      useLazyGetCallSummaryQuery: () => [jest.fn(), {}],
-      useUpdateCallSummaryMutation: () => [jest.fn(), {}],
-      useLazyExportCallSummaryQuery: () => [jest.fn(), {}],
-      useUpdateCallInfoMutation: () => [jest.fn(), {}],
-      useEnhanceCallSummaryMutation: () => [jest.fn(), {}],
-      useGetTagsMutation: () => [jest.fn(), {}],
-      useAddSummaryFeedbackMutation: () => [jest.fn(), {}],
-    }),
-  },
-}));
-
-// Stub @livekit/react-native imports if needed by any sub-component
-jest.mock('@livekit/react-native', () => ({
-  AndroidAudioTypePresets: { media: {} },
-  AudioSession: { configureAudio: jest.fn() },
-}));
-
-// Guard: if any hook attempts to import live audio stream, stub it
-jest.mock('@/hooks/useLiveAudioStream', () => ({
-  useLiveAudioStream: () => ({
-    isRecording: false,
-    startRecording: jest.fn(),
-    stopRecording: jest.fn(),
-  }),
-}));
-
-jest.mock('@/components', () => {
+jest.mock('@/assets', () => {
   const React = require('react');
-  const {Text} = require('react-native');
+  const {View} = require('react-native');
   return {
-    FeedbackPopup: ({note}: any) => <Text>{note}</Text>,
-    DropdownMenu: ({items}: any) => <Text>{items?.[0]?.text || 'dropdown'}</Text>,
+    ArchiveIcon: (props: any) => <View testID="archive-icon" {...props} />,
+    ContractIcon: (props: any) => <View testID="contract-icon" {...props} />,
+    EditIcon: (props: any) => <View testID="edit-icon" {...props} />,
+    ExportIcon: (props: any) => <View testID="export-icon" {...props} />,
+    UnarchiveIcon: (props: any) => <View testID="unarchive-icon" {...props} />,
   };
 });
 
-// Mock the CallSummaryScreen components barrel to avoid deep import chains
-jest.mock('../../index', () => ({
-  CustomMenuModal: () => <>menu</>,
-  DeleteRenameModal: () => <>del</>,
-  ArchiveActionModal: () => <>archive</>,
+jest.mock('@/constants', () => ({
+  PRIVACY_POLICY_URL: 'https://example.com/privacy',
 }));
 
-// Also mock safe area context to avoid provider requirement
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+const mockDeleteRenameModal = jest.fn();
+const mockCustomMenuModal = jest.fn();
+const mockArchiveActionModal = jest.fn();
+const mockFeedbackPopup = jest.fn();
 
-// i18n translate passthrough
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
-
-// Mock NetInfo native module used by hooks
-jest.mock('@react-native-community/netinfo', () => ({
-  __esModule: true,
-  default: {
-    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-    fetch: jest.fn(() => Promise.resolve({ isConnected: true })),
-  },
-}));
-
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
-
-const {SummaryModals} = require('../SummaryModals');
-
-describe('CallSummaryScreen/SummaryModals', () => {
-  it('renders feedback popup note text', () => {
-    const {getByText} = render(
-      <SummaryModals
-        activeModal={null}
-        setActiveModal={() => {}}
-        handleDelete={() => {}}
-        handleBlur={() => {}}
-        editedName=""
-        setEditedName={() => {}}
-        isMenuVisible={false}
-        hideMenu={() => {}}
-        handleExport={() => {}}
-        isSummaryFeedbackPopup
-        hideSummaryFeedbackPopup={() => {}}
-        onSubmitSummaryFeedback={() => {}}
-      />,
-    );
-    expect(getByText('FeedbackPopup.instructionText')).toBeTruthy();
-  });
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    FeedbackPopup: (props: any) => {
+      mockFeedbackPopup(props);
+      return props.visible ? <View testID="feedback-popup" /> : null;
+    },
+  };
 });
 
+jest.mock('../../index', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    CustomMenuModal: (props: any) => {
+      mockCustomMenuModal(props);
+      return props.visible ? <View testID="custom-menu-modal" /> : null;
+    },
+    DeleteRenameModal: (props: any) => {
+      mockDeleteRenameModal(props);
+      return <View testID="delete-rename-modal" />;
+    },
+    ArchiveActionModal: (props: any) => {
+      mockArchiveActionModal(props);
+      return props.visible ? <View testID="archive-action-modal" /> : null;
+    },
+  };
+});
 
+import {SummaryModals} from '../SummaryModals';
+
+const baseProps = {
+  activeModal: null as 'rename' | 'delete' | null,
+  setActiveModal: jest.fn(),
+  handleDelete: jest.fn(),
+  handleBlur: jest.fn(),
+  editedName: '',
+  setEditedName: jest.fn(),
+  isMenuVisible: false,
+  hideMenu: jest.fn(),
+  handleExport: jest.fn(),
+  actionType: 'archive' as const,
+  showArchiveConfirmation: false,
+  setShowArchiveConfirmation: jest.fn(),
+  onArchive: jest.fn(),
+  showExportOption: false,
+  isSummaryFeedbackPopup: false,
+  hideSummaryFeedbackPopup: jest.fn(),
+  onSubmitSummaryFeedback: jest.fn(),
+};
+
+describe('SummaryModals', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders DeleteRenameModal', () => {
+    const {getByTestId} = render(<SummaryModals {...baseProps} />);
+    expect(getByTestId('delete-rename-modal')).toBeTruthy();
+  });
+
+  it('passes activeModal to DeleteRenameModal', () => {
+    render(<SummaryModals {...baseProps} activeModal="rename" />);
+    expect(mockDeleteRenameModal).toHaveBeenCalledWith(
+      expect.objectContaining({activeModal: 'rename'}),
+    );
+  });
+
+  it('shows CustomMenuModal when isMenuVisible is true', () => {
+    const {getByTestId} = render(
+      <SummaryModals {...baseProps} isMenuVisible={true} />,
+    );
+    expect(getByTestId('custom-menu-modal')).toBeTruthy();
+  });
+
+  it('hides CustomMenuModal when isMenuVisible is false', () => {
+    const {queryByTestId} = render(
+      <SummaryModals {...baseProps} isMenuVisible={false} />,
+    );
+    expect(queryByTestId('custom-menu-modal')).toBeNull();
+  });
+
+  it('shows FeedbackPopup when isSummaryFeedbackPopup is true', () => {
+    const {getByTestId} = render(
+      <SummaryModals {...baseProps} isSummaryFeedbackPopup={true} />,
+    );
+    expect(getByTestId('feedback-popup')).toBeTruthy();
+  });
+
+  it('hides FeedbackPopup when isSummaryFeedbackPopup is false', () => {
+    const {queryByTestId} = render(
+      <SummaryModals {...baseProps} isSummaryFeedbackPopup={false} />,
+    );
+    expect(queryByTestId('feedback-popup')).toBeNull();
+  });
+
+  it('shows ArchiveActionModal when showArchiveConfirmation is true', () => {
+    const {getByTestId} = render(
+      <SummaryModals {...baseProps} showArchiveConfirmation={true} />,
+    );
+    expect(getByTestId('archive-action-modal')).toBeTruthy();
+  });
+
+  it('does not render ArchiveActionModal when actionType is null', () => {
+    const {queryByTestId} = render(
+      <SummaryModals
+        {...baseProps}
+        actionType={null}
+        showArchiveConfirmation={true}
+      />,
+    );
+    expect(queryByTestId('archive-action-modal')).toBeNull();
+  });
+
+  it('passes 4 menu options by default (no export)', () => {
+    render(<SummaryModals {...baseProps} isMenuVisible={true} />);
+    const options = mockCustomMenuModal.mock.calls[0][0].options;
+    expect(options).toHaveLength(3);
+  });
+
+  it('passes 4 menu options when showExportOption is true', () => {
+    render(
+      <SummaryModals {...baseProps} isMenuVisible={true} showExportOption={true} />,
+    );
+    const options = mockCustomMenuModal.mock.calls[0][0].options;
+    expect(options).toHaveLength(4);
+  });
+
+  it('shows unarchive label when actionType is unarchive', () => {
+    render(
+      <SummaryModals
+        {...baseProps}
+        isMenuVisible={true}
+        actionType="unarchive"
+      />,
+    );
+    const options = mockCustomMenuModal.mock.calls[0][0].options;
+    const archiveOption = options.find((o: any) =>
+      o.label.includes('unarchive'),
+    );
+    expect(archiveOption).toBeTruthy();
+  });
+});
