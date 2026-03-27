@@ -91,4 +91,82 @@ describe('useStartSimulation', () => {
       expect(result.current.isMicPermissionGranted).toBe(true);
     });
   });
+
+  it('showRetryModal is initially false', async () => {
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+    expect(result.current.showRetryModal).toBe(false);
+  });
+
+  it('closeRetryModal resets showRetryModal to false', async () => {
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+
+    act(() => {
+      result.current.closeRetryModal();
+    });
+
+    expect(result.current.showRetryModal).toBe(false);
+  });
+
+  it('retryStartSimulation returns false when no params stored', async () => {
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+
+    let retryResult: boolean | undefined;
+    await act(async () => {
+      retryResult = await result.current.retryStartSimulation();
+    });
+
+    expect(retryResult).toBe(false);
+  });
+
+  it('startSimulation sets showRetryModal when 429 error occurs', async () => {
+    const {useStartScenarioSessionMutation} = require('@/services');
+    useStartScenarioSessionMutation.mockReturnValue([
+      jest.fn().mockReturnValue({
+        unwrap: jest.fn().mockRejectedValue({status: 429}),
+      }),
+    ]);
+
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.startSimulation({scenarioId: 1});
+    });
+
+    expect(result.current.showRetryModal).toBe(true);
+  });
+
+  it('startSimulation shows active simulation modal on entityId error', async () => {
+    const {useStartScenarioSessionMutation} = require('@/services');
+    useStartScenarioSessionMutation.mockReturnValue([
+      jest.fn().mockReturnValue({
+        unwrap: jest
+          .fn()
+          .mockRejectedValue({data: {entityId: 'active-sim-1'}}),
+      }),
+    ]);
+
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.startSimulation({scenarioId: 1});
+    });
+
+    expect(result.current.showActiveSimulationModal).toBe(true);
+    expect(result.current.activeSimulationId).toBe('active-sim-1');
+  });
 });
