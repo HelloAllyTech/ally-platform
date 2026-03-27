@@ -3,10 +3,10 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {EditSquareIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
-import {colors, fontFamily, radius, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
 
 interface ReviewNoteProps {
-  note: string;
+  note: string | undefined;
   onEditNote?: () => void;
 }
 
@@ -15,10 +15,17 @@ export const ReviewNote: React.FC<ReviewNoteProps> = ({note, onEditNote}) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {t('SimulationFeedback.reviewNoteTitle')}
-        </Text>
-        {onEditNote && (
+        <View style={styles.headerTitle}>
+          <Text style={styles.headerTitleText}>
+            {t('SimulationFeedback.reviewNoteTitle')}
+          </Text>
+          {!note && onEditNote && (
+            <TouchableOpacity onPress={onEditNote} style={styles.addNoteButton}>
+              <Text style={styles.addNoteButtonText}>+</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {!!note && onEditNote && (
           <TouchableOpacity onPress={onEditNote} style={styles.editButton}>
             <EditSquareIcon width={16} height={16} />
           </TouchableOpacity>
@@ -43,6 +50,12 @@ const styles = ScaledSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+  },
+  headerTitleText: {
+    alignItems: 'center',
     ...fontFamily.ROBOTO.REGULAR,
     ...typography.body.medium,
     color: colors.ds.orange[900],
@@ -61,5 +74,20 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  addNoteButton: {
+    width: '24@ms',
+    height: '24@ms',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderRadius: '4@ms',
+    backgroundColor: colors.ds.neutral.white,
+    borderColor: colors.ds.stroke.primary,
+  },
+  addNoteButtonText: {
+    fontWeight: fontWeights.light,
+    color: colors.ds.typography.mediumEmphasis,
+    fontSize: 16,
   },
 });

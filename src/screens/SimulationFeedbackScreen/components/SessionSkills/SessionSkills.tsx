@@ -70,10 +70,10 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       isFirstActivation.current = false;
       return;
     }
-    if (isActive && !isFetching && !simulationSkills) {
+    if (isActive && !isFetching && !simulationSkills && !isError) {
       refetch();
     }
-  }, [isActive, isFetching, simulationSkills, refetch]);
+  }, [isActive, isFetching, simulationSkills, isError, refetch]);
 
   const skillCoverage = simulationSkills?.skillCoverage?.length
     ? simulationSkills.skillCoverage
