@@ -176,18 +176,28 @@ class BehaviorInstructionFeedbackData:
 
 def add_behavior_feedback_data(
     left: List[BehaviorInstructionFeedbackData],
-    right: List[BehaviorInstructionFeedbackData],
+    right: Union[List[BehaviorInstructionFeedbackData], None],
 ) -> List[BehaviorInstructionFeedbackData]:
     """
     Reducer for behavior_feedback_data.
 
-    Always replaces with the new value (right). This prevents double-accumulation
-    when subgraphs propagate their full state back to the parent graph — the parent
-    reducer would otherwise run add(parent_current, subgraph_output), doubling the
-    list at every subgraph boundary.
-
-    When an empty list is provided (right is empty), clear all data.
+    Behaviors:
+    1. No-op: If `right` is an empty list `[]`, return `left` unchanged.
+       This handles the case where a subgraph node (e.g. resolve_branching_instruction)
+       didn't return this field — LangGraph passes `[]` for missing Annotated list
+       fields, and we must NOT clear existing data in that case.
+    2. Clear State: If `right` is `None`, reset to an empty list.
+       Nodes that intentionally want to clear must pass `None`, not `[]`.
+    3. Replace: If `right` contains data, replace `left` with `right`.
+       This prevents double-accumulation when subgraphs propagate their full state
+       back to the parent graph — the parent reducer would otherwise run
+       add(parent_current, subgraph_output), doubling the list at every subgraph
+       boundary.
     """
+    if right is None:
+        return []
+    if not right:
+        return left
     return right
 
 

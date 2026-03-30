@@ -1013,7 +1013,7 @@ async def send_event_feedback(
         "branching_and_feedback_data": None,
         "non_branching_feedback_data": None,
         "feedback_to_send": None,
-        "behavior_feedback_data": [],
+        "behavior_feedback_data": None,
     }
 
 
@@ -1094,7 +1094,7 @@ async def clear_events_and_detected_data(
         "branching_and_feedback_data": None,
         "non_branching_feedback_data": None,
         "feedback_to_send": None,
-        "behavior_feedback_data": [],
+        "behavior_feedback_data": None,
         "retrieved_context": None,
     }
 

@@ -70,7 +70,7 @@ class TestSendEventFeedback:
         assert result["branching_and_feedback_data"] is None
         assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_falls_back_to_non_branching_feedback(self, monkeypatch):
@@ -447,7 +447,7 @@ class TestSendEventFeedback:
         assert result["branching_and_feedback_data"] is None
         assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_sends_behavior_feedback_to_ui_and_be(self):
@@ -494,7 +494,7 @@ class TestSendEventFeedback:
             assert "message_body" in be_call_args
 
         # Verify behavior_feedback_data is cleared
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_sends_multiple_behavior_feedbacks(self):
@@ -544,7 +544,7 @@ class TestSendEventFeedback:
             # Should send 2 BE messages
             assert mock_send_be.call_count == 2
 
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_sends_both_event_and_behavior_feedback(self):
@@ -599,7 +599,7 @@ class TestSendEventFeedback:
         assert result["branching_and_feedback_data"] is None
         assert result["non_branching_feedback_data"] is None
         assert result["feedback_to_send"] is None
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
 
     @pytest.mark.asyncio
     async def test_handles_empty_behavior_feedback_data(self):
@@ -630,4 +630,4 @@ class TestSendEventFeedback:
             assert not mock_send_ui.called
             assert not mock_send_be.called
 
-        assert result["behavior_feedback_data"] == []
+        assert result["behavior_feedback_data"] is None
