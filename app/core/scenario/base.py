@@ -100,6 +100,14 @@ class PromptData(BaseModel):
             '[{"counselor": "...", "actor": "..."}, ...].'
         ),
     )
+    allowed_fillers: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Optional discourse particles / filler words allowed for this "
+            "session language; injected into multilingual instructions. "
+            "From scenario metadata allowedFillerWords for the active language."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -392,6 +400,9 @@ class Scenario(BaseModel):
                     "languageDialogueSamples"
                 )
                 or prompt_data_dict.get("language_dialogue_samples"),
+                "allowed_fillers": prompt_data_dict.get("allowedFillerWords")
+                or prompt_data_dict.get("allowedFillers")
+                or prompt_data_dict.get("allowed_fillers"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
             }
 

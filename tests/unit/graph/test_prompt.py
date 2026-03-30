@@ -550,6 +550,19 @@ class TestPrompt:
         assert "Generate the next dialogue" in content
         assert "hi-IN" in content
         assert "Example 1:" not in content
+        assert "## Filler Word Guidance" in content
+        assert "No curated filler list is set for this language" in content
+
+    def test_generate_system_message_non_english_includes_allowed_fillers(self):
+        """Non-English: allowed_fillers list appears in multilingual block."""
+        pd = make_prompt_data(allowed_fillers=["ठीक है", "मतलब"])
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
+        )
+        content = msg.content
+        assert "## Filler Word Guidance" in content
+        assert "ठीक है, मतलब" in content
+        assert "Rules:" in content
 
     def test_generate_system_message_non_english_empty_samples_uses_multilingual_tpl(
         self,

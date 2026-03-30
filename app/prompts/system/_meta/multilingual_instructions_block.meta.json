@@ -1,5 +1,5 @@
 {
   "name": "Multilingual Instructions Block",
   "kind": "block",
-  "description": "Injects language code and linguistic style samples for the next client dialogue turn. Ensures output matches the scenario language and style (e.g. samples from linguistic style generation)."
+  "description": "Injects language code, linguistic style samples, and allowed filler-word guidance for the next client dialogue turn. Placeholder allowed_fillers comes from promptData.allowedFillerWords (active language string[]); when empty, code injects neutral scenario-metadata guidance instead of a filler list."
 }

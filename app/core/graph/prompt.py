@@ -71,6 +71,21 @@ def _optional_prompt_block(
     return content + " "
 
 
+def _format_allowed_fillers_for_prompt(fillers: Optional[List[str]]) -> str:
+    """Human-readable list for multilingual_instructions_block {allowed_fillers}."""
+    empty_guidance = (
+        "No curated filler list is set for this language in scenario metadata. "
+        "Speak naturally and idiomatically; do not invent or assume a prescribed "
+        "set of interjections."
+    )
+    if not fillers:
+        return empty_guidance
+    parts = [str(f).strip() for f in fillers if f is not None and str(f).strip()]
+    if not parts:
+        return empty_guidance
+    return ", ".join(parts)
+
+
 def _format_language_samples(samples: List) -> str:
     """
     Format sample dialogues for injection into multilingual_instructions template.
@@ -100,14 +115,17 @@ def _get_language_sample_block(
     samples: Optional[List],
     language_code: str,
     backend_prompts: Optional[dict] = None,
+    allowed_fillers: Optional[List[str]] = None,
 ) -> str:
     samples_text = _format_language_samples(samples) if samples else ""
+    allowed_fillers_text = _format_allowed_fillers_for_prompt(allowed_fillers)
 
     result = load_and_format(
         "system/multilingual_instructions_block",
         prompt_data=backend_prompts,
         language_code=language_code,
         samples=samples_text,
+        allowed_fillers=allowed_fillers_text,
     )
     if not result or not result.strip():
         logger.error(
@@ -130,8 +148,11 @@ def _get_language_block(
 
     samples = prompt_data.language_dialogue_samples
     backend_prompts = getattr(prompt_data, "prompts", None)
+    allowed_fillers = getattr(prompt_data, "allowed_fillers", None)
 
-    block = _get_language_sample_block(samples, language_code, backend_prompts)
+    block = _get_language_sample_block(
+        samples, language_code, backend_prompts, allowed_fillers
+    )
     if not block or not block.strip():
         return ""
 
