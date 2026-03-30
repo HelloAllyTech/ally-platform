@@ -9,7 +9,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.14"
-fastapi = ">=0.116.1,<0.117.0"
+fastapi = "^0.121.0"
 pydantic-settings = ">=2.10.1,<3.0.0"
 uvicorn = ">=0.35.0,<0.36.0"
 livekit-api = ">=1.0.3,<2.0.0"
@@ -22,6 +22,7 @@ boto3 = "^1.40.2"
 pydantic = {extras = ["email"], version = "^2.11.7"}
 langgraph = "^0.6.7"
 livekit-plugins-langchain = "^1.3.10"
+langchain-core = ">=1.2.22"
 langchain-openai = "^0.3.33"
 langchain-google-genai = "^2.0.0"
 livekit-plugins-openai = "^1.3.10"
@@ -36,7 +37,9 @@ elevenlabs = "^2.20.0"
 numpy = "^2.3.5"
 stopwordsiso = "^0.6.1"
 advertools = "^0.15.0"
-setuptools = "^75.0.0"
+setuptools = "^78.1.1"
+starlette = ">=0.49.1"
+pyasn1 = ">=0.6.3"
 pydub = "^0.25.1"
 hume = "^0.13.6"
 httpx = "^0.28.1"
@@ -44,7 +47,7 @@ audioop-lts = {markers = "python_version >= \"3.13\"", version = "^0.2.2"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
-black = "^24.2.0"
+black = "^26.3.1"
 isort = "^5.13.2"
 flake8 = "^7.0.0"
 pytest = "^8.0.0"
