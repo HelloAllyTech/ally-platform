@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import json
 from typing import Any, Dict, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -721,6 +722,12 @@ async def generate_response(
     score_keeper = None
     if config and "configurable" in config:
         score_keeper = config["configurable"].get("score_keeper")
+        room = config["configurable"].get("room")
+        if room:
+            await room.local_participant.publish_data(
+                json.dumps({"type": "AGENT_STATE", "state": "thinking"}).encode(),
+                reliable=True,
+            )
 
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
@@ -843,6 +850,14 @@ async def generate_response(
                 )
         except Exception as e:
             logger.warning(f"Failed to log interaction for evaluation: {e}")
+
+    if config and "configurable" in config:
+        room = config["configurable"].get("room")
+        if room:
+            await room.local_participant.publish_data(
+                json.dumps({"type": "AGENT_STATE", "state": "done_thinking"}).encode(),
+                reliable=True,
+            )
 
     return {
         "messages": [AIMessage(content=response.content)],
