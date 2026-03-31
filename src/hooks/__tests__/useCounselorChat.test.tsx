@@ -26,6 +26,11 @@ jest.mock('@/store/slices/chatSlice', () => ({
   clearCurrentChat: () => ({type: 'clear'}),
 }));
 
+jest.mock('@/constants', () => ({
+  USER_PERMISSIONS: {VIEW_COUNSELOR_CHAT: 'VIEW_COUNSELOR_CHAT'},
+  SCREEN_NAMES: {BREATHING: 'Breathing', CALL_SUMMARY: 'CallSummary', LISTENING: 'Listening', SPLASH: 'Splash'},
+}));
+
 const Test = () => {
   const {checkCounselorChat} = useCounselorChat({
     onActiveChatFound: jest.fn(),
@@ -43,6 +48,26 @@ describe('useCounselorChat', () => {
       getByTestId('check').props.onPress();
     });
   });
+
+  it('returns checkCounselorChat function', () => {
+    const TestReturn = () => {
+      const {checkCounselorChat} = useCounselorChat();
+      return <Text testID="exists">{typeof checkCounselorChat}</Text>;
+    };
+
+    const {getByText} = render(<TestReturn />);
+    expect(getByText('function')).toBeTruthy();
+  });
+
+  it('renders component using the hook without errors', () => {
+    const TestSimple = () => {
+      const {checkCounselorChat} = useCounselorChat({
+        shouldSubscribeToAppState: false,
+      });
+      return <Text testID="simple">{String(!!checkCounselorChat)}</Text>;
+    };
+
+    const {getByText} = render(<TestSimple />);
+    expect(getByText('true')).toBeTruthy();
+  });
 });
-
-
