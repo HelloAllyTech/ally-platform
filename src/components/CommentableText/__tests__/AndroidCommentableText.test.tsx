@@ -26,7 +26,7 @@ describe('AndroidCommentableText', () => {
       </AndroidCommentableText>,
     );
 
-    const views = UNSAFE_root.findAllByType(View);
+    const views = UNSAFE_root.findAllByType(View as any);
     const withMargin = views.find((v: {props: {style?: unknown}}) => {
       const s = v.props.style;
       if (Array.isArray(s)) {

@@ -6,7 +6,6 @@ import {TabBar, TabView} from 'react-native-tab-view';
 import {useSelector} from 'react-redux';
 
 import {BadgePopup, TabScreenHeader} from '@/components';
-import {env} from '@/config/env';
 import {REVIEW_TYPE_TABS, ReviewType, USER_PERMISSIONS} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {isReviewerOnly} from '@/navigation/TabNavigator';
@@ -29,9 +28,9 @@ export const ReviewScreen: React.FC = () => {
   const canViewSimulationReviews = permissions.includes(
     USER_PERMISSIONS.VIEW_SIMULATION_REVIEWS,
   );
-  const canViewScribeReviews =
-    permissions.includes(USER_PERMISSIONS.VIEW_SCRIBE_REVIEWS) &&
-    env.SCRIBE_REVIEW_ENABLED;
+  const canViewScribeReviews = permissions.includes(
+    USER_PERMISSIONS.VIEW_SCRIBE_REVIEWS,
+  );
 
   const canViewSimulationReview = permissions.includes(
     USER_PERMISSIONS.VIEW_SIMULATION_REVIEW,
