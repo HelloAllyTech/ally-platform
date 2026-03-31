@@ -72,7 +72,7 @@ describe('UpNextSimulationCard', () => {
     );
 
     const images = UNSAFE_root.findAll(
-      node => node.type === 'Image' || (node.props?.source?.uri !== undefined),
+      node => (node.type as unknown) === 'Image' || (node.props?.source?.uri !== undefined),
     );
     expect(images.length).toBeGreaterThan(0);
   });
