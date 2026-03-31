@@ -143,7 +143,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   );
 
   const noteElementHeader = useMemo(() => {
-    if (reviewNote) {
+    if (reviewNote || onEditNote) {
       return <ReviewNote note={reviewNote} onEditNote={onEditNote} />;
     }
     return null;
