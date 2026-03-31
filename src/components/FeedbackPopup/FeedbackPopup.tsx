@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   ScrollView,
   Text,
@@ -37,14 +38,38 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
   const [rating, setRating] = useState(DEFAULT_RATING);
   const [suggestion, setSuggestion] = useState('');
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
-  const [slideAnim] = useState(new Animated.Value(1000)); // Start off-screen
+  const [slideAnim] = useState(new Animated.Value(1000));
+  const [keyboardOffset] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    if (!isIOS) return;
+
+    const showSub = Keyboard.addListener('keyboardWillShow', e => {
+      Animated.timing(keyboardOffset, {
+        toValue: -e.endCoordinates.height,
+        duration: e.duration || 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', e => {
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: e.duration || 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardOffset]);
 
   useEffect(() => {
     if (visible) {
       setRating(DEFAULT_RATING);
       setSuggestion('');
       setSelectedIssues([]);
-      // Slide up animation
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -52,7 +77,6 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
         friction: 11,
       }).start();
     } else {
-      // Slide down animation
       Animated.timing(slideAnim, {
         toValue: 1000,
         duration: 250,
@@ -132,10 +156,15 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
       <Animated.View
         style={[
           styles.animatedContainer,
-          {transform: [{translateY: slideAnim}]},
+          {
+            transform: [
+              {translateY: slideAnim},
+              {translateY: isIOS ? keyboardOffset : 0},
+            ],
+          },
         ]}>
         <KeyboardAvoidingView
-          behavior={isIOS ? 'padding' : 'height'}
+          behavior={isIOS ? undefined : 'height'}
           keyboardVerticalOffset={0}>
           <ScrollView
             style={styles.scrollView}
