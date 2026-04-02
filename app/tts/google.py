@@ -13,6 +13,9 @@ logger = get_logger(__name__)
 # Type aliases for Google TTS parameters
 Gender = Literal["male", "female", "neutral"]
 
+# Cloud TTS model id used by livekit.plugins.google.TTS for Chirp 3 HD / cloning.
+_GOOGLE_TTS_CHIRP3_MODEL_NAME = "chirp_3"
+
 
 class GoogleTTSClient(BaseTTSClient):
     """
@@ -36,6 +39,10 @@ class GoogleTTSClient(BaseTTSClient):
             See: https://docs.cloud.google.com/text-to-speech/docs/
             list-voices-and-types
         voice_cloning_key: Optional voice cloning key for custom voices (Chirp 3)
+        model_name: Optional Cloud TTS model for the LiveKit plugin (e.g.
+            ``chirp_3``, ``gemini-2.5-flash-tts``). If omitted, matches
+            ``livekit.plugins.google.TTS``: ``chirp_3`` for Chirp/cloned voices,
+            otherwise the plugin infers Gemini vs other defaults from ``voice_name``.
         credentials_info: Optional dict of Google Cloud credentials
         credentials_file: Optional path to credentials JSON file
     """
@@ -78,17 +85,44 @@ class GoogleTTSClient(BaseTTSClient):
     # support SSML. Tags would be spoken aloud. Prosody is applied via
     # update_options() (speaking_rate) and PARAMETER_METADATA only.
 
+    @staticmethod
+    def _resolve_plugin_model_name(
+        explicit_model_name: Optional[str],
+        voice_name: Optional[str],
+        voice_cloning_key: Optional[str],
+    ) -> Optional[str]:
+        """
+        Resolve ``model_name`` for ``livekit.plugins.google.TTS``.
+
+        Mirrors the plugin's own defaults (see LiveKit ``google/tts.py``):
+        explicit ``model_name`` wins; else ``chirp_3`` when using a Chirp voice
+        id or voice cloning; else ``None`` so we omit the kwarg and the plugin
+        picks ``gemini-2.5-flash-tts`` for Standard/Neural/gemini-style paths.
+        """
+        if isinstance(explicit_model_name, str) and explicit_model_name.strip():
+            return explicit_model_name.strip()
+        if voice_cloning_key:
+            return _GOOGLE_TTS_CHIRP3_MODEL_NAME
+        if isinstance(voice_name, str) and "chirp" in voice_name.lower():
+            return _GOOGLE_TTS_CHIRP3_MODEL_NAME
+        return None
+
     def __init__(
         self,
         language_code: str,
         gender: Optional[Gender] = None,
         voice_name: Optional[str] = None,
         voice_cloning_key: Optional[str] = None,
+        model_name: Optional[str] = None,
         credentials_info: Optional[dict] = None,
         credentials_file: Optional[str] = None,
     ):
         if not language_code:
             raise ValueError("Google TTS requires 'language_code'")
+
+        self._model_name = self._resolve_plugin_model_name(
+            model_name, voice_name, voice_cloning_key
+        )
 
         # Validate configuration
         if not self.validate_voice(
@@ -233,17 +267,28 @@ class GoogleTTSClient(BaseTTSClient):
         Args:
             config: Config dict from metadata. Expected structure:
                 {"voice_name": "en-US-Chirp3-HD-Aoede", "gender": "female",
-                "voice_cloning_key": "..."}
+                "model_name": "chirp_3", "voice_cloning_key": "..."}
+                If ``model_name`` is missing, Chirp voices still get ``chirp_3``;
+                other voice ids omit ``model_name`` and follow the plugin default
+                (typically Gemini for non-Chirp names).
             language_code: BCP 47 language code (e.g., "en-US", "hi-IN")
 
         Returns:
             GoogleTTSClient instance
         """
+        raw_model = config.get("model_name")
+        model_arg = (
+            raw_model.strip()
+            if isinstance(raw_model, str) and raw_model.strip()
+            else None
+        )
+
         return cls(
             language_code=language_code,
             gender=config.get("gender"),  # Optional
             voice_name=config.get("voice_name"),  # Optional
             voice_cloning_key=config.get("voice_cloning_key"),  # Optional
+            model_name=model_arg,
             credentials_file=getattr(
                 settings, "GOOGLE_APPLICATION_CREDENTIALS", None
             ),  # Optional
@@ -264,6 +309,8 @@ class GoogleTTSClient(BaseTTSClient):
                 tts_kwargs["voice_name"] = self._voice_name
             if self._voice_cloning_key:
                 tts_kwargs["voice_cloning_key"] = self._voice_cloning_key
+            if self._model_name is not None:
+                tts_kwargs["model_name"] = self._model_name
             if self._credentials_info:
                 tts_kwargs["credentials_info"] = self._credentials_info
             if self._credentials_file:
