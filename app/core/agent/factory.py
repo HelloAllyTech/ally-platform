@@ -127,6 +127,7 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
                 "voice_id": scenario.voice.config.voice_id,
                 "speaker": scenario.voice.config.speaker,
                 "voice_name": scenario.voice.config.voice_name,
+                "model_name": scenario.voice.config.model_name,
                 "gender": scenario.voice.config.gender,
                 "voice_cloning_key": scenario.voice.config.voice_cloning_key,
                 "instant_mode": scenario.voice.config.instant_mode,

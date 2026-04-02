@@ -124,6 +124,9 @@ class VoiceConfig(BaseModel):
     voice_id: Optional[str] = Field(default=None)
     speaker: Optional[str] = Field(default=None)
     voice_name: Optional[str] = Field(default=None)  # For Google TTS
+    # Google TTS only: optional override for livekit.plugins.google.TTS model_name
+    # (chirp_3, gemini-2.5-flash-tts, …). Unset = client uses same rules as the plugin.
+    model_name: Optional[str] = Field(default=None)
     gender: Optional[str] = Field(
         default=None
     )  # For Google TTS ("male", "female", "neutral")
@@ -336,6 +339,7 @@ class Scenario(BaseModel):
             voice_id=config_meta.get("voice_id") or config_meta.get("voiceId"),
             speaker=config_meta.get("speaker"),
             voice_name=config_meta.get("voice_name"),
+            model_name=config_meta.get("model_name"),
             gender=config_meta.get("gender"),
             voice_cloning_key=config_meta.get("voice_cloning_key"),
             instant_mode=config_meta.get("instant_mode"),
