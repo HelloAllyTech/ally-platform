@@ -32,8 +32,25 @@ interface SimulationMessagesParams {
   sortOrder?: string;
 }
 
+export interface SimulationSessionRecordingParams {
+  scenarioSessionId: string;
+}
+
+export interface SimulationSessionRecordingResponse {
+  presignedUrl: string;
+}
+
 export const simulationTranscriptApi = api.injectEndpoints({
   endpoints: builder => ({
+    getSimulationSessionRecording: builder.query<
+      SimulationSessionRecordingResponse,
+      SimulationSessionRecordingParams
+    >({
+      query: ({scenarioSessionId}) => ({
+        url: API_ROUTES.LEARN.SCENARIO_SESSION_RECORDING(scenarioSessionId),
+        method: API_METHODS.GET,
+      }),
+    }),
     getSimulationMessages: builder.query<
       SimulationMessagesResponse,
       SimulationMessagesParams
@@ -53,4 +70,7 @@ export const simulationTranscriptApi = api.injectEndpoints({
   }),
 });
 
-export const {useLazyGetSimulationMessagesQuery} = simulationTranscriptApi;
+export const {
+  useLazyGetSimulationMessagesQuery,
+  useLazyGetSimulationSessionRecordingQuery,
+} = simulationTranscriptApi;

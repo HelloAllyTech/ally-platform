@@ -1,6 +1,14 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
+jest.mock('../../SimulationAudioPlayer/SimulationAudioPlayer', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    SimulationAudioPlayer: () => <View testID="simulation-audio-player" />,
+  };
+});
+
 import {SimulationTranscript} from '../SimulationTranscript';
 
 // Avoid importing NetworkLogs through components barrel
@@ -31,6 +39,8 @@ jest.mock('@/hooks/useSimulationTranscriptDetails', () => ({
       {id: 6, time: '00:06', message: 'Test4', learner: false, startSeconds: 6},
     ],
     isLoading: true,
+    isFetching: false,
+    hasMore: false,
     listRef: {current: null},
     handleEndReached: jest.fn(),
   }),
@@ -45,11 +55,26 @@ jest.mock('@/hooks/useTranslate', () => ({
 
 describe('SimulationTranscript', () => {
   it('renders transcript items and loading footer', () => {
-    const {getByText} = render(
-      <SimulationTranscript sessionId="1" startedAt="2024-01-01T00:00:00Z" />,
+    const {getByText, getByTestId} = render(
+      <SimulationTranscript
+        sessionId="1"
+        startedAt="2024-01-01T00:00:00Z"
+        audioUrl="https://example.com/recording.ogg"
+      />,
     );
     expect(getByText('Hello')).toBeTruthy();
     expect(getByText('Hi')).toBeTruthy();
+    expect(getByTestId('simulation-audio-player')).toBeTruthy();
+  });
+
+  it('shows message when no recording URL', () => {
+    const {getByText, queryByTestId} = render(
+      <SimulationTranscript sessionId="1" startedAt="2024-01-01T00:00:00Z" />,
+    );
+    expect(
+      getByText('SimulationFeedback.noSessionRecording'),
+    ).toBeTruthy();
+    expect(queryByTestId('simulation-audio-player')).toBeNull();
   });
 });
 

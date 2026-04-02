@@ -40,7 +40,11 @@ export const BreathingControls: React.FC<Props> = ({
         onPress={onTogglePlayPause}
         style={styles.button}
         testID="play-pause-button">
-        {isPlaying ? <PauseWhiteIcon /> : <PlayWhiteIcon />}
+        {isPlaying ? (
+          <PauseWhiteIcon />
+        ) : (
+          <PlayWhiteIcon color={colors.ds.neutral.white} />
+        )}
       </TouchableOpacity>
     </View>
   );

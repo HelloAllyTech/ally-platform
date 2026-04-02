@@ -1,6 +1,46 @@
 import React from 'react';
 import {ActivityIndicator, TouchableOpacity} from 'react-native';
-import {fireEvent, render} from '@testing-library/react-native';
+import {fireEvent, render, waitFor} from '@testing-library/react-native';
+
+jest.mock('react-native-audio-api', () => {
+  class MockAudioContext {
+    currentTime = 0;
+    sampleRate = 44100;
+    state = 'running';
+    destination = {};
+    createBufferSource() {
+      return {
+        connect: jest.fn(),
+        start: jest.fn(),
+        stop: jest.fn(),
+        onEnded: null as any,
+        buffer: null as any,
+      };
+    }
+    resume() {
+      return Promise.resolve();
+    }
+    suspend() {
+      return Promise.resolve();
+    }
+    close() {
+      return Promise.resolve();
+    }
+  }
+  return {
+    AudioContext: MockAudioContext,
+    AudioManager: {
+      getDevicePreferredSampleRate: jest.fn().mockReturnValue(44100),
+      setAudioSessionActivity: jest.fn().mockResolvedValue(undefined),
+    },
+    decodeAudioData: jest.fn().mockResolvedValue({
+      duration: 10,
+      length: 441000,
+      numberOfChannels: 1,
+      sampleRate: 44100,
+    }),
+  };
+});
 
 jest.mock('react-native-size-matters', () => ({
   ScaledSheet: {create: (s: unknown) => s},
@@ -10,10 +50,8 @@ jest.mock('@/assets', () => {
   const React = require('react');
   const {View} = require('react-native');
   return {
-    Forward10Icon: (props: any) => <View testID="forward-icon" {...props} />,
     PausePlayerIcon: (props: any) => <View testID="pause-icon" {...props} />,
     PlayWhiteIcon: (props: any) => <View testID="play-icon" {...props} />,
-    Replay10Icon: (props: any) => <View testID="replay-icon" {...props} />,
   };
 });
 
@@ -24,8 +62,9 @@ jest.mock('@/theme', () => ({
       neutral: {400: '#999'},
       theme: {primary: '#007'},
       grey: {200: '#ddd'},
-      blue: {100: '#e0f0ff'},
-      typography: {mediumEmphasis: '#666'},
+      blue: {50: '#f0f8ff', 100: '#e0f0ff'},
+      typography: {mediumEmphasis: '#666', lowEmphasis: '#aaa'},
+      stroke: {primary: '#ccc'},
     },
   },
   fontFamily: {IBM_PLEX_SERIF: {REGULAR: {}}},
@@ -40,17 +79,9 @@ jest.mock('@/utils', () => ({
   },
 }));
 
-const mockSeek = jest.fn();
-jest.mock('react-native-video', () => {
-  const React = require('react');
-  return {
-    __esModule: true,
-    default: React.forwardRef(function MockVideo(props: any, ref: any) {
-      React.useImperativeHandle(ref, () => ({seek: mockSeek}));
-      return null;
-    }),
-  };
-});
+jest.mock('@/utils/logger', () => ({
+  logger: {error: jest.fn(), warn: jest.fn(), info: jest.fn()},
+}));
 
 import {SimulationAudioPlayer} from '../SimulationAudioPlayer';
 
@@ -62,22 +93,36 @@ describe('SimulationAudioPlayer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
   });
 
-  it('renders play button initially (not playing)', () => {
+  afterEach(() => {
+    delete (global as any).fetch;
+  });
+
+  it('shows loading indicator while audio is loading', () => {
+    const {UNSAFE_getByType} = render(<SimulationAudioPlayer {...defaultProps} />);
+    expect(UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+  });
+
+  it('shows play button after audio loads', async () => {
     const {getByTestId} = render(<SimulationAudioPlayer {...defaultProps} />);
-    expect(getByTestId('play-icon')).toBeTruthy();
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
   });
 
-  it('toggles play/pause on press', () => {
-    const {UNSAFE_getAllByType, getByTestId, queryByTestId} = render(
+  it('toggles play/pause on press', async () => {
+    const {getByTestId, queryByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const playBtn = touchables[1];
 
-    expect(getByTestId('play-icon')).toBeTruthy();
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    const playBtn = UNSAFE_getAllByType(TouchableOpacity)[0];
     fireEvent.press(playBtn);
+
     expect(queryByTestId('pause-icon')).toBeTruthy();
   });
 
@@ -89,31 +134,19 @@ describe('SimulationAudioPlayer', () => {
     expect(timeTexts.length).toBe(2);
   });
 
-  it('calls onProgress with 0 after rewind press when at start', () => {
-    const onProgress = jest.fn();
-    const {UNSAFE_getAllByType} = render(
-      <SimulationAudioPlayer {...defaultProps} onProgress={onProgress} />,
+  it('calls onPlaybackLoadError when audio fails to load', async () => {
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+    });
+    const onPlaybackLoadError = jest.fn();
+    render(
+      <SimulationAudioPlayer
+        {...defaultProps}
+        onPlaybackLoadError={onPlaybackLoadError}
+      />,
     );
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const rewindBtn = touchables[0];
-
-    fireEvent.press(rewindBtn);
-
-    expect(mockSeek).toHaveBeenCalledWith(0);
-    expect(onProgress).toHaveBeenCalledWith(0);
-  });
-
-  it('calls onProgress after forward press', () => {
-    const onProgress = jest.fn();
-    const {UNSAFE_getAllByType} = render(
-      <SimulationAudioPlayer {...defaultProps} onProgress={onProgress} />,
-    );
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-    const forwardBtn = touchables[2];
-
-    fireEvent.press(forwardBtn);
-
-    expect(mockSeek).toHaveBeenCalledWith(10);
-    expect(onProgress).toHaveBeenCalledWith(10);
+    await waitFor(() => expect(onPlaybackLoadError).toHaveBeenCalled());
   });
 });

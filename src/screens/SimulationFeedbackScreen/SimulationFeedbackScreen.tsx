@@ -355,8 +355,6 @@ export const SimulationFeedbackScreen: React.FC<
         case SimulationSummaryTabKey.TRANSCRIPTION:
           return (
             <TranscriptTab
-              reviewId={reviewId}
-              setReviewId={setReviewId}
               scenarioSessionId={scenarioSessionId}
               startedAt={simulationDetails?.startedAt}
               agentName={simulationDetails?.scenario?.metadata?.name}
@@ -395,7 +393,6 @@ export const SimulationFeedbackScreen: React.FC<
       pathId,
       caseId,
       handleFeedbackAndNavigate,
-      reviewId,
       languageId,
       activeTabKey,
     ],

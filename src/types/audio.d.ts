@@ -3,6 +3,11 @@ declare module '*.mp3' {
   export default value;
 }
 
+declare module '*.ogg' {
+  const value: string;
+  export default value;
+}
+
 export interface CircleConfig {
   scale: number;
   isStatic: boolean;

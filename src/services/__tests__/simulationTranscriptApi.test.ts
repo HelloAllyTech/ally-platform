@@ -13,6 +13,12 @@ describe('simulationTranscriptApi', () => {
   it('exposes getSimulationMessages endpoint', () => {
     expect((simulationTranscriptApi as any).endpoints.getSimulationMessages).toBeTruthy();
   });
+
+  it('exposes getSimulationSessionRecording endpoint', () => {
+    expect(
+      (simulationTranscriptApi as any).endpoints.getSimulationSessionRecording,
+    ).toBeTruthy();
+  });
 });
 
 

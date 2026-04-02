@@ -147,6 +147,8 @@ export const API_ROUTES = {
     SIMULATION_LOGS: '/learn/scenario-sessions',
     SIMULATION_MESSAGES: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/messages`,
+    SCENARIO_SESSION_RECORDING: (scenarioSessionId: string) =>
+      `/learn/scenario-session/${scenarioSessionId}/recording`,
     SIMULATION_CREDITS: '/simulation-credits',
     SCENARIO_PATHS: '/learn/scenario-paths',
     CREATE_PATH_SESSION: (pathId: string) =>

@@ -1,5 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, FlatList} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {ActivityIndicator, FlatList, Text} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
@@ -7,42 +7,134 @@ import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDet
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
 import {SimulationTranscriptMessage} from '@/types';
+import {logger} from '@/utils/logger';
 
+import {
+  SimulationAudioPlayer,
+  type ExternalSeekRequest,
+} from '../SimulationAudioPlayer/SimulationAudioPlayer';
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
 import {SummaryCard} from '../SummaryCard';
 
 export const SimulationTranscript: React.FC<{
   sessionId: string;
   startedAt?: string;
-  currentTime?: number;
-  onSeek?: (time: number) => void;
   agentName?: string;
-}> = ({sessionId, startedAt, currentTime, onSeek, agentName}) => {
+  audioUrl?: string;
+  recordingUrlLoading?: boolean;
+  onRecordingPlaybackFailed?: () => void;
+}> = ({
+  sessionId,
+  startedAt,
+  agentName,
+  audioUrl,
+  recordingUrlLoading = false,
+  onRecordingPlaybackFailed,
+}) => {
   const {t} = useTranslate();
-  const {formattedMessages, isLoading, listRef, handleEndReached} =
-    useSimulationTranscriptDetails(sessionId, startedAt);
+  const {
+    formattedMessages,
+    isLoading,
+    isFetching,
+    listRef,
+    handleEndReached,
+    hasMore,
+  } = useSimulationTranscriptDetails(sessionId, startedAt);
+
+  const [playbackSeconds, setPlaybackSeconds] = useState(0);
+  const [externalSeek, setExternalSeek] = useState<ExternalSeekRequest | null>(
+    null,
+  );
+  const seekKeyRef = useRef(0);
+
+  const trimmedAudioUrl = audioUrl?.trim() ?? '';
+  const hasPlayableRecording = trimmedAudioUrl.length > 0;
+
+  // When the user seeks past loaded transcript, this stores the target time.
+  // A chase effect then paginates until the transcript covers it (or ends).
+  const [pendingSeekTarget, setPendingSeekTarget] = useState<number | null>(
+    null,
+  );
+
+  const lastLoadedStartSeconds = useMemo(() => {
+    if (formattedMessages.length === 0) {
+      return -1;
+    }
+    return Math.max(...formattedMessages.map(m => m.startSeconds));
+  }, [formattedMessages]);
+
+  const startChaseIfNeeded = useCallback(
+    (seekSeconds: number) => {
+      if (hasMore && seekSeconds > lastLoadedStartSeconds) {
+        setPendingSeekTarget(seekSeconds);
+      }
+    },
+    [hasMore, lastLoadedStartSeconds],
+  );
+
+  // Chase effect: paginates until the target is within loaded transcript or
+  // there are no more pages. Each new page updates formattedMessages which
+  // re-triggers this effect.
+  useEffect(() => {
+    if (pendingSeekTarget === null) {
+      return;
+    }
+    if (lastLoadedStartSeconds >= pendingSeekTarget) {
+      setPendingSeekTarget(null);
+      return;
+    }
+    if (!hasMore) {
+      setPendingSeekTarget(null);
+      return;
+    }
+    if (!isFetching) {
+      handleEndReached();
+    }
+  }, [
+    pendingSeekTarget,
+    lastLoadedStartSeconds,
+    hasMore,
+    isFetching,
+    handleEndReached,
+  ]);
+
+  const queueSeekToSeconds = useCallback(
+    (seconds: number) => {
+      const raw = Math.max(0, seconds);
+      seekKeyRef.current += 1;
+      setExternalSeek({key: seekKeyRef.current, seconds: raw});
+      startChaseIfNeeded(raw);
+    },
+    [startChaseIfNeeded],
+  );
+
+  /** Called by the audio player on any user-initiated seek (progress bar scrub) */
+  const handlePlayerSeek = useCallback(
+    (time: number) => {
+      startChaseIfNeeded(time);
+    },
+    [startChaseIfNeeded],
+  );
 
   const [activeIndex, setActiveIndex] = useState(-1);
   const isUserScrolling = useRef(false);
 
   useEffect(() => {
-    if (currentTime === undefined || !formattedMessages.length) {
+    if (!formattedMessages.length) {
       return;
     }
 
-    // Find the currently active message based on timestamp
     const index = formattedMessages.findIndex((item, i, arr) => {
       const nextItem = arr[i + 1];
       return (
-        item.startSeconds <= currentTime &&
-        (!nextItem || nextItem.startSeconds > currentTime)
+        item.startSeconds <= playbackSeconds &&
+        (!nextItem || nextItem.startSeconds > playbackSeconds)
       );
     });
 
     if (index !== -1 && index !== activeIndex) {
       setActiveIndex(index);
 
-      // Only auto-scroll if the user isn't manually interacting
       if (
         !isUserScrolling.current &&
         listRef.current &&
@@ -52,14 +144,14 @@ export const SimulationTranscript: React.FC<{
           listRef.current.scrollToIndex({
             index,
             animated: true,
-            viewPosition: 0.3, // Scroll to top-third of screen for better reading context
+            viewPosition: 0.3,
           });
-        } catch (e) {
-          // Ignore scroll errors (e.g. layout not ready)
+        } catch {
+          logger.error('SimulationTranscript: scrollToIndex failed');
         }
       }
     }
-  }, [currentTime, formattedMessages, activeIndex, listRef]);
+  }, [playbackSeconds, formattedMessages, activeIndex, listRef]);
 
   const renderItem = ({
     item,
@@ -81,7 +173,7 @@ export const SimulationTranscript: React.FC<{
         message={message}
         speakerLabel={speakerLabel}
         isActive={index === activeIndex}
-        // onPress={onSeek ? () => onSeek(startSeconds) : undefined}
+        onPress={() => queueSeekToSeconds(startSeconds)}
         isLearner={isLearner}
         tags={tags}
       />
@@ -103,6 +195,26 @@ export const SimulationTranscript: React.FC<{
 
   return (
     <SummaryCard title={t('SimulationFeedback.annotatedTranscription')}>
+      {recordingUrlLoading ? (
+        <ActivityIndicator
+          color={colors.ds.theme.primary}
+          size="large"
+          style={styles.audioLoadingPlaceholder}
+        />
+      ) : hasPlayableRecording ? (
+        <SimulationAudioPlayer
+          audioUrl={trimmedAudioUrl}
+          onProgress={setPlaybackSeconds}
+          onSeek={handlePlayerSeek}
+          externalSeek={externalSeek}
+          containerStyle={styles.audioPlayerInCard}
+          onPlaybackLoadError={onRecordingPlaybackFailed}
+        />
+      ) : (
+        <Text style={styles.noRecordingText}>
+          {t('SimulationFeedback.noSessionRecording')}
+        </Text>
+      )}
       <FlatList
         contentContainerStyle={styles.contentContainer}
         ref={listRef}
@@ -110,7 +222,7 @@ export const SimulationTranscript: React.FC<{
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         ListFooterComponent={
-          isLoading && formattedMessages?.length > 0 ? (
+          (isLoading || isFetching) && formattedMessages?.length > 0 ? (
             <ActivityIndicator color={colors.ds.theme.primary} />
           ) : null
         }
@@ -120,7 +232,6 @@ export const SimulationTranscript: React.FC<{
         onScrollBeginDrag={() => (isUserScrolling.current = true)}
         onMomentumScrollEnd={() => (isUserScrolling.current = false)}
         onScrollToIndexFailed={info => {
-          // Fallback or retry logic if needed
           setTimeout(() => {
             if (listRef.current) {
               try {
@@ -139,10 +250,23 @@ export const SimulationTranscript: React.FC<{
 };
 
 const styles = ScaledSheet.create({
-  placeholder: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    color: colors.darkGray2,
-    fontSize: '15@ms',
+  audioLoadingPlaceholder: {
+    marginHorizontal: 0,
+    marginBottom: '12@ms',
+    minHeight: '56@vs',
+    justifyContent: 'center',
+  },
+  audioPlayerInCard: {
+    marginHorizontal: 0,
+    marginBottom: '12@ms',
+  },
+  noRecordingText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    marginHorizontal: 0,
+    marginBottom: '12@ms',
+    paddingVertical: '8@ms',
   },
   contentContainer: {
     paddingBottom: '100@mvs',

@@ -1,35 +1,22 @@
 import React from 'react';
 
-// import {View} from 'react-native';
-// import {ScaledSheet} from 'react-native-size-matters';
-
-// import {useToast} from '@/components';
-// import {useTranslate} from '@/hooks';
-// import {
-//   useCreateReviewMutation,
-//   useUpdateReviewStatusMutation,
-// } from '@/services';
-// import {ReviewStatus} from '@/types';
+import {useSimulationSessionRecordingUrl} from '@/hooks/useSimulationSessionRecordingUrl';
 
 import {SimulationTranscript} from '../';
 
 interface TranscriptTabProps {
   scenarioSessionId: string;
-  reviewId?: string;
-  setReviewId: (reviewId: string) => void;
   startedAt?: string;
   agentName?: string;
 }
 
 export const TranscriptTab: React.FC<TranscriptTabProps> = ({
   scenarioSessionId,
-  // reviewId,
-  // setReviewId,
-  // isPrivate,
-  // setIsPrivate,
   startedAt,
   agentName,
 }) => {
+  const recording = useSimulationSessionRecordingUrl(scenarioSessionId);
+
   if (!scenarioSessionId) {
     return null;
   }
@@ -40,19 +27,12 @@ export const TranscriptTab: React.FC<TranscriptTabProps> = ({
         sessionId={scenarioSessionId}
         startedAt={startedAt}
         agentName={agentName}
+        audioUrl={recording.url}
+        recordingUrlLoading={recording.isInitialLoad}
+        onRecordingPlaybackFailed={
+          recording.url ? recording.refreshFromPlaybackError : undefined
+        }
       />
-      {/* <View style={styles.privacyToggleContainer}>
-        <PrivacyToggle isPrivate={isPrivate} onToggle={handlePrivacyToggle} />
-      </View> */}
     </>
   );
 };
-
-// const styles = ScaledSheet.create({
-//   privacyToggleContainer: {
-//     position: 'absolute',
-//     bottom: '30@vs',
-//     left: 0,
-//     right: 0,
-//   },
-// });

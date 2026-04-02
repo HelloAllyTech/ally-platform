@@ -508,6 +508,7 @@
     "askAICitationsHeader": "Transcript References",
     "sessionFeedback": "Session Feedback",
     "annotatedTranscription": "Annotated Transcription",
+    "noSessionRecording": "No session recording is available for playback.",
     "checklistHeader": "Evaluation Checklist",
     "reflection": {
       "sectionTitle": "Self-Reflection Prompts",
