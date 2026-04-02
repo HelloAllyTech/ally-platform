@@ -40,6 +40,12 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Download react-native-audio-api prebuilt binaries
+        run: |
+          cd node_modules/react-native-audio-api
+          chmod +x scripts/download-prebuilt-binaries.sh
+          scripts/download-prebuilt-binaries.sh ios
+
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
