@@ -1,92 +1,271 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  GestureResponderEvent,
   LayoutChangeEvent,
   Pressable,
+  StyleProp,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
-import Video, {OnLoadData, OnProgressData, VideoRef} from 'react-native-video';
-
 import {
-  Forward10Icon,
-  PausePlayerIcon,
-  PlayWhiteIcon,
-  Replay10Icon,
-} from '@/assets';
+  AudioContext,
+  AudioManager,
+  decodeAudioData,
+  type AudioBuffer,
+} from 'react-native-audio-api';
+import {ScaledSheet} from 'react-native-size-matters';
+
+import {PausePlayerIcon, PlayWhiteIcon} from '@/assets';
 import {colors, fontFamily} from '@/theme';
 import {formatTimeToMMSS} from '@/utils';
+import {logger} from '@/utils/logger';
+
+const REMOTE_AUDIO_FETCH_INIT: RequestInit = {
+  headers: {
+    'User-Agent': 'AllyMobile/1.0 (React Native; simulation feedback)',
+    Accept: 'application/ogg,audio/ogg,audio/*,*/*',
+  },
+};
+
+export type ExternalSeekRequest = {key: number; seconds: number};
 
 interface SimulationAudioPlayerProps {
   audioUrl: string;
   onProgress: (currentTime: number) => void;
   onSeek?: (time: number) => void;
-  externalSeekTime?: number | null; // Allow external control to seek
+  externalSeek?: ExternalSeekRequest | null;
+  containerStyle?: StyleProp<ViewStyle>;
+  onPlaybackLoadError?: () => void;
 }
 
 export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
   audioUrl,
   onProgress,
   onSeek,
-  externalSeekTime,
+  externalSeek,
+  containerStyle,
+  onPlaybackLoadError,
 }) => {
-  const videoRef = useRef<VideoRef>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [progressBarWidth, setProgressBarWidth] = useState(0);
+  const [decodeError, setDecodeError] = useState(false);
+  const [decodedVersion, setDecodedVersion] = useState(0);
+  const [playbackGeneration, setPlaybackGeneration] = useState(0);
 
-  // Handle external seek requests (e.g. from transcript click)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const decodedBufferRef = useRef<AudioBuffer | null>(null);
+  const sourceRef = useRef<ReturnType<
+    AudioContext['createBufferSource']
+  > | null>(null);
+  const playStartCtxTimeRef = useRef(0);
+  const offsetAtPlayStartRef = useRef(0);
+  const pausePositionRef = useRef(0);
+  const isPlayingRef = useRef(isPlaying);
+  const onProgressRef = useRef(onProgress);
+  const onSeekRef = useRef(onSeek);
+  const onPlaybackLoadErrorRef = useRef(onPlaybackLoadError);
+
   useEffect(() => {
-    if (externalSeekTime !== undefined && externalSeekTime !== null) {
-      handleSeek(externalSeekTime);
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+  useEffect(() => {
+    onSeekRef.current = onSeek;
+  }, [onSeek]);
+  useEffect(() => {
+    onPlaybackLoadErrorRef.current = onPlaybackLoadError;
+  }, [onPlaybackLoadError]);
+
+  const stopSource = useCallback(() => {
+    const src = sourceRef.current;
+    if (src) {
+      src.onEnded = null;
+      try {
+        src.stop(0);
+      } catch {
+        // already stopped
+      }
+      sourceRef.current = null;
     }
+  }, []);
+
+  // Fetch + decode remote OGG via Web Audio API
+  useEffect(() => {
+    let cancelled = false;
+    const ctx = new AudioContext();
+    audioContextRef.current = ctx;
+    decodedBufferRef.current = null;
+    pausePositionRef.current = 0;
+    setCurrentTime(0);
+    setDuration(0);
+    setDecodeError(false);
+    setIsLoading(true);
+
+    (async () => {
+      try {
+        const response = await fetch(audioUrl, REMOTE_AUDIO_FETCH_INIT);
+        if (!response.ok) {
+          throw new Error(
+            `Audio fetch failed: HTTP ${response.status} ${response.statusText}`,
+          );
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error('Audio fetch returned an empty body');
+        }
+        const preferredRate = AudioManager.getDevicePreferredSampleRate();
+        const buffer = await decodeAudioData(arrayBuffer, preferredRate);
+        if (
+          !Number.isFinite(buffer.duration) ||
+          buffer.duration <= 0 ||
+          buffer.length <= 0
+        ) {
+          throw new Error('Decoded audio has no playable duration');
+        }
+        if (cancelled) {
+          return;
+        }
+        decodedBufferRef.current = buffer;
+        setDuration(buffer.duration);
+        setDecodedVersion(v => v + 1);
+      } catch (e) {
+        if (!cancelled) {
+          setDecodeError(true);
+          logger.error(
+            `SimulationAudioPlayer: decodeAudioData failed — ${String(e)}`,
+          );
+          onPlaybackLoadErrorRef.current?.();
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopSource();
+      decodedBufferRef.current = null;
+      ctx.close().catch(() => {});
+      audioContextRef.current = null;
+      setIsLoading(false);
+    };
+  }, [audioUrl, stopSource]);
+
+  // Start/stop AudioBufferSourceNode when play state changes
+  useEffect(() => {
+    if (!isPlaying) {
+      return;
+    }
+    const ctx = audioContextRef.current;
+    const buffer = decodedBufferRef.current;
+    if (!ctx || !buffer) {
+      setIsPlaying(false);
+      return;
+    }
+
+    stopSource();
+    AudioManager.setAudioSessionActivity(true).catch(() => {});
+    ctx.resume().catch(() => {});
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+
+    const offset = pausePositionRef.current;
+    playStartCtxTimeRef.current = ctx.currentTime;
+    offsetAtPlayStartRef.current = offset;
+
+    src.onEnded = () => {
+      sourceRef.current = null;
+      setIsPlaying(false);
+      pausePositionRef.current = buffer.duration;
+      setCurrentTime(buffer.duration);
+      onProgressRef.current(buffer.duration);
+    };
+
+    src.start(0, offset);
+    sourceRef.current = src;
+
+    return () => {
+      stopSource();
+    };
+  }, [isPlaying, decodedVersion, playbackGeneration, stopSource]);
+
+  // Progress ticks
+  useEffect(() => {
+    if (!isPlaying || duration <= 0) {
+      return;
+    }
+    const id = setInterval(() => {
+      const ctx = audioContextRef.current;
+      if (!ctx || !sourceRef.current) {
+        return;
+      }
+      const elapsed = ctx.currentTime - playStartCtxTimeRef.current;
+      const t = Math.min(duration, offsetAtPlayStartRef.current + elapsed);
+      setCurrentTime(t);
+      pausePositionRef.current = t;
+      onProgressRef.current(t);
+    }, 200);
+    return () => clearInterval(id);
+  }, [isPlaying, duration]);
+
+  // External seek (transcript tap): seek then start playback
+  useEffect(() => {
+    if (externalSeek === null || externalSeek === undefined) {
+      return;
+    }
+    handleSeek(externalSeek.seconds);
+    setIsPlaying(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalSeekTime]);
-
-  const handleLoad = (data: OnLoadData) => {
-    setDuration(data.duration);
-    setIsLoading(false);
-  };
-
-  const handleProgress = (data: OnProgressData) => {
-    if (!isLoading) {
-      setCurrentTime(data.currentTime);
-      onProgress(data.currentTime);
-    }
-  };
+  }, [externalSeek?.key]);
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleSeek = (time: number) => {
-    const newTime = Math.max(0, Math.min(time, duration || time));
-    videoRef.current?.seek(newTime);
-    setCurrentTime(newTime);
-    onProgress(newTime);
-    if (onSeek) {
-      onSeek(newTime);
+    if (decodeError) {
+      return;
     }
+    setIsPlaying(p => !p);
   };
 
-  const handleRewind = () => {
-    handleSeek(currentTime - 10);
-  };
+  const clampToAllowedRange = useCallback(
+    (time: number) => {
+      const dur = duration || time;
+      return Math.max(0, Math.min(time, dur));
+    },
+    [duration],
+  );
 
-  const handleForward = () => {
-    handleSeek(currentTime + 10);
-  };
+  const handleSeek = useCallback(
+    (time: number) => {
+      const newTime = clampToAllowedRange(time);
+      pausePositionRef.current = newTime;
+      setCurrentTime(newTime);
+      onProgressRef.current(newTime);
+      onSeekRef.current?.(newTime);
 
-  const handleProgressBarPress = (e: any) => {
-    if (progressBarWidth > 0) {
+      stopSource();
+      if (isPlayingRef.current) {
+        setPlaybackGeneration(g => g + 1);
+      }
+    },
+    [clampToAllowedRange, stopSource],
+  );
+
+  const handleProgressBarPress = (e: GestureResponderEvent) => {
+    if (progressBarWidth > 0 && duration > 0) {
       const x = e.nativeEvent.locationX;
       const progress = x / progressBarWidth;
-      const time = progress * duration;
-      handleSeek(time);
+      handleSeek(progress * duration);
     }
   };
 
@@ -95,60 +274,28 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <Video
-        ref={videoRef}
-        source={{uri: audioUrl}}
-        paused={!isPlaying}
-        onLoad={handleLoad}
-        onProgress={handleProgress}
-        onEnd={() => setIsPlaying(false)}
-        onLoadStart={() => setIsLoading(true)}
-        playInBackground={false}
-        playWhenInactive={false}
-        ignoreSilentSwitch="ignore"
-      />
-
-      {/* Left: Controls Group */}
-      <View style={styles.controlsGroup}>
-        <TouchableOpacity
-          onPress={handleRewind}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-          style={styles.seekButton}>
-          <Replay10Icon width={24} height={24} color={colors.ds.neutral[400]} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handlePlayPause} style={styles.playButton}>
-          {isLoading ? (
-            <ActivityIndicator color={colors.ds.theme.primary} size="small" />
-          ) : isPlaying ? (
-            <PausePlayerIcon
-              width={16}
-              height={16}
-              color={colors.ds.theme.primary}
-            />
-          ) : (
-            <PlayWhiteIcon
-              width={16}
-              height={16}
-              color={colors.ds.theme.primary}
-            />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleForward}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-          style={styles.seekButton}>
-          <Forward10Icon
-            width={24}
-            height={24}
-            color={colors.ds.neutral[400]}
+    <View style={[styles.container, containerStyle]}>
+      <TouchableOpacity
+        onPress={handlePlayPause}
+        disabled={decodeError}
+        style={styles.playButton}>
+        {isLoading ? (
+          <ActivityIndicator color={colors.ds.theme.primary} size="small" />
+        ) : isPlaying ? (
+          <PausePlayerIcon
+            width={16}
+            height={16}
+            color={colors.ds.theme.primary}
           />
-        </TouchableOpacity>
-      </View>
+        ) : (
+          <PlayWhiteIcon
+            width={16}
+            height={16}
+            color={colors.ds.theme.primary}
+          />
+        )}
+      </TouchableOpacity>
 
-      {/* Right: Progress Group */}
       <View style={styles.progressGroup}>
         <Text style={styles.timeText}>
           {formatTimeToMMSS(currentTime * 1000)}
@@ -176,34 +323,22 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
 const styles = ScaledSheet.create({
   container: {
     backgroundColor: colors.white,
-    paddingVertical: '12@ms',
-    paddingHorizontal: '16@ms',
+    paddingVertical: '16@ms',
+    paddingHorizontal: '12@ms',
     borderRadius: '8@ms',
-    borderWidth: 1,
-    borderColor: colors.ds.grey[200],
+    borderWidth: '0.5@ms',
+    borderColor: colors.ds.stroke.primary,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: '16@ms',
     marginHorizontal: '25@ms',
     paddingRight: '12@ms',
-  },
-  controlsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: '12@ms',
-  },
-  seekButton: {
-    width: '24@ms',
-    height: '24@ms',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   playButton: {
     width: '32@ms',
     height: '32@ms',
     borderRadius: '16@ms',
-    backgroundColor: colors.ds.blue[100],
+    backgroundColor: colors.ds.blue[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -211,13 +346,13 @@ const styles = ScaledSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: '12@ms',
+    marginLeft: '17@ms',
     gap: '6@ms',
   },
   timeText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    color: colors.ds.typography.mediumEmphasis,
+    fontSize: '10@ms',
+    color: colors.ds.typography.lowEmphasis,
     minWidth: '35@ms',
   },
   progressBarContainer: {

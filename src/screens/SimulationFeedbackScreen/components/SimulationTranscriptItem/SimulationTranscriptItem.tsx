@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {Pressable, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {TRANSCRIPT_TAG_COLORS} from '@/constants';
@@ -13,11 +13,20 @@ export type SimulationTranscriptItemProps = {
   isActive?: boolean;
   isLearner?: boolean;
   tags?: SimulationMessageTag[];
+  onPress?: () => void;
 };
 
 export const SimulationTranscriptItem: React.FC<
   SimulationTranscriptItemProps
-> = ({time, message, speakerLabel, isLearner = false, tags}) => {
+> = ({
+  time,
+  message,
+  speakerLabel,
+  isLearner = false,
+  isActive = false,
+  tags,
+  onPress,
+}) => {
   const backgroundColor = isLearner
     ? colors.ds.blueAlpha[25]
     : colors.ds.deepPurpleAlpha[25];
@@ -41,14 +50,19 @@ export const SimulationTranscriptItem: React.FC<
     );
   };
 
+  const shellStyle = [
+    styles.messageContainer,
+    {backgroundColor, borderColor},
+    isActive && styles.messageContainerActive,
+  ];
+
   return (
-    <View
-      style={[
-        styles.messageContainer,
-        {
-          backgroundColor,
-          borderColor,
-        },
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      style={({pressed}) => [
+        ...shellStyle,
+        pressed && onPress && styles.messageContainerPressed,
       ]}>
       <View style={[styles.aiClientLayout, isLearner && styles.learnerLayout]}>
         <Text style={styles.timeAndSpeaker}>
@@ -66,7 +80,7 @@ export const SimulationTranscriptItem: React.FC<
         )}
         <Text style={styles.message}>{message}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -76,6 +90,12 @@ const styles = ScaledSheet.create({
     borderRadius: '8@ms',
     padding: '12@ms',
     marginBottom: '16@vs',
+  },
+  messageContainerActive: {
+    borderWidth: '1.5@ms',
+  },
+  messageContainerPressed: {
+    opacity: 0.92,
   },
   learnerLayout: {
     flexDirection: 'column',

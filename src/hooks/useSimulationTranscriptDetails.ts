@@ -36,6 +36,10 @@ export const useSimulationTranscriptDetails = (
   useEffect(() => {
     if (data) {
       const newMessages = data.messages || [];
+      if (newMessages.length === 0) {
+        setHasMore(false);
+        return;
+      }
       setMessages(prev => {
         const updated = [...prev, ...newMessages];
         if (typeof data.count === 'number' && updated.length >= data.count) {
@@ -75,10 +79,10 @@ export const useSimulationTranscriptDetails = (
   );
 
   const handleEndReached = useCallback(() => {
-    if (!isLoading && hasMore) {
+    if (!isLoading && !isFetching && hasMore) {
       fetchMessages(offset);
     }
-  }, [isLoading, hasMore, fetchMessages, offset]);
+  }, [isLoading, isFetching, hasMore, fetchMessages, offset]);
 
   const formattedMessages = useMemo<SimulationTranscriptMessage[]>(() => {
     return messages.map(message => ({

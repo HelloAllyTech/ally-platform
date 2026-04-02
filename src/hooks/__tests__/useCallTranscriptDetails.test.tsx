@@ -79,9 +79,9 @@ describe('useCallTranscriptDetails', () => {
     await waitFor(() => expect(getByTestId('count').props.children).toBe('2'));
     await waitFor(() => {
       expect(getByTestId('hasMore').props.children).toBe('false');
-      // For non-WEBRTC provider, times use startSeconds => 00.01 and 00.02
-      expect(getByTestId('time0').props.children).toBe('00.01');
-      expect(getByTestId('time1').props.children).toBe('00.02');
+      // For non-WEBRTC provider, times use startSeconds => formatTimeToMMSS(startSeconds * 1000)
+      expect(getByTestId('time0').props.children).toBe('00:01');
+      expect(getByTestId('time1').props.children).toBe('00:02');
     });
   });
 

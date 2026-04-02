@@ -87,10 +87,12 @@ describe('useReviewDetailsLogic', () => {
     expect(result.current.showCommentInput).toBe(false);
     expect(result.current.offset).toBe(0);
 
-    await waitFor(() => expect(api.fetchMessages).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(api.fetchMessages).toHaveBeenCalled();
+      expect(result.current.hasMore).toBe(false);
+    });
 
     expect(result.current.conversationMessages).toEqual([]);
-    expect(result.current.hasMore).toBe(false);
   });
 
   it('calls fetchMessages on mount with reviewId', async () => {
