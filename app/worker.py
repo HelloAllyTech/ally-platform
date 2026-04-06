@@ -169,10 +169,13 @@ class AgentWorker:
         self.tts_client._default_params = defaults.copy()
 
         # Initialize agent state
-        self.joined_iso = initialize_agent_state(
+        agent_joined_iso = initialize_agent_state(
             thread_id=self.ctx.room.name,
             scenario=self.scenario,
         )
+        self.joined_iso = self.scenario.conversation_started_at or agent_joined_iso
+
+        print("debugging: ", self.joined_iso)
 
     async def initialize(self):
         """
@@ -607,5 +610,6 @@ if __name__ == "__main__":
             # Increased from 10 to 600 seconds (10 minutes) for longer conversations
             drain_timeout=600,
             job_memory_warn_mb=650,
+            initialize_process_timeout=120,
         )
     )

@@ -550,6 +550,112 @@ class TestScenario:
         assert scenario.prompt_data.name == "Integration Character"
         assert scenario.prompt_data.age == "40"
 
+    # -------------------- _parse_conversation_started_at --------------------
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_z_suffix(self):
+        """Z-suffix is normalised to +00:00 offset."""
+        result = Scenario._parse_conversation_started_at("2026-03-23T07:01:44.447Z")
+        assert result == "2026-03-23T07:01:44.447000+00:00"
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_plus_offset(self):
+        """Explicit +00:00 offset is accepted and preserved."""
+        result = Scenario._parse_conversation_started_at("2026-03-23T07:01:44+00:00")
+        assert result == "2026-03-23T07:01:44+00:00"
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_naive_assumed_utc(self):
+        """Naive datetime (no tzinfo) is treated as UTC."""
+        result = Scenario._parse_conversation_started_at("2026-03-23T07:01:44")
+        assert result is not None
+        assert "+00:00" in result
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_none(self):
+        """None input returns None."""
+        assert Scenario._parse_conversation_started_at(None) is None
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_empty_string(self):
+        """Empty string returns None."""
+        assert Scenario._parse_conversation_started_at("") is None
+
+    @pytest.mark.unit
+    def test_parse_conversation_started_at_invalid_returns_none(self, mock_logger):
+        """Unparseable value logs a warning and returns None."""
+        with patch("app.core.scenario.base.logger", mock_logger):
+            result = Scenario._parse_conversation_started_at("not-a-date")
+        assert result is None
+        mock_logger.warning.assert_called_once()
+
+    # -------------------- conversationStartedAt in create() --------------------
+
+    @pytest.mark.unit
+    def test_scenario_create_sets_conversation_started_at(self):
+        """conversationStartedAt from top-level scenarioSession is stored
+        on scenario."""
+        payload = {
+            "version": "1.0",
+            "scenario": {
+                "title": "Started At Test",
+                "promptData": {
+                    "name": "Test Character",
+                    "age": 25,
+                    "gender": "female",
+                    "currentLocation": "City",
+                    "context": "ctx",
+                    "lifeHistory": "history",
+                    "openingStatements": ["Hello!"],
+                },
+            },
+            "scenarioSession": {
+                "conversationStartedAt": "2026-03-23T07:01:44.447Z",
+            },
+        }
+        scenario = Scenario.create(payload)
+        assert scenario.conversation_started_at == "2026-03-23T07:01:44.447000+00:00"
+
+    @pytest.mark.unit
+    def test_scenario_create_conversation_started_at_absent(self):
+        """When scenarioSession is absent, conversation_started_at is None."""
+        payload = {
+            "title": "No Started At",
+            "promptData": {
+                "name": "Test Character",
+                "age": 25,
+                "gender": "female",
+                "currentLocation": "City",
+                "context": "ctx",
+                "lifeHistory": "history",
+                "openingStatements": ["Hello!"],
+            },
+        }
+        scenario = Scenario.create(payload)
+        assert scenario.conversation_started_at is None
+
+    @pytest.mark.unit
+    def test_scenario_create_conversation_started_at_empty_session(self):
+        """Empty scenarioSession leaves conversation_started_at as None."""
+        payload = {
+            "version": "1.0",
+            "scenario": {
+                "title": "Empty Session Test",
+                "promptData": {
+                    "name": "Test Character",
+                    "age": 25,
+                    "gender": "female",
+                    "currentLocation": "City",
+                    "context": "ctx",
+                    "lifeHistory": "history",
+                    "openingStatements": ["Hello!"],
+                },
+            },
+            "scenarioSession": {},
+        }
+        scenario = Scenario.create(payload)
+        assert scenario.conversation_started_at is None
+
     @pytest.mark.unit
     def test_scenario_model_config(self):
         """Test Scenario model configuration."""

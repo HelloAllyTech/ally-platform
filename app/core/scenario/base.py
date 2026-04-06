@@ -1,3 +1,5 @@
+from datetime import datetime as _datetime
+from datetime import timezone
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
@@ -176,6 +178,12 @@ class Scenario(BaseModel):
         description="List of auto-termination event configurations",
     )
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    conversation_started_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp (UTC) when the conversation started, sourced from "
+        "the backend conversationStartedAt field. When present, used as the agent "
+        "joined time instead of the current clock time.",
+    )
     voice: Optional[ScenarioVoice] = Field(default=None)
     prompt_data: PromptData = Field(default_factory=PromptData)
     language_config: Optional[LanguageConfig] = Field(default=None)
@@ -240,6 +248,11 @@ class Scenario(BaseModel):
         behavior_instructions = raw.get("behaviorInstructions")
         state_instructions = raw.get("stateInstructions")
 
+        scenario_session = payload.get("scenarioSession") or {}
+        conversation_started_at = cls._parse_conversation_started_at(
+            scenario_session.get("conversationStartedAt")
+        )
+
         # Parse guardrails array and build one GuardrailEvent per entry
         guardrail_events = []
         guardrails_raw = raw.get("guardrails") or []
@@ -297,6 +310,7 @@ class Scenario(BaseModel):
         return cls(
             scenarioName=normalized["scenarioName"],
             metadata=normalized.get("metadata", {}),
+            conversation_started_at=conversation_started_at,
             events=built_events,
             trigger_events=trigger_events,
             termination_events=termination_events,
@@ -310,6 +324,35 @@ class Scenario(BaseModel):
     # ---------------------------
     # Internal helpers
     # ---------------------------
+    @staticmethod
+    def _parse_conversation_started_at(raw_value: Optional[str]) -> Optional[str]:
+        """
+        Parse and normalise the conversationStartedAt field from the backend.
+
+        Converts the value to a UTC-aware ISO string using ``+00:00`` offset
+        (consistent with ``datetime.now(timezone.utc).isoformat()``).
+        Returns ``None`` when the value is absent or cannot be parsed.
+
+        Args:
+            raw_value: Raw ISO string from backend (e.g. ``"2026-03-23T07:01:44.447Z"``)
+
+        Returns:
+            Normalised ISO string or ``None``
+        """
+        if not raw_value:
+            return None
+        try:
+            parsed = _datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.isoformat()
+        except (ValueError, AttributeError):
+            logger.warning(
+                f"Failed to parse conversationStartedAt: {raw_value!r}; "
+                "falling back to current time"
+            )
+            return None
+
     @staticmethod
     def _extract_scenario_section(payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """Return the inner scenario dict from an envelope or the payload itself."""

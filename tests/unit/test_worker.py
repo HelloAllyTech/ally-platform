@@ -78,6 +78,64 @@ class TestWorker:
         assert captured["values"]["new_events"] == []
         assert captured["values"]["current_score"] == 0
 
+    # -------------------- joined_iso initialization --------------------
+
+    def test_joined_iso_uses_conversation_started_at_when_present(self, monkeypatch):
+        """joined_iso is taken from scenario.conversation_started_at when set."""
+        from app.core.agent.factory import initialize_agent_state
+
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **kw: None)
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        worker_instance.scenario = types.SimpleNamespace(
+            events=[],
+            conversation_started_at="2026-03-23T07:01:44.447000+00:00",
+        )
+
+        agent_joined_iso = initialize_agent_state(
+            thread_id=ctx.room.name,
+            scenario=worker_instance.scenario,
+        )
+        worker_instance.joined_iso = (
+            worker_instance.scenario.conversation_started_at or agent_joined_iso
+        )
+
+        assert worker_instance.joined_iso == "2026-03-23T07:01:44.447000+00:00"
+
+    def test_joined_iso_falls_back_to_current_time_when_absent(self, monkeypatch):
+        """joined_iso falls back to initialize_agent_state return value when absent."""
+        from app.core.agent.factory import initialize_agent_state
+
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **kw: None)
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        worker_instance.scenario = types.SimpleNamespace(
+            events=[],
+            conversation_started_at=None,
+        )
+
+        agent_joined_iso = initialize_agent_state(
+            thread_id=ctx.room.name,
+            scenario=worker_instance.scenario,
+        )
+        worker_instance.joined_iso = (
+            worker_instance.scenario.conversation_started_at or agent_joined_iso
+        )
+
+        assert worker_instance.joined_iso is not None
+        assert worker_instance.joined_iso == agent_joined_iso
+        assert "+00:00" in worker_instance.joined_iso
+
     # -------------------- create_agent_session --------------------
     def test_create_agent_session_uses_expected_components(self, monkeypatch):
         created = {}
