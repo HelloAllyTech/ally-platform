@@ -234,6 +234,11 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
     if (decodeError) {
       return;
     }
+    if (!isPlaying && duration > 0 && pausePositionRef.current >= duration) {
+      pausePositionRef.current = 0;
+      setCurrentTime(0);
+      onProgressRef.current(0);
+    }
     setIsPlaying(p => !p);
   };
 
@@ -346,14 +351,13 @@ const styles = ScaledSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: '17@ms',
+    marginLeft: '14@ms',
     gap: '6@ms',
   },
   timeText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     fontSize: '10@ms',
     color: colors.ds.typography.lowEmphasis,
-    minWidth: '35@ms',
   },
   progressBarContainer: {
     flex: 1,
