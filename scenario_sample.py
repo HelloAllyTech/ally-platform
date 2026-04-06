@@ -318,6 +318,9 @@ SCENARIO_SAMPLE = {
         "llm": {"provider": "openai", "config": {"model": "gpt-4o-mini"}},
         "metadata": {},
     },
+    "scenarioSession": {
+        "conversationStartedAt": "2026-03-23T07:01:44.447Z",
+    },
 }
 
 # Ollama scenario for testing open-source LLM via Ollama
