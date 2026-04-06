@@ -249,10 +249,15 @@ class AgentWorker:
     def _register_callbacks(self):
         """Register room, session, and shutdown callbacks."""
         # Conversation handler (register on session)
-        conversation_handler, cleanup_conversation_handler = (
+        conversation_handler, state_handlers, cleanup_conversation_handler = (
             create_conversation_handler(self.ctx.room.name, self.joined_iso)
         )
         self.session.on("conversation_item_added")(conversation_handler)
+
+        # Register state-change handlers to track when audio starts playing
+        # These capture speaking start times used by conversation_handler
+        self.session.on("agent_state_changed")(state_handlers["agent_state"])
+        self.session.on("user_state_changed")(state_handlers["user_state"])
 
         # Store cleanup handler for shutdown
         self._cleanup_conversation_handler = cleanup_conversation_handler

@@ -135,7 +135,7 @@ class TestEventHandler:
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
         # Build handler and trigger
-        handler, cleanup = eh.create_conversation_handler(
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
             room_id="room-123", joined_iso="2024-01-01T00:00:00+00:00"
         )
 
@@ -207,7 +207,7 @@ class TestEventHandler:
 
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
-        handler, cleanup = eh.create_conversation_handler(
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
             "room", "2024-01-01T00:00:00+00:00"
         )
         handler(
@@ -247,7 +247,7 @@ class TestEventHandler:
 
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
-        handler, cleanup = eh.create_conversation_handler(
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
             "room-123", "2024-01-01T00:00:00+00:00"
         )
 
@@ -301,7 +301,7 @@ class TestEventHandler:
             asyncio, "create_task", lambda _: types.SimpleNamespace(cancel=lambda: None)
         )
 
-        handler, cleanup = eh.create_conversation_handler(
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
             "room-123", "2024-01-01T00:00:00+00:00"
         )
 
@@ -329,3 +329,148 @@ class TestEventHandler:
 
         # Call cleanup again to ensure it's idempotent
         cleanup()
+
+
+class DummyStateEvent:
+    """Minimal stand-in for AgentStateChangedEvent / UserStateChangedEvent."""
+
+    def __init__(self, new_state, created_at):
+        self.new_state = new_state
+        self.created_at = created_at
+
+
+class TestConversationHandlerTimestamps:
+    """Tests for start_time / end_time tracking via state-change handlers."""
+
+    def _common_stubs(self, monkeypatch):
+        """Apply common monkeypatches and return a list that collects chat_messages."""
+        collected = []
+
+        class DummyCoreEvent:
+            def model_dump_json(self):
+                return "{}"
+
+        def fake_core_create(room_id, chat_message=None, event_id=None):
+            collected.append(chat_message)
+            return DummyCoreEvent()
+
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(create=fake_core_create),
+        )
+        monkeypatch.setattr(
+            asyncio,
+            "create_task",
+            lambda _: types.SimpleNamespace(cancel=lambda: None),
+        )
+
+        class DummyQueue:
+            async def send_message(self, m):
+                pass
+
+        monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
+        return collected
+
+    def test_agent_start_time_from_state_change(self, monkeypatch):
+        """Agent transcript start_time should come from agent_state_changed."""
+        collected = self._common_stubs(monkeypatch)
+        # joined at unix 1704067200 (2024-01-01T00:00:00+00:00)
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+
+        # Simulate agent starting to speak at t+3s
+        state_handlers["agent_state"](
+            DummyStateEvent(new_state="speaking", created_at=1704067203.0)
+        )
+        # conversation_item_added fires at t+5s (audio finished)
+        handler(
+            DummyEvent(
+                DummyItem(role="assistant", content="hello"),
+                created_at=1704067205.0,
+            )
+        )
+
+        assert len(collected) == 1
+        msg = collected[0]
+        assert msg.role == "CLIENT"
+        assert pytest.approx(msg.start_time, rel=1e-3) == 3.0  # from state change
+        assert pytest.approx(msg.end_time, rel=1e-3) == 5.0  # from created_at
+
+    def test_user_start_time_from_state_change(self, monkeypatch):
+        """User transcript start_time should come from user_state_changed."""
+        collected = self._common_stubs(monkeypatch)
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+
+        # Simulate user starting to speak at t+2s
+        state_handlers["user_state"](
+            DummyStateEvent(new_state="speaking", created_at=1704067202.0)
+        )
+        # conversation_item_added fires at t+6s (final transcript committed)
+        handler(
+            DummyEvent(
+                DummyItem(role="user", content="hey"),
+                created_at=1704067206.0,
+            )
+        )
+
+        assert len(collected) == 1
+        msg = collected[0]
+        assert msg.role == "COUNSELOR"
+        assert pytest.approx(msg.start_time, rel=1e-3) == 2.0
+        assert pytest.approx(msg.end_time, rel=1e-3) == 6.0
+
+    def test_fallback_when_no_state_change(self, monkeypatch):
+        """Without a prior state change, start_time should fall back to end_time."""
+        collected = self._common_stubs(monkeypatch)
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+
+        # No state_change event before conversation_item_added
+        handler(
+            DummyEvent(
+                DummyItem(role="assistant", content="hi"),
+                created_at=1704067210.0,
+            )
+        )
+
+        assert len(collected) == 1
+        msg = collected[0]
+        assert msg.start_time == msg.end_time
+        assert pytest.approx(msg.end_time, rel=1e-3) == 10.0
+
+    def test_speaking_start_is_consumed(self, monkeypatch):
+        """Speaking start should be consumed after one conversation item."""
+        collected = self._common_stubs(monkeypatch)
+        handler, state_handlers, cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+
+        # Agent starts speaking at t+3s
+        state_handlers["agent_state"](
+            DummyStateEvent(new_state="speaking", created_at=1704067203.0)
+        )
+        # First item consumes the start time
+        handler(
+            DummyEvent(
+                DummyItem(role="assistant", content="first"),
+                created_at=1704067205.0,
+            )
+        )
+        # Second item without new state change should fall back
+        handler(
+            DummyEvent(
+                DummyItem(role="assistant", content="second"),
+                created_at=1704067208.0,
+            )
+        )
+
+        assert len(collected) == 2
+        assert pytest.approx(collected[0].start_time, rel=1e-3) == 3.0
+        # Second message: no speaking start captured → falls back to end_time
+        assert collected[1].start_time == collected[1].end_time
+        assert pytest.approx(collected[1].end_time, rel=1e-3) == 8.0
