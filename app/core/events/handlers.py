@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 from livekit import agents, rtc
 from livekit.agents import ConversationItemAddedEvent
+from livekit.agents.voice.events import AgentStateChangedEvent, UserStateChangedEvent
 
 from app.core.constants import SESSION_TERMINATED_MESSAGE
 from app.core.events.base import BaseEvent, ChatMessage
@@ -63,16 +64,40 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     """
     Factory function to create conversation event handler with deduplication.
 
+    Tracks speaking start times via agent_state_changed / user_state_changed
+    so that transcripts record when audio *started* playing (start_time) and
+    when the item was committed to chat history (end_time).
+
     Args:
         room_id: LiveKit room identifier
         joined_iso: ISO timestamp when agent joined
 
     Returns:
-        Tuple of (handler_function, cleanup_function):
-        - handler_function: Event handler for conversation_item_added events
+        Tuple of (conversation_handler, state_handlers, cleanup_function):
+        - conversation_handler: Event handler for conversation_item_added events
+        - state_handlers: Dict with 'agent_state' and 'user_state' handlers
         - cleanup_function: Function to clean up internal state (call on shutdown)
     """
     seen_utterances = set()
+
+    # Track when agent/user most recently started speaking.
+    # These are consumed (reset to None) when conversation_item_added fires.
+    _agent_speaking_start: list[float | None] = [None]
+    _user_speaking_start: list[float | None] = [None]
+
+    # ---- state-change handlers ----
+
+    def on_agent_state_changed(event: AgentStateChangedEvent):
+        if event.new_state == "speaking":
+            _agent_speaking_start[0] = event.created_at
+            logger.debug(f"Agent started speaking at {event.created_at}")
+
+    def on_user_state_changed(event: UserStateChangedEvent):
+        if event.new_state == "speaking":
+            _user_speaking_start[0] = event.created_at
+            logger.debug(f"User started speaking at {event.created_at}")
+
+    # ---- main conversation handler ----
 
     def on_conversation_item_added(event: ConversationItemAddedEvent):
         content = extract_content(event.item)
@@ -93,11 +118,48 @@ def create_conversation_handler(room_id: str, joined_iso: str):
 
         role = "CLIENT" if event.item.role == "assistant" else "COUNSELOR"
 
+        # Determine start_time (when audio began) and end_time (when committed)
+        # For agent (assistant/CLIENT): use tracked agent speaking start
+        # For user (COUNSELOR): use tracked user speaking start
+        if event.item.role == "assistant":
+            speaking_start = _agent_speaking_start[0]
+            _agent_speaking_start[0] = None  # consume
+        else:
+            speaking_start = _user_speaking_start[0]
+            _user_speaking_start[0] = None  # consume
+
+        # start_time: relative seconds from conversation start when audio began
+        # (speaking_start).
+        # end_time: relative seconds from conversation start when the item was
+        # committed (event.created_at).
+        # speaking_start is set by on_agent_state_changed / on_user_state_changed
+        # and consumed here to ensure each utterance uses the correct
+        # corresponding speaking window.
+        start_time = (
+            calculate_start_time(speaking_start, joined_iso) if speaking_start else None
+        )
+        end_time = calculate_start_time(event.created_at, joined_iso)
+
+        # Fallback: speaking_start may be None if the state-change event was missed
+        # (e.g. handler not yet registered, or event fired before the agent joined).
+        # In that case, use end_time so that start_time is never left undefined.
+        if start_time is None:
+            logger.debug(
+                f"No speaking start captured for {role}, "
+                f"falling back to end_time as start_time"
+            )
+            start_time = end_time
+
         chat_message = ChatMessage(
             role=role,
             content=content,
-            start_time=calculate_start_time(event.created_at, joined_iso),
-            end_time=None,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        logger.debug(
+            f"Transcript [{role}]: start_time={start_time:.2f}s, "
+            f"end_time={end_time:.2f}s, content={content[:20]}"
         )
 
         core_event = CoreEventMessageType.create(
@@ -120,9 +182,16 @@ def create_conversation_handler(room_id: str, joined_iso: str):
         """Clean up the seen_utterances set."""
         count = len(seen_utterances)
         seen_utterances.clear()
+        _agent_speaking_start[0] = None
+        _user_speaking_start[0] = None
         logger.debug(f"Cleaned up {count} utterance entries from conversation handler")
 
-    return on_conversation_item_added, cleanup
+    state_handlers = {
+        "agent_state": on_agent_state_changed,
+        "user_state": on_user_state_changed,
+    }
+
+    return on_conversation_item_added, state_handlers, cleanup
 
 
 async def send_event_to_ui(
