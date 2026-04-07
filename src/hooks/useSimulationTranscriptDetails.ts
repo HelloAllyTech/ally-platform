@@ -85,32 +85,22 @@ export const useSimulationTranscriptDetails = (
   }, [isLoading, isFetching, hasMore, fetchMessages, offset]);
 
   const formattedMessages = useMemo<SimulationTranscriptMessage[]>(() => {
-    return messages.map((message, index) => {
-      // API startSeconds is actually the segment's end time.
-      // Real start = previous message's end time; first message starts at 0.
-      const prevEnd = index > 0 ? messages[index - 1].startSeconds : null;
-      const derivedStart =
-        index === 0 ? 0 : typeof prevEnd === 'number' ? prevEnd : null;
-
-      const startSeconds = derivedStart ?? 0;
-
-      const timeMs =
-        derivedStart !== null
-          ? Math.round(derivedStart * 1000)
+    return messages.map(message => ({
+      id: message.id,
+      message: message.content,
+      startSeconds:
+        typeof message.startSeconds === 'number' ? message.startSeconds : 0,
+      time: formatTimeToMMSS(
+        typeof message.startSeconds === 'number' && message.startSeconds >= 0
+          ? Math.round(message.startSeconds * 1000)
           : sessionStartedAt
             ? new Date(message.createdAt).getTime() -
               new Date(sessionStartedAt).getTime()
-            : 0;
-
-      return {
-        id: message.id,
-        message: message.content,
-        startSeconds,
-        time: formatTimeToMMSS(Math.max(0, timeMs)),
-        isLearner: message.senderId !== -1,
-        tags: message.tags,
-      };
-    });
+            : 0,
+      ),
+      isLearner: message.senderId !== -1,
+      tags: message.tags,
+    }));
   }, [messages, sessionStartedAt]);
 
   return {
