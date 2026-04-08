@@ -3,6 +3,7 @@ import {fireEvent, render} from '@testing-library/react-native';
 
 jest.mock('react-native-size-matters', () => ({
   ScaledSheet: {create: (s: unknown) => s},
+  ms: (n: number) => n,
 }));
 
 jest.mock('@/assets/icons', () => {

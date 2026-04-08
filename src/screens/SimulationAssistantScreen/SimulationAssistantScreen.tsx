@@ -12,8 +12,8 @@ import {
 } from '@sayem314/react-native-keep-awake';
 import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {SafeAreaView, Text, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {Text, View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
@@ -60,7 +60,6 @@ const RINGING_BELL_DELAY = 5000; // 5 seconds for ringing the bell before connec
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
-  const insets = useSafeAreaInsets();
   const {sessionData, scenario, pathId, caseId, languageId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
@@ -341,7 +340,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <RoomContext.Provider value={room}>
         <View style={styles.contentContainer}>
           {isSimulationInProgress && startTime && (
