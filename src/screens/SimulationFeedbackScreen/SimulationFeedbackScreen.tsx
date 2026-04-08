@@ -54,7 +54,7 @@ import {
 } from './components';
 import {styles} from './styles';
 
-const MAX_RETRY_ATTEMPTS = 5;
+const MAX_RETRY_ATTEMPTS = 7;
 const RETRY_DELAY = 3500;
 
 export const SimulationFeedbackScreen: React.FC<
@@ -84,6 +84,10 @@ export const SimulationFeedbackScreen: React.FC<
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
+  console.log(
+    '🚀 ~ SimulationFeedbackScreen ~ simulationDetails:',
+    simulationDetails?.details,
+  );
 
   const {data: reviewData} = useGetReviewByIdQuery(
     {reviewId: reviewId || ''},

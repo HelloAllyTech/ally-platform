@@ -1,7 +1,7 @@
 import React from 'react';
 import {Participant, Track, TrackPublication} from 'livekit-client';
 import {Image, Text, TouchableWithoutFeedback, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {MicOffWhiteIcon, UserIcon} from '@/assets/icons';
 import {AUDIO} from '@/constants';
@@ -20,6 +20,8 @@ interface ParticipantTileProps {
   overlayRef?: React.RefObject<ScenarioInfoOverlayRef> | null;
   isMicEnabled?: boolean;
 }
+
+const PLACEHOLDER_ICON_SIZE = ms(90);
 
 export const ParticipantTile: React.FC<ParticipantTileProps> = ({
   participant,
@@ -61,7 +63,10 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
           />
         ) : (
           <View style={styles.placeholderContainer}>
-            <UserIcon />
+            <UserIcon
+              width={PLACEHOLDER_ICON_SIZE}
+              height={PLACEHOLDER_ICON_SIZE}
+            />
           </View>
         )}
 
@@ -99,6 +104,7 @@ const styles = ScaledSheet.create({
     backgroundColor: colors.ds.whiteAlpha[50],
     borderWidth: '6@ms',
     borderColor: 'transparent',
+    overflow: 'hidden',
   },
   activeContainerBorder: {
     borderColor: colors.ds.theme.primaryLight,
