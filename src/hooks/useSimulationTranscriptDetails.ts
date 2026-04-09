@@ -28,7 +28,7 @@ export const useSimulationTranscriptDetails = (
       scenarioSessionId,
       limit: LIMIT,
       sortOrder: SortOrder.ASC,
-      sortBy: 'createdAt',
+      sortBy: 'startSeconds',
     }),
     [scenarioSessionId],
   );
