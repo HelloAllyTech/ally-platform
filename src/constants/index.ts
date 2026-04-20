@@ -6,6 +6,7 @@ export * from './badgePopup';
 export * from './simulations';
 export * from './chat';
 export * from './dates';
+export * from './leaderboard';
 export * from './summary';
 export * from './navigation';
 export * from './feedback';

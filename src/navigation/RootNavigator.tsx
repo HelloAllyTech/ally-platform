@@ -1,14 +1,19 @@
-import {useEffect, useMemo, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
+import notifee from '@notifee/react-native';
 import {
+  createNavigationContainerRef,
   NavigationContainer,
   NavigationContainerRef,
-  useNavigationContainerRef,
+  TabActions,
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {Linking} from 'react-native';
+import {useSelector} from 'react-redux';
 
 import {env} from '@/config/env';
-import {SCREEN_NAMES} from '@/constants';
+import {LEADERBOARD_NOTIFICATION_ID, SCREEN_NAMES} from '@/constants';
+import {AsyncStorageKeys} from '@/constants/asyncStorage';
+import {USER_PERMISSIONS} from '@/constants/permissions';
 import {
   useCounselorChat,
   useNavigationAwareCounselorChat,
@@ -35,9 +40,17 @@ import {
   SplashScreen,
   SuspendedAccountScreen,
 } from '@/screens';
+import {
+  createAndroidChannel,
+  EventType,
+  requestNotificationPermission,
+  scheduleWeeklyLeaderboardNotification,
+} from '@/services/notificationService';
 import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
+import {AppRootState} from '@/store/store';
 import {SocketEvent} from '@/types';
 import {logger} from '@/utils';
+import {getItem, setItem} from '@/utils/asyncStorage';
 import {
   getCallIdFromUrl,
   isSupportedDeepLink,
@@ -56,6 +69,7 @@ const NavigationContent = ({
   navigationRef: NavigationContainerRef<RootStackParamList>;
 }) => {
   const {userData, isAuthenticated} = useUser();
+  const permissions = useSelector((s: AppRootState) => s.user.permissions);
   const pendingItemIdRef = useRef<number | undefined>(undefined);
   const deepLinkInProgressRef = useRef<boolean>(false);
   const [
@@ -189,6 +203,85 @@ const NavigationContent = ({
     }
   }, [isAuthenticated, summaryFieldsLoading, summaryFields, navigationRef]);
 
+  const navigateToLeaderboard = useCallback(() => {
+    if (!navigationRef.isReady()) return;
+    navigationRef.dispatch(TabActions.jumpTo(SCREEN_NAMES.LEADERBOARD));
+  }, [navigationRef]);
+
+  useEffect(() => {
+    if (
+      !isAuthenticated ||
+      !permissions.includes(USER_PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD)
+    )
+      return;
+    (async () => {
+      const enabled = await getItem<boolean>(
+        AsyncStorageKeys.LEADERBOARD_NOTIFICATION_ENABLED,
+      );
+      // null means never set — treat as default ON
+      if (enabled === null || enabled === true) {
+        await createAndroidChannel();
+        await requestNotificationPermission();
+        await scheduleWeeklyLeaderboardNotification();
+      }
+    })();
+  }, [isAuthenticated, permissions]);
+
+  // Handle notification press when app is in the foreground
+  useEffect(() => {
+    return notifee.onForegroundEvent(({type, detail}) => {
+      if (
+        type === EventType.PRESS &&
+        detail.notification?.id === LEADERBOARD_NOTIFICATION_ID
+      ) {
+        navigateToLeaderboard();
+      }
+    });
+  }, [navigateToLeaderboard]);
+
+  // Handle notification press when app was killed (initial notification)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    notifee.getInitialNotification().then(async initialNotification => {
+      if (
+        initialNotification?.notification?.id !== LEADERBOARD_NOTIFICATION_ID
+      ) {
+        return;
+      }
+
+      const scheduledAt = initialNotification.notification.data?.scheduledAt as
+        | string
+        | undefined;
+      const lastHandled = await getItem<string>(
+        AsyncStorageKeys.LEADERBOARD_NOTIF_HANDLED_TS,
+      );
+      if (scheduledAt && lastHandled === scheduledAt) {
+        return; // Already navigated for this notification instance
+      }
+      await setItem(
+        AsyncStorageKeys.LEADERBOARD_NOTIF_HANDLED_TS,
+        scheduledAt ?? String(Date.now()),
+      );
+
+      // Navigate — wait for the tab navigator to mount if still on SPLASH
+      const doNavigate = () => {
+        const currentRoute = navigationRef.getCurrentRoute()?.name;
+        if (currentRoute && currentRoute !== SCREEN_NAMES.SPLASH) {
+          navigateToLeaderboard();
+          return;
+        }
+        const unsubscribe = navigationRef.addListener('state', () => {
+          const route = navigationRef.getCurrentRoute()?.name;
+          if (route && route !== SCREEN_NAMES.SPLASH) {
+            unsubscribe();
+            navigateToLeaderboard();
+          }
+        });
+      };
+      doNavigate();
+    });
+  }, [isAuthenticated, navigateToLeaderboard, navigationRef]);
+
   return (
     <Stack.Navigator
       initialRouteName={SCREEN_NAMES.SPLASH}
@@ -283,8 +376,14 @@ const NavigationContent = ({
   );
 };
 
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+export const navigateToLeaderboard = () => {
+  if (!navigationRef.isReady()) return;
+  navigationRef.dispatch(TabActions.jumpTo(SCREEN_NAMES.LEADERBOARD));
+};
+
 export const RootNavigator = () => {
-  const navigationRef = useNavigationContainerRef<RootStackParamList>();
   return (
     <NavigationContainer ref={navigationRef}>
       <NavigationContent navigationRef={navigationRef} />

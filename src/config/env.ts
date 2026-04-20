@@ -9,6 +9,9 @@ export interface Env {
   CLOUD_TELEPHONY_PATH: string;
   GOOGLE_WEB_CLIENT_ID: string;
   GOOGLE_IOS_CLIENT_ID: string;
+  NOTIFICATION_SCHEDULE_DAY: number;
+  NOTIFICATION_SCHEDULE_HOUR: number;
+  NOTIFICATION_SCHEDULE_MINUTE: number;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -16,6 +19,22 @@ function assertEnvVar(value: string | undefined, name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function parseIntWithDefault(
+  value: string | undefined,
+  defaultValue: number,
+  name: string,
+): number {
+  if (!value) return defaultValue;
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    console.warn(
+      `Invalid integer for ${name}: "${value}", using default: ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+  return parsed;
 }
 
 export const env: Env = {
@@ -41,5 +60,20 @@ export const env: Env = {
   GOOGLE_IOS_CLIENT_ID: assertEnvVar(
     Config.GOOGLE_IOS_CLIENT_ID,
     'GOOGLE_IOS_CLIENT_ID',
+  ),
+  NOTIFICATION_SCHEDULE_DAY: parseIntWithDefault(
+    Config.NOTIFICATION_SCHEDULE_DAY,
+    1, // Default to Monday
+    'NOTIFICATION_SCHEDULE_DAY',
+  ),
+  NOTIFICATION_SCHEDULE_HOUR: parseIntWithDefault(
+    Config.NOTIFICATION_SCHEDULE_HOUR,
+    11, // Default to 11:00 AM
+    'NOTIFICATION_SCHEDULE_HOUR',
+  ),
+  NOTIFICATION_SCHEDULE_MINUTE: parseIntWithDefault(
+    Config.NOTIFICATION_SCHEDULE_MINUTE,
+    0, // Default to 0 minutes
+    'NOTIFICATION_SCHEDULE_MINUTE',
   ),
 };

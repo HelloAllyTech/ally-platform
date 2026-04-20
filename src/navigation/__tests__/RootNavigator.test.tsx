@@ -2,6 +2,23 @@ import React from 'react';
 import {Linking} from 'react-native';
 import {render} from '@testing-library/react-native';
 
+jest.mock('@notifee/react-native', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn(),
+    requestPermission: jest.fn(),
+    createTriggerNotification: jest.fn(),
+    cancelTriggerNotification: jest.fn(),
+    onForegroundEvent: jest.fn(() => jest.fn()),
+    onBackgroundEvent: jest.fn(),
+    getInitialNotification: jest.fn(() => Promise.resolve(null)),
+  },
+  AndroidImportance: {HIGH: 4},
+  EventType: {PRESS: 1, DISMISSED: 2},
+  TriggerType: {TIMESTAMP: 0},
+  RepeatFrequency: {WEEKLY: 2},
+}));
+
 jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
 jest.spyOn(Linking, 'addEventListener').mockReturnValue({remove: jest.fn()} as any);
 
@@ -16,6 +33,13 @@ jest.mock('@react-navigation/native', () => {
       current: null,
       getCurrentRoute: () => ({name: 'Splash'}),
       reset: jest.fn(),
+    }),
+    createNavigationContainerRef: () => ({
+      current: null,
+      isReady: () => false,
+      navigate: jest.fn(),
+      reset: jest.fn(),
+      dispatch: jest.fn(),
     }),
   };
 });
@@ -36,10 +60,18 @@ jest.mock('@react-navigation/native-stack', () => ({
 }));
 
 jest.mock('@/config/env', () => ({
-  env: {CLOUD_TELEPHONY_PATH: '/ct', MICROPHONE_SOCKET_PATH: '/mic'},
+  env: {
+    CLOUD_TELEPHONY_PATH: '/ct',
+    MICROPHONE_SOCKET_PATH: '/mic',
+    NOTIFICATION_SCHEDULE_DAY: 1,
+    NOTIFICATION_SCHEDULE_HOUR: 11,
+    NOTIFICATION_SCHEDULE_MINUTE: 0,
+  },
 }));
 
 jest.mock('@/constants', () => ({
+  LEADERBOARD_NOTIFICATION_ID: 'weekly-leaderboard',
+  LEADERBOARD_CHANNEL_ID: 'leaderboard',
   SCREEN_NAMES: {
     SPLASH: 'Splash',
     CALL_LOG: 'CallLog',
@@ -63,11 +95,21 @@ jest.mock('@/constants', () => ({
   },
 }));
 
+jest.mock('react-redux', () => ({
+  useSelector: jest.fn(() => ['VIEW_SCENARIO_SESSION']),
+  useDispatch: jest.fn(() => jest.fn()),
+  useStore: jest.fn(),
+}));
+
 jest.mock('@/hooks', () => ({
   useCounselorChat: () => ({checkCounselorChat: jest.fn()}),
   useNavigationAwareCounselorChat: jest.fn(),
   useSocketConnection: jest.fn(),
   useUser: () => ({userData: {id: 1}, isAuthenticated: true}),
+  useLeaderboardNotification: () => ({
+    leaderboardNotifEnabled: false,
+    handleLeaderboardNotifToggle: jest.fn(),
+  }),
 }));
 
 jest.mock('@/screens', () => {

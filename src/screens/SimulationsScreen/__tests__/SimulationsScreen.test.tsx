@@ -6,6 +6,30 @@ import {SimulationsScreen} from '../SimulationsScreen';
 import {ScenarioStatus, SCREEN_NAMES} from '../../../constants';
 import type {Scenario} from '../../../types';
 
+jest.mock('@notifee/react-native', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn(),
+    requestPermission: jest.fn(),
+    createTriggerNotification: jest.fn(),
+    cancelTriggerNotification: jest.fn(),
+    onForegroundEvent: jest.fn(() => jest.fn()),
+    onBackgroundEvent: jest.fn(),
+  },
+  AndroidImportance: {HIGH: 4},
+  EventType: {PRESS: 1, DISMISSED: 2},
+  TriggerType: {TIMESTAMP: 0},
+  RepeatFrequency: {WEEKLY: 2},
+}));
+
+jest.mock('@/config/env', () => ({
+  env: {
+    NOTIFICATION_SCHEDULE_DAY: 1,
+    NOTIFICATION_SCHEDULE_HOUR: 11,
+    NOTIFICATION_SCHEDULE_MINUTE: 0,
+  },
+}));
+
 jest.mock('@gorhom/bottom-sheet', () => ({
   BottomSheetFooter: 'BottomSheetFooter',
   BottomSheetFlatList: 'BottomSheetFlatList',
