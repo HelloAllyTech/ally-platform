@@ -16,7 +16,7 @@ jest.mock('@/services', () => ({
         badges: [
           {
             id: 'badge-1',
-            name: 'First Steps',
+            name: 'First Step',
             description: 'Complete your first session',
             lockStatus: 'UNLOCKED',
             iconUrl: '',
@@ -218,7 +218,7 @@ jest.mock('@/services', () => ({
         badges: [
           {
             id: 'badge-1',
-            name: 'First Steps',
+            name: 'First Step',
             description: 'Complete your first session',
             lockStatus: 'UNLOCKED',
             iconUrl: 'https://example.com/icon1.png',
@@ -309,7 +309,7 @@ jest.mock('react-i18next', () => ({
         'Achievements.title': 'Achievements',
         'Achievements.unlocked': 'Unlocked',
         'Achievements.locked': 'Locked',
-        'Achievements.firstSteps.title': 'First Steps',
+        'Achievements.firstSteps.title': 'First Step',
         'Achievements.firstSteps.description': 'Complete your first session',
         'Achievements.consistentStart.title': 'Consistent Start',
         'Achievements.consistentStart.description': 'Start 5 sessions',
