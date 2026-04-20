@@ -1,3 +1,5 @@
+export const IST_OFFSET_MINUTES = 330; // UTC+5:30
+
 export const MONTH_NAMES_SHORT = [
   'Jan',
   'Feb',

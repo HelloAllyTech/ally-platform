@@ -12,16 +12,18 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {Button, CustomDropdown, CustomModal} from '@/components';
+import {Button, CustomDropdown, CustomModal, CustomSwitch} from '@/components';
 import {
   useAppNavigation,
   useLanguageDropdown,
+  useLeaderboardNotification,
   useProfileImage,
   useTranslate,
   useUser,
 } from '@/hooks';
 import {useUpdateUserPreferencesMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {UserRole} from '@/types';
 
 import {ProfileImageBottomSheet} from './components/ProfileImageBottomSheet';
 
@@ -34,9 +36,12 @@ export const ProfileSettingsScreen: React.FC = () => {
   const {userData} = useUser();
   const {t} = useTranslate();
   const {name, email, profileImageUrl} = userData ?? {};
-
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const isLearner = userData?.role === UserRole.LEARNER;
+
+  const {leaderboardNotifEnabled, handleLeaderboardNotifToggle} =
+    useLeaderboardNotification({isLearner});
 
   // Use custom hook for language dropdown management
   const {
@@ -218,6 +223,18 @@ export const ProfileSettingsScreen: React.FC = () => {
               />
             </View>
           </View>
+
+          {isLearner && (
+            <View style={styles.notifToggleContainer}>
+              <Text style={styles.fieldLabel}>
+                {t('ProfileSettings.leaderboardNotification')}
+              </Text>
+              <CustomSwitch
+                value={leaderboardNotifEnabled}
+                onToggle={handleLeaderboardNotifToggle}
+              />
+            </View>
+          )}
         </View>
       </View>
 
@@ -381,5 +398,10 @@ const styles = ScaledSheet.create({
   },
   dropdownContainer: {
     position: 'relative',
+  },
+  notifToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 });

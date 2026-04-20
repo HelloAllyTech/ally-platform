@@ -118,7 +118,8 @@
     "changeImage": "Change image",
     "removeImage": "Remove image",
     "imageRequirements": "1:1 ratio (max 2MB)",
-    "language": "Language"
+    "language": "Language",
+    "leaderboardNotification": "Leaderboard Notification"
   },
   "ListeningScreen": {
     "takingNotes": "Taking Notes",

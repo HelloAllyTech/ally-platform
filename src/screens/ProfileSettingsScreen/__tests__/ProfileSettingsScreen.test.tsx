@@ -29,6 +29,10 @@ jest.mock('@/hooks', () => ({
   useUser: () => ({
     userData: {name: 'Maria Test', email: 'maria@test.com', profileImageUrl: null},
   }),
+  useLeaderboardNotification: () => ({
+    leaderboardNotifEnabled: false,
+    handleLeaderboardNotifToggle: jest.fn(),
+  }),
 }));
 
 jest.mock('@react-navigation/native', () => ({

@@ -1,3 +1,28 @@
+jest.mock('@notifee/react-native', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn(),
+    requestPermission: jest.fn(),
+    createTriggerNotification: jest.fn(),
+    cancelTriggerNotification: jest.fn(),
+    onForegroundEvent: jest.fn(() => jest.fn()),
+    onBackgroundEvent: jest.fn(),
+    getInitialNotification: jest.fn(() => Promise.resolve(null)),
+  },
+  AndroidImportance: {HIGH: 4},
+  EventType: {PRESS: 1, DISMISSED: 2},
+  TriggerType: {TIMESTAMP: 0},
+  RepeatFrequency: {WEEKLY: 2},
+}));
+
+jest.mock('@/config/env', () => ({
+  env: {
+    NOTIFICATION_SCHEDULE_DAY: 1,
+    NOTIFICATION_SCHEDULE_HOUR: 11,
+    NOTIFICATION_SCHEDULE_MINUTE: 0,
+  },
+}));
+
 // Avoid importing modules that pull native modules via hooks index
 jest.mock('@/hooks', () => ({
   useAppNavigation: () => ({navigate: jest.fn(), reset: jest.fn()}),
