@@ -1,6 +1,6 @@
 import asyncio
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -329,6 +329,7 @@ def _build_state_update_dict(
 
     return update_dict
 
+
 async def _publish_done_thinking(room) -> None:
     """Publish done_thinking signal — always called after voice chain completes."""
     if not room:
@@ -357,7 +358,7 @@ async def process_events(
     room = None
     if config and "configurable" in config:
         room = config["configurable"].get("room")
-    
+
     if room:
         try:
             await room.local_participant.publish_data(
@@ -366,7 +367,6 @@ async def process_events(
             )
         except Exception as e:
             logger.warning(f"Failed to publish thinking state: {e}")
-    
 
     with TimingContext("process_events") as timing:
         # 1. Prepare context
@@ -1163,7 +1163,9 @@ async def apply_voice_expressions(
             tts_client = config["configurable"].get("tts_client")
             llm_client = config["configurable"].get("llm_client")
             scenario = (
-                cast(Scenario, config["configurable"].get("scenario")) if config else None
+                cast(Scenario, config["configurable"].get("scenario"))
+                if config
+                else None
             )
 
         if not tts_client or not llm_client:
@@ -1203,9 +1205,9 @@ async def apply_voice_expressions(
             return {}
 
         # Skip runtime prosody when under pressure (keeps last params, reduces latency)
-        # IMPORTANT: Do NOT skip when provider supports text enhancement (SSML/audio tags).
-        # Skipping would send plain text instead of enhanced text, losing pauses and rate
-        # variations, which makes speech sound noticeably faster and less natural.
+        # IMPORTANT: Do NOT skip when provider supports text enhancement
+        # (SSML/audio tags). Skipping would send plain text instead of enhanced
+        # text, losing pauses and rate variations (faster, less natural speech).
         response_len = len(response_text)
         skip_prosody = False
         skip_reason = ""
@@ -1243,7 +1245,9 @@ async def apply_voice_expressions(
         conversation_history = []
         if state.messages:
             # Get last N messages (excluding the current response which is the last one)
-            messages_for_history = state.messages[:-1] if len(state.messages) > 1 else []
+            messages_for_history = (
+                state.messages[:-1] if len(state.messages) > 1 else []
+            )
             for msg in messages_for_history[-10:]:  # Last 10 messages
                 role = "user"
                 content = ""
@@ -1276,8 +1280,9 @@ async def apply_voice_expressions(
                 if content:
                     conversation_history.append({"role": role, "content": content})
 
-        # Note: response_text comes from the agent's LLM response in generate_response node
-        # It should not contain parameters dict - parameters are generated separately
+        # Note: response_text comes from the agent's LLM response in
+        # generate_response node. It should not contain parameters dict —
+        # parameters are generated separately.
 
         # Generate and apply voice expressions (parameters + enhanced text)
         # in single LLM call
@@ -1319,8 +1324,6 @@ async def apply_voice_expressions(
         # generate_and_apply_voice_expressions()
         # Message content remains unchanged
         return {}
-    
+
     finally:
         await _publish_done_thinking(room)
-
-    
