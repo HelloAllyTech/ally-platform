@@ -18,7 +18,7 @@ describe('AchievementCard', () => {
   const mockUnlockedBadge: Badge = {
     id: 'test-unlocked',
     code: 'FIRST_STEPS',
-    name: 'First Steps',
+    name: 'First Step',
     description: 'Complete your first session',
     imageUrl: 'https://example.com/badge.png',
     category: BadgeCategory.SIMULATION_MINUTES,
@@ -44,7 +44,7 @@ describe('AchievementCard', () => {
       <AchievementCard badge={mockUnlockedBadge} />,
     );
 
-    expect(getByText('First Steps')).toBeTruthy();
+    expect(getByText('First Step')).toBeTruthy();
     expect(getByText('Complete your first session')).toBeTruthy();
     expect(queryByTestId('achievement-locked-icon')).toBeNull();
   });
@@ -92,7 +92,7 @@ describe('AchievementCard', () => {
       <AchievementCard badge={mockUnlockedBadge} />,
     );
 
-    expect(getByText('First Steps')).toBeTruthy();
+    expect(getByText('First Step')).toBeTruthy();
   });
 
   it('renders achievement description correctly', () => {

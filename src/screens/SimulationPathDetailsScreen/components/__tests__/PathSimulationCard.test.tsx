@@ -9,7 +9,7 @@ jest.mock('@/hooks', () => ({
   useTranslate: jest.fn(() => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
-        'Simulations.simulation': 'Simulation',
+        'Simulations.simulation': 'Role-play',
         'Common.next': 'Next',
       };
       return translations[key] || key;
@@ -31,7 +31,7 @@ describe('PathSimulationCard', () => {
   it('should render simulation card with title and order', () => {
     const {getByText} = render(<PathSimulationCard {...defaultProps} />);
 
-    expect(getByText('Simulation 1')).toBeTruthy();
+    expect(getByText('Role-play 1')).toBeTruthy();
     expect(getByText('Test Simulation')).toBeTruthy();
   });
 
@@ -155,7 +155,7 @@ describe('PathSimulationCard', () => {
   it('should render with different order numbers', () => {
     const {getByText} = render(<PathSimulationCard {...defaultProps} order={5} />);
 
-    expect(getByText('Simulation 5')).toBeTruthy();
+    expect(getByText('Role-play 5')).toBeTruthy();
   });
 
   it('should truncate long titles', () => {
@@ -180,7 +180,7 @@ describe('PathSimulationCard', () => {
 
     // Should still render the card
     expect(getByText('Test')).toBeTruthy();
-    expect(getByText('Simulation 1')).toBeTruthy();
+    expect(getByText('Role-play 1')).toBeTruthy();
   });
 
   it('should render with null thumbnailUrl', () => {
@@ -203,14 +203,14 @@ describe('PathSimulationCard', () => {
 
     // Card should still render with title when locked
     expect(getByText('Test Simulation')).toBeTruthy();
-    expect(getByText('Simulation 1')).toBeTruthy();
+    expect(getByText('Role-play 1')).toBeTruthy();
   });
 
   it('should render simulation order label correctly', () => {
     const {getByText} = render(<PathSimulationCard {...defaultProps} order={3} />);
 
     // Should display "Simulation 3"
-    const orderLabel = getByText('Simulation 3');
+    const orderLabel = getByText('Role-play 3');
     expect(orderLabel).toBeTruthy();
   });
 
@@ -224,14 +224,14 @@ describe('PathSimulationCard', () => {
 
     // Card should render normally when not locked
     expect(getByText('Test Simulation')).toBeTruthy();
-    expect(getByText('Simulation 1')).toBeTruthy();
+    expect(getByText('Role-play 1')).toBeTruthy();
   });
 
   it('should use translation for simulation label', () => {
     const {getByText} = render(<PathSimulationCard {...defaultProps} />);
 
     // Verify that "Simulation" comes from translation
-    expect(getByText('Simulation 1')).toBeTruthy();
+    expect(getByText('Role-play 1')).toBeTruthy();
   });
 
   it('should use translation for next badge', () => {

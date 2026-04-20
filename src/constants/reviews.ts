@@ -20,7 +20,7 @@ export const REVIEW_FILTERS = [
   },
   {
     key: ReviewFilter.UNDISCOVERED,
-    label: 'Undiscovered',
+    label: 'Yet to view',
   },
 ];
 

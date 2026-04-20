@@ -30,7 +30,7 @@ jest.mock('@/hooks', () => ({
         return `${params?.current} of ${params?.total} completed`;
       }
       if (key === 'Simulations.simulation') {
-        return 'Simulation';
+        return 'Role-play';
       }
       const translations: Record<string, string> = {
         'Simulations.trackWay': 'Track way',

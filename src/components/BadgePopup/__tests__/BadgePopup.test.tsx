@@ -67,7 +67,7 @@ describe('BadgePopup', () => {
   it('renders badge content when currentBadge is set', () => {
     const badge = {
       id: 'badge-1',
-      name: 'First Steps',
+      name: 'First Step',
       description: 'You completed your first simulation',
       imageUrl: 'https://example.com/badge.png',
     };
@@ -80,7 +80,7 @@ describe('BadgePopup', () => {
     });
 
     const {getByText, UNSAFE_getByType} = render(<BadgePopup />);
-    expect(getByText('First Steps')).toBeTruthy();
+    expect(getByText('First Step')).toBeTruthy();
     expect(getByText('You completed your first simulation')).toBeTruthy();
     expect(getByText('Achievements.earnedNewBadge')).toBeTruthy();
 
