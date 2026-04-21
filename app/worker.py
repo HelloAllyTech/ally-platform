@@ -175,6 +175,8 @@ class AgentWorker:
         )
         self.joined_iso = self.scenario.conversation_started_at or agent_joined_iso
 
+        print("debugging: ", self.joined_iso)
+
     async def initialize(self):
         """
         Creates session, agent, orchestrator, and registers callbacks.
