@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, cast
 
@@ -329,6 +330,19 @@ def _build_state_update_dict(
     return update_dict
 
 
+async def _publish_done_thinking(room) -> None:
+    """Publish done_thinking signal — always called after voice chain completes."""
+    if not room:
+        return
+    try:
+        await room.local_participant.publish_data(
+            json.dumps({"type": "AGENT_STATE", "state": "done_thinking"}).encode(),
+            reliable=True,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to publish done_thinking state: {e}")
+
+
 async def process_events(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -341,6 +355,19 @@ async def process_events(
     with subsets of events, as it would cause double-processing, double-scoring,
     and duplicate event sending.
     """
+    room = None
+    if config and "configurable" in config:
+        room = config["configurable"].get("room")
+
+    if room:
+        try:
+            await room.local_participant.publish_data(
+                json.dumps({"type": "AGENT_STATE", "state": "thinking"}).encode(),
+                reliable=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish thinking state: {e}")
+
     with TimingContext("process_events") as timing:
         # 1. Prepare context
         with timing.operation("Context preparation"):
@@ -1121,167 +1148,182 @@ async def apply_voice_expressions(
     Returns:
         Updated simulation state with enhanced message content if text was enhanced
     """
-    # Get TTS client, LLM client, and scenario from config
-    tts_client = None
-    llm_client = None
-    scenario = None
+
+    # Get room upfront — done_thinking fires here regardless of voice path taken
+    room = None
     if config and "configurable" in config:
-        tts_client = config["configurable"].get("tts_client")
-        llm_client = config["configurable"].get("llm_client")
-        scenario = (
-            cast(Scenario, config["configurable"].get("scenario")) if config else None
-        )
+        room = config["configurable"].get("room")
 
-    if not tts_client or not llm_client:
-        logger.debug(
-            "No TTS client or LLM client available, "
-            "skipping voice expression application"
-        )
-        return {}
+    try:
+        # Get TTS client, LLM client, and scenario from config
+        tts_client = None
+        llm_client = None
+        scenario = None
+        if config and "configurable" in config:
+            tts_client = config["configurable"].get("tts_client")
+            llm_client = config["configurable"].get("llm_client")
+            scenario = (
+                cast(Scenario, config["configurable"].get("scenario"))
+                if config
+                else None
+            )
 
-    # Early return if provider doesn't support voice expression parameters
-    # This avoids unnecessary processing for providers like Deepgram
-    parameter_metadata = tts_client.get_parameter_metadata()
-    if not parameter_metadata:
-        logger.debug(
-            "Provider does not support voice expression parameters, "
-            "skipping voice expression node"
-        )
-        return {}
+        if not tts_client or not llm_client:
+            logger.debug(
+                "No TTS client or LLM client available, "
+                "skipping voice expression application"
+            )
+            return {}
 
-    # Get the last message (the generated response)
-    if not state.messages:
-        return {}
+        # Early return if provider doesn't support voice expression parameters
+        # This avoids unnecessary processing for providers like Deepgram
+        parameter_metadata = tts_client.get_parameter_metadata()
+        if not parameter_metadata:
+            logger.debug(
+                "Provider does not support voice expression parameters, "
+                "skipping voice expression node"
+            )
+            return {}
 
-    last_message = state.messages[-1]
-    response_text = None
+        # Get the last message (the generated response)
+        if not state.messages:
+            return {}
 
-    if hasattr(last_message, "content"):
-        response_text = last_message.content
-    elif isinstance(last_message, str):
-        response_text = last_message
+        last_message = state.messages[-1]
+        response_text = None
 
-    if not response_text:
-        logger.debug(
-            "[apply_voice_expressions] No response text found, "
-            "skipping voice expression application"
-        )
-        return {}
+        if hasattr(last_message, "content"):
+            response_text = last_message.content
+        elif isinstance(last_message, str):
+            response_text = last_message
 
-    # Skip runtime prosody when under pressure (keeps last params, reduces latency)
-    # IMPORTANT: Do NOT skip when provider supports text enhancement (SSML/audio tags).
-    # Skipping would send plain text instead of enhanced text, losing pauses and rate
-    # variations, which makes speech sound noticeably faster and less natural.
-    response_len = len(response_text)
-    skip_prosody = False
-    skip_reason = ""
-    has_text_enhancement = bool(tts_client.get_text_enhancement_instructions())
-    if not settings.PROSDY_SKIP_ENABLED:
-        pass  # Skip logic disabled, always run prosody
-    elif has_text_enhancement:
-        pass  # Provider needs enhanced text; skip would cause faster speech
-    elif response_len < settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH:
-        skip_prosody = True
-        min_len = settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH
-        skip_reason = f"response too short ({response_len} < {min_len} chars)"
-    elif (
-        settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH > 0
-        and response_len > settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
-    ):
-        skip_prosody = True
-        max_len = settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
-        skip_reason = f"response too long ({response_len} > {max_len} chars)"
-    elif settings.PROSDY_SKIP_WHEN_EVENTS_DETECTED and state.new_events:
-        skip_prosody = True
-        skip_reason = f"events detected this turn ({len(state.new_events)} events)"
+        if not response_text:
+            logger.debug(
+                "[apply_voice_expressions] No response text found, "
+                "skipping voice expression application"
+            )
+            return {}
 
-    if skip_prosody:
-        logger.debug(
-            "[apply_voice_expressions] Skipped prosody (%s)",
-            skip_reason,
-        )
-        # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
-        if hasattr(tts_client, "_current_params") and tts_client._current_params:
-            tts_client._apply_parameters_dict(tts_client._current_params.copy())
-        return {}
+        # Skip runtime prosody when under pressure (keeps last params, reduces latency)
+        # IMPORTANT: Do NOT skip when provider supports text enhancement
+        # (SSML/audio tags). Skipping would send plain text instead of enhanced
+        # text, losing pauses and rate variations (faster, less natural speech).
+        response_len = len(response_text)
+        skip_prosody = False
+        skip_reason = ""
+        has_text_enhancement = bool(tts_client.get_text_enhancement_instructions())
+        if not settings.PROSDY_SKIP_ENABLED:
+            pass  # Skip logic disabled, always run prosody
+        elif has_text_enhancement:
+            pass  # Provider needs enhanced text; skip would cause faster speech
+        elif response_len < settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH:
+            skip_prosody = True
+            min_len = settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH
+            skip_reason = f"response too short ({response_len} < {min_len} chars)"
+        elif (
+            settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH > 0
+            and response_len > settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
+        ):
+            skip_prosody = True
+            max_len = settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
+            skip_reason = f"response too long ({response_len} > {max_len} chars)"
+        elif settings.PROSDY_SKIP_WHEN_EVENTS_DETECTED and state.new_events:
+            skip_prosody = True
+            skip_reason = f"events detected this turn ({len(state.new_events)} events)"
 
-    # Extract conversation history (last N messages, excluding the current response)
-    conversation_history = []
-    if state.messages:
-        # Get last N messages (excluding the current response which is the last one)
-        messages_for_history = state.messages[:-1] if len(state.messages) > 1 else []
-        for msg in messages_for_history[-10:]:  # Last 10 messages
-            role = "user"
-            content = ""
+        if skip_prosody:
+            logger.debug(
+                "[apply_voice_expressions] Skipped prosody (%s)",
+                skip_reason,
+            )
+            # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
+            if hasattr(tts_client, "_current_params") and tts_client._current_params:
+                tts_client._apply_parameters_dict(tts_client._current_params.copy())
+            return {}
 
-            # Determine role based on message type
-            if isinstance(msg, AIMessage):
-                role = "assistant"
-            elif isinstance(msg, HumanMessage):
+        # Extract conversation history (last N messages, excluding the current response)
+        conversation_history = []
+        if state.messages:
+            # Get last N messages (excluding the current response which is the last one)
+            messages_for_history = (
+                state.messages[:-1] if len(state.messages) > 1 else []
+            )
+            for msg in messages_for_history[-10:]:  # Last 10 messages
                 role = "user"
-            elif hasattr(msg, "type"):
-                # Fallback to type attribute
-                if msg.type == "ai":
+                content = ""
+
+                # Determine role based on message type
+                if isinstance(msg, AIMessage):
                     role = "assistant"
-                elif msg.type == "human":
+                elif isinstance(msg, HumanMessage):
                     role = "user"
-            elif hasattr(msg, "__class__"):
-                # Fallback to class name
-                class_name = msg.__class__.__name__
-                if "AI" in class_name or "Assistant" in class_name:
-                    role = "assistant"
-                elif "Human" in class_name or "User" in class_name:
-                    role = "user"
+                elif hasattr(msg, "type"):
+                    # Fallback to type attribute
+                    if msg.type == "ai":
+                        role = "assistant"
+                    elif msg.type == "human":
+                        role = "user"
+                elif hasattr(msg, "__class__"):
+                    # Fallback to class name
+                    class_name = msg.__class__.__name__
+                    if "AI" in class_name or "Assistant" in class_name:
+                        role = "assistant"
+                    elif "Human" in class_name or "User" in class_name:
+                        role = "user"
 
-            # Extract content
-            if hasattr(msg, "content"):
-                content = msg.content
-            elif isinstance(msg, str):
-                content = msg
+                # Extract content
+                if hasattr(msg, "content"):
+                    content = msg.content
+                elif isinstance(msg, str):
+                    content = msg
 
-            if content:
-                conversation_history.append({"role": role, "content": content})
+                if content:
+                    conversation_history.append({"role": role, "content": content})
 
-    # Note: response_text comes from the agent's LLM response in generate_response node
-    # It should not contain parameters dict - parameters are generated separately
+        # Note: response_text comes from the agent's LLM response in
+        # generate_response node. It should not contain parameters dict —
+        # parameters are generated separately.
 
-    # Generate and apply voice expressions (parameters + enhanced text)
-    # in single LLM call
-    # This method:
-    # 1. Generates parameters (speed, description, etc.)
-    #    → applies via update_options() to TTS
-    # 2. Returns enhanced text (if supported) or original text (if not supported)
-    # CRITICAL: Parameters go ONLY to update_options(), never to message content
-    from app.speech_prosody.service import generate_and_apply_prosody_for_message
+        # Generate and apply voice expressions (parameters + enhanced text)
+        # in single LLM call
+        # This method:
+        # 1. Generates parameters (speed, description, etc.)
+        #    → applies via update_options() to TTS
+        # 2. Returns enhanced text (if supported) or original text (if not supported)
+        # CRITICAL: Parameters go ONLY to update_options(), never to message content
+        from app.speech_prosody.service import generate_and_apply_prosody_for_message
 
-    # Get current parameters from TTS client for context
-    current_parameters = None
-    if hasattr(tts_client, "_current_params") and tts_client._current_params:
-        current_parameters = tts_client._current_params.copy()
+        # Get current parameters from TTS client for context
+        current_parameters = None
+        if hasattr(tts_client, "_current_params") and tts_client._current_params:
+            current_parameters = tts_client._current_params.copy()
 
-    enhanced_text = await generate_and_apply_prosody_for_message(
-        tts_client=tts_client,
-        message_text=response_text,
-        llm_client=llm_client,
-        scenario=scenario,
-        conversation_history=conversation_history,
-        current_parameters=current_parameters,
-    )
+        enhanced_text = await generate_and_apply_prosody_for_message(
+            tts_client=tts_client,
+            message_text=response_text,
+            llm_client=llm_client,
+            scenario=scenario,
+            conversation_history=conversation_history,
+            current_parameters=current_parameters,
+        )
 
-    if enhanced_text is not None:
-        # Text was enhanced (provider supports text enhancement)
-        # Preserve the message ID to ensure it's replaced in state history,
-        # not appended, which would cause duplicate speech/history bloat.
-        message_id = getattr(last_message, "id", None)
-        enhanced_message = AIMessage(content=enhanced_text, id=message_id)
+        if enhanced_text is not None:
+            # Text was enhanced (provider supports text enhancement)
+            # Preserve the message ID to ensure it's replaced in state history,
+            # not appended, which would cause duplicate speech/history bloat.
+            message_id = getattr(last_message, "id", None)
+            enhanced_message = AIMessage(content=enhanced_text, id=message_id)
 
-        # Return only the fields that need updating
-        return {
-            "messages": [enhanced_message],
-        }
+            # Return only the fields that need updating
+            return {
+                "messages": [enhanced_message],
+            }
 
-    # Text was not enhanced (provider doesn't support text enhancement, like Hume)
-    # Parameters have already been applied via update_options() in
-    # generate_and_apply_voice_expressions()
-    # Message content remains unchanged
-    return {}
+        # Text was not enhanced (provider doesn't support text enhancement, like Hume)
+        # Parameters have already been applied via update_options() in
+        # generate_and_apply_voice_expressions()
+        # Message content remains unchanged
+        return {}
+
+    finally:
+        await _publish_done_thinking(room)
