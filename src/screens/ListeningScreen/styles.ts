@@ -109,4 +109,12 @@ export const styles = ScaledSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  transcriptionScrollView: {
+    flex: 1,
+    width: '100%',
+    marginTop: '15@vs',
+  },
+  transcriptionContentContainer: {
+    paddingBottom: '20@vs',
+  },
 });

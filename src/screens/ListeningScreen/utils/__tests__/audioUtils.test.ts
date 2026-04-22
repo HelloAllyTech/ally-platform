@@ -36,12 +36,21 @@ describe('audioUtils', () => {
     expect(amps.length).toBe(NUM_BARS);
   });
 
-  it('builds start audio payload', () => {
+  it('builds start audio payload with default SCRIBE mode', () => {
     const payload = getStartAudioChatPayload();
     expect(payload.platform).toBe('MOBILE');
     expect(payload.sampleRate).toBe(16000);
     expect(payload.isLinear16Encoded).toBe(true);
+    expect(payload.mode).toBe('SCRIBE');
+  });
+
+  it('builds start audio payload with explicit scribe mode', () => {
+    const payload = getStartAudioChatPayload('scribe');
+    expect(payload.mode).toBe('SCRIBE');
+  });
+
+  it('builds start audio payload with dictation mode', () => {
+    const payload = getStartAudioChatPayload('dictation');
+    expect(payload.mode).toBe('DICTATION');
   });
 });
-
-

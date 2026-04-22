@@ -9,6 +9,7 @@ export type CallTranscriptItemProps = {
   message: string;
   speakerLabel?: string;
   counselor?: boolean;
+  isDictation?: boolean;
 };
 
 export const CallTranscriptItem: React.FC<CallTranscriptItemProps> = ({
@@ -16,13 +17,18 @@ export const CallTranscriptItem: React.FC<CallTranscriptItemProps> = ({
   message,
   speakerLabel,
   counselor = false,
+  isDictation = false,
 }) => {
-  const backgroundColor = counselor
-    ? colors.ds.blueAlpha[25]
-    : colors.ds.deepPurpleAlpha[25];
-  const borderColor = counselor
-    ? colors.ds.theme.primary
-    : colors.ds.deepPurple[500];
+  const backgroundColor = isDictation
+    ? colors.white
+    : counselor
+      ? colors.ds.blueAlpha[25]
+      : colors.ds.deepPurpleAlpha[25];
+  const borderColor = isDictation
+    ? colors.ds.grey[300]
+    : counselor
+      ? colors.ds.theme.primary
+      : colors.ds.deepPurple[500];
   const speakerColor = counselor
     ? colors.ds.theme.primary
     : colors.ds.deepPurple[800];

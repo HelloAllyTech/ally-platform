@@ -300,8 +300,90 @@ describe('useListeningCommon', () => {
     expect(activateKeepAwake).toHaveBeenCalledTimes(1);
 
     unmount();
-
     expect(deactivateKeepAwake).toHaveBeenCalledTimes(1);
   });
-});
 
+  it('should process transcriptions correctly', () => {
+    const {result} = renderHook(() =>
+      useListeningCommon({
+        isMicrophoneMode: true,
+      }),
+    );
+
+    const payload = {
+      id: 1,
+      content: 'Hello',
+      senderId: 456,
+      createdAt: '2024-01-01T10:00:00Z',
+      isFinal: false,
+      isSentenceComplete: false,
+    };
+
+    act(() => {
+      result.current.processTranscription(
+        result.current.setSpeakerTranscriptions,
+        payload,
+      );
+    });
+
+    expect(result.current.speakerTranscriptions).toHaveLength(1);
+    expect(result.current.speakerTranscriptions[0].message).toBe('Hello');
+
+    // Update partial transcription
+    act(() => {
+      result.current.processTranscription(
+        result.current.setSpeakerTranscriptions,
+        {...payload, content: 'Hello world'},
+      );
+    });
+
+    expect(result.current.speakerTranscriptions).toHaveLength(1);
+    expect(result.current.speakerTranscriptions[0].message).toBe('Hello world');
+
+    // Finalize it
+    act(() => {
+      result.current.processTranscription(
+        result.current.setSpeakerTranscriptions,
+        {...payload, content: 'Hello world', isFinal: true},
+      );
+    });
+
+    expect(result.current.speakerTranscriptions[0].isFinal).toBe(true);
+
+    // New transcription after final
+    act(() => {
+      result.current.processTranscription(
+        result.current.setSpeakerTranscriptions,
+        {...payload, id: 2, content: 'New', isFinal: false},
+      );
+    });
+
+    expect(result.current.speakerTranscriptions).toHaveLength(2);
+  });
+
+  it('should update last transcription to final', () => {
+    const {result} = renderHook(() =>
+      useListeningCommon({
+        isMicrophoneMode: true,
+      }),
+    );
+
+    act(() => {
+      result.current.setMyTranscriptions([
+        {
+          id: 1,
+          message: 'Test',
+          senderId: 123,
+          timestamp: '...',
+          isFinal: false,
+        },
+      ]);
+    });
+
+    act(() => {
+      result.current.updateLastTranscription(result.current.setMyTranscriptions);
+    });
+
+    expect(result.current.myTranscriptions[0].isFinal).toBe(true);
+  });
+});

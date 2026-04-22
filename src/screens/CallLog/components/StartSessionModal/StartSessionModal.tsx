@@ -10,24 +10,30 @@ import {styles} from './styles';
 interface StartSessionModalProps {
   visible: boolean;
   onClose: () => void;
-  onListenLive: () => void;
+  onListenLive: (mode: 'scribe' | 'dictation') => void;
+  hasMicrophoneChatType?: boolean;
+  hasDictationChatType?: boolean;
 }
 
 export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   visible,
   onClose,
   onListenLive,
+  hasMicrophoneChatType,
+  hasDictationChatType,
 }) => {
   const {t} = useTranslate();
   const [showNotification, setShowNotification] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'scribe' | 'dictation'>('scribe');
 
-  const handleStart = () => {
+  const handleStart = (mode: 'scribe' | 'dictation') => {
+    setSelectedMode(mode);
     setShowNotification(true);
   };
 
   const handleNotificationConfirm = () => {
     setShowNotification(false);
-    onListenLive();
+    onListenLive(selectedMode);
     onClose();
   };
 
@@ -74,11 +80,25 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
 
           <View style={[styles.separator, styles.marginB16]} />
 
-          <Button
-            label={t('CallLogs.startSessionNow')}
-            onPress={handleStart}
-            customContainerStyle={styles.ctaBtn}
-          />
+          {hasMicrophoneChatType && (
+            <Button
+              label={t('CallLogs.startScribeMode')}
+              onPress={() => handleStart('scribe')}
+              customContainerStyle={styles.ctaBtn}
+            />
+          )}
+
+          {hasDictationChatType && (
+            <Button
+              label={t('CallLogs.startDictationMode')}
+              onPress={() => handleStart('dictation')}
+              customContainerStyle={[
+                styles.ctaBtn,
+                hasMicrophoneChatType ? { backgroundColor: 'white', borderWidth: 1, borderColor: '#007AFF', marginTop: 10 } : {},
+              ]}
+              customTextStyle={hasMicrophoneChatType ? { color: '#007AFF' } : {}}
+            />
+          )}
 
           <Text style={styles.consent}>{t('CallLogs.consentNotice')}</Text>
         </View>

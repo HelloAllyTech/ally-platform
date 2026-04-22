@@ -446,6 +446,7 @@ export const CallSummaryScreen: React.FC<
         onBackPress={onBackNavigation}
         onMenuPress={showMenu}
         summaryName={summaryName}
+        mode={callInfo.mode}
         showShareSwitch={
           isSummaryAvailable &&
           summaryStatus === ChatSummaryStatus.SUCCESS &&

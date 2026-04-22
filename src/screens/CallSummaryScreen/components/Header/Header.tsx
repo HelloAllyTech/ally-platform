@@ -17,6 +17,7 @@ interface HeaderProps {
   onBackPress: () => void;
   onMenuPress: () => void;
   summaryName?: string;
+  mode?: string;
   showShareSwitch?: boolean;
   isSharedForReview?: boolean;
   onShareToggle?: (isEnabled: boolean) => void;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
+  mode,
   showShareSwitch = false,
   isSharedForReview = false,
   onShareToggle,
@@ -139,5 +141,17 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: '16@ms',
+  },
+  modeBadge: {
+    backgroundColor: '#E8EAF6',
+    paddingHorizontal: '8@ms',
+    paddingVertical: '2@ms',
+    borderRadius: '10@ms',
+  },
+  modeBadgeText: {
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    color: '#3949AB',
+    fontSize: '10@ms',
   },
 });

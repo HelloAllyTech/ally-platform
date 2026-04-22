@@ -115,6 +115,7 @@ export type LogItem = {
     callInfo?: {
       summaryName?: string;
       provider?: ChatProvider;
+      mode?: string;
     };
   };
   client: {

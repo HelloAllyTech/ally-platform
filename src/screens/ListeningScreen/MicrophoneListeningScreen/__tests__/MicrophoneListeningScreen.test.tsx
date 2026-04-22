@@ -89,9 +89,15 @@ jest.mock('../../components', () => {
 
 jest.mock('../../styles', () => ({styles: {}}));
 jest.mock('../../utils', () => ({
-  getStartAudioChatPayload: () => ({}),
+  getStartAudioChatPayload: jest.fn(() => ({})),
   NUM_BARS: 10,
   recorderAudioToAmplitudes: () => new Array(10).fill(0),
+}));
+
+// Default mock – scribe mode
+const mockRouteParams = {params: {mode: 'scribe'}};
+jest.mock('@react-navigation/native', () => ({
+  useRoute: () => mockRouteParams,
 }));
 
 import {MicrophoneListeningScreen} from '../MicrophoneListeningScreen';
@@ -119,13 +125,21 @@ const defaultCommon = {
   handleLockIconPress: jest.fn(),
   handlePrivacyTooltipClose: jest.fn(),
   checkCounselorChat: jest.fn(),
-  canShowFocusModeButton: false,
+  canShowFocusModeButton: true,
+  speakerTranscriptions: [],
+  myTranscriptions: [],
+  setMyTranscriptions: jest.fn(),
+  setSpeakerTranscriptions: jest.fn(),
+  processTranscription: jest.fn(),
+  updateLastTranscription: jest.fn(),
 };
 
 describe('MicrophoneListeningScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseListeningCommon.mockReturnValue({...defaultCommon});
+    // reset to scribe by default
+    mockRouteParams.params = {mode: 'scribe'} as any;
   });
 
   it('shows loading state when chatData is null', () => {
@@ -163,5 +177,51 @@ describe('MicrophoneListeningScreen', () => {
 
     const {getByTestId} = render(<MicrophoneListeningScreen />);
     expect(getByTestId('listening-controls')).toBeTruthy();
+  });
+
+  // --- Dictation mode tests ---
+
+  it('hides search panel in dictation mode (non-focus)', () => {
+    mockRouteParams.params = {mode: 'dictation'} as any;
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      chatData: {chatId: 'chat-123'},
+      isFocusMode: false,
+    });
+
+    const {queryByTestId} = render(<MicrophoneListeningScreen />);
+    expect(queryByTestId('search')).toBeNull();
+  });
+
+  it('shows search panel in scribe mode (non-focus)', () => {
+    mockRouteParams.params = {mode: 'scribe'} as any;
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      chatData: {chatId: 'chat-123'},
+      isFocusMode: false,
+    });
+
+    const {getByTestId} = render(<MicrophoneListeningScreen />);
+    expect(getByTestId('search')).toBeTruthy();
+  });
+
+  it('renders transcriptions when in non-focus mode', () => {
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      chatData: {chatId: 'chat-123'},
+      isFocusMode: false,
+      myTranscriptions: [
+        {
+          id: 1,
+          message: 'Hello World',
+          senderId: 'user-1',
+          timestamp: new Date().toISOString(),
+          isFinal: true,
+        },
+      ],
+    });
+
+    const {getByText} = render(<MicrophoneListeningScreen />);
+    expect(getByText('Hello World')).toBeTruthy();
   });
 });

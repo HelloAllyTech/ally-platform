@@ -79,6 +79,8 @@ export const selectCallInfo = createSelector(
     endTime: summaryData?.details?.endTime,
     clientId: summaryData?.clientId,
     summaryName: summaryData?.details?.callInfo?.summaryName,
+    provider: summaryData?.details?.callInfo?.provider,
+    mode: summaryData?.details?.callInfo?.mode,
   }),
 );
 

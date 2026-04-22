@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState, Dispatch, SetStateAction} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import {
   activateKeepAwake,
@@ -14,7 +14,7 @@ import {
 } from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {ChatProvider, DisconnectedType, FeedbackResponse, Nudge} from '@/types';
+import {ChatProvider, DisconnectedType, FeedbackResponse, Nudge, Transcription} from '@/types';
 import {Maybe} from '@/utils';
 
 interface UseListeningCommonParams {
@@ -56,6 +56,88 @@ export const useListeningCommon = ({
     useState(true);
   const [disconnectedType, setDisconnectedType] =
     useState<DisconnectedType | null>(null);
+  const [speakerTranscriptions, setSpeakerTranscriptions] = useState<
+    Transcription[]
+  >([]);
+  const [myTranscriptions, setMyTranscriptions] = useState<Transcription[]>([]);
+
+  // Transcription processing logic
+  const updateLastTranscription = (
+    setCorrespondingTranscription: Dispatch<SetStateAction<Transcription[]>>,
+  ) => {
+    setCorrespondingTranscription(previousTranscriptions => {
+      const updatedList = [...previousTranscriptions];
+      if (previousTranscriptions.length > 0) {
+        updatedList[previousTranscriptions.length - 1] = {
+          ...previousTranscriptions[previousTranscriptions.length - 1],
+          isFinal: true,
+          isSentenceComplete: true,
+        };
+      }
+      return updatedList;
+    });
+  };
+
+  const processTranscription = (
+    setCorrespondingTranscription: Dispatch<SetStateAction<Transcription[]>>,
+    payload: any,
+  ) => {
+    setCorrespondingTranscription(previousTranscriptions => {
+      const lastTranscription =
+        previousTranscriptions[previousTranscriptions.length - 1];
+      if (!lastTranscription) {
+        return [
+          ...previousTranscriptions,
+          {
+            id: payload.id,
+            message: payload.content,
+            senderId: payload.senderId,
+            timestamp: payload.createdAt,
+            isFinal: payload.isFinal,
+            isSentenceComplete: payload.isSentenceComplete,
+          },
+        ];
+      }
+      if (!lastTranscription.isFinal) {
+        // replace the last transcription with the new one
+        const updatedTranscriptions = [...previousTranscriptions];
+        updatedTranscriptions[previousTranscriptions.length - 1] = {
+          ...lastTranscription,
+          message: payload.content,
+          isSentenceComplete: payload.isSentenceComplete,
+          isFinal: payload.isFinal,
+        };
+        return updatedTranscriptions;
+      }
+
+      if (
+        !lastTranscription.isSentenceComplete &&
+        lastTranscription.isFinal &&
+        payload.isFinal
+      ) {
+        // concat the last transcription with the new one
+        const updatedTranscriptions = [...previousTranscriptions];
+        updatedTranscriptions[previousTranscriptions.length - 1] = {
+          ...lastTranscription,
+          message: `${lastTranscription.message} ${payload.content}`,
+          isSentenceComplete: payload.isSentenceComplete,
+          isFinal: payload.isFinal,
+        };
+        return updatedTranscriptions;
+      }
+      return [
+        ...previousTranscriptions,
+        {
+          id: payload.id,
+          message: payload.content,
+          senderId: payload.senderId,
+          timestamp: payload.createdAt,
+          isFinal: payload.isFinal,
+          isSentenceComplete: payload.isSentenceComplete,
+        },
+      ];
+    });
+  };
 
   // Navigation handlers
   const handleCallEndRedirection = useCallback(() => {
@@ -204,6 +286,8 @@ export const useListeningCommon = ({
     isPrivacyTooltipVisible,
     isControlSectionMaximized,
     disconnectedType,
+    speakerTranscriptions,
+    myTranscriptions,
 
     // Setters
     setCurrentNudge,
@@ -212,6 +296,8 @@ export const useListeningCommon = ({
     setIsBannerDismissed,
     setIsControlSectionMaximized,
     setDisconnectedType,
+    setSpeakerTranscriptions,
+    setMyTranscriptions,
 
     // Handlers
     handleCallEndRedirection,
@@ -222,6 +308,8 @@ export const useListeningCommon = ({
     handleLockIconPress,
     handlePrivacyTooltipClose,
     checkCounselorChat,
+    processTranscription,
+    updateLastTranscription,
 
     // Computed
     canShowFocusModeButton,

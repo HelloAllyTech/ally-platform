@@ -102,4 +102,46 @@ describe('CallLogItem', () => {
     expect(getByText('CallLogs.duration: 5m')).toBeTruthy();
     expect(getByText('help')).toBeTruthy();
   });
+
+  it('shows "Mode: Scribe" when expanded and mode is SCRIBE', () => {
+    const scribeItem: any = {
+      ...baseItem,
+      details: {
+        ...baseItem.details,
+        callInfo: { summaryName: 'Test', mode: 'SCRIBE' },
+      },
+    };
+    const {getByText} = render(
+      <CallLogItem
+        item={scribeItem}
+        expanded={true}
+        logType={(require('@/constants').LogType as any).REAL}
+        onToggle={jest.fn()}
+        onItemPress={jest.fn()}
+      />,
+    );
+
+    expect(getByText(/CallLogs.scribe/)).toBeTruthy();
+  });
+
+  it('shows "Mode: Dictation" when expanded and mode is DICTATION', () => {
+    const dictationItem: any = {
+      ...baseItem,
+      details: {
+        ...baseItem.details,
+        callInfo: { summaryName: 'Test', mode: 'DICTATION' },
+      },
+    };
+    const {getByText} = render(
+      <CallLogItem
+        item={dictationItem}
+        expanded={true}
+        logType={(require('@/constants').LogType as any).REAL}
+        onToggle={jest.fn()}
+        onItemPress={jest.fn()}
+      />,
+    );
+
+    expect(getByText(/CallLogs.dictation/)).toBeTruthy();
+  });
 });
