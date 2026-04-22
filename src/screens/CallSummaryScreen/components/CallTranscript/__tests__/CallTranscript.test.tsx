@@ -78,6 +78,25 @@ describe('CallSummaryScreen/CallTranscript', () => {
     list.props.onEndReached();
     expect(onEnd).toHaveBeenCalled();
   });
+  it('renders continuous text when isDictationMode=true', () => {
+    mockHookState = {
+      formattedMessages: [
+        {id: 1, message: 'Hello', time: '10:00', counselor: true, client: false},
+        {id: 2, message: 'world', time: '10:01', counselor: false, client: true},
+      ],
+      isLoading: false,
+      listRef: {current: null},
+      handleEndReached: jest.fn(),
+      summaryData: {details: {callInfo: {mode: 'DICTATION'}}},
+    };
+
+    const {getByText, queryByTestId} = render(<CallTranscript chatId={1} />);
+
+    // In dictation mode, we join messages: 'Hello world'
+    expect(getByText('Hello world')).toBeTruthy();
+    // FlatList should not be rendered
+    expect(queryByTestId('transcript-list')).toBeNull();
+  });
 });
 
 

@@ -1,11 +1,13 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useRoute} from '@react-navigation/native';
 
 import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
@@ -22,7 +24,12 @@ import {
 } from '@/hooks';
 import {useGetNudgeStatusQuery} from '@/services';
 import {colors, globalStyles} from '@/theme';
-import {DisconnectedType, SocketEvent, SocketMessage} from '@/types';
+import {
+  DisconnectedType,
+  MessageType,
+  SocketEvent,
+  SocketMessage,
+} from '@/types';
 
 import {
   AudioWaveformContainer,
@@ -40,9 +47,13 @@ import {
   NUM_BARS,
   recorderAudioToAmplitudes,
 } from '../utils';
+import {CallTranscriptItem} from '../../CallSummaryScreen/components/CallTranscriptItem';
 
 export const MicrophoneListeningScreen = () => {
   const {t} = useTranslate();
+  const route = useRoute<any>();
+  const mode = route.params?.mode || 'scribe';
+  const isDictationMode = mode === 'dictation';
   const {isOffline} = useNetworkConnectivity();
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const {userData} = useUser();
@@ -55,6 +66,8 @@ export const MicrophoneListeningScreen = () => {
     useState(false);
   const [isPermissionGrantedLocal, setIsPermissionGrantedLocal] =
     useState(false);
+
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const {
     chatData,
@@ -80,6 +93,12 @@ export const MicrophoneListeningScreen = () => {
     handlePrivacyTooltipClose,
     checkCounselorChat,
     canShowFocusModeButton,
+    speakerTranscriptions,
+    myTranscriptions,
+    setMyTranscriptions,
+    setSpeakerTranscriptions,
+    processTranscription,
+    updateLastTranscription,
   } = useListeningCommon({
     isMicrophoneMode: true,
     isPermissionGranted: isPermissionGrantedLocal,
@@ -159,6 +178,31 @@ export const MicrophoneListeningScreen = () => {
     return clearChatIdTimeout;
   }, [chatData?.chatId, setDisconnectedType]);
 
+  const userId = userData?.id;
+
+  // Process existing messages from chatData
+  useEffect(() => {
+    if (chatData?.messages && chatData.messages.length > 0) {
+      const existingTranscriptions = [...chatData.messages]
+        .reverse()
+        .filter(transcription => transcription.type === MessageType.TEXT)
+        .map(transcription => ({
+          id: transcription.id,
+          message: transcription.content,
+          senderId: transcription.senderId,
+          timestamp: transcription.createdAt,
+          isFinal: true,
+          isSentenceComplete: true,
+        }));
+      setMyTranscriptions(
+        existingTranscriptions?.filter(payload => payload.senderId === userId),
+      );
+      setSpeakerTranscriptions(
+        existingTranscriptions?.filter(payload => payload.senderId !== userId),
+      );
+    }
+  }, [chatData, userId, setMyTranscriptions, setSpeakerTranscriptions]);
+
   const socketEventCallbacks = useMemo(
     () => ({
       [SocketEvent.SESSION_CREATED]: () => {
@@ -186,12 +230,34 @@ export const MicrophoneListeningScreen = () => {
       [SocketEvent.USER_JOINED]: async () => {
         await checkCounselorChat();
       },
+      [SocketEvent.MESSAGE_RECEIVED]: data => {
+        const message = data.payload;
+        if (message.type === MessageType.TEXT) {
+          if (message.senderId === userId) {
+            processTranscription(setMyTranscriptions, message);
+          } else {
+            processTranscription(setSpeakerTranscriptions, message);
+          }
+        }
+      },
+      [SocketEvent.UTTERANCE_ENDED]: data => {
+        if (data?.payload.senderId === userId) {
+          updateLastTranscription(setMyTranscriptions);
+        } else {
+          updateLastTranscription(setSpeakerTranscriptions);
+        }
+      },
     }),
     [
       handleCallEndRedirection,
       checkCounselorChat,
       setIsLoading,
       setCurrentNudge,
+      userId,
+      processTranscription,
+      setMyTranscriptions,
+      setSpeakerTranscriptions,
+      updateLastTranscription,
     ],
   );
 
@@ -267,7 +333,7 @@ export const MicrophoneListeningScreen = () => {
       setTimeout(() => {
         emitSocketEvent(
           SocketEvent.START_AUDIO_CHAT,
-          getStartAudioChatPayload(),
+          getStartAudioChatPayload(mode),
         );
         setIsAudioChatEmitted(true);
       });
@@ -349,6 +415,22 @@ export const MicrophoneListeningScreen = () => {
     );
   }
 
+  const getElapsedSeconds = (timestamp: string) => {
+    if (!chatData?.startedAt) return '00:00';
+    const start = new Date(chatData.startedAt).getTime();
+    const current = new Date(timestamp).getTime();
+    const diffInSeconds = Math.floor((current - start) / 1000);
+    const minutes = Math.floor(diffInSeconds / 60);
+    const seconds = diffInSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds
+      .toString()
+      .padStart(2, '0')}`;
+  };
+
+  const allTranscriptions = [...myTranscriptions, ...speakerTranscriptions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
   const renderFocusMode = () => {
     return (
       <View style={styles.focusModeLayout}>
@@ -386,14 +468,44 @@ export const MicrophoneListeningScreen = () => {
             />
           </View>
         </View>
-        {!!nudgeStatus && currentNudge && (
+        {!isDictationMode && !!nudgeStatus && currentNudge && (
           <NudgeSection
             nudge={currentNudge}
             isLoading={isLoading}
             onFeedbackSuccess={handleNudgeFeedbackSuccess}
           />
         )}
-        <Search />
+        {!isDictationMode && <Search />}
+        <ScrollView
+          style={styles.transcriptionScrollView}
+          contentContainerStyle={styles.transcriptionContentContainer}
+          ref={scrollViewRef}
+          onContentSizeChange={() =>
+            scrollViewRef.current?.scrollToEnd({animated: true})
+          }>
+          {isDictationMode ? (
+            <CallTranscriptItem
+              time=""
+              message={allTranscriptions.map(item => item.message).join(' ')}
+              speakerLabel=""
+              isDictation={true}
+            />
+          ) : (
+            allTranscriptions.map((transcription, index) => (
+              <CallTranscriptItem
+                key={index}
+                time={getElapsedSeconds(transcription.timestamp)}
+                message={transcription.message}
+                counselor={transcription.senderId === userId}
+                speakerLabel={
+                  transcription.senderId === userId
+                    ? t('CallTranscript.you')
+                    : t('CallTranscript.client')
+                }
+              />
+            ))
+          )}
+        </ScrollView>
       </View>
     );
   };
@@ -425,7 +537,7 @@ export const MicrophoneListeningScreen = () => {
         showPauseResumeButton
         showEndSessionButton
         isPauseResumeDisabled={isWebMicrophoneMode}
-        showFocusModeButton={canShowFocusModeButton}
+        showFocusModeButton={!isDictationMode && canShowFocusModeButton}
         showMuteTooltip={showMuteTooltip}
         onDismissMuteTooltip={() => setIsMuteTooltipOpen(false)}
       />

@@ -35,51 +35,6 @@ describe('StartSessionModal', () => {
     expect(toJSON()).toBeNull();
   });
 
-  it('shows notification modal when start button is pressed', () => {
-    const {getByText, getByTestId} = render(
-      <StartSessionModal visible onClose={jest.fn()} onListenLive={jest.fn()} />,
-    );
-
-    fireEvent.press(getByText('CallLogs.startSessionNow'));
-    expect(getByTestId('notification-modal')).toBeTruthy();
-    expect(getByText('Before you get started')).toBeTruthy();
-    expect(getByText('Start Session')).toBeTruthy();
-  });
-
-  it('fires onListenLive when Start Session button is pressed after notification', () => {
-    const onClose = jest.fn();
-    const onListenLive = jest.fn();
-    const {getByText} = render(
-      <StartSessionModal visible onClose={onClose} onListenLive={onListenLive} />,
-    );
-
-    fireEvent.press(getByText('CallLogs.startSessionNow'));
-    fireEvent.press(getByText('Start Session'));
-    expect(onListenLive).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it('does not fire onListenLive immediately when start button is pressed', () => {
-    const onListenLive = jest.fn();
-    const {getByText} = render(
-      <StartSessionModal visible onClose={jest.fn()} onListenLive={onListenLive} />,
-    );
-
-    fireEvent.press(getByText('CallLogs.startSessionNow'));
-    expect(onListenLive).not.toHaveBeenCalled();
-  });
-
-  it('closes notification modal when pressing outside (via onClose)', () => {
-    const onListenLive = jest.fn();
-    const {getByText, getByTestId} = render(
-      <StartSessionModal visible onClose={jest.fn()} onListenLive={onListenLive} />,
-    );
-
-    fireEvent.press(getByText('CallLogs.startSessionNow'));
-    expect(getByTestId('notification-modal')).toBeTruthy();
-    expect(onListenLive).not.toHaveBeenCalled();
-  });
-
   it('renders SecurityCarousel when visible', () => {
     const {getByTestId} = render(
       <StartSessionModal visible onClose={jest.fn()} onListenLive={jest.fn()} />,
@@ -87,5 +42,123 @@ describe('StartSessionModal', () => {
 
     expect(getByTestId('security-carousel')).toBeTruthy();
   });
-});
 
+  // --- Scribe-only tenant ---
+  it('shows only Start Scribe Mode button when only hasMicrophoneChatType is true', () => {
+    const {getByText, queryByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        hasMicrophoneChatType
+        hasDictationChatType={false}
+      />,
+    );
+
+    expect(getByText('CallLogs.startScribeMode')).toBeTruthy();
+    expect(queryByText('CallLogs.startDictationMode')).toBeNull();
+  });
+
+  // --- Dictation-only tenant ---
+  it('shows only Start Dictation Mode button when only hasDictationChatType is true', () => {
+    const {getByText, queryByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        hasMicrophoneChatType={false}
+        hasDictationChatType
+      />,
+    );
+
+    expect(getByText('CallLogs.startDictationMode')).toBeTruthy();
+    expect(queryByText('CallLogs.startScribeMode')).toBeNull();
+  });
+
+  // --- Both enabled ---
+  it('shows both buttons when both chat types are enabled', () => {
+    const {getByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        hasMicrophoneChatType
+        hasDictationChatType
+      />,
+    );
+
+    expect(getByText('CallLogs.startScribeMode')).toBeTruthy();
+    expect(getByText('CallLogs.startDictationMode')).toBeTruthy();
+  });
+
+  // --- Scribe flow ---
+  it('calls onListenLive with "scribe" when Start Scribe Mode is confirmed', () => {
+    const onClose = jest.fn();
+    const onListenLive = jest.fn();
+    const {getByText} = render(
+      <StartSessionModal
+        visible
+        onClose={onClose}
+        onListenLive={onListenLive}
+        hasMicrophoneChatType
+        hasDictationChatType={false}
+      />,
+    );
+
+    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    fireEvent.press(getByText('Start Session'));
+    expect(onListenLive).toHaveBeenCalledWith('scribe');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  // --- Dictation flow ---
+  it('calls onListenLive with "dictation" when Start Dictation Mode is confirmed', () => {
+    const onClose = jest.fn();
+    const onListenLive = jest.fn();
+    const {getByText} = render(
+      <StartSessionModal
+        visible
+        onClose={onClose}
+        onListenLive={onListenLive}
+        hasMicrophoneChatType={false}
+        hasDictationChatType
+      />,
+    );
+
+    fireEvent.press(getByText('CallLogs.startDictationMode'));
+    fireEvent.press(getByText('Start Session'));
+    expect(onListenLive).toHaveBeenCalledWith('dictation');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('does not fire onListenLive immediately when start button is pressed', () => {
+    const onListenLive = jest.fn();
+    const {getByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={onListenLive}
+        hasMicrophoneChatType
+      />,
+    );
+
+    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    expect(onListenLive).not.toHaveBeenCalled();
+  });
+
+  it('closes notification modal when pressing outside (via onClose)', () => {
+    const onListenLive = jest.fn();
+    const {getByText, getByTestId} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={onListenLive}
+        hasMicrophoneChatType
+      />,
+    );
+
+    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    expect(getByTestId('notification-modal')).toBeTruthy();
+    expect(onListenLive).not.toHaveBeenCalled();
+  });
+});

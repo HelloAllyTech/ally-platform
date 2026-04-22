@@ -9,10 +9,11 @@ import {CallTranscriptMessage} from '@/types';
 import {CallTranscriptItem} from '../CallTranscriptItem';
 
 export const CallTranscript = ({chatId}: {chatId: number}) => {
-  const {formattedMessages, isLoading, listRef, handleEndReached} =
+  const {formattedMessages, isLoading, listRef, handleEndReached, summaryData} =
     useCallTranscriptDetails(chatId);
 
   const {t} = useTranslate();
+  const isDictationMode = summaryData?.details?.callInfo?.mode === 'DICTATION';
 
   const renderItem = ({item}: {item: CallTranscriptMessage}) => {
     const {time, counselor, message} = item;
@@ -31,17 +32,27 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
   const renderEmptyComponent = () => <EmptyTranscript />;
   return (
     <SummaryCard title={t('CallSummary.header.transcript')}>
-      <FlatList
-        contentContainerStyle={styles.contentContainer}
-        ref={listRef}
-        data={formattedMessages}
-        keyExtractor={item => item.id.toString()}
-        renderItem={renderItem}
-        ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.1}
-        ListEmptyComponent={renderEmptyComponent}
-      />
+      {isDictationMode ? (
+        <CallTranscriptItem
+          time=""
+          message={formattedMessages.map(m => m.message).join(' ')}
+          speakerLabel=""
+          isDictation={true}
+        />
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.contentContainer}
+          ref={listRef}
+          data={formattedMessages}
+          testID="transcript-list"
+          keyExtractor={item => item.id.toString()}
+          renderItem={renderItem}
+          ListFooterComponent={isLoading ? <ActivityIndicator /> : null}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.1}
+          ListEmptyComponent={renderEmptyComponent}
+        />
+      )}
     </SummaryCard>
   );
 };

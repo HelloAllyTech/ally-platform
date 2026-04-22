@@ -85,17 +85,30 @@ export type SocketMessage = {
   createdAt?: string;
 };
 
+export interface Transcription {
+  id: number;
+  message: string;
+  senderId: number;
+  timestamp: string;
+  isFinal?: boolean;
+  isSentenceComplete?: boolean;
+}
+
 export enum MessageType {
   TEXT = 'TEXT',
   NUDGE = 'NUDGE',
+  STAGE = 'STAGE',
 }
 
 export enum SocketEvent {
   NUDGE = 'NUDGE',
+  STAGE = 'STAGE',
   SEND_MESSAGE = 'SEND_MESSAGE',
+  MESSAGE_RECEIVED = 'MESSAGE_RECEIVED',
   AUDIO_MESSAGE = 'AUDIO_MESSAGE',
   START_AUDIO_CHAT = 'START_AUDIO_CHAT',
   CHAT_ENDED = 'CHAT_ENDED',
+  UTTERANCE_ENDED = 'UTTERANCE_ENDED',
   USER_JOINED = 'USER_JOINED',
   USER_DISCONNECTED = 'USER_DISCONNECTED',
   AUDIO_STREAM = 'AUDIO_STREAM',

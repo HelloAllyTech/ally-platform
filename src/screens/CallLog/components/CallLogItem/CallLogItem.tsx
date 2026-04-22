@@ -12,6 +12,7 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 import {getLogSourceLabelConfig} from '@/utils/callLog';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
+import {formatSessionMode} from '@/constants';
 
 import {LogItem} from '../../types';
 import {StatusBadge} from '../StatusBadge';
@@ -143,6 +144,9 @@ export const CallLogItem = ({
               {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
               {item?.score
                 ? ` • ${t('CallLogs.sessionScore')}: ${item?.score}`
+                : ''}
+              {item?.details?.callInfo?.mode
+                ? ` • ${t('CallLogs.mode')}: ${formatSessionMode(item.details.callInfo.mode, t)}`
                 : ''}
             </Text>
           </View>

@@ -37,6 +37,7 @@ export interface FieldDataContext {
     endTime?: string | null;
     clientId?: number;
     summaryName?: string;
+    mode?: string;
   } | null;
 }
 

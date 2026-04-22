@@ -59,6 +59,8 @@
     "consentNotice": "By starting, you confirm everyone being transcribed has given consent.",
     "startSessionDescription": "Ally's mental health AI scribe safely listens, transcribes and writes session notes for you.",
     "startSessionNow": "Start session now",
+    "startScribeMode": "Start Scribe Mode",
+    "startDictationMode": "Start Dictation Mode",
     "learn": "Learn",
     "learnDescription": "Engage in AI-powered role plays",
     "search": {
@@ -77,6 +79,9 @@
     "noAudioDetected": "No audio detected",
     "uploaded": "Uploaded",
     "liveSession": "Live session",
+    "mode": "Mode",
+    "scribe": "Scribe",
+    "dictation": "Dictation",
     "archives":{
       "header":{
         "title":"Archives"

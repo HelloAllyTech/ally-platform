@@ -32,6 +32,7 @@ import {
   formatTimeHHmm,
 } from '@/utils/date';
 
+import {ScribeSessionMode} from './chat';
 import {LanguageMap} from './general';
 
 // Helper functions for computeValue and formatDisplay specific to call summary
@@ -62,6 +63,14 @@ const formatLanguages = (value: unknown) => {
         `${LanguageMap[lang.language as keyof typeof LanguageMap] || lang.language} (${lang.percentage}%)`,
     )
     .join(', ');
+};
+
+export const formatSessionMode = (value: unknown, t: any) => {
+  if (!value) return '-';
+  const mode = value.toString().toUpperCase();
+  return mode === ScribeSessionMode.DICTATION
+    ? t('CallLogs.dictation')
+    : t('CallLogs.scribe');
 };
 
 export enum ChatSummaryStatus {
@@ -151,6 +160,7 @@ export const SUMMARY_FIELDS = {
   CALL_TIME: 'callTime',
   CALLER_ID: 'clientId',
   CALLER_TYPE: 'callType',
+  MODE: 'mode',
   AGE: 'age',
   GENDER: 'gender',
   PROFESSION: 'profession',
@@ -485,6 +495,15 @@ export const summaryFields: SummaryField[] = [
     label: 'Caller Type',
     sectionKey: SectionKey.FeaturesAndDemographics,
     type: FieldType.Text,
+  },
+  {
+    isEditable: false,
+    key: SUMMARY_FIELDS.MODE,
+    label: 'Mode',
+    sectionKey: SectionKey.FeaturesAndDemographics,
+    type: FieldType.Text,
+    computeValue: ({callInfo}) => callInfo?.mode,
+    formatDisplay: (value, t) => formatSessionMode(value, t),
   },
   {
     isEditable: true,

@@ -15,6 +15,7 @@ export interface CallInfo {
   clientTalkingPercentage: string;
   counselorTalkingPercentage: string;
   provider: ChatProvider;
+  mode?: string;
   notes: string | null;
 }
 

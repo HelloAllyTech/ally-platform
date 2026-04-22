@@ -147,6 +147,16 @@ export const CallLogScreen: React.FC = () => {
     [enabledChatTypes],
   );
 
+  const hasDictationChatType = useMemo(
+    () =>
+      Boolean(
+        enabledChatTypes?.some?.(
+          (chatType: CHAT_TYPES) => chatType === CHAT_TYPES.DICTATION_MODE,
+        ),
+      ),
+    [enabledChatTypes],
+  );
+
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
 
@@ -439,7 +449,7 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
-  const handleVoiceRecording = async () => {
+  const handleVoiceRecording = async (mode: 'scribe' | 'dictation' = 'scribe') => {
     try {
       const micPermission = MICROPHONE_PERMISSION;
 
@@ -454,7 +464,7 @@ export const CallLogScreen: React.FC = () => {
 
       if (finalStatus === RESULTS.GRANTED) {
         checkCounselorChat();
-        stackNavigation.navigate('Listening', {isMicrophoneMode: true});
+        stackNavigation.navigate('Listening', {isMicrophoneMode: true, mode});
         return;
       }
 
@@ -586,9 +596,9 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !hasMicrophoneChatType && styles.bgAshGray,
+            !(hasMicrophoneChatType || hasDictationChatType) && styles.bgAshGray,
           ]}
-          disabled={!hasMicrophoneChatType}
+          disabled={!(hasMicrophoneChatType || hasDictationChatType)}
           activeOpacity={0.9}
           onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
@@ -598,6 +608,8 @@ export const CallLogScreen: React.FC = () => {
         visible={showStartSession}
         onClose={() => setShowStartSession(false)}
         onListenLive={handleVoiceRecording}
+        hasMicrophoneChatType={hasMicrophoneChatType}
+        hasDictationChatType={hasDictationChatType}
       />
     </View>
   );
