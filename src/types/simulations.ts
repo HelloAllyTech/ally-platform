@@ -10,6 +10,14 @@ export interface TriggerWarning {
   updatedAt?: string;
 }
 
+export interface LanguageOption {
+  language_id: number;
+  label: string;
+  active: boolean;
+  translationCode?: string;
+  value?: string;
+}
+
 export interface ScenarioMetadata {
   age?: number;
   name?: string;
@@ -56,6 +64,7 @@ export interface Scenario {
   experienceMode?: string;
   checklistEvents?: ChecklistItem[];
   showScoreMeter?: boolean;
+  availableLanguages?: LanguageOption[];
 }
 
 export interface ScenariosResponse {
@@ -298,6 +307,7 @@ export interface PathScenario {
   sessionId: string | null;
   status: SessionItemStatus;
   triggerWarnings?: TriggerWarning[];
+  availableLanguages?: LanguageOption[];
 }
 
 export interface SimulationPathDetails {
