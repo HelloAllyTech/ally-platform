@@ -1,10 +1,10 @@
+import {ScribeSessionMode} from '@/constants';
 import {
   AllyPlatforms,
   isIOS,
   MICROPHONE_AUDIO_SAMPLE_RATE,
   SCREEN_WIDTH,
 } from '@/constants/general';
-import {ScribeSessionMode} from '@/constants';
 
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
@@ -99,10 +99,14 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
   return amplitudes;
 };
 
-
-export const getStartAudioChatPayload = (mode: 'scribe' | 'dictation' = 'scribe') => ({
+export const getStartAudioChatPayload = (
+  mode: 'scribe' | 'dictation' = 'scribe',
+) => ({
   isLinear16Encoded: true,
   platform: AllyPlatforms.MOBILE,
   sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
-  mode: mode === 'dictation' ? ScribeSessionMode.DICTATION : ScribeSessionMode.SCRIBE,
+  mode:
+    mode === 'dictation'
+      ? ScribeSessionMode.DICTATION
+      : ScribeSessionMode.SCRIBE,
 });

@@ -154,4 +154,53 @@ describe('SessionChecklist', () => {
     );
     expect(toJSON()).toBeNull();
   });
+
+  it('renders correctly in LIST mode (names visible regardless of trigger state)', () => {
+    const {getByText} = render(
+      <SessionChecklist
+        mode={ChecklistType.LIST}
+        items={mockItems}
+        triggeredEvents={[]}
+      />,
+    );
+
+    expect(getByText('Session Checklist')).toBeTruthy();
+    expect(getByText('Step 1')).toBeTruthy();
+    expect(getByText('Step 2')).toBeTruthy();
+  });
+
+  it('hides progress subtitle and status circles in LIST mode', () => {
+    const {queryByText, queryAllByTestId} = render(
+      <SessionChecklist
+        mode={ChecklistType.LIST}
+        items={mockItems}
+        triggeredEvents={['1', '2']}
+      />,
+    );
+
+    // Progress line should not render in LIST mode
+    expect(queryByText('Progress')).toBeNull();
+    expect(queryByText('2 completed')).toBeNull();
+
+    // Status circle (tick icon) should not render in LIST mode
+    expect(queryAllByTestId('tick-icon').length).toBe(0);
+  });
+
+  it('toggles expansion on press in LIST mode', () => {
+    const {getByText, queryByText} = render(
+      <SessionChecklist
+        mode={ChecklistType.LIST}
+        items={mockItems}
+        triggeredEvents={[]}
+      />,
+    );
+
+    expect(queryByText('Details 1')).toBeNull();
+
+    fireEvent.press(getByText('Step 1'));
+    expect(getByText('Details 1')).toBeTruthy();
+
+    fireEvent.press(getByText('Step 1'));
+    expect(queryByText('Details 1')).toBeNull();
+  });
 });

@@ -332,6 +332,7 @@ export enum ChecklistType {
   OFF = 'OFF',
   GUIDED = 'GUIDED',
   UNGUIDED = 'UNGUIDED',
+  LIST = 'LIST',
 }
 
 export enum ExperienceMode {

@@ -22,6 +22,12 @@ jest.mock('@/constants', () => ({
     4: { bg: '#444', text: '#fff' },
     5: { bg: '#555', text: '#fff' },
   },
+  formatSessionMode: (value: unknown, t: (k: string) => string) => {
+    if (!value) return '-';
+    return value.toString().toUpperCase() === 'DICTATION'
+      ? t('CallLogs.dictation')
+      : t('CallLogs.scribe');
+  },
 }));
 
 jest.mock('@/utils/date', () => ({

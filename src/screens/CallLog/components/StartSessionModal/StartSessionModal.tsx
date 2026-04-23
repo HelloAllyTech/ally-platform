@@ -24,7 +24,9 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
 }) => {
   const {t} = useTranslate();
   const [showNotification, setShowNotification] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<'scribe' | 'dictation'>('scribe');
+  const [selectedMode, setSelectedMode] = useState<'scribe' | 'dictation'>(
+    'scribe',
+  );
 
   const handleStart = (mode: 'scribe' | 'dictation') => {
     setSelectedMode(mode);
@@ -94,9 +96,16 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               onPress={() => handleStart('dictation')}
               customContainerStyle={[
                 styles.ctaBtn,
-                hasMicrophoneChatType ? { backgroundColor: 'white', borderWidth: 1, borderColor: '#007AFF', marginTop: 10 } : {},
+                hasMicrophoneChatType
+                  ? {
+                      backgroundColor: 'white',
+                      borderWidth: 1,
+                      borderColor: '#007AFF',
+                      marginTop: 10,
+                    }
+                  : {},
               ]}
-              customTextStyle={hasMicrophoneChatType ? { color: '#007AFF' } : {}}
+              customTextStyle={hasMicrophoneChatType ? {color: '#007AFF'} : {}}
             />
           )}
 

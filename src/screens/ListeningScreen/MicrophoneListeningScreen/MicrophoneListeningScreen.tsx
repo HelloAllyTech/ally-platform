@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useRoute} from '@react-navigation/native';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {useRoute} from '@react-navigation/native';
 
 import {LockIcon} from '@/assets';
 import {PrivacyTooltip} from '@/components';
@@ -31,6 +31,7 @@ import {
   SocketMessage,
 } from '@/types';
 
+import {CallTranscriptItem} from '../../CallSummaryScreen/components/CallTranscriptItem';
 import {
   AudioWaveformContainer,
   CallEndConfirmationModal,
@@ -47,7 +48,6 @@ import {
   NUM_BARS,
   recorderAudioToAmplitudes,
 } from '../utils';
-import {CallTranscriptItem} from '../../CallSummaryScreen/components/CallTranscriptItem';
 
 export const MicrophoneListeningScreen = () => {
   const {t} = useTranslate();
@@ -338,7 +338,7 @@ export const MicrophoneListeningScreen = () => {
         setIsAudioChatEmitted(true);
       });
     }
-  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted, mode]);
 
   const handleEndCall = useCallback(() => {
     handleEndCallCommon(() => {
@@ -427,7 +427,10 @@ export const MicrophoneListeningScreen = () => {
       .padStart(2, '0')}`;
   };
 
-  const allTranscriptions = [...myTranscriptions, ...speakerTranscriptions].sort(
+  const allTranscriptions = [
+    ...myTranscriptions,
+    ...speakerTranscriptions,
+  ].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
@@ -488,7 +491,7 @@ export const MicrophoneListeningScreen = () => {
               time=""
               message={allTranscriptions.map(item => item.message).join(' ')}
               speakerLabel=""
-              isDictation={true}
+              isDictation
             />
           ) : (
             allTranscriptions.map((transcription, index) => (

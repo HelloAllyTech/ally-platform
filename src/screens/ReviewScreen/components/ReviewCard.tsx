@@ -69,7 +69,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   onReviewPress,
   note,
   reviewType,
-  summaryName,
   useLazyGeneralCommentsQuery = useLazyGetGeneralCommentsOverviewQuery,
 }) => {
   const {t} = useTranslation();

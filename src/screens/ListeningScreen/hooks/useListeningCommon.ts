@@ -1,4 +1,11 @@
-import {useCallback, useEffect, useMemo, useState, Dispatch, SetStateAction} from 'react';
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import {
   activateKeepAwake,
@@ -14,7 +21,13 @@ import {
 } from '@/services/chatApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {clearCurrentChat} from '@/store/slices/chatSlice';
-import {ChatProvider, DisconnectedType, FeedbackResponse, Nudge, Transcription} from '@/types';
+import {
+  ChatProvider,
+  DisconnectedType,
+  FeedbackResponse,
+  Nudge,
+  Transcription,
+} from '@/types';
 import {Maybe} from '@/utils';
 
 interface UseListeningCommonParams {
@@ -80,7 +93,14 @@ export const useListeningCommon = ({
 
   const processTranscription = (
     setCorrespondingTranscription: Dispatch<SetStateAction<Transcription[]>>,
-    payload: any,
+    payload: {
+      id: number;
+      content: string;
+      senderId: number;
+      createdAt: string;
+      isFinal: boolean;
+      isSentenceComplete: boolean;
+    },
   ) => {
     setCorrespondingTranscription(previousTranscriptions => {
       const lastTranscription =

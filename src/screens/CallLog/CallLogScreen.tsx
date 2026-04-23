@@ -449,7 +449,9 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
-  const handleVoiceRecording = async (mode: 'scribe' | 'dictation' = 'scribe') => {
+  const handleVoiceRecording = async (
+    mode: 'scribe' | 'dictation' = 'scribe',
+  ) => {
     try {
       const micPermission = MICROPHONE_PERMISSION;
 
@@ -596,7 +598,8 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !(hasMicrophoneChatType || hasDictationChatType) && styles.bgAshGray,
+            !(hasMicrophoneChatType || hasDictationChatType) &&
+              styles.bgAshGray,
           ]}
           disabled={!(hasMicrophoneChatType || hasDictationChatType)}
           activeOpacity={0.9}
