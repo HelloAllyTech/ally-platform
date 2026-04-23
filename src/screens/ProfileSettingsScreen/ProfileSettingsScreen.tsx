@@ -1,5 +1,4 @@
 import {useState} from 'react';
-import {useIsFocused} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -12,16 +11,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {Button, CustomDropdown, CustomModal, CustomSwitch} from '@/components';
+import {Button, CustomModal, CustomSwitch} from '@/components';
 import {
   useAppNavigation,
-  useLanguageDropdown,
   useLeaderboardNotification,
   useProfileImage,
   useTranslate,
   useUser,
 } from '@/hooks';
-import {useUpdateUserPreferencesMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {UserRole} from '@/types';
 
@@ -32,7 +29,6 @@ const isIOS = Platform.OS === 'ios';
 export const ProfileSettingsScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
-  const isFocused = useIsFocused();
   const {userData} = useUser();
   const {t} = useTranslate();
   const {name, email, profileImageUrl} = userData ?? {};
@@ -42,20 +38,6 @@ export const ProfileSettingsScreen: React.FC = () => {
 
   const {leaderboardNotifEnabled, handleLeaderboardNotifToggle} =
     useLeaderboardNotification({isLearner});
-
-  // Use custom hook for language dropdown management
-  const {
-    selectedLanguage,
-    setSelectedLanguage,
-    isLanguageDropdownOpen,
-    setIsLanguageDropdownOpen,
-    languageOptions,
-    languageMap,
-  } = useLanguageDropdown({isFocused});
-
-  // Update user preferences mutation
-  const [updateUserPreferences, {isLoading: isUpdatingPreferences}] =
-    useUpdateUserPreferencesMutation();
 
   const {
     previewImageUri,
@@ -91,21 +73,6 @@ export const ProfileSettingsScreen: React.FC = () => {
   const onRemoveImage = () => {
     setIsBottomSheetVisible(false);
     handleRemoveImage();
-  };
-
-  const handleLanguageSelect = async (selectedLabel: string) => {
-    setSelectedLanguage(selectedLabel);
-    const languageId = languageMap.get(selectedLabel);
-
-    if (languageId) {
-      try {
-        await updateUserPreferences({
-          default_language_id: languageId,
-        }).unwrap();
-      } catch (error) {
-        console.error('Error updating language preference:', error);
-      }
-    }
   };
 
   const handleBackPress = () => {
@@ -200,27 +167,6 @@ export const ProfileSettingsScreen: React.FC = () => {
             <Text style={styles.fieldLabel}>{t('ProfileSettings.email')}</Text>
             <View style={styles.fieldValue}>
               <Text style={styles.fieldValueText}>{email || '—'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>
-              {t('ProfileSettings.language')}
-            </Text>
-            <View style={styles.dropdownContainer}>
-              {isUpdatingPreferences && (
-                <View style={styles.loadingOverlay}>
-                  <ActivityIndicator size="small" color={colors.azureBlue} />
-                </View>
-              )}
-              <CustomDropdown
-                value={selectedLanguage}
-                options={languageOptions}
-                onSelect={handleLanguageSelect}
-                isOpen={isLanguageDropdownOpen}
-                setIsOpen={setIsLanguageDropdownOpen}
-                disabled={isUpdatingPreferences || languageOptions.length === 0}
-              />
             </View>
           </View>
 
@@ -395,9 +341,6 @@ const styles = ScaledSheet.create({
   },
   saveButton: {
     width: '100%',
-  },
-  dropdownContainer: {
-    position: 'relative',
   },
   notifToggleContainer: {
     flexDirection: 'row',

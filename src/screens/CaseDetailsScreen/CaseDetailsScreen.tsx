@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useState} from 'react';
-import {useIsFocused} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, RefreshControl, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -20,7 +19,6 @@ import {
 } from '@/constants';
 import {
   useHardwareBackPressHandler,
-  useLanguageDropdown,
   useLearningPathDetails,
   useSimulationCredits,
   useStartSimulation,
@@ -32,13 +30,12 @@ import {ActiveSimulationModal} from '@/screens/SimulationDetailsScreen/component
 import {PathSimulationCard} from '@/screens/SimulationPathDetailsScreen/components/PathSimulationCard';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors} from '@/theme';
-import {CaseSimulation, SessionItemStatus} from '@/types';
+import {CaseSimulation, LanguageOption, SessionItemStatus} from '@/types';
 import {getErrorDetails, navigateToLearnTab} from '@/utils';
 
 export const CaseDetailsScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.CASE_DETAILS>
 > = ({navigation, route}) => {
-  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const {t} = useTranslate();
   const {caseId} = route.params;
@@ -60,14 +57,25 @@ export const CaseDetailsScreen: React.FC<
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
 
-  const {
-    selectedLanguage,
-    setSelectedLanguage,
-    isLanguageDropdownOpen,
-    setIsLanguageDropdownOpen,
-    languageOptions,
-    languageMap,
-  } = useLanguageDropdown({isFocused});
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<LanguageOption | null>(null);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+
+  const availableLanguages = selectedSimulation?.availableLanguages ?? [];
+
+  useEffect(() => {
+    if (selectedSimulation?.availableLanguages?.length) {
+      setSelectedLanguage(selectedSimulation.availableLanguages[0]);
+    } else {
+      setSelectedLanguage(null);
+    }
+  }, [selectedSimulation]);
+
+  const handleLanguageSelect = (label: string) => {
+    const selected =
+      availableLanguages.find(lang => lang.label === label) ?? null;
+    setSelectedLanguage(selected);
+  };
 
   const {credits, getCreditsInfo} = useSimulationCredits();
   const [refreshing, setRefreshing] = useState(false);
@@ -196,13 +204,14 @@ export const CaseDetailsScreen: React.FC<
       const freshScenario = data?.scenarios?.find(
         s => s.id === selectedSimulation.id,
       );
-      const languageId = languageMap.get(selectedLanguage);
       startSimulation({
         scenarioId: selectedSimulation.scenarioId,
         caseSessionItemId:
           (freshScenario ?? selectedSimulation).sessionId || '',
-        languageId,
         caseId,
+        ...(availableLanguages.length
+          ? {languageId: selectedLanguage?.language_id}
+          : {}),
       }).finally(() => {
         handleCloseModal();
       });
@@ -305,9 +314,9 @@ export const CaseDetailsScreen: React.FC<
         {...(selectedSimulation ?? {})}
         onStartSimulation={handleStartSimulation}
         isCreatingRoom={isCreatingRoom}
-        selectedLanguage={selectedLanguage}
-        languageOptions={languageOptions}
-        onLanguageSelect={setSelectedLanguage}
+        selectedLanguage={selectedLanguage?.label ?? ''}
+        languageOptions={availableLanguages.map(lang => lang.label)}
+        onLanguageSelect={handleLanguageSelect}
         isLanguageDropdownOpen={isLanguageDropdownOpen}
         setIsLanguageDropdownOpen={setIsLanguageDropdownOpen}
       />

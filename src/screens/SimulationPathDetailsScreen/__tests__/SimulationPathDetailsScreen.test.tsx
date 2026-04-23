@@ -57,18 +57,6 @@ jest.mock('@/hooks', () => ({
     closeActiveSimulationModal: jest.fn(),
     setShowActiveSimulationModal: jest.fn(),
   })),
-  useLanguageDropdown: jest.fn(() => ({
-    selectedLanguage: 'English',
-    setSelectedLanguage: jest.fn(),
-    isLanguageDropdownOpen: false,
-    setIsLanguageDropdownOpen: jest.fn(),
-    languageOptions: ['English', 'Spanish'],
-    languageMap: new Map([
-      ['English', 1],
-      ['Spanish', 2],
-    ]),
-    isLoading: false,
-  })),
   useLearningPathDetails: jest.fn(() => ({
     data: undefined,
     isLoading: false,
