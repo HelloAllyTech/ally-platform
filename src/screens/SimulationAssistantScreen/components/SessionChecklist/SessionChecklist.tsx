@@ -84,21 +84,32 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
       style={styles.container}
       testID="session-checklist">
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerIconContainer}>
+      <View
+        style={[
+          styles.header,
+          mode === ChecklistType.LIST && styles.headerList,
+        ]}>
+        <View
+          style={
+            mode === ChecklistType.LIST
+              ? styles.headerIconContainerList
+              : styles.headerIconContainer
+          }>
           <ChecklistIcon width={40} height={40} color="white" />
         </View>
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>
             {t('SimulationChecklist.sessionChecklist')}
           </Text>
-          <Text style={styles.headerSubtitle}>
-            {t('SimulationChecklist.progress')}:{' '}
-            <Text style={styles.progressCompleted}>{completedCount}</Text> of{' '}
-            <Text style={styles.progressTotal}>
-              {totalCount} {t('SimulationChecklist.completed')}
+          {mode !== ChecklistType.LIST && (
+            <Text style={styles.headerSubtitle}>
+              {t('SimulationChecklist.progress')}:{' '}
+              <Text style={styles.progressCompleted}>{completedCount}</Text> of{' '}
+              <Text style={styles.progressTotal}>
+                {totalCount} {t('SimulationChecklist.completed')}
+              </Text>
             </Text>
-          </Text>
+          )}
         </View>
       </View>
 
@@ -113,9 +124,9 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
             ? triggeredEvents.includes(item.id)
             : true;
           const isExpanded = !!expandedItems[itemId];
-          // Guided mode: Show Name. Unguided mode: Show Name if triggered, otherwise show blank.
+          // Guided/List mode: Show Name. Unguided mode: Show Name if triggered, otherwise show rank.
           const displayText =
-            mode === ChecklistType.GUIDED
+            mode === ChecklistType.GUIDED || mode === ChecklistType.LIST
               ? item.name
               : isTriggered
                 ? item.name
@@ -130,40 +141,51 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
                 activeOpacity={0.7}
                 style={styles.itemHeader}
                 onPress={() => toggleExpand(itemId)}
-                disabled={mode !== ChecklistType.GUIDED || !item.message}>
+                disabled={
+                  (mode !== ChecklistType.GUIDED &&
+                    mode !== ChecklistType.LIST) ||
+                  !item.message
+                }>
                 <View style={styles.itemLeft}>
-                  {/* Status Circle */}
-                  <View
-                    style={[
-                      styles.statusCircle,
-                      isTriggered
-                        ? styles.statusCircleTriggered
-                        : styles.statusCircleUntriggered,
-                    ]}>
-                    <TickIcon
-                      width={14}
-                      height={14}
-                      color={isTriggered ? 'black' : '#25272a'}
-                    />
-                  </View>
+                  {/* Status Circle (hidden in LIST mode) */}
+                  {mode !== ChecklistType.LIST && (
+                    <View
+                      style={[
+                        styles.statusCircle,
+                        isTriggered
+                          ? styles.statusCircleTriggered
+                          : styles.statusCircleUntriggered,
+                      ]}>
+                      <TickIcon
+                        width={14}
+                        height={14}
+                        color={isTriggered ? 'black' : '#25272a'}
+                      />
+                    </View>
+                  )}
                   {/* Title */}
                   <Text style={styles.itemTitle}>{displayText}</Text>
                 </View>
 
                 {/* Chevron */}
-                {mode === ChecklistType.GUIDED && item.message && (
-                  <View
-                    style={[
-                      styles.chevronContainer,
-                      {transform: [{rotate: isExpanded ? '180deg' : '0deg'}]},
-                    ]}>
-                    <ChevronDown width={12} height={12} color="white" />
-                  </View>
-                )}
+                {(mode === ChecklistType.GUIDED ||
+                  mode === ChecklistType.LIST) &&
+                  item.message && (
+                    <View
+                      style={[
+                        styles.chevronContainer,
+                        {
+                          transform: [{rotate: isExpanded ? '180deg' : '0deg'}],
+                        },
+                      ]}>
+                      <ChevronDown width={12} height={12} color="white" />
+                    </View>
+                  )}
               </TouchableOpacity>
 
-              {/* Description (Guided Only) */}
-              {mode === ChecklistType.GUIDED && (
+              {/* Description (Guided / List) */}
+              {(mode === ChecklistType.GUIDED ||
+                mode === ChecklistType.LIST) && (
                 <CollapsibleContent expanded={isExpanded}>
                   {item.message && (
                     <Text style={styles.itemMessage}>{item.message}</Text>
@@ -193,8 +215,14 @@ const styles = ScaledSheet.create({
     marginBottom: '24@vs',
     paddingLeft: '4@ms',
   },
+  headerList: {
+    alignItems: 'center',
+  },
   headerIconContainer: {
     marginTop: '4@vs',
+    marginRight: '16@ms',
+  },
+  headerIconContainerList: {
     marginRight: '16@ms',
   },
   headerTextContainer: {

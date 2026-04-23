@@ -7,12 +7,16 @@ import {
   DoubleRightArrowIcon,
   EyeIcon,
 } from '@/assets/icons';
-import {DEFAULT_HIT_SLOP, LogType, TAG_COLORS} from '@/constants';
+import {
+  DEFAULT_HIT_SLOP,
+  formatSessionMode,
+  LogType,
+  TAG_COLORS,
+} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, typography} from '@/theme';
 import {getLogSourceLabelConfig} from '@/utils/callLog';
 import {calculateDuration, formatDate, formatTime} from '@/utils/date';
-import {formatSessionMode} from '@/constants';
 
 import {LogItem} from '../../types';
 import {StatusBadge} from '../StatusBadge';

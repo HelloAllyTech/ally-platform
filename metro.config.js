@@ -1,5 +1,6 @@
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 const path = require('path');
+
+const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
 const tslibEsm = path.resolve(__dirname, 'node_modules/tslib/tslib.es6.js');
 
