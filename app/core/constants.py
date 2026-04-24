@@ -4,9 +4,7 @@ from typing import Dict, Final, Optional
 # BCP-47 language code -> explicit language name (avoids model confusion)
 # Used by generate_language_samples and other language-aware features
 # Non-standard codes that TTS/STT providers don't support -> BCP-47 equivalents
-LANGUAGE_CODE_NORMALIZATIONS: Final[Dict[str, str]] = {
-    "en-GLOBAL": "en-GB",
-}
+LANGUAGE_CODE_NORMALIZATIONS: Final[Dict[str, str]] = {}
 
 # Sarvam TTS/STT: map unsupported codes to Sarvam's supported equivalents.
 # Sarvam only supports en-IN for English; uses od-IN for Odia (not or-IN).
@@ -18,9 +16,8 @@ SARVAM_LANGUAGE_CODE_OVERRIDES: Final[Dict[str, str]] = {
 }
 
 LANGUAGE_CODE_TO_NAME: Final[Dict[str, str]] = {
-    "en-US": "English (United States)",
-    "en-GB": "English (Global)",
-    "en-GLOBAL": "English (Global)",
+    "en-US": "English (US)",
+    "en-GB": "English (UK)",
     "en-IN": "English (India)",
     "ml": "Malayalam",
     "ml-IN": "Malayalam",

@@ -395,16 +395,11 @@ class TestScenarioWithLanguageConfig:
 
 
 class TestNormalizeLanguageCodeForProviders:
-    """Test cases for normalize_language_code_for_providers (en-GLOBAL fix)."""
+    """Test cases for normalize_language_code_for_providers."""
 
     @pytest.mark.unit
-    def test_en_global_normalizes_to_en_gb(self):
-        """en-GLOBAL should normalize to en-GB for TTS/STT provider compatibility."""
-        assert normalize_language_code_for_providers("en-GLOBAL") == "en-GB"
-
-    @pytest.mark.unit
-    def test_other_codes_pass_through(self):
-        """Other language codes should pass through unchanged."""
+    def test_standard_codes_pass_through(self):
+        """Standard BCP-47 codes should pass through unchanged."""
         assert normalize_language_code_for_providers("en-IN") == "en-IN"
         assert normalize_language_code_for_providers("en-US") == "en-US"
         assert normalize_language_code_for_providers("en-GB") == "en-GB"
@@ -440,14 +435,14 @@ class TestConvertLanguageCodeForSarvam:
         assert convert_language_code_for_sarvam("ml-IN") == "ml-IN"
 
 
-class TestScenarioBuildLanguageConfigEnGlobal:
-    """Test that en-GLOBAL in metadata normalizes to en-GB."""
+class TestScenarioBuildLanguageConfigEnGB:
+    """Test that en-GB in metadata parses correctly."""
 
     @pytest.mark.unit
-    def test_build_language_config_normalizes_en_global(self):
-        """_build_language_config should normalize en-GLOBAL to en-GB."""
+    def test_build_language_config_en_gb(self):
+        """_build_language_config should parse en-GB correctly."""
         raw_payload = {
-            "languageCode": "en-GLOBAL",
+            "languageCode": "en-GB",
             "title": "Test Scenario",
             "promptData": {
                 "name": "Test",
