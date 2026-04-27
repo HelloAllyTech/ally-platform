@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AndroidAudioTypePresets,
   AudioSession,
@@ -25,11 +25,14 @@ import type {RootStackScreenProps} from '@/navigation/types';
 import {useEndScenarioSessionMutation} from '@/services';
 import {colors} from '@/theme';
 import {
+  AgentStatePayload,
+  AgentTurnStatus,
   ChecklistType,
   ExperienceMode,
   Feedback,
   LiveEventPayload,
   RoomStatus,
+  TurnState,
 } from '@/types';
 import {
   decodeFeedbackPayloadToJson,
@@ -91,6 +94,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [detectedEvents, setDetectedEvents] = useState<string[]>([]);
+  const [agentTurnStatus, setAgentTurnStatus] = useState<AgentTurnStatus>('user_turn');
+  const agentTurnStatusRef = useRef<AgentTurnStatus>('user_turn');
+  const [debouncedRemoteSpeaking, setDebouncedRemoteSpeaking] = useState(false);
+  const remoteSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isControlButtonMaximized, setIsControlButtonMaximized] =
@@ -104,6 +111,55 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
   }, []);
+
+  const updateAgentTurnStatus = useCallback((status: AgentTurnStatus) => {
+    agentTurnStatusRef.current = status;
+    setAgentTurnStatus(status);
+  }, []);
+
+  // Debounce remote speaking to avoid flicker on natural pauses (matches web: 1500ms)
+  useEffect(() => {
+    const isRemoteSpeaking = remoteParticipant?.isSpeaking ?? false;
+    if (isRemoteSpeaking) {
+      setDebouncedRemoteSpeaking(true);
+      if (remoteSpeakingTimeoutRef.current) {
+        clearTimeout(remoteSpeakingTimeoutRef.current);
+        remoteSpeakingTimeoutRef.current = null;
+      }
+    } else {
+      remoteSpeakingTimeoutRef.current = setTimeout(() => {
+        setDebouncedRemoteSpeaking(false);
+      }, 1500);
+    }
+    return () => {
+      if (remoteSpeakingTimeoutRef.current) {
+        clearTimeout(remoteSpeakingTimeoutRef.current);
+      }
+    };
+  }, [remoteParticipant?.isSpeaking]);
+
+  const {remoteTurnState, localTurnState} = useMemo(() => {
+    const isLocalSpeaking = localParticipant?.isSpeaking ?? false;
+    const isThinking = agentTurnStatus === 'thinking';
+
+    let remote: TurnState = TurnState.IDLE;
+    let local: TurnState = TurnState.IDLE;
+
+    if (isThinking) {
+      remote = TurnState.THINKING;
+    } else if (debouncedRemoteSpeaking) {
+      remote = TurnState.AI_SPEAKING;
+      local = TurnState.USER_TURN_TO_LISTEN;
+    } else if (isLocalSpeaking) {
+      remote = TurnState.AI_LISTENING;
+      local = TurnState.IDLE;
+    } else {
+      remote = TurnState.AI_LISTENING;
+      local = TurnState.USER_TURN_TO_SPEAK;
+    }
+
+    return {remoteTurnState: remote, localTurnState: local};
+  }, [agentTurnStatus, debouncedRemoteSpeaking, localParticipant?.isSpeaking]);
 
   useEffect(() => {
     if (accessToken) {
@@ -185,6 +241,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         playNotificationSound(sounds.endSimulation);
         setRoomStatus(RoomStatus.DISCONNECTING);
         setIsMicEnabled(false);
+        updateAgentTurnStatus('user_turn');
         navigation.replace(SCREEN_NAMES.SIMULATION_FEEDBACK, {
           scenarioSessionId: sessionId,
           pathId,
@@ -194,10 +251,32 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       }
     };
     const onDataReceived = (payload: unknown) => {
-      const eventObj = decodeFeedbackPayloadToJson(payload) as LiveEventPayload;
-      if (!eventObj?.data) return;
+      const eventObj = decodeFeedbackPayloadToJson(payload) as
+        | LiveEventPayload
+        | AgentStatePayload
+        | null;
 
-      const {score, emoji, message, detected_event_ids} = eventObj.data;
+      if (!eventObj) return;
+
+      // Handle agent state events
+      if ((eventObj as AgentStatePayload).type === 'AGENT_STATE') {
+        const agentEvent = eventObj as AgentStatePayload;
+        if (agentEvent.state === 'thinking') {
+          updateAgentTurnStatus('thinking');
+        } else if (agentEvent.state === 'done_thinking') {
+          if (agentTurnStatusRef.current !== 'speaking') {
+            updateAgentTurnStatus('user_turn');
+          }
+        } else if (agentEvent.state === 'speaking') {
+          updateAgentTurnStatus('speaking');
+        }
+        return;
+      }
+
+      const feedbackEvent = eventObj as LiveEventPayload;
+      if (!feedbackEvent?.data) return;
+
+      const {score, emoji, message, detected_event_ids} = feedbackEvent.data;
 
       if (typeof score === 'number' && !Number.isNaN(score)) {
         setAccumulatedScore(prev => clamp(prev + score, -100, 100));
@@ -245,6 +324,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     caseId,
     languageId,
     clamp,
+    updateAgentTurnStatus,
   ]);
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
@@ -384,6 +464,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                         publication={remoteAudioPub}
                         avatarUrl={scenario?.coverImageUrl ?? null}
                         name={scenario?.metadata?.name || scenario?.title}
+                        turnState={remoteTurnState}
                         {...(scenario?.title
                           ? {
                               topLeftOverlay: (
@@ -408,6 +489,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                         avatarUrl={userData?.profileImageUrl ?? null}
                         name={userData?.name}
                         isMicEnabled={isMicEnabled}
+                        turnState={localTurnState}
                       />
                     </View>
                   </View>
@@ -454,6 +536,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                             publication={remoteAudioPub}
                             avatarUrl={scenario?.coverImageUrl ?? null}
                             name={scenario?.metadata?.name || scenario?.title}
+                            turnState={remoteTurnState}
                             {...(scenario?.title
                               ? {
                                   topLeftOverlay: (
@@ -478,6 +561,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                             avatarUrl={userData?.profileImageUrl ?? null}
                             name={userData?.name}
                             isMicEnabled={isMicEnabled}
+                            turnState={localTurnState}
                           />
                         </View>
                       </View>
