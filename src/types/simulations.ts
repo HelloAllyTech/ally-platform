@@ -395,3 +395,19 @@ export enum RoomStatus {
   DISCONNECTING = 'disconnecting',
   AGENT_JOINED = 'agent_joined',
 }
+
+export type AgentTurnStatus = 'thinking' | 'speaking' | 'user_turn';
+
+export type AgentStatePayload = {
+  type: 'AGENT_STATE';
+  state: 'thinking' | 'done_thinking' | 'speaking';
+};
+
+export enum TurnState {
+  AI_SPEAKING = 'ai_speaking',
+  AI_LISTENING = 'ai_listening',
+  USER_TURN_TO_SPEAK = 'user_turn_to_speak',
+  USER_TURN_TO_LISTEN = 'user_turn_to_listen',
+  THINKING = 'thinking',
+  IDLE = 'idle',
+}

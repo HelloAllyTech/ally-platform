@@ -6,10 +6,12 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {MicOffWhiteIcon, UserIcon} from '@/assets/icons';
 import {AUDIO} from '@/constants';
 import {colors, fontFamily} from '@/theme';
+import {TurnState} from '@/types';
 
 import {useAudioLevel} from '../AudioWave/useAudioLevel';
 import {ScenarioInfoOverlayRef} from '../ScenarioInfoOverlay';
 import {SpeakingIndicator} from '../SpeakingIndicator';
+import {TurnIndicator} from '../TurnIndicator';
 
 interface ParticipantTileProps {
   participant?: Participant | null;
@@ -19,6 +21,7 @@ interface ParticipantTileProps {
   topLeftOverlay?: React.ReactNode;
   overlayRef?: React.RefObject<ScenarioInfoOverlayRef> | null;
   isMicEnabled?: boolean;
+  turnState?: TurnState;
 }
 
 const PLACEHOLDER_ICON_SIZE = ms(90);
@@ -31,6 +34,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
   topLeftOverlay,
   overlayRef,
   isMicEnabled = true,
+  turnState,
 }) => {
   const trackRef = React.useMemo(
     () => ({
@@ -72,6 +76,10 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
 
         {/* Top Left Overlay Slot - for scenario info, etc. */}
         {topLeftOverlay}
+
+        {turnState && turnState !== TurnState.IDLE && (
+          <TurnIndicator turnState={turnState} />
+        )}
 
         {/* Active Speaker Overlay (Bottom Left) */}
         {name && (
