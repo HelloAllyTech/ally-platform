@@ -51,6 +51,14 @@ jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) => sel({}),
 }));
 
+// Mock custom fields API to avoid RTK store initialization in test env
+jest.mock('@/services/customFieldsApi', () => ({
+  useGetCustomFieldDefinitionsQuery: () => ({data: undefined}),
+  useGetCustomFieldValuesQuery: () => ({data: undefined}),
+  useUpsertCustomFieldValuesMutation: () => [jest.fn()],
+  useGetCustomFieldsEnabledQuery: () => ({data: false}),
+}));
+
 // Translate
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (k: string) => k}),

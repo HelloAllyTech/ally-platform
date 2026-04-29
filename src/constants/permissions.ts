@@ -50,6 +50,9 @@ export enum USER_PERMISSIONS {
   // === BADGES ===
   VIEW_USER_BADGES = 'view:user:badges',
   EDIT_USER_BADGES = 'edit:user:badges',
+
+  // === CUSTOM FIELDS ===
+  MANAGE_CUSTOM_FIELD_DEFINITIONS = 'manage:custom-field:definitions',
 }
 
 export const MICROPHONE_PERMISSION =
