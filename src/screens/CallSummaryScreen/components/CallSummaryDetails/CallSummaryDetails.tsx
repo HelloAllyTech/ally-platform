@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useState} from 'react';
+import React, {memo, useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -12,6 +12,13 @@ import {
   summaryFields,
 } from '@/constants';
 import {useCallSummaryForm, useTranslate} from '@/hooks';
+import {
+  CustomFieldValue,
+  useGetCustomFieldDefinitionsQuery,
+  useGetCustomFieldValuesQuery,
+  useGetCustomFieldsEnabledQuery,
+  useUpsertCustomFieldValuesMutation,
+} from '@/services/customFieldsApi';
 import {useAppSelector} from '@/store/hooks';
 import {selectSummaryVisibleFields} from '@/store/slices/summarySlice';
 import {colors, fontFamily, typography} from '@/theme';
@@ -23,16 +30,77 @@ interface Props {
   isLoading: boolean;
   onSubmit: (isUpdateSuccess: boolean) => void;
   showSaveButton: boolean;
+  chatId?: number;
 }
 
 const CallSummaryDetailsComponent: React.FC<Props> = ({
   isLoading: isLoadingSummary,
   onSubmit,
   showSaveButton,
+  chatId,
 }) => {
   const {t} = useTranslate();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const {isUpdating, handleSubmit} = useCallSummaryForm();
+
+  const {data: customFieldsEnabled} = useGetCustomFieldsEnabledQuery();
+  const customFieldsActive = customFieldsEnabled !== false;
+
+  const {data: customFieldDefs} = useGetCustomFieldDefinitionsQuery(undefined, {
+    skip: !customFieldsActive,
+  });
+
+  const {data: customFieldValues} = useGetCustomFieldValuesQuery(chatId!, {
+    skip: !chatId || !customFieldsActive,
+  });
+
+  const [upsertCustomFieldValues] = useUpsertCustomFieldValuesMutation();
+
+  const [customLocalValues, setCustomLocalValues] = useState<
+    Record<string, string | null>
+  >({});
+
+  useEffect(() => {
+    if (customFieldValues) {
+      const initial: Record<string, string | null> = {};
+      customFieldValues.forEach((f: CustomFieldValue) => {
+        initial[f.fieldDefinitionId] = f.value ?? null;
+      });
+      setCustomLocalValues(initial);
+    }
+  }, [customFieldValues]);
+
+  const handleCustomFieldChange = useCallback(
+    (fieldDefinitionId: string, value: string | null) => {
+      setCustomLocalValues(prev => ({...prev, [fieldDefinitionId]: value}));
+    },
+    [],
+  );
+
+  const handleCustomFieldSave = useCallback(
+    async (sectionKey: string) => {
+      if (!chatId || !customFieldDefs || !customFieldValues) return;
+      const sectionDefIds = new Set(
+        customFieldDefs
+          .filter(d => d.sectionKey === sectionKey)
+          .map(d => d.id),
+      );
+      const changed = customFieldValues
+        .filter(
+          f =>
+            sectionDefIds.has(f.fieldDefinitionId) &&
+            customLocalValues[f.fieldDefinitionId] !== (f.value ?? null),
+        )
+        .map(f => ({
+          fieldDefinitionId: f.fieldDefinitionId,
+          value: customLocalValues[f.fieldDefinitionId] ?? undefined,
+        }));
+      if (changed.length > 0) {
+        await upsertCustomFieldValues({chatId, values: changed});
+      }
+    },
+    [chatId, customFieldDefs, customFieldValues, customLocalValues, upsertCustomFieldValues],
+  );
 
   const [expanded, setExpanded] = useState(() =>
     SECTION_LIST.reduce(
@@ -125,11 +193,15 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
             handleSubmit={handleSubmit}
             isEditing={isEditing[sectionConfig.key]}
             setIsEditing={setIsEditing}
+            customFieldDefs={customFieldDefs}
+            customFieldLocalValues={customLocalValues}
+            onCustomFieldChange={handleCustomFieldChange}
+            onCustomFieldSave={handleCustomFieldSave}
           />
         </View>
       );
     },
-    [expanded, isEditing, handleSubmit, toggleSection, visibleFields],
+    [expanded, isEditing, handleSubmit, toggleSection, visibleFields, customFieldDefs, customLocalValues, handleCustomFieldChange, handleCustomFieldSave],
   );
 
   if (isLoadingSummary) {

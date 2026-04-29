@@ -328,6 +328,7 @@ export const CallSummaryScreen: React.FC<
           isLoading={isLoading}
           onSubmit={onSaveButtonPress}
           showSaveButton={shouldShowSaveButton}
+          chatId={chatId}
         />
       );
     }

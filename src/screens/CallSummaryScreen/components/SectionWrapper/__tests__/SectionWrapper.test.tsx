@@ -25,6 +25,15 @@ jest.mock('@/services/callSummaryApi', () => ({
   useEnhanceCallSummaryMutation: () => [mockEnhance, { isLoading: false, data: mockEnhancedData }],
 }));
 
+jest.mock('@/services/customFieldsApi', () => ({
+  CustomFieldEditPermission: { ADMIN_ONLY: 'ADMIN_ONLY', COUNSELLOR_ONLY: 'COUNSELLOR_ONLY', BOTH: 'BOTH' },
+  CustomFieldType: { TEXT: 'TEXT', NUMBER: 'NUMBER', SINGLE_SELECT: 'SINGLE_SELECT', MULTI_SELECT: 'MULTI_SELECT', DATE: 'DATE', BOOLEAN: 'BOOLEAN' },
+}));
+
+jest.mock('../../CustomFieldsSection/CustomFieldsSection', () => ({
+  CustomFieldsSection: () => null,
+}));
+
 jest.mock('../../CallSummaryDetails/SectionHeader', () => {
   const React = require('react');
   const {Text, TouchableOpacity, View} = require('react-native');

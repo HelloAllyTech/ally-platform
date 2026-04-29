@@ -132,6 +132,11 @@ export const API_ROUTES = {
     SUMMARY_FIELDS: '/settings/summary-fields',
     NUDGE_STATUS: '/settings/nudge-status',
     CHAT_TYPES: '/settings/chat-types',
+    CUSTOM_FIELDS_ENABLED: '/settings/custom-fields-enabled',
+  },
+  CUSTOM_FIELDS: {
+    DEFINITIONS: '/custom-fields/definitions',
+    VALUES: (chatId: number) => `/chats/${chatId}/custom-field-values`,
   },
   LEARN: {
     ROOMS: '/rooms',

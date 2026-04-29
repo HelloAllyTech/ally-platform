@@ -1,4 +1,5 @@
 export * from './analyticsApi';
+export * from './customFieldsApi';
 export * from './api';
 export * from './appConfigApi';
 export * from './authApi';
