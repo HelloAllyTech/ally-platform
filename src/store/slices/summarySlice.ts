@@ -74,6 +74,7 @@ export const selectCallInfo = createSelector(
   [selectSummaryData],
   summaryData => ({
     chatId: summaryData?.details?.chatId,
+    counselorId: summaryData?.counselorId,
     callDuration: summaryData?.details?.callDuration,
     startTime: summaryData?.details?.startTime,
     endTime: summaryData?.details?.endTime,
