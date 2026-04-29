@@ -6,10 +6,15 @@ import {
   ALWAYS_VISIBLE_SECTIONS,
   SECTION_LIST,
   SectionKey,
+  USER_PERMISSIONS,
   summaryFields,
 } from '@/constants';
 import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
+import {
+  CustomFieldDefinition,
+  CustomFieldValue,
+} from '@/services/customFieldsApi';
 import {useAppSelector} from '@/store/hooks';
 import {
   selectCallInfo,
@@ -19,6 +24,7 @@ import {colors, fontFamily} from '@/theme';
 import {EditableFieldKey, SectionItem} from '@/types';
 
 import {SectionHeader} from '../CallSummaryDetails/SectionHeader';
+import {CustomFieldsSection} from '../CustomFieldsSection/CustomFieldsSection';
 import {GenericSectionContent} from '../GenericSectionContent';
 
 interface SectionWrapperProps {
@@ -33,6 +39,11 @@ interface SectionWrapperProps {
   setIsEditing: React.Dispatch<
     React.SetStateAction<Record<SectionKey, boolean>>
   >;
+  customFieldDefs?: CustomFieldDefinition[];
+  customFieldValues?: CustomFieldValue[];
+  customFieldLocalValues?: Record<string, string | null>;
+  onCustomFieldChange?: (fieldDefinitionId: string, value: string | null) => void;
+  onCustomFieldSave?: (sectionKey: string) => Promise<void>;
 }
 
 const SectionWrapperComponent = ({
@@ -45,11 +56,19 @@ const SectionWrapperComponent = ({
   handleSubmit,
   isEditing,
   setIsEditing,
+  customFieldDefs,
+  customFieldLocalValues,
+  onCustomFieldChange,
+  onCustomFieldSave,
 }: SectionWrapperProps) => {
   const {handleSectionFieldsReset, handleFieldChange, formData} =
     useCallSummaryForm();
-  const {chatId} = useAppSelector(selectCallInfo);
+  const {chatId, counselorId} = useAppSelector(selectCallInfo);
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
+  const permissions = useAppSelector(state => state.user.permissions);
+  const currentUserId = useAppSelector(state => state.user.user?.id);
+  const isAdmin = permissions?.includes(USER_PERMISSIONS.MANAGE_CUSTOM_FIELD_DEFINITIONS) ?? false;
+  const isCounsellorForCall = counselorId !== undefined && counselorId === currentUserId;
   const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
     useEnhanceCallSummaryMutation();
 
@@ -96,7 +115,10 @@ const SectionWrapperComponent = ({
       ...prev,
       [sectionConfig.key]: false,
     }));
-    handleSubmit();
+    await handleSubmit();
+    if (onCustomFieldSave) {
+      await onCustomFieldSave(sectionConfig.key);
+    }
   };
 
   const renderSection = () => {
@@ -121,11 +143,24 @@ const SectionWrapperComponent = ({
     });
 
     return (
-      <GenericSectionContent
-        fields={sectionFields}
-        isEditing={isEditing}
-        isEnhancing={isEnhancing}
-      />
+      <>
+        <GenericSectionContent
+          fields={sectionFields}
+          isEditing={isEditing}
+          isEnhancing={isEnhancing}
+        />
+        {customFieldDefs && customFieldLocalValues && onCustomFieldChange && (
+          <CustomFieldsSection
+            definitions={customFieldDefs}
+            localValues={customFieldLocalValues}
+            onValueChange={onCustomFieldChange}
+            isEditing={isEditing}
+            sectionKey={sectionConfig.key}
+            isAdmin={isAdmin}
+            isCounsellorForCall={isCounsellorForCall}
+          />
+        )}
+      </>
     );
   };
 
@@ -143,7 +178,7 @@ const SectionWrapperComponent = ({
         isExpanded={isExpanded}
         onToggle={onToggle}
         icon={icon}
-        canEdit={sectionConfig.canEdit}
+        canEdit={sectionConfig.canEdit && (isAdmin || isCounsellorForCall)}
         canEnhance={sectionConfig.canEnhance}
         isEditing={isEditing}
         onTickPress={onTickPress}
