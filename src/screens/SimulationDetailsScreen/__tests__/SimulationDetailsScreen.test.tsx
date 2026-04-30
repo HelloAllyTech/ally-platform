@@ -34,15 +34,6 @@ jest.mock('@/hooks', () => {
       closeActiveSimulationModal: mockCloseActiveSimulationModal,
       setShowActiveSimulationModal: jest.fn(),
     }),
-    useLanguageDropdown: () => ({
-      selectedLanguage: 'English',
-      setSelectedLanguage: jest.fn(),
-      isLanguageDropdownOpen: false,
-      setIsLanguageDropdownOpen: jest.fn(),
-      languageOptions: ['English'],
-      languageMap: new Map([['English', 1]]),
-      isLoading: false,
-    }),
   };
 });
 
@@ -165,7 +156,6 @@ describe('SimulationDetailsScreen', () => {
     await waitFor(() => {
       expect(mockStartSimulation).toHaveBeenCalledWith({
         scenarioId: scenario.id,
-        languageId: 1,
       });
     });
   });

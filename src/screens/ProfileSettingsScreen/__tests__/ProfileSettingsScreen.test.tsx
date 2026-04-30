@@ -132,12 +132,6 @@ describe('ProfileSettingsScreen', () => {
     expect(getByText('M')).toBeTruthy();
   });
 
-  it('renders language dropdown', () => {
-    const {getByTestId} = render(<ProfileSettingsScreen />);
-
-    expect(getByTestId('language-dropdown')).toBeTruthy();
-  });
-
   it('renders upload image button when no image', () => {
     const {getByText} = render(<ProfileSettingsScreen />);
 
@@ -156,6 +150,5 @@ describe('ProfileSettingsScreen', () => {
 
     expect(getByText('ProfileSettings.name')).toBeTruthy();
     expect(getByText('ProfileSettings.email')).toBeTruthy();
-    expect(getByText('ProfileSettings.language')).toBeTruthy();
   });
 });

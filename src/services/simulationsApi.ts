@@ -8,6 +8,7 @@ import {
   EventChecklistResponse,
   FeedbackRequest,
   FeedbackResponse,
+  LanguageOption,
   RoomListResponse,
   Scenario,
   ScenarioSessionStartResponse,
@@ -21,13 +22,7 @@ import {
 
 import {api} from './api';
 
-export interface LanguageOption {
-  language_id: number;
-  label: string;
-  active: boolean;
-  translationCode?: string;
-  value?: string;
-}
+export type {LanguageOption};
 
 export interface AvailableLanguagesParams {
   active?: boolean;
