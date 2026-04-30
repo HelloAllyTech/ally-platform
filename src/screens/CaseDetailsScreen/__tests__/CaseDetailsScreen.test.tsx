@@ -8,14 +8,6 @@ jest.mock('react-i18next', () => ({
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (key: string) => key}),
   useHardwareBackPressHandler: jest.fn(),
-  useLanguageDropdown: () => ({
-    selectedLanguage: 'English',
-    setSelectedLanguage: jest.fn(),
-    isLanguageDropdownOpen: false,
-    setIsLanguageDropdownOpen: jest.fn(),
-    languageOptions: ['English'],
-    languageMap: new Map([['English', 1]]),
-  }),
   useLearningPathDetails: jest.fn(() => ({
     data: null,
     isLoading: false,
@@ -33,10 +25,6 @@ jest.mock('@/hooks', () => ({
     activeSimulationId: null,
     closeActiveSimulationModal: jest.fn(),
   }),
-}));
-
-jest.mock('@react-navigation/native', () => ({
-  useIsFocused: () => true,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

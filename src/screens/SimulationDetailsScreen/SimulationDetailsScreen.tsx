@@ -25,7 +25,6 @@ import {isIOS, LOW_CREDITS_MODAL_DISPLAY_MS} from '@/constants';
 import {
   useAppNavigation,
   useHardwareBackPressHandler,
-  useLanguageDropdown,
   useSimulationCredits,
   useStartSimulation,
   useTranslate,
@@ -33,6 +32,7 @@ import {
 import type {RootStackScreenProps} from '@/navigation/types';
 import {RetrySessionModal} from '@/screens/CallLog/components';
 import {colors, fontFamily, fontWeights, radius, typography} from '@/theme';
+import type {LanguageOption} from '@/types';
 import {copyToClipboard, getTriggerWarningNames} from '@/utils';
 
 import {ActiveSimulationModal} from './components';
@@ -62,15 +62,10 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   const [showLowCreditsModal, setShowLowCreditsModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
 
-  // Use custom hook for language dropdown management
-  const {
-    selectedLanguage,
-    setSelectedLanguage,
-    isLanguageDropdownOpen,
-    setIsLanguageDropdownOpen,
-    languageOptions,
-    languageMap,
-  } = useLanguageDropdown({isFocused});
+  const availableLanguages = scenario.availableLanguages ?? [];
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<LanguageOption | null>(availableLanguages[0] ?? null);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (getCreditsInfo?.isLow) {
@@ -92,7 +87,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
   };
 
   const handleLanguageSelect = (selectedLabel: string) => {
-    setSelectedLanguage(selectedLabel);
+    const selected =
+      availableLanguages.find(lang => lang.label === selectedLabel) ?? null;
+    setSelectedLanguage(selected);
   };
 
   const startSimulationPress = () => {
@@ -101,8 +98,12 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const handleConfirmSimulation = () => {
     setShowNotification(false);
-    const languageId = languageMap.get(selectedLanguage);
-    startSimulation({scenarioId: scenario.id, languageId});
+    startSimulation({
+      scenarioId: scenario.id,
+      ...(availableLanguages.length
+        ? {languageId: selectedLanguage?.language_id}
+        : {}),
+    });
   };
 
   const renderLoadingOverlay = () => {
@@ -121,18 +122,19 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
     return (
       <ScrollView contentContainerStyle={styles.container} bounces={false}>
-        {/* Language Dropdown */}
-        <View style={styles.languageDropdownContainer}>
-          <CustomDropdown
-            value={selectedLanguage}
-            options={languageOptions}
-            onSelect={handleLanguageSelect}
-            placeholder={t('Simulations.language')}
-            isOpen={isLanguageDropdownOpen}
-            setIsOpen={setIsLanguageDropdownOpen}
-            disabled={languageOptions.length === 0 || isCreatingRoom}
-          />
-        </View>
+        {availableLanguages.length > 0 && (
+          <View style={styles.languageDropdownContainer}>
+            <CustomDropdown
+              value={selectedLanguage?.label ?? ''}
+              options={availableLanguages.map(lang => lang.label)}
+              onSelect={handleLanguageSelect}
+              placeholder={t('Simulations.language')}
+              isOpen={isLanguageDropdownOpen}
+              setIsOpen={setIsLanguageDropdownOpen}
+              disabled={isCreatingRoom}
+            />
+          </View>
+        )}
 
         <View style={styles.imageContainer}>
           {!!videoUrl && (
