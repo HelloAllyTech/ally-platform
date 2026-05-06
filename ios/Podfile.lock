@@ -104,7 +104,7 @@ PODS:
   - GoogleDataTransport (10.1.0):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
-  - GoogleSignIn (9.0.0):
+  - GoogleSignIn (9.1.0):
     - AppAuth (~> 2.0)
     - AppCheckCore (~> 11.0)
     - GTMAppAuth (~> 5.0)
@@ -2361,6 +2361,11 @@ PODS:
     - Yoga
   - RNLiveAudioStream (1.1.1):
     - React
+  - RNNotifee (9.1.8):
+    - React-Core
+    - RNNotifee/NotifeeCore (= 9.1.8)
+  - RNNotifee/NotifeeCore (9.1.8):
+    - React-Core
   - RNPermissions (5.4.0):
     - DoubleConversion
     - glog
@@ -2722,6 +2727,7 @@ DEPENDENCIES:
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - "RNGoogleSignin (from `../node_modules/@react-native-google-signin/google-signin`)"
   - RNLiveAudioStream (from `../node_modules/react-native-live-audio-stream`)
+  - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNPermissions (from `../node_modules/react-native-permissions`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -2946,6 +2952,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-google-signin/google-signin"
   RNLiveAudioStream:
     :path: "../node_modules/react-native-live-audio-stream"
+  RNNotifee:
+    :path: "../node_modules/@notifee/react-native"
   RNPermissions:
     :path: "../node_modules/react-native-permissions"
   RNReanimated:
@@ -2981,7 +2989,7 @@ SPEC CHECKSUMS:
   GoogleAdsOnDeviceConversion: 2be6297a4f048459e0ae17fad9bfd2844e10cf64
   GoogleAppMeasurement: 700dce7541804bec33db590a5c496b663fbe2539
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
-  GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
+  GoogleSignIn: fcee2257188d5eda57a5e2b6a715550ffff9206d
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
@@ -3076,6 +3084,7 @@ SPEC CHECKSUMS:
   RNGestureHandler: ebef699ea17e7c0006c1074e1e423ead60ce0121
   RNGoogleSignin: a8c3e472b67d0f065b9198e9cd148a0d7c14a50c
   RNLiveAudioStream: 93ac2bb6065be9018d0b00157b220f11cebc1513
+  RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNPermissions: 40994551b0425f187604054515bd19f931ad1b64
   RNReanimated: aeca78e794b87ec881a55fde810a4b23825feb2e
   RNScreens: 5621e3ad5a329fbd16de683344ac5af4192b40d3
@@ -3088,4 +3097,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 93e4f3f0884facbabc3224bf668508d5f9fd2da8
 
-COCOAPODS: 1.16.2
+COCOAPODS: 1.15.2
