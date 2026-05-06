@@ -16,7 +16,11 @@ jest.mock('@/hooks', () => ({
 }));
 
 jest.mock('@/store/hooks', () => ({
-  useAppSelector: (sel: any) => sel({ summary: { callInfo: { chatId: 1 } } }),
+  useAppSelector: (sel: any) =>
+    sel({
+      summary: { callInfo: { chatId: 1 } },
+      user: { permissions: [], user: undefined },
+    }),
 }));
 
 const mockEnhance = jest.fn();
