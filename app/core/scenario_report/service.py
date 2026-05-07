@@ -487,16 +487,8 @@ class ScenarioReportService:
                 counselor_prompt=counselor_system_prompt,
             )
 
-            # Check if evaluation failed (all metrics are zero)
-            metric_keys = (
-                "gradual_disclosure",
-                "difficulty_level",
-                "colloquialism",
-                "context_appropriateness",
-                "consistency",
-                "resistance",
-            )
-            all_zero = all(eval_result.get(k, 0) == 0 for k in metric_keys)
+            metrics = eval_result.get("metrics", {})
+            all_zero = bool(metrics) and all(v == 0 for v in metrics.values())
 
             if all_zero and self._transcripts:
                 logger.error(
@@ -504,15 +496,17 @@ class ScenarioReportService:
                     report_id,
                 )
                 payload = ScenarioReportWebhookPayload(
-                    metrics={k: 0 for k in metric_keys},
+                    metrics=metrics,
                     status=ReportStatus.FAILED,
                     transcripts=self._transcripts,
+                    report_markdown=eval_result.get("report_markdown", ""),
                 )
             else:
                 payload = ScenarioReportWebhookPayload(
-                    metrics={k: eval_result[k] for k in metric_keys},
+                    metrics=metrics,
                     status=ReportStatus.COMPLETED,
                     transcripts=self._transcripts,
+                    report_markdown=eval_result.get("report_markdown", ""),
                 )
 
             elapsed = time.perf_counter() - _run_start

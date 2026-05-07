@@ -407,12 +407,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 80,
-            "difficulty_level": 75,
-            "colloquialism": 85,
-            "context_appropriateness": 90,
-            "consistency": 78,
-            "resistance": 70,
+            "metrics": {
+                "gradual_disclosure": 80,
+                "difficulty_level": 75,
+                "context_appropriateness": 90,
+                "consistency": 78,
+                "resistance": 70,
+            },
+            "report_markdown": "# Report\n\nGood session.",
         }
 
         svc = ScenarioReportService(_make_request(turns=2))
@@ -425,10 +427,10 @@ class TestServiceRun:
             assert payload.status == ReportStatus.COMPLETED
             assert payload.metrics["gradual_disclosure"] == 80
             assert payload.metrics["difficulty_level"] == 75
-            assert payload.metrics["colloquialism"] == 85
             assert payload.metrics["context_appropriateness"] == 90
             assert payload.metrics["consistency"] == 78
             assert payload.metrics["resistance"] == 70
+            assert payload.report_markdown == "# Report\n\nGood session."
             assert len(payload.transcripts) > 0
 
     @pytest.mark.asyncio
@@ -461,12 +463,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 0,
-            "difficulty_level": 0,
-            "colloquialism": 0,
-            "context_appropriateness": 0,
-            "consistency": 0,
-            "resistance": 0,
+            "metrics": {
+                "gradual_disclosure": 0,
+                "difficulty_level": 0,
+                "context_appropriateness": 0,
+                "consistency": 0,
+                "resistance": 0,
+            },
+            "report_markdown": "",
         }
 
         svc = ScenarioReportService(_make_request(turns=1))
@@ -545,12 +549,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 70,
-            "difficulty_level": 65,
-            "colloquialism": 60,
-            "context_appropriateness": 75,
-            "consistency": 80,
-            "resistance": 55,
+            "metrics": {
+                "gradual_disclosure": 70,
+                "difficulty_level": 65,
+                "context_appropriateness": 75,
+                "consistency": 80,
+                "resistance": 55,
+            },
+            "report_markdown": "",
         }
 
         svc = ScenarioReportService(_make_request(turns=5))
@@ -612,12 +618,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 70,
-            "difficulty_level": 65,
-            "colloquialism": 60,
-            "context_appropriateness": 75,
-            "consistency": 80,
-            "resistance": 55,
+            "metrics": {
+                "gradual_disclosure": 70,
+                "difficulty_level": 65,
+                "context_appropriateness": 75,
+                "consistency": 80,
+                "resistance": 55,
+            },
+            "report_markdown": "",
         }
 
         svc = ScenarioReportService(_make_request(turns=5))
@@ -673,12 +681,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 80,
-            "difficulty_level": 75,
-            "colloquialism": 85,
-            "context_appropriateness": 90,
-            "consistency": 78,
-            "resistance": 70,
+            "metrics": {
+                "gradual_disclosure": 80,
+                "difficulty_level": 75,
+                "context_appropriateness": 90,
+                "consistency": 78,
+                "resistance": 70,
+            },
+            "report_markdown": "",
         }
 
         svc = ScenarioReportService(_make_request(turns=1))
@@ -720,12 +730,14 @@ class TestServiceRun:
         mock_get_graph.return_value.compile.return_value = graph
         mock_orch_cls.return_value = orchestrator
         mock_evaluate.return_value = {
-            "gradual_disclosure": 50,
-            "difficulty_level": 50,
-            "colloquialism": 50,
-            "context_appropriateness": 50,
-            "consistency": 50,
-            "resistance": 50,
+            "metrics": {
+                "gradual_disclosure": 50,
+                "difficulty_level": 50,
+                "context_appropriateness": 50,
+                "consistency": 50,
+                "resistance": 50,
+            },
+            "report_markdown": "",
         }
 
         svc = ScenarioReportService(_make_request(turns=2))

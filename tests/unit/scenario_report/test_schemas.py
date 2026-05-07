@@ -30,24 +30,35 @@ class TestScenarioReportRequest:
 
     def test_turns_min_boundary(self):
         req = ScenarioReportRequest(
-            prompt="p", turns=1, language="en", scenario_id=1,
-            report_id="id", metadata={},
+            prompt="p",
+            turns=1,
+            language="en",
+            scenario_id=1,
+            report_id="id",
+            metadata={},
         )
         assert req.turns == 1
 
     def test_turns_below_min_raises(self):
         with pytest.raises(ValidationError):
             ScenarioReportRequest(
-                prompt="p", turns=0, language="en", scenario_id=1,
-                report_id="id", metadata={},
+                prompt="p",
+                turns=0,
+                language="en",
+                scenario_id=1,
+                report_id="id",
+                metadata={},
             )
 
     def test_missing_required_field_raises(self):
         with pytest.raises(ValidationError):
             ScenarioReportRequest(
-                prompt="p", turns=5, language="en",
+                prompt="p",
+                turns=5,
+                language="en",
                 # scenario_id missing
-                report_id="id", metadata={},
+                report_id="id",
+                metadata={},
             )
 
 
@@ -99,8 +110,38 @@ class TestScenarioReportWebhookPayload:
 
     def test_failed_payload(self):
         payload = ScenarioReportWebhookPayload(
-            metrics={}, status=ReportStatus.FAILED, transcripts=[],
+            metrics={},
+            status=ReportStatus.FAILED,
+            transcripts=[],
         )
         assert payload.status == ReportStatus.FAILED
         assert payload.metrics == {}
 
+    def test_report_markdown_defaults_to_empty(self):
+        payload = ScenarioReportWebhookPayload(
+            metrics={},
+            status=ReportStatus.COMPLETED,
+            transcripts=[],
+        )
+        assert payload.report_markdown == ""
+
+    def test_report_markdown_stored_when_provided(self):
+        md = "# Evaluation\n\nStrong performance overall."
+        payload = ScenarioReportWebhookPayload(
+            metrics={"consistency": 85},
+            status=ReportStatus.COMPLETED,
+            transcripts=[],
+            report_markdown=md,
+        )
+        assert payload.report_markdown == md
+
+    def test_dynamic_metrics_keys_accepted(self):
+        """Metrics dict accepts any string keys — not limited to fixed fields."""
+        payload = ScenarioReportWebhookPayload(
+            metrics={"empathy": 90, "active_listening": 75, "rapport": 88},
+            status=ReportStatus.COMPLETED,
+            transcripts=[],
+        )
+        assert payload.metrics["empathy"] == 90
+        assert payload.metrics["active_listening"] == 75
+        assert payload.metrics["rapport"] == 88

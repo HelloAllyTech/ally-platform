@@ -6,16 +6,15 @@ import pytest
 
 from app.core.scenario_report.evaluator import (
     EvaluationResult,
-    _SCORE_FIELDS,
     _build_evaluation_prompt,
     evaluate_transcript,
 )
 from app.core.scenario_report.schemas import TranscriptEntry
 
-
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _make_transcript(content="hi", role="CLIENT", start_time=0.0):
     return TranscriptEntry(content=content, start_time=start_time, role=role)
@@ -36,6 +35,7 @@ def _make_prompt_data(**overrides):
         "session_behavior_guidelines": "Be realistic",
         "opening_statements": ["Hello!"],
         "custom_fields": None,
+        "prompts": None,
     }
     defaults.update(overrides)
     mock = MagicMock()
@@ -52,79 +52,53 @@ def _make_prompt_data(**overrides):
 class TestEvaluationResult:
     """Tests for the structured output model and clamping."""
 
-    def test_valid_scores(self):
+    def test_valid_metrics(self):
         result = EvaluationResult(
-            gradual_disclosure=80,
-            difficulty_level=70,
-            colloquialism=90,
-            context_appropriateness=85,
-            consistency=75,
-            resistance=65,
+            metrics={"gradual_disclosure": 80, "difficulty_level": 70},
+            report_markdown="# Report\nGood session.",
         )
-        assert result.gradual_disclosure == 80
-        assert result.difficulty_level == 70
-        assert result.colloquialism == 90
-        assert result.context_appropriateness == 85
-        assert result.consistency == 75
-        assert result.resistance == 65
+        assert result.metrics["gradual_disclosure"] == 80
+        assert result.metrics["difficulty_level"] == 70
+        assert result.report_markdown == "# Report\nGood session."
 
     def test_clamps_above_100(self):
         result = EvaluationResult(
-            gradual_disclosure=120,
-            difficulty_level=150,
-            colloquialism=200,
-            context_appropriateness=110,
-            consistency=105,
-            resistance=300,
+            metrics={"gradual_disclosure": 120, "difficulty_level": 200},
+            report_markdown="",
         )
-        assert result.gradual_disclosure == 100
-        assert result.difficulty_level == 100
-        assert result.colloquialism == 100
-        assert result.context_appropriateness == 100
-        assert result.consistency == 100
-        assert result.resistance == 100
+        assert result.metrics["gradual_disclosure"] == 100
+        assert result.metrics["difficulty_level"] == 100
 
     def test_clamps_below_0(self):
         result = EvaluationResult(
-            gradual_disclosure=-10,
-            difficulty_level=-50,
-            colloquialism=-1,
-            context_appropriateness=-20,
-            consistency=-5,
-            resistance=-100,
+            metrics={"gradual_disclosure": -10, "resistance": -50},
+            report_markdown="",
         )
-        assert result.gradual_disclosure == 0
-        assert result.difficulty_level == 0
-        assert result.colloquialism == 0
-        assert result.context_appropriateness == 0
-        assert result.consistency == 0
-        assert result.resistance == 0
+        assert result.metrics["gradual_disclosure"] == 0
+        assert result.metrics["resistance"] == 0
 
     def test_boundary_values(self):
         result = EvaluationResult(
-            gradual_disclosure=0,
-            difficulty_level=100,
-            colloquialism=50,
-            context_appropriateness=25,
-            consistency=75,
-            resistance=100,
+            metrics={"a": 0, "b": 100, "c": 50},
+            report_markdown="",
         )
-        assert result.gradual_disclosure == 0
-        assert result.difficulty_level == 100
-        assert result.colloquialism == 50
-        assert result.context_appropriateness == 25
-        assert result.consistency == 75
-        assert result.resistance == 100
+        assert result.metrics["a"] == 0
+        assert result.metrics["b"] == 100
+        assert result.metrics["c"] == 50
 
-    def test_score_fields_tuple(self):
-        assert _SCORE_FIELDS == (
-            "gradual_disclosure",
-            "difficulty_level",
-            "colloquialism",
-            "context_appropriateness",
-            "consistency",
-            "resistance",
+    def test_empty_metrics(self):
+        result = EvaluationResult(metrics={}, report_markdown="")
+        assert result.metrics == {}
+
+    def test_dynamic_metric_keys(self):
+        """Any metric keys from the prompt are accepted — no hardcoded fields."""
+        result = EvaluationResult(
+            metrics={"empathy": 88, "active_listening": 72, "rapport": 91},
+            report_markdown="# Custom metrics",
         )
+        assert result.metrics["empathy"] == 88
+        assert result.metrics["active_listening"] == 72
+        assert result.metrics["rapport"] == 91
 
 
 # ------------------------------------------------------------------
@@ -178,10 +152,18 @@ class TestBuildEvaluationPrompt:
 
     def test_missing_prompt_data_fields(self):
         prompt_data = _make_prompt_data(
-            name=None, age=None, gender=None, profession=None,
-            current_location=None, context=None, personality=None,
-            tone=None, emotional_needs=None, starting_state=None,
-            session_behavior_guidelines=None, custom_fields=None,
+            name=None,
+            age=None,
+            gender=None,
+            profession=None,
+            current_location=None,
+            context=None,
+            personality=None,
+            tone=None,
+            emotional_needs=None,
+            starting_state=None,
+            session_behavior_guidelines=None,
+            custom_fields=None,
         )
         prompt = _build_evaluation_prompt(
             transcripts=[_make_transcript()],
@@ -207,9 +189,9 @@ class TestBuildEvaluationPrompt:
     def test_custom_fields_with_missing_values(self):
         custom_fields = [
             {"name": "Field1", "value": "Value1"},
-            {"name": "Field2", "value": ""},  # Empty value
-            {"name": "", "value": "Value3"},  # Empty name
-            {"name": "Field4"},  # Missing value key
+            {"name": "Field2", "value": ""},
+            {"name": "", "value": "Value3"},
+            {"name": "Field4"},
         ]
         prompt_data = _make_prompt_data(custom_fields=custom_fields)
         prompt = _build_evaluation_prompt(
@@ -232,32 +214,29 @@ class TestEvaluateTranscript:
     """Tests for the main evaluation function."""
 
     @pytest.mark.asyncio
-    async def test_empty_transcripts_returns_zeros(self):
+    async def test_empty_transcripts_returns_empty(self):
         result = await evaluate_transcript(
             transcripts=[],
             prompt_data=_make_prompt_data(),
             counselor_prompt="prompt",
         )
-        assert result == {
-            "gradual_disclosure": 0,
-            "difficulty_level": 0,
-            "colloquialism": 0,
-            "context_appropriateness": 0,
-            "consistency": 0,
-            "resistance": 0,
-        }
+        assert result == {"metrics": {}, "report_markdown": ""}
 
     @pytest.mark.asyncio
     @patch("app.core.scenario_report.evaluator.create_llm_client")
-    async def test_successful_evaluation(self, mock_create_llm):
+    async def test_successful_evaluation_returns_metrics_and_markdown(
+        self, mock_create_llm
+    ):
         mock_llm = AsyncMock()
         mock_llm.ainvoke.return_value = EvaluationResult(
-            gradual_disclosure=85,
-            difficulty_level=78,
-            colloquialism=92,
-            context_appropriateness=88,
-            consistency=80,
-            resistance=75,
+            metrics={
+                "gradual_disclosure": 85,
+                "difficulty_level": 78,
+                "context_appropriateness": 88,
+                "consistency": 80,
+                "resistance": 75,
+            },
+            report_markdown="# Evaluation Report\n\nGood performance.",
         )
         mock_client = MagicMock()
         mock_client.llm_instance.with_structured_output.return_value = mock_llm
@@ -269,16 +248,70 @@ class TestEvaluateTranscript:
             counselor_prompt="Be supportive",
         )
 
-        assert result["gradual_disclosure"] == 85
-        assert result["difficulty_level"] == 78
-        assert result["colloquialism"] == 92
-        assert result["context_appropriateness"] == 88
-        assert result["consistency"] == 80
-        assert result["resistance"] == 75
+        assert result["metrics"]["gradual_disclosure"] == 85
+        assert result["metrics"]["difficulty_level"] == 78
+        assert result["metrics"]["context_appropriateness"] == 88
+        assert result["metrics"]["consistency"] == 80
+        assert result["metrics"]["resistance"] == 75
+        assert "# Evaluation Report" in result["report_markdown"]
 
     @pytest.mark.asyncio
     @patch("app.core.scenario_report.evaluator.create_llm_client")
-    async def test_llm_exception_returns_zeros(self, mock_create_llm):
+    async def test_dynamic_metrics_passed_through(self, mock_create_llm):
+        """Any metric keys returned by the LLM are preserved without code changes."""
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = EvaluationResult(
+            metrics={"empathy": 90, "active_listening": 82, "rapport": 76},
+            report_markdown="# Custom Report",
+        )
+        mock_client = MagicMock()
+        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_create_llm.return_value = mock_client
+
+        result = await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=_make_prompt_data(),
+            counselor_prompt="prompt",
+        )
+
+        assert result["metrics"] == {
+            "empathy": 90,
+            "active_listening": 82,
+            "rapport": 76,
+        }
+        assert result["report_markdown"] == "# Custom Report"
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator.load_template")
+    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    async def test_passes_prompt_data_to_load_template(
+        self, mock_create_llm, mock_load_template
+    ):
+        """prompt_data must be forwarded to load_template so the dashboard
+        prompt override is used instead of the local .txt file."""
+        mock_load_template.return_value = "You are an evaluator."
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = EvaluationResult(
+            metrics={"consistency": 70}, report_markdown=""
+        )
+        mock_client = MagicMock()
+        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_create_llm.return_value = mock_client
+
+        prompt_data = _make_prompt_data()
+        await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=prompt_data,
+            counselor_prompt="prompt",
+        )
+
+        mock_load_template.assert_called_once_with(
+            "evaluation/evaluator_system", prompt_data
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    async def test_llm_exception_returns_empty(self, mock_create_llm):
         mock_create_llm.side_effect = RuntimeError("LLM unavailable")
 
         result = await evaluate_transcript(
@@ -287,18 +320,11 @@ class TestEvaluateTranscript:
             counselor_prompt="prompt",
         )
 
-        assert result == {
-            "gradual_disclosure": 0,
-            "difficulty_level": 0,
-            "colloquialism": 0,
-            "context_appropriateness": 0,
-            "consistency": 0,
-            "resistance": 0,
-        }
+        assert result == {"metrics": {}, "report_markdown": ""}
 
     @pytest.mark.asyncio
     @patch("app.core.scenario_report.evaluator.create_llm_client")
-    async def test_llm_invocation_failure_returns_zeros(self, mock_create_llm):
+    async def test_llm_invocation_failure_returns_empty(self, mock_create_llm):
         mock_llm = AsyncMock()
         mock_llm.ainvoke.side_effect = Exception("API timeout")
         mock_client = MagicMock()
@@ -311,11 +337,24 @@ class TestEvaluateTranscript:
             counselor_prompt="prompt",
         )
 
-        assert result == {
-            "gradual_disclosure": 0,
-            "difficulty_level": 0,
-            "colloquialism": 0,
-            "context_appropriateness": 0,
-            "consistency": 0,
-            "resistance": 0,
-        }
+        assert result == {"metrics": {}, "report_markdown": ""}
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    async def test_uses_json_mode_for_structured_output(self, mock_create_llm):
+        """json_mode is required because OpenAI rejects arbitrary Dict schemas."""
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = EvaluationResult(metrics={}, report_markdown="")
+        mock_client = MagicMock()
+        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_create_llm.return_value = mock_client
+
+        await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=_make_prompt_data(),
+            counselor_prompt="prompt",
+        )
+
+        mock_client.llm_instance.with_structured_output.assert_called_once_with(
+            EvaluationResult, method="json_mode"
+        )
