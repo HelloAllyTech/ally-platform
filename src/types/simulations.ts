@@ -348,6 +348,7 @@ export enum ChecklistType {
 export enum ExperienceMode {
   FEEDBACK = 'FEEDBACK',
   CHECKLIST = 'CHECKLIST',
+  NONE = 'NONE',
 }
 
 export interface ChecklistItem {

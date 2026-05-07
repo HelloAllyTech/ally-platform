@@ -65,6 +65,7 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const {sessionData, scenario, pathId, caseId, languageId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
+  const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
   const navigation = useAppNavigation();
@@ -94,10 +95,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const [feedbackKey, setFeedbackKey] = useState<number>(0);
   const [accumulatedScore, setAccumulatedScore] = useState<number>(0);
   const [detectedEvents, setDetectedEvents] = useState<string[]>([]);
-  const [agentTurnStatus, setAgentTurnStatus] = useState<AgentTurnStatus>('user_turn');
+  const [agentTurnStatus, setAgentTurnStatus] =
+    useState<AgentTurnStatus>('user_turn');
   const agentTurnStatusRef = useRef<AgentTurnStatus>('user_turn');
   const [debouncedRemoteSpeaking, setDebouncedRemoteSpeaking] = useState(false);
-  const remoteSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [isControlButtonMaximized, setIsControlButtonMaximized] =
@@ -616,6 +620,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             onFocusModeToggle={() => setIsFocusMode(prev => !prev)}
             onEndSession={handleDisconnect}
             isSimulationInProgress={isSimulationInProgress}
+            showFocusButton={!isNoneMode}
           />
         )}
       </RoomContext.Provider>
