@@ -18,6 +18,7 @@ interface SimulationControlsProps {
   onFocusModeToggle: () => void;
   onEndSession: () => void;
   isSimulationInProgress: boolean;
+  showFocusButton?: boolean;
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -29,6 +30,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
   onFocusModeToggle,
   onEndSession,
   isSimulationInProgress,
+  showFocusButton = true,
 }) => {
   const {t} = useTranslate();
 
@@ -42,14 +44,22 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
         disabled: !isSimulationInProgress,
         variant: !isMicEnabled ? 'active' : 'default',
       },
-      {
-        id: 'focus',
-        icon: <MicIcon color={isFocusMode ? colors.black : colors.white} />,
-        label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
-        onPress: onFocusModeToggle,
-        disabled: !isSimulationInProgress,
-        variant: isFocusMode ? 'active' : 'default',
-      },
+      ...(showFocusButton
+        ? [
+            {
+              id: 'focus',
+              icon: (
+                <MicIcon color={isFocusMode ? colors.black : colors.white} />
+              ),
+              label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
+              onPress: onFocusModeToggle,
+              disabled: !isSimulationInProgress,
+              variant: (isFocusMode ? 'active' : 'default') as
+                | 'active'
+                | 'default',
+            },
+          ]
+        : []),
       {
         id: 'end',
         icon: <View style={styles.endButtonIcon} />,
@@ -63,6 +73,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
       isMicEnabled,
       isFocusMode,
       isSimulationInProgress,
+      showFocusButton,
       t,
       onMicToggle,
       onFocusModeToggle,

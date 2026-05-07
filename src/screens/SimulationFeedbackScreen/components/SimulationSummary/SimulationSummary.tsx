@@ -43,8 +43,9 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
   // Match ally-web: use metadata.sessionName for session id display (FeedbackSection shows "ID: {formattedData.sessionName}")
   const sessionName = data?.metadata?.sessionName ?? data?.id ?? '';
 
-  const isChecklistMode =
-    data?.scenario?.metadata?.experienceMode === ExperienceMode.CHECKLIST;
+  const experienceMode = data?.scenario?.metadata?.experienceMode;
+  const isChecklistMode = experienceMode === ExperienceMode.CHECKLIST;
+  const isNoneMode = experienceMode === ExperienceMode.NONE;
 
   // Note: coverImageUrl may be available in extended scenario data
   const coverImageUrl =
@@ -103,7 +104,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           {isChecklistMode && data?.id && (
             <EventChecklist scenarioSessionId={data.id} />
           )}
-          {!isChecklistMode && (
+          {!isChecklistMode && !isNoneMode && (
             <>
               <ExpandableFeedbackSection
                 title={t('SimulationFeedback.strengthsAndSkills')}

@@ -161,6 +161,7 @@ jest.mock('../components', () => {
       onFocusModeToggle,
       onEndSession,
       isSimulationInProgress,
+      showFocusButton = true,
     }: any) => (
       <View testID="simulation-control-buttons">
         <TouchableOpacity
@@ -169,12 +170,14 @@ jest.mock('../components', () => {
           onPress={onMicToggle}>
           <Text>{isMicEnabled ? 'unmuted' : 'muted'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityLabel="focus"
-          disabled={!isSimulationInProgress}
-          onPress={onFocusModeToggle}>
-          <Text>{isFocusMode ? 'focused' : 'unfocused'}</Text>
-        </TouchableOpacity>
+        {showFocusButton && (
+          <TouchableOpacity
+            accessibilityLabel="focus"
+            disabled={!isSimulationInProgress}
+            onPress={onFocusModeToggle}>
+            <Text>{isFocusMode ? 'focused' : 'unfocused'}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           accessibilityLabel="end"
           disabled={!isSimulationInProgress}
@@ -518,6 +521,34 @@ describe('SimulationAssistantScreen', () => {
 
     // Verify SessionChecklist is rendered
     expect(getByTestId('session-checklist')).toBeDefined();
+  });
+
+  it('hides the Focus button when experienceMode is NONE', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const noneParams = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'None Scenario',
+        experienceMode: 'NONE',
+      },
+    };
+
+    const {queryByLabelText, getByLabelText} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: noneParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Mic and end remain; focus is hidden
+    expect(getByLabelText('mic')).toBeDefined();
+    expect(getByLabelText('end')).toBeDefined();
+    expect(queryByLabelText('focus')).toBeNull();
   });
 });
 
