@@ -608,3 +608,76 @@ class TestPrompt:
         assert "Counselor:" in content
         assert "Client:" in content
         assert "എനിക്ക് സഹായം വേണം." in content
+
+
+class TestOptionalFieldsDefensiveGuards:
+    """Tests verifying safe handling when studio fields are absent (None/empty)."""
+
+    def test_format_language_samples_with_none_returns_empty_string(self):
+        """_format_language_samples with None must not crash."""
+        from app.core.graph.prompt import _format_language_samples
+
+        result = _format_language_samples(None)
+        assert result == ""
+
+    def test_format_language_samples_with_empty_list_returns_empty_string(self):
+        from app.core.graph.prompt import _format_language_samples
+
+        result = _format_language_samples([])
+        assert result == ""
+
+    def test_generate_system_message_none_character_profile_text(self):
+        """System message generates when character_profile_text is None."""
+        pd = make_prompt_data(character_profile_text=None)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="en-IN"
+        )
+        assert msg.content is not None
+
+    def test_generate_system_message_none_role_instructions(self):
+        """System message generates without crash when role_instructions is None."""
+        pd = make_prompt_data(role_instructions=None)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="en-IN"
+        )
+        assert msg.content is not None
+
+    def test_generate_system_message_none_behavior_instructions(self):
+        """System message generates without crash when behavior_instructions is None."""
+        pd = make_prompt_data()
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=None, language_code="en-IN"
+        )
+        assert msg.content is not None
+
+    def test_generate_system_message_none_linguistic_style_samples(self):
+        """System message generates when language_dialogue_samples is None."""
+        pd = make_prompt_data(language_dialogue_samples=None)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
+        )
+        assert msg.content is not None
+        assert "Output language: hi-IN" in msg.content
+
+    def test_generate_system_message_none_allowed_filler_words(self):
+        """System message generates filler guidance when allowed_fillers is None."""
+        pd = make_prompt_data(allowed_fillers=None)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
+        )
+        assert msg.content is not None
+        assert "No curated filler list is set for this language" in msg.content
+
+    def test_generate_system_message_all_optional_fields_none(self):
+        """System message generates when all optional studio fields are None."""
+        pd = make_prompt_data(
+            character_profile_text=None,
+            role_instructions=None,
+            language_dialogue_samples=None,
+            allowed_fillers=None,
+        )
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=None, language_code="en-IN"
+        )
+        assert msg.content is not None
+        assert len(msg.content) > 0

@@ -93,6 +93,8 @@ def _format_language_samples(samples: List) -> str:
     - List[str]: ["utterance 1", "utterance 2", ...]
     - List[Dict]: [{"counselor": "...", "actor": "..."}, ...] (legacy)
     """
+    if not samples:
+        return ""
     lines = []
     for i, sample in enumerate(samples, 1):
         if isinstance(sample, str) and sample.strip():

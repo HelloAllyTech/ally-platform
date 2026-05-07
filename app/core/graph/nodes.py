@@ -610,7 +610,7 @@ async def _detect_single_behavior_instruction(
 
 
 async def _detect_behavior_instructions(
-    behavior_instructions: list[SimulationBehaviorInstruction],
+    behavior_instructions: list[SimulationBehaviorInstruction] | None,
     chat_messages: list,
     prompt_data: Optional[Any] = None,
 ) -> list[BehaviorInstructionFeedbackData]:
@@ -627,6 +627,8 @@ async def _detect_behavior_instructions(
     Returns:
         List of BehaviorInstructionFeedbackData for detected behaviors
     """
+    if not behavior_instructions:
+        return []
 
     concurrency_limit = max(1, settings.EVENT_DETECTION_CONCURRENCY_LIMIT)
     semaphore = asyncio.Semaphore(concurrency_limit)

@@ -227,3 +227,44 @@ class TestFinalScoreIsScoreKeeperTotal:
 
         sent_payload = mock_send.call_args[0][0]
         assert '"totalScore":42' in sent_payload
+
+
+class TestDetectBehaviorsOptionalFields:
+    """Tests verifying detect_behaviors handles None/empty behavior_instructions."""
+
+    @pytest.mark.asyncio
+    async def test_none_behavior_instructions_returns_empty_feedback(self):
+        """detect_behaviors returns [] when behavior_instructions is None."""
+        scenario = MagicMock()
+        scenario.behavior_instructions = None
+
+        config = {"configurable": {"scenario": scenario}}
+
+        result = await detect_behaviors(_make_state(), config=config)
+
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_empty_behavior_instructions_returns_empty_feedback(self):
+        """detect_behaviors returns [] when behavior_instructions is []."""
+        scenario = MagicMock()
+        scenario.behavior_instructions = []
+
+        config = {"configurable": {"scenario": scenario}}
+
+        result = await detect_behaviors(_make_state(), config=config)
+
+        assert result["behavior_feedback_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_none_behavior_instructions_does_not_update_score_keeper(self):
+        """Score keeper stays at 0 when behavior_instructions is None."""
+        scenario = MagicMock()
+        scenario.behavior_instructions = None
+
+        score_keeper = ScoreKeeper()
+        config = {"configurable": {"scenario": scenario, "score_keeper": score_keeper}}
+
+        await detect_behaviors(_make_state(), config=config)
+
+        assert score_keeper.get_total_score() == 0
