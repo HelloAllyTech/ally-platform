@@ -36,7 +36,7 @@ class EvaluationResult(BaseModel):
         ),
     )
     report_markdown: str = Field(
-        ...,
+        default="",
         description=(
             "A full markdown evaluation report for a training supervisor. "
             "Must include a summary, metric scores, per-metric analysis "
