@@ -74,7 +74,7 @@ Do not award 85+ unless you can cite specific transcript evidence that justifies
 
 For every metric score, you must:
 1. State the score.
-2. Cite at least one direct quote from the transcript that supports your reasoning.
+2. Cite at least one direct quote from a [CLIENT] turn in the transcript that supports your reasoning. Do not cite [COUNSELOR] turns as evidence of CLIENT agent performance.
 3. Explain specifically what the quote demonstrates — do not paraphrase the character description back as evidence.
 
 If you cannot find a specific quote to justify a score above 80, lower the score until you can.
