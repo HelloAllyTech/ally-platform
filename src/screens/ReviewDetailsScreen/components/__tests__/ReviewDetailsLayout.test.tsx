@@ -46,7 +46,16 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {View} = require('react-native');
   return {
-    Conversation: () => React.createElement(View, {testID: 'conversation'}),
+    Conversation: ({
+      listHeaderComponent,
+    }: {
+      listHeaderComponent?: React.ReactNode;
+    }) =>
+      React.createElement(
+        View,
+        {testID: 'conversation'},
+        listHeaderComponent || null,
+      ),
     InteractionsBar: () => React.createElement(View, {testID: 'interactions-bar'}),
     CommentInput: () => React.createElement(View, {testID: 'comment-input'}),
     ThreadsBottomSheet: () =>
@@ -61,6 +70,21 @@ jest.mock('@/components', () => {
       React.createElement(View, {testID: 'confirmation-modal'}),
   };
 });
+
+jest.mock(
+  '@/screens/SimulationFeedbackScreen/components/SimulationAudioPlayer/SimulationAudioPlayer',
+  () => {
+    const React = require('react');
+    const {View} = require('react-native');
+    return {
+      SimulationAudioPlayer: ({audioUrl}: {audioUrl: string}) =>
+        React.createElement(View, {
+          testID: 'simulation-audio-player',
+          accessibilityLabel: audioUrl,
+        }),
+    };
+  },
+);
 
 const createMockReviewLogic = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -159,5 +183,29 @@ describe('ReviewDetailsLayout', () => {
     );
     fireEvent.press(getByTestId('back-button'));
     expect(mockGoBack).toHaveBeenCalledTimes(1);
+  });
+
+  describe('audio player', () => {
+    it('renders audio player when audioUrl is provided', () => {
+      const {getByTestId} = render(
+        <ReviewDetailsLayout
+          {...defaultProps}
+          audioUrl="https://example.com/audio.ogg"
+        />,
+      );
+      expect(getByTestId('simulation-audio-player')).toBeTruthy();
+    });
+
+    it('does not render audio player when audioUrl is null', () => {
+      const {queryByTestId} = render(
+        <ReviewDetailsLayout {...defaultProps} audioUrl={null} />,
+      );
+      expect(queryByTestId('simulation-audio-player')).toBeNull();
+    });
+
+    it('does not render audio player when audioUrl is undefined', () => {
+      const {queryByTestId} = render(<ReviewDetailsLayout {...defaultProps} />);
+      expect(queryByTestId('simulation-audio-player')).toBeNull();
+    });
   });
 });

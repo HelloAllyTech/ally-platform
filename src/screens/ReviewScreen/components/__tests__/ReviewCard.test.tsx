@@ -80,6 +80,19 @@ jest.mock('../ReactionsCount', () => {
   };
 });
 
+jest.mock(
+  '@/screens/SimulationFeedbackScreen/components/SimulationAudioPlayer/SimulationAudioPlayer',
+  () => {
+    const React = require('react');
+    const {View} = require('react-native');
+    return {
+      SimulationAudioPlayer: ({audioUrl}: {audioUrl: string}) => (
+        <View testID="simulation-audio-player" accessibilityLabel={audioUrl} />
+      ),
+    };
+  },
+);
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -194,5 +207,60 @@ describe('ReviewCard', () => {
       <ReviewCard {...defaultProps} user={userWithImage} />,
     );
     expect(getByTestId('user-profile-image')).toBeTruthy();
+  });
+
+  describe('audio player', () => {
+    it('renders audio player for simulation review with audioUrl', () => {
+      const sessionWithAudio: ScenarioSessionData = {
+        ...mockSession,
+        audioUrl: 'https://example.com/audio.ogg',
+      };
+      const {getByTestId} = render(
+        <ReviewCard
+          {...defaultProps}
+          scenarioSession={sessionWithAudio}
+          reviewType="simulation"
+        />,
+      );
+      expect(getByTestId('simulation-audio-player')).toBeTruthy();
+    });
+
+    it('hides audio player when audioUrl is null', () => {
+      const sessionNoAudio: ScenarioSessionData = {...mockSession, audioUrl: null};
+      const {queryByTestId} = render(
+        <ReviewCard
+          {...defaultProps}
+          scenarioSession={sessionNoAudio}
+          reviewType="simulation"
+        />,
+      );
+      expect(queryByTestId('simulation-audio-player')).toBeNull();
+    });
+
+    it('hides audio player when audioUrl is undefined', () => {
+      const {queryByTestId} = render(
+        <ReviewCard
+          {...defaultProps}
+          scenarioSession={mockSession}
+          reviewType="simulation"
+        />,
+      );
+      expect(queryByTestId('simulation-audio-player')).toBeNull();
+    });
+
+    it('hides audio player for scribe reviews even if audioUrl is set', () => {
+      const sessionWithAudio: ScenarioSessionData = {
+        ...mockSession,
+        audioUrl: 'https://example.com/audio.ogg',
+      };
+      const {queryByTestId} = render(
+        <ReviewCard
+          {...defaultProps}
+          scenarioSession={sessionWithAudio}
+          reviewType="scribe"
+        />,
+      );
+      expect(queryByTestId('simulation-audio-player')).toBeNull();
+    });
   });
 });

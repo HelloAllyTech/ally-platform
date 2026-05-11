@@ -9,6 +9,7 @@ import {ChatAddOnIcon} from '@/assets';
 import {SimulationDetailsCard, UserProfileImage} from '@/components';
 import {SimulationDetailRow} from '@/components/SimulationDetailsCard/SimulationDetailRow';
 import {ReviewType} from '@/contexts/ReviewApiContext';
+import {SimulationAudioPlayer} from '@/screens/SimulationFeedbackScreen/components/SimulationAudioPlayer/SimulationAudioPlayer';
 import {useLazyGetGeneralCommentsOverviewQuery} from '@/services/generalCommentsApi';
 import {
   colors,
@@ -76,6 +77,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
 
   const isScribe = reviewType === 'scribe';
   const session = scenarioSession ?? scribeSession;
+  const shouldShowAudioPlayer = !isScribe && !!scenarioSession?.audioUrl;
 
   const [
     getGeneralComments,
@@ -193,6 +195,14 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
       {!!note && <Text style={styles.noteText}>{note}</Text>}
 
       {isScribe ? renderScribeDetails() : renderSimulationDetails()}
+
+      {shouldShowAudioPlayer && (
+        <SimulationAudioPlayer
+          audioUrl={scenarioSession!.audioUrl as string}
+          onProgress={() => {}}
+          containerStyle={styles.audioPlayer}
+        />
+      )}
 
       {onReviewPress && (
         <TouchableOpacity
@@ -330,5 +340,10 @@ const styles = ScaledSheet.create({
     ...typography.body.medium,
     color: colors.ds.typography.highEmphasis,
     marginBottom: '8@s',
+  },
+  audioPlayer: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+    paddingVertical: '8@ms',
   },
 });

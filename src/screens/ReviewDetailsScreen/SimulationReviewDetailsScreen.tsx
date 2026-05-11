@@ -108,6 +108,7 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
       <ReviewDetailsLayout
         reviewId={reviewId}
         reviewNote={reviewData?.note}
+        audioUrl={reviewData?.scenarioSession?.audioUrl}
         reviewLogic={reviewLogic}
         metadata={metadata}
         onRefreshReactions={refetchReviewData}
