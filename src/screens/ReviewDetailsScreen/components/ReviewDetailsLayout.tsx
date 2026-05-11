@@ -20,6 +20,7 @@ import {
   ThreadsBottomSheet,
 } from '@/components';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
+import {SimulationAudioPlayer} from '@/screens/SimulationFeedbackScreen/components/SimulationAudioPlayer/SimulationAudioPlayer';
 import {colors} from '@/theme';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
@@ -34,6 +35,7 @@ interface ReviewDetailsLayoutProps {
   isScribeReview?: boolean;
   reviewId: string;
   reviewNote?: string;
+  audioUrl?: string | null;
   reviewLogic: ReturnType<typeof useReviewDetailsLogic>;
   metadata: ReviewMetadata | undefined;
   onRefreshReactions: () => void;
@@ -49,6 +51,7 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   isScribeReview = false,
   reviewId,
   reviewNote,
+  audioUrl,
   reviewLogic,
   metadata,
   onRefreshReactions,
@@ -143,11 +146,23 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
   );
 
   const noteElementHeader = useMemo(() => {
-    if (reviewNote || onEditNote) {
-      return <ReviewNote note={reviewNote} onEditNote={onEditNote} />;
+    const hasNote = !!reviewNote || !!onEditNote;
+    if (!audioUrl && !hasNote) {
+      return null;
     }
-    return null;
-  }, [reviewNote, onEditNote]);
+    return (
+      <>
+        {!!audioUrl && (
+          <SimulationAudioPlayer
+            audioUrl={audioUrl}
+            onProgress={() => {}}
+            containerStyle={styles.audioPlayer}
+          />
+        )}
+        {hasNote && <ReviewNote note={reviewNote} onEditNote={onEditNote} />}
+      </>
+    );
+  }, [audioUrl, reviewNote, onEditNote]);
 
   if (isLoading) {
     return (
@@ -296,5 +311,10 @@ const styles = ScaledSheet.create({
     bottom: '30@vs',
     left: 0,
     right: 0,
+  },
+  audioPlayer: {
+    marginHorizontal: '16@ms',
+    marginTop: '12@ms',
+    marginBottom: '4@ms',
   },
 });

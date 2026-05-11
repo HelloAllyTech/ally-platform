@@ -94,6 +94,7 @@ export interface ScenarioSessionData {
   id: string;
   duration: string;
   createdAt: string;
+  audioUrl?: string | null;
 }
 export interface ScribeSessionData {
   id: number;
@@ -143,6 +144,7 @@ export interface GetReviewByIdResponse {
     id: string;
     createdAt: string;
     duration: string;
+    audioUrl?: string | null;
   };
   commentsCount: number;
   createdBy: {
