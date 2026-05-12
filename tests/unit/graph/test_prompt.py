@@ -577,18 +577,34 @@ class TestPrompt:
         assert "ml-IN" in content
         assert "Example 1:" not in content
 
-    def test_generate_system_message_english_omits_language_instruction(self):
-        """Test that language instruction is omitted for English language codes."""
-        pd = make_prompt_data()
+    def test_generate_system_message_region_tagged_english_includes_dialect_block(
+        self,
+    ):
+        """Region-tagged English (en-IN, en-US, en-GB) must still receive the
+        multilingual block — without it the LLM has no signal to choose between
+        Indian, American, and British English and defaults to its training
+        distribution (typically American English)."""
+        pd_in = make_prompt_data(language_label="English (India)")
         msg_en_in = generate_system_message(
-            prompt_data=pd, behavior_instructions=[], language_code="en-IN"
+            prompt_data=pd_in, behavior_instructions=[], language_code="en-IN"
         )
+        pd_us = make_prompt_data(language_label="English (US)")
         msg_en_us = generate_system_message(
-            prompt_data=pd, behavior_instructions=[], language_code="en-US"
+            prompt_data=pd_us, behavior_instructions=[], language_code="en-US"
         )
 
-        assert "Output language:" not in msg_en_in.content
-        assert "Output language:" not in msg_en_us.content
+        assert "Output language: English (India) (locale: en-IN)" in msg_en_in.content
+        assert "Output language: English (US) (locale: en-US)" in msg_en_us.content
+
+    def test_generate_system_message_bare_english_omits_language_instruction(self):
+        """Bare 'en' (no region) still omits the multilingual block — there's no
+        regional dialect to enforce and emitting the block would be misleading."""
+        pd = make_prompt_data()
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="en"
+        )
+
+        assert "Output language:" not in msg.content
 
     def test_generate_system_message_includes_language_label_when_present(self):
         """Non-English with language_label: human-readable name appears in the

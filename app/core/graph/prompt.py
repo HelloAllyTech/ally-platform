@@ -150,7 +150,12 @@ def _get_language_sample_block(
 def _get_language_block(
     prompt_data: PromptData, language_code: Optional[str] = None
 ) -> str:
-    if not language_code or language_code.startswith("en"):
+    # Skip only when language is unspecified or "bare" English (no region).
+    # Region-tagged English variants (en-IN, en-US, en-GB, …) still need the
+    # multilingual block so the LLM gets an explicit regional dialect signal —
+    # without it, all English locales collapse to the model's default
+    # distribution, usually American English.
+    if not language_code or language_code.lower() == "en":
         return ""
 
     samples = prompt_data.language_dialogue_samples
