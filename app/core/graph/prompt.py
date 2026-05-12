@@ -118,14 +118,19 @@ def _get_language_sample_block(
     language_code: str,
     backend_prompts: Optional[dict] = None,
     allowed_fillers: Optional[List[str]] = None,
+    language_label: Optional[str] = None,
 ) -> str:
     samples_text = _format_language_samples(samples) if samples else ""
     allowed_fillers_text = _format_allowed_fillers_for_prompt(allowed_fillers)
+    # Fall back to the code itself if the backend didn't supply a label, so
+    # the template still renders something meaningful.
+    language_label_text = (language_label or "").strip() or language_code
 
     result = load_and_format(
         "system/multilingual_instructions_block",
         prompt_data=backend_prompts,
         language_code=language_code,
+        language_label=language_label_text,
         samples=samples_text,
         allowed_fillers=allowed_fillers_text,
     )
@@ -151,9 +156,14 @@ def _get_language_block(
     samples = prompt_data.language_dialogue_samples
     backend_prompts = getattr(prompt_data, "prompts", None)
     allowed_fillers = getattr(prompt_data, "allowed_fillers", None)
+    language_label = getattr(prompt_data, "language_label", None)
 
     block = _get_language_sample_block(
-        samples, language_code, backend_prompts, allowed_fillers
+        samples,
+        language_code,
+        backend_prompts,
+        allowed_fillers,
+        language_label=language_label,
     )
     if not block or not block.strip():
         return ""

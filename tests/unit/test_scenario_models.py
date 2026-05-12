@@ -158,6 +158,50 @@ class TestPromptData:
             PromptData(name="Test")  # Missing other required fields
 
     @pytest.mark.unit
+    def test_prompt_data_normalizes_language_label_from_camelcase(self):
+        """Scenario._build_prompt_data maps backend `languageLabel` (camelCase)
+        onto PromptData.language_label (snake_case) so the prompt renderer can
+        inject the human-readable name (e.g. 'Tamil (India)')."""
+        raw_payload = {
+            "promptData": {
+                "name": "Lang Label Test",
+                "age": "30",
+                "gender": "female",
+                "currentLocation": "Chennai",
+                "context": "Tamil session",
+                "lifeHistory": "Grew up in Chennai.",
+                "openingStatements": ["Vanakkam"],
+                "languageLabel": "Tamil (India)",
+            }
+        }
+
+        result = Scenario._build_prompt_data(raw_payload)
+
+        assert result is not None
+        assert result.language_label == "Tamil (India)"
+
+    @pytest.mark.unit
+    def test_prompt_data_language_label_defaults_to_none_when_absent(self):
+        """When backend doesn't supply `languageLabel`, PromptData.language_label
+        stays None — the prompt renderer falls back to the locale code."""
+        raw_payload = {
+            "promptData": {
+                "name": "No Label Test",
+                "age": "30",
+                "gender": "female",
+                "currentLocation": "Chennai",
+                "context": "Session without label",
+                "lifeHistory": "Background.",
+                "openingStatements": ["Hi"],
+            }
+        }
+
+        result = Scenario._build_prompt_data(raw_payload)
+
+        assert result is not None
+        assert result.language_label is None
+
+    @pytest.mark.unit
     @pytest.mark.parametrize(
         "age_input,expected_age",
         [(25, "25"), ("30", "30"), (35.5, "35.5"), ("forty", "forty")],  # String input

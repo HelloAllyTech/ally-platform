@@ -110,6 +110,15 @@ class PromptData(BaseModel):
             "From scenario metadata allowedFillerWords for the active language."
         ),
     )
+    language_label: Optional[str] = Field(
+        default=None,
+        description=(
+            "Human-readable language name with region (e.g. 'Tamil (India)'). "
+            "Injected into the multilingual instructions block alongside the "
+            "BCP-47 code; gives the LLM a stronger dialect signal than the "
+            "raw code alone."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -450,6 +459,8 @@ class Scenario(BaseModel):
                 "allowed_fillers": prompt_data_dict.get("allowedFillerWords")
                 or prompt_data_dict.get("allowedFillers")
                 or prompt_data_dict.get("allowed_fillers"),
+                "language_label": prompt_data_dict.get("languageLabel")
+                or prompt_data_dict.get("language_label"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
             }
 

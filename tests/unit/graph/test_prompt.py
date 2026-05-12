@@ -590,6 +590,29 @@ class TestPrompt:
         assert "Output language:" not in msg_en_in.content
         assert "Output language:" not in msg_en_us.content
 
+    def test_generate_system_message_includes_language_label_when_present(self):
+        """Non-English with language_label: human-readable name appears in the
+        multilingual block alongside the BCP-47 code."""
+        pd = make_prompt_data(language_label="Tamil (India)")
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
+        )
+        content = msg.content
+        assert "Tamil (India)" in content
+        assert "ta-IN" in content
+
+    def test_generate_system_message_falls_back_to_code_when_label_missing(self):
+        """Non-English without language_label: the locale code stands in for the
+        label so the prompt still renders coherently."""
+        pd = make_prompt_data(language_label=None)
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
+        )
+        content = msg.content
+        # Template: "Output language: {language_label} (locale: {language_code})."
+        # With label=None the fallback substitutes the code into both slots.
+        assert "Output language: ta-IN (locale: ta-IN)" in content
+
     def test_generate_system_message_samples_present_injects_sample_block(self):
         """When samples present for non-English, use sample block."""
         samples = [
