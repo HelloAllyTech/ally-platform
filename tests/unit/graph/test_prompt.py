@@ -617,6 +617,36 @@ class TestPrompt:
         assert "Tamil (India)" in content
         assert "ta-IN" in content
 
+    def test_generate_system_message_override_replaces_label_slot(self):
+        """Per-scenario author override takes the label slot in the
+        multilingual block. The DB-derived label steps aside; the locale
+        code stays for traceability."""
+        pd = make_prompt_data(
+            language_label="Tamil (India)",
+            language_characteristics=(
+                "Speaks simple, colloquial Chennai Tamil; code-mixes with English."
+            ),
+        )
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
+        )
+        content = msg.content
+        assert (
+            "Output language: Speaks simple, colloquial Chennai Tamil; "
+            "code-mixes with English. (locale: ta-IN)"
+        ) in content
+        # DB label must NOT also appear — override wins.
+        assert "Output language: Tamil (India)" not in content
+
+    def test_generate_system_message_falls_back_to_db_label_when_override_blank(self):
+        """With no override the DB-derived label fills the slot."""
+        pd = make_prompt_data(language_label="Tamil (India)")
+        msg = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
+        )
+        content = msg.content
+        assert "Output language: Tamil (India) (locale: ta-IN)" in content
+
     def test_generate_system_message_falls_back_to_code_when_label_missing(self):
         """Non-English without language_label: the locale code stands in for the
         label so the prompt still renders coherently."""

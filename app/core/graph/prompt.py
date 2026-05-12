@@ -113,24 +113,48 @@ def _format_language_samples(samples: List) -> str:
     return "\n".join(lines).strip()
 
 
+def _resolve_effective_language_label(
+    language_code: str,
+    language_label: Optional[str],
+    language_characteristics: Optional[str],
+) -> str:
+    """Pick the language label that goes into the multilingual block.
+
+    Fallback chain: per-scenario author override (`languageCharacteristics`)
+    → DB default label (`languageLabel`, e.g. "Tamil (India)") → bare locale
+    code as last resort. Studio surfaces all three as a single concept
+    called "Language label", which keeps the author's mental model simple
+    while still letting the platform provide a baseline.
+    """
+    override = (language_characteristics or "").strip()
+    if override:
+        return override
+    label = (language_label or "").strip()
+    if label:
+        return label
+    return language_code
+
+
 def _get_language_sample_block(
     samples: Optional[List],
     language_code: str,
     backend_prompts: Optional[dict] = None,
     allowed_fillers: Optional[List[str]] = None,
     language_label: Optional[str] = None,
+    language_characteristics: Optional[str] = None,
 ) -> str:
     samples_text = _format_language_samples(samples) if samples else ""
     allowed_fillers_text = _format_allowed_fillers_for_prompt(allowed_fillers)
-    # Fall back to the code itself if the backend didn't supply a label, so
-    # the template still renders something meaningful.
-    language_label_text = (language_label or "").strip() or language_code
-
+    effective_language_label = _resolve_effective_language_label(
+        language_code=language_code,
+        language_label=language_label,
+        language_characteristics=language_characteristics,
+    )
     result = load_and_format(
         "system/multilingual_instructions_block",
         prompt_data=backend_prompts,
         language_code=language_code,
-        language_label=language_label_text,
+        language_label=effective_language_label,
         samples=samples_text,
         allowed_fillers=allowed_fillers_text,
     )
@@ -162,6 +186,7 @@ def _get_language_block(
     backend_prompts = getattr(prompt_data, "prompts", None)
     allowed_fillers = getattr(prompt_data, "allowed_fillers", None)
     language_label = getattr(prompt_data, "language_label", None)
+    language_characteristics = getattr(prompt_data, "language_characteristics", None)
 
     block = _get_language_sample_block(
         samples,
@@ -169,6 +194,7 @@ def _get_language_block(
         backend_prompts,
         allowed_fillers,
         language_label=language_label,
+        language_characteristics=language_characteristics,
     )
     if not block or not block.strip():
         return ""

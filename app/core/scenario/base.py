@@ -119,6 +119,16 @@ class PromptData(BaseModel):
             "raw code alone."
         ),
     )
+    language_characteristics: Optional[str] = Field(
+        default=None,
+        description=(
+            "Free-text per-scenario-per-language style guidance authored in "
+            "studio (e.g. 'Speaks simple, colloquial Chennai Tamil; "
+            "code-mixes with English'). Optional; when present, rendered as "
+            "a character-specific style section inside the multilingual "
+            "block. Lets the same language sound different across scenarios."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -461,6 +471,10 @@ class Scenario(BaseModel):
                 or prompt_data_dict.get("allowed_fillers"),
                 "language_label": prompt_data_dict.get("languageLabel")
                 or prompt_data_dict.get("language_label"),
+                "language_characteristics": prompt_data_dict.get(
+                    "languageCharacteristics"
+                )
+                or prompt_data_dict.get("language_characteristics"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
             }
 

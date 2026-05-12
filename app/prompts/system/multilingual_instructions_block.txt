@@ -1,7 +1,5 @@
 Output language: {language_label} (locale: {language_code}).
 
-The locale's region code (the part after the dash, e.g. "IN" in a code like "xx-IN") is mandatory, not advisory. Use the regional dialect spoken in that country/region — vocabulary, sentence endings, code-switching habits, and idiom must match that region. Do NOT use vocabulary, phrasing, or sentence patterns from a different country that shares the same base language.
-
 Use the target language naturally and idiomatically in the next client reply.
 Match colloquial spoken usage for that language and region.
 

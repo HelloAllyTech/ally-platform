@@ -181,6 +181,30 @@ class TestPromptData:
         assert result.language_label == "Tamil (India)"
 
     @pytest.mark.unit
+    def test_prompt_data_normalizes_language_characteristics_from_camelcase(self):
+        """Scenario._build_prompt_data maps backend `languageCharacteristics`
+        (camelCase) onto PromptData.language_characteristics (snake_case),
+        carrying the free-text per-language style guidance through to the
+        prompt builder."""
+        raw_payload = {
+            "promptData": {
+                "name": "Chars Test",
+                "age": "30",
+                "gender": "female",
+                "currentLocation": "Chennai",
+                "context": "Tamil session",
+                "lifeHistory": "Background.",
+                "openingStatements": ["Vanakkam"],
+                "languageCharacteristics": "Speaks Chennai-style Tamil.",
+            }
+        }
+
+        result = Scenario._build_prompt_data(raw_payload)
+
+        assert result is not None
+        assert result.language_characteristics == "Speaks Chennai-style Tamil."
+
+    @pytest.mark.unit
     def test_prompt_data_language_label_defaults_to_none_when_absent(self):
         """When backend doesn't supply `languageLabel`, PromptData.language_label
         stays None — the prompt renderer falls back to the locale code."""
