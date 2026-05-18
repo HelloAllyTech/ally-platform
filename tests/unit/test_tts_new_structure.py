@@ -199,6 +199,128 @@ class TestElevenLabsProvider:
             voice_id="test-voice-id-snake", api_key="test-api-key"
         )
 
+    @pytest.mark.unit
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("app.tts.elevenlabs.agents_tts.StreamAdapter")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_v3_model_wraps_with_stream_adapter(
+        self, mock_settings, mock_tts_class, mock_stream_adapter, mock_validate
+    ):
+        """eleven_v3 must route through StreamAdapter (HTTP chunked) since the
+        WS multi-stream-input endpoint is unsupported for v3."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        base_tts = Mock()
+        mock_tts_class.return_value = base_tts
+        wrapped = Mock()
+        mock_stream_adapter.return_value = wrapped
+
+        client = ElevenLabsTTSClient(
+            model="eleven_v3",
+            voice_id="test-voice-id",
+            language_code="hi-IN",
+            api_key="test-api-key",
+        )
+
+        assert client._is_v3_model is True
+        result = client.tts_instance
+
+        mock_tts_class.assert_called_once_with(
+            voice_id="test-voice-id",
+            model="eleven_v3",
+            api_key="test-api-key",
+        )
+        mock_stream_adapter.assert_called_once_with(tts=base_tts)
+        assert result is wrapped
+        assert client._base_tts is base_tts
+
+    @pytest.mark.unit
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("app.tts.elevenlabs.agents_tts.StreamAdapter")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_non_v3_model_does_not_wrap(
+        self, mock_settings, mock_tts_class, mock_stream_adapter, mock_validate
+    ):
+        """Non-v3 models must use the plugin's WS path directly — no StreamAdapter."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        base_tts = Mock()
+        mock_tts_class.return_value = base_tts
+
+        client = ElevenLabsTTSClient(
+            model="eleven_multilingual_v2",
+            voice_id="test-voice-id",
+            language_code="en-IN",
+            api_key="test-api-key",
+        )
+
+        assert client._is_v3_model is False
+        result = client.tts_instance
+
+        mock_stream_adapter.assert_not_called()
+        assert result is base_tts
+        assert client._base_tts is base_tts
+
+    @pytest.mark.unit
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("app.tts.elevenlabs.agents_tts.StreamAdapter")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_v3_apply_parameters_updates_underlying_tts(
+        self, mock_settings, mock_tts_class, mock_stream_adapter, mock_validate
+    ):
+        """Voice settings must apply to the underlying elevenlabs.TTS even when
+        wrapped in StreamAdapter — StreamAdapter does not forward update_options."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        base_tts = Mock()
+        mock_tts_class.return_value = base_tts
+        mock_stream_adapter.return_value = Mock(spec=[])  # no update_options
+
+        client = ElevenLabsTTSClient(
+            model="eleven_v3",
+            voice_id="test-voice-id",
+            language_code="hi-IN",
+            api_key="test-api-key",
+        )
+        client._apply_parameters_dict(
+            {"speed": 1.05, "stability": 0.7, "similarity_boost": 0.6}
+        )
+
+        base_tts.update_options.assert_called_once()
+        kwargs = base_tts.update_options.call_args.kwargs
+        vs = kwargs["voice_settings"]
+        assert vs.speed == 1.05
+        assert vs.stability == 0.7
+        assert vs.similarity_boost == 0.6
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "model,expected_v3",
+        [
+            ("eleven_v3", True),
+            ("eleven_multilingual_v3", True),
+            ("Eleven_V3", True),  # case-insensitive
+            ("eleven_multilingual_v2", False),
+            ("eleven_turbo_v2_5", False),
+            ("eleven_flash_v2_5", False),
+        ],
+    )
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    def test_v3_detection(self, mock_validate, model, expected_v3):
+        """_is_v3_model must detect v3 variants and reject v2/turbo/flash."""
+        mock_validate.return_value = True
+        client = ElevenLabsTTSClient(
+            model=model,
+            voice_id="test-voice-id",
+            language_code="en-IN",
+            api_key="test-api-key",
+        )
+        assert client._is_v3_model is expected_v3
+        assert client._supports_audio_tags is expected_v3
+
 
 class TestSarvamProvider:
     """Test cases for Sarvam TTS provider."""

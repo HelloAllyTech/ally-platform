@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 
 from elevenlabs import ElevenLabs
 from elevenlabs.core import ApiError as ElevenLabsApiError
+from livekit.agents import tts as agents_tts
 from livekit.plugins import elevenlabs
 from livekit.plugins.elevenlabs import VoiceSettings
 
@@ -147,12 +148,11 @@ Examples:
         self._voice_id = voice_id
         self._language_code = language_code
         self._api_key = api_key or settings.ELEVEN_API_KEY
-        self._tts_instance = None
+        self._tts_instance: Optional[agents_tts.TTS] = None
+        self._base_tts: Optional[elevenlabs.TTS] = None
 
-        # Check if model supports audio tags (v3 models only)
-        self._supports_audio_tags = (
-            "v3" in model.lower() or "eleven_v3" in model.lower()
-        )
+        self._is_v3_model = "v3" in model.lower()
+        self._supports_audio_tags = self._is_v3_model
 
     @staticmethod
     def validate_voice(voice_id: str, api_key: Optional[str] = None) -> bool:
@@ -250,14 +250,22 @@ Examples:
         )
 
     @property
-    def tts_instance(self) -> elevenlabs.TTS:
+    def tts_instance(self) -> agents_tts.TTS:
         """Get the underlying ElevenLabs TTS instance."""
         if self._tts_instance is None:
-            self._tts_instance = elevenlabs.TTS(
+            base = elevenlabs.TTS(
                 voice_id=self._voice_id,
                 model=self._model,
                 api_key=self._api_key,
             )
+            self._base_tts = base
+            if self._is_v3_model:
+                # eleven_v3 has no WebSocket multi-stream-input support
+                # (livekit/agents#4901). StreamAdapter sentence-streams via
+                # the plugin's HTTP /stream chunked path instead.
+                self._tts_instance = agents_tts.StreamAdapter(tts=base)
+            else:
+                self._tts_instance = base
         return self._tts_instance
 
     def get_text_enhancement_instructions(self) -> Optional[str]:
@@ -285,7 +293,10 @@ Examples:
             params_dict: Validated dict with parameter names as keys
         """
         try:
-            if self.tts_instance is None:
+            # Trigger lazy init so self._base_tts is populated.
+            _ = self.tts_instance
+            target = self._base_tts
+            if target is None:
                 logger.warning(
                     "[ElevenLabs] Cannot apply parameters: TTS instance is None"
                 )
@@ -325,8 +336,8 @@ Examples:
             )
 
             # Update TTS options with VoiceSettings
-            if hasattr(self.tts_instance, "update_options"):
-                self.tts_instance.update_options(voice_settings=voice_settings)
+            if hasattr(target, "update_options"):
+                target.update_options(voice_settings=voice_settings)
                 logger.debug(
                     "[ElevenLabs] Successfully updated TTS options with VoiceSettings"
                 )
