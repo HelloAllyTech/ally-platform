@@ -373,7 +373,7 @@
     "startingTitle": "Simulation ",
     "starting": "starting...",
     "ending": "ending...",
-    "waitingForAgent": "Waiting for agent to join...",
+    "waitingForAgent": "Waiting for the agent to join, this could take up to 15 seconds…",
     "connectingToSession": "Connecting to session...",
     "startingSubtitle": "To start the simulation, please allow us to use your microphone.",
     "sessionDuration": "Session Duration",
