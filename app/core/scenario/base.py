@@ -138,6 +138,16 @@ class PromptData(BaseModel):
             "and injects the corresponding descriptions into the prompt."
         ),
     )
+    enable_prosody: bool = Field(
+        default=True,
+        description=(
+            "Per-simulation toggle for speech prosody generation. "
+            "When False, the runtime prosody node is skipped and the TTS "
+            "client keeps its current/default parameters; no SSML/audio-tag "
+            "enhancement is applied either. Default True for backwards "
+            "compatibility with existing scenarios."
+        ),
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -476,6 +486,11 @@ class Scenario(BaseModel):
                 )
                 or prompt_data_dict.get("language_characteristics"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
+                "enable_prosody": (
+                    True
+                    if prompt_data_dict.get("enableProsody") is None
+                    else bool(prompt_data_dict.get("enableProsody"))
+                ),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

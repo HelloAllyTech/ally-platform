@@ -1214,7 +1214,14 @@ async def apply_voice_expressions(
         skip_prosody = False
         skip_reason = ""
         has_text_enhancement = bool(tts_client.get_text_enhancement_instructions())
-        if not settings.PROSDY_SKIP_ENABLED:
+        # Per-simulation override: if scenario has prosody disabled, skip
+        # unconditionally (takes precedence over PROSDY_SKIP_ENABLED and
+        # text-enhancement providers).
+        prompt_data = getattr(scenario, "prompt_data", None)
+        if prompt_data is not None and not getattr(prompt_data, "enable_prosody", True):
+            skip_prosody = True
+            skip_reason = "prosody disabled for simulation"
+        elif not settings.PROSDY_SKIP_ENABLED:
             pass  # Skip logic disabled, always run prosody
         elif has_text_enhancement:
             pass  # Provider needs enhanced text; skip would cause faster speech
