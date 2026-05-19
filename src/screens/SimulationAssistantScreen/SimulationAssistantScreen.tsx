@@ -58,7 +58,14 @@ import {
 } from './components/ScenarioInfoOverlay';
 import {styles} from './styles';
 
-const RINGING_BELL_DELAY = 5000; // 5 seconds for ringing the bell before connecting
+// Tiny delay before connect to avoid React effect mount/unmount races. Was
+// 5000ms when it was also acting as a "give the agent time to boot" hack;
+// agent-readiness is now event-driven below.
+const STRICT_MODE_GUARD_MS = 100;
+// If the agent participant joins but produces no audio (e.g. user-speaks-first
+// scenarios), transition out of ringing after this grace window so the UI
+// isn't stuck on ringing forever.
+const AGENT_SILENT_GRACE_MS = 1500;
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
@@ -104,6 +111,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+
+  // Tracks whether we've already transitioned to AGENT_JOINED in this session;
+  // prevents the grace timer + active-speakers handler from racing.
+  const agentJoinedRef = useRef<boolean>(false);
+  const silentGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [isControlButtonMaximized, setIsControlButtonMaximized] =
     useState<boolean>(false);
   const [showBackPressConfirmation, setShowBackPressConfirmation] =
@@ -168,10 +182,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   useEffect(() => {
     if (accessToken) {
       setRoomStatus(RoomStatus.CONNECTING);
-      // Delay connection to allow ringtone to play (matching web behavior)
+      // Connect right away; the ringing UI is gated by roomStatus !==
+      // AGENT_JOINED and is left in place until the agent emits audio (or the
+      // silent-grace fallback fires). The tiny delay is kept solely to dodge
+      // React effect mount/unmount races on Hot Reload / StrictMode.
       const connectionTimeout = setTimeout(() => {
         handleConnect();
-      }, RINGING_BELL_DELAY);
+      }, STRICT_MODE_GUARD_MS);
 
       return () => {
         clearTimeout(connectionTimeout);
@@ -218,6 +235,23 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   // }, []);
 
   const attachRoomListeners = useCallback(() => {
+    const transitionToAgentJoined = () => {
+      if (agentJoinedRef.current) return;
+      agentJoinedRef.current = true;
+      if (silentGraceTimerRef.current) {
+        clearTimeout(silentGraceTimerRef.current);
+        silentGraceTimerRef.current = null;
+      }
+      // Stop the ringtone once the agent is actually speaking (or grace-timer
+      // expired) — matches the event-driven ringing behavior on web.
+      try {
+        SoundPlayer.stop();
+      } catch {
+        // Ignore if sound already finished
+      }
+      setRoomStatus(RoomStatus.AGENT_JOINED);
+    };
+
     const onConnected = async () => {
       setRoomStatus(RoomStatus.CONNECTED);
       try {
@@ -230,14 +264,26 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     };
 
     const onRemoteParticipantConnected = () => {
-      // Stop the ringtone once the agent joins (matching web behavior)
-      try {
-        SoundPlayer.stop();
-      } catch {
-        // Ignore if sound already finished
+      setStartTime(prev => prev ?? new Date());
+      // Stay in ringing UI until the agent actually emits audio. For scenarios
+      // where the agent waits for the user to speak first, the grace timer
+      // below promotes us to AGENT_JOINED so the UI doesn't ring forever.
+      if (!agentJoinedRef.current && !silentGraceTimerRef.current) {
+        silentGraceTimerRef.current = setTimeout(() => {
+          silentGraceTimerRef.current = null;
+          transitionToAgentJoined();
+        }, AGENT_SILENT_GRACE_MS);
       }
-      setStartTime(new Date());
-      setRoomStatus(RoomStatus.AGENT_JOINED);
+    };
+
+    const onActiveSpeakersChanged = (speakers: unknown) => {
+      // The agent (or any non-local participant) emitting audio ends the ring.
+      const localIdentity = room.localParticipant?.identity;
+      const list = Array.isArray(speakers) ? speakers : [];
+      const remoteSpeaking = list.some(
+        s => s && (s as {identity?: string}).identity !== localIdentity,
+      );
+      if (remoteSpeaking) transitionToAgentJoined();
     };
 
     const onDisconnected = () => {
@@ -309,13 +355,21 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       .on(RoomEvent.Connected, onConnected)
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
+      .on(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged)
       .on(RoomEvent.DataReceived, onDataReceived);
     return () => {
       room
         .off(RoomEvent.Connected, onConnected)
         .off(RoomEvent.Disconnected, onDisconnected)
         .off(RoomEvent.ParticipantConnected, onRemoteParticipantConnected)
+        .off(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged)
         .off(RoomEvent.DataReceived, onDataReceived);
+      // Reset ringing/agent-joined tracking so a subsequent attach starts fresh.
+      agentJoinedRef.current = false;
+      if (silentGraceTimerRef.current) {
+        clearTimeout(silentGraceTimerRef.current);
+        silentGraceTimerRef.current = null;
+      }
     };
   }, [
     room,
