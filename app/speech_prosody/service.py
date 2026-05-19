@@ -138,6 +138,21 @@ class SpeechProsodyService:
             llm_client: LLM client for generation
         """
         logger.info("[Speech Prosody] generate_and_set_defaults entered")
+
+        # Per-simulation toggle: skip baseline generation entirely when disabled.
+        # Leave _default_params / _current_params empty so the runtime skip path
+        # in apply_voice_expressions is a no-op and the TTS uses provider defaults.
+        if not getattr(scenario.prompt_data, "enable_prosody", True):
+            logger.info(
+                "[Speech Prosody] Prosody disabled for simulation; "
+                "skipping baseline parameter generation"
+            )
+            self._default_params = {}
+            self._current_params = {}
+            self.tts_client._default_params = {}
+            self.tts_client._current_params = {}
+            return
+
         # Get parameter metadata from provider
         parameter_metadata = self.tts_client.get_parameter_metadata()
 

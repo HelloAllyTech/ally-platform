@@ -305,7 +305,8 @@ class AgentWorker:
         self.ctx.add_shutdown_callback(shutdown_handler)
 
     async def _arm_orphan_deadline(self, timeout: float = 30.0) -> None:
-        """Shut down if no human participant joins within `timeout` seconds of the agent joining.
+        """Shut down if no human participant joins within `timeout` seconds
+        of the agent joining.
 
         Prevents a proactively dispatched agent from burning resources indefinitely
         when the user closes the tab after room creation but before connecting.
@@ -313,7 +314,8 @@ class AgentWorker:
         await asyncio.sleep(timeout)
         if not self.ctx.room.remote_participants:
             logger.warning(
-                "[AgentWorker] No human participant joined within %.0fs — orphaned agent, shutting down.",
+                "[AgentWorker] No human participant joined within %.0fs — "
+                "orphaned agent, shutting down.",
                 timeout,
             )
             self.ctx.shutdown("orphaned_no_human")
@@ -330,10 +332,13 @@ class AgentWorker:
             logger.info("[AgentWorker] Prosody configuration applied.")
         except asyncio.TimeoutError:
             logger.warning(
-                "[AgentWorker] Prosody generation timed out after 1.5s, using safe defaults."
+                "[AgentWorker] Prosody generation timed out after 1.5s, "
+                "using safe defaults."
             )
         except Exception as e:
-            logger.error(f"[AgentWorker] Prosody generation failed: {e}. Using safe defaults.")
+            logger.error(
+                f"[AgentWorker] Prosody generation failed: {e}. Using safe defaults."
+            )
         finally:
             self._prosody_task = None
 
@@ -452,28 +457,34 @@ class AgentWorker:
 
             # Step 1: Generate new prosody parameters for termination message
             # Termination is a significant moment - pass current parameters for context
-            # so LLM can make informed decisions about the transition
-            from app.speech_prosody.service import (
-                SpeechProsodyService,
-                generate_and_apply_prosody_for_message,
-            )
+            # so LLM can make informed decisions about the transition.
+            # Skip the prosody pass when the simulation has prosody disabled —
+            # the termination message will play with the TTS provider's defaults.
+            prosody_enabled = getattr(self.scenario.prompt_data, "enable_prosody", True)
+            if prosody_enabled:
+                from app.speech_prosody.service import (
+                    SpeechProsodyService,
+                    generate_and_apply_prosody_for_message,
+                )
 
-            # Get current parameters for context (LLM will decide on transition)
-            prosody_service = SpeechProsodyService(self.tts_client)
-            current_params = prosody_service.get_current_parameters()
+                # Get current parameters for context (LLM will decide on transition)
+                prosody_service = SpeechProsodyService(self.tts_client)
+                current_params = prosody_service.get_current_parameters()
 
-            # Generate parameters for termination message
-            # Pass current parameters so LLM can make context-aware decisions
-            # about the transition (dramatic shift vs subtle change)
-            termination_text_to_say = await generate_and_apply_prosody_for_message(
-                tts_client=self.tts_client,
-                message_text=self._termination_message,
-                llm_client=self.llm_client,
-                scenario=self.scenario,
-                conversation_history=None,  # No history for termination
-                conversation_history_limit=0,
-                current_parameters=current_params,  # Pass current for context
-            )
+                # Generate parameters for termination message
+                # Pass current parameters so LLM can make context-aware decisions
+                # about the transition (dramatic shift vs subtle change)
+                termination_text_to_say = await generate_and_apply_prosody_for_message(
+                    tts_client=self.tts_client,
+                    message_text=self._termination_message,
+                    llm_client=self.llm_client,
+                    scenario=self.scenario,
+                    conversation_history=None,  # No history for termination
+                    conversation_history_limit=0,
+                    current_parameters=current_params,
+                )
+            else:
+                termination_text_to_say = None
 
             if not termination_text_to_say:
                 termination_text_to_say = self._termination_message

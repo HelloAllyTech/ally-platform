@@ -113,6 +113,32 @@ async def test_cache_invalidation_on_scenario_change(
 
 
 @pytest.mark.asyncio
+async def test_skips_baseline_generation_when_prosody_disabled(
+    mock_scenario, mock_tts_client, mock_llm_client
+):
+    """When the simulation has prosody disabled, generate_and_set_defaults
+    must short-circuit before any LLM call and leave params empty so the
+    runtime per-turn skip path is a no-op and the TTS uses its own defaults."""
+    SpeechProsodyService._DEFAULTS_CACHE.clear()
+    mock_scenario.prompt_data.enable_prosody = False
+    service = SpeechProsodyService(mock_tts_client)
+
+    with patch(
+        "app.speech_prosody.service.generate_default_parameters",
+        new_callable=AsyncMock,
+    ) as mock_generate:
+        await service.generate_and_set_defaults(mock_scenario, mock_llm_client)
+
+    # No LLM call, no provider metadata lookup needed
+    assert mock_generate.call_count == 0
+    # Service- and client-side params reset so per-turn skip path is a true no-op
+    assert service._default_params == {}
+    assert service._current_params == {}
+    assert mock_tts_client._default_params == {}
+    assert mock_tts_client._current_params == {}
+
+
+@pytest.mark.asyncio
 async def test_load_from_disk(mock_scenario, mock_tts_client, mock_llm_client):
     """Test that cache is loaded from disk if memory is empty."""
     SpeechProsodyService._DEFAULTS_CACHE.clear()
