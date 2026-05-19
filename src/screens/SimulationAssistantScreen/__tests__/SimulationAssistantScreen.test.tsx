@@ -266,7 +266,8 @@ const baseRouteParams = {
   scenario: {title: 'Persona', coverImageUrl: undefined},
 };
 
-const RINGING_BELL_DELAY = 5000;
+// Just needs to be > STRICT_MODE_GUARD_MS (100ms) so the deferred connect fires.
+const CONNECT_TIMER_ADVANCE_MS = 500;
 
 const renderWithProviders = async (ui: React.ReactElement) => {
   const result = render(
@@ -278,9 +279,9 @@ const renderWithProviders = async (ui: React.ReactElement) => {
       {ui}
     </SafeAreaProvider>,
   );
-  // Advance past the RINGING_BELL_DELAY so the room connection is triggered
+  // Advance past the connect timer so the room connection is triggered.
   await act(async () => {
-    jest.advanceTimersByTime(RINGING_BELL_DELAY);
+    jest.advanceTimersByTime(CONNECT_TIMER_ADVANCE_MS);
   });
   return result;
 };
