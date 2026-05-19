@@ -48,6 +48,8 @@ jest.mock('livekit-client', () => ({
   Track: {Source: {Microphone: 'microphone'}},
 }));
 
+import {TurnState} from '@/types';
+
 import {ParticipantTile} from '../ParticipantTile';
 
 describe('ParticipantTile', () => {
@@ -102,6 +104,29 @@ describe('ParticipantTile', () => {
       <ParticipantTile topLeftOverlay={<View testID="custom-overlay" />} />,
     );
     expect(getByTestId('custom-overlay')).toBeTruthy();
+  });
+
+  it('renders the turn indicator label when turnState is set and not IDLE', () => {
+    const {getByText} = render(
+      <ParticipantTile turnState={TurnState.THINKING} />,
+    );
+    expect(getByText('Thinking...')).toBeTruthy();
+  });
+
+  it('does not render the turn indicator when turnState is IDLE', () => {
+    const {queryByText} = render(
+      <ParticipantTile turnState={TurnState.IDLE} />,
+    );
+    expect(queryByText('Thinking...')).toBeNull();
+    expect(queryByText('Speaking...')).toBeNull();
+    expect(queryByText('Listening...')).toBeNull();
+  });
+
+  it('does not render the turn indicator when turnState is undefined', () => {
+    const {queryByText} = render(<ParticipantTile />);
+    expect(queryByText('Thinking...')).toBeNull();
+    expect(queryByText('Speaking...')).toBeNull();
+    expect(queryByText('Listening...')).toBeNull();
   });
 
   it('calls overlayRef.close on press if overlay is open', () => {
