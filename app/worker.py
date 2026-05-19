@@ -145,28 +145,22 @@ class AgentWorker:
         # Configure LLM client
         self.llm_client = configure_llm_client(self.scenario)
 
-        # Generate and set default voice expression parameters
-        try:
-            logger.info("[AgentWorker] Phase 1: Configuring prosody service...")
-            from app.speech_prosody.service import SpeechProsodyService
+        # Fire prosody generation as a background task so configure() returns
+        # immediately and the agent can join the room while prosody is generating.
+        # _await_prosody() in start() will collect the result before first speech.
 
-            prosody_service = SpeechProsodyService(self.tts_client)
-            await prosody_service.generate_and_set_defaults(
+        from app.speech_prosody.service import SpeechProsodyService
+
+        self._prosody_service = SpeechProsodyService(self.tts_client)
+        self._prosody_task: Optional[asyncio.Task] = asyncio.create_task(
+            self._prosody_service.generate_and_set_defaults(
                 scenario=self.scenario,
                 llm_client=self.llm_client,
             )
-            logger.info("[AgentWorker] Phase 1: Prosody configuration complete.")
-        except Exception as e:
-            logger.error(f"[AgentWorker] Failed to configure prosody: {e}")
-            logger.info(f"[AgentWorker] Phase 1: Prosody configuration failed: {e}")
+        )
+        logger.info("[AgentWorker] Phase 1: Prosody generation started in background.")
 
         logger.info("[AgentWorker] Configuration phase complete")
-        # Get defaults from prosody service (single source of truth)
-        defaults = prosody_service.get_default_parameters()
-
-        # Sync to TTS client for backward compatibility with
-        # get_defaults_for_learn_service()
-        self.tts_client._default_params = defaults.copy()
 
         # Initialize agent state
         agent_joined_iso = initialize_agent_state(
@@ -310,6 +304,39 @@ class AgentWorker:
 
         self.ctx.add_shutdown_callback(shutdown_handler)
 
+    async def _arm_orphan_deadline(self, timeout: float = 30.0) -> None:
+        """Shut down if no human participant joins within `timeout` seconds of the agent joining.
+
+        Prevents a proactively dispatched agent from burning resources indefinitely
+        when the user closes the tab after room creation but before connecting.
+        """
+        await asyncio.sleep(timeout)
+        if not self.ctx.room.remote_participants:
+            logger.warning(
+                "[AgentWorker] No human participant joined within %.0fs — orphaned agent, shutting down.",
+                timeout,
+            )
+            self.ctx.shutdown("orphaned_no_human")
+
+    async def _await_prosody(self) -> None:
+        """Collect the background prosody task and apply defaults to the TTS client."""
+        task = getattr(self, "_prosody_task", None)
+        if task is None:
+            return
+        try:
+            await asyncio.wait_for(task, timeout=1.5)
+            defaults = self._prosody_service.get_default_parameters()
+            self.tts_client._default_params = defaults.copy()
+            logger.info("[AgentWorker] Prosody configuration applied.")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[AgentWorker] Prosody generation timed out after 1.5s, using safe defaults."
+            )
+        except Exception as e:
+            logger.error(f"[AgentWorker] Prosody generation failed: {e}. Using safe defaults.")
+        finally:
+            self._prosody_task = None
+
     async def start(self):
         """
         Connects to room, initializes orchestrator, sets up interruption detection,
@@ -336,6 +363,12 @@ class AgentWorker:
             logger.info("[AgentWorker] Phase 3: Joining room...")
             await self.ctx.connect()
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
+
+            # Arm orphan deadline: if no human joins within 30s the agent was
+            # dispatched proactively but the user never connected — exit cleanly.
+            orphan_task = asyncio.create_task(self._arm_orphan_deadline(timeout=30.0))
+            self._background_tasks.add(orphan_task)
+            orphan_task.add_done_callback(self._background_tasks.discard)
         except Exception as e:
             logger.exception(f"[AgentWorker] Failed to start/join room: {e}")
             logger.info(f"[AgentWorker] Phase 3: Failed to start/join room: {e}")
@@ -346,6 +379,9 @@ class AgentWorker:
 
         # Initialize event orchestrator (only after session is connected)
         await self.event_orchestrator.initialize()
+
+        # Collect background prosody task before first speech synthesis call
+        await self._await_prosody()
 
         if should_say_opening_statement(
             scenario=self.scenario,
@@ -603,7 +639,7 @@ if __name__ == "__main__":
             agent_name=agent_name,
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
-            num_idle_processes=1,
+            num_idle_processes=2,
             api_key=settings.LIVEKIT_API_KEY,
             api_secret=settings.LIVEKIT_API_SECRET,
             ws_url=settings.LIVEKIT_URL,

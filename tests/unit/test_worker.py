@@ -616,6 +616,180 @@ class TestWorker:
 
         assert proc.userdata["vad"] == "VAD_THRESHOLD_0.7"
 
+    # -------------------- _arm_orphan_deadline --------------------
+    @pytest.mark.asyncio
+    async def test_arm_orphan_deadline_shuts_down_when_no_human(self):
+        """If no human joins within the timeout window, the agent shuts down
+        with the orphaned_no_human reason."""
+
+        class MockCtx:
+            def __init__(self):
+                # No remote participants — simulates user never connecting.
+                self.room = types.SimpleNamespace(name="room-1", remote_participants={})
+                self.shutdown_calls = []
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+
+        # 50ms is enough to confirm the timer fires without slowing CI.
+        await worker_instance._arm_orphan_deadline(timeout=0.05)
+
+        assert ctx.shutdown_calls == ["orphaned_no_human"]
+
+    @pytest.mark.asyncio
+    async def test_arm_orphan_deadline_does_not_shut_down_when_human_present(self):
+        """If a human participant has joined before the deadline, the agent
+        stays alive and does not call ctx.shutdown."""
+
+        class MockCtx:
+            def __init__(self):
+                # remote_participants populated — simulates a connected user.
+                self.room = types.SimpleNamespace(
+                    name="room-1",
+                    remote_participants={
+                        "user-1": types.SimpleNamespace(identity="user-1")
+                    },
+                )
+                self.shutdown_calls = []
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+
+        await worker_instance._arm_orphan_deadline(timeout=0.05)
+
+        assert ctx.shutdown_calls == []
+
+    # -------------------- _await_prosody --------------------
+    @pytest.mark.asyncio
+    async def test_await_prosody_no_op_when_task_is_none(self):
+        """If configure() never started a prosody task, _await_prosody is a no-op."""
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        worker_instance = worker.AgentWorker(MockCtx())
+        worker_instance._prosody_task = None
+        worker_instance.tts_client = Mock(_default_params={})
+        worker_instance._prosody_service = Mock()
+
+        # Should return cleanly without touching tts_client._default_params or
+        # invoking the prosody service.
+        await worker_instance._await_prosody()
+
+        worker_instance._prosody_service.get_default_parameters.assert_not_called()
+        assert worker_instance.tts_client._default_params == {}
+
+    @pytest.mark.asyncio
+    async def test_await_prosody_applies_defaults_on_success(self):
+        """When the background prosody task completes in time, the generated
+        defaults are copied onto the TTS client."""
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        worker_instance = worker.AgentWorker(MockCtx())
+        worker_instance.tts_client = Mock(_default_params={})
+
+        prosody_defaults = {"rate": 1.0, "pitch": 0.0}
+        worker_instance._prosody_service = Mock()
+        worker_instance._prosody_service.get_default_parameters = Mock(
+            return_value=prosody_defaults
+        )
+
+        async def completed_task():
+            return None
+
+        worker_instance._prosody_task = asyncio.create_task(completed_task())
+
+        await worker_instance._await_prosody()
+
+        worker_instance._prosody_service.get_default_parameters.assert_called_once()
+        assert worker_instance.tts_client._default_params == prosody_defaults
+        # finally-block clears the task ref so we don't await it twice.
+        assert worker_instance._prosody_task is None
+
+    @pytest.mark.asyncio
+    async def test_await_prosody_uses_safe_defaults_on_timeout(self, monkeypatch):
+        """If prosody generation runs past the 1.5s ceiling, _await_prosody
+        swallows the TimeoutError and leaves the TTS client untouched."""
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        worker_instance = worker.AgentWorker(MockCtx())
+        worker_instance.tts_client = Mock(_default_params={})
+        worker_instance._prosody_service = Mock()
+        worker_instance._prosody_service.get_default_parameters = Mock(
+            return_value={"rate": 1.0}
+        )
+
+        async def slow_task():
+            await asyncio.sleep(10)
+
+        worker_instance._prosody_task = asyncio.create_task(slow_task())
+
+        # Patch asyncio.wait_for to simulate a timeout immediately so tests stay
+        # fast; the real function would wait 1.5s before raising.
+        async def fake_wait_for(coro, timeout):
+            if asyncio.iscoroutine(coro):
+                coro.close()
+            elif isinstance(coro, asyncio.Task):
+                coro.cancel()
+                try:
+                    await coro
+                except (asyncio.CancelledError, Exception):
+                    pass
+            raise asyncio.TimeoutError()
+
+        monkeypatch.setattr(asyncio, "wait_for", fake_wait_for)
+
+        # Should not raise.
+        await worker_instance._await_prosody()
+
+        # Defaults should NOT have been applied on timeout.
+        worker_instance._prosody_service.get_default_parameters.assert_not_called()
+        assert worker_instance.tts_client._default_params == {}
+        # finally-block still clears the task ref.
+        assert worker_instance._prosody_task is None
+
+    @pytest.mark.asyncio
+    async def test_await_prosody_handles_exception_gracefully(self):
+        """If the prosody task raises an exception, _await_prosody catches it
+        and falls back to safe defaults without propagating."""
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        worker_instance = worker.AgentWorker(MockCtx())
+        worker_instance.tts_client = Mock(_default_params={})
+        worker_instance._prosody_service = Mock()
+        worker_instance._prosody_service.get_default_parameters = Mock(
+            return_value={"rate": 1.0}
+        )
+
+        async def failing_task():
+            raise RuntimeError("prosody generation blew up")
+
+        worker_instance._prosody_task = asyncio.create_task(failing_task())
+
+        # Should not raise — the exception is caught and logged.
+        await worker_instance._await_prosody()
+
+        # Defaults should NOT have been applied on failure.
+        worker_instance._prosody_service.get_default_parameters.assert_not_called()
+        assert worker_instance.tts_client._default_params == {}
+        assert worker_instance._prosody_task is None
+
     # -------------------- publish_termination_audio --------------------
     # NOTE: publish_termination_audio was removed - termination handling
     # is now done in worker._handle_termination_in_entrypoint_context
