@@ -78,7 +78,9 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
         {topLeftOverlay}
 
         {turnState && turnState !== TurnState.IDLE && (
-          <TurnIndicator turnState={turnState} />
+          <View style={styles.turnIndicatorOverlay}>
+            <TurnIndicator turnState={turnState} />
+          </View>
         )}
 
         {/* Active Speaker Overlay (Bottom Left) */}
@@ -126,6 +128,12 @@ const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  turnIndicatorOverlay: {
+    position: 'absolute',
+    top: '12@ms',
+    right: '12@ms',
+    zIndex: 2,
   },
   speakerOverlay: {
     position: 'absolute',
