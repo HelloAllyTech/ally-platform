@@ -252,15 +252,48 @@ async def _orchestrate_and_split_events(
     """Orchestrate events and split them by type."""
     detected_event_ids = {event.event_id for event in new_events}
 
-    with time_operation("Event orchestration"):
-        _, additional_score, all_feedback_data = await orchestrator.orchestrate_events(
-            room=room,
-            detected_event_ids=(detected_event_ids if detected_event_ids else None),
-        )
-
+    # Wrap event orchestration in asyncio.wait_for. The orchestrator runs
+    # its own LLM calls (branching resolution, feedback generation) which can
+    # hang if upstream providers are slow. On timeout we return empty results
+    # so the agent can still produce a response. See ORCHESTRATION_TIMEOUT in
+    # app/core/config.py.
+    _orch_start = datetime.now(timezone.utc)
     logger.info(
-        f"Event orchestration completed (total events: {len(all_feedback_data)})"
+        "[orchestrate_events] orchestration_start timeout=%ss events=%d",
+        settings.ORCHESTRATION_TIMEOUT,
+        len(new_events),
     )
+    try:
+        with time_operation("Event orchestration"):
+            (
+                _,
+                additional_score,
+                all_feedback_data,
+            ) = await asyncio.wait_for(
+                orchestrator.orchestrate_events(
+                    room=room,
+                    detected_event_ids=(
+                        detected_event_ids if detected_event_ids else None
+                    ),
+                ),
+                timeout=settings.ORCHESTRATION_TIMEOUT,
+            )
+        _orch_latency = (datetime.now(timezone.utc) - _orch_start).total_seconds()
+        logger.info(
+            "Event orchestration completed (total events: %d, latency_s=%.2f)",
+            len(all_feedback_data),
+            _orch_latency,
+        )
+    except asyncio.TimeoutError:
+        _orch_latency = (datetime.now(timezone.utc) - _orch_start).total_seconds()
+        logger.error(
+            "[orchestrate_events] orchestration_timeout latency_s=%.2f "
+            "timeout=%ss events=%d — returning empty results",
+            _orch_latency,
+            settings.ORCHESTRATION_TIMEOUT,
+            len(new_events),
+        )
+        return 0, [], []
 
     branching_data, non_branching_data = _split_events_by_type(all_feedback_data)
     _log_event_data(all_feedback_data)
@@ -829,8 +862,54 @@ async def generate_response(
     # Get LLM instance
     llm_instance = llm_client.llm_instance
 
-    # Generate response - no tools, just generate response text
-    response = await llm_instance.ainvoke(messages_to_send)
+    # Generate response - no tools, just generate response text.
+    # Wrapped in asyncio.wait_for so a hanging upstream LLM (OpenAI/Gemini)
+    # cannot block the agent in "thinking" state indefinitely. See
+    # LLM_RESPONSE_TIMEOUT in app/core/config.py.
+    llm_model_name = (
+        getattr(llm_instance, "model_name", None)
+        or getattr(llm_instance, "model", None)
+        or "unknown"
+    )
+    _llm_start = datetime.now(timezone.utc)
+    logger.info(
+        "[generate_response] llm_call_start model=%s timeout=%ss messages=%d",
+        llm_model_name,
+        settings.LLM_RESPONSE_TIMEOUT,
+        len(messages_to_send),
+    )
+    try:
+        response = await asyncio.wait_for(
+            llm_instance.ainvoke(messages_to_send),
+            timeout=settings.LLM_RESPONSE_TIMEOUT,
+        )
+        _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
+        logger.info(
+            "[generate_response] llm_call_complete model=%s latency_s=%.2f "
+            "content_chars=%d",
+            llm_model_name,
+            _llm_latency,
+            len(getattr(response, "content", "") or ""),
+        )
+    except asyncio.TimeoutError:
+        _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
+        logger.error(
+            "[generate_response] llm_call_timeout model=%s latency_s=%.2f "
+            "timeout=%ss — returning safe fallback message",
+            llm_model_name,
+            _llm_latency,
+            settings.LLM_RESPONSE_TIMEOUT,
+        )
+        response = AIMessage(content="Sorry, can you say that again?")
+    except Exception as e:
+        _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
+        logger.exception(
+            "[generate_response] llm_call_failed model=%s latency_s=%.2f error=%s",
+            llm_model_name,
+            _llm_latency,
+            str(e),
+        )
+        raise
 
     # Log interaction for evaluation if logging is enabled
     if settings.EVALUATION_LOGGING_ENABLED:
@@ -1307,14 +1386,59 @@ async def apply_voice_expressions(
         if hasattr(tts_client, "_current_params") and tts_client._current_params:
             current_parameters = tts_client._current_params.copy()
 
-        enhanced_text = await generate_and_apply_prosody_for_message(
-            tts_client=tts_client,
-            message_text=response_text,
-            llm_client=llm_client,
-            scenario=scenario,
-            conversation_history=conversation_history,
-            current_parameters=current_parameters,
+        # Wrap prosody generation in asyncio.wait_for so a hanging upstream
+        # prosody LLM call cannot block done_thinking from firing. On timeout
+        # we fall back to the original (un-enhanced) text. See
+        # PROSODY_GENERATION_TIMEOUT in app/core/config.py.
+        _prosody_start = datetime.now(timezone.utc)
+        logger.info(
+            "[apply_voice_expressions] prosody_call_start timeout=%ss text_chars=%d",
+            settings.PROSODY_GENERATION_TIMEOUT,
+            len(response_text or ""),
         )
+        try:
+            enhanced_text = await asyncio.wait_for(
+                generate_and_apply_prosody_for_message(
+                    tts_client=tts_client,
+                    message_text=response_text,
+                    llm_client=llm_client,
+                    scenario=scenario,
+                    conversation_history=conversation_history,
+                    current_parameters=current_parameters,
+                ),
+                timeout=settings.PROSODY_GENERATION_TIMEOUT,
+            )
+            _prosody_latency = (
+                datetime.now(timezone.utc) - _prosody_start
+            ).total_seconds()
+            logger.info(
+                "[apply_voice_expressions] prosody_call_complete latency_s=%.2f "
+                "enhanced=%s",
+                _prosody_latency,
+                enhanced_text is not None,
+            )
+        except asyncio.TimeoutError:
+            _prosody_latency = (
+                datetime.now(timezone.utc) - _prosody_start
+            ).total_seconds()
+            logger.error(
+                "[apply_voice_expressions] prosody_call_timeout latency_s=%.2f "
+                "timeout=%ss — falling back to original text",
+                _prosody_latency,
+                settings.PROSODY_GENERATION_TIMEOUT,
+            )
+            enhanced_text = None
+        except Exception as e:
+            _prosody_latency = (
+                datetime.now(timezone.utc) - _prosody_start
+            ).total_seconds()
+            logger.exception(
+                "[apply_voice_expressions] prosody_call_failed latency_s=%.2f "
+                "error=%s — falling back to original text",
+                _prosody_latency,
+                str(e),
+            )
+            enhanced_text = None
 
         if enhanced_text is not None:
             # Text was enhanced (provider supports text enhancement)

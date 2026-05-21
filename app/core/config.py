@@ -101,6 +101,32 @@ class Settings(BaseSettings):
     )
     HUME_API_KEY: str = Field(...)
 
+    # Timeouts for LLM-bound turn-processing nodes. These prevent the LiveKit
+    # agent from getting stuck in "thinking" state if an upstream provider
+    # (OpenAI, Gemini, etc.) hangs indefinitely.
+    LLM_RESPONSE_TIMEOUT: float = Field(
+        default=30.0,
+        description=(
+            "Upper limit in seconds for the main LLM ainvoke() call in "
+            "generate_response. On timeout, a safe fallback message is returned."
+        ),
+    )
+    PROSODY_GENERATION_TIMEOUT: float = Field(
+        default=15.0,
+        description=(
+            "Upper limit in seconds for prosody / voice-expression LLM call in "
+            "apply_voice_expressions. On timeout, the original text is used."
+        ),
+    )
+    ORCHESTRATION_TIMEOUT: float = Field(
+        default=20.0,
+        description=(
+            "Upper limit in seconds for event orchestration "
+            "(orchestrator.orchestrate_events). On timeout, empty results are "
+            "returned so generate_response still fires."
+        ),
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(
