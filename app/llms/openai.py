@@ -71,11 +71,17 @@ class OpenAILLMClient(BaseLLMClient):
             + (f", base_url: {base_url}" if base_url else "")
         )
 
-        # Create the underlying LLM instance
+        # Create the underlying LLM instance.
+        # timeout/max_retries cap the worst-case duration of any single LLM
+        # call. Without these, openai-python defaults to 600s timeout and 2
+        # retries, so a slow OpenAI response can hang the agent for many
+        # minutes, manifesting as a "stuck thinking" freeze for the user.
         chat_kwargs: Dict[str, Any] = {
             "model": self._model,
             "temperature": self._temperature,
             "api_key": self._api_key,
+            "timeout": 30,
+            "max_retries": 1,
         }
         if self._base_url:
             chat_kwargs["base_url"] = self._base_url

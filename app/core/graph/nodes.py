@@ -545,7 +545,10 @@ async def resolve_branching_instruction(
                                 "llm_client"
                             )
 
-                    # Lazily resolve llm_response tags if present (BLOCKING operation)
+                    # Lazily resolve llm_response tags if present (BLOCKING operation).
+                    # Wrapped in asyncio.wait_for so a hanging upstream LLM cannot
+                    # park this node indefinitely (would manifest as the user being
+                    # stuck on the "thinking" indicator).
                     if instruction.needs_llm_resolution():
                         logger.info(
                             "Resolving LLM response tags for branching instruction "
@@ -558,10 +561,19 @@ async def resolve_branching_instruction(
                             }
                             if branching_llm_client is not None:
                                 resolve_kwargs["llm_client"] = branching_llm_client
-                            await instruction.resolve_llm_responses(**resolve_kwargs)
+                            try:
+                                await asyncio.wait_for(
+                                    instruction.resolve_llm_responses(**resolve_kwargs),
+                                    timeout=10.0,
+                                )
+                            except asyncio.TimeoutError:
+                                logger.warning(
+                                    "Branching LLM resolution timed out after 10s; "
+                                    "proceeding with unresolved instruction"
+                                )
 
                     # Use the branching instruction content
-                    # (with llm_response tags resolved)
+                    # (with llm_response tags resolved). Same timeout guard.
                     dynamic_kwargs = {
                         "messages": state.messages,
                         "llm_config": llm_config_for_branching,
@@ -569,11 +581,19 @@ async def resolve_branching_instruction(
                     }
                     if branching_llm_client is not None:
                         dynamic_kwargs["llm_client"] = branching_llm_client
-                    next_instruction = (
-                        await instruction.resolve_dynamic_branching_instruction(
-                            **dynamic_kwargs
+                    try:
+                        next_instruction = await asyncio.wait_for(
+                            instruction.resolve_dynamic_branching_instruction(
+                                **dynamic_kwargs
+                            ),
+                            timeout=15.0,
                         )
-                    )
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            "Dynamic branching instruction resolution timed out "
+                            "after 15s; falling back to instruction.content"
+                        )
+                        next_instruction = getattr(instruction, "content", None)
 
                     logger.info("Using next instruction: %s", next_instruction)
 
@@ -1161,9 +1181,20 @@ async def retrieve_knowledge(
     )
     logger.info(f"Knowledge sources: {knowledge_summary}")
 
-    retrieved_context = await retrieve_relevant_knowledge(
-        llm_client, state.messages, knowledge_map
-    )
+    # Wrap in asyncio.wait_for so a hanging upstream LLM doesn't keep this
+    # parallel branch (and therefore the graph join) waiting forever, which
+    # leaves the user stuck on the "thinking" indicator. On timeout we
+    # proceed without retrieved context — the agent still produces a reply.
+    try:
+        retrieved_context = await asyncio.wait_for(
+            retrieve_relevant_knowledge(llm_client, state.messages, knowledge_map),
+            timeout=8.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Knowledge retrieval timed out after 8s; proceeding without context"
+        )
+        retrieved_context = None
 
     return {"retrieved_context": retrieved_context or None}
 

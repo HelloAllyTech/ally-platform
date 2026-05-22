@@ -43,7 +43,11 @@ class TestOpenAILLMClient:
 
         assert isinstance(client, BaseLLMClient)
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4o-mini", temperature=0.7, api_key="test-api-key"
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -60,7 +64,11 @@ class TestOpenAILLMClient:
         client = OpenAILLMClient(model="gpt-4o-mini", language_code="hi-IN")
 
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4o-mini", temperature=0.7, api_key="test-api-key"
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -79,7 +87,11 @@ class TestOpenAILLMClient:
         )
 
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4o-mini", temperature=0.9, api_key="custom-key"
+            model="gpt-4o-mini",
+            temperature=0.9,
+            api_key="custom-key",
+            timeout=30,
+            max_retries=1,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -122,7 +134,11 @@ class TestOpenAILLMClient:
 
         assert isinstance(client, OpenAILLMClient)
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4", temperature=0.8, api_key="test-api-key"
+            model="gpt-4",
+            temperature=0.8,
+            api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -144,7 +160,11 @@ class TestOpenAILLMClient:
 
         assert isinstance(client, OpenAILLMClient)
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4", temperature=0.8, api_key="test-api-key"
+            model="gpt-4",
+            temperature=0.8,
+            api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
         )
 
 
@@ -275,6 +295,8 @@ class TestOpenAILLMClientBaseUrl:
             model="llama3.2",
             temperature=0.7,
             api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
             base_url="http://localhost:11434/v1",
         )
 
@@ -299,6 +321,8 @@ class TestOpenAILLMClientBaseUrl:
             model="llama3.2",
             temperature=0.7,
             api_key="not-needed",
+            timeout=30,
+            max_retries=1,
             base_url="http://localhost:11434/v1",
         )
         assert client.llm_instance is not None
@@ -320,6 +344,8 @@ class TestOpenAILLMClientBaseUrl:
             model="gpt-4o-mini",
             temperature=0.7,
             api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
         )
 
     @pytest.mark.unit
@@ -341,6 +367,8 @@ class TestOpenAILLMClientBaseUrl:
             model="llama3.2",
             temperature=0.7,
             api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
             base_url="http://localhost:11434/v1",
         )
 
@@ -471,7 +499,11 @@ class TestLLMAbstractionIntegration:
         assert isinstance(client, OpenAILLMClient)
         assert llm == mock_llm_instance
         mock_chat_openai_class.assert_called_once_with(
-            model="gpt-4o-mini", temperature=0.7, api_key="test-key"
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-key",
+            timeout=30,
+            max_retries=1,
         )
 
     @pytest.mark.integration

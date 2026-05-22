@@ -537,6 +537,16 @@ async def entrypoint(ctx: agents.JobContext):
         agent = Agent(options=WorkerOptions(...))
         await agent.run_from_notebook(entrypoint)
     """
+    # Opt-in concurrency/freeze diagnostics. No-op unless
+    # AGENT_DIAGNOSTICS_INTERVAL is set in the environment. Wrapped in
+    # try/except so a bug in diagnostics can never prevent a job from running.
+    try:
+        from app.core.diagnostics import start_diagnostics
+
+        start_diagnostics()
+    except Exception as _diag_exc:
+        logger.warning("Failed to start diagnostics, continuing: %r", _diag_exc)
+
     worker = AgentWorker(ctx)
     logger.info(f"[AgentWorker] Starting job {ctx.job.id}...")
     await worker.configure()  # Phase 1: Configure clients
