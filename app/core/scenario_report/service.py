@@ -39,7 +39,13 @@ logger = get_logger(__name__)
 
 # Semaphore to limit concurrent report generation tasks
 # Prevents memory spikes from too many simultaneous reports
-_report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
+_report_semaphore = None
+
+def _get_report_semaphore():
+    global _report_semaphore
+    if _report_semaphore is None:
+        _report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
+    return _report_semaphore
 
 # --------------- Anti-stagnation prompt fragments ---------------
 # Loaded from .txt so they can be edited via the dashboard override system.
@@ -82,7 +88,7 @@ async def run_report_with_concurrency_limit(
             waiting_count,
         )
 
-    async with _report_semaphore:
+    async with _get_report_semaphore():
         logger.info(
             "Report %s started execution (concurrency slot acquired)",
             report_id,
