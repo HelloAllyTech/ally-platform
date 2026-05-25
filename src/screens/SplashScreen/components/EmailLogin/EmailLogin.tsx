@@ -5,13 +5,14 @@ import {Alert, Linking, Text, TextInput, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 
 import {Button} from '@/components';
+import {AppleLoginButton} from '@/components/Button/AppleLoginButton';
 import {GoogleLoginButton} from '@/components/Button/GoogleLoginButton';
 import {
   isIOS,
   PRIVACY_POLICY_URL,
   TERMS_AND_CONDITIONS_URL,
 } from '@/constants/general';
-import {useGoogleLogin, useTranslate} from '@/hooks';
+import {useAppleLogin, useGoogleLogin, useTranslate} from '@/hooks';
 import {AuthResponse, useGenerateOtpMutation} from '@/services/authApi';
 import {useAppDispatch} from '@/store/hooks';
 import {storeTokens} from '@/store/slices/userSlice';
@@ -51,6 +52,10 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
     useGoogleLogin({
       onLoginSuccess: handleGoogleLoginSuccess,
     });
+
+  const {signIn: handleAppleSignIn, isLoading: isAppleLoading} = useAppleLogin({
+    onLoginSuccess: handleGoogleLoginSuccess,
+  });
 
   const handleAcceptTerms = useCallback(async () => {
     const tokens = tempTokensRef.current;
@@ -102,7 +107,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
     }
   }, [email, generateOtp]);
 
-  const isLoading = isOtpLoading || isGoogleLoading;
+  const isLoading = isOtpLoading || isGoogleLoading || isAppleLoading;
 
   return (
     <View style={styles.container}>
@@ -157,6 +162,14 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
             isLoading={isGoogleLoading}
             isDisabled={isLoading}
           />
+
+          {isIOS && (
+            <AppleLoginButton
+              onPress={handleAppleSignIn}
+              isLoading={isAppleLoading}
+              isDisabled={isLoading}
+            />
+          )}
         </View>
         <View style={styles.bottomContainer}>
           <View style={styles.termsContainer}>

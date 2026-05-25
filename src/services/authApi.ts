@@ -27,6 +27,15 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export interface AppleLoginRequest {
+  identityToken: string;
+  authorizationCode?: string;
+  fullName?: {
+    givenName?: string | null;
+    familyName?: string | null;
+  };
+}
+
 export interface GetPresignedUrlRequest {
   fileName: string;
   fileSize: number;
@@ -72,6 +81,18 @@ export const authApi = api.injectEndpoints({
         url: API_ROUTES.AUTH.GOOGLE_LOGIN,
         method: API_METHODS.POST,
         body: {idToken, allowedRoles: ALLOWED_ROLES},
+      }),
+    }),
+    loginWithApple: builder.mutation<AuthResponse, AppleLoginRequest>({
+      query: ({identityToken, authorizationCode, fullName}) => ({
+        url: API_ROUTES.AUTH.APPLE_LOGIN,
+        method: API_METHODS.POST,
+        body: {
+          identityToken,
+          authorizationCode,
+          fullName,
+          allowedRoles: ALLOWED_ROLES,
+        },
       }),
     }),
     getUser: builder.query<User, void>({
@@ -147,6 +168,7 @@ export const {
   useGenerateOtpMutation,
   useVerifyOtpMutation,
   useLoginWithGoogleMutation,
+  useLoginWithAppleMutation,
   useLazyGetUserQuery,
   useLazyGetPermissionsQuery,
   useGetProfileImagePresignedUrlMutation,

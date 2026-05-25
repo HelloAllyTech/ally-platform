@@ -85,6 +85,7 @@ export const API_ROUTES = {
     GENERATE_OTP: '/auth/generate-otp',
     VERIFY_OTP: '/auth/verify-otp',
     GOOGLE_LOGIN: '/auth/google',
+    APPLE_LOGIN: '/auth/apple',
     PERMISSIONS: '/authorization/permissions',
   },
   USERS: {
