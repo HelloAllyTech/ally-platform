@@ -36,6 +36,23 @@ jest.mock('@/components/Button/GoogleLoginButton', () => {
   };
 });
 
+jest.mock('@/components/Button/AppleLoginButton', () => {
+  const React = require('react');
+  const {Text} = require('react-native');
+  return {
+    AppleLoginButton: ({onPress, isLoading, isDisabled}: any) =>
+      React.createElement(
+        Text,
+        {
+          accessibilityRole: 'button',
+          onPress: isDisabled || isLoading ? undefined : onPress,
+          testID: 'apple-login-button',
+        },
+        isLoading ? 'Loading...' : 'Continue with Apple',
+      ),
+  };
+});
+
 jest.mock('@/services/authApi', () => ({
   useGenerateOtpMutation: () => [jest.fn().mockResolvedValue({}), {isLoading: false, isSuccess: false, isError: false}],
 }));
@@ -48,6 +65,10 @@ jest.mock('@/store/slices/userSlice', () => ({
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (k: string) => k}),
   useGoogleLogin: () => ({
+    signIn: jest.fn(),
+    isLoading: false,
+  }),
+  useAppleLogin: () => ({
     signIn: jest.fn(),
     isLoading: false,
   }),

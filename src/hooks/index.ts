@@ -1,4 +1,5 @@
 export * from './useAppNavigation';
+export * from './useAppleLogin';
 export * from './useCallSummaryActions';
 export * from './useCallSummaryForm';
 export * from './useCallTranscriptDetails';

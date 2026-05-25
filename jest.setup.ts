@@ -181,6 +181,29 @@ jest.mock('react-native-config', () => {
   };
 });
 
+// Mock @invertase/react-native-apple-authentication (loads native code at import time)
+jest.mock('@invertase/react-native-apple-authentication', () => {
+  const React = require('react');
+  const {Text} = require('react-native');
+  const AppleButton: any = ({onPress}: {onPress: () => void}) =>
+    React.createElement(Text, {onPress}, 'Continue with Apple');
+  AppleButton.Style = {BLACK: 'BLACK', WHITE: 'WHITE'};
+  AppleButton.Type = {CONTINUE: 'CONTINUE', SIGN_IN: 'SIGN_IN'};
+  return {
+    AppleButton,
+    appleAuth: {performRequest: jest.fn()},
+    AppleError: {
+      CANCELED: '1001',
+      FAILED: '1000',
+      INVALID_RESPONSE: '1002',
+      NOT_HANDLED: '1003',
+      UNKNOWN: '1000',
+    },
+    AppleRequestOperation: {LOGIN: 1, REFRESH: 2, LOGOUT: 3},
+    AppleRequestScope: {EMAIL: 0, FULL_NAME: 1},
+  };
+});
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),

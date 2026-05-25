@@ -73,6 +73,8 @@ describe('constants/general', () => {
     expect(API_ROUTES.AUTH.REFRESH).toBe('/auth/refresh');
     expect(API_ROUTES.AUTH.GENERATE_OTP).toBe('/auth/generate-otp');
     expect(API_ROUTES.AUTH.VERIFY_OTP).toBe('/auth/verify-otp');
+    expect(API_ROUTES.AUTH.GOOGLE_LOGIN).toBe('/auth/google');
+    expect(API_ROUTES.AUTH.APPLE_LOGIN).toBe('/auth/apple');
     expect(API_ROUTES.AUTH.PERMISSIONS).toBe('/authorization/permissions');
   });
 
