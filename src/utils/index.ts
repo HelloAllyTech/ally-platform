@@ -7,6 +7,7 @@ export * from './date';
 export * from './error';
 export * from './fieldRenderer';
 export * from './fileOperations';
+export * from './html';
 export * from './imageUpload';
 export * from './navigation';
 export * from './validation';
