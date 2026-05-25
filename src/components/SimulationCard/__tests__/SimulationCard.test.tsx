@@ -243,11 +243,28 @@ describe('SimulationCard', () => {
   });
 
   it('handles special characters in description', () => {
-    const specialDesc = 'Description with & special <> characters "test"';
+    const specialDesc = 'Description with & special characters "test"';
     const {getByText} = render(
       <SimulationCard title="Test" description={specialDesc} />,
     );
     expect(getByText(specialDesc)).toBeTruthy();
+  });
+
+  it('strips HTML tags from description and decodes entities', () => {
+    const htmlDesc =
+      '<p>Hello <strong>world</strong></p><p>Tom &amp; Jerry</p>';
+    const {getByText, queryByText} = render(
+      <SimulationCard title="Test" description={htmlDesc} />,
+    );
+    expect(getByText('Hello world Tom & Jerry')).toBeTruthy();
+    expect(queryByText(htmlDesc)).toBeNull();
+  });
+
+  it('does not render description when value is HTML that strips to empty', () => {
+    const {queryByText} = render(
+      <SimulationCard title="Test" description="<p></p>" />,
+    );
+    expect(queryByText('<p></p>')).toBeNull();
   });
 
   it('responds to press events when onPress is provided', () => {

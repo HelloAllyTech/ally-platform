@@ -11,6 +11,7 @@ import {
   radius,
   typography,
 } from '@/theme';
+import {htmlToPlainText} from '@/utils';
 
 export interface SimulationCardProps {
   title: string;
@@ -40,6 +41,7 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
   triggerWarnings,
 }) => {
   const {t} = useTranslation();
+  const plainDescription = htmlToPlainText(description);
 
   return (
     <View style={styles.cardContainer}>
@@ -62,11 +64,11 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
             <Text style={styles.cardTitle} numberOfLines={titleNumberOfLines}>
               {title || '-'}
             </Text>
-            {!!description && (
+            {!!plainDescription && (
               <Text
                 style={styles.cardDesc}
                 numberOfLines={descriptionNumberOfLines}>
-                {description}
+                {plainDescription}
               </Text>
             )}
             {!!triggerWarnings?.length && (
