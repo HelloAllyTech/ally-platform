@@ -85,17 +85,53 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     _agent_speaking_start: list[float | None] = [None]
     _user_speaking_start: list[float | None] = [None]
 
+    # Latency tracking: timestamp of the most recent user "stopped speaking"
+    # transition. When the agent next transitions to "speaking", we compute the
+    # delta and log it as [LATENCY] response_latency_ms — this is the
+    # user-perceived response latency that preempt is supposed to reduce.
+    _user_speech_end_ts: list[float | None] = [None]
+
     # ---- state-change handlers ----
 
     def on_agent_state_changed(event: AgentStateChangedEvent):
         if event.new_state == "speaking":
             _agent_speaking_start[0] = event.created_at
             logger.debug(f"Agent started speaking at {event.created_at}")
+            # Compute response latency if we have a matching user_speech_end
+            user_end = _user_speech_end_ts[0]
+            if user_end is not None:
+                latency_ms = (event.created_at - user_end) * 1000
+                logger.info(
+                    "[LATENCY] response_latency_ms=%.1f room=%s "
+                    "user_speech_end=%.3f agent_speech_start=%.3f",
+                    latency_ms,
+                    room_id,
+                    user_end,
+                    event.created_at,
+                )
+                _user_speech_end_ts[0] = None  # consume
+            else:
+                logger.info(
+                    "[LATENCY] agent_speech_start room=%s ts=%.3f "
+                    "(no matching user_speech_end)",
+                    room_id,
+                    event.created_at,
+                )
 
     def on_user_state_changed(event: UserStateChangedEvent):
         if event.new_state == "speaking":
             _user_speaking_start[0] = event.created_at
             logger.debug(f"User started speaking at {event.created_at}")
+        else:
+            # User left "speaking" — endpointing fired (or interim ended).
+            # Stash this as the start of the latency measurement window.
+            _user_speech_end_ts[0] = event.created_at
+            logger.info(
+                "[LATENCY] user_speech_end room=%s new_state=%s ts=%.3f",
+                room_id,
+                event.new_state,
+                event.created_at,
+            )
 
     # ---- main conversation handler ----
 

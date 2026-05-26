@@ -11,6 +11,7 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
+from app.core.graph.instrumentation import instrumented_node, log_side_effect
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -263,6 +264,11 @@ async def _orchestrate_and_split_events(
         settings.ORCHESTRATION_TIMEOUT,
         len(new_events),
     )
+    log_side_effect(
+        "orchestrate_events_begin",
+        events=len(new_events),
+        detected_ids=",".join(sorted(detected_event_ids)) or "none",
+    )
     try:
         with time_operation("Event orchestration"):
             (
@@ -278,6 +284,11 @@ async def _orchestrate_and_split_events(
                 ),
                 timeout=settings.ORCHESTRATION_TIMEOUT,
             )
+        log_side_effect(
+            "orchestrate_events_complete",
+            additional_score=additional_score,
+            feedback_count=len(all_feedback_data),
+        )
         _orch_latency = (datetime.now(timezone.utc) - _orch_start).total_seconds()
         logger.info(
             "Event orchestration completed (total events: %d, latency_s=%.2f)",
@@ -376,6 +387,7 @@ async def _publish_done_thinking(room) -> None:
         logger.warning(f"Failed to publish done_thinking state: {e}")
 
 
+@instrumented_node("process_events")
 async def process_events(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -394,6 +406,7 @@ async def process_events(
 
     if room:
         try:
+            log_side_effect("ui_publish_thinking_state")
             await room.local_participant.publish_data(
                 json.dumps({"type": "AGENT_STATE", "state": "thinking"}).encode(),
                 reliable=True,
@@ -463,6 +476,7 @@ async def process_events(
         return result
 
 
+@instrumented_node("resolve_branching_instruction")
 async def resolve_branching_instruction(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -725,6 +739,7 @@ async def _detect_behavior_instructions(
     return results
 
 
+@instrumented_node("detect_behaviors")
 async def detect_behaviors(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -771,6 +786,11 @@ async def detect_behaviors(
 
     # Accumulate behavior scores in ScoreKeeper
     if score_keeper and behavior_feedback:
+        log_side_effect(
+            "score_keeper_add_behavior",
+            count=len(behavior_feedback),
+            scores=",".join(str(f.score) for f in behavior_feedback),
+        )
         for feedback in behavior_feedback:
             await score_keeper.add_behavior_score(feedback.score)
         logger.info(
@@ -781,6 +801,7 @@ async def detect_behaviors(
     return {"behavior_feedback_data": behavior_feedback}
 
 
+@instrumented_node("generate_response")
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -980,6 +1001,7 @@ async def generate_response(
     }
 
 
+@instrumented_node("send_event_feedback")
 async def send_event_feedback(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -1103,6 +1125,12 @@ async def send_event_feedback(
                 )
 
                 logger.info("Sending combined feedback to UI:")
+                log_side_effect(
+                    "ui_publish_score",
+                    cumulative_score=cumulative_score,
+                    event_count=len(all_active_events_data),
+                    behavior_count=len(behavior_scores),
+                )
                 await send_event_to_ui(ui_message, room)
                 logger.info("UI feedback sent successfully")
 
@@ -1116,6 +1144,10 @@ async def send_event_feedback(
             logger.info(
                 f"Sending {len(state.behavior_feedback_data)} "
                 f"behavior feedback entries to BE"
+            )
+            log_side_effect(
+                "sqs_behavior_feedback_send",
+                count=len(state.behavior_feedback_data),
             )
             for bf_data in state.behavior_feedback_data:
                 behavior_data = {
@@ -1145,6 +1177,7 @@ async def send_event_feedback(
     }
 
 
+@instrumented_node("retrieve_knowledge")
 async def retrieve_knowledge(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -1199,6 +1232,7 @@ async def retrieve_knowledge(
     return {"retrieved_context": retrieved_context or None}
 
 
+@instrumented_node("sync_events_and_behaviors_node")
 async def sync_events_and_behaviors_node(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -1216,6 +1250,7 @@ async def sync_events_and_behaviors_node(
     return {}
 
 
+@instrumented_node("clear_events_and_detected_data")
 async def clear_events_and_detected_data(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> dict:
@@ -1238,6 +1273,7 @@ async def clear_events_and_detected_data(
     }
 
 
+@instrumented_node("apply_voice_expressions")
 async def apply_voice_expressions(
     state: SimulationState, config: Optional[RunnableConfig] = None
 ) -> Dict:
