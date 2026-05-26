@@ -43,8 +43,8 @@ export const useSocket = ({
           return;
         }
         socketRef.current = io(`${baseUrl}${path}`, {
-          path: '',
-          transports: ['polling', 'websocket'],
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
           auth: {
             token: accessToken,
           },
