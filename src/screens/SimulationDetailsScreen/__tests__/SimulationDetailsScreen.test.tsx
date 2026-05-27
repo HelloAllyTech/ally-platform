@@ -66,6 +66,7 @@ jest.mock('@/components', () => {
     IllustratedModal: () => null,
     useToast: () => ({showToast: jest.fn()}),
     VideoPreview: () => null,
+    RichText: ({html}: any) => <Text>{html}</Text>,
   };
 });
 

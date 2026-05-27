@@ -17,6 +17,7 @@ import {
   CustomDropdown,
   IllustratedModal,
   NotificationModal,
+  RichText,
   useToast,
   VideoPreview,
 } from '@/components';
@@ -158,7 +159,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
-        <Text style={styles.fieldValue}>{scenario.description}</Text>
+        <RichText html={scenario.description} style={styles.description} />
 
         {triggerWarnings.length > 0 && (
           <>
@@ -292,11 +293,7 @@ const styles = ScaledSheet.create({
     marginBottom: '2@ms',
     fontWeight: '500',
   },
-  fieldValue: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    color: colors.darkCharcoal,
-    fontSize: '14@ms',
-    lineHeight: '22@ms',
+  description: {
     marginBottom: '6@ms',
   },
   ctaWrapper: {

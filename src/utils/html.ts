@@ -16,7 +16,11 @@ const NAMED_ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
-const decodeEntities = (input: string): string =>
+/**
+ * Decode the common named/numeric/hex HTML entities the backend emits into
+ * their literal characters. Unknown entities are left untouched.
+ */
+export const decodeHtmlEntities = (input: string): string =>
   input.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, body: string) => {
     if (body[0] === '#') {
       const isHex = body[1] === 'x' || body[1] === 'X';
@@ -35,5 +39,5 @@ export const htmlToPlainText = (value: string | undefined | null): string => {
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]*>/g, ' ');
 
-  return decodeEntities(stripped).replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(stripped).replace(/\s+/g, ' ').trim();
 };
