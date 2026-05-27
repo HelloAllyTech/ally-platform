@@ -1,10 +1,5 @@
 import {useCallback} from 'react';
-import {
-  appleAuth,
-  AppleError,
-  AppleRequestOperation,
-  AppleRequestScope,
-} from '@invertase/react-native-apple-authentication';
+import {appleAuth} from '@invertase/react-native-apple-authentication';
 
 import {showToast} from '@/components/Toast/ToastProvider';
 import {SCREEN_NAMES} from '@/constants/navigation';
@@ -43,12 +38,12 @@ export const useAppleLogin = ({onLoginSuccess}: UseAppleLoginProps) => {
       if (typeof error === 'object' && error !== null && 'code' in error) {
         const err = error as {code: string; message?: string};
         switch (err.code) {
-          case AppleError.CANCELED:
+          case appleAuth.Error.CANCELED:
             return;
-          case AppleError.NOT_HANDLED:
-          case AppleError.UNKNOWN:
-          case AppleError.FAILED:
-          case AppleError.INVALID_RESPONSE:
+          case appleAuth.Error.NOT_HANDLED:
+          case appleAuth.Error.UNKNOWN:
+          case appleAuth.Error.FAILED:
+          case appleAuth.Error.INVALID_RESPONSE:
           default:
             const message = err.message || 'Failed to sign in with Apple';
             showToast(message, 'error');
@@ -65,8 +60,8 @@ export const useAppleLogin = ({onLoginSuccess}: UseAppleLoginProps) => {
   const signIn = useCallback(async () => {
     try {
       const response = await appleAuth.performRequest({
-        requestedOperation: AppleRequestOperation.LOGIN,
-        requestedScopes: [AppleRequestScope.EMAIL, AppleRequestScope.FULL_NAME],
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
       });
 
       const {identityToken, authorizationCode, fullName} = response;
