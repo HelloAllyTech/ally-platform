@@ -11,20 +11,30 @@ import {SCREEN_NAMES} from '@/constants/navigation';
 import {useAppNavigation} from '@/hooks';
 import {useLoginWithAppleMutation} from '@/services/authApi';
 
-jest.mock('@invertase/react-native-apple-authentication', () => ({
-  appleAuth: {
-    performRequest: jest.fn(),
-  },
-  AppleError: {
+jest.mock('@invertase/react-native-apple-authentication', () => {
+  const errorCodes = {
     CANCELED: '1001',
     FAILED: '1000',
     INVALID_RESPONSE: '1002',
     NOT_HANDLED: '1003',
     UNKNOWN: '1000',
-  },
-  AppleRequestOperation: {LOGIN: 1},
-  AppleRequestScope: {EMAIL: 0, FULL_NAME: 1},
-}));
+  };
+  const operation = {LOGIN: 1};
+  const scope = {EMAIL: 0, FULL_NAME: 1};
+  return {
+    // The hook reads these constants off `appleAuth` itself, so the mock must
+    // expose Operation/Scope/Error there — not only as top-level exports.
+    appleAuth: {
+      performRequest: jest.fn(),
+      Operation: operation,
+      Scope: scope,
+      Error: errorCodes,
+    },
+    AppleError: errorCodes,
+    AppleRequestOperation: operation,
+    AppleRequestScope: scope,
+  };
+});
 
 jest.mock('@/components/Toast/ToastProvider', () => ({
   showToast: jest.fn(),
