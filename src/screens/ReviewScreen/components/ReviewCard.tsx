@@ -30,6 +30,7 @@ import {
   formatDateTime,
   formatDurationFromSeconds,
   formatRelativeTime,
+  htmlToPlainText,
   pluralize,
 } from '@/utils';
 
@@ -172,7 +173,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
           coverImageUrl={scenario.coverImageUrl}
           coverVideoUrl={scenario.coverVideoUrl}
           title={scenario.title}
-          description={scenario.description}
+          description={htmlToPlainText(scenario.description)}
         />
       )}
     </>

@@ -61,6 +61,7 @@ jest.mock('@/screens/SimulationPathDetailsScreen/components/SimulationDetailsMod
 jest.mock('@/utils', () => ({
   formatDateTime: (date: string) => `formatted-${date}`,
   formatDurationFromSeconds: (sec: number) => `${sec}s`,
+  htmlToPlainText: (s: string | undefined | null) => s ?? '',
 }));
 
 const defaultUser = {

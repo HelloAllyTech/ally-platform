@@ -58,6 +58,7 @@ jest.mock('@/utils', () => ({
   formatDateTime: (d: string) => `date-${d}`,
   formatDurationFromSeconds: (s: number) => `${s}s`,
   formatRelativeTime: (d: string) => `relative-${d}`,
+  htmlToPlainText: (s: string | undefined | null) => s ?? '',
   pluralize: (n: number, s: string) => (n === 1 ? `1 ${s}` : `${n} ${s}s`),
 }));
 

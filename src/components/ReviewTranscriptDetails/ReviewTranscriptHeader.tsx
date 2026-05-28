@@ -9,7 +9,11 @@ import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {User} from '@/types/reviews';
-import {formatDateTime, formatDurationFromSeconds} from '@/utils';
+import {
+  formatDateTime,
+  formatDurationFromSeconds,
+  htmlToPlainText,
+} from '@/utils';
 
 interface ScenarioDetails {
   title?: string;
@@ -122,7 +126,7 @@ export const ReviewTranscriptHeader = ({
           visible={showSimulationDetailsModal}
           onClose={() => setShowSimulationDetailsModal(false)}
           title={t('Review.card.simulationDetails')}
-          description={sessionDetails.description}
+          description={htmlToPlainText(sessionDetails.description)}
           coverImageUrl={sessionDetails.coverImageUrl}
           coverVideoUrl={sessionDetails.coverVideoUrl}
           headerTitle={sessionDetails.title}
