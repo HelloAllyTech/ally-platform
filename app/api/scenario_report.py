@@ -12,6 +12,7 @@ from app.core.scenario_report.schemas import (
 )
 from app.core.scenario_report.service import (
     ScenarioReportService,
+    request_cancel,
     run_report_with_concurrency_limit,
 )
 
@@ -57,3 +58,27 @@ async def generate_scenario_report(
         scenario_id=request.scenario_id,
         report_id=request.report_id,
     )
+
+
+@router.post(
+    "/cancel/{report_id}",
+    summary="Signal an in-flight report to stop",
+    description=(
+        "Called by ally-be when the user clicks Cancel in the studio. "
+        "Looks up the active ScenarioReportService for `report_id` and "
+        "sets its cancellation flag — the run loop exits on the next "
+        "iteration and ships a CANCELLED webhook with any partial "
+        "transcripts collected so far. No-op when the report has "
+        "already completed or doesn't exist in this worker's registry."
+    ),
+    status_code=202,
+)
+async def cancel_scenario_report(report_id: str) -> dict:
+    """Signal cancellation; ally-be is the source of truth for DB status."""
+    found = request_cancel(report_id)
+    logger.info(
+        "Cancel propagation for report_id=%s: active_service_found=%s",
+        report_id,
+        found,
+    )
+    return {"report_id": report_id, "cancel_signalled": found}

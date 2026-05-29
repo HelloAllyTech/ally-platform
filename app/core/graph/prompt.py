@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import SystemMessage
 
@@ -10,7 +10,7 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
-from app.prompts.resolver import load_and_format
+from app.prompts.resolver import load_and_format, load_and_format_by_code
 
 logger = get_logger(__name__)
 
@@ -254,6 +254,53 @@ def _resolve_state_guidance(
     return ""
 
 
+def _resolve_simulation_state_by_score(
+    states: Optional[List[Dict[str, Any]]],
+    current_score: Optional[int],
+) -> Optional[Dict[str, Any]]:
+    """Pick the active simulation state for a given turn score.
+
+    States are studio-edited and live on `Scenarios.metadata.states` (see
+    PromptData.states). Selection rules:
+      - `scoreLower` is inclusive; `scoreUpper` is exclusive.
+      - `None` means open at that end (first state's lower, last state's upper).
+      - When `current_score` is None, fall back to the state marked
+        `isStarting: true` so turn 1 has a deterministic state.
+      - When no state matches at all, return None (caller should treat as
+        "no state injection this turn").
+
+    Distinct from {@link _resolve_state_guidance}, which threads behavior-rule
+    state guidance into `{behavior_instructions_json}` — that path is
+    independent and continues to operate in parallel.
+    """
+    if not states:
+        return None
+
+    if current_score is None:
+        starting = next((s for s in states if s.get("isStarting")), None)
+        if starting is not None:
+            return starting
+        # No starting flag set: fall through to the first state by lower bound.
+        return sorted(
+            states,
+            key=lambda s: (
+                s.get("scoreLower")
+                if s.get("scoreLower") is not None
+                else float("-inf")
+            ),
+        )[0]
+
+    for state in states:
+        lower = state.get("scoreLower")
+        upper = state.get("scoreUpper")
+        if lower is not None and current_score < lower:
+            continue
+        if upper is not None and current_score >= upper:
+            continue
+        return state
+    return None
+
+
 def _build_behavior_instructions_json(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
@@ -310,16 +357,114 @@ def _build_branching_prompt(
     return SystemMessage(content=(branching_prompt or "").strip())
 
 
+def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
+    """Look up `hasStates` on the selected main-agent prompt entry.
+
+    The backend forwards each ai-learn prompt to PromptData.prompts as
+    `{prompt, availableVariables, hasStates}`. When the simulation has
+    chosen a variant (`PromptData.selected_main_prompt_code`), we read
+    the flag from that entry. Falls back to False when the entry / flag
+    is missing.
+    """
+    selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
+    if not selected_code:
+        return False
+    prompts = getattr(prompt_data, "prompts", None)
+    if not isinstance(prompts, dict):
+        return False
+    entry = prompts.get(selected_code)
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("hasStates"))
+
+
 def _build_behavior_prompt(
     prompt_data: PromptData,
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
     language_code: Optional[str] = None,
     retrieved_context: Optional[str] = None,
+    current_score: Optional[int] = None,
 ) -> SystemMessage:
-    behavior_prompt = load_and_format(
-        "system/main_agent_prompt",
-        prompt_data=prompt_data,
+    # Resolve the active simulation state (separate from behavior-rules
+    # state guidance) when the selected main-agent prompt opts in via
+    # `hasStates: true`. The matched state's guidelines go into
+    # `{state_x_guidelines}`; if its `ragEnabled` is False, we blank
+    # `{retrieved_context}` for this turn even if retrieval ran upstream.
+    prompt_has_states = _get_selected_prompt_has_states(prompt_data)
+    sim_states = getattr(prompt_data, "states", None)
+    active_sim_state: Optional[Dict[str, Any]] = (
+        _resolve_simulation_state_by_score(sim_states, current_score)
+        if prompt_has_states
+        else None
+    )
+    state_x_guidelines = (
+        _coerce_block_value(active_sim_state.get("guidelines"))
+        if active_sim_state
+        else ""
+    )
+    # Observability: surface variant + state + RAG decisions every turn so
+    # we can verify behaviour from session logs alone. These fire on every
+    # conversation turn — emitted at DEBUG to keep production INFO logs
+    # clean. Bump log level via env var when investigating a session.
+    # Grep tags:
+    #   [VARIANT]      → which main-agent prompt code was selected
+    #   [STATE]        → score → resolved state (name, range, ragEnabled)
+    #   [RAG_GATE]     → whether prompt-builder is blanking retrieved_context
+    selected_code = (
+        getattr(prompt_data, "selected_main_prompt_code", None) or "<default>"
+    )
+    logger.debug(
+        "%s [VARIANT] selected_main_prompt_code=%s hasStates=%s",
+        LOG_PREFIX,
+        selected_code,
+        prompt_has_states,
+    )
+    if prompt_has_states:
+        state_name = active_sim_state.get("name") if active_sim_state else None
+        state_lower = active_sim_state.get("scoreLower") if active_sim_state else None
+        state_upper = active_sim_state.get("scoreUpper") if active_sim_state else None
+        state_rag = active_sim_state.get("ragEnabled") if active_sim_state else None
+        logger.debug(
+            "%s [STATE] current_score=%s resolved=%s range=[%s,%s) ragEnabled=%s",
+            LOG_PREFIX,
+            current_score,
+            state_name,
+            state_lower,
+            state_upper,
+            state_rag,
+        )
+
+    # If a variant opted into hasStates but no active state was resolved
+    # (states array empty, or current_score outside every range), the
+    # rendered {state_x_guidelines} will be empty silently. Warn so this
+    # misconfiguration is visible rather than only manifesting as "the LLM
+    # ignores state guidance".
+    if prompt_has_states and active_sim_state is None:
+        logger.warning(
+            "%s [STATE] hasStates=true but no active state resolved for "
+            "current_score=%s; {state_x_guidelines} will render empty. "
+            "Check Scenarios.metadata.states.",
+            LOG_PREFIX,
+            current_score,
+        )
+    effective_retrieved_context = retrieved_context
+    if active_sim_state is not None and active_sim_state.get("ragEnabled") is False:
+        had_context = bool(retrieved_context)
+        effective_retrieved_context = ""
+        # DEBUG: per-turn diagnostic when RAG is gated off by state config.
+        logger.debug(
+            "%s [RAG_GATE] gated_off_by_state name=%s id=%s had_upstream_context=%s",
+            LOG_PREFIX,
+            active_sim_state.get("name"),
+            active_sim_state.get("id"),
+            had_context,
+        )
+
+    # Build kwargs once so we can route through either the default
+    # main_agent_prompt or a per-simulation variant selected via
+    # PromptData.selected_main_prompt_code without duplicating the call site.
+    template_kwargs = dict(
         title=_coerce_block_value(getattr(prompt_data, "title", None)),
         description=_coerce_block_value(getattr(prompt_data, "description", None)),
         role_instructions=_coerce_block_value(
@@ -349,15 +494,115 @@ def _build_behavior_prompt(
             getattr(prompt_data, "character_profile_text", None)
         ),
         multilingual_instructions_block=_get_language_block(prompt_data, language_code),
-        retrieved_context=_get_retrieved_context_text(retrieved_context),
+        retrieved_context=_get_retrieved_context_text(effective_retrieved_context),
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []
         ),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
+        # Additional persona/style fields exposed for prompt variants.
+        # Not referenced by the default main_agent_prompt.txt today; SafeFormatter
+        # silently ignores unused kwargs. Future variants can reference any of
+        # these as {placeholder} in their prompt text. These attributes are
+        # populated on PromptData by app/core/scenario/base.py and otherwise
+        # feed prosody / evaluator / worker subsystems.
+        tone=_coerce_block_value(getattr(prompt_data, "tone", None)),
+        life_history_summary=_coerce_block_value(
+            getattr(prompt_data, "life_history_summary", None)
+        ),
+        core_memories=_coerce_block_value(getattr(prompt_data, "core_memories", None)),
+        personality=_coerce_block_value(getattr(prompt_data, "personality", None)),
+        emotional_needs=_coerce_block_value(
+            getattr(prompt_data, "emotional_needs", None)
+        ),
+        agent_goal=_coerce_block_value(getattr(prompt_data, "agent_goal", None)),
+        session_behavior_guidelines=_coerce_block_value(
+            getattr(prompt_data, "session_behavior_guidelines", None)
+        ),
+        starting_state=_coerce_block_value(
+            getattr(prompt_data, "starting_state", None)
+        ),
+        opening_statements=_coerce_block_value(
+            getattr(prompt_data, "opening_statements", None)
+        ),
+        response_length=_coerce_block_value(
+            getattr(prompt_data, "response_length", None)
+        ),
+        # Block-internal variables lifted to the top level so new variants
+        # can use them directly (e.g. `{profession}` in the prompt text)
+        # without going through the `{profession_block}` / `{previous_memory_block}`
+        # wrappers. The wrappers continue to work for prompts that prefer
+        # the canned wording.
+        profession=_coerce_block_value(getattr(prompt_data, "profession", None)),
+        previous_memory=_coerce_block_value(
+            getattr(prompt_data, "previous_memory", None)
+        ),
+        # Multilingual block-internal variables. Variants can compose
+        # their own multilingual section instead of including the full
+        # `{multilingual_instructions_block}` wrapper. `language_code`
+        # is the runtime BCP-47 locale (e.g. 'ta-IN'); empty for bare
+        # English. The other values mirror what the block template
+        # consumes today.
+        language_code=_coerce_block_value(language_code),
+        language_label=_coerce_block_value(
+            _resolve_effective_language_label(
+                language_code=language_code or "",
+                language_label=getattr(prompt_data, "language_label", None),
+                language_characteristics=getattr(
+                    prompt_data, "language_characteristics", None
+                ),
+            )
+            if language_code
+            else None
+        ),
+        language_characteristics=_coerce_block_value(
+            getattr(prompt_data, "language_characteristics", None)
+        ),
+        # Style/voice fields that used to live inside
+        # `{multilingual_instructions_block}` only. Lifted to the top
+        # level so variants can reference them directly — e.g. the
+        # "Main Agent Prompt #2" variant uses `{samples}` and
+        # `{allowed_fillers}` in its `## About you` section instead of
+        # going through the full multilingual wrapper.
+        samples=_format_language_samples(
+            getattr(prompt_data, "language_dialogue_samples", None) or []
+        ),
+        allowed_fillers=_format_allowed_fillers_for_prompt(
+            getattr(prompt_data, "allowed_fillers", None)
+        ),
+        # Active simulation state's guidelines for `hasStates` prompts.
+        # Empty when no state is active (no states configured / no match /
+        # prompt did not opt in). Variants without {state_x_guidelines} in
+        # their text simply ignore this kwarg via SafeFormatter.
+        state_x_guidelines=state_x_guidelines,
         behavior_instructions_json=_build_behavior_instructions_json(
             behavior_instructions, current_state
         ),
     )
+
+    # Route through the variant resolver when the simulation has picked a
+    # specific main-agent prompt; otherwise use the default. Variants
+    # typically live in backend metadata (useDashboardOverride=true) since
+    # they are authored in prompt management, not as local files. The
+    # fallback path keeps stale/missing codes from breaking the run.
+    selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
+    if selected_code:
+        behavior_prompt = load_and_format_by_code(
+            selected_code,
+            prompt_data,
+            fallback_internal_path="system/main_agent_prompt",
+            **template_kwargs,
+        )
+        logger.info(
+            "%s BUILT main agent prompt: selected_code=%s",
+            LOG_PREFIX,
+            selected_code,
+        )
+    else:
+        behavior_prompt = load_and_format(
+            "system/main_agent_prompt",
+            prompt_data=prompt_data,
+            **template_kwargs,
+        )
 
     return SystemMessage(content=(behavior_prompt or "").strip())
 
@@ -369,10 +614,15 @@ def generate_system_message(
     behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
     current_state: Optional[SimulationStateInstruction] = None,
     retrieved_context: Optional[str] = None,
+    current_score: Optional[int] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
     based on the structured PromptData.
+
+    `current_score` is required only when the selected main-agent prompt
+    has `hasStates: true`; the score selects the active simulation state.
+    Branching mode ignores it.
     """
     if next_instruction:
         msg = _build_branching_prompt(
@@ -396,6 +646,7 @@ def generate_system_message(
             current_state,
             language_code,
             retrieved_context,
+            current_score=current_score,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -414,6 +665,7 @@ def generate_system_message(
         current_state,
         language_code,
         retrieved_context,
+        current_score=current_score,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",

@@ -1,6 +1,7 @@
 {
     "name": "Branching Agent Prompt",
     "kind": "prompt",
+    "promptType": "branching",
     "description": "Minimal branching prompt that keeps direct editable wording in the top-level template.",
     "availableVariables": [
         "title",

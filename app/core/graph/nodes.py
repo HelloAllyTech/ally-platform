@@ -16,6 +16,12 @@ from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
 )
+from app.core.graph.prompt import (
+    _get_selected_prompt_has_states as _selected_prompt_has_states_for_retrieval,
+)
+from app.core.graph.prompt import (
+    _resolve_simulation_state_by_score as _resolve_state_for_retrieval,
+)
 from app.core.graph.prompt import generate_system_message
 from app.core.graph.state import (
     BehaviorInstructionFeedbackData,
@@ -853,7 +859,18 @@ async def generate_response(
                 scenario.state_instructions, current_score
             )
 
-        # Let generate_system_message handle routing based on parameters
+        # Let generate_system_message handle routing based on parameters.
+        # current_score is forwarded so main-agent variants with hasStates
+        # can resolve the active simulation state per turn. score_keeper
+        # tracks the cumulative session score (events + behaviors, see
+        # app/core/scoring/score_keeper.py); .get_total_score() returns an
+        # int (starts at 0 — never None). Passed as None only when no
+        # score_keeper has been wired up (test fixtures, dev paths) — the
+        # state resolver handles None by falling back to the isStarting
+        # state.
+        turn_score: Optional[int] = (
+            score_keeper.get_total_score() if score_keeper else None
+        )
         system_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
@@ -861,6 +878,7 @@ async def generate_response(
             behavior_instructions=scenario.behavior_instructions,
             current_state=current_state,
             retrieved_context=state.retrieved_context,
+            current_score=turn_score,
         )
 
         room_name = ""
@@ -1203,16 +1221,81 @@ async def retrieve_knowledge(
 
     knowledge_sources = getattr(scenario.prompt_data, "knowledge_sources", None)
     if not knowledge_sources:
+        # DEBUG: per-turn — most scenarios don't configure knowledge sources.
+        logger.debug(
+            "[RAG] retrieve_knowledge: no knowledge_sources; skipping retrieval"
+        )
         return {"retrieved_context": None}
 
     knowledge_map = build_knowledge_map(knowledge_sources)
     if not knowledge_map:
+        # DEBUG: per-turn — niche edge case (malformed sources).
+        logger.debug(
+            "[RAG] retrieve_knowledge: knowledge_sources present (n=%d) "
+            "but all entries were filtered out (missing title/content); "
+            "skipping retrieval",
+            len(knowledge_sources) if isinstance(knowledge_sources, list) else 0,
+        )
         return {"retrieved_context": None}
+
+    # Per-state RAG gate: if the *selected main-agent prompt* opts into
+    # states (hasStates=true) AND the simulation has states defined AND the
+    # active state has ragEnabled=false, skip the retrieval LLM call
+    # entirely. The prompt builder also blanks {retrieved_context} when
+    # ragEnabled is false, but gating here saves the LLM call upstream.
+    #
+    # Mirror prompt.py:_build_behavior_prompt's check ORDER exactly:
+    #   1) selected prompt has hasStates=true
+    #   2) simulation has a states array
+    #   3) active state resolves
+    # so the two paths can't disagree on whether to honor the gate.
+    # Dormant `metadata.states` left over from a previous variant
+    # selection no longer triggers gating when the current prompt
+    # doesn't declare hasStates.
+    #
+    # Known race: this read of score_keeper runs in parallel with
+    # process_events / detect_behaviors which can update the score.
+    # The eventual `_build_behavior_prompt` may resolve a different
+    # state if the score crosses a boundary mid-turn. Consequence is
+    # cosmetic — at worst one wasted LLM call when retrieval ran but
+    # the prompt builder ends up blanking retrieved_context for the
+    # newer state. State boundaries are 50 apart and per-turn deltas
+    # are typically small, so this is rare. See review item B1.
+    prompt_has_states = _selected_prompt_has_states_for_retrieval(scenario.prompt_data)
+    sim_states = getattr(scenario.prompt_data, "states", None)
+    if prompt_has_states and sim_states:
+        score_keeper = config["configurable"].get("score_keeper") if config else None
+        current_score: Optional[int] = (
+            score_keeper.get_total_score() if score_keeper else None
+        )
+        active_state = _resolve_state_for_retrieval(sim_states, current_score)
+        if active_state is not None and active_state.get("ragEnabled") is False:
+            # DEBUG: per-turn diagnostic; this fires on every turn for any
+            # scenario whose active state has RAG disabled.
+            logger.debug(
+                "[RAG_GATE] retrieve_knowledge: skipped — active state '%s' (score=%s) "
+                "has ragEnabled=false",
+                active_state.get("name"),
+                current_score,
+            )
+            return {"retrieved_context": None}
+        logger.debug(
+            "[RAG_GATE] retrieve_knowledge: proceeding — "
+            "state='%s' score=%s ragEnabled=%s",
+            active_state.get("name") if active_state else None,
+            current_score,
+            active_state.get("ragEnabled") if active_state else None,
+        )
 
     knowledge_summary = ", ".join(
         [f"{k}: {v[:20]}..." for k, v in knowledge_map.items()]
     )
-    logger.info(f"Knowledge sources: {knowledge_summary}")
+    # DEBUG: per-turn — knowledge titles list can be long; not useful at INFO.
+    logger.debug(
+        "[RAG] Knowledge sources available (n=%d): %s",
+        len(knowledge_map),
+        knowledge_summary,
+    )
 
     # Wrap in asyncio.wait_for so a hanging upstream LLM doesn't keep this
     # parallel branch (and therefore the graph join) waiting forever, which
@@ -1225,10 +1308,18 @@ async def retrieve_knowledge(
         )
     except asyncio.TimeoutError:
         logger.warning(
-            "Knowledge retrieval timed out after 8s; proceeding without context"
+            "[RAG] retrieve_knowledge: timed out after 8s; proceeding without context"
         )
         retrieved_context = None
 
+    if retrieved_context:
+        # DEBUG: per-turn — fires on every turn that runs RAG retrieval.
+        logger.debug(
+            "[RAG] retrieve_knowledge: completed — context_chars=%d",
+            len(retrieved_context),
+        )
+    else:
+        logger.debug("[RAG] retrieve_knowledge: completed — no matches")
     return {"retrieved_context": retrieved_context or None}
 
 

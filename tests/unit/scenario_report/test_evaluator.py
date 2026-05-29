@@ -223,7 +223,7 @@ class TestEvaluateTranscript:
         assert result == {"metrics": {}, "report_markdown": ""}
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_successful_evaluation_returns_metrics_and_markdown(
         self, mock_create_llm
     ):
@@ -238,8 +238,12 @@ class TestEvaluateTranscript:
             },
             report_markdown="# Evaluation Report\n\nGood performance.",
         )
+        # New mock chain: _build_evaluator_llm() returns a ChatOpenAI
+        # directly (no `.llm_instance` indirection). Its
+        # `.with_structured_output(...)` returns the structured-output
+        # wrapped LLM that the evaluator awaits via `.ainvoke(...)`.
         mock_client = MagicMock()
-        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_client.with_structured_output.return_value = mock_llm
         mock_create_llm.return_value = mock_client
 
         result = await evaluate_transcript(
@@ -256,7 +260,7 @@ class TestEvaluateTranscript:
         assert "# Evaluation Report" in result["report_markdown"]
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_dynamic_metrics_passed_through(self, mock_create_llm):
         """Any metric keys returned by the LLM are preserved without code changes."""
         mock_llm = AsyncMock()
@@ -264,8 +268,12 @@ class TestEvaluateTranscript:
             metrics={"empathy": 90, "active_listening": 82, "rapport": 76},
             report_markdown="# Custom Report",
         )
+        # New mock chain: _build_evaluator_llm() returns a ChatOpenAI
+        # directly (no `.llm_instance` indirection). Its
+        # `.with_structured_output(...)` returns the structured-output
+        # wrapped LLM that the evaluator awaits via `.ainvoke(...)`.
         mock_client = MagicMock()
-        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_client.with_structured_output.return_value = mock_llm
         mock_create_llm.return_value = mock_client
 
         result = await evaluate_transcript(
@@ -283,7 +291,7 @@ class TestEvaluateTranscript:
 
     @pytest.mark.asyncio
     @patch("app.core.scenario_report.evaluator.load_template")
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_passes_prompt_data_to_load_template(
         self, mock_create_llm, mock_load_template
     ):
@@ -294,8 +302,12 @@ class TestEvaluateTranscript:
         mock_llm.ainvoke.return_value = EvaluationResult(
             metrics={"consistency": 70}, report_markdown=""
         )
+        # New mock chain: _build_evaluator_llm() returns a ChatOpenAI
+        # directly (no `.llm_instance` indirection). Its
+        # `.with_structured_output(...)` returns the structured-output
+        # wrapped LLM that the evaluator awaits via `.ainvoke(...)`.
         mock_client = MagicMock()
-        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_client.with_structured_output.return_value = mock_llm
         mock_create_llm.return_value = mock_client
 
         prompt_data = _make_prompt_data()
@@ -310,7 +322,7 @@ class TestEvaluateTranscript:
         )
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_llm_exception_returns_empty(self, mock_create_llm):
         mock_create_llm.side_effect = RuntimeError("LLM unavailable")
 
@@ -323,12 +335,16 @@ class TestEvaluateTranscript:
         assert result == {"metrics": {}, "report_markdown": ""}
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_llm_invocation_failure_returns_empty(self, mock_create_llm):
         mock_llm = AsyncMock()
         mock_llm.ainvoke.side_effect = Exception("API timeout")
+        # New mock chain: _build_evaluator_llm() returns a ChatOpenAI
+        # directly (no `.llm_instance` indirection). Its
+        # `.with_structured_output(...)` returns the structured-output
+        # wrapped LLM that the evaluator awaits via `.ainvoke(...)`.
         mock_client = MagicMock()
-        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_client.with_structured_output.return_value = mock_llm
         mock_create_llm.return_value = mock_client
 
         result = await evaluate_transcript(
@@ -340,13 +356,17 @@ class TestEvaluateTranscript:
         assert result == {"metrics": {}, "report_markdown": ""}
 
     @pytest.mark.asyncio
-    @patch("app.core.scenario_report.evaluator.create_llm_client")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_uses_json_mode_for_structured_output(self, mock_create_llm):
         """json_mode is required because OpenAI rejects arbitrary Dict schemas."""
         mock_llm = AsyncMock()
         mock_llm.ainvoke.return_value = EvaluationResult(metrics={}, report_markdown="")
+        # New mock chain: _build_evaluator_llm() returns a ChatOpenAI
+        # directly (no `.llm_instance` indirection). Its
+        # `.with_structured_output(...)` returns the structured-output
+        # wrapped LLM that the evaluator awaits via `.ainvoke(...)`.
         mock_client = MagicMock()
-        mock_client.llm_instance.with_structured_output.return_value = mock_llm
+        mock_client.with_structured_output.return_value = mock_llm
         mock_create_llm.return_value = mock_client
 
         await evaluate_transcript(
@@ -355,6 +375,6 @@ class TestEvaluateTranscript:
             counselor_prompt="prompt",
         )
 
-        mock_client.llm_instance.with_structured_output.assert_called_once_with(
+        mock_client.with_structured_output.assert_called_once_with(
             EvaluationResult, method="json_mode"
         )

@@ -32,6 +32,7 @@ from app.core.scenario_report.schemas import (
     ScenarioReportWebhookPayload,
     TranscriptEntry,
 )
+from app.core.scoring.score_keeper import ScoreKeeper
 from app.llms import create_llm_client
 from app.prompts.resolver import load_and_format, load_template
 
@@ -41,11 +42,42 @@ logger = get_logger(__name__)
 # Prevents memory spikes from too many simultaneous reports
 _report_semaphore = None
 
+
 def _get_report_semaphore():
     global _report_semaphore
     if _report_semaphore is None:
         _report_semaphore = asyncio.Semaphore(settings.REPORT_CONCURRENCY_LIMIT)
     return _report_semaphore
+
+
+# Registry of currently-running ScenarioReportService instances, keyed by
+# report_id. Populated by ScenarioReportService.run() on entry and cleared
+# in its finally block. The cancel HTTP endpoint looks instances up here
+# to signal user-initiated cancellation. Process-local — fine for a
+# single-worker deployment, would need a Redis pubsub bridge for multi-
+# worker setups (out of scope here; we run one worker per container).
+_ACTIVE_REPORT_SERVICES: dict[str, "ScenarioReportService"] = {}
+
+
+def request_cancel(report_id: str) -> bool:
+    """Signal the running report service (if any) to stop.
+
+    Called by the FastAPI cancel endpoint after ally-be relays a user's
+    cancel click. Returns True if a running service was found and
+    signalled, False if no in-flight report matches the ID (already
+    completed, never started, or unknown).
+    """
+    service = _ACTIVE_REPORT_SERVICES.get(report_id)
+    if service is None:
+        logger.info(
+            "Cancel requested for report_id=%s but no active service found "
+            "(already completed or unknown)",
+            report_id,
+        )
+        return False
+    service.request_cancel()
+    return True
+
 
 # --------------- Anti-stagnation prompt fragments ---------------
 # Loaded from .txt so they can be edited via the dashboard override system.
@@ -79,8 +111,20 @@ async def run_report_with_concurrency_limit(
     """
     report_id = service._request.report_id
 
-    # Log queue position
-    waiting_count = settings.REPORT_CONCURRENCY_LIMIT - _report_semaphore._value
+    # Resolve (lazily initialize) the semaphore BEFORE reading its state.
+    # Previously this function dereferenced the module-level
+    # `_report_semaphore` directly — but that variable is `None` until
+    # `_get_report_semaphore()` runs, so the first report every container
+    # boot crashed with `AttributeError: 'NoneType' object has no attribute
+    # '_value'` before ever entering the run loop. Reports landed in the
+    # task graveyard and the DB status sat at STARTED indefinitely.
+    semaphore = _get_report_semaphore()
+
+    # Log queue position. `_value` is an asyncio.Semaphore implementation
+    # detail (the remaining slot count); we only read it for telemetry so
+    # an upstream change in CPython would just lose this log line, not
+    # break execution.
+    waiting_count = settings.REPORT_CONCURRENCY_LIMIT - semaphore._value
     if waiting_count > 0:
         logger.info(
             "Report %s queued (waiting for slot, %d reports currently running)",
@@ -88,12 +132,45 @@ async def run_report_with_concurrency_limit(
             waiting_count,
         )
 
-    async with _get_report_semaphore():
+    async with semaphore:
         logger.info(
             "Report %s started execution (concurrency slot acquired)",
             report_id,
         )
-        await service.run()
+        try:
+            await service.run()
+        except Exception as e:
+            # Outer backstop for any exception that escapes service.run()
+            # (e.g. a crash inside its own except: handler, an OOM, a bug
+            # in the cleanup `finally`). Without this, the asyncio task
+            # dies silently and the DB row sits at STARTED forever — which
+            # was the exact failure mode users were reporting as "report
+            # generation taking a lot more time". A FAILED webhook here
+            # ensures the UI can show the error and stop polling.
+            logger.exception(
+                "Report %s crashed outside service.run()'s handler: %s",
+                report_id,
+                e,
+            )
+            try:
+                error_message = f"{type(e).__name__}: {e}"[:500]
+                await service._send_webhook(
+                    ScenarioReportWebhookPayload(
+                        metrics={},
+                        status=ReportStatus.FAILED,
+                        transcripts=service._transcripts,
+                        error_message=error_message,
+                    )
+                )
+            except Exception:
+                # Last-resort: if even the webhook send fails, log loudly
+                # so ops can spot it. The DB row will remain at STARTED
+                # but that's strictly better than an exception swallowed
+                # by asyncio's task done-callback with no log.
+                logger.exception(
+                    "Failed to send FAILED webhook for report %s after outer crash",
+                    report_id,
+                )
 
 
 class ScenarioReportService:
@@ -111,11 +188,38 @@ class ScenarioReportService:
 
     def __init__(self, request: ScenarioReportRequest) -> None:
         self._request = request
+        # In-conversation termination event (e.g. client said something
+        # that triggered a TerminationEvent rule). Causes the run loop to
+        # exit gracefully and the evaluator to still run — the resulting
+        # report is COMPLETED with a partial transcript.
         self._terminated = False
         self._termination_event: Optional[BaseEvent] = None
+        # User-initiated cancel from the studio UI. Distinct from
+        # _terminated: when this is set we ALSO skip the evaluator (no
+        # point burning LLM tokens on output no one will read) and the
+        # final webhook ships status=CANCELLED with whatever transcripts
+        # were already collected, so the user can review what was
+        # generated before they cancelled.
+        self._cancel_requested = False
         self._transcripts: list[TranscriptEntry] = []
         self._start_time: Optional[float] = None
         self._checkpointer = PruningCheckpointer()
+
+    def request_cancel(self) -> None:
+        """Mark the run for user-initiated cancellation.
+
+        Called from the FastAPI cancel endpoint via the
+        _ACTIVE_REPORT_SERVICES registry. Setting the flag is enough —
+        the run loop checks it between turns and exits early. Idempotent:
+        repeated calls are no-ops.
+        """
+        if self._cancel_requested:
+            return
+        self._cancel_requested = True
+        logger.info(
+            "Cancel requested for report_id=%s — run loop will exit at next turn",
+            self._request.report_id,
+        )
 
     # ------------------------------------------------------------------
     # Callbacks & helpers
@@ -310,6 +414,17 @@ class ScenarioReportService:
         req = self._request
         report_id = req.report_id
         _run_start = time.perf_counter()
+
+        # Register so the cancel HTTP endpoint can find us. Last-write-
+        # wins on report_id collision (shouldn't happen — report_id is a
+        # UUID generated by ally-be) but we log for safety.
+        if report_id in _ACTIVE_REPORT_SERVICES:
+            logger.warning(
+                "Duplicate report_id=%s in active services registry; "
+                "overwriting earlier entry",
+                report_id,
+            )
+        _ACTIVE_REPORT_SERVICES[report_id] = self
         logger.info(
             "Starting report generation: report_id=%s, scenario_id=%s, turns=%s",
             report_id,
@@ -343,12 +458,27 @@ class ScenarioReportService:
                 _build_counselor_track(),
             )
 
+            # Single ScoreKeeper shared across the EventOrchestrator (event
+            # scores) and the detect_behaviors graph node (behavior scores).
+            # Without this, both code paths fall back to fresh ScoreKeeper()
+            # instances and their totals never combine. Wiring it here is
+            # also what makes simulation-state transitions activate during
+            # a report run: generate_response reads
+            # `score_keeper.get_total_score()` per turn and forwards it as
+            # current_score into _resolve_simulation_state_by_score. Without
+            # a score_keeper in the configurable, the resolver gets None
+            # every turn and pins to the isStarting state forever — so
+            # transitions never fire and reports can't exercise state-2+
+            # behavior or per-state RAG gating beyond the starting state.
+            score_keeper = ScoreKeeper()
+
             event_orchestrator = EventOrchestrator(
                 scenario=scenario,
                 thread_id=report_id,
                 room=None,
                 termination_callback=self._on_termination,
                 is_report_mode=True,
+                score_keeper=score_keeper,
             )
 
             report_graph = get_report_graph().compile(checkpointer=self._checkpointer)
@@ -361,6 +491,7 @@ class ScenarioReportService:
                     "event_orchestrator": event_orchestrator,
                     "llm_client": client_llm,
                     "embedding_client": embedding_client,
+                    "score_keeper": score_keeper,
                 }
             }
 
@@ -421,13 +552,35 @@ class ScenarioReportService:
             ]
 
             for turn in range(req.turns):
+                # User-initiated cancel check — break before doing any
+                # work on this turn so the cancel feels responsive. The
+                # final webhook below will ship status=CANCELLED with
+                # whatever transcripts we already have.
+                if self._cancel_requested:
+                    logger.info(
+                        "Cancel received before turn %d, exiting run loop "
+                        "(report_id=%s, partial_transcripts=%d)",
+                        turn + 1,
+                        report_id,
+                        len(self._transcripts),
+                    )
+                    break
+
+                # Per-turn latency instrumentation — grep `[REPORT_TURN]` to
+                # see the actual cost breakdown for any report run. Helps
+                # answer "why is report-gen slow" with data instead of
+                # guesses (counselor LLM vs. client graph vs. context-prep).
+                turn_started_at = time.monotonic()
+
                 # Counselor speaks — windowed context with goal reminder
                 windowed = self._prepare_counselor_context(
                     counselor_messages,
                     counselor_base_prompt,
                 )
+                counselor_started_at = time.monotonic()
                 counselor_resp = await counselor_llm.llm_instance.ainvoke(windowed)
                 counselor_text = counselor_resp.content
+                counselor_ms = (time.monotonic() - counselor_started_at) * 1000
                 self._record_transcript(counselor_text, "COUNSELOR")
                 counselor_messages.append(AIMessage(content=counselor_text))
 
@@ -445,10 +598,12 @@ class ScenarioReportService:
                     break
 
                 # Client speaks (via graph)
+                graph_started_at = time.monotonic()
                 graph_output = await report_graph.ainvoke(
                     {"messages": [HumanMessage(content=counselor_text)]},
                     config,
                 )
+                graph_ms = (time.monotonic() - graph_started_at) * 1000
 
                 # Event-based termination fired during graph invocation
                 if self._terminated:
@@ -472,6 +627,17 @@ class ScenarioReportService:
                 self._record_transcript(client_text, "CLIENT")
                 counselor_messages.append(HumanMessage(content=client_text))
 
+                turn_ms = (time.monotonic() - turn_started_at) * 1000
+                logger.info(
+                    "[REPORT_TURN] turn=%d/%d counselor_ms=%.0f graph_ms=%.0f "
+                    "total_ms=%.0f score=%d",
+                    turn + 1,
+                    req.turns,
+                    counselor_ms,
+                    graph_ms,
+                    turn_ms,
+                    score_keeper.get_total_score(),
+                )
                 logger.debug(
                     "Turn %d/%d completed (terminated=%s)",
                     turn + 1,
@@ -487,25 +653,94 @@ class ScenarioReportService:
             # ==========================================================
             # Phase 3 -- Finalize + webhook
             # ==========================================================
+            # Short-circuit when the user cancelled: skip the evaluator
+            # entirely (saves 5-60s of GPT-4o-mini cost) and ship a
+            # CANCELLED webhook with whatever partial transcripts we
+            # already collected. ally-be persists those transcripts so
+            # the user can review what was generated before they cancelled.
+            if self._cancel_requested:
+                logger.info(
+                    "Report %s cancelled by user — skipping eval, "
+                    "shipping CANCELLED webhook with %d partial transcripts",
+                    report_id,
+                    len(self._transcripts),
+                )
+                cancel_payload = ScenarioReportWebhookPayload(
+                    metrics={},
+                    status=ReportStatus.CANCELLED,
+                    transcripts=self._transcripts,
+                    report_markdown="",
+                    error_message=None,
+                )
+                await self._send_webhook(cancel_payload)
+                return
+
+            # The evaluator is a single LLM call against the full transcript
+            # — typically 5-15s. Timing it separately lets us tell whether
+            # report latency is dominated by the N-turn simulation vs the
+            # final evaluation (grep `[REPORT_EVAL]`).
+            transcript_chars = sum(len(t.content) for t in self._transcripts)
+            eval_started_at = time.monotonic()
             eval_result = await evaluate_transcript(
                 transcripts=self._transcripts,
                 prompt_data=scenario.prompt_data,
                 counselor_prompt=counselor_system_prompt,
             )
+            eval_ms = (time.monotonic() - eval_started_at) * 1000
+            logger.info(
+                "[REPORT_EVAL] report_id=%s eval_ms=%.0f transcript_chars=%d "
+                "turns_recorded=%d final_score=%d",
+                report_id,
+                eval_ms,
+                transcript_chars,
+                len(self._transcripts),
+                score_keeper.get_total_score(),
+            )
 
             metrics = eval_result.get("metrics", {})
+            report_markdown = eval_result.get("report_markdown", "")
+            # An eval that timed out / errored returns `{"metrics": {},
+            # "report_markdown": ""}` from evaluator.evaluate_transcript's
+            # except path — the previous `all_zero` check evaluated to
+            # False on that input (because `bool({}) is False`) and the
+            # report sailed through as COMPLETED with empty content. Treat
+            # empty metrics OR empty markdown as failure now, so the
+            # user gets a clear FAILED status + toast instead of a
+            # deceptively-green report card with no content.
+            metrics_missing = not metrics
+            markdown_missing = not report_markdown.strip()
             all_zero = bool(metrics) and all(v == 0 for v in metrics.values())
+            eval_failed = metrics_missing or markdown_missing or all_zero
 
-            if all_zero and self._transcripts:
+            if eval_failed and self._transcripts:
                 logger.error(
-                    "Evaluation failed for report_id=%s, sending FAILED status",
+                    "Evaluation failed for report_id=%s, sending FAILED status "
+                    "(metrics_missing=%s markdown_missing=%s all_zero=%s)",
                     report_id,
+                    metrics_missing,
+                    markdown_missing,
+                    all_zero,
                 )
+                if metrics_missing or markdown_missing:
+                    failure_reason = (
+                        "The LLM judge could not produce a report. This usually "
+                        "means the evaluation call timed out or hit a token "
+                        "limit on a long transcript. Try a shorter turn count, "
+                        "or regenerate."
+                    )
+                else:
+                    failure_reason = (
+                        "Evaluation returned zero scores for every metric. "
+                        "The LLM judge either failed to parse the transcript or "
+                        "the conversation produced no scorable content. "
+                        "Try regenerating, or check the transcript quality."
+                    )
                 payload = ScenarioReportWebhookPayload(
                     metrics=metrics,
                     status=ReportStatus.FAILED,
                     transcripts=self._transcripts,
-                    report_markdown=eval_result.get("report_markdown", ""),
+                    report_markdown=report_markdown,
+                    error_message=failure_reason,
                 )
             else:
                 payload = ScenarioReportWebhookPayload(
@@ -530,12 +765,23 @@ class ScenarioReportService:
 
         except Exception as e:
             logger.exception(f"Report generation failed: report_id=%s: {e}", report_id)
+            # Truncate to keep DB column / UI toast sane. We surface the
+            # exception type + message so engineers can grep logs and users
+            # see something concrete instead of an indefinite spinner.
+            error_message = f"{type(e).__name__}: {e}"[:500]
             await self._send_webhook(
                 ScenarioReportWebhookPayload(
                     metrics={},
                     status=ReportStatus.FAILED,
                     transcripts=self._transcripts,
+                    error_message=error_message,
                 )
             )
         finally:
             self._checkpointer.delete_thread(report_id)
+            # Always unregister from the active-services registry so the
+            # cancel endpoint stops finding a completed service. Use .pop
+            # with default to tolerate the (theoretical) case where we
+            # never made it into the registry — e.g. an exception during
+            # __init__ before run() registered. Idempotent.
+            _ACTIVE_REPORT_SERVICES.pop(report_id, None)

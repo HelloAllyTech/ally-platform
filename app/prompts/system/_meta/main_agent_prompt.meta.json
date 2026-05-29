@@ -1,10 +1,21 @@
 {
     "name": "Main Agent Prompt",
     "kind": "prompt",
+    "promptType": "main_agent",
+    "hasStates": false,
     "description": "Top-level behavior-mode prompt with editable persona and guidance wording owned directly in the prompt file.",
     "availableVariables": [
-        "title",
-        "description"
+        { "name": "title", "label": "Title", "required": false },
+        { "name": "description", "label": "Description", "required": false },
+        { "name": "role_instructions", "label": "Role Instructions", "required": false },
+        { "name": "name", "label": "Name", "required": true },
+        { "name": "age", "label": "Age", "required": true },
+        { "name": "gender", "label": "Gender", "required": true },
+        { "name": "current_location", "label": "Current Location", "required": true },
+        { "name": "gender_identity", "label": "Gender Identity", "required": false },
+        { "name": "sexual_orientation", "label": "Sexual Orientation", "required": false },
+        { "name": "character_profile_text", "label": "Character Profile", "required": false },
+        { "name": "competency", "label": "Competency", "required": false }
     ],
     "uses_blocks": [
         "profession_block",

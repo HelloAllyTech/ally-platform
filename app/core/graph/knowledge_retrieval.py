@@ -14,6 +14,18 @@ logger = get_logger(__name__)
 
 _RETRIEVAL_CACHE: "OrderedDict[str, str]" = OrderedDict()
 
+# Cap injected RAG context to keep prompt budgets predictable. Without
+# these the prompt could balloon to tens of KB when the LLM matches many
+# titles or knowledge entries are large.
+#  - PER_MATCH: each knowledge entry's content is truncated at this many
+#    characters. Big enough to fit a paragraph or two of guidance per
+#    title, small enough to bound the worst case at MAX_MATCHES * cap.
+#  - TOTAL: hard ceiling across all matches. When the running total
+#    would exceed this, remaining matches are dropped with a marker so
+#    the prompt reader can see something was trimmed.
+_MAX_PER_MATCH_CHARS = 1500
+_MAX_TOTAL_CONTEXT_CHARS = 8000
+
 
 class RelevantKeys(BaseModel):
     """Structured output schema for knowledge retrieval."""
@@ -51,11 +63,52 @@ def _format_retrieved_context(
     relevant_titles: List[str],
     knowledge_map: Dict[str, str],
 ) -> str:
-    """Format matched knowledge entries as a markdown block."""
+    """Format matched knowledge entries as a markdown block, with both
+    per-match and total-context size caps so the prompt budget stays
+    bounded regardless of how many titles match or how large the entries
+    are."""
     sections: List[str] = []
+    total_chars = 0
+    truncated_any_total = False
+    per_match_truncations = 0
+    matched_count = 0
     for title in relevant_titles:
-        if title in knowledge_map:
-            sections.append(f"**{title}:**\n{knowledge_map[title]}")
+        if title not in knowledge_map:
+            continue
+
+        content = knowledge_map[title]
+        if len(content) > _MAX_PER_MATCH_CHARS:
+            per_match_truncations += 1
+            content = content[:_MAX_PER_MATCH_CHARS].rstrip() + " …[truncated]"
+
+        section = f"**{title}:**\n{content}"
+        # +2 accounts for the "\n\n" separator that join() will insert
+        # between this section and the next.
+        prospective_total = total_chars + len(section) + (2 if sections else 0)
+        if prospective_total > _MAX_TOTAL_CONTEXT_CHARS:
+            truncated_any_total = True
+            break
+
+        sections.append(section)
+        total_chars = prospective_total
+        matched_count += 1
+
+    if truncated_any_total:
+        sections.append("…[additional matches omitted to fit context budget]")
+
+    # Truncation observability — grep `[RAG_TRUNC]` to see when caps fired.
+    if per_match_truncations or truncated_any_total:
+        logger.info(
+            "[RAG_TRUNC] per_match_truncations=%d total_truncated=%s "
+            "matched=%d/%d total_chars=%d cap_per_match=%d cap_total=%d",
+            per_match_truncations,
+            truncated_any_total,
+            matched_count,
+            len(relevant_titles),
+            total_chars,
+            _MAX_PER_MATCH_CHARS,
+            _MAX_TOTAL_CONTEXT_CHARS,
+        )
 
     return "\n\n".join(sections)
 

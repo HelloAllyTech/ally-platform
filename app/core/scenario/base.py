@@ -148,6 +148,29 @@ class PromptData(BaseModel):
             "compatibility with existing scenarios."
         ),
     )
+    selected_main_prompt_code: Optional[str] = Field(
+        default=None,
+        description=(
+            "promptCode of the main-agent prompt variant this simulation "
+            "uses (e.g. 'ally_ai_learn_system_main_agent_prompt_v2'). "
+            "When set, the runtime resolves the main agent prompt by this "
+            "code (via PromptData.prompts metadata or local fallback). "
+            "When unset, falls back to the default "
+            "'ally_ai_learn_system_main_agent_prompt'. Branching and "
+            "multilingual prompts are not variant-selectable and remain "
+            "singletons shared by every variant."
+        ),
+    )
+    states: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description=(
+            "Per-simulation states used by main-agent prompt variants with "
+            "`hasStates: true`. Each entry has `id`, `name`, `guidelines`, "
+            "`isStarting`, `scoreLower` (int|None), `scoreUpper` (int|None), "
+            "`ragEnabled`. Distinct from `behaviorInstructions`-based state "
+            "guidance, which continues to operate in parallel."
+        ),
+    )
 
 
 class VoiceConfig(BaseModel):
@@ -491,6 +514,10 @@ class Scenario(BaseModel):
                     if prompt_data_dict.get("enableProsody") is None
                     else bool(prompt_data_dict.get("enableProsody"))
                 ),
+                "selected_main_prompt_code": prompt_data_dict.get(
+                    "selectedMainPromptCode"
+                ),
+                "states": prompt_data_dict.get("states"),
             }
 
             prompt_data_obj = PromptData(**mapped_data)

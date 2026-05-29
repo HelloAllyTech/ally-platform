@@ -46,14 +46,42 @@ def parse_variables_from_prompt(text: str) -> list[str]:
     return sorted(set(matches))
 
 
-def merge_available_variables(*variable_lists: list[str]) -> list[str]:
-    merged = {
-        value.strip()
-        for values in variable_lists
-        for value in values
-        if isinstance(value, str) and value.strip()
-    }
-    return sorted(merged)
+def merge_available_variables(*variable_lists) -> list:
+    """Merge variable lists, accepting either string names or
+    ``{name, label?, required?}`` objects.
+
+    Auto-parsed placeholders from prompt text arrive as strings; richer meta
+    JSON entries arrive as objects. The merge is by ``name`` — when both a
+    string and an object reference the same name, the object's metadata
+    (label / required / etc.) is preserved.
+
+    Output is always a list of objects sorted by name so the studio can
+    consume a stable schema.
+    """
+    by_name: dict[str, dict] = {}
+    for values in variable_lists:
+        if not values:
+            continue
+        for value in values:
+            if isinstance(value, str) and value.strip():
+                name = value.strip()
+                if name not in by_name:
+                    by_name[name] = {"name": name}
+            elif isinstance(value, dict):
+                raw_name = value.get("name")
+                if not isinstance(raw_name, str) or not raw_name.strip():
+                    continue
+                name = raw_name.strip()
+                existing = by_name.get(name, {"name": name})
+                for key, val in value.items():
+                    if key == "name":
+                        continue
+                    # First write wins for any metadata key; auto-parsed
+                    # strings (which have no metadata) never overwrite the
+                    # meta JSON's labels / required flags.
+                    existing.setdefault(key, val)
+                by_name[name] = existing
+    return [by_name[name] for name in sorted(by_name)]
 
 
 def format_label(text: str) -> str:
@@ -68,7 +96,8 @@ def format_label(text: str) -> str:
 
 def load_meta(txt_file: Path) -> dict | None:
     """
-    Load name, description, category, kind, uses_blocks from _meta/<stem>.meta.json.
+    Load name, description, category, kind, promptType, hasStates,
+    uses_blocks, availableVariables from _meta/<stem>.meta.json.
     """
     meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
     if not meta_path.exists():
@@ -86,6 +115,10 @@ def load_meta(txt_file: Path) -> dict | None:
             out["category"] = data["category"].strip()
         if isinstance(data.get("kind"), str) and data["kind"].strip():
             out["kind"] = data["kind"].strip()
+        if isinstance(data.get("promptType"), str) and data["promptType"].strip():
+            out["promptType"] = data["promptType"].strip()
+        if isinstance(data.get("hasStates"), bool):
+            out["hasStates"] = data["hasStates"]
         if isinstance(data.get("uses_blocks"), list):
             out["uses_blocks"] = data["uses_blocks"]
         if isinstance(data.get("availableVariables"), list):
@@ -153,6 +186,10 @@ def scan_prompts() -> list[dict]:
             if meta:
                 if meta.get("kind"):
                     item["kind"] = meta["kind"]
+                if meta.get("promptType"):
+                    item["promptType"] = meta["promptType"]
+                if "hasStates" in meta:
+                    item["hasStates"] = meta["hasStates"]
                 if meta.get("uses_blocks"):
                     # block name -> ally_ai_learn_subdir_blockname.
                     # Note: only handles blocks in same dir as the prompt for now.

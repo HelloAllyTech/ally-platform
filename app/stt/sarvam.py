@@ -1,5 +1,7 @@
 """Sarvam STT provider implementation."""
 
+import asyncio
+import time
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -11,6 +13,33 @@ from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
 
 logger = get_logger(__name__)
+
+# --- Sarvam STT zombie-stream watchdog tuning -----------------------------
+#
+# After a long utterance + END_SPEECH + flush, the Sarvam server has been
+# observed (notably for Malayalam ml-IN) to enter a state where it accepts
+# audio chunks indefinitely but stops emitting START_SPEECH / END_SPEECH /
+# FINAL_TRANSCRIPT events. The WebSocket ping/pong heartbeat keeps the
+# connection technically alive, so the plugin's `_run_connection` just
+# waits forever for events that never arrive — the agent goes silent.
+#
+# The plugin already supports clean reconnection via `_reconnect_event`
+# (see plugin's `_run_connection`: setting the event clears the WS, opens
+# a fresh one, and resumes audio streaming). We just need to fire that
+# event when we detect staleness.
+#
+# Tuning:
+#  - STALE_THRESHOLD_S: how long the gap between (last audio chunk sent)
+#    and (last Sarvam-side event) is allowed to grow before we declare
+#    the stream zombie. 15s is roomy enough for a real human pause
+#    mid-sentence without false-triggering, but trips well within the
+#    minute+ observed in the failure mode.
+#  - WATCHDOG_INTERVAL_S: how often the watchdog polls. 3s keeps
+#    detection latency low without burning CPU.
+#  - On false trigger the cost is one short blip while a fresh WS opens
+#    — the next utterance still transcribes — so we bias toward sooner.
+SARVAM_STALE_THRESHOLD_S = 15.0
+SARVAM_WATCHDOG_INTERVAL_S = 3.0
 
 
 def _patch_sarvam_stt_url_builder() -> None:
@@ -142,6 +171,136 @@ def _patch_sarvam_stt_url_builder() -> None:
         # Apply the patch
         sarvam_stt_module.SpeechStream.aclose = _patched_aclose
         logger.info("Patched SpeechStream.aclose to prevent shared session closure")
+
+        # --- Patch 3: zombie-stream watchdog ----------------------------
+        # See SARVAM_STALE_THRESHOLD_S constant above for the failure
+        # mode this guards against. We instrument three plugin methods:
+        #
+        #   _handle_transcript_data → updates last_event_time on FINAL_TRANSCRIPT
+        #   _handle_events          → updates last_event_time on VAD signals
+        #   _process_audio          → updates last_audio_time on every chunk send
+        #
+        # and add a watchdog task spawned alongside the plugin's existing
+        # _audio_task / _message_task in _run_connection. When the gap
+        # (now - last_event_time) exceeds the threshold AND audio has
+        # flowed within the same window, we fire the plugin's own
+        # _reconnect_event — which the plugin handles cleanly by tearing
+        # down the WS and opening a fresh one without dropping the
+        # SpeechStream object.
+
+        original_handle_transcript_data = (
+            sarvam_stt_module.SpeechStream._handle_transcript_data
+        )
+        original_handle_events = sarvam_stt_module.SpeechStream._handle_events
+        original_process_audio = sarvam_stt_module.SpeechStream._process_audio
+        original_run_connection = sarvam_stt_module.SpeechStream._run_connection
+
+        def _mark_event(self: Any) -> None:
+            self._last_sarvam_event_time = time.monotonic()
+
+        def _mark_audio(self: Any) -> None:
+            self._last_audio_send_time = time.monotonic()
+
+        async def _patched_handle_transcript_data(self: Any, data: dict) -> None:
+            _mark_event(self)
+            await original_handle_transcript_data(self, data)
+
+        async def _patched_handle_events(self: Any, data: dict) -> None:
+            _mark_event(self)
+            await original_handle_events(self, data)
+
+        async def _patched_process_audio(self: Any, ws: Any) -> None:
+            # Wrap ws.send_str so each Sarvam-bound write updates the
+            # audio-flowing timestamp. Restore on exit so subsequent
+            # connections get a clean WS object.
+            original_send_str = ws.send_str
+
+            async def _tracking_send_str(payload: Any) -> Any:
+                _mark_audio(self)
+                return await original_send_str(payload)
+
+            ws.send_str = _tracking_send_str
+            try:
+                await original_process_audio(self, ws)
+            finally:
+                try:
+                    ws.send_str = original_send_str
+                except Exception:
+                    pass
+
+        async def _stale_stream_watchdog(self: Any) -> None:
+            """Force reconnect when Sarvam goes zombie (audio flowing, no events)."""
+            while not getattr(self, "_closing", False):
+                try:
+                    await asyncio.sleep(SARVAM_WATCHDOG_INTERVAL_S)
+                except asyncio.CancelledError:
+                    return
+                try:
+                    now = time.monotonic()
+                    last_event = getattr(self, "_last_sarvam_event_time", now)
+                    last_audio = getattr(self, "_last_audio_send_time", 0.0)
+                    event_gap = now - last_event
+                    # "Audio flowing" = a chunk was sent within the same
+                    # window we're measuring staleness against. Avoids
+                    # false-triggering when the room is genuinely idle
+                    # (e.g. participant muted) — in that case _process_audio
+                    # isn't running and we shouldn't be churning the WS.
+                    audio_flowing = (now - last_audio) < SARVAM_STALE_THRESHOLD_S
+                    if event_gap > SARVAM_STALE_THRESHOLD_S and audio_flowing:
+                        logger.warning(
+                            "[SARVAM_STT_WATCHDOG] stale stream — no Sarvam event "
+                            "for %.1fs while audio flowing (last chunk %.1fs ago); "
+                            "forcing reconnect",
+                            event_gap,
+                            now - last_audio,
+                        )
+                        # Re-baseline so we don't re-fire before the new
+                        # connection has a chance to produce events.
+                        self._last_sarvam_event_time = now
+                        try:
+                            self._reconnect_event.set()
+                        except Exception:
+                            logger.exception(
+                                "[SARVAM_STT_WATCHDOG] failed to set _reconnect_event"
+                            )
+                except asyncio.CancelledError:
+                    return
+                except Exception:
+                    logger.exception("[SARVAM_STT_WATCHDOG] error in watchdog loop")
+
+        async def _patched_run_connection(self: Any) -> None:
+            # Initialize state on each (re)connection so a freshly opened
+            # WS gets a fresh baseline — otherwise an old `last_event_time`
+            # from a dead WS could trip the watchdog immediately.
+            now = time.monotonic()
+            self._last_sarvam_event_time = now
+            self._last_audio_send_time = now
+            watchdog_task = asyncio.create_task(_stale_stream_watchdog(self))
+            try:
+                await original_run_connection(self)
+            finally:
+                watchdog_task.cancel()
+                try:
+                    await watchdog_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.exception(
+                        "[SARVAM_STT_WATCHDOG] watchdog raised on shutdown"
+                    )
+
+        sarvam_stt_module.SpeechStream._handle_transcript_data = (
+            _patched_handle_transcript_data
+        )
+        sarvam_stt_module.SpeechStream._handle_events = _patched_handle_events
+        sarvam_stt_module.SpeechStream._process_audio = _patched_process_audio
+        sarvam_stt_module.SpeechStream._run_connection = _patched_run_connection
+        logger.info(
+            "Patched SpeechStream with zombie-stream watchdog "
+            "(stale_threshold=%.1fs, poll=%.1fs)",
+            SARVAM_STALE_THRESHOLD_S,
+            SARVAM_WATCHDOG_INTERVAL_S,
+        )
 
     except Exception as e:
         # Log but don't fail - the plugin might work without the patch in some cases

@@ -9,15 +9,51 @@ or removing a metric from the system prompt requires no code changes here.
 
 from typing import Any, Dict, List
 
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.scenario.base import PromptData
 from app.core.scenario_report.schemas import TranscriptEntry
-from app.llms import create_llm_client
 from app.prompts.resolver import load_template
 
 logger = get_logger(__name__)
+
+# Evaluator-specific LLM tuning. Different from the default LLM client
+# returned by app.llms.create_llm_client() in three ways:
+#   - timeout=120s (default is 30s) — the judge consumes the entire
+#     transcript (can be 100KB+ for 100-turn reports) plus a sizeable
+#     rubric prompt, and must emit structured JSON containing both
+#     metrics and a multi-paragraph markdown report. OpenAI's gpt-4o-mini
+#     consistently needs 30-60s on long inputs; 30s was tripping the
+#     APITimeoutError observed for 100-turn runs.
+#   - temperature=0 — the judge should be deterministic across re-runs
+#     so the same transcript produces the same metric scores. The default
+#     temperature is tuned for the conversational agents, not for scoring.
+#   - model pinned to gpt-4o-mini — explicit and version-pinned at the
+#     report layer, so swapping the default conversational model in
+#     settings won't silently change report scoring behaviour.
+_EVALUATOR_MODEL = "gpt-4o-mini"
+_EVALUATOR_TIMEOUT_S = 120
+_EVALUATOR_TEMPERATURE = 0
+
+
+def _build_evaluator_llm():
+    """Return a ChatOpenAI instance tuned for transcript evaluation.
+
+    Built per-call rather than at module import so any settings change
+    (e.g. test fixtures swapping the API key) takes effect without
+    process restart, and so the client doesn't persist a background
+    session in the report-gen worker between runs.
+    """
+    return ChatOpenAI(
+        model=_EVALUATOR_MODEL,
+        temperature=_EVALUATOR_TEMPERATURE,
+        api_key=settings.OPENAI_API_KEY,
+        timeout=_EVALUATOR_TIMEOUT_S,
+        max_retries=1,
+    )
 
 
 # ------------------------------------------------------------------
@@ -128,7 +164,7 @@ async def evaluate_transcript(
         return {"metrics": {}, "report_markdown": ""}
 
     try:
-        llm = create_llm_client().llm_instance.with_structured_output(
+        llm = _build_evaluator_llm().with_structured_output(
             EvaluationResult, method="json_mode"
         )
         user_message = _build_evaluation_prompt(

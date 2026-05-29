@@ -2,7 +2,10 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.graph.knowledge_retrieval import (
+    _MAX_PER_MATCH_CHARS,
+    _MAX_TOTAL_CONTEXT_CHARS,
     RelevantKeys,
+    _format_retrieved_context,
     build_knowledge_map,
     retrieve_relevant_knowledge,
 )
@@ -186,3 +189,53 @@ class TestRetrieveKnowledgeErrorHandling:
             {"key1": "value1"},
         )
         assert result == ""
+
+
+class TestFormatRetrievedContextCaps:
+    """B5: prevent prompt-budget blow-up from large or many matches."""
+
+    def test_short_content_passes_through_untouched(self):
+        result = _format_retrieved_context(
+            ["title_a"],
+            {"title_a": "Short content."},
+        )
+        assert result == "**title_a:**\nShort content."
+
+    def test_oversize_match_truncated_with_marker(self):
+        big = "x" * (_MAX_PER_MATCH_CHARS + 500)
+        result = _format_retrieved_context(["t"], {"t": big})
+        assert "[truncated]" in result
+        # Truncation only chops the content portion. Marker should be at
+        # roughly the cap (allow some slack for rstrip + marker text).
+        assert len(result) < _MAX_PER_MATCH_CHARS + 80
+
+    def test_total_cap_drops_remaining_matches_with_marker(self):
+        # Each entry near per-match cap; combined exceeds total cap.
+        big = "y" * _MAX_PER_MATCH_CHARS
+        knowledge_map = {f"title_{i}": big for i in range(20)}
+        titles = list(knowledge_map.keys())
+        result = _format_retrieved_context(titles, knowledge_map)
+        assert "additional matches omitted to fit context budget" in result
+        # Total result length stays at or below the cap plus marker.
+        assert len(result) <= _MAX_TOTAL_CONTEXT_CHARS + 100
+
+    def test_missing_titles_silently_skipped(self):
+        result = _format_retrieved_context(
+            ["present", "absent"],
+            {"present": "Here"},
+        )
+        assert "**present:**" in result
+        assert "absent" not in result
+
+    def test_empty_inputs_return_empty_string(self):
+        assert _format_retrieved_context([], {}) == ""
+        assert _format_retrieved_context(["x"], {}) == ""
+        assert _format_retrieved_context([], {"a": "b"}) == ""
+
+    def test_order_preserved_from_relevant_titles(self):
+        # Order matters: the LLM's title order determines section order.
+        result = _format_retrieved_context(
+            ["b", "a"],
+            {"a": "alpha", "b": "beta"},
+        )
+        assert result.index("**b:**") < result.index("**a:**")

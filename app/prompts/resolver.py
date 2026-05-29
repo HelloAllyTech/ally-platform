@@ -79,6 +79,13 @@ def _extract_backend_template(entry: Any) -> Optional[str]:
 
 
 def _extract_allowed_variables(entry: Any) -> Optional[set[str]]:
+    """Extract the set of allowed placeholder names from a backend prompt entry.
+
+    Accepts both the legacy `string[]` schema and the richer
+    `{name, label?, required?}[]` schema introduced for studio rendering.
+    Returns just the names; metadata like `label` / `required` is consumed
+    by the frontend, not by the formatter.
+    """
     if not isinstance(entry, dict):
         return None
 
@@ -86,11 +93,73 @@ def _extract_allowed_variables(entry: Any) -> Optional[set[str]]:
     if not isinstance(raw_variables, list):
         return None
 
-    return {
-        value.strip()
-        for value in raw_variables
-        if isinstance(value, str) and value.strip()
-    }
+    names: set[str] = set()
+    for value in raw_variables:
+        if isinstance(value, str) and value.strip():
+            names.add(value.strip())
+        elif isinstance(value, dict):
+            name = value.get("name")
+            if isinstance(name, str) and name.strip():
+                names.add(name.strip())
+    return names
+
+
+def _extract_required_variables(entry: Any) -> set[str]:
+    """Names of variables marked `required: true` on a backend prompt entry.
+
+    Used by the runtime to enforce mandatoriness — the corresponding
+    kwarg value must be a non-empty string when the prompt is rendered.
+    Bare-string entries (legacy schema) are never required since they
+    carry no metadata.
+    """
+    if not isinstance(entry, dict):
+        return set()
+
+    raw_variables = entry.get("availableVariables")
+    if not isinstance(raw_variables, list):
+        return set()
+
+    required: set[str] = set()
+    for value in raw_variables:
+        if not isinstance(value, dict):
+            continue
+        if not value.get("required"):
+            continue
+        name = value.get("name")
+        if isinstance(name, str) and name.strip():
+            required.add(name.strip())
+    return required
+
+
+def _check_required_variables_present(
+    prompt_code: str,
+    required: set[str],
+    kwargs: dict,
+) -> list[str]:
+    """Return the names of required variables whose kwarg value is empty.
+
+    A value is "empty" when it's None, an empty string after strip(), or an
+    empty list / tuple. Studio surfaces these in the warn-on-save pass; the
+    runtime can re-check before formatting to block runs with missing data.
+    """
+    missing = []
+    for name in sorted(required):
+        value = kwargs.get(name)
+        if value is None:
+            missing.append(name)
+            continue
+        if isinstance(value, str) and not value.strip():
+            missing.append(name)
+            continue
+        if isinstance(value, (list, tuple)) and len(value) == 0:
+            missing.append(name)
+    if missing:
+        logger.warning(
+            "[PROMPT_REQUIRED] %s: missing required values for %s",
+            prompt_code,
+            missing,
+        )
+    return missing
 
 
 class SafeFormatter(dict):
@@ -239,6 +308,95 @@ def load_and_format(
         logger.info(
             "[PROMPT_FORMAT] %s: unknown placeholders left as literal text: %s",
             internal_path,
+            sorted(formatter.literal_keys),
+        )
+
+    return formatted
+
+
+def load_and_format_by_code(
+    prompt_code: str,
+    prompt_data: Any = None,
+    fallback_internal_path: Optional[str] = None,
+    **kwargs,
+) -> str:
+    """
+    Like load_and_format(), but resolves by a fully-qualified prompt_code
+    instead of deriving the code from an internal path. Use this when the
+    caller already knows which prompt row to load (e.g. a main-agent
+    variant selected per-simulation via Scenarios.metadata.selectedMainPromptCode).
+
+    Resolution order:
+      1. Backend metadata prompt for `prompt_code` (when present and non-empty).
+      2. Local .txt file matching `prompt_code` (best-effort; only works if
+         the code follows the ally_ai_learn_<path>_<stem> convention with no
+         underscores inside path segments — typically NOT the case for variants).
+      3. If both miss and `fallback_internal_path` is provided, resolve that
+         path via the normal load_template() pipeline.
+
+    Variants almost always live in backend metadata (useDashboardOverride=true)
+    and not as local files, so step 1 covers the common case; step 3 is the
+    safety net when a stale selectedMainPromptCode points at a deleted/missing
+    variant.
+
+    Args:
+        prompt_code: Fully-qualified code, e.g.
+            'ally_ai_learn_system_main_agent_prompt_variant_xyz'.
+        prompt_data: PromptData (carries .prompts) or raw backend_prompts dict.
+        fallback_internal_path: Optional fallback path resolved via load_template
+            if the code can't be found.
+        **kwargs: Format kwargs.
+
+    Returns:
+        Formatted string, or "" if no template can be resolved.
+    """
+    template = resolve_template(prompt_code, prompt_data)
+    used_path_for_logging = prompt_code
+    # Track which code's backend_entry the SafeFormatter should consult so
+    # `allowed_variables` matches the template actually being rendered. When
+    # we fall back to `fallback_internal_path`, the variant's backend entry
+    # is missing (that's WHY we fell back) — using it would yield None and
+    # bypass the literal-{key} escape for unknown placeholders, masking
+    # author errors. Pull the entry for the fallback's prompt_code instead.
+    effective_prompt_code = prompt_code
+
+    if not template and fallback_internal_path:
+        template = load_template(fallback_internal_path, prompt_data)
+        used_path_for_logging = f"{prompt_code} (fell back to {fallback_internal_path})"
+        if template:
+            logger.warning(
+                "[PROMPT_SOURCE] %s: variant code did not resolve; falling back "
+                "to %s",
+                prompt_code,
+                fallback_internal_path,
+            )
+            effective_prompt_code = (
+                f"ally_ai_learn_{fallback_internal_path.replace('/', '_')}"
+            )
+
+    if not template:
+        return ""
+
+    backend_entry = _get_backend_prompt_entry(prompt_data, effective_prompt_code)
+    formatter = SafeFormatter(
+        **kwargs,
+        allowed_variables=_extract_allowed_variables(backend_entry),
+    )
+    formatted = template.format_map(formatter)
+
+    if formatter.missing_keys:
+        logger.warning(
+            "[PROMPT_FORMAT] %s: missing placeholders resolved to empty string: %s. "
+            "Provided kwargs: %s",
+            used_path_for_logging,
+            sorted(formatter.missing_keys),
+            sorted(kwargs.keys()),
+        )
+
+    if formatter.literal_keys:
+        logger.info(
+            "[PROMPT_FORMAT] %s: unknown placeholders left as literal text: %s",
+            used_path_for_logging,
             sorted(formatter.literal_keys),
         )
 
