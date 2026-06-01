@@ -162,3 +162,62 @@ def test_overlapping_ranges_returns_first_in_array_order():
     result = _resolve_simulation_state_by_score(states, 75)
     assert result is not None
     assert result["name"] == "First"
+
+
+# ---- Strict-bounds clamp fallback ------------------------------------------
+# As of the strict-bounds migration, every state has finite numeric bounds
+# (no more "open" ends). Out-of-range scores must clamp to the nearest
+# end-state so {state_x_guidelines} always renders something meaningful.
+
+
+def test_score_below_first_lower_clamps_to_first_state():
+    """Strict-bounds: score < first.scoreLower → first state."""
+    states = [
+        _state("First", lower=0, upper=50),
+        _state("Second", lower=50, upper=100),
+        _state("Third", lower=100, upper=150),
+    ]
+    # Score -10 is below every interval; clamp to "First".
+    result = _resolve_simulation_state_by_score(states, -10)
+    assert result is not None
+    assert result["name"] == "First"
+
+
+def test_score_above_last_upper_clamps_to_last_state():
+    """Strict-bounds: score >= last.scoreUpper → last state."""
+    states = [
+        _state("First", lower=0, upper=50),
+        _state("Second", lower=50, upper=100),
+        _state("Third", lower=100, upper=150),
+    ]
+    # Score 9999 is way past every upper; clamp to "Third".
+    result = _resolve_simulation_state_by_score(states, 9999)
+    assert result is not None
+    assert result["name"] == "Third"
+
+
+def test_score_exactly_at_last_upper_clamps_to_last_state():
+    """Boundary: score = last.scoreUpper isn't a strict match (upper is
+    exclusive) but the clamp catches it and returns the last state."""
+    states = [
+        _state("First", lower=0, upper=50),
+        _state("Second", lower=50, upper=100),
+    ]
+    result = _resolve_simulation_state_by_score(states, 100)
+    assert result is not None
+    assert result["name"] == "Second"
+
+
+def test_clamp_uses_score_order_not_array_order():
+    """Clamp resolves based on numeric ordering of bounds, regardless of
+    how the admin's states array is ordered in storage."""
+    states = [
+        # Author saved them in random order.
+        _state("Middle", lower=50, upper=100),
+        _state("Last", lower=100, upper=150),
+        _state("First", lower=0, upper=50),
+    ]
+    # Below all bounds → "First" (lowest lower).
+    assert _resolve_simulation_state_by_score(states, -5)["name"] == "First"
+    # Above all bounds → "Last" (highest upper).
+    assert _resolve_simulation_state_by_score(states, 200)["name"] == "Last"

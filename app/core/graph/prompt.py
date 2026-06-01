@@ -263,11 +263,18 @@ def _resolve_simulation_state_by_score(
     States are studio-edited and live on `Scenarios.metadata.states` (see
     PromptData.states). Selection rules:
       - `scoreLower` is inclusive; `scoreUpper` is exclusive.
-      - `None` means open at that end (first state's lower, last state's upper).
+      - Bounds are finite numbers (the studio enforces strict min/max as
+        of the bounds change). Older scenarios authored with the legacy
+        open-ended-at-the-ends design still resolve correctly because the
+        legacy `None` semantics is preserved below.
       - When `current_score` is None, fall back to the state marked
         `isStarting: true` so turn 1 has a deterministic state.
-      - When no state matches at all, return None (caller should treat as
-        "no state injection this turn").
+      - Out-of-range scores clamp to the nearest state:
+          score < first.lower → first state
+          score >= last.upper → last state
+        This guarantees total coverage of the score axis even when the
+        admin authored strict bounds; without clamping a runaway score
+        would render `{state_x_guidelines}` empty.
 
     Distinct from {@link _resolve_state_guidance}, which threads behavior-rule
     state guidance into `{behavior_instructions_json}` — that path is
@@ -290,6 +297,9 @@ def _resolve_simulation_state_by_score(
             ),
         )[0]
 
+    # First pass: standard interval match. Legacy `None` bounds are
+    # honored (open-ended → always matches that end), so scenarios
+    # authored before the strict-bounds migration keep working.
     for state in states:
         lower = state.get("scoreLower")
         upper = state.get("scoreUpper")
@@ -298,6 +308,23 @@ def _resolve_simulation_state_by_score(
         if upper is not None and current_score >= upper:
             continue
         return state
+
+    # Out-of-range fallback (strict-bounds scenarios). Sort by lower
+    # bound; clamp to the nearest end. We re-derive the ordering here
+    # rather than relying on caller-provided order because the studio
+    # stores states in admin-edit order, not score order.
+    sorted_states = sorted(
+        states,
+        key=lambda s: (
+            s.get("scoreLower") if s.get("scoreLower") is not None else float("-inf")
+        ),
+    )
+    first_lower = sorted_states[0].get("scoreLower")
+    if first_lower is not None and current_score < first_lower:
+        return sorted_states[0]
+    last_upper = sorted_states[-1].get("scoreUpper")
+    if last_upper is not None and current_score >= last_upper:
+        return sorted_states[-1]
     return None
 
 
@@ -362,9 +389,23 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
 
     The backend forwards each ai-learn prompt to PromptData.prompts as
     `{prompt, availableVariables, hasStates}`. When the simulation has
-    chosen a variant (`PromptData.selected_main_prompt_code`), we read
-    the flag from that entry. Falls back to False when the entry / flag
-    is missing.
+    chosen a variant (`PromptData.selected_main_prompt_code`), we
+    decide whether to compute state guidance using a two-tier check:
+
+      1. Body-driven (preferred): does the variant's auto-reconciled
+         `availableVariables` list include `state_x_guidelines`? This
+         matches how every other variable-aware UI element gates itself
+         and keeps the runtime in sync with what the prompt body
+         actually references — remove the placeholder from the body,
+         save, and state computation auto-disables.
+      2. Legacy `hasStates` boolean (backward compat): rows authored
+         before body-reference gating still resolve correctly. As
+         admins re-save prompts under the new flow, the auto-reconcile
+         brings the list up to date and the body-driven check takes
+         over naturally.
+
+    Returns False when no variant is selected, the prompts dict is
+    missing, or neither signal is set.
     """
     selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
     if not selected_code:
@@ -375,6 +416,23 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     entry = prompts.get(selected_code)
     if not isinstance(entry, dict):
         return False
+
+    # Tier 1 — body-driven. availableVariables can be either a list of
+    # strings or a list of {name, label, required} dicts (the schema
+    # widened to support the studio's chip metadata). Normalize before
+    # the membership check.
+    available_vars = entry.get("availableVariables") or []
+    if isinstance(available_vars, list):
+        for var in available_vars:
+            name = (
+                var
+                if isinstance(var, str)
+                else (var.get("name") if isinstance(var, dict) else None)
+            )
+            if name == "state_x_guidelines":
+                return True
+
+    # Tier 2 — legacy fallback.
     return bool(entry.get("hasStates"))
 
 
