@@ -385,27 +385,21 @@ def _build_branching_prompt(
 
 
 def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
-    """Look up `hasStates` on the selected main-agent prompt entry.
+    """Decide whether to compute state guidance for the selected variant.
 
-    The backend forwards each ai-learn prompt to PromptData.prompts as
-    `{prompt, availableVariables, hasStates}`. When the simulation has
-    chosen a variant (`PromptData.selected_main_prompt_code`), we
-    decide whether to compute state guidance using a two-tier check:
+    Strictly body-driven: the variant's auto-reconciled
+    `availableVariables` is the single source of truth. We return True
+    iff that list references `{state_x_guidelines}`.
 
-      1. Body-driven (preferred): does the variant's auto-reconciled
-         `availableVariables` list include `state_x_guidelines`? This
-         matches how every other variable-aware UI element gates itself
-         and keeps the runtime in sync with what the prompt body
-         actually references — remove the placeholder from the body,
-         save, and state computation auto-disables.
-      2. Legacy `hasStates` boolean (backward compat): rows authored
-         before body-reference gating still resolve correctly. As
-         admins re-save prompts under the new flow, the auto-reconcile
-         brings the list up to date and the body-driven check takes
-         over naturally.
+    The backend's BackfillAvailableVariables1780150000000 migration
+    populates `availableVariables` for every existing row from its
+    latest body, so we no longer fall back to the legacy `hasStates`
+    boolean. Empty / missing list now means "no states" — same as a
+    row whose reconciled list simply doesn't include the placeholder.
 
     Returns False when no variant is selected, the prompts dict is
-    missing, or neither signal is set.
+    missing, the entry is malformed, or the list doesn't reference
+    `state_x_guidelines`.
     """
     selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
     if not selected_code:
@@ -417,23 +411,21 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     if not isinstance(entry, dict):
         return False
 
-    # Tier 1 — body-driven. availableVariables can be either a list of
-    # strings or a list of {name, label, required} dicts (the schema
-    # widened to support the studio's chip metadata). Normalize before
-    # the membership check.
+    # availableVariables can be a list of strings OR a list of
+    # {name, label, required} dicts (the studio's chip metadata schema);
+    # normalize before the membership check.
     available_vars = entry.get("availableVariables") or []
-    if isinstance(available_vars, list):
-        for var in available_vars:
-            name = (
-                var
-                if isinstance(var, str)
-                else (var.get("name") if isinstance(var, dict) else None)
-            )
-            if name == "state_x_guidelines":
-                return True
-
-    # Tier 2 — legacy fallback.
-    return bool(entry.get("hasStates"))
+    if not isinstance(available_vars, list):
+        return False
+    for var in available_vars:
+        name = (
+            var
+            if isinstance(var, str)
+            else (var.get("name") if isinstance(var, dict) else None)
+        )
+        if name == "state_x_guidelines":
+            return True
+    return False
 
 
 def _build_behavior_prompt(
