@@ -418,7 +418,7 @@ export const SECTION_LIST: SectionItem[] = [
   },
   {
     key: SectionKey.OngoingRisks,
-    label: 'Ongoing Risks',
+    label: 'Risk Assessment',
     icon: OngoingRisksIcon,
     canEdit: true,
     canEnhance: false,
