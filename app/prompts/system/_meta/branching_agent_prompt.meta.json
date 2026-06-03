@@ -5,9 +5,18 @@
     "description": "Minimal branching prompt that keeps direct editable wording in the top-level template.",
     "availableVariables": [
         "title",
-        "description"
-    ],
-    "uses_blocks": [
-        "multilingual_instructions_block"
+        "description",
+        "name",
+        "age",
+        "gender",
+        "current_location",
+        "character_profile_text",
+        "language_code",
+        "language_label",
+        "samples",
+        "allowed_fillers",
+        "retrieved_context",
+        "competency",
+        "next_instruction"
     ]
 }

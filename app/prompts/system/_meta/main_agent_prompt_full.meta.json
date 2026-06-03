@@ -21,17 +21,11 @@
         { "name": "opening_statements", "label": "Opening Statements", "required": false },
         { "name": "language_code", "label": "Output Language Code", "required": false },
         { "name": "language_label", "label": "Output Language Label", "required": false },
-        { "name": "language_characteristics", "label": "Language Characteristics", "required": false },
         { "name": "allowed_fillers", "label": "Allowed Filler Words", "required": false },
         { "name": "samples", "label": "Tone & Style Samples", "required": false },
         { "name": "custom_fields_text", "label": "Custom Fields", "required": false },
         { "name": "state_x_guidelines", "label": "Active State Guidelines", "required": false },
         { "name": "retrieved_context", "label": "Retrieved Knowledge Context", "required": false },
         { "name": "behavior_instructions_json", "label": "Behavior Rules (JSON)", "required": false }
-    ],
-    "uses_blocks": [
-        "profession_block",
-        "previous_memory_block",
-        "multilingual_instructions_block"
     ]
 }

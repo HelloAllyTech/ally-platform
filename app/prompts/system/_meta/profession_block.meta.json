@@ -1,5 +1,0 @@
-{
-    "name": "Profession Block",
-    "kind": "block",
-    "description": "Optional persona sentence describing the client's profession in the main prompt."
-}

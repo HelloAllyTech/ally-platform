@@ -35,15 +35,43 @@ SYNC_ENDPOINT = "/api/v1/prompts/sync"
 PROMPT_CODE_PREFIX = "ally_ai_learn_"
 
 
+# Placeholders that the runtime substitutes from non-author-facing
+# sources and that we therefore don't want surfaced in the studio's
+# "Available Variables" chip list. They're still valid to reference
+# inside a custom prompt variant — they just don't fit the
+# "one placeholder = one scenario-author input" mental model the chip
+# list is built around, and showing them clutters the legitimate
+# author-facing fields.
+#
+# - `custom_fields_text`: rendered concatenation of the scenario's
+#   customFields[] array. Authors fill in the individual name/value
+#   pairs in the simulator creator, never the rendered string itself.
+# - `language_characteristics`: raw per-scenario language-style
+#   override. Whenever it's set, it's also what `{language_label}`
+#   resolves to (the resolver merges it in). The only behavior it
+#   uniquely exposes is "render empty when no override exists" — a
+#   niche pattern that doesn't justify a chip alongside `{name}` /
+#   `{age}` / etc. Variants that want the empty-when-absent rendering
+#   can still reference `{language_characteristics}` directly.
+HIDDEN_PLACEHOLDERS = frozenset(
+    {
+        "custom_fields_text",
+        "language_characteristics",
+    }
+)
+
+
 def parse_variables_from_prompt(text: str) -> list[str]:
     """
     Extract placeholders from prompt template.
     Supports {var_name} format used by Python str.format().
-    Returns sorted unique list of variable names.
+    Returns sorted unique list of variable names, with placeholders in
+    HIDDEN_PLACEHOLDERS filtered out so they don't surface in the
+    studio's available-variables chip list.
     """
     pattern = r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}"
     matches = re.findall(pattern, text)
-    return sorted(set(matches))
+    return sorted(set(matches) - HIDDEN_PLACEHOLDERS)
 
 
 def merge_available_variables(*variable_lists) -> list:
@@ -171,6 +199,31 @@ def scan_prompts() -> list[dict]:
             )
 
             content = txt_file.read_text(encoding="utf-8")
+            # Resolve usesBlocks to fully-qualified prompt codes. ALWAYS
+            # include the field (defaulting to []) so the BE upsert can
+            # explicitly clear stale entries when a meta JSON drops a
+            # block reference — TypeORM's .update() treats `undefined`
+            # as "don't change", so omitting the field would leave old
+            # uses_blocks values pinned in the DB forever even after
+            # they were removed from the meta JSON.
+            uses_blocks_codes: list[str] = []
+            if meta and meta.get("uses_blocks"):
+                # block name -> ally_ai_learn_subdir_blockname.
+                # Note: only handles blocks in same dir as the prompt for now.
+                # e.g. system/competency_block.txt ->
+                # ally_ai_learn_system_competency_block.
+                # prompt: system/full_prompt -> item rel.parent: system.
+                subdir_prefix = (
+                    str(rel.parent).replace("/", "_") if str(rel.parent) != "." else ""
+                )
+                for b in meta["uses_blocks"]:
+                    if subdir_prefix:
+                        uses_blocks_codes.append(
+                            f"{PROMPT_CODE_PREFIX}{subdir_prefix}_{b}"
+                        )
+                    else:
+                        uses_blocks_codes.append(f"{PROMPT_CODE_PREFIX}{b}")
+
             item = {
                 "promptCode": prompt_code,
                 "name": name,
@@ -181,6 +234,7 @@ def scan_prompts() -> list[dict]:
                     parse_variables_from_prompt(content),
                     meta.get("availableVariables", []) if meta else [],
                 ),
+                "usesBlocks": uses_blocks_codes,
             }
 
             if meta:
@@ -190,24 +244,6 @@ def scan_prompts() -> list[dict]:
                     item["promptType"] = meta["promptType"]
                 if "hasStates" in meta:
                     item["hasStates"] = meta["hasStates"]
-                if meta.get("uses_blocks"):
-                    # block name -> ally_ai_learn_subdir_blockname.
-                    # Note: only handles blocks in same dir as the prompt for now.
-                    # e.g. system/competency_block.txt ->
-                    # ally_ai_learn_system_competency_block.
-                    # prompt: system/full_prompt -> item rel.parent: system.
-                    subdir_prefix = (
-                        str(rel.parent).replace("/", "_")
-                        if str(rel.parent) != "."
-                        else ""
-                    )
-                    codes = []
-                    for b in meta["uses_blocks"]:
-                        if subdir_prefix:
-                            codes.append(f"{PROMPT_CODE_PREFIX}{subdir_prefix}_{b}")
-                        else:
-                            codes.append(f"{PROMPT_CODE_PREFIX}{b}")
-                    item["usesBlocks"] = codes
 
             items.append(item)
         except Exception as e:

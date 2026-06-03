@@ -49,30 +49,11 @@ def _optional_field_line(prompt_text: str, value: Any) -> str:
     return content + " "
 
 
-def _optional_prompt_block(
-    internal_path: str,
-    value: Any,
-    prompt_data: Optional[PromptData] = None,
-) -> str:
-    normalized = _coerce_block_value(value)
-    if not normalized:
-        return ""
-
-    block = load_and_format(
-        internal_path,
-        prompt_data=prompt_data,
-        value=normalized,
-    )
-    content = (block or "").strip()
-    if not content:
-        return ""
-    if not content.endswith((".", "!", "?")):
-        content += "."
-    return content + " "
-
-
 def _format_allowed_fillers_for_prompt(fillers: Optional[List[str]]) -> str:
-    """Human-readable list for multilingual_instructions_block {allowed_fillers}."""
+    """Human-readable list for the {allowed_fillers} placeholder.
+
+    Used inline by the main agent prompt and the branching prompt.
+    """
     empty_guidance = (
         "No curated filler list is set for this language in scenario metadata. "
         "Speak naturally and idiomatically; do not invent or assume a prescribed "
@@ -133,80 +114,6 @@ def _resolve_effective_language_label(
     if label:
         return label
     return language_code
-
-
-def _get_language_sample_block(
-    samples: Optional[List],
-    language_code: str,
-    backend_prompts: Optional[dict] = None,
-    allowed_fillers: Optional[List[str]] = None,
-    language_label: Optional[str] = None,
-    language_characteristics: Optional[str] = None,
-) -> str:
-    samples_text = _format_language_samples(samples) if samples else ""
-    allowed_fillers_text = _format_allowed_fillers_for_prompt(allowed_fillers)
-    effective_language_label = _resolve_effective_language_label(
-        language_code=language_code,
-        language_label=language_label,
-        language_characteristics=language_characteristics,
-    )
-    result = load_and_format(
-        "system/multilingual_instructions_block",
-        prompt_data=backend_prompts,
-        language_code=language_code,
-        language_label=effective_language_label,
-        samples=samples_text,
-        allowed_fillers=allowed_fillers_text,
-    )
-    if not result or not result.strip():
-        logger.error(
-            "%s multilingual_instructions template resolved empty for language_code=%s",
-            # log token kept for grep stability;
-            # template file is multilingual_instructions_block
-            LOG_PREFIX,
-            language_code,
-        )
-        return ""
-
-    return result.strip() + "\n\n"
-
-
-def _get_language_block(
-    prompt_data: PromptData, language_code: Optional[str] = None
-) -> str:
-    # Skip only when language is unspecified or "bare" English (no region).
-    # Region-tagged English variants (en-IN, en-US, en-GB, …) still need the
-    # multilingual block so the LLM gets an explicit regional dialect signal —
-    # without it, all English locales collapse to the model's default
-    # distribution, usually American English.
-    if not language_code or language_code.lower() == "en":
-        return ""
-
-    samples = prompt_data.language_dialogue_samples
-    backend_prompts = getattr(prompt_data, "prompts", None)
-    allowed_fillers = getattr(prompt_data, "allowed_fillers", None)
-    language_label = getattr(prompt_data, "language_label", None)
-    language_characteristics = getattr(prompt_data, "language_characteristics", None)
-
-    block = _get_language_sample_block(
-        samples,
-        language_code,
-        backend_prompts,
-        allowed_fillers,
-        language_label=language_label,
-        language_characteristics=language_characteristics,
-    )
-    if not block or not block.strip():
-        return ""
-
-    sample_count = len(samples) if samples else 0
-    logger.info(
-        "%s INJECTED language_block (language_code=%s, samples=%d)",
-        LOG_PREFIX,
-        language_code,
-        sample_count,
-    )
-    return block
 
 
 def _get_retrieved_context_text(retrieved_context: Optional[str]) -> str:
@@ -375,7 +282,28 @@ def _build_branching_prompt(
             getattr(prompt_data, "character_profile_text", None)
             or getattr(prompt_data, "context", None)
         ),
-        multilingual_instructions_block=_get_language_block(prompt_data, language_code),
+        # Multilingual fields substituted directly into the branching
+        # template body (no block wrapper). Mirror of the main-agent
+        # path — same kwargs go into both prompts so wording stays
+        # consistent across the runtime + branching surfaces.
+        language_code=_coerce_block_value(language_code),
+        language_label=_coerce_block_value(
+            _resolve_effective_language_label(
+                language_code=language_code or "",
+                language_label=getattr(prompt_data, "language_label", None),
+                language_characteristics=getattr(
+                    prompt_data, "language_characteristics", None
+                ),
+            )
+            if language_code
+            else None
+        ),
+        samples=_format_language_samples(
+            getattr(prompt_data, "language_dialogue_samples", None) or []
+        ),
+        allowed_fillers=_format_allowed_fillers_for_prompt(
+            getattr(prompt_data, "allowed_fillers", None)
+        ),
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
@@ -530,20 +458,9 @@ def _build_behavior_prompt(
         sexual_orientation=_coerce_block_value(
             getattr(prompt_data, "sexual_orientation", None)
         ),
-        profession_block=_optional_prompt_block(
-            "system/profession_block",
-            getattr(prompt_data, "profession", None),
-            prompt_data,
-        ),
-        previous_memory_block=_optional_prompt_block(
-            "system/previous_memory_block",
-            getattr(prompt_data, "previous_memory", None),
-            prompt_data,
-        ),
         character_profile_text=_coerce_block_value(
             getattr(prompt_data, "character_profile_text", None)
         ),
-        multilingual_instructions_block=_get_language_block(prompt_data, language_code),
         retrieved_context=_get_retrieved_context_text(effective_retrieved_context),
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []
@@ -558,21 +475,20 @@ def _build_behavior_prompt(
         opening_statements=_coerce_block_value(
             getattr(prompt_data, "opening_statements", None)
         ),
-        # Block-internal variables lifted to the top level so new variants
-        # can use them directly (e.g. `{profession}` in the prompt text)
-        # without going through the `{profession_block}` / `{previous_memory_block}`
-        # wrappers. The wrappers continue to work for prompts that prefer
-        # the canned wording.
+        # Persona + language variables used directly by the prompt
+        # template body. `previous_memory` is preformatted on the BE
+        # side (full "You remember from your last session: …" sentence
+        # when present, empty string otherwise), so the template just
+        # substitutes it verbatim — no conditional wrapper needed.
         profession=_coerce_block_value(getattr(prompt_data, "profession", None)),
         previous_memory=_coerce_block_value(
             getattr(prompt_data, "previous_memory", None)
         ),
-        # Multilingual block-internal variables. Variants can compose
-        # their own multilingual section instead of including the full
-        # `{multilingual_instructions_block}` wrapper. `language_code`
-        # is the runtime BCP-47 locale (e.g. 'ta-IN'); empty for bare
-        # English. The other values mirror what the block template
-        # consumes today.
+        # Multilingual variables substituted directly into the prompt
+        # body. `language_code` is the runtime BCP-47 locale (e.g.
+        # 'ta-IN'); empty / 'en' when bare English. The template
+        # always renders these (no conditional skip for English) —
+        # English sessions get the same multilingual rules.
         language_code=_coerce_block_value(language_code),
         language_label=_coerce_block_value(
             _resolve_effective_language_label(
@@ -588,12 +504,10 @@ def _build_behavior_prompt(
         language_characteristics=_coerce_block_value(
             getattr(prompt_data, "language_characteristics", None)
         ),
-        # Style/voice fields that used to live inside
-        # `{multilingual_instructions_block}` only. Lifted to the top
-        # level so variants can reference them directly — e.g. the
-        # "Main Agent Prompt #2" variant uses `{samples}` and
-        # `{allowed_fillers}` in its `## About you` section instead of
-        # going through the full multilingual wrapper.
+        # Style/voice fields rendered inline by the main agent prompt's
+        # multilingual section. Variants can reference them directly via
+        # `{samples}` / `{allowed_fillers}` (e.g. the lean #2 variant
+        # uses both in its `## About you` section).
         samples=_format_language_samples(
             getattr(prompt_data, "language_dialogue_samples", None) or []
         ),

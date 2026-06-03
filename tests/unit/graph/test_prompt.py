@@ -151,15 +151,23 @@ class TestPrompt:
         # assert "## Additional Custom Context" not in content
 
     def test_generate_system_message_with_previous_memory(self):
-        """Test that previous_memory is included when provided."""
+        """Test that previous_memory is included when provided.
+
+        The BE preformats the value into a full sentence (e.g.
+        "You remember from your last session: …") and the ai-learn
+        template substitutes the placeholder verbatim — no wrapper.
+        We assert on the literal preformatted text round-tripping
+        through the template, since the wrapping responsibility now
+        lives upstream.
+        """
         previous_session_summary = (
-            "In our last session, we discussed anxiety management "
-            "techniques and you mentioned making progress with breathing exercises."
+            "You remember from your last session: we discussed anxiety "
+            "management techniques and you mentioned breathing exercises."
         )
         pd = make_prompt_data(previous_memory=previous_session_summary)
         msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
-        assert "previous session" in content
+        assert "last session" in content
         assert "breathing exercises" in content
 
     def test_generate_system_message_omits_legacy_character_context_fields(self):
@@ -596,15 +604,22 @@ class TestPrompt:
         assert "Output language: English (India) (locale: en-IN)" in msg_en_in.content
         assert "Output language: English (US) (locale: en-US)" in msg_en_us.content
 
-    def test_generate_system_message_bare_english_omits_language_instruction(self):
-        """Bare 'en' (no region) still omits the multilingual block — there's no
-        regional dialect to enforce and emitting the block would be misleading."""
+    def test_generate_system_message_bare_english_renders_language_instruction(self):
+        """Bare 'en' (no region) now renders the multilingual section too.
+
+        The block was inlined into the main prompt template, so the
+        language directive shows up regardless of language. For bare
+        'en' the locale slot reads 'en' and the label falls back to
+        the same. Slight redundancy for English sessions; in exchange
+        we drop one indirection in the prompt builder.
+        """
         pd = make_prompt_data()
         msg = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="en"
         )
 
-        assert "Output language:" not in msg.content
+        assert "Output language:" in msg.content
+        assert "en" in msg.content
 
     def test_generate_system_message_includes_language_label_when_present(self):
         """Non-English with language_label: human-readable name appears in the
