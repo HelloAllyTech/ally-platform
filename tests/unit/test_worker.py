@@ -223,7 +223,7 @@ class TestWorker:
     async def test_entrypoint_happy_path(self, monkeypatch):
         # Parse metadata -> scenario
         # Create a proper VoicePromptData object
-        from app.core.scenario.base import PromptData, Scenario, ScenarioResponseLength
+        from app.core.scenario.base import PromptData, Scenario
 
         prompt_data = PromptData(
             name="Test Client",
@@ -232,9 +232,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello", "hi"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         # Create a proper Scenario object with empty events list
@@ -429,7 +427,7 @@ class TestWorker:
     @pytest.mark.asyncio
     async def test_entrypoint_tts_fallback(self, monkeypatch):
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
-        from app.core.scenario.base import PromptData, Scenario, ScenarioResponseLength
+        from app.core.scenario.base import PromptData, Scenario
 
         prompt_data = PromptData(
             name="Test Client",
@@ -438,9 +436,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = Scenario(
@@ -811,7 +807,7 @@ class TestWorker:
     # -------------------- entrypoint additional tests --------------------
     @pytest.mark.asyncio
     async def test_entrypoint_stt_fallback(self, monkeypatch):
-        from app.core.scenario.base import PromptData, ScenarioResponseLength
+        from app.core.scenario.base import PromptData
 
         prompt_data = PromptData(
             name="Test Client",
@@ -820,9 +816,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = _create_test_scenario(prompt_data)
@@ -972,7 +966,7 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_initializes_event_orchestrator(self, monkeypatch):
-        from app.core.scenario.base import PromptData, ScenarioResponseLength
+        from app.core.scenario.base import PromptData
 
         prompt_data = PromptData(
             name="Test Client",
@@ -981,9 +975,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = _create_test_scenario(prompt_data)
@@ -1134,7 +1126,7 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_registers_shutdown_callback(self, monkeypatch):
-        from app.core.scenario.base import PromptData, ScenarioResponseLength
+        from app.core.scenario.base import PromptData
 
         prompt_data = PromptData(
             name="Test Client",
@@ -1143,9 +1135,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = _create_test_scenario(prompt_data)
@@ -1274,7 +1264,7 @@ class TestWorker:
 
     @pytest.mark.asyncio
     async def test_entrypoint_handle_termination_callback(self, monkeypatch):
-        from app.core.scenario.base import PromptData, ScenarioResponseLength
+        from app.core.scenario.base import PromptData
 
         prompt_data = PromptData(
             name="Test Client",
@@ -1283,9 +1273,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = _create_test_scenario(prompt_data)
@@ -1514,7 +1502,7 @@ class TestWorker:
     ):
         """Test that opening statement is skipped when termination is
         initiated during initialization."""
-        from app.core.scenario.base import PromptData, ScenarioResponseLength
+        from app.core.scenario.base import PromptData
 
         prompt_data = PromptData(
             name="Test Client",
@@ -1523,9 +1511,7 @@ class TestWorker:
             current_location="Test Location",
             context="test context",
             opening_statements=["hello"],
-            agent_goal="test goal",
             prompt="test prompt",
-            response_length=ScenarioResponseLength.BRIEF,
         )
 
         scenario = _create_test_scenario(prompt_data)

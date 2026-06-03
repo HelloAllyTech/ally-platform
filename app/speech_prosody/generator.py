@@ -24,6 +24,14 @@ def _get_prosody_identity_context(prompt_data: PromptData) -> str:
     """
     Get a minimized identity context for prosody generation to avoid OOM.
     Includes only essential fields for emotional/vocal baseline analysis.
+
+    Previously this also pulled `personality`, `tone`, `starting_state`,
+    and `life_history_summary` from PromptData. Those fields were
+    removed when the structured simulator-creator UI was retired; the
+    free-text `character_profile_text` (which authors write in the
+    studio's Character Profile editor) is the successor — it captures
+    all of those signals as one paragraph and is now the canonical place
+    to express the character's emotional baseline.
     """
     parts = []
     if prompt_data.name:
@@ -32,19 +40,15 @@ def _get_prosody_identity_context(prompt_data: PromptData) -> str:
         parts.append(f"AGE: {prompt_data.age}")
     if prompt_data.gender:
         parts.append(f"GENDER: {prompt_data.gender}")
-    if prompt_data.personality:
-        parts.append(f"PERSONALITY: {prompt_data.personality}")
-    if prompt_data.tone:
-        parts.append(f"TONE: {prompt_data.tone}")
-    if prompt_data.starting_state:
-        parts.append(f"STARTING STATE: {prompt_data.starting_state}")
 
-    # Life history can be very large; provide a truncated version
-    if prompt_data.life_history_summary:
-        history = prompt_data.life_history_summary
-        if len(history) > 500:
-            history = history[:500] + "..."
-        parts.append(f"LIFE HISTORY: {history}")
+    # Character profile is the free-text successor to the removed
+    # structured personality / tone / starting-state / life-history
+    # fields. Truncate to cap the prosody prompt size for OOM safety.
+    if prompt_data.character_profile_text:
+        profile = prompt_data.character_profile_text
+        if len(profile) > 500:
+            profile = profile[:500] + "..."
+        parts.append(f"CHARACTER PROFILE: {profile}")
 
     return "\n".join(parts)
 

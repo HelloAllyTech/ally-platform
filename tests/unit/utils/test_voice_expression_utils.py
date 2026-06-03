@@ -101,43 +101,35 @@ class TestFormatPersonaContext:
     def test_format_persona_context_all_fields(self):
         """Test with all essential fields."""
         persona = {
-            "personality": "Friendly and outgoing",
-            "tone": "Warm and professional",
-            "emotional_needs": "Understanding and validation",
-            "starting_state": "Calm and ready",
+            "character_profile_text": "Friendly, warm, calm and ready for therapy",
             "context": "Therapy session",
         }
         result = ve_utils.format_persona_context(persona)
-        assert "Personality: Friendly and outgoing" in result
-        assert "Tone: Warm and professional" in result
-        assert "Emotional Needs: Understanding and validation" in result
-        assert "Starting State: Calm and ready" in result
+        assert "Character Profile: Friendly, warm, calm and ready for therapy" in result
         assert "Context: Therapy session" in result
 
     @pytest.mark.unit
     def test_format_persona_context_partial_fields(self):
         """Test with only some fields."""
         persona = {
-            "personality": "Shy",
-            "tone": "Gentle",
+            "character_profile_text": "Shy and gentle",
         }
         result = ve_utils.format_persona_context(persona)
-        assert "Personality: Shy" in result
-        assert "Tone: Gentle" in result
-        assert "Emotional Needs" not in result
+        assert "Character Profile: Shy and gentle" in result
+        assert "Context" not in result
 
     @pytest.mark.unit
     def test_format_persona_context_extra_fields_ignored(self):
         """Test that non-essential fields are ignored."""
         persona = {
-            "personality": "Friendly",
+            "character_profile_text": "Friendly",
             "age": 25,  # Not essential
             "name": "John",  # Not essential
-            "tone": "Warm",
+            "context": "Therapy session",
         }
         result = ve_utils.format_persona_context(persona)
-        assert "Personality: Friendly" in result
-        assert "Tone: Warm" in result
+        assert "Character Profile: Friendly" in result
+        assert "Context: Therapy session" in result
         assert "age" not in result
         assert "name" not in result
 
@@ -145,12 +137,12 @@ class TestFormatPersonaContext:
     def test_format_persona_context_empty_values(self):
         """Test with empty string values."""
         persona = {
-            "personality": "",
-            "tone": "Warm",
+            "character_profile_text": "",
+            "context": "Therapy session",
         }
         result = ve_utils.format_persona_context(persona)
-        assert "Personality" not in result
-        assert "Tone: Warm" in result
+        assert "Character Profile" not in result
+        assert "Context: Therapy session" in result
 
 
 class TestExtractPersonaContextFromPromptData:
@@ -166,36 +158,33 @@ class TestExtractPersonaContextFromPromptData:
     def test_extract_persona_context_all_fields(self):
         """Test extraction with all essential fields present."""
         mock_prompt_data = Mock()
-        mock_prompt_data.personality = "Friendly and outgoing"
-        mock_prompt_data.tone = "Warm and professional"
-        mock_prompt_data.emotional_needs = "Understanding and validation"
-        mock_prompt_data.starting_state = "Calm and ready"
+        mock_prompt_data.character_profile_text = (
+            "Friendly, outgoing, warm, calm and ready"
+        )
         mock_prompt_data.context = "Therapy session"
 
         result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
 
         assert result is not None
-        assert result["personality"] == "Friendly and outgoing"
-        assert result["tone"] == "Warm and professional"
-        assert result["emotional_needs"] == "Understanding and validation"
-        assert result["starting_state"] == "Calm and ready"
+        assert (
+            result["character_profile_text"]
+            == "Friendly, outgoing, warm, calm and ready"
+        )
         assert result["context"] == "Therapy session"
 
     @pytest.mark.unit
     def test_extract_persona_context_partial_fields(self):
         """Test extraction with only some fields present."""
         mock_prompt_data = Mock()
-        mock_prompt_data.personality = "Shy"
-        mock_prompt_data.tone = "Gentle"
-        # Other fields are missing
+        mock_prompt_data.character_profile_text = "Shy and gentle"
+        # context field is unset on the Mock; getattr returns a child Mock
+        # which the implementation filters out via isinstance(str) check.
 
         result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
 
         assert result is not None
-        assert result["personality"] == "Shy"
-        assert result["tone"] == "Gentle"
-        assert "emotional_needs" not in result
-        assert "starting_state" not in result
+        assert result["character_profile_text"] == "Shy and gentle"
+        assert "context" not in result
 
     @pytest.mark.unit
     def test_extract_persona_context_missing_fields(self):
@@ -245,14 +234,14 @@ class TestExtractPersonaContextFromPromptData:
     def test_extract_persona_context_non_string_values(self):
         """Test extraction with non-string values (should be skipped)."""
         mock_prompt_data = Mock()
-        mock_prompt_data.personality = 123  # Not a string
-        mock_prompt_data.tone = "Warm"  # Valid string
+        mock_prompt_data.character_profile_text = 123  # Not a string
+        mock_prompt_data.context = "Therapy session"  # Valid string
 
         result = ve_utils.extract_persona_context_from_prompt_data(mock_prompt_data)
 
         assert result is not None
-        assert "personality" not in result  # Non-string skipped
-        assert result["tone"] == "Warm"
+        assert "character_profile_text" not in result  # Non-string skipped
+        assert result["context"] == "Therapy session"
 
 
 class TestBuildVoiceExpressionPrompt:

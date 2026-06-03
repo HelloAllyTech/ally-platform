@@ -102,15 +102,11 @@ def sample_room_metadata() -> Dict[str, Any]:
                 "currentLocation": "San Francisco",
                 "profession": "Software Engineer",
                 "context": "Test context",
-                "sessionBehaviorGuidelines": "Be helpful and supportive",
-                "lifeHistory": "Test life history",
-                "coreMemories": "Test memories",
-                "personality": "Friendly and outgoing",
-                "startingState": "Calm and ready",
-                "emotionalNeeds": "Understanding and validation",
-                "tone": "Warm and professional",
+                "characterProfileText": (
+                    "Friendly, outgoing, warm and professional; "
+                    "calm and ready; needs understanding and validation."
+                ),
                 "openingStatements": ["Hello!", "How are you today?"],
-                "agentGoal": "Provide support",
             },
             "events": [],
         },

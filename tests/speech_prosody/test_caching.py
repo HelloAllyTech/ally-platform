@@ -15,10 +15,7 @@ def mock_scenario():
         current_location="Earth",
         context="Test context",
         opening_statements=["Hello"],
-        tone="Happy",
-        emotional_needs="None",
-        agent_goal="Test",
-        personality="Helpful",
+        character_profile_text="Happy and helpful",
     )
     voice = ScenarioVoice(
         name="TestVoice",
@@ -105,7 +102,8 @@ async def test_cache_invalidation_on_scenario_change(
 
         # Create different scenario
         other_scenario = mock_scenario.model_copy(deep=True)
-        other_scenario.prompt_data.tone = "Sad"  # Change tone
+        # Change character profile to invalidate the cache key.
+        other_scenario.prompt_data.character_profile_text = "Sad and reserved"
 
         # Call with second scenario
         await service.generate_and_set_defaults(other_scenario, mock_llm_client)

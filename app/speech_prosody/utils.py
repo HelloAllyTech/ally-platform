@@ -9,12 +9,13 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Whitelist of PromptData fields relevant for prosody decisions
+# Whitelist of PromptData fields relevant for prosody decisions.
+# `personality`, `tone`, `emotional_needs`, and `starting_state` lived
+# here until the structured simulator-creator UI was retired; the
+# free-text `character_profile_text` (written in the studio's Character
+# Profile editor) is the successor that captures all of those signals.
 PERSONA_CONTEXT_FIELDS = {
-    "personality": "Personality",
-    "tone": "Tone",
-    "emotional_needs": "Emotional Needs",
-    "starting_state": "Starting State",
+    "character_profile_text": "Character Profile",
     "context": "Context",
 }
 

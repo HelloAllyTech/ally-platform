@@ -107,15 +107,8 @@ class TestPromptData:
             current_location="San Francisco",
             profession="Software Engineer",
             context="Test context",
-            session_behavior_guidelines="Be supportive",
-            life_history_summary="Test history",
-            core_memories="Important memories",
-            personality="Friendly",
-            starting_state="Calm",
-            emotional_needs="Understanding",
-            tone="Professional",
+            character_profile_text="Friendly, professional, calm and supportive",
             opening_statements=["Hello!", "How are you?"],
-            agent_goal="Provide support",
         )
 
         assert prompt_data.name == "Test Character"
@@ -135,7 +128,6 @@ class TestPromptData:
             age="30",
             gender="female",
             current_location="Test City",
-            life_history_summary="Minimal history",
             opening_statements=["Hi!"],
         )
 
@@ -143,7 +135,7 @@ class TestPromptData:
         assert prompt_data.age == "30"
         assert prompt_data.gender == "female"
         assert prompt_data.profession is None  # Optional field
-        assert prompt_data.personality is None  # Optional field
+        assert prompt_data.character_profile_text is None  # Optional field
 
     @pytest.mark.unit
     def test_prompt_data_validation_errors(self):
@@ -300,7 +292,7 @@ class TestScenario:
             gender="male",
             current_location="City",
             context="Some context",
-            life_history_summary="History",
+            character_profile_text="Friendly",
             opening_statements=["Hello!"],
         )
 
@@ -330,7 +322,7 @@ class TestScenario:
             gender="male",
             current_location="City",
             context="Some context",
-            life_history_summary="History",
+            character_profile_text="Friendly",
             opening_statements=["Hello!"],
         )
 
@@ -775,7 +767,7 @@ class TestScenario:
                 gender="female",
                 current_location="Config City",
                 context="Config context",
-                life_history_summary="Config history",
+                character_profile_text="Config profile",
                 opening_statements=["Hi"],
             ),
         }

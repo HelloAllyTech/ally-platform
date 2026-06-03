@@ -111,18 +111,6 @@ def _build_evaluation_prompt(
         character_parts.append(f"Location: {prompt_data.current_location}")
     if prompt_data.context:
         character_parts.append(f"Context: {prompt_data.context}")
-    if prompt_data.personality:
-        character_parts.append(f"Personality: {prompt_data.personality}")
-    if prompt_data.tone:
-        character_parts.append(f"Tone: {prompt_data.tone}")
-    if prompt_data.emotional_needs:
-        character_parts.append(f"Emotional needs: {prompt_data.emotional_needs}")
-    if prompt_data.starting_state:
-        character_parts.append(f"Starting state: {prompt_data.starting_state}")
-    if prompt_data.session_behavior_guidelines:
-        character_parts.append(
-            f"Behavior guidelines: {prompt_data.session_behavior_guidelines}"
-        )
 
     if prompt_data.custom_fields:
         for field in prompt_data.custom_fields:

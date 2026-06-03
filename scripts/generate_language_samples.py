@@ -126,14 +126,14 @@ async def _generate_language_samples(
         return []
 
     language_name = get_language_name_from_code(language_code)
-    # Build emotional_state from prompt_data (aligns with ally-be metadata)
+    # Build emotional_state from prompt_data (aligns with ally-be metadata).
+    # `character_profile_text` is the free-text successor to the removed
+    # structured tone / personality / starting_state / emotional_needs /
+    # life_history_summary fields and is the canonical source of
+    # emotional context for downstream LLM calls.
     emotional_parts = [
         prompt_data.context,
-        prompt_data.tone,
-        prompt_data.starting_state,
-        prompt_data.emotional_needs,
-        prompt_data.life_history_summary,
-        prompt_data.personality,
+        prompt_data.character_profile_text,
     ]
     emotional_state = (
         " ".join(p for p in emotional_parts if p and str(p).strip()).strip()

@@ -104,16 +104,16 @@ class SpeechProsodyService:
         # Extract fields that influence default prosody generation
         pd = scenario.prompt_data
 
-        # Create a dict of relevant fields
+        # Create a dict of relevant fields. `character_profile_text` is the
+        # free-text successor to the removed structured personality / tone /
+        # emotional_needs / agent_goal fields and is the canonical source
+        # of emotional baseline information for prosody hashing.
         relevant_data = {
             "scenario_name": scenario.name,
             "age": pd.age,
             "gender": pd.gender,
-            "tone": pd.tone,
-            "emotional_needs": pd.emotional_needs,
-            "personality": pd.personality,
+            "character_profile_text": pd.character_profile_text,
             "opening_statements": pd.opening_statements,
-            "agent_goal": pd.agent_goal,
             # Include minimal voice config identifying info
             "voice_provider": scenario.voice.provider if scenario.voice else None,
             "voice_name": scenario.voice.name if scenario.voice else None,

@@ -555,27 +555,8 @@ def _build_behavior_prompt(
         # these as {placeholder} in their prompt text. These attributes are
         # populated on PromptData by app/core/scenario/base.py and otherwise
         # feed prosody / evaluator / worker subsystems.
-        tone=_coerce_block_value(getattr(prompt_data, "tone", None)),
-        life_history_summary=_coerce_block_value(
-            getattr(prompt_data, "life_history_summary", None)
-        ),
-        core_memories=_coerce_block_value(getattr(prompt_data, "core_memories", None)),
-        personality=_coerce_block_value(getattr(prompt_data, "personality", None)),
-        emotional_needs=_coerce_block_value(
-            getattr(prompt_data, "emotional_needs", None)
-        ),
-        agent_goal=_coerce_block_value(getattr(prompt_data, "agent_goal", None)),
-        session_behavior_guidelines=_coerce_block_value(
-            getattr(prompt_data, "session_behavior_guidelines", None)
-        ),
-        starting_state=_coerce_block_value(
-            getattr(prompt_data, "starting_state", None)
-        ),
         opening_statements=_coerce_block_value(
             getattr(prompt_data, "opening_statements", None)
-        ),
-        response_length=_coerce_block_value(
-            getattr(prompt_data, "response_length", None)
         ),
         # Block-internal variables lifted to the top level so new variants
         # can use them directly (e.g. `{profession}` in the prompt text)

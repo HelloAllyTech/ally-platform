@@ -145,7 +145,7 @@ class AssertionHelpers:
             "gender",
             "current_location",
             "context",
-            "life_history_summary",
+            "character_profile_text",
             "opening_statements",
         ]
         for field in required_fields:

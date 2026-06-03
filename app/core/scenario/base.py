@@ -60,20 +60,11 @@ class PromptData(BaseModel):
     profession: Optional[str] = Field(default=None)
     character_profile_text: Optional[str] = Field(default=None)
     context: Optional[str] = Field(default=None)
-    session_behavior_guidelines: Optional[str] = Field(default=None)
-    life_history_summary: Optional[str] = Field(default=None)
-    core_memories: Optional[str] = Field(default=None)
-    personality: Optional[str] = Field(default=None)
-    starting_state: Optional[str] = Field(default=None)
-    emotional_needs: Optional[str] = Field(default=None)
-    tone: Optional[str] = Field(default=None)
     opening_statements: List[str] = Field(...)
-    agent_goal: Optional[str] = Field(default=None)
     custom_fields: Optional[List[Dict[str, Any]]] = Field(
         default_factory=list, description="Dynamic custom fields"
     )
     prompt: Optional[str] = Field(default=None)
-    response_length: Optional[ScenarioResponseLength] = Field(default=None)
     agent_dialogues: Optional[List[str]] = Field(default=None)
     previous_memory: Optional[str] = Field(
         default=None,
@@ -476,21 +467,10 @@ class Scenario(BaseModel):
                     "characterProfileText", None
                 ),
                 "context": prompt_data_dict.get("context"),
-                "session_behavior_guidelines": prompt_data_dict.get(
-                    "sessionBehaviorGuidelines", None
-                ),
-                "life_history_summary": prompt_data_dict.get("lifeHistory"),
-                "core_memories": prompt_data_dict.get("coreMemories", None),
-                "personality": prompt_data_dict.get("personality", None),
-                "starting_state": prompt_data_dict.get("startingState", None),
-                "emotional_needs": prompt_data_dict.get("emotionalNeeds", None),
-                "tone": prompt_data_dict.get("tone", None),
                 "opening_statements": prompt_data_dict.get("openingStatements") or [],
-                "agent_goal": prompt_data_dict.get("agentGoal"),
                 "custom_fields": prompt_data_dict.get("customFields"),
                 # Legacy: backend may send at scenario.prompt or promptData.prompt
                 "prompt": prompt_data_dict.get("prompt") or raw.get("prompt"),
-                "response_length": prompt_data_dict.get("responseLength"),
                 "agent_dialogues": prompt_data_dict.get("agentDialogues"),
                 "previous_memory": prompt_data_dict.get("previousMemory", None),
                 "prompts": prompt_data_dict.get("prompts"),
