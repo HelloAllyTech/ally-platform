@@ -50,17 +50,22 @@ class ScenarioResponseLength(str, Enum):
 class PromptData(BaseModel):
     title: Optional[str] = Field(default=None)
     description: Optional[str] = Field(default=None)
-    name: str = Field(...)
-    age: str = Field(...)
-    gender: str = Field(...)
+    # name/age/gender/current_location are optional: studio scenarios are no
+    # longer required to fill the character demographics (only title,
+    # competency and role instructions are mandatory upstream). Every
+    # consumer guards these (truthiness checks / `getattr(..., "") or ""`),
+    # so leaving them None renders an empty section rather than crashing.
+    name: Optional[str] = Field(default=None)
+    age: Optional[str] = Field(default=None)
+    gender: Optional[str] = Field(default=None)
     role_instructions: Optional[str] = Field(default=None)
     gender_identity: Optional[str] = Field(default=None)
     sexual_orientation: Optional[str] = Field(default=None)
-    current_location: str = Field(...)
+    current_location: Optional[str] = Field(default=None)
     profession: Optional[str] = Field(default=None)
     character_profile_text: Optional[str] = Field(default=None)
     context: Optional[str] = Field(default=None)
-    opening_statements: List[str] = Field(...)
+    opening_statements: List[str] = Field(default_factory=list)
     custom_fields: Optional[List[Dict[str, Any]]] = Field(
         default_factory=list, description="Dynamic custom fields"
     )
@@ -456,7 +461,14 @@ class Scenario(BaseModel):
                 "description": prompt_data_dict.get("description")
                 or raw.get("description"),
                 "name": prompt_data_dict.get("name"),
-                "age": str(prompt_data_dict.get("age")),
+                # Coerce to str only when present — str(None) would store the
+                # literal "None" and defeat downstream truthiness guards now
+                # that age is optional.
+                "age": (
+                    str(prompt_data_dict.get("age"))
+                    if prompt_data_dict.get("age") is not None
+                    else None
+                ),
                 "gender": prompt_data_dict.get("gender"),
                 "role_instructions": prompt_data_dict.get("roleInstructions", None),
                 "gender_identity": prompt_data_dict.get("genderIdentity", None),

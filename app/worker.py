@@ -17,6 +17,7 @@ from app.core.agent.factory import (
     create_agent_with_adapter,
     initialize_agent_state,
     parse_room_metadata,
+    should_auto_start_conversation,
     should_say_opening_statement,
 )
 from app.core.config import settings
@@ -394,10 +395,41 @@ class AgentWorker:
         ):
             statement = random.choice(self.scenario.prompt_data.opening_statements)
             logger.info(f"[AgentWorker] Saying opening statement: {statement}")
-            handler = self.session.say(statement)
-            logger.info("[AgentWorker] Waiting for opening statement playout...")
-            await handler.wait_for_playout()
-            logger.info("[AgentWorker] Opening statement playout complete.")
+            # Best-effort: if the user disconnects during startup the session
+            # may already be closing, in which case say() raises
+            # "AgentSession is closing, cannot use say()". That must not crash
+            # the job — the session is ending anyway.
+            try:
+                handler = self.session.say(statement)
+                logger.info("[AgentWorker] Waiting for opening statement playout...")
+                await handler.wait_for_playout()
+                logger.info("[AgentWorker] Opening statement playout complete.")
+            except Exception as e:
+                logger.warning(
+                    f"[AgentWorker] Skipped opening statement (session not "
+                    f"available, likely closing): {e}"
+                )
+        elif should_auto_start_conversation(
+            scenario=self.scenario,
+            event_orchestrator=self.event_orchestrator,
+        ):
+            # No scripted opening statement — kick off the agent loop so the
+            # character opens the conversation via the LLM instead of staying
+            # silent. This is best-effort: a failure here must NOT break the
+            # session. The agent is already listening after session.start(), so
+            # even if the auto-start turn doesn't fire the conversation still
+            # works as soon as the user speaks.
+            logger.info(
+                "[AgentWorker] No opening statement; auto-starting agent turn "
+                "via generate_reply()."
+            )
+            try:
+                self.session.generate_reply()
+            except Exception as e:
+                logger.warning(
+                    f"[AgentWorker] Auto-start generate_reply() failed; agent "
+                    f"will respond once the user speaks: {e}"
+                )
 
     async def shutdown(self):
         """

@@ -92,6 +92,12 @@ _REPETITION_JACCARD_THRESHOLD = 0.5
 _REPETITION_LOOKBACK = 3
 _MAX_CONTEXT_MESSAGES = 20
 
+# Opening statements are optional on a scenario. When none are configured,
+# the report's conversation simulation still needs a first client utterance
+# to kick things off (subsequent client turns are generated in-persona by the
+# graph). Use a neutral greeting rather than failing the whole report.
+_DEFAULT_REPORT_OPENING = "Hello."
+
 
 async def run_report_with_concurrency_limit(
     service: "ScenarioReportService",
@@ -514,12 +520,20 @@ class ScenarioReportService:
             await event_orchestrator.initialize(graph=report_graph)
 
             # -- Conversation simulation
-            if not scenario.prompt_data or not scenario.prompt_data.opening_statements:
-                raise ValueError(
-                    "Opening statements are required for report generation"
+            # Opening statements are optional. When present, the client opens
+            # with one of the scripted lines; when absent, fall back to a
+            # neutral greeting so the report still generates (this mirrors the
+            # live session, where the client simply opens the conversation).
+            if scenario.prompt_data and scenario.prompt_data.opening_statements:
+                opening = random.choice(scenario.prompt_data.opening_statements)
+            else:
+                opening = _DEFAULT_REPORT_OPENING
+                logger.info(
+                    "No opening statements configured for scenario %s; using "
+                    "fallback opening for report %s",
+                    req.scenario_id,
+                    report_id,
                 )
-
-            opening = random.choice(scenario.prompt_data.opening_statements)
 
             report_graph.update_state(
                 config,

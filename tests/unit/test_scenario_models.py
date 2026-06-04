@@ -138,16 +138,30 @@ class TestPromptData:
         assert prompt_data.character_profile_text is None  # Optional field
 
     @pytest.mark.unit
-    def test_prompt_data_validation_errors(self):
-        """Test PromptData validation with missing required fields."""
+    def test_prompt_data_all_fields_optional(self):
+        """All PromptData fields are optional now (only title, competency and
+        role instructions are mandatory upstream), so empty construction must
+        succeed and apply defaults rather than raising."""
+        prompt_data = PromptData()
+        assert prompt_data.name is None
+        assert prompt_data.age is None
+        assert prompt_data.gender is None
+        assert prompt_data.current_location is None
+        assert prompt_data.opening_statements == []
+
+        # A partial construction is fine too.
+        partial = PromptData(name="Test")
+        assert partial.name == "Test"
+        assert partial.gender is None
+
+    @pytest.mark.unit
+    def test_prompt_data_rejects_wrong_types(self):
+        """Type validation still applies: a strictly-typed field given the
+        wrong type must raise."""
         from pydantic import ValidationError
 
-        # Missing required fields
         with pytest.raises(ValidationError):
-            PromptData()
-
-        with pytest.raises(ValidationError):
-            PromptData(name="Test")  # Missing other required fields
+            PromptData(prompts=123)  # prompts must be a dict / None
 
     @pytest.mark.unit
     def test_prompt_data_normalizes_language_label_from_camelcase(self):
@@ -560,7 +574,10 @@ class TestScenario:
         raw_payload = {
             "promptData": {
                 "name": "Test",
-                # Missing required fields to trigger validation error
+                # Character fields are optional now, so a missing field no
+                # longer fails. Pass an invalid type for a strictly-typed
+                # field to trigger the ValidationError -> None path.
+                "prompts": 123,
             }
         }
 

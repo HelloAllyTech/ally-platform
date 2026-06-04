@@ -341,6 +341,38 @@ def should_say_opening_statement(
     )
 
 
+def should_auto_start_conversation(
+    scenario: Scenario,
+    event_orchestrator: EventOrchestrator,
+) -> bool:
+    """
+    Decide whether the agent should open the conversation itself, via an
+    LLM-generated turn, because there's no scripted opening statement.
+
+    Opening statements are optional. When a scenario has none, we don't want
+    the character to sit silent waiting for the counselor — the agent loop
+    should start automatically so the character speaks first (the caller
+    triggers `session.generate_reply()`).
+
+    Returns True only when the session is otherwise ready to talk: a scenario
+    exists and termination hasn't already been initiated. Mutually exclusive
+    with `should_say_opening_statement` — that one wins whenever opening
+    statements are present.
+
+    Args:
+        scenario: Scenario instance
+        event_orchestrator: EventOrchestrator instance
+
+    Returns:
+        True if the agent should auto-start the conversation, False otherwise.
+    """
+    if scenario is None or event_orchestrator.is_termination_initiated():
+        return False
+
+    opening_statements = getattr(scenario.prompt_data, "opening_statements", None)
+    return not opening_statements
+
+
 # ====================================================================
 # Cleanup
 # ====================================================================
