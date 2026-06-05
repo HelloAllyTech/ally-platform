@@ -160,15 +160,19 @@ loggers = {
     },
     # Parent of every per-module logger created via get_logger(__name__)
     # ("app.core.queue.sqs", "app.core.scenario_report.service", ...). Most of
-    # the app logs through these, so the slack_alerts handler MUST be attached
-    # here — otherwise their WARNING+/ERROR records would propagate to root
-    # (which has no Slack handler) and silently never reach the channel.
-    # Scoped to "app" so noisy third-party libraries (httpx, openai, boto3, …)
-    # that propagate to root are NOT forwarded to Slack.
+    # the app logs through these, so the slack_alerts handler is attached here
+    # (via the loop below) — otherwise their WARNING+/ERROR records would reach
+    # only root (which has no Slack handler) and silently never alert. Scoped to
+    # "app" so noisy third-party libraries (httpx, openai, boto3, …) are NOT
+    # forwarded to Slack.
+    #
+    # No stdout handler + propagate=True: stdout is emitted exactly once by the
+    # root logger (avoiding duplicate lines), and propagation keeps pytest's
+    # caplog — which captures at root — working for app.* loggers.
     "app": {
         "level": settings.LOG_LEVEL,
-        "handlers": ["stdout"],
-        "propagate": False,
+        "handlers": [],
+        "propagate": True,
     },
     "uvicorn": {
         "level": settings.LOG_LEVEL,
