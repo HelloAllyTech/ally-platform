@@ -15,7 +15,7 @@ Output language: {language_label} (locale: {language_code}).
 Use the target language naturally and idiomatically in the next client reply.
 Match colloquial spoken usage for that language and region.
 
-{samples}
+{linguistic_samples}
 
 ## Filler Word Guidance
 

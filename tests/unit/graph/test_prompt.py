@@ -57,14 +57,16 @@ class TestPrompt:
 
         assert "You are a difficult customer. Stay in that role." in msg.content
 
-    def test_generate_system_message_supports_title_and_description_vars(self):
+    def test_generate_system_message_supports_title_and_challenge_description_vars(
+        self,
+    ):
         pd = make_prompt_data(
             title="Burnout Intake",
             description="The client is struggling with workplace stress.",
             prompts={
                 "ally_ai_learn_system_main_agent_prompt": {
-                    "prompt": "{title} | {description}",
-                    "availableVariables": ["title", "description"],
+                    "prompt": "{title} | {challenge_description}",
+                    "availableVariables": ["title", "challenge_description"],
                 }
             },
         )

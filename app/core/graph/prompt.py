@@ -273,7 +273,9 @@ def _build_branching_prompt(
         "system/branching_agent_prompt",
         prompt_data=prompt_data,
         title=_coerce_block_value(getattr(prompt_data, "title", None)),
-        description=_coerce_block_value(getattr(prompt_data, "description", None)),
+        challenge_description=_coerce_block_value(
+            getattr(prompt_data, "description", None)
+        ),
         name=getattr(prompt_data, "name", "") or "",
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
@@ -298,7 +300,7 @@ def _build_branching_prompt(
             if language_code
             else None
         ),
-        samples=_format_language_samples(
+        linguistic_samples=_format_language_samples(
             getattr(prompt_data, "language_dialogue_samples", None) or []
         ),
         allowed_fillers=_format_allowed_fillers_for_prompt(
@@ -444,7 +446,9 @@ def _build_behavior_prompt(
     # PromptData.selected_main_prompt_code without duplicating the call site.
     template_kwargs = dict(
         title=_coerce_block_value(getattr(prompt_data, "title", None)),
-        description=_coerce_block_value(getattr(prompt_data, "description", None)),
+        challenge_description=_coerce_block_value(
+            getattr(prompt_data, "description", None)
+        ),
         role_instructions=_coerce_block_value(
             getattr(prompt_data, "role_instructions", None)
         ),
@@ -506,9 +510,9 @@ def _build_behavior_prompt(
         ),
         # Style/voice fields rendered inline by the main agent prompt's
         # multilingual section. Variants can reference them directly via
-        # `{samples}` / `{allowed_fillers}` (e.g. the lean #2 variant
+        # `{linguistic_samples}` / `{allowed_fillers}` (e.g. the lean #2 variant
         # uses both in its `## About you` section).
-        samples=_format_language_samples(
+        linguistic_samples=_format_language_samples(
             getattr(prompt_data, "language_dialogue_samples", None) or []
         ),
         allowed_fillers=_format_allowed_fillers_for_prompt(

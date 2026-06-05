@@ -7,7 +7,7 @@ Your character backstory is {character_profile_text}.
 Output language: {language_code}
 Use any of the following filler words when appropriate: {allowed_fillers}
 Use the following samples as reference for tone, and style:
-{samples}
+{linguistic_samples}
 
 ## Guidelines for generating your next dialogue
 {state_x_guidelines}
