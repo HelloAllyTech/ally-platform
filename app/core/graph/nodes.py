@@ -11,7 +11,11 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE
 from app.core.events.base import BaseEvent
 from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
-from app.core.graph.instrumentation import instrumented_node, log_side_effect
+from app.core.graph.instrumentation import (
+    get_room_id,
+    instrumented_node,
+    log_side_effect,
+)
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -304,8 +308,9 @@ async def _orchestrate_and_split_events(
     except asyncio.TimeoutError:
         _orch_latency = (datetime.now(timezone.utc) - _orch_start).total_seconds()
         logger.error(
-            "[orchestrate_events] orchestration_timeout latency_s=%.2f "
+            "[orchestrate_events] orchestration_timeout room=%s latency_s=%.2f "
             "timeout=%ss events=%d — returning empty results",
+            get_room_id(),
             _orch_latency,
             settings.ORCHESTRATION_TIMEOUT,
             len(new_events),
@@ -953,8 +958,9 @@ async def generate_response(
     except asyncio.TimeoutError:
         _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
         logger.error(
-            "[generate_response] llm_call_timeout model=%s latency_s=%.2f "
+            "[generate_response] llm_call_timeout room=%s model=%s latency_s=%.2f "
             "timeout=%ss — returning safe fallback message",
+            get_room_id(),
             llm_model_name,
             _llm_latency,
             settings.LLM_RESPONSE_TIMEOUT,
