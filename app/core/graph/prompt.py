@@ -10,7 +10,6 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
-from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 from app.prompts.resolver import load_and_format, load_and_format_by_code
 
 logger = get_logger(__name__)
@@ -165,37 +164,36 @@ def _resolve_state_guidance(
 def _resolve_simulation_state_by_score(
     states: Optional[List[Dict[str, Any]]],
     current_score: Optional[int],
+    default_state_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Pick the active simulation state for a given turn score.
 
-    States are studio-edited and live on `Scenarios.metadata.states` (see
-    PromptData.states). Selection rules:
-      - `scoreLower` is inclusive; `scoreUpper` is exclusive.
-      - Bounds are finite numbers (the studio enforces strict min/max as
-        of the bounds change). Older scenarios authored with the legacy
-        open-ended-at-the-ends design still resolve correctly because the
-        legacy `None` semantics is preserved below.
-      - When `current_score` is None, fall back to the state marked
-        `isStarting: true` so turn 1 has a deterministic state.
-      - Out-of-range scores clamp to the nearest state:
-          score < first.lower → first state
-          score >= last.upper → last state
-        This guarantees total coverage of the score axis even when the
-        admin authored strict bounds; without clamping a runaway score
-        would render `{state_x_guidelines}` empty.
+    ally-be pre-sorts states by scoreLower (ascending) and provides
+    default_state_id (the isStarting state) before sending to ai-learn,
+    so this resolver can skip those derivations.
 
-    Distinct from {@link _resolve_state_guidance}, which threads behavior-rule
-    state guidance into `{behavior_instructions_json}` — that path is
-    independent and continues to operate in parallel.
+    Selection rules:
+      - scoreLower is inclusive; scoreUpper is exclusive.
+      - When current_score is None, return the state matching default_state_id
+        (falls back to isStarting scan then first-by-lower-bound).
+      - Out-of-range scores clamp to first/last state.
     """
     if not states:
         return None
 
     if current_score is None:
+        # Use pre-computed default_state_id when available (ally-be sends this
+        # for new sessions so the resolver skips scanning).
+        if default_state_id:
+            match = next((s for s in states if s.get("id") == default_state_id), None)
+            if match:
+                return match
+        # Fallback: scan for isStarting flag.
         starting = next((s for s in states if s.get("isStarting")), None)
-        if starting is not None:
+        if starting:
             return starting
-        # No starting flag set: fall through to the first state by lower bound.
+        # Last resort for legacy/unsorted states: pick the one with the lowest
+        # scoreLower (None treated as -inf, matching pre-strict-bounds behaviour).
         return sorted(
             states,
             key=lambda s: (
@@ -205,9 +203,7 @@ def _resolve_simulation_state_by_score(
             ),
         )[0]
 
-    # First pass: standard interval match. Legacy `None` bounds are
-    # honored (open-ended → always matches that end), so scenarios
-    # authored before the strict-bounds migration keep working.
+    # States are pre-sorted by ally-be; iterate in order for interval match.
     for state in states:
         lower = state.get("scoreLower")
         upper = state.get("scoreUpper")
@@ -217,10 +213,8 @@ def _resolve_simulation_state_by_score(
             continue
         return state
 
-    # Out-of-range fallback (strict-bounds scenarios). Sort by lower
-    # bound; clamp to the nearest end. We re-derive the ordering here
-    # rather than relying on caller-provided order because the studio
-    # stores states in admin-edit order, not score order.
+    # Out-of-range clamp. Ally-be pre-sorts states, but we re-sort here as a
+    # safety net for legacy sessions or direct test callers that may not.
     sorted_states = sorted(
         states,
         key=lambda s: (
@@ -234,36 +228,6 @@ def _resolve_simulation_state_by_score(
     if last_upper is not None and current_score >= last_upper:
         return sorted_states[-1]
     return None
-
-
-def _build_helpful_behaviours(
-    behavior_instructions: Optional[List[SimulationBehaviorInstruction]],
-) -> str:
-    if not behavior_instructions:
-        return ""
-    names = [
-        b.strip()
-        for bi in behavior_instructions
-        if bi.category == SimulationBehaviorCategory.SHOULD_DO
-        for b in bi.behaviors
-        if b and b.strip()
-    ]
-    return ", ".join(dict.fromkeys(names))
-
-
-def _build_unhelpful_behaviours(
-    behavior_instructions: Optional[List[SimulationBehaviorInstruction]],
-) -> str:
-    if not behavior_instructions:
-        return ""
-    names = [
-        b.strip()
-        for bi in behavior_instructions
-        if bi.category == SimulationBehaviorCategory.SHOULD_NOT_DO
-        for b in bi.behaviors
-        if b and b.strip()
-    ]
-    return ", ".join(dict.fromkeys(names))
 
 
 def _build_behavior_instructions_json(
@@ -340,11 +304,11 @@ def _build_branching_prompt(
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
-        helpful_behaviours=_build_helpful_behaviours(
-            getattr(prompt_data, "behavior_instructions", None)
+        helpful_behaviours=", ".join(
+            getattr(prompt_data, "helpful_behaviours", None) or []
         ),
-        unhelpful_behaviours=_build_unhelpful_behaviours(
-            getattr(prompt_data, "behavior_instructions", None)
+        unhelpful_behaviours=", ".join(
+            getattr(prompt_data, "unhelpful_behaviours", None) or []
         ),
     )
 
@@ -411,7 +375,11 @@ def _build_behavior_prompt(
     prompt_has_states = _get_selected_prompt_has_states(prompt_data)
     sim_states = getattr(prompt_data, "states", None)
     active_sim_state: Optional[Dict[str, Any]] = (
-        _resolve_simulation_state_by_score(sim_states, current_score)
+        _resolve_simulation_state_by_score(
+            sim_states,
+            current_score,
+            default_state_id=getattr(prompt_data, "default_state_id", None),
+        )
         if prompt_has_states
         else None
     )
@@ -563,8 +531,12 @@ def _build_behavior_prompt(
         behavior_instructions_json=_build_behavior_instructions_json(
             behavior_instructions, current_state
         ),
-        helpful_behaviours=_build_helpful_behaviours(behavior_instructions),
-        unhelpful_behaviours=_build_unhelpful_behaviours(behavior_instructions),
+        helpful_behaviours=", ".join(
+            getattr(prompt_data, "helpful_behaviours", None) or []
+        ),
+        unhelpful_behaviours=", ".join(
+            getattr(prompt_data, "unhelpful_behaviours", None) or []
+        ),
     )
 
     # Route through the variant resolver when the simulation has picked a

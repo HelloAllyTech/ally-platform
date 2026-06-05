@@ -163,8 +163,33 @@ class PromptData(BaseModel):
             "Per-simulation states used by main-agent prompt variants with "
             "`hasStates: true`. Each entry has `id`, `name`, `guidelines`, "
             "`isStarting`, `scoreLower` (int|None), `scoreUpper` (int|None), "
-            "`ragEnabled`. Distinct from `behaviorInstructions`-based state "
+            "`ragEnabled`. Pre-sorted by scoreLower (ascending) by ally-be. "
+            "Distinct from `behaviorInstructions`-based state "
             "guidance, which continues to operate in parallel."
+        ),
+    )
+    default_state_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "ID of the starting state (isStarting=true), pre-computed by "
+            "ally-be. Used by the state resolver when current_score is None "
+            "so it can skip scanning the states array."
+        ),
+    )
+    helpful_behaviours: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Behaviour class names where category=SHOULD_DO, pre-computed "
+            "by ally-be from behaviorInstructions. Injected as "
+            "{helpful_behaviours} into the prompt."
+        ),
+    )
+    unhelpful_behaviours: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Behaviour class names where category=SHOULD_NOT_DO, "
+            "pre-computed by ally-be from behaviorInstructions. Injected "
+            "as {unhelpful_behaviours} into the prompt."
         ),
     )
 
@@ -510,6 +535,9 @@ class Scenario(BaseModel):
                     "selectedMainPromptCode"
                 ),
                 "states": prompt_data_dict.get("states"),
+                "default_state_id": prompt_data_dict.get("defaultStateId"),
+                "helpful_behaviours": prompt_data_dict.get("helpfulBehaviours"),
+                "unhelpful_behaviours": prompt_data_dict.get("unhelpfulBehaviours"),
             }
 
             prompt_data_obj = PromptData(**mapped_data)
