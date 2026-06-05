@@ -26,6 +26,8 @@
         { "name": "custom_fields_text", "label": "Custom Fields", "required": false },
         { "name": "state_x_guidelines", "label": "Active State Guidelines", "required": false },
         { "name": "retrieved_context", "label": "Retrieved Knowledge Context", "required": false },
-        { "name": "behavior_instructions_json", "label": "Behavior Rules (JSON)", "required": false }
+        { "name": "behavior_instructions_json", "label": "Behavior Rules (JSON)", "required": false },
+        { "name": "helpful_behaviours", "label": "Helpful Behaviours", "required": false },
+        { "name": "unhelpful_behaviours", "label": "Unhelpful Behaviours", "required": false }
     ]
 }

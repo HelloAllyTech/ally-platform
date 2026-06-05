@@ -10,6 +10,7 @@ from app.core.scenario.base import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
 )
+from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 from app.prompts.resolver import load_and_format, load_and_format_by_code
 
 logger = get_logger(__name__)
@@ -235,6 +236,36 @@ def _resolve_simulation_state_by_score(
     return None
 
 
+def _build_helpful_behaviours(
+    behavior_instructions: Optional[List[SimulationBehaviorInstruction]],
+) -> str:
+    if not behavior_instructions:
+        return ""
+    names = [
+        b.strip()
+        for bi in behavior_instructions
+        if bi.category == SimulationBehaviorCategory.SHOULD_DO
+        for b in bi.behaviors
+        if b and b.strip()
+    ]
+    return ", ".join(dict.fromkeys(names))
+
+
+def _build_unhelpful_behaviours(
+    behavior_instructions: Optional[List[SimulationBehaviorInstruction]],
+) -> str:
+    if not behavior_instructions:
+        return ""
+    names = [
+        b.strip()
+        for bi in behavior_instructions
+        if bi.category == SimulationBehaviorCategory.SHOULD_NOT_DO
+        for b in bi.behaviors
+        if b and b.strip()
+    ]
+    return ", ".join(dict.fromkeys(names))
+
+
 def _build_behavior_instructions_json(
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
@@ -309,6 +340,12 @@ def _build_branching_prompt(
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
+        helpful_behaviours=_build_helpful_behaviours(
+            getattr(prompt_data, "behavior_instructions", None)
+        ),
+        unhelpful_behaviours=_build_unhelpful_behaviours(
+            getattr(prompt_data, "behavior_instructions", None)
+        ),
     )
 
     return SystemMessage(content=(branching_prompt or "").strip())
@@ -526,6 +563,8 @@ def _build_behavior_prompt(
         behavior_instructions_json=_build_behavior_instructions_json(
             behavior_instructions, current_state
         ),
+        helpful_behaviours=_build_helpful_behaviours(behavior_instructions),
+        unhelpful_behaviours=_build_unhelpful_behaviours(behavior_instructions),
     )
 
     # Route through the variant resolver when the simulation has picked a
