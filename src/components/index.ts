@@ -30,6 +30,10 @@ export {PrivacyTooltip} from './PrivacyTooltip';
 export {ShinyText} from './ShinyText';
 export {ForceUpdateModal} from './ForceUpdateModal';
 export {StarRating, type StarRatingProps} from './StarRating';
+export {
+  SessionRatingTrigger,
+  type SessionRatingTriggerProps,
+} from './SessionRatingTrigger';
 export {ChipGroup, type ChipGroupProps, type ChipOption} from './ChipGroup';
 export {
   ButtonGroup,

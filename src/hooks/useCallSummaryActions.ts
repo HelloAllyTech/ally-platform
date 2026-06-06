@@ -195,11 +195,16 @@ export const useCallSummaryActions = ({
   );
 
   const onAddSummaryFeedback = useCallback(
-    async (rating: number, feedback: {issues: string[]; comment: string}) => {
+    async (feedback: {
+      rating: number;
+      issues: string[];
+      comment: string;
+      tags: string[];
+    }) => {
       const response = await addSummaryFeedback({
         chatId,
-        rating,
-        feedback: feedback || {issues: [], comment: ''},
+        rating: feedback.rating,
+        feedback,
       });
 
       return response;

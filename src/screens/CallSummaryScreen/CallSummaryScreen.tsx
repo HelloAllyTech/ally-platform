@@ -246,11 +246,13 @@ export const CallSummaryScreen: React.FC<
     navigateToCallLogTab(navigation);
   };
 
-  const onSubmitSummaryFeedback = async (
-    rating: number,
-    feedback: {issues: string[]; comment: string},
-  ) => {
-    const response = await onAddSummaryFeedback(rating, feedback);
+  const onSubmitSummaryFeedback = async (feedback: {
+    rating: number;
+    issues: string[];
+    comment: string;
+    tags: string[];
+  }) => {
+    const response = await onAddSummaryFeedback(feedback);
     if (response.data) {
       showToast(t('Success.submitFeedback'), 'success');
     } else {

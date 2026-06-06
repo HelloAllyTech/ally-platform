@@ -44,10 +44,11 @@ export const styles = ScaledSheet.create({
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   backArrowButton: {
     paddingRight: '1@ms',
+    paddingTop: '3@vs',
   },
   title: {
     ...typography.headline.tiny,
@@ -153,6 +154,10 @@ export const styles = ScaledSheet.create({
   },
   titleContainer: {
     flex: 1,
+    flexDirection: 'column',
+    gap: '4@vs',
+  },
+  titleTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

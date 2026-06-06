@@ -84,12 +84,19 @@ export interface FeedbackRequest {
   scenarioSessionId: string;
   rating?: number;
   comment?: string;
+  tags?: string[];
 }
 
 export interface FeedbackResponse {
   success: boolean;
   message?: string;
   feedbackId?: number;
+}
+
+export interface SessionFeedbackData {
+  rating?: number | null;
+  tags?: string[] | null;
+  feedback?: string | null;
 }
 
 export interface EndScenarioSessionResponse {
@@ -255,6 +262,9 @@ export interface SimulationSummaryData {
   score: number | null;
   metadata: SummaryMetadata | null;
   hasFeedback: boolean;
+  feedbackRating?: number | null;
+  feedbackTags?: string[] | null;
+  sessionFeedback?: SessionFeedbackData | null;
   scenarioPathSessionId?: string | null;
   reviewId?: string | null;
   reviewStatus?: ReviewStatus | null;

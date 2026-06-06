@@ -13,7 +13,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {TabBar, TabView} from 'react-native-tab-view';
 
 import {CommentIcon, LeftArrowIcon} from '@/assets';
-import {Button, CustomSwitch, FeedbackPopup, useToast} from '@/components';
+import {
+  Button,
+  CustomSwitch,
+  FeedbackPopup,
+  SessionRatingTrigger,
+  useToast,
+} from '@/components';
+import {FeedbackSubmission, FeedbackValue} from '@/components/FeedbackPopup';
 import {
   getSimulationSummaryTabs,
   SCREEN_NAMES,
@@ -71,6 +78,13 @@ export const SimulationFeedbackScreen: React.FC<
   );
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
+  const [existingFeedback, setExistingFeedback] = useState<FeedbackValue>({
+    rating: 0,
+    tags: [],
+    comment: '',
+  });
+  const feedbackPopupSource = useRef<'auto' | 'leave' | 'manual'>('auto');
+  const hasFeedbackSubmitted = useRef(false);
   const [reviewId, setReviewId] = useState<string>();
 
   const navigation = useAppNavigation();
@@ -155,6 +169,30 @@ export const SimulationFeedbackScreen: React.FC<
     }
   }, [simulationDetails?.reviewId]);
 
+  // On first simulationDetails load: fetch existing feedback OR auto-open popup
+  const hasHandledFeedbackInit = useRef(false);
+  useEffect(() => {
+    if (!simulationDetails || hasHandledFeedbackInit.current) {
+      return;
+    }
+    hasHandledFeedbackInit.current = true;
+
+    if (simulationDetails.hasFeedback && scenarioSessionId) {
+      hasFeedbackSubmitted.current = true;
+      const inlineFeedback = simulationDetails.sessionFeedback;
+      if (inlineFeedback) {
+        setExistingFeedback({
+          rating: inlineFeedback.rating ?? 0,
+          tags: inlineFeedback.tags ?? [],
+          comment: inlineFeedback.feedback ?? '',
+        });
+      }
+    } else if (!fromLogs) {
+      feedbackPopupSource.current = 'auto';
+      setIsFeedbackPopupVisible(true);
+    }
+  }, [fromLogs, simulationDetails, scenarioSessionId]);
+
   // Refetch simulation details on screen focus to pick up review changes
   const isFirstFocus = useRef(true);
   useFocusEffect(
@@ -193,23 +231,63 @@ export const SimulationFeedbackScreen: React.FC<
     navigateToLearnTab(navigation);
   }, [pathId, caseId, fromLogs, navigation]);
 
+  const hideFeedbackPopup = useCallback(() => {
+    const source = feedbackPopupSource.current;
+    setIsFeedbackPopupVisible(false);
+    if (!hasFeedbackSubmitted.current && source !== 'manual') {
+      setExistingFeedback(prev => ({...prev, rating: 0}));
+    }
+    if (source === 'leave') {
+      handleBack();
+    }
+  }, [handleBack]);
+
   const handleFeedbackAndNavigate = useCallback(() => {
+    if (isFeedbackPopupVisible) {
+      if (feedbackPopupSource.current === 'leave') {
+        hideFeedbackPopup();
+      } else {
+        setIsFeedbackPopupVisible(false);
+      }
+      return true;
+    }
+    if (
+      !fromLogs &&
+      !hasFeedbackSubmitted.current &&
+      !simulationDetails?.hasFeedback
+    ) {
+      feedbackPopupSource.current = 'leave';
+      setIsFeedbackPopupVisible(true);
+      return true;
+    }
     handleBack();
     return true;
-  }, [handleBack]);
+  }, [
+    isFeedbackPopupVisible,
+    fromLogs,
+    simulationDetails?.hasFeedback,
+    handleBack,
+    hideFeedbackPopup,
+  ]);
 
   useHardwareBackPressHandler(handleFeedbackAndNavigate);
 
-  const submitFeedback = async (
-    rating: number,
-    {comment}: {issues: string[]; comment: string},
-  ) => {
+  const submitFeedback = async ({
+    rating,
+    comment,
+    tags,
+  }: FeedbackSubmission) => {
     if (rating === 0) return;
+    const source = feedbackPopupSource.current;
+    setIsFeedbackPopupVisible(false);
+    hasFeedbackSubmitted.current = true;
+    setExistingFeedback({rating, tags, comment});
     try {
       const response = await addSimulationFeedback({
         scenarioSessionId: scenarioSessionId?.toString() || '',
         rating,
         comment,
+        tags,
       });
       if (response.data) {
         showToast(t('Success.submitFeedback'), 'success');
@@ -220,14 +298,18 @@ export const SimulationFeedbackScreen: React.FC<
       showToast(t('Errors.submitFeedback'), 'error');
       hideFeedbackPopup();
     }
-    handleBack();
-  };
-
-  const hideFeedbackPopup = () => {
-    setIsFeedbackPopupVisible(false);
+    if (source === 'leave') {
+      handleBack();
+    }
   };
 
   const handleSubmit = () => {
+    setIsFeedbackPopupVisible(true);
+  };
+
+  const handleRatingSelect = (rating: number) => {
+    feedbackPopupSource.current = 'manual';
+    setExistingFeedback(prev => ({...prev, rating}));
     setIsFeedbackPopupVisible(true);
   };
 
@@ -273,37 +355,47 @@ export const SimulationFeedbackScreen: React.FC<
   const renderTitle = () => {
     return (
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>
-          {t('SimulationFeedback.title')}{' '}
-          <Text style={styles.titleItalic}>
-            {fromLogs
-              ? t('CallSummary.header.subtitle')
-              : t('SimulationFeedback.titleEnded')}
-          </Text>
-        </Text>
-
-        {!shortSession && (
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>
-              {t('SimulationFeedback.share')}
+        <View style={styles.titleTopRow}>
+          <Text style={styles.title}>
+            {t('SimulationFeedback.title')}{' '}
+            <Text style={styles.titleItalic}>
+              {fromLogs
+                ? t('CallSummary.header.subtitle')
+                : t('SimulationFeedback.titleEnded')}
             </Text>
-            <CustomSwitch
-              value={!!reviewId && !isPrivate}
-              onToggle={isEnabled => {
-                if (
-                  isEnabled &&
-                  (!reviewId ||
-                    (reviewData?.createdAt &&
-                      !isMinutesPassed(reviewData.createdAt)))
-                ) {
-                  handleShareSimulation();
-                } else if (reviewId) {
-                  handleTogglePrivate(isEnabled);
-                }
-              }}
-            />
-          </View>
-        )}
+          </Text>
+
+          {!shortSession && (
+            <View style={styles.switchContainer}>
+              <Text style={styles.switchLabel}>
+                {t('SimulationFeedback.share')}
+              </Text>
+              <CustomSwitch
+                value={!!reviewId && !isPrivate}
+                onToggle={isEnabled => {
+                  if (
+                    isEnabled &&
+                    (!reviewId ||
+                      (reviewData?.createdAt &&
+                        !isMinutesPassed(reviewData.createdAt)))
+                  ) {
+                    handleShareSimulation();
+                  } else if (reviewId) {
+                    handleTogglePrivate(isEnabled);
+                  }
+                }}
+              />
+            </View>
+          )}
+        </View>
+
+        {
+          <SessionRatingTrigger
+            value={existingFeedback.rating ?? 0}
+            onSelect={handleRatingSelect}
+            size="sm"
+          />
+        }
       </View>
     );
   };
@@ -481,6 +573,7 @@ export const SimulationFeedbackScreen: React.FC<
         showChips={false}
         placeholder={t('SimulationFeedback.placeholderText')}
         customTitle={t('SimulationFeedback.questionText')}
+        initialFeedback={existingFeedback}
       />
     </SafeAreaView>
   );

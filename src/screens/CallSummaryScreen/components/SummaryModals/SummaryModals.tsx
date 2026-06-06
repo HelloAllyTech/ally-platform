@@ -34,10 +34,12 @@ interface SummaryModalsProps {
   showExportOption?: boolean;
   isSummaryFeedbackPopup?: boolean;
   hideSummaryFeedbackPopup: () => void;
-  onSubmitSummaryFeedback: (
-    rating: number,
-    feedback: {issues: string[]; comment: string},
-  ) => void;
+  onSubmitSummaryFeedback: (feedback: {
+    rating: number;
+    issues: string[];
+    comment: string;
+    tags: string[];
+  }) => void;
 }
 
 export const SummaryModals: React.FC<SummaryModalsProps> = ({

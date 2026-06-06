@@ -70,12 +70,13 @@ export const simulationsApi = api.injectEndpoints({
     }),
 
     addSimulationFeedback: builder.mutation<FeedbackResponse, FeedbackRequest>({
-      query: ({scenarioSessionId, rating, comment}) => ({
+      query: ({scenarioSessionId, rating, comment, tags}) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_FEEDBACK(scenarioSessionId),
         method: API_METHODS.POST,
         body: {
           rating: Number(rating),
           feedback: comment,
+          ...(tags && tags.length > 0 ? {tags} : {}),
         },
       }),
     }),
