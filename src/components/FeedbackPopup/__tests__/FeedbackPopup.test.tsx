@@ -40,7 +40,7 @@ describe('FeedbackPopup', () => {
     // Press submit button
     fireEvent.press(getByText('FeedbackPopup.submitButton'));
 
-    expect(onSubmit).toHaveBeenCalledWith(4, {issues: [], comment: ''});
+    expect(onSubmit).toHaveBeenCalledWith({rating: 4, issues: [], comment: '', tags: []});
     expect(onClose).toHaveBeenCalled();
   });
 });

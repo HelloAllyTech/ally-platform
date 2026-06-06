@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
@@ -32,12 +33,14 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
   note = null,
   showChips = true,
   placeholder,
+  initialFeedback,
   testID,
 }) => {
   const {t} = useTranslation();
   const [rating, setRating] = useState(DEFAULT_RATING);
   const [suggestion, setSuggestion] = useState('');
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [slideAnim] = useState(new Animated.Value(1000));
   const [keyboardOffset] = useState(new Animated.Value(0));
 
@@ -67,9 +70,10 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
 
   useEffect(() => {
     if (visible) {
-      setRating(DEFAULT_RATING);
-      setSuggestion('');
+      setRating(initialFeedback?.rating ?? DEFAULT_RATING);
+      setSuggestion(initialFeedback?.comment ?? '');
       setSelectedIssues([]);
+      setSelectedTags(initialFeedback?.tags ?? []);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -83,7 +87,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, slideAnim]);
+  }, [visible, slideAnim, initialFeedback]);
 
   const handleIssueSelectionChange = useCallback(
     (newSelectedIssues: string[]) => {
@@ -93,9 +97,14 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
   );
 
   const handleSubmit = useCallback(() => {
-    onSubmit(rating, {issues: selectedIssues, comment: suggestion});
+    onSubmit({
+      rating,
+      issues: selectedIssues,
+      comment: suggestion,
+      tags: selectedTags,
+    });
     onClose();
-  }, [onSubmit, rating, suggestion, selectedIssues, onClose]);
+  }, [onSubmit, rating, suggestion, selectedIssues, selectedTags, onClose]);
 
   const issueOptions = useMemo(
     () =>
@@ -116,7 +125,23 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
   const setStarRating = (newRating: number) => {
     setRating(newRating);
     setSelectedIssues([]);
+    setSelectedTags([]);
   };
+
+  const ratingTagOptions = useMemo(() => {
+    if (rating <= 0) return [];
+    const result = t(
+      `SimulationFeedback.feedback.dialog.rating.tags.${rating}`,
+      {returnObjects: true},
+    );
+    return Array.isArray(result) ? result : [];
+  }, [rating, t]);
+
+  const handleTagSelectionChange = useCallback((tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(item => item !== tag) : [...prev, tag],
+    );
+  }, []);
 
   const renderSuggestionInput = (showTitle?: boolean) => {
     return (
@@ -183,6 +208,30 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                 />
                 {getRatingText?.length > 0 && (
                   <Text style={styles.ratingText}>{getRatingText}</Text>
+                )}
+                {rating > 0 && ratingTagOptions.length > 0 && (
+                  <View style={styles.tagsContainer}>
+                    {ratingTagOptions.map(tag => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          onPress={() => handleTagSelectionChange(tag)}
+                          style={[
+                            styles.tag,
+                            isSelected && styles.tagSelected,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.tagText,
+                              isSelected && styles.tagTextSelected,
+                            ]}>
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 )}
                 {rating !== 5 && rating !== 0 && showChips && (
                   <>
@@ -310,5 +359,33 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
     marginBottom: '24@vs',
     lineHeight: '18@vs',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: '8@ms',
+    marginBottom: '14@vs',
+    width: '100%',
+  },
+  tag: {
+    paddingHorizontal: '12@ms',
+    paddingVertical: '6@vs',
+    borderRadius: '20@ms',
+    borderWidth: 1,
+    borderColor: stroke.primary,
+    backgroundColor: colors.ds.neutral.white,
+  },
+  tagSelected: {
+    backgroundColor: colors.ds.theme.primary,
+    borderColor: colors.ds.theme.primary,
+  },
+  tagText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '13@ms',
+    color: colors.ds.typography.highEmphasis,
+  },
+  tagTextSelected: {
+    color: colors.ds.neutral.white,
   },
 });

@@ -102,6 +102,7 @@ jest.mock('@/components', () => {
         <Text>{isEnabled ? 'ON' : 'OFF'}</Text>
       </TouchableOpacity>
     ),
+    SessionRatingTrigger: () => <View testID="session-rating-trigger" />,
     useToast: () => ({showToast: showToastMock}),
     __mocks__: {showToastMock},
   };

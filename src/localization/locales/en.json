@@ -82,20 +82,20 @@
     "mode": "Mode",
     "scribe": "Scribe",
     "dictation": "Dictation",
-    "archives":{
-      "header":{
-        "title":"Archives"
+    "archives": {
+      "header": {
+        "title": "Archives"
       }
     },
     "retrySession": {
-      "header":{
-          "title":"We're at capacity ",
-          "subtitle":"Right now"
+      "header": {
+        "title": "We're at capacity ",
+        "subtitle": "Right now"
       },
-    "description": "We're currently handling the maximum number of active users. Please wait a moment and try again access usually frees up shortly.",
-    "button": "Retry",
-    "retryDescription": "You can retry in",
-    "autoRetryDescription": "We'll automatically retry in"
+      "description": "We're currently handling the maximum number of active users. Please wait a moment and try again access usually frees up shortly.",
+      "button": "Retry",
+      "retryDescription": "You can retry in",
+      "autoRetryDescription": "We'll automatically retry in"
     }
   },
   "Logout": {
@@ -248,7 +248,7 @@
       "callSummary": "Call summary",
       "transcript": "Transcript",
       "callTranscript": "Call transcript",
-      "actionsMenu":{
+      "actionsMenu": {
         "archive": "Archives"
       }
     },
@@ -292,8 +292,8 @@
       "summaryFeedbackSubmittedFailed": "Failed to submit summary feedback"
     },
     "archiveActionModal": {
-      "archive":{
-        "header":{
+      "archive": {
+        "header": {
           "title": "Archive this",
           "subtitle": "Session"
         },
@@ -303,8 +303,8 @@
         "success": "Session archived successfully",
         "failed": "Failed to archive session"
       },
-      "unarchive":{
-        "header":{
+      "unarchive": {
+        "header": {
           "title": "Confirm",
           "subtitle": "Unarchive"
         },
@@ -394,8 +394,8 @@
   },
   "SimulationChecklist": {
     "sessionChecklist": "Session Checklist",
-    "progress":"Progress",
-    "completed":"completed"
+    "progress": "Progress",
+    "completed": "completed"
   },
   "NetworkLogs": {
     "logs": "Logs"
@@ -488,6 +488,57 @@
     "shortSession": {
       "title": "Session ended too soon",
       "description": "We need more interaction data to provide meaningful feedback."
+    },
+    "feedback": {
+      "sessionFeedback": "Session Feedback",
+      "noData": "No data found",
+      "dialog": {
+        "header": "Did this feel like useful practice for real sessions?",
+        "rating": {
+          "1": "Not at all",
+          "2": "Not really",
+          "3": "Maybe",
+          "4": "Yes",
+          "5": "5 — Absolutely",
+          "tags": {
+            "1": [
+              "Poor",
+              "Not helpful",
+              "Very bad",
+              "Disappointing",
+              "Unhelpful"
+            ],
+            "2": [
+              "Below average",
+              "Lacking",
+              "Unsatisfying",
+              "Weak",
+              "Needs improvement"
+            ],
+            "3": [
+              "Neutral",
+              "Okay",
+              "Average",
+              "Moderate",
+              "Acceptable"
+            ],
+            "4": [
+              "Good",
+              "Helpful",
+              "Satisfying",
+              "Effective",
+              "Worthwhile"
+            ],
+            "5": [
+              "Excellent",
+              "Amazing",
+              "Highly useful",
+              "Outstanding",
+              "Very effective"
+            ]
+          }
+        }
+      }
     },
     "shareScreenTitle": "Share this simulation",
     "shareForReviewTitle": "Share this for review",
@@ -628,7 +679,7 @@
       "description": "Practice daily for 7 consecutive days (minimum 10 mins/day)"
     }
   },
- "Review": {
+  "Review": {
     "header": {
       "title": "Review"
     },
@@ -640,12 +691,12 @@
       "reaction": "Reaction",
       "comment": "Comment",
       "viewLess": "View less",
-      "viewMore": "View more" ,
+      "viewMore": "View more",
       "simulationDetails": "Simulation Details",
       "collapse": "Collapse",
       "noComments": "No comments yet",
       "showMore": "Show more",
-      "reviewType":"{{reviewType}}"
+      "reviewType": "{{reviewType}}"
     },
     "filters": {
       "all": "All",
@@ -657,7 +708,7 @@
       "title": "No shared sessions yet",
       "description": "Shared user transcripts will be available here for review."
     },
-    "fetchError" : "Failed to fetch reviews",
+    "fetchError": "Failed to fetch reviews",
     "tabs": {
       "simulations": "Simulations",
       "scribe": "Scribe"
@@ -718,25 +769,24 @@
   "BadgeTooltip": {
     "Journey": {
       "title": "App Journey Badges",
-      "description":"Earned by completing simulation minutes. Only completed simulation time is counted."
+      "description": "Earned by completing simulation minutes. Only completed simulation time is counted."
     },
     "Momentum": {
       "title": "Momentum Badges",
-      "description":"Earned by maintaining a 3-day practice streak. Only completed simulation time is counted."
+      "description": "Earned by maintaining a 3-day practice streak. Only completed simulation time is counted."
     },
     "Contribution": {
       "title": "Contribution Badges",
-      "description":"Earned by providing comments and reactions. Only completed simulation time is counted."
+      "description": "Earned by providing comments and reactions. Only completed simulation time is counted."
     },
     "Resonance": {
       "title": "Resonance Badges",
-      "description":"Earned by receiving comments and reactions. Only completed simulation time is counted."
+      "description": "Earned by receiving comments and reactions. Only completed simulation time is counted."
     },
     "Badge": "Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.",
     "Community": {
       "title": "Community",
-      "description":"This view reflects overall activity in the selected time period, including practice time, badges earned, and community participation. If a comment or reaction is removed by you or a reviewer, the leaderboard updates accordingly."
+      "description": "This view reflects overall activity in the selected time period, including practice time, badges earned, and community participation. If a comment or reaction is removed by you or a reviewer, the leaderboard updates accordingly."
     }
   }
 }
-
