@@ -113,6 +113,12 @@ export const SimulationFeedbackScreen: React.FC<
   const shortSession = isShortSession(simulationDetails?.details?.callDuration);
   const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 
+  // When the trainer has disabled the AI feedback summary for this scenario,
+  // skip the evaluation surface and only collect the star rating. Default to
+  // enabled when the flag is missing (legacy scenarios).
+  const feedbackEnabled =
+    simulationDetails?.scenario?.metadata?.enableFeedback !== false;
+
   const {hideReviewDetails} = useHideReviewDetails({
     reviewId,
     isPrivate,
@@ -130,7 +136,10 @@ export const SimulationFeedbackScreen: React.FC<
           id: scenarioSessionId,
         }).unwrap();
 
-        if (response?.details?.summary?.feedback) {
+        if (
+          response?.scenario?.metadata?.enableFeedback === false ||
+          response?.details?.summary?.feedback
+        ) {
           return;
         }
 
@@ -298,7 +307,9 @@ export const SimulationFeedbackScreen: React.FC<
       showToast(t('Errors.submitFeedback'), 'error');
       hideFeedbackPopup();
     }
-    if (source === 'leave') {
+    // When AI feedback is disabled, the rating popup is the only surface, so
+    // submitting it returns the user to the list (mirrors the dismiss path).
+    if (source === 'leave' || !feedbackEnabled) {
       handleBack();
     }
   };
@@ -365,7 +376,7 @@ export const SimulationFeedbackScreen: React.FC<
             </Text>
           </Text>
 
-          {!shortSession && (
+          {feedbackEnabled && !shortSession && (
             <View style={styles.switchContainer}>
               <Text style={styles.switchLabel}>
                 {t('SimulationFeedback.share')}
@@ -527,7 +538,7 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
         </View>
       </View>
-      {hasScenarioMessagesPermission && (
+      {feedbackEnabled && hasScenarioMessagesPermission && (
         <View style={[styles.tabsContainer, styles.tabViewWrapper]}>
           <TabView
             navigationState={{index: tabIndex, routes: tabs}}
@@ -549,7 +560,8 @@ export const SimulationFeedbackScreen: React.FC<
           />
         </View>
       )}
-      {!!reviewId &&
+      {feedbackEnabled &&
+        !!reviewId &&
         activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
         !hideReviewDetails &&
         hasSimulationReviewPermission && (
@@ -560,7 +572,8 @@ export const SimulationFeedbackScreen: React.FC<
             <CommentIcon width={20} height={20} color={colors.black} />
           </TouchableOpacity>
         )}
-      {activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
+      {feedbackEnabled &&
+        activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
         !fromLogs &&
         !pathId &&
         !caseId &&
@@ -568,7 +581,7 @@ export const SimulationFeedbackScreen: React.FC<
         renderTryAnotherSimulation()}
       <FeedbackPopup
         visible={isFeedbackPopupVisible}
-        onClose={hideFeedbackPopup}
+        onClose={feedbackEnabled ? hideFeedbackPopup : handleBack}
         onSubmit={submitFeedback}
         showChips={false}
         placeholder={t('SimulationFeedback.placeholderText')}
