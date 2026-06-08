@@ -38,6 +38,7 @@ export interface ScenarioMetadata {
   sexualOrientation?: string;
   sessionBehaviorGuidelines?: string;
   experienceMode?: string;
+  enableFeedback?: boolean;
 }
 
 export interface Scenario {
