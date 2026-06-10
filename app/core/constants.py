@@ -114,6 +114,7 @@ class STTProvider(str, Enum):
     DEEPGRAM = "deepgram"
     GOOGLE = "google"
     SARVAM = "sarvam"
+    ELEVENLABS = "elevenlabs"
 
 
 class LLMProvider(str, Enum):

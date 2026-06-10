@@ -6,6 +6,7 @@ from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG, STTPro
 from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
+from app.stt.elevenlabs import ElevenLabsSTTClient
 from app.stt.google import GoogleSTTClient
 from app.stt.sarvam import SarvamSTTClient
 
@@ -69,6 +70,11 @@ def create_stt_client(
         )
     elif provider == STTProvider.SARVAM:
         return SarvamSTTClient.from_config(
+            config=config_dict,
+            language_code=language_code,
+        )
+    elif provider == STTProvider.ELEVENLABS:
+        return ElevenLabsSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )

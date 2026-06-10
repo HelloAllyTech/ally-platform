@@ -6,6 +6,7 @@ import pytest
 
 from app.stt.base import BaseSTTClient
 from app.stt.deepgram import DeepgramSTTClient
+from app.stt.elevenlabs import DEFAULT_ELEVENLABS_STT_MODEL, ElevenLabsSTTClient
 from app.stt.factory import create_stt_client
 
 
@@ -148,6 +149,150 @@ class TestDeepgramSTTClient:
         )
 
 
+class TestElevenLabsSTTClient:
+    """Test cases for ElevenLabs (Scribe) STT client."""
+
+    @pytest.mark.unit
+    @patch("livekit.plugins.elevenlabs.STT")
+    @patch("app.stt.elevenlabs.settings")
+    def test_elevenlabs_stt_client_init_success(self, mock_settings, mock_stt_class):
+        """Test successful ElevenLabs STT client initialization with BCP 47 code."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+
+        # Pass BCP 47 format - provider converts it to ISO 639-1 internally
+        client = ElevenLabsSTTClient(model="scribe_v2_realtime", language_code="en-IN")
+
+        # Plugin uses model_id/language_code; "en-IN" -> "en"
+        mock_stt_class.assert_called_once_with(
+            model_id="scribe_v2_realtime",
+            language_code="en",
+            api_key="test-api-key",
+        )
+        assert client.stt_instance == mock_stt_instance
+        assert isinstance(client, BaseSTTClient)
+
+    @pytest.mark.unit
+    @patch("livekit.plugins.elevenlabs.STT")
+    @patch("app.stt.elevenlabs.settings")
+    def test_elevenlabs_stt_client_with_hi(self, mock_settings, mock_stt_class):
+        """Test ElevenLabs STT client with Hindi BCP 47 code."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+
+        client = ElevenLabsSTTClient(model="scribe_v2_realtime", language_code="hi-IN")
+
+        mock_stt_class.assert_called_once_with(
+            model_id="scribe_v2_realtime",
+            language_code="hi",
+            api_key="test-api-key",
+        )
+        assert client.stt_instance == mock_stt_instance
+
+    @pytest.mark.unit
+    @patch("livekit.plugins.elevenlabs.STT")
+    def test_elevenlabs_stt_client_custom_api_key(self, mock_stt_class):
+        """Test ElevenLabs STT client with custom API key."""
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+
+        client = ElevenLabsSTTClient(
+            model="scribe_v2_realtime",
+            language_code="ml-IN",
+            api_key="custom-api-key",
+        )
+
+        mock_stt_class.assert_called_once_with(
+            model_id="scribe_v2_realtime",
+            language_code="ml",  # Converted from "ml-IN"
+            api_key="custom-api-key",
+        )
+        assert client.stt_instance == mock_stt_instance
+
+    @pytest.mark.unit
+    def test_elevenlabs_stt_client_missing_model(self):
+        """Test ElevenLabs STT client with missing model."""
+        with pytest.raises(
+            ValueError, match="ElevenLabs STT requires 'model' parameter"
+        ):
+            ElevenLabsSTTClient(model="", language_code="en-IN")
+
+    @pytest.mark.unit
+    def test_elevenlabs_stt_client_missing_language_code(self):
+        """Test ElevenLabs STT client with missing language code."""
+        with pytest.raises(
+            ValueError, match="ElevenLabs STT requires 'language_code' parameter"
+        ):
+            ElevenLabsSTTClient(model="scribe_v2_realtime", language_code="")
+
+    @pytest.mark.unit
+    @patch("app.stt.elevenlabs.settings")
+    def test_elevenlabs_stt_client_missing_api_key(self, mock_settings):
+        """Test ElevenLabs STT client with missing API key."""
+        mock_settings.ELEVEN_API_KEY = None
+
+        with pytest.raises(
+            ValueError, match="ElevenLabs STT requires 'api_key' parameter"
+        ):
+            ElevenLabsSTTClient(model="scribe_v2_realtime", language_code="en-IN")
+
+    @pytest.mark.unit
+    def test_elevenlabs_language_format(self):
+        """Test that ElevenLabs declares ISO 639-1 format requirement."""
+        assert ElevenLabsSTTClient.LANGUAGE_FORMAT == "iso6391"
+
+    @pytest.mark.unit
+    def test_elevenlabs_convert_language_code(self):
+        """Test language code conversion in ElevenLabs client."""
+        assert ElevenLabsSTTClient.convert_language_code("en-IN") == "en"
+        assert ElevenLabsSTTClient.convert_language_code("hi-IN") == "hi"
+        assert ElevenLabsSTTClient.convert_language_code("kn-IN") == "kn"
+        assert ElevenLabsSTTClient.convert_language_code("ml") == "ml"
+
+    @pytest.mark.unit
+    @patch("livekit.plugins.elevenlabs.STT")
+    @patch("app.stt.elevenlabs.settings")
+    def test_elevenlabs_stt_client_from_config_defaults_model(
+        self, mock_settings, mock_stt_class
+    ):
+        """from_config defaults to the streaming realtime model when omitted."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+
+        client = ElevenLabsSTTClient.from_config(config={}, language_code="en-IN")
+
+        assert isinstance(client, ElevenLabsSTTClient)
+        mock_stt_class.assert_called_once_with(
+            model_id=DEFAULT_ELEVENLABS_STT_MODEL,
+            language_code="en",
+            api_key="test-api-key",
+        )
+
+    @pytest.mark.unit
+    @patch("livekit.plugins.elevenlabs.STT")
+    @patch("app.stt.elevenlabs.settings")
+    def test_elevenlabs_stt_client_from_config_nested(
+        self, mock_settings, mock_stt_class
+    ):
+        """from_config supports nested config structure from the factory."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_stt_instance = Mock()
+        mock_stt_class.return_value = mock_stt_instance
+
+        config = {"config": {"model": "scribe_v2_realtime"}}
+        client = ElevenLabsSTTClient.from_config(config=config, language_code="hi-IN")
+
+        assert isinstance(client, ElevenLabsSTTClient)
+        mock_stt_class.assert_called_once_with(
+            model_id="scribe_v2_realtime",
+            language_code="hi",
+            api_key="test-api-key",
+        )
+
+
 class TestSTTFactory:
     """Test cases for create_stt_client factory function."""
 
@@ -185,6 +330,25 @@ class TestSTTFactory:
         mock_stt_client_class.from_config.assert_called_once_with(
             config={"model": "nova-2"},
             language_code="en-IN",
+        )
+        assert client == mock_client
+
+    @pytest.mark.unit
+    @patch("app.stt.factory.ElevenLabsSTTClient")
+    def test_create_stt_client_routes_to_elevenlabs(self, mock_stt_client_class):
+        """Test factory routes elevenlabs provider to ElevenLabsSTTClient."""
+        mock_client = Mock()
+        mock_stt_client_class.from_config.return_value = mock_client
+
+        stt_config = {
+            "provider": "elevenlabs",
+            "config": {"model": "scribe_v2_realtime"},
+        }
+        client = create_stt_client(stt_config=stt_config, language_code="hi-IN")
+
+        mock_stt_client_class.from_config.assert_called_once_with(
+            config={"model": "scribe_v2_realtime"},
+            language_code="hi-IN",
         )
         assert client == mock_client
 
