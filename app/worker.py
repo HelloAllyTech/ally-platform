@@ -37,6 +37,7 @@ from app.core.events.handlers import (
     setup_interruption_detection,
 )
 from app.core.logger import get_logger
+from app.core.metrics import turn_metrics
 from app.core.scenario.base import Scenario
 from app.core.scoring.score_keeper import ScoreKeeper
 from app.llms import BaseLLMClient
@@ -257,6 +258,41 @@ class AgentWorker:
         self.session.on("agent_state_changed")(state_handlers["agent_state"])
         self.session.on("user_state_changed")(state_handlers["user_state"])
 
+        # Latency metrics: LiveKit emits per-component timings (end-of-utterance
+        # delay, LLM time-to-first-token, TTS time-to-first-byte). Record them
+        # into the per-turn accumulator so they ship to Core with the app-stage
+        # timings. Defensive: metric class shapes vary by LiveKit version, so
+        # read attributes by name and never let this break the session.
+        metrics_room_name = self.ctx.room.name
+
+        @self.session.on("metrics_collected")
+        def on_metrics_collected(ev):
+            try:
+                metric = getattr(ev, "metrics", None)
+                if metric is None:
+                    return
+                metric_cls = type(metric).__name__
+                if metric_cls == "EOUMetrics":
+                    delay = getattr(metric, "end_of_utterance_delay", None)
+                    if delay is not None and delay >= 0:
+                        turn_metrics.record(
+                            metrics_room_name, eou_delay_ms=int(delay * 1000)
+                        )
+                elif metric_cls == "LLMMetrics":
+                    ttft = getattr(metric, "ttft", None)
+                    if ttft is not None and ttft >= 0:
+                        turn_metrics.record(
+                            metrics_room_name, llm_ttft_ms=int(ttft * 1000)
+                        )
+                elif metric_cls == "TTSMetrics":
+                    ttfb = getattr(metric, "ttfb", None)
+                    if ttfb is not None and ttfb >= 0:
+                        turn_metrics.record(
+                            metrics_room_name, tts_ttfb_ms=int(ttfb * 1000)
+                        )
+            except Exception:  # noqa: BLE001 - metrics must never break a session
+                logger.exception("[turn-metrics] metrics_collected hook failed")
+
         # Store cleanup handler for shutdown
         self._cleanup_conversation_handler = cleanup_conversation_handler
 
@@ -297,6 +333,8 @@ class AgentWorker:
                 self._cleanup_conversation_handler()
             except Exception as e:
                 logger.debug(f"Error cleaning up conversation handler: {e}")
+            # Drop any in-flight turn-metrics state for this room.
+            turn_metrics.discard(self.ctx.room.name)
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup

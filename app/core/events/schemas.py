@@ -20,6 +20,45 @@ class CoreMessageType(str, Enum):
     MESSAGE = "message"
     EVENT = "event"
     BEHAVIOR_INSTRUCTION = "behavior_instruction"
+    TURN_METRICS = "turn_metrics"
+
+
+class TurnMetricsData(BaseModel):
+    """Per-turn latency metrics shipped to Core for the latency dashboards.
+
+    All *_ms fields are integer milliseconds. ``response_latency_ms`` is the
+    headline metric (user stops speaking -> agent starts speaking); the rest is
+    the breakdown so a bottleneck can be pinpointed. Breakdown fields are
+    optional because some stages are skipped or not always measured.
+    """
+
+    turn_index: int
+    response_latency_ms: int
+    invocation_id: Optional[str] = None
+
+    # Framework timings (LiveKit MetricsCollectedEvent)
+    eou_delay_ms: Optional[int] = None
+    llm_ttft_ms: Optional[int] = None
+    tts_ttfb_ms: Optional[int] = None
+
+    # App-stage timings (graph nodes)
+    orchestration_ms: Optional[int] = None
+    llm_response_ms: Optional[int] = None
+    prosody_ms: Optional[int] = None
+    branching_ms: Optional[int] = None
+    knowledge_retrieval_ms: Optional[int] = None
+
+    # Dimensions / flags
+    scenario_id: Optional[int] = None
+    language: Optional[str] = None
+    llm_model: Optional[str] = None
+    env: Optional[str] = None
+    response_chars: Optional[int] = None
+    events_detected: Optional[int] = None
+    prosody_skipped: Optional[bool] = None
+    llm_timed_out: Optional[bool] = None
+    interrupted: Optional[bool] = None
+    metadata: Optional[dict] = None
 
 
 class EventRegistryEntry(BaseModel):
@@ -123,6 +162,9 @@ class CoreEventMessageTypeData(BaseModel):
     behavior_instruction: Optional[CoreBehaviorInstructionType] = Field(
         default=None, description="Behavior instruction detection result"
     )
+    turn_metrics: Optional[TurnMetricsData] = Field(
+        default=None, description="Per-turn latency metrics"
+    )
 
 
 class CoreEventMessageType(BaseModel):
@@ -171,6 +213,20 @@ class CoreEventMessageType(BaseModel):
             data=CoreEventMessageTypeData(
                 behavior_instruction=behavior_instruction,
             ),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_turn_metrics(
+        cls,
+        room_id: str,
+        turn_metrics: TurnMetricsData,
+    ) -> "CoreEventMessageType":
+        """Create a per-turn latency metrics message for Core."""
+        return cls(
+            message_type=CoreMessageType.TURN_METRICS,
+            data=CoreEventMessageTypeData(turn_metrics=turn_metrics),
             room_id=room_id,
             timestamp=int(time.time()),
         )

@@ -12,10 +12,12 @@ from app.core.events.base import BaseEvent
 from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.graph.instrumentation import (
+    get_invocation_id,
     get_room_id,
     instrumented_node,
     log_side_effect,
 )
+from app.core.metrics import turn_metrics
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -305,6 +307,12 @@ async def _orchestrate_and_split_events(
             len(all_feedback_data),
             _orch_latency,
         )
+        turn_metrics.record(
+            get_room_id(),
+            orchestration_ms=int(_orch_latency * 1000),
+            events_detected=len(new_events),
+            invocation_id=get_invocation_id(),
+        )
     except asyncio.TimeoutError:
         _orch_latency = (datetime.now(timezone.utc) - _orch_start).total_seconds()
         logger.error(
@@ -314,6 +322,9 @@ async def _orchestrate_and_split_events(
             _orch_latency,
             settings.ORCHESTRATION_TIMEOUT,
             len(new_events),
+        )
+        turn_metrics.record(
+            get_room_id(), orchestration_ms=int(_orch_latency * 1000)
         )
         return 0, [], []
 
@@ -955,6 +966,14 @@ async def generate_response(
             _llm_latency,
             len(getattr(response, "content", "") or ""),
         )
+        turn_metrics.record(
+            get_room_id(),
+            llm_response_ms=int(_llm_latency * 1000),
+            response_chars=len(getattr(response, "content", "") or ""),
+            llm_model=llm_model_name,
+            language=language_code or DEFAULT_LANGUAGE_CODE,
+            invocation_id=get_invocation_id(),
+        )
     except asyncio.TimeoutError:
         _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
         logger.error(
@@ -964,6 +983,14 @@ async def generate_response(
             llm_model_name,
             _llm_latency,
             settings.LLM_RESPONSE_TIMEOUT,
+        )
+        turn_metrics.record(
+            get_room_id(),
+            llm_response_ms=int(_llm_latency * 1000),
+            llm_model=llm_model_name,
+            language=language_code or DEFAULT_LANGUAGE_CODE,
+            llm_timed_out=True,
+            invocation_id=get_invocation_id(),
         )
         response = AIMessage(content="Sorry, can you say that again?")
     except Exception as e:
@@ -1488,6 +1515,7 @@ async def apply_voice_expressions(
                 "[apply_voice_expressions] Skipped prosody (%s)",
                 skip_reason,
             )
+            turn_metrics.record(get_room_id(), prosody_skipped=True, prosody_ms=0)
             # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
             if hasattr(tts_client, "_current_params") and tts_client._current_params:
                 tts_client._apply_parameters_dict(tts_client._current_params.copy())
@@ -1581,6 +1609,11 @@ async def apply_voice_expressions(
                 _prosody_latency,
                 enhanced_text is not None,
             )
+            turn_metrics.record(
+                get_room_id(),
+                prosody_ms=int(_prosody_latency * 1000),
+                prosody_skipped=False,
+            )
         except asyncio.TimeoutError:
             _prosody_latency = (
                 datetime.now(timezone.utc) - _prosody_start
@@ -1590,6 +1623,9 @@ async def apply_voice_expressions(
                 "timeout=%ss — falling back to original text",
                 _prosody_latency,
                 settings.PROSODY_GENERATION_TIMEOUT,
+            )
+            turn_metrics.record(
+                get_room_id(), prosody_ms=int(_prosody_latency * 1000)
             )
             enhanced_text = None
         except Exception as e:

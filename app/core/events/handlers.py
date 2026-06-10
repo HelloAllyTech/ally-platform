@@ -14,13 +14,19 @@ from livekit import agents, rtc
 from livekit.agents import ConversationItemAddedEvent
 from livekit.agents.voice.events import AgentStateChangedEvent, UserStateChangedEvent
 
+from app.core.config import settings
 from app.core.constants import SESSION_TERMINATED_MESSAGE
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.interruption.interruption_event import (
     set_interruption_detected,
 )
-from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
+from app.core.events.schemas import (
+    CoreEventMessageType,
+    CustomUIEventMessageType,
+    TurnMetricsData,
+)
 from app.core.logger import get_logger
+from app.core.metrics import turn_metrics
 from app.core.queue import msg_event_queue
 from app.core.queue.utils import finalize_session, send_deferred_termination_event
 
@@ -91,6 +97,27 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     # user-perceived response latency that preempt is supposed to reduce.
     _user_speech_end_ts: list[float | None] = [None]
 
+    # ---- turn-metrics emit ----
+
+    def _emit_turn_metrics(room: str, agent_speech_start_ts: float) -> None:
+        """Finalize the in-flight turn and ship its metrics to Core.
+
+        Best-effort and fire-and-forget: builds the record from the accumulated
+        component timings, stamps the env dimension, and schedules the SQS send
+        so the (sync) state handler never blocks on the network.
+        """
+        try:
+            rec = turn_metrics.finalize(room, agent_speech_start_ts)
+            if not rec:
+                return
+            rec.setdefault("env", settings.ENV.value)
+            message = CoreEventMessageType.create_turn_metrics(
+                room, TurnMetricsData(**rec)
+            )
+            asyncio.create_task(send_event_to_queue(message.model_dump_json()))
+        except Exception:  # noqa: BLE001 - metrics must never break a turn
+            logger.exception("[turn-metrics] emit failed for room=%s", room)
+
     # ---- state-change handlers ----
 
     def on_agent_state_changed(event: AgentStateChangedEvent):
@@ -110,6 +137,10 @@ def create_conversation_handler(room_id: str, joined_iso: str):
                     event.created_at,
                 )
                 _user_speech_end_ts[0] = None  # consume
+                # Persist the turn's latency (total + accumulated breakdown) to
+                # Core for the Metabase dashboards. Best-effort: never let a
+                # metrics failure disrupt the conversation.
+                _emit_turn_metrics(room_id, event.created_at)
             else:
                 logger.info(
                     "[LATENCY] agent_speech_start room=%s ts=%.3f "
@@ -132,6 +163,12 @@ def create_conversation_handler(room_id: str, joined_iso: str):
                 event.new_state,
                 event.created_at,
             )
+            # Begin a turn in the metrics accumulator; graph nodes + LiveKit
+            # metrics will record component timings into it before finalize.
+            try:
+                turn_metrics.note_user_speech_end(room_id, event.created_at)
+            except Exception:  # noqa: BLE001 - metrics must never break a turn
+                logger.exception("[turn-metrics] note_user_speech_end failed")
 
     # ---- main conversation handler ----
 
