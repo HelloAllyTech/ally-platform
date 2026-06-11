@@ -1,0 +1,5 @@
+{
+    "name": "Coherence Guardrail Classifier User Prompt",
+    "kind": "prompt",
+    "description": "User-turn prompt for SYSTEM coherence guardrails: presents recent conversation context plus the counselor message to classify."
+}

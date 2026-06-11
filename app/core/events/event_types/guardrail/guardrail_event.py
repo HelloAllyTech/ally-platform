@@ -71,6 +71,13 @@ class GuardrailEvent(BaseEvent):
     # None means use OpenAI
     llm_base_url: Optional[str] = None
 
+    # USER (category) guardrails use the shared classifier and must fire on
+    # coherent, on-topic statements that match their category. SYSTEM guardrails
+    # (e.g. the STT Coherence Guard) have the OPPOSITE bias — they must NOT fire
+    # on coherent content — so they route to a dedicated, precision-biased
+    # classifier prompt with conversation context and few-shot examples.
+    kind: str = "USER"
+
     # Shared client cache per base_url
     _CLIENTS: ClassVar[dict] = {}
 
@@ -104,6 +111,11 @@ class GuardrailEvent(BaseEvent):
         )
         return inst
 
+    # Number of preceding turns shown to the classifier as context. Enough to
+    # judge whether an utterance is on-topic / coherent without bloating the
+    # prompt.
+    _CONTEXT_TURNS: ClassVar[int] = 6
+
     @override
     async def detect_event(self, conversations: List[ChatMessage]) -> bool:
         if not conversations:
@@ -111,23 +123,51 @@ class GuardrailEvent(BaseEvent):
         last = conversations[-1]
         if last.role.lower() != "counselor":
             return False
-        return await self._classify(last.content)
+        context = self._format_context(conversations[:-1])
+        return await self._classify(last.content, context)
 
-    async def _classify(self, text: str) -> bool:
+    @classmethod
+    def _format_context(cls, history: List[ChatMessage]) -> str:
+        """Render the most recent turns as 'Role: content' lines for the
+        classifier. Used so guardrails whose boundary concerns relevance /
+        coherence (e.g. the STT Coherence Guard) can tell an off-topic
+        mistranscription apart from a legitimate topic change."""
+        recent = [
+            m for m in history[-cls._CONTEXT_TURNS :] if m.content and m.content.strip()
+        ]
+        if not recent:
+            return "(no prior conversation)"
+        return "\n".join(f"{m.role}: {m.content}" for m in recent)
+
+    async def _classify(self, text: str, conversation_context: str = "") -> bool:
         if not text.strip():
             return False
         try:
             client = self._get_client(self.llm_base_url)
 
-            system_prompt = load_and_format(
-                "events/guardrail_system",
-                helper_dialogue=self.data.helper_dialogue,
-            )
-
-            user_prompt = load_and_format(
-                "events/guardrail_user",
-                counselor_message=text,
-            )
+            if self.kind == "SYSTEM":
+                # Coherence/system guardrails: dedicated precision-biased prompt
+                # that uses recent conversation context and few-shot examples.
+                system_prompt = load_and_format(
+                    "events/coherence_guardrail_system",
+                    helper_dialogue=self.data.helper_dialogue,
+                )
+                user_prompt = load_and_format(
+                    "events/coherence_guardrail_user",
+                    counselor_message=text,
+                    conversation_context=conversation_context
+                    or "(no prior conversation)",
+                )
+            else:
+                # Category guardrails: shared classifier (unchanged behavior).
+                system_prompt = load_and_format(
+                    "events/guardrail_system",
+                    helper_dialogue=self.data.helper_dialogue,
+                )
+                user_prompt = load_and_format(
+                    "events/guardrail_user",
+                    counselor_message=text,
+                )
 
             messages = [
                 ChatCompletionSystemMessageParam(content=system_prompt, role="system"),

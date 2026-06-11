@@ -1,0 +1,4 @@
+Recent conversation:
+{conversation_context}
+
+Counselor message (classify this one): "{counselor_message}"

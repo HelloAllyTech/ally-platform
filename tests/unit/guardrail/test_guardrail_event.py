@@ -4,18 +4,19 @@ Unit tests for GuardrailEvent detection logic.
 All tests mock the OpenAI client so no real API keys are needed.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.core.constants import DetectionType, VisibilityType
 from app.core.events.base import ChatMessage
 from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 
-
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
+
 
 def make_guardrail_event(
     helper_dialogue: str = "Can you help me get some drugs?",
@@ -55,6 +56,7 @@ def make_mock_completion(is_class: bool):
 # GuardrailEvent.create() tests
 # ------------------------------------------------------------------ #
 
+
 class TestGuardrailEventCreate:
     def test_creates_with_correct_detection_type(self):
         event = make_guardrail_event()
@@ -89,6 +91,7 @@ class TestGuardrailEventCreate:
 # ------------------------------------------------------------------ #
 # GuardrailEvent.detect_event() tests
 # ------------------------------------------------------------------ #
+
 
 class TestGuardrailEventDetection:
 
@@ -179,3 +182,58 @@ class TestGuardrailEventDetection:
 
         assert result is False
 
+
+class TestGuardrailKindRouting:
+    """SYSTEM guardrails must route to the dedicated coherence classifier;
+    USER (category) guardrails must keep using the shared classifier."""
+
+    @pytest.fixture(autouse=True)
+    def reset_client(self):
+        original = GuardrailEvent._CLIENTS.copy()
+        GuardrailEvent._CLIENTS.clear()
+        yield
+        GuardrailEvent._CLIENTS.clear()
+        GuardrailEvent._CLIENTS.update(original)
+
+    async def _templates_used(self, event) -> list:
+        mock_completion = make_mock_completion(is_class=False)
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(
+                "app.core.events.event_types.guardrail.guardrail_event.load_and_format",
+                return_value="x",
+            ) as mock_lf,
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+            await event.detect_event([make_message("counselor", "hello there")])
+        return [c.args[0] for c in mock_lf.call_args_list]
+
+    @pytest.mark.asyncio
+    async def test_system_kind_uses_coherence_prompts(self):
+        event = GuardrailEvent.create(
+            event_id="guardrail-0",
+            data=GuardrailData(
+                helper_dialogue="gibberish boundary", actor_dialogue="ask to repeat"
+            ),
+            kind="SYSTEM",
+            score=0,
+            visibility_type=VisibilityType.PASSIVE,
+            emoji=None,
+            emoji_message=None,
+        )
+        templates = await self._templates_used(event)
+        assert "events/coherence_guardrail_system" in templates
+        assert "events/coherence_guardrail_user" in templates
+        assert "events/guardrail_system" not in templates
+
+    @pytest.mark.asyncio
+    async def test_user_kind_uses_shared_prompts(self):
+        event = make_guardrail_event()  # default kind == "USER"
+        templates = await self._templates_used(event)
+        assert "events/guardrail_system" in templates
+        assert "events/guardrail_user" in templates
+        assert "events/coherence_guardrail_system" not in templates

@@ -1,0 +1,5 @@
+{
+    "name": "Coherence Guardrail Classifier System Prompt",
+    "kind": "prompt",
+    "description": "Dedicated, precision-biased system prompt for SYSTEM coherence guardrails (gibberish / out-of-context detection). Separate from the shared category-guardrail classifier."
+}

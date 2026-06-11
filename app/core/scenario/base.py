@@ -328,6 +328,9 @@ class Scenario(BaseModel):
                 try:
                     helper_dialogue = g.get("helperDialogue", "")
                     actor_dialogue = g.get("actorDialogue", "")
+                    # SYSTEM guardrails route to the dedicated coherence
+                    # classifier; default USER keeps category-guardrail behavior.
+                    guard_kind = g.get("kind", "USER")
 
                     if not helper_dialogue or not actor_dialogue:
                         logger.warning(
@@ -354,6 +357,7 @@ class Scenario(BaseModel):
                         ),
                         model=guardrail_model,
                         llm_base_url=guardrail_llm_base_url,
+                        kind=guard_kind,
                         branching_instruction=BranchingInstruction.create(
                             actor_dialogue, prompt_data=None
                         ),
