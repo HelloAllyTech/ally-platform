@@ -47,6 +47,9 @@ class TurnMetricsData(BaseModel):
     prosody_ms: Optional[int] = None
     branching_ms: Optional[int] = None
     knowledge_retrieval_ms: Optional[int] = None
+    # Parallel fan-out branch totals (for fan-in bottleneck analysis)
+    process_events_ms: Optional[int] = None
+    behaviors_ms: Optional[int] = None
 
     # Dimensions / flags
     scenario_id: Optional[int] = None

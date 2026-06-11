@@ -44,6 +44,8 @@ _RECORD_FIELDS = {
     "prosody_ms",
     "branching_ms",
     "knowledge_retrieval_ms",
+    "process_events_ms",
+    "behaviors_ms",
     "scenario_id",
     "language",
     "llm_model",

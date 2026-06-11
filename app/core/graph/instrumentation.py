@@ -20,6 +20,19 @@ from typing import Any, Awaitable, Callable, Optional
 from langchain_core.runnables import RunnableConfig
 
 from app.core.logger import logger
+from app.core.metrics import turn_metrics
+
+# Graph nodes whose successful elapsed time maps directly onto a turn-metrics
+# field. Recorded from node_exit below so the breakdown is captured in one place
+# (these stages have no dedicated inner timer like llm/orchestration/prosody do).
+_NODE_METRIC_FIELDS = {
+    "resolve_branching_instruction": "branching_ms",
+    "retrieve_knowledge": "knowledge_retrieval_ms",
+    # The three parallel fan-out branches — their node times let dashboards
+    # answer "which branch held up the sync?" (the fan-in bottleneck).
+    "process_events": "process_events_ms",
+    "detect_behaviors": "behaviors_ms",
+}
 
 # Set on first node entry of an invocation. Same value visible to nodes
 # that inherit the contextvar, but LangGraph fans out parallel nodes as
@@ -121,6 +134,12 @@ def instrumented_node(name: str):
                     name,
                     elapsed_ms,
                 )
+                metric_field = _NODE_METRIC_FIELDS.get(name)
+                if metric_field is not None:
+                    try:
+                        turn_metrics.record(room, **{metric_field: int(elapsed_ms)})
+                    except Exception:  # noqa: BLE001 - metrics never break a turn
+                        logger.debug("[turn-metrics] node record failed for %s", name)
                 return result
             finally:
                 if inv_token is not None:

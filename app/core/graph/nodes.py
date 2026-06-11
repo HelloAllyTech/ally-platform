@@ -138,6 +138,8 @@ async def _detect_events(
         Adds timeout to prevent slow API calls from blocking all event detection.
         This improves reliability and prevents cascading delays.
         """
+        _start = datetime.now(timezone.utc)
+        outcome = "false"
         try:
             async with semaphore:
                 if settings.ENABLE_EVENT_DETECTION_OPTIMIZATIONS:
@@ -150,14 +152,27 @@ async def _detect_events(
                 else:
                     # Old behavior: no timeout
                     result = await event.detect_event(chat_messages)
+                outcome = "true" if result else "false"
                 if result:
                     return event
         except asyncio.TimeoutError:
+            outcome = "timeout"
             logger.warning(
                 f"Event {event.event_id} detection timed out after 10s, skipping"
             )
         except Exception as e:
+            outcome = "error"
             logger.exception(f"Event {event.event_id} detection failed: {e}")
+        finally:
+            # Per-event timing for deep dives — DEBUG keeps it out of prod INFO.
+            _ms = (datetime.now(timezone.utc) - _start).total_seconds() * 1000
+            logger.debug(
+                "[EVENT_TIMING] event_id=%s type=%s latency_ms=%.1f detected=%s",
+                getattr(event, "event_id", "?"),
+                type(event).__name__,
+                _ms,
+                outcome,
+            )
         return None
 
     # Collect eligible events
@@ -425,6 +440,15 @@ async def process_events(
     room = None
     if config and "configurable" in config:
         room = config["configurable"].get("room")
+
+    # Record the active language every turn — process_events always runs, so this
+    # keeps the `language` metric dimension populated even on turns that don't
+    # reach generate_response (where it was previously recorded).
+    if config and "configurable" in config:
+        _scn = config["configurable"].get("scenario")
+        _lang = getattr(getattr(_scn, "language_config", None), "language_code", None)
+        if _lang:
+            turn_metrics.record(get_room_id(), language=_lang)
 
     if room:
         try:
@@ -725,20 +749,34 @@ async def _detect_behavior_instructions(
     async def detect_with_timeout(
         bi: SimulationBehaviorInstruction,
     ) -> Optional[BehaviorInstructionFeedbackData]:
+        _start = datetime.now(timezone.utc)
+        outcome = "false"
         try:
             async with semaphore:
-                return await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     _detect_single_behavior_instruction(
                         bi, chat_messages, prompt_data=prompt_data
                     ),
                     timeout=10.0,
                 )
+                outcome = "true" if result else "false"
+                return result
         except asyncio.TimeoutError:
+            outcome = "timeout"
             logger.warning(
                 f"Behavior instruction {bi.behavior_instruction_id or ''} "
                 f"detection timed out after 10s, skipping"
             )
             return None
+        finally:
+            # Per-behavior timing for deep dives — DEBUG, out of prod INFO.
+            _ms = (datetime.now(timezone.utc) - _start).total_seconds() * 1000
+            logger.debug(
+                "[BEHAVIOR_TIMING] behavior_id=%s latency_ms=%.1f detected=%s",
+                getattr(bi, "behavior_instruction_id", "") or "?",
+                _ms,
+                outcome,
+            )
 
     detection_tasks = [
         asyncio.create_task(detect_with_timeout(bi)) for bi in behavior_instructions
@@ -1425,6 +1463,11 @@ async def apply_voice_expressions(
     room = None
     if config and "configurable" in config:
         room = config["configurable"].get("room")
+
+    # Baseline so the prosody metric is populated even when this node
+    # early-returns (provider without prosody params, empty response, etc.).
+    # The complete/timeout/skip paths below overwrite this with the real value.
+    turn_metrics.record(get_room_id(), prosody_ms=0)
 
     try:
         # Get TTS client, LLM client, and scenario from config
