@@ -137,7 +137,7 @@ export const API_ROUTES = {
   },
   CUSTOM_FIELDS: {
     DEFINITIONS: '/custom-fields/definitions',
-    VALUES: (chatId: number) => `/chats/${chatId}/custom-field-values`,
+    VALUES: (chatId: number) => `/custom-fields/values/${chatId}`,
   },
   LEARN: {
     ROOMS: '/rooms',
