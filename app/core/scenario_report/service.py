@@ -472,9 +472,9 @@ class ScenarioReportService:
             # a report run: generate_response reads
             # `score_keeper.get_total_score()` per turn and forwards it as
             # current_score into _resolve_simulation_state_by_score. Without
-            # a score_keeper in the configurable, the resolver gets None
-            # every turn and pins to the isStarting state forever — so
-            # transitions never fire and reports can't exercise state-2+
+            # a score_keeper in the configurable, the resolver gets None every
+            # turn (treated as score 0) and pins to the opening state forever —
+            # so transitions never fire and reports can't exercise state-2+
             # behavior or per-state RAG gating beyond the starting state.
             score_keeper = ScoreKeeper()
 

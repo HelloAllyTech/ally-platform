@@ -164,52 +164,37 @@ def _resolve_state_guidance(
 def _resolve_simulation_state_by_score(
     states: Optional[List[Dict[str, Any]]],
     current_score: Optional[int],
-    default_state_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Pick the active simulation state for a given turn score.
 
-    ally-be pre-sorts states by scoreLower (ascending) and provides
-    default_state_id (the isStarting state) before sending to ai-learn,
-    so this resolver can skip those derivations.
+    ally-be pre-sorts states by scoreLower (ascending) before sending to
+    ai-learn, so this resolver can skip re-sorting on the happy path.
+
+    The starting state is emergent, not flagged: a session's score begins
+    at 0 (ScoreKeeper.get_total_score() starts at 0 — never None in
+    production), so turn 1 resolves through the same interval match as any
+    later turn. The legacy `isStarting` / `default_state_id` flag is gone.
 
     Selection rules:
       - scoreLower is inclusive; scoreUpper is exclusive.
-      - When current_score is None, return the state matching default_state_id
-        (falls back to isStarting scan then first-by-lower-bound).
+      - current_score is None only on dev/test paths with no ScoreKeeper
+        wired up; it is treated as 0 so it resolves identically to turn 1.
       - Out-of-range scores clamp to first/last state.
     """
     if not states:
         return None
 
-    if current_score is None:
-        # Use pre-computed default_state_id when available (ally-be sends this
-        # for new sessions so the resolver skips scanning).
-        if default_state_id:
-            match = next((s for s in states if s.get("id") == default_state_id), None)
-            if match:
-                return match
-        # Fallback: scan for isStarting flag.
-        starting = next((s for s in states if s.get("isStarting")), None)
-        if starting:
-            return starting
-        # Last resort for legacy/unsorted states: pick the one with the lowest
-        # scoreLower (None treated as -inf, matching pre-strict-bounds behaviour).
-        return sorted(
-            states,
-            key=lambda s: (
-                s.get("scoreLower")
-                if s.get("scoreLower") is not None
-                else float("-inf")
-            ),
-        )[0]
+    # No ScoreKeeper (dev/test) → behave as the session's opening turn (score 0)
+    # so the "starting state = the state containing 0" rule holds everywhere.
+    score = current_score if current_score is not None else 0
 
     # States are pre-sorted by ally-be; iterate in order for interval match.
     for state in states:
         lower = state.get("scoreLower")
         upper = state.get("scoreUpper")
-        if lower is not None and current_score < lower:
+        if lower is not None and score < lower:
             continue
-        if upper is not None and current_score >= upper:
+        if upper is not None and score >= upper:
             continue
         return state
 
@@ -222,10 +207,10 @@ def _resolve_simulation_state_by_score(
         ),
     )
     first_lower = sorted_states[0].get("scoreLower")
-    if first_lower is not None and current_score < first_lower:
+    if first_lower is not None and score < first_lower:
         return sorted_states[0]
     last_upper = sorted_states[-1].get("scoreUpper")
-    if last_upper is not None and current_score >= last_upper:
+    if last_upper is not None and score >= last_upper:
         return sorted_states[-1]
     return None
 
@@ -378,7 +363,6 @@ def _build_behavior_prompt(
         _resolve_simulation_state_by_score(
             sim_states,
             current_score,
-            default_state_id=getattr(prompt_data, "default_state_id", None),
         )
         if prompt_has_states
         else None

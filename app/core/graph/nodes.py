@@ -882,8 +882,8 @@ async def generate_response(
         # app/core/scoring/score_keeper.py); .get_total_score() returns an
         # int (starts at 0 — never None). Passed as None only when no
         # score_keeper has been wired up (test fixtures, dev paths) — the
-        # state resolver handles None by falling back to the isStarting
-        # state.
+        # state resolver treats None as score 0, so it resolves to the same
+        # state turn 1 would.
         turn_score: Optional[int] = (
             score_keeper.get_total_score() if score_keeper else None
         )

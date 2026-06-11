@@ -100,29 +100,36 @@ def test_single_state_with_both_bounds_open_always_matches():
 
 
 # ---- Turn-1 / no-score fallback ---------------------------------------------
+# current_score is None only on dev/test paths with no ScoreKeeper wired up.
+# The starting state is emergent: None is treated as score 0, so it resolves
+# to the state whose range contains 0 — exactly as turn 1 would in production.
 
 
-def test_none_score_returns_starting_state():
+def test_none_score_resolves_as_score_zero():
     states = [
-        _state("Early", lower=None, upper=50),
-        _state("Middle", lower=50, upper=100, is_starting=True),
-        _state("Late", lower=100, upper=None),
-    ]
-    result = _resolve_simulation_state_by_score(states, None)
-    assert result is not None
-    assert result["name"] == "Middle"
-
-
-def test_none_score_without_starting_flag_falls_back_to_lowest_lower():
-    states = [
-        _state("Late", lower=100, upper=None),
         _state("Early", lower=None, upper=50),
         _state("Middle", lower=50, upper=100),
+        _state("Late", lower=100, upper=None),
+    ]
+    # None → treated as 0 → "Early" (the 0-containing state), and identical
+    # to passing 0 explicitly.
+    by_none = _resolve_simulation_state_by_score(states, None)
+    by_zero = _resolve_simulation_state_by_score(states, 0)
+    assert by_none is not None
+    assert by_none["name"] == "Early"
+    assert by_none == by_zero
+
+
+def test_none_score_clamps_to_first_when_zero_below_range():
+    """If 0 sits below the first state's lower bound, None (=0) clamps to
+    the first state — the same clamp any below-range score gets."""
+    states = [
+        _state("Mid", lower=50, upper=100),
+        _state("High", lower=100, upper=200),
     ]
     result = _resolve_simulation_state_by_score(states, None)
     assert result is not None
-    # Sort by scoreLower with None as -inf → "Early" wins.
-    assert result["name"] == "Early"
+    assert result["name"] == "Mid"
 
 
 # ---- No-states / no-match cases --------------------------------------------
