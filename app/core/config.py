@@ -112,10 +112,13 @@ class Settings(BaseSettings):
         ),
     )
     PROSODY_GENERATION_TIMEOUT: float = Field(
-        default=15.0,
+        default=3.0,
         description=(
             "Upper limit in seconds for prosody / voice-expression LLM call in "
-            "apply_voice_expressions. On timeout, the original text is used."
+            "apply_voice_expressions. On timeout, the original text is used. "
+            "Prosody is on the serial critical path before first audio, so this "
+            "is kept tight (was 15s): a slow prosody call falls back to raw text "
+            "quickly instead of blocking the turn. Measured by prosodyMs."
         ),
     )
     ORCHESTRATION_TIMEOUT: float = Field(
