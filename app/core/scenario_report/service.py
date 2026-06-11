@@ -699,6 +699,7 @@ class ScenarioReportService:
                 transcripts=self._transcripts,
                 prompt_data=scenario.prompt_data,
                 counselor_prompt=counselor_system_prompt,
+                selected_prompt_code=self._request.evaluator_prompt_code,
             )
             eval_ms = (time.monotonic() - eval_started_at) * 1000
             logger.info(

@@ -43,6 +43,16 @@ class ScenarioReportRequest(BaseModel):
             "Full scenario metadata envelope " "(same format as LiveKit room metadata)"
         ),
     )
+    evaluator_prompt_code: Optional[str] = Field(
+        default=None,
+        description=(
+            "promptCode of the transcript-evaluator prompt variant to run. When "
+            "set, the evaluator (LLM-judge) system prompt is resolved from this "
+            "variant's (dashboard-overridden) text instead of the default "
+            "evaluator template. Falls back to the default when unset or "
+            "unresolvable."
+        ),
+    )
 
 
 class ScenarioReportResponse(BaseModel):

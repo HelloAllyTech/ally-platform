@@ -7,7 +7,7 @@ the client agent's performance. Metrics are fully prompt-driven — adding
 or removing a metric from the system prompt requires no code changes here.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field, model_validator
@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.scenario.base import PromptData
 from app.core.scenario_report.schemas import TranscriptEntry
-from app.prompts.resolver import load_template
+from app.prompts.resolver import load_template, resolve_template
 
 logger = get_logger(__name__)
 
@@ -139,9 +139,20 @@ async def evaluate_transcript(
     transcripts: List[TranscriptEntry],
     prompt_data: PromptData,
     counselor_prompt: str,
+    selected_prompt_code: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Use an LLM as a judge to evaluate the client agent's performance.
+
+    Args:
+        selected_prompt_code: promptCode of an evaluator (transcript-judge)
+            variant to run. When set, the evaluator system prompt is resolved
+            from that variant's (dashboard-overridden) text, falling back to the
+            default evaluator template when the code can't be resolved. When
+            None, the default template is used. Resolved WITHOUT formatting
+            (resolve_template, not load_and_format_by_code) because the evaluator
+            prompt contains literal braces (JSON scoring examples) that must not
+            be treated as format placeholders.
 
     Returns:
         Dict with a 'metrics' key (Dict[str, int]) and a 'report_markdown' key (str).
@@ -159,13 +170,21 @@ async def evaluate_transcript(
             transcripts, prompt_data, counselor_prompt
         )
 
+        evaluator_system_prompt = ""
+        if selected_prompt_code:
+            evaluator_system_prompt = resolve_template(
+                selected_prompt_code, prompt_data
+            )
+        if not evaluator_system_prompt:
+            evaluator_system_prompt = load_template(
+                "evaluation/evaluator_system", prompt_data
+            )
+
         result: EvaluationResult = await llm.ainvoke(
             [
                 {
                     "role": "system",
-                    "content": load_template(
-                        "evaluation/evaluator_system", prompt_data
-                    ),
+                    "content": evaluator_system_prompt,
                 },
                 {"role": "user", "content": user_message},
             ]
