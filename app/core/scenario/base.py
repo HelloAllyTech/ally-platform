@@ -691,8 +691,25 @@ class Scenario(BaseModel):
         Returns:
             LanguageConfig object with language code and optional STT/LLM overrides
         """
-        language_code = normalize_language_code_for_providers(
-            raw.get("languageCode", DEFAULT_LANGUAGE_CODE)
+        # The backend sends the active BCP-47 code under "languageCode", but it
+        # is added to the scenario section *conditionally* — fall back to the
+        # always-present "language" field before defaulting, so a non-English
+        # session never silently collapses to en-IN. (An empty string also
+        # falls through, since normalize_*() would otherwise treat it as the
+        # default.)
+        raw_language_code = (
+            raw.get("languageCode") or raw.get("language") or DEFAULT_LANGUAGE_CODE
+        )
+        language_code = normalize_language_code_for_providers(raw_language_code)
+        # WARNING on purpose: a temporary diagnostic that must appear even when
+        # LOG_LEVEL=WARNING. Downgrade/remove once the language flow is verified.
+        logger.warning(
+            "[LANGUAGE] resolved language_code=%s (languageCode=%r language=%r "
+            "raw_keys=%s)",
+            language_code,
+            raw.get("languageCode"),
+            raw.get("language"),
+            list(raw.keys())[:30],
         )
         stt_config = raw.get("stt")
         llm_config = raw.get("llm")
