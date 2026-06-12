@@ -183,9 +183,9 @@ class TestGuardrailEventDetection:
         assert result is False
 
 
-class TestGuardrailKindRouting:
-    """SYSTEM guardrails must route to the dedicated coherence classifier;
-    USER (category) guardrails must keep using the shared classifier."""
+class TestGuardrailDetectorTypeRouting:
+    """COHERENCE guardrails must route to the dedicated coherence classifier;
+    CATEGORY (default) guardrails must keep using the shared classifier."""
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
@@ -213,13 +213,13 @@ class TestGuardrailKindRouting:
         return [c.args[0] for c in mock_lf.call_args_list]
 
     @pytest.mark.asyncio
-    async def test_system_kind_uses_coherence_prompts(self):
+    async def test_coherence_detector_uses_coherence_prompts(self):
         event = GuardrailEvent.create(
             event_id="guardrail-0",
             data=GuardrailData(
                 helper_dialogue="gibberish boundary", actor_dialogue="ask to repeat"
             ),
-            kind="SYSTEM",
+            detector_type="COHERENCE",
             score=0,
             visibility_type=VisibilityType.PASSIVE,
             emoji=None,
@@ -231,8 +231,8 @@ class TestGuardrailKindRouting:
         assert "events/guardrail_system" not in templates
 
     @pytest.mark.asyncio
-    async def test_user_kind_uses_shared_prompts(self):
-        event = make_guardrail_event()  # default kind == "USER"
+    async def test_category_detector_uses_shared_prompts(self):
+        event = make_guardrail_event()  # default detector_type == "CATEGORY"
         templates = await self._templates_used(event)
         assert "events/guardrail_system" in templates
         assert "events/guardrail_user" in templates

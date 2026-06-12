@@ -1,6 +1,7 @@
 """
-Manual recall + precision check for the SYSTEM coherence guard (kind="SYSTEM"),
-in Hindi, using the dedicated coherence classifier prompt + the live model.
+Manual recall + precision check for the coherence guard
+(detector_type="COHERENCE"), in Hindi, using the dedicated coherence classifier
+prompt + the live model.
 
 The scenario report's auto-counselor won't reliably produce off-topic turns
 (its goal-reminder framing keeps it on-topic), so we validate recall directly
@@ -124,7 +125,7 @@ async def main():
         ),
         model=model,
         llm_base_url=llm_base_url,
-        kind="SYSTEM",
+        detector_type="COHERENCE",
         score=0,
         visibility_type=VisibilityType.PASSIVE,
         emoji=None,
@@ -132,7 +133,7 @@ async def main():
     )
 
     print("\n" + "=" * 72)
-    print("COHERENCE GUARD — RECALL + PRECISION CHECK (Hindi, kind=SYSTEM)")
+    print("COHERENCE GUARD — RECALL + PRECISION CHECK (Hindi, COHERENCE)")
     print("=" * 72)
 
     passed = failed = 0

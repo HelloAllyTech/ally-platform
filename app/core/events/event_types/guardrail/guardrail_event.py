@@ -71,12 +71,13 @@ class GuardrailEvent(BaseEvent):
     # None means use OpenAI
     llm_base_url: Optional[str] = None
 
-    # USER (category) guardrails use the shared classifier and must fire on
-    # coherent, on-topic statements that match their category. SYSTEM guardrails
-    # (e.g. the STT Coherence Guard) have the OPPOSITE bias — they must NOT fire
-    # on coherent content — so they route to a dedicated, precision-biased
-    # classifier prompt with conversation context and few-shot examples.
-    kind: str = "USER"
+    # Which classifier this guardrail uses (independent of governance):
+    # - CATEGORY: shared classifier; fires on coherent content matching the
+    #   category (rude, directive, ...).
+    # - COHERENCE: dedicated, precision-biased classifier with recent
+    #   conversation context + few-shot; must NOT fire on coherent, on-topic
+    #   content (used by the STT Coherence Guard).
+    detector_type: str = "CATEGORY"
 
     # Shared client cache per base_url
     _CLIENTS: ClassVar[dict] = {}
@@ -145,9 +146,9 @@ class GuardrailEvent(BaseEvent):
         try:
             client = self._get_client(self.llm_base_url)
 
-            if self.kind == "SYSTEM":
-                # Coherence/system guardrails: dedicated precision-biased prompt
-                # that uses recent conversation context and few-shot examples.
+            if self.detector_type == "COHERENCE":
+                # Coherence guardrails: dedicated precision-biased prompt that
+                # uses recent conversation context and few-shot examples.
                 system_prompt = load_and_format(
                     "events/coherence_guardrail_system",
                     helper_dialogue=self.data.helper_dialogue,
