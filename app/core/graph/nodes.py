@@ -1531,7 +1531,12 @@ async def apply_voice_expressions(
         # unconditionally (takes precedence over PROSDY_SKIP_ENABLED and
         # text-enhancement providers).
         prompt_data = getattr(scenario, "prompt_data", None)
-        if prompt_data is not None and not getattr(prompt_data, "enable_prosody", True):
+        if settings.PROSDY_FORCE_SKIP:
+            skip_prosody = True
+            skip_reason = "PROSDY_FORCE_SKIP enabled (latency kill-switch)"
+        elif prompt_data is not None and not getattr(
+            prompt_data, "enable_prosody", True
+        ):
             skip_prosody = True
             skip_reason = "prosody disabled for simulation"
         elif not settings.PROSDY_SKIP_ENABLED:

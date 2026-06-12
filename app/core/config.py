@@ -233,6 +233,17 @@ class Settings(BaseSettings):
 
     # Speech prosody skip thresholds (reduce latency when under pressure)
     # When skipped, TTS keeps last params instead of running prosody LLM call
+    PROSDY_FORCE_SKIP: bool = Field(
+        default=False,
+        description=(
+            "Latency kill-switch: when True, prosody is skipped unconditionally "
+            "so the (streamed) generate_response reply goes straight to TTS "
+            "instead of waiting on the prosody LLM call. Trades voice "
+            "expressiveness for the lowest voice-to-voice latency. Default False "
+            "(no change); flip to True in prod to A/B against the prosodyMs / "
+            "responseLatencyMs metrics."
+        ),
+    )
     PROSDY_SKIP_ENABLED: bool = Field(
         default=True,
         description=(
