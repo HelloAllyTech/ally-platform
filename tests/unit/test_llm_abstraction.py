@@ -36,6 +36,7 @@ class TestOpenAILLMClient:
         """Test successful OpenAILLMClient initialization."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -48,6 +49,7 @@ class TestOpenAILLMClient:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -58,6 +60,7 @@ class TestOpenAILLMClient:
         """Test OpenAILLMClient with Hindi language code."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -69,13 +72,41 @@ class TestOpenAILLMClient:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
         assert client.llm_instance == mock_llm_instance
 
     @pytest.mark.unit
     @patch("app.llms.openai.ChatOpenAI")
-    def test_openai_llm_client_custom_temperature(self, mock_chat_openai_class):
+    @patch("app.llms.openai.settings")
+    def test_openai_llm_client_streaming_enabled(
+        self, mock_settings, mock_chat_openai_class
+    ):
+        """STREAM_RESPONSE=True enables token streaming on the chat model."""
+        mock_settings.OPENAI_API_KEY = "test-api-key"
+        mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = True
+        mock_chat_openai_class.return_value = Mock()
+
+        OpenAILLMClient(model="gpt-4o-mini", language_code="en-IN")
+
+        mock_chat_openai_class.assert_called_once_with(
+            model="gpt-4o-mini",
+            temperature=0.7,
+            api_key="test-api-key",
+            timeout=30,
+            max_retries=1,
+            streaming=True,
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.openai.ChatOpenAI")
+    @patch("app.llms.openai.settings")
+    def test_openai_llm_client_custom_temperature(
+        self, mock_settings, mock_chat_openai_class
+    ):
         """Test OpenAILLMClient with custom temperature."""
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -92,6 +123,7 @@ class TestOpenAILLMClient:
             api_key="custom-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -126,6 +158,7 @@ class TestOpenAILLMClient:
         """Test OpenAILLMClient.from_config method."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -139,6 +172,7 @@ class TestOpenAILLMClient:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -151,6 +185,7 @@ class TestOpenAILLMClient:
         """Test OpenAILLMClient.from_config with nested config structure."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -165,6 +200,7 @@ class TestOpenAILLMClient:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
 
 
@@ -283,6 +319,7 @@ class TestOpenAILLMClientBaseUrl:
         """Test that base_url is passed through to ChatOpenAI."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_chat_openai_class.return_value = Mock()
 
         OpenAILLMClient(
@@ -297,6 +334,7 @@ class TestOpenAILLMClientBaseUrl:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
             base_url="http://localhost:11434/v1",
         )
 
@@ -309,6 +347,7 @@ class TestOpenAILLMClientBaseUrl:
         """Test that base_url with no API key uses placeholder."""
         mock_settings.OPENAI_API_KEY = None
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_chat_openai_class.return_value = Mock()
 
         client = OpenAILLMClient(
@@ -323,6 +362,7 @@ class TestOpenAILLMClientBaseUrl:
             api_key="not-needed",
             timeout=30,
             max_retries=1,
+            streaming=False,
             base_url="http://localhost:11434/v1",
         )
         assert client.llm_instance is not None
@@ -336,6 +376,7 @@ class TestOpenAILLMClientBaseUrl:
         """Test that when base_url is None it is not passed to ChatOpenAI."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_chat_openai_class.return_value = Mock()
 
         OpenAILLMClient(model="gpt-4o-mini", language_code="en-IN")
@@ -346,6 +387,7 @@ class TestOpenAILLMClientBaseUrl:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
 
     @pytest.mark.unit
@@ -355,6 +397,7 @@ class TestOpenAILLMClientBaseUrl:
         """Test that from_config extracts base_url from config dict."""
         mock_settings.OPENAI_API_KEY = "test-api-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_chat_openai_class.return_value = Mock()
 
         config = {
@@ -369,6 +412,7 @@ class TestOpenAILLMClientBaseUrl:
             api_key="test-api-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
             base_url="http://localhost:11434/v1",
         )
 
@@ -490,6 +534,7 @@ class TestLLMAbstractionIntegration:
         """Test complete LLM creation flow."""
         mock_settings.OPENAI_API_KEY = "test-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
@@ -504,6 +549,7 @@ class TestLLMAbstractionIntegration:
             api_key="test-key",
             timeout=30,
             max_retries=1,
+            streaming=False,
         )
 
     @pytest.mark.integration
@@ -513,6 +559,7 @@ class TestLLMAbstractionIntegration:
         """Test LLM creation with different language codes."""
         mock_settings.OPENAI_API_KEY = "test-key"
         mock_settings.LLM_TEMPERATURE = "0.7"
+        mock_settings.STREAM_RESPONSE = False
         mock_llm_instance = Mock()
         mock_chat_openai_class.return_value = mock_llm_instance
 
