@@ -101,6 +101,21 @@ class Settings(BaseSettings):
     )
     HUME_API_KEY: str = Field(...)
 
+    # Stream the agent's reply token-by-token to TTS instead of waiting for the
+    # full LLM response. The LiveKit LLMAdapter already streams (stream_mode=
+    # "messages"); the only missing piece is enabling streaming on the chat
+    # model. When True, TTS starts on the first tokens of generate_response —
+    # the single biggest voice-to-voice latency lever. Default False (no change);
+    # flip in dev to verify no double-speak, then A/B in prod.
+    STREAM_RESPONSE: bool = Field(
+        default=False,
+        description=(
+            "Enable token streaming of generate_response to TTS (sets "
+            "streaming=True on the response chat model). Cuts time-to-first-audio "
+            "from full-generation to first-token. Verify in dev before prod."
+        ),
+    )
+
     # Timeouts for LLM-bound turn-processing nodes. These prevent the LiveKit
     # agent from getting stuck in "thinking" state if an upstream provider
     # (OpenAI, Gemini, etc.) hangs indefinitely.

@@ -82,6 +82,10 @@ class OpenAILLMClient(BaseLLMClient):
             "api_key": self._api_key,
             "timeout": 30,
             "max_retries": 1,
+            # When enabled, ainvoke() streams tokens (via callbacks) so the
+            # LLMAdapter's stream_mode="messages" forwards them to TTS as they
+            # arrive — TTS starts on the first token instead of the full reply.
+            "streaming": settings.STREAM_RESPONSE,
         }
         if self._base_url:
             chat_kwargs["base_url"] = self._base_url

@@ -73,6 +73,9 @@ class GeminiLLMClient(BaseLLMClient):
         llm_kwargs = {
             "model": self._model,
             "temperature": self._temperature,
+            # Stream tokens to TTS via the LLMAdapter when enabled (see
+            # settings.STREAM_RESPONSE). Default False keeps current behavior.
+            "streaming": settings.STREAM_RESPONSE,
         }
 
         # Only pass google_api_key if we have one, otherwise let it use
