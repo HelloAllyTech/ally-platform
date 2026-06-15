@@ -101,14 +101,6 @@ def _prepare_event_context(
         room = config["configurable"].get("room")
         embedding_client = config["configurable"].get("embedding_client")
 
-    # Inject embedding client for SemanticSimilarityEvent
-    if embedding_client:
-        from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
-            SemanticSimilarityEvent,
-        )
-
-        SemanticSimilarityEvent._EMBEDDING_CLIENT = embedding_client
-
     logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
     return chat_messages, elapsed_time, live_score, orchestrator, room
 
@@ -908,12 +900,26 @@ async def detect_behaviors(
         logger.debug("No conversation messages, skipping behavior detection")
         return {"behavior_feedback_data": []}
 
-    # Detect all behavior instructions in parallel
-    behavior_feedback = await _detect_behavior_instructions(
-        scenario.behavior_instructions,
-        chat_messages,
-        prompt_data=scenario.prompt_data,
-    )
+    # Detect all behavior instructions in parallel.
+    # Node-level ceiling: per-behavior timeout is 10s, but with many behaviors
+    # queued behind the semaphore the node can run far longer. 15s covers two
+    # full batches of 8 concurrent behaviors; beyond that we return what we
+    # have so the fan-in sync node can unblock.
+    try:
+        behavior_feedback = await asyncio.wait_for(
+            _detect_behavior_instructions(
+                scenario.behavior_instructions,
+                chat_messages,
+                prompt_data=scenario.prompt_data,
+            ),
+            timeout=15.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "[detect_behaviors] node timed out after 15s — "
+            "returning empty behavior feedback so fan-in can proceed"
+        )
+        behavior_feedback = []
 
     # Accumulate behavior scores in ScoreKeeper
     if score_keeper and behavior_feedback:
