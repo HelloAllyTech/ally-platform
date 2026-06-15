@@ -5,22 +5,34 @@ import {
   MICROPHONE_AUDIO_SAMPLE_RATE,
   SCREEN_WIDTH,
 } from '@/constants/general';
+import {logger} from '@/utils';
 
 const BAR_WIDTH = 2.5;
 const BAR_MARGIN = 2;
 export const NUM_BARS = Math.floor(SCREEN_WIDTH / (BAR_WIDTH + BAR_MARGIN));
 
-// Decodes base64 to Uint8Array
+// Decodes base64 to Uint8Array.
+// Runs on every audio frame from a native event callback, so it must never
+// throw: a strict `atob` rejects malformed/partial chunks and `Buffer` may be
+// absent on some Hermes builds. Either would escape the callback and crash the
+// app. On failure we return an empty array and let the caller skip the frame.
 export const base64ToUint8Array = (base64: string): Uint8Array => {
-  const binary = globalThis.atob
-    ? globalThis.atob(base64)
-    : Buffer.from(base64, 'base64').toString('binary');
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    const decode = globalThis.atob;
+    const binary =
+      typeof decode === 'function'
+        ? decode(base64)
+        : Buffer.from(base64, 'base64').toString('binary');
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  } catch (error) {
+    logger.error(`base64ToUint8Array decode failed: ${error}`);
+    return new Uint8Array(0);
   }
-  return bytes;
 };
 
 // Maps Exotel audio data to normalized amplitudes for the waveform

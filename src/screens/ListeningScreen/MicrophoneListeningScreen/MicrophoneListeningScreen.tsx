@@ -275,7 +275,7 @@ export const MicrophoneListeningScreen = () => {
     }
   }, [isWebMicrophoneMode, setDisconnectedType]);
 
-  const {emitSocketEvent} = useSocketConnection({
+  const {emitSocketEvent, isConnected} = useSocketConnection({
     path: env.MICROPHONE_SOCKET_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
@@ -290,7 +290,11 @@ export const MicrophoneListeningScreen = () => {
         !isCallPausedRef.current &&
         !isWebMicrophoneMode &&
         !isWebMicrophoneModeRef.current &&
-        chatIdRef.current
+        chatIdRef.current &&
+        // Drop frames while disconnected: emitting buffers them in socket.io's
+        // in-memory sendBuffer, which grows unbounded and OOM-crashes long
+        // sessions, and replays stale audio on reconnect.
+        isConnected()
       ) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
@@ -298,7 +302,7 @@ export const MicrophoneListeningScreen = () => {
         });
       }
     },
-    [emitSocketEvent, isWebMicrophoneMode],
+    [emitSocketEvent, isConnected, isWebMicrophoneMode],
   );
 
   // Live audio stream

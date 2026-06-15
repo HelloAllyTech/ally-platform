@@ -104,6 +104,9 @@ export const useSocket = ({
       socketRef.current.disconnect();
       socketRef.current = null;
     }
+    // Reset so the next connect() (e.g. on foreground/refocus) starts fresh.
+    // Otherwise the cumulative cap permanently disables reconnection mid-session.
+    connectionAttemptsRef.current = 0;
   }, []);
 
   const sendMessage = useCallback((message: string) => {

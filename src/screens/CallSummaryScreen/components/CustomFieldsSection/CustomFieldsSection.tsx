@@ -55,7 +55,9 @@ const MultiSelectModal: React.FC<MultiSelectModalProps> = ({
 
   const toggle = (option: string) => {
     setLocalSelected(prev =>
-      prev.includes(option) ? prev.filter(o => o !== option) : [...prev, option],
+      prev.includes(option)
+        ? prev.filter(o => o !== option)
+        : [...prev, option],
     );
   };
 
@@ -108,12 +110,17 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
 
   const sectionDefs = definitions.filter(d => d.sectionKey === sectionKey);
 
-  const canEditField = useCallback((def: CustomFieldDefinition) => {
-    if (def.editPermission === CustomFieldEditPermission.BOTH) return true;
-    if (def.editPermission === CustomFieldEditPermission.ADMIN_ONLY) return isAdmin;
-    if (def.editPermission === CustomFieldEditPermission.COUNSELLOR_ONLY) return isCounsellorForCall;
-    return false;
-  }, [isAdmin, isCounsellorForCall]);
+  const canEditField = useCallback(
+    (def: CustomFieldDefinition) => {
+      if (def.editPermission === CustomFieldEditPermission.BOTH) return true;
+      if (def.editPermission === CustomFieldEditPermission.ADMIN_ONLY)
+        return isAdmin;
+      if (def.editPermission === CustomFieldEditPermission.COUNSELLOR_ONLY)
+        return isCounsellorForCall;
+      return false;
+    },
+    [isAdmin, isCounsellorForCall],
+  );
 
   if (sectionDefs.length === 0) return null;
 
@@ -140,28 +147,21 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
             );
 
           case CustomFieldType.NUMBER:
+            // Must render a real, wired input — the previous static <Text>
+            // meant typed numbers never reached onValueChange, so the edit
+            // never saved and the field appeared to revert to the old value.
             return (
-              <FieldRow
+              <EditableField
                 key={def.id}
+                fieldKey={def.id as any}
                 label={def.name}
-                value={value ?? '-'}
-                renderEdit={
-                  isEditing && fieldIsEditable
-                    ? () => (
-                        <FieldRow
-                          label=""
-                          value={value ?? ''}
-                          renderEdit={() => (
-                            <Text
-                              style={styles.inlineInput}
-                              suppressHighlighting>
-                              {value ?? ''}
-                            </Text>
-                          )}
-                        />
-                      )
-                    : undefined
-                }
+                value={value}
+                onChangeText={text => onValueChange(def.id, text || null)}
+                canEdit={fieldIsEditable}
+                isEditing={isEditing}
+                isEnhancing={false}
+                placeholder="-"
+                keyboardType="numeric"
               />
             );
 
@@ -203,7 +203,11 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
           case CustomFieldType.BOOLEAN: {
             const boolOptions = ['Yes', 'No'];
             const boolDisplay =
-              value === 'true' ? 'Yes' : value === 'false' ? 'No' : value ?? '-';
+              value === 'true'
+                ? 'Yes'
+                : value === 'false'
+                  ? 'No'
+                  : (value ?? '-');
             return (
               <FieldRow
                 key={def.id}
@@ -309,12 +313,6 @@ const styles = ScaledSheet.create({
   dropdownContainer: {
     flex: 1,
     maxWidth: '200@ms',
-  },
-  inlineInput: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    flex: 1,
-    color: colors.ds.typography.highEmphasis,
   },
   multiSelectTrigger: {
     flex: 1,
