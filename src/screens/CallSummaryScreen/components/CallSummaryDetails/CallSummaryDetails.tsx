@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useEffect, useState} from 'react';
+import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -15,8 +15,8 @@ import {useCallSummaryForm, useTranslate} from '@/hooks';
 import {
   CustomFieldValue,
   useGetCustomFieldDefinitionsQuery,
-  useGetCustomFieldValuesQuery,
   useGetCustomFieldsEnabledQuery,
+  useGetCustomFieldValuesQuery,
   useUpsertCustomFieldValuesMutation,
 } from '@/services/customFieldsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -59,16 +59,21 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   const [customLocalValues, setCustomLocalValues] = useState<
     Record<string, string | null>
   >({});
+  const seededChatIdRef = useRef<number | null>(null);
 
+  // Seed local edit state once per chat. Re-seeding on every customFieldValues
+  // change would clobber the user's in-progress edits: a background refetch
+  // resets typed values back to the stale server value before the user saves.
   useEffect(() => {
-    if (customFieldValues) {
+    if (customFieldValues && seededChatIdRef.current !== chatId) {
       const initial: Record<string, string | null> = {};
       customFieldValues.forEach((f: CustomFieldValue) => {
         initial[f.fieldDefinitionId] = f.value ?? null;
       });
       setCustomLocalValues(initial);
+      seededChatIdRef.current = chatId ?? null;
     }
-  }, [customFieldValues]);
+  }, [customFieldValues, chatId]);
 
   const handleCustomFieldChange = useCallback(
     (fieldDefinitionId: string, value: string | null) => {
@@ -81,9 +86,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
     async (sectionKey: string) => {
       if (!chatId || !customFieldDefs || !customFieldValues) return;
       const sectionDefIds = new Set(
-        customFieldDefs
-          .filter(d => d.sectionKey === sectionKey)
-          .map(d => d.id),
+        customFieldDefs.filter(d => d.sectionKey === sectionKey).map(d => d.id),
       );
       const changed = customFieldValues
         .filter(
@@ -99,7 +102,13 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         await upsertCustomFieldValues({chatId, values: changed});
       }
     },
-    [chatId, customFieldDefs, customFieldValues, customLocalValues, upsertCustomFieldValues],
+    [
+      chatId,
+      customFieldDefs,
+      customFieldValues,
+      customLocalValues,
+      upsertCustomFieldValues,
+    ],
   );
 
   const [expanded, setExpanded] = useState(() =>
@@ -201,7 +210,17 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         </View>
       );
     },
-    [expanded, isEditing, handleSubmit, toggleSection, visibleFields, customFieldDefs, customLocalValues, handleCustomFieldChange, handleCustomFieldSave],
+    [
+      expanded,
+      isEditing,
+      handleSubmit,
+      toggleSection,
+      visibleFields,
+      customFieldDefs,
+      customLocalValues,
+      handleCustomFieldChange,
+      handleCustomFieldSave,
+    ],
   );
 
   if (isLoadingSummary) {

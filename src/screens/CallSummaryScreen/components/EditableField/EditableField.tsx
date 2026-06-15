@@ -1,5 +1,11 @@
 import React, {useEffect, useRef} from 'react';
-import {ScrollView, Text, TextInput, View} from 'react-native';
+import {
+  KeyboardTypeOptions,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,6 +27,7 @@ interface EditableFieldProps {
   canEdit: boolean;
   isEditing: boolean;
   isEnhancing: boolean;
+  keyboardType?: KeyboardTypeOptions;
 }
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -34,6 +41,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   canEdit,
   isEditing,
   isEnhancing,
+  keyboardType = 'default',
 }) => {
   const inputRef = useRef<TextInput>(null);
   const opacity = useSharedValue(1);
@@ -76,6 +84,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           value={value || ''}
           onChangeText={onChangeText}
           placeholderTextColor={colors.lightGray3}
+          keyboardType={keyboardType}
           multiline
           scrollEnabled
         />

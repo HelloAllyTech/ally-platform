@@ -61,7 +61,7 @@ export const useSocketConnection = ({
 }: UseSocketConnectionOptions) => {
   const appState = useRef(AppState.currentState);
 
-  const {connect, disconnect, emitSocketEvent} = useSocket({
+  const {connect, disconnect, emitSocketEvent, isConnected} = useSocket({
     path,
     userId,
     eventCallbacks,
@@ -105,5 +105,6 @@ export const useSocketConnection = ({
 
   return {
     emitSocketEvent,
+    isConnected,
   };
 };
