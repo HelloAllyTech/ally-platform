@@ -112,6 +112,12 @@ class AgentWorker:
             model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
         )
         logger.debug("Created shared embedding client for semantic similarity events")
+        # Set once at session start so per-turn _prepare_event_context doesn't
+        # mutate a class attribute on every graph invocation.
+        from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
+            SemanticSimilarityEvent,
+        )
+        SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
 
         # Parse metadata
         rm_md_envelope = parse_room_metadata(
