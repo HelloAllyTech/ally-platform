@@ -2,6 +2,7 @@ from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.config import settings
 from app.core.graph.nodes import (
     clear_events_and_detected_data,
     detect_behaviors,
@@ -156,10 +157,18 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge(START, "process_events")
     graph.add_edge(START, "retrieve_knowledge")
 
-    # All three paths converge at sync_events_and_behaviors_node
-    graph.add_edge("detect_behaviors", "sync_events_and_behaviors_node")
+    # process_events and retrieve_knowledge always gate the response (the reply
+    # consumes branching instructions + retrieved_context).
     graph.add_edge("process_events", "sync_events_and_behaviors_node")
     graph.add_edge("retrieve_knowledge", "sync_events_and_behaviors_node")
+
+    if settings.BEHAVIORS_OFF_GATE:
+        # Behaviors only drive scoring + UI feedback (not the reply text), so
+        # run them parallel to the response and join at send_event_feedback —
+        # off the voice-to-voice critical path. See BEHAVIORS_OFF_GATE.
+        graph.add_edge("detect_behaviors", "send_event_feedback")
+    else:
+        graph.add_edge("detect_behaviors", "sync_events_and_behaviors_node")
 
     # Continue with sequential flow
     graph.add_edge("sync_events_and_behaviors_node", "resolve_branching_instruction")
