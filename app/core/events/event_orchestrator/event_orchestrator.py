@@ -3,10 +3,13 @@ Expression registry for tracking event states and evaluating combination express
 Includes built-in scheduling for time-based events (no external registry needed).
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple
 
 from livekit import rtc
+
+from app.core.config import settings
 
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
@@ -65,6 +68,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         self._event_map = {e.event_id: e for e in self.events}
         self.event_registry: Dict[str, EventRegistryEntry] = {}
         self.expression_list: List[ExpressionListEntry] = []
+        # Strong refs to in-flight fire-and-forget side-effect tasks (e.g. the
+        # async SQS send when ORCHESTRATION_ASYNC_SQS is on) so they are not
+        # garbage-collected mid-flight ("Task was destroyed but it is pending").
+        self._background_tasks: Set[asyncio.Task] = set()
         # Time event scheduler for managing asyncio timers
         self._scheduler = TimeEventScheduler()
         # Track events that have been sent (for events with trigger_multiple=False)
@@ -493,6 +500,29 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             branching_and_feedback_data,
         )
 
+    def _spawn_background(self, coro, label: str) -> None:
+        """Run a side-effect coroutine off the critical path.
+
+        Keeps a strong reference to the task until it finishes (so it is not
+        GC'd while pending) and logs any exception instead of letting it escape
+        unobserved. Used for fire-and-forget SQS sends; the caller does not
+        await the result.
+        """
+        task = asyncio.ensure_future(coro)
+        self._background_tasks.add(task)
+
+        def _on_done(t: asyncio.Task) -> None:
+            self._background_tasks.discard(t)
+            if t.cancelled():
+                return
+            exc = t.exception()
+            if exc is not None:
+                logger.error(
+                    "[orchestrate_events] background %s failed: %r", label, exc
+                )
+
+        task.add_done_callback(_on_done)
+
     async def orchestrate_events(
         self,
         room: Optional[rtc.Room] = None,
@@ -541,7 +571,17 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # UI events are handled via branching_and_feedback_data in generate_response
         # In report mode, skip SQS entirely -- results are delivered via webhook
         if not self.is_report_mode:
-            await self._send_events_to_core(events_to_process, room)
+            if settings.ORCHESTRATION_ASYNC_SQS:
+                # Latency lever: the SQS round-trip is on the fan-in critical
+                # path before generate_response, but the spoken reply does not
+                # depend on it. Fire it off so orchestrate_events can return the
+                # branching data immediately. See ORCHESTRATION_ASYNC_SQS.
+                self._spawn_background(
+                    self._send_events_to_core(events_to_process, room),
+                    label="send_events_to_core",
+                )
+            else:
+                await self._send_events_to_core(events_to_process, room)
 
         # Commit event scores to ScoreKeeper
         await self._update_event_score(events_to_process)

@@ -144,6 +144,21 @@ class Settings(BaseSettings):
             "returned so generate_response still fires."
         ),
     )
+    ORCHESTRATION_ASYNC_SQS: bool = Field(
+        default=False,
+        description=(
+            "Latency lever: send detected events to Core (SQS) as a "
+            "fire-and-forget background task instead of awaiting them inside "
+            "process_events. The SQS round-trip is on the fan-in critical path "
+            "before generate_response, but the spoken reply does not depend on "
+            "it. Branching data, score commit and termination handling stay "
+            "synchronous. Trade-off: backend event/score updates land a moment "
+            "later and a send still in flight can be dropped on abrupt worker "
+            "shutdown (termination events are unaffected — already deferred to "
+            "the shutdown handler). Default False; flip in dev, then A/B in "
+            "prod against orchestrationMs / responseLatencyMs."
+        ),
+    )
 
     LLM_TEMPERATURE: str = Field(...)
 
