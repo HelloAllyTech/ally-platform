@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional
+from typing import ClassVar, List, Optional, Sequence, Set
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -11,9 +11,11 @@ from app.core.config import settings
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.binary_classifier.prompts import (
+    get_batch_binary_classifier_prompt,
     get_binary_classifier_prompt,
 )
 from app.core.events.event_types.binary_classifier.schemas import (
+    BatchClassificationResultStrOp,
     BinaryClassifierData,
     ClassificationResultStrOp,
 )
@@ -67,6 +69,49 @@ class BinaryClassifierEvent(BaseEvent):
             return False
 
         return await self._classify(last.content)
+
+    @classmethod
+    async def classify_batch(
+        cls, events: Sequence["BinaryClassifierEvent"], text: str
+    ) -> Set[str]:
+        """Classify `text` against every event's class in a SINGLE LLM call.
+
+        Returns the set of event_ids whose class matched. Raises on any API /
+        parsing failure so the caller can fall back to per-event detection.
+        Assumes all `events` share the same model (the caller groups by model).
+        """
+        if not text.strip() or not events:
+            return set()
+
+        client = cls._get_client()
+        system_prompt, user_prompt = get_batch_binary_classifier_prompt(
+            [(e.event_id, e.data) for e in events], text
+        )
+        messages = [
+            ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
+            ChatCompletionUserMessageParam(content=user_prompt, role="user"),
+        ]
+
+        completion = await client.beta.chat.completions.parse(
+            model=events[0].model,
+            messages=messages,
+            response_format=BatchClassificationResultStrOp,
+        )
+        parsed = completion.choices[0].message.parsed
+
+        requested_ids = {e.event_id for e in events}
+        matched = {
+            item.event_id
+            for item in parsed.results
+            if item.is_class and item.event_id in requested_ids
+        }
+        logger.info(
+            "Batch binary classification: %d classes, %d matched (text='%s...')",
+            len(events),
+            len(matched),
+            text[:50],
+        )
+        return matched
 
     async def _classify(self, text: str) -> bool:
         """

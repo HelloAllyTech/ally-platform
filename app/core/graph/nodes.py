@@ -7,8 +7,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.config import settings
-from app.core.constants import DEFAULT_LANGUAGE_CODE
+from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType
 from app.core.events.base import BaseEvent
+from app.core.events.event_types.binary_classifier.binary_classifier_event import (
+    BinaryClassifierEvent,
+)
 from app.core.events.handlers import send_event_to_ui
 from app.core.events.schemas import CoreEventMessageType, CustomUIEventMessageType
 from app.core.graph.instrumentation import (
@@ -199,20 +202,88 @@ async def _detect_events(
             f"Event optimization: Skipped {skipped_count} events (outside windows)."
         )
 
-    # Detect all eligible events in parallel
+    async def run_binary_batch(group: list[BaseEvent]) -> list[BaseEvent]:
+        """Classify a group of BinaryClassifier events in one LLM call.
+
+        Falls back to per-event detection on any failure/timeout so detection
+        never regresses. Honors the same semaphore as per-event detection.
+        """
+        last = chat_messages[-1] if chat_messages else None
+        if last is None or last.role.lower() != "counselor":
+            return []
+        _start = datetime.now(timezone.utc)
+        try:
+            async with semaphore:
+                matched = await asyncio.wait_for(
+                    BinaryClassifierEvent.classify_batch(group, last.content),
+                    timeout=10.0,
+                )
+            detected = [e for e in group if e.event_id in matched]
+        except Exception as e:
+            logger.warning(
+                "[EVENT_BATCH] batch classify of %d events failed (%s); "
+                "falling back to per-event",
+                len(group),
+                e,
+            )
+            results = await asyncio.gather(
+                *[detect_single_event(e) for e in group]
+            )
+            detected = [r for r in results if r is not None]
+        finally:
+            _ms = (datetime.now(timezone.utc) - _start).total_seconds() * 1000
+            logger.debug(
+                "[EVENT_BATCH] classified %d binary events in %.1fms",
+                len(group),
+                _ms,
+            )
+        return detected
+
+    # When batching is enabled, collapse BinaryClassifier events that share a
+    # model into a single LLM call; everything else keeps its per-event task.
+    batch_groups: list[list[BaseEvent]] = []
+    per_event_events = eligible_events
+    if settings.BATCH_EVENT_CLASSIFIERS:
+        binary_events = [
+            e
+            for e in eligible_events
+            if e.detection_type == DetectionType.BINARY_CLASSIFIER
+        ]
+        if len(binary_events) >= 2:
+            by_model: dict[str, list[BaseEvent]] = {}
+            for e in binary_events:
+                by_model.setdefault(getattr(e, "model", ""), []).append(e)
+            batch_groups = [g for g in by_model.values() if len(g) >= 2]
+            batched_ids = {e.event_id for g in batch_groups for e in g}
+            per_event_events = [
+                e for e in eligible_events if e.event_id not in batched_ids
+            ]
+
+    # Detect events in parallel: per-event tasks + one task per batch group.
     detection_tasks = [
-        asyncio.create_task(detect_single_event(event)) for event in eligible_events
+        asyncio.create_task(detect_single_event(event))
+        for event in per_event_events
+    ]
+    detection_tasks += [
+        asyncio.create_task(run_binary_batch(group)) for group in batch_groups
     ]
 
     detected_events_with_timestamps = []
 
     if detection_tasks:
-        logger.debug(f"Detecting {len(detection_tasks)} events in parallel")
+        logger.debug(
+            "Detecting %d events (%d batched binary groups) in parallel",
+            len(per_event_events),
+            len(batch_groups),
+        )
         for t in asyncio.as_completed(detection_tasks):
             result = await t
-            if result is not None:
+            if result is None:
+                continue
+            events_found = result if isinstance(result, list) else [result]
+            for ev in events_found:
                 timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-                detected_events_with_timestamps.append((timestamp, result))
+                detected_events_with_timestamps.append((timestamp, ev))
 
     logger.debug(f"Detected {len(detected_events_with_timestamps)} events")
     new_events = [event for _, event in detected_events_with_timestamps]

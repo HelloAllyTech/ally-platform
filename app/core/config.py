@@ -235,6 +235,20 @@ class Settings(BaseSettings):
             "no cache, no timeout (old behavior)."
         ),
     )
+    BATCH_EVENT_CLASSIFIERS: bool = Field(
+        default=False,
+        description=(
+            "Latency lever: when 2+ BinaryClassifier events are eligible on a "
+            "turn, classify the counselor message against all their classes in "
+            "a SINGLE LLM call (one label per event_id) instead of one call per "
+            "event. Collapses N round-trips on the process_events critical path "
+            "into 1. Other event types keep their per-event path; any batch "
+            "error/timeout falls back to per-event detection so behavior never "
+            "regresses. Default False; flip in dev and A/B the detection rate "
+            "against the per-event path before prod (one combined prompt can "
+            "classify slightly differently than isolated prompts)."
+        ),
+    )
     EVENT_DETECTION_CONCURRENCY_LIMIT: int = Field(
         default=8,
         description=(

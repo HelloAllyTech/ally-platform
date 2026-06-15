@@ -1,6 +1,9 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
-from app.core.events.event_types.binary_classifier.schemas import Example
+from app.core.events.event_types.binary_classifier.schemas import (
+    BinaryClassifierData,
+    Example,
+)
 from app.prompts.resolver import load_and_format
 
 
@@ -52,6 +55,39 @@ def get_binary_classifier_prompt(
         examples_block=examples_block,
     )
 
+    user_prompt = load_and_format(
+        "events/binary_classifier_user",
+        message=message,
+    )
+
+    return system_prompt, user_prompt
+
+
+def get_batch_binary_classifier_prompt(
+    items: Sequence[Tuple[str, BinaryClassifierData]],
+    message: str,
+) -> Tuple[str, str]:
+    """Build (system_prompt, user_prompt) for classifying `message` against
+    several binary-classifier classes in a single call.
+
+    Args:
+        items: (event_id, BinaryClassifierData) pairs — one per class.
+        message: The counselor text to classify against every class.
+    """
+    blocks = []
+    for event_id, data in items:
+        examples_block = _build_examples_block(
+            data.positive_examples, data.negative_examples
+        )
+        blocks.append(
+            f'- id="{event_id}" class="{data.class_name}"{examples_block}'
+        )
+    classes_block = "\n".join(blocks)
+
+    system_prompt = load_and_format(
+        "events/binary_classifier_batch_system",
+        classes_block=classes_block,
+    )
     user_prompt = load_and_format(
         "events/binary_classifier_user",
         message=message,

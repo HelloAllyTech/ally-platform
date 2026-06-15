@@ -8,6 +8,16 @@ class ClassificationResultStrOp(BaseModel):
     is_class: bool
 
 
+# Structured output for batched classification: one entry per event/class.
+class BatchClassificationItem(BaseModel):
+    event_id: str
+    is_class: bool
+
+
+class BatchClassificationResultStrOp(BaseModel):
+    results: List[BatchClassificationItem]
+
+
 class Example(BaseModel):
     text: str
 
