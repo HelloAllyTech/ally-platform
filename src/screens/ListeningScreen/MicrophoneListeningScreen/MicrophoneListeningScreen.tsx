@@ -275,7 +275,7 @@ export const MicrophoneListeningScreen = () => {
     }
   }, [isWebMicrophoneMode, setDisconnectedType]);
 
-  const {emitSocketEvent, isConnected} = useSocketConnection({
+  const {emitSocketEvent} = useSocketConnection({
     path: env.MICROPHONE_SOCKET_PATH,
     userId: userData?.id,
     eventCallbacks: socketEventCallbacks,
@@ -286,15 +286,17 @@ export const MicrophoneListeningScreen = () => {
   const handleAudioData = useCallback(
     (base64Wav: string) => {
       latestAmplitudesRef.current = recorderAudioToAmplitudes(base64Wav);
+      // Always emit while a chat is active. socket.io buffers frames when the
+      // socket is transiently disconnected and flushes them on reconnect, so
+      // audio survives connection blips. Do NOT gate this on a live-connected
+      // check: socket.connected dips false during the initial connect window
+      // and transport upgrades, and gating there silently drops audio, leaving
+      // the backend with an empty transcript and the summary stuck "processing".
       if (
         !isCallPausedRef.current &&
         !isWebMicrophoneMode &&
         !isWebMicrophoneModeRef.current &&
-        chatIdRef.current &&
-        // Drop frames while disconnected: emitting buffers them in socket.io's
-        // in-memory sendBuffer, which grows unbounded and OOM-crashes long
-        // sessions, and replays stale audio on reconnect.
-        isConnected()
+        chatIdRef.current
       ) {
         emitSocketEvent(SocketEvent.AUDIO_MESSAGE, {
           audioData: base64Wav,
@@ -302,7 +304,7 @@ export const MicrophoneListeningScreen = () => {
         });
       }
     },
-    [emitSocketEvent, isConnected, isWebMicrophoneMode],
+    [emitSocketEvent, isWebMicrophoneMode],
   );
 
   // Live audio stream
