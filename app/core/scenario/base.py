@@ -144,6 +144,19 @@ class PromptData(BaseModel):
             "compatibility with existing scenarios."
         ),
     )
+    filler_enabled: bool = Field(
+        default=False,
+        description=(
+            "Per-simulation toggle (Studio: fillerEnabled) for the "
+            "thinking-filler back-channel — a short acknowledgement played the "
+            "instant the user stops speaking, to mask turn latency. Default "
+            "False (opt-in) so existing scenarios are unchanged. The filler is "
+            "excluded from response_latency_ms and from the transcript. When "
+            "enabled, filler phrases come from the scenario's existing "
+            "allowed_fillers (Studio allowedFillerWords), falling back to "
+            "language-aware defaults."
+        ),
+    )
     selected_main_prompt_code: Optional[str] = Field(
         default=None,
         description=(
@@ -529,6 +542,7 @@ class Scenario(BaseModel):
                     if prompt_data_dict.get("enableProsody") is None
                     else bool(prompt_data_dict.get("enableProsody"))
                 ),
+                "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "selected_main_prompt_code": prompt_data_dict.get(
                     "selectedMainPromptCode"
                 ),

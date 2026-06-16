@@ -255,7 +255,12 @@ class AgentWorker:
         """Register room, session, and shutdown callbacks."""
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
-            create_conversation_handler(self.ctx.room.name, self.joined_iso)
+            create_conversation_handler(
+                self.ctx.room.name,
+                self.joined_iso,
+                session=self.session,
+                scenario=self.scenario,
+            )
         )
         self.session.on("conversation_item_added")(conversation_handler)
 

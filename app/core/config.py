@@ -160,6 +160,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Perceived-latency lever: play a short thinking back-channel ("Mm-hmm.",
+    # "Right...") the instant the user stops speaking, while the real reply is
+    # still generating. Masks the voice-to-voice gap without changing the
+    # measured response_latency_ms (the filler is excluded from that metric and
+    # from the transcript). This is the GLOBAL kill-switch; the feature is also
+    # gated per-scenario by prompt_data.filler_enabled (Studio toggle, default
+    # off), so platform-wide it stays off until a scenario opts in. Set False to
+    # disable everywhere regardless of scenario config.
+    FILLER_GLOBALLY_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for the thinking-filler back-channel. When "
+            "False, no filler plays even if a scenario sets fillerEnabled. "
+            "Per-scenario opt-in is prompt_data.filler_enabled (default off)."
+        ),
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(

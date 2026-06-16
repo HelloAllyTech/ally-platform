@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import random
 from datetime import datetime
 from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Set
 
@@ -66,7 +67,9 @@ async def send_event_to_queue(event_data: str) -> None:
         logger.error(f"Failed to send event to queue: {e}")
 
 
-def create_conversation_handler(room_id: str, joined_iso: str):
+def create_conversation_handler(
+    room_id: str, joined_iso: str, session=None, scenario=None
+):
     """
     Factory function to create conversation event handler with deduplication.
 
@@ -77,6 +80,10 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     Args:
         room_id: LiveKit room identifier
         joined_iso: ISO timestamp when agent joined
+        session: Optional AgentSession — required to play thinking fillers
+            (perceived-latency back-channel). When None, fillers are disabled.
+        scenario: Optional Scenario — used to resolve whether fillers are
+            enabled and which phrases to use (language-aware).
 
     Returns:
         Tuple of (conversation_handler, state_handlers, cleanup_function):
@@ -85,6 +92,42 @@ def create_conversation_handler(room_id: str, joined_iso: str):
         - cleanup_function: Function to clean up internal state (call on shutdown)
     """
     seen_utterances = set()
+
+    # Thinking-filler state. _filler_phrases is empty when the feature is off
+    # (global kill-switch, scenario opt-out, or no session) — that's the only
+    # gate the handlers check. _filler_in_flight marks that a filler's audio is
+    # the NEXT agent "speaking" transition, so it can be excluded from
+    # response_latency_ms (the filler must not be mistaken for the real reply).
+    _filler_phrases: list[str] = []
+    _filler_in_flight: list[bool] = [False]
+    if session is not None and scenario is not None:
+        try:
+            from app.core.livekit.fillers import resolve_filler_phrases
+
+            _filler_phrases = resolve_filler_phrases(scenario)
+        except Exception as e:  # noqa: BLE001 - fillers must never break a session
+            logger.warning("[FILLER] could not resolve filler phrases: %s", e)
+    if _filler_phrases:
+        logger.info(
+            "[FILLER] enabled for room=%s (%d phrases)", room_id, len(_filler_phrases)
+        )
+
+    def _maybe_play_filler() -> None:
+        """Play a short back-channel to mask pipeline latency (best-effort).
+
+        Kept out of the transcript (add_to_chat_ctx=False) and interruptible so
+        the real reply (or the user resuming) takes over cleanly. Excluded from
+        response_latency_ms via _filler_in_flight (see on_agent_state_changed).
+        """
+        if not _filler_phrases or _filler_in_flight[0]:
+            return
+        try:
+            phrase = random.choice(_filler_phrases)
+            session.say(phrase, allow_interruptions=True, add_to_chat_ctx=False)
+            _filler_in_flight[0] = True
+            logger.info("[FILLER] played phrase=%r room=%s", phrase, room_id)
+        except Exception as e:  # noqa: BLE001 - fillers must never break a session
+            logger.warning("[FILLER] failed to play filler room=%s: %s", room_id, e)
 
     # Track when agent/user most recently started speaking.
     # These are consumed (reset to None) when conversation_item_added fires.
@@ -122,6 +165,20 @@ def create_conversation_handler(room_id: str, joined_iso: str):
 
     def on_agent_state_changed(event: AgentStateChangedEvent):
         if event.new_state == "speaking":
+            # The thinking-filler also makes the agent enter "speaking". Do NOT
+            # treat it as the real reply: skip latency + transcript bookkeeping
+            # for this transition and clear the flag. The real reply is the next
+            # "speaking" transition, which is measured normally. This keeps
+            # response_latency_ms tracking true pipeline latency, not the filler.
+            if _filler_in_flight[0]:
+                _filler_in_flight[0] = False
+                logger.info(
+                    "[FILLER] filler speaking (excluded from response_latency) "
+                    "room=%s ts=%.3f",
+                    room_id,
+                    event.created_at,
+                )
+                return
             _agent_speaking_start[0] = event.created_at
             logger.debug(f"Agent started speaking at {event.created_at}")
             # Compute response latency if we have a matching user_speech_end
@@ -152,6 +209,10 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     def on_user_state_changed(event: UserStateChangedEvent):
         if event.new_state == "speaking":
             _user_speaking_start[0] = event.created_at
+            # User (re)started speaking — cancel any pending filler accounting so
+            # a filler that never reached playout doesn't skip the next real
+            # reply's latency measurement.
+            _filler_in_flight[0] = False
             logger.debug(f"User started speaking at {event.created_at}")
         else:
             # User left "speaking" — endpointing fired (or interim ended).
@@ -169,6 +230,9 @@ def create_conversation_handler(room_id: str, joined_iso: str):
                 turn_metrics.note_user_speech_end(room_id, event.created_at)
             except Exception:  # noqa: BLE001 - metrics must never break a turn
                 logger.exception("[turn-metrics] note_user_speech_end failed")
+            # Perceived-latency lever: speak a short back-channel now, while the
+            # graph generates the real reply. No-op unless fillers are enabled.
+            _maybe_play_filler()
 
     # ---- main conversation handler ----
 
