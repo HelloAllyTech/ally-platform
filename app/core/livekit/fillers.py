@@ -14,12 +14,12 @@ Two principles drive the defaults here:
     non-lexical vocalizations ("Mm.", "Hmm...") which read as natural thinking
     sounds across languages and can't be "wrong".
 
-Studio toggles the feature per scenario (``fillerEnabled``). When the scenario
-already carries filler words (``allowed_fillers``, from Studio's
-``allowedFillerWords``), those are used as the phrases; otherwise we fall back to
-the language defaults below. A global kill-switch
-(``settings.FILLER_GLOBALLY_ENABLED``) lets ops disable it platform-wide without
-a scenario edit.
+Studio toggles the feature per scenario (``fillerEnabled``); the phrases
+themselves are the purpose-built, language-aware back-channels defined below —
+deliberately NOT the scenario's ``allowed_fillers`` (those are in-speech
+discourse particles like "um"/"yaar" that read oddly as standalone thinking
+sounds). A global kill-switch (``settings.FILLER_GLOBALLY_ENABLED``) lets ops
+disable it platform-wide without a scenario edit.
 """
 
 from __future__ import annotations
@@ -59,8 +59,7 @@ def resolve_filler_phrases(scenario) -> List[str]:
     scenario), which the caller treats as "don't play a filler".
 
     Precedence: global kill-switch -> per-scenario ``filler_enabled`` ->
-    scenario's existing ``allowed_fillers`` (Studio allowedFillerWords) ->
-    language defaults -> neutral fallback.
+    language defaults (keyed by scenario language) -> neutral fallback.
     """
     if not getattr(settings, "FILLER_GLOBALLY_ENABLED", True):
         return []
@@ -71,14 +70,6 @@ def resolve_filler_phrases(scenario) -> List[str]:
 
     if not getattr(prompt_data, "filler_enabled", False):
         return []
-
-    # Reuse the scenario's existing Studio filler words when present (drop
-    # blanks). These are already language-appropriate per the active scenario.
-    allowed = getattr(prompt_data, "allowed_fillers", None)
-    if allowed:
-        cleaned = [p.strip() for p in allowed if isinstance(p, str) and p.strip()]
-        if cleaned:
-            return cleaned
 
     language_code = _scenario_language_code(scenario) or ""
     primary = language_code.split("-")[0].lower()

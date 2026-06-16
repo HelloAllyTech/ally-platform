@@ -152,9 +152,8 @@ class PromptData(BaseModel):
             "instant the user stops speaking, to mask turn latency. Default "
             "False (opt-in) so existing scenarios are unchanged. The filler is "
             "excluded from response_latency_ms and from the transcript. When "
-            "enabled, filler phrases come from the scenario's existing "
-            "allowed_fillers (Studio allowedFillerWords), falling back to "
-            "language-aware defaults."
+            "enabled, the agent plays purpose-built, language-aware back-channel "
+            "phrases (see app/core/livekit/fillers.py)."
         ),
     )
     selected_main_prompt_code: Optional[str] = Field(
