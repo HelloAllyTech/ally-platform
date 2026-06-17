@@ -113,7 +113,10 @@ export const SplashScreen: React.FC<
         displayBottomSheet();
       }
     } else if (isAuthenticated) {
-      if (permissions?.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)) {
+      // Bulk-created accounts must finish their profile before entering the app.
+      if (userData?.profileCompleted === false) {
+        navigation.replace(SCREEN_NAMES.COMPLETE_PROFILE);
+      } else if (permissions?.includes(USER_PERMISSIONS.VIEW_COUNSELOR_CHAT)) {
         checkCounselorChat();
       } else {
         navigation.replace(SCREEN_NAMES.CALL_LOG);
@@ -126,6 +129,7 @@ export const SplashScreen: React.FC<
     isUserLoading,
     isBottomSheetVisible,
     userData?.role,
+    userData?.profileCompleted,
     permissions,
   ]);
 

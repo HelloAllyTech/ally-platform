@@ -90,6 +90,7 @@ export const API_ROUTES = {
   },
   USERS: {
     ME: '/users/me',
+    COMPLETE_PROFILE: '/users/me/complete-profile',
     PROFILE_IMAGE_URL: '/users/profile-image-url',
     PROFILE_IMAGE: '/users/profile-image',
     LOGO_URL: '/users/tenant',

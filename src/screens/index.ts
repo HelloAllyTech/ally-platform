@@ -2,6 +2,7 @@ export {CallLogScreen} from './CallLog';
 export {ListeningScreen} from './ListeningScreen';
 export {SplashScreen} from './SplashScreen';
 export {SuspendedAccountScreen} from './SuspendedAccountScreen';
+export {CompleteProfileScreen} from './CompleteProfileScreen';
 export {CallSummaryScreen} from './CallSummaryScreen';
 export {UserAnalyticsScreen} from './UserAnalyticsScreen';
 export {BreathingScreen} from './BoxBreathingScreen';
