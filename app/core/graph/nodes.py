@@ -20,7 +20,6 @@ from app.core.graph.instrumentation import (
     instrumented_node,
     log_side_effect,
 )
-from app.core.metrics import turn_metrics
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -44,6 +43,7 @@ from app.core.graph.utils import (
     is_event_eligible,
 )
 from app.core.logger import logger
+from app.core.metrics import turn_metrics
 from app.core.queue import msg_event_queue
 from app.core.scenario.base import (
     Scenario,
@@ -218,9 +218,7 @@ async def _detect_events(
                 len(group),
                 e,
             )
-            results = await asyncio.gather(
-                *[detect_single_event(e) for e in group]
-            )
+            results = await asyncio.gather(*[detect_single_event(e) for e in group])
             detected = [r for r in results if r is not None]
         finally:
             _ms = (datetime.now(timezone.utc) - _start).total_seconds() * 1000
@@ -253,8 +251,7 @@ async def _detect_events(
 
     # Detect events in parallel: per-event tasks + one task per batch group.
     detection_tasks = [
-        asyncio.create_task(detect_single_event(event))
-        for event in per_event_events
+        asyncio.create_task(detect_single_event(event)) for event in per_event_events
     ]
     detection_tasks += [
         asyncio.create_task(run_binary_batch(group)) for group in batch_groups
@@ -401,9 +398,7 @@ async def _orchestrate_and_split_events(
             settings.ORCHESTRATION_TIMEOUT,
             len(new_events),
         )
-        turn_metrics.record(
-            get_room_id(), orchestration_ms=int(_orch_latency * 1000)
-        )
+        turn_metrics.record(get_room_id(), orchestration_ms=int(_orch_latency * 1000))
         return 0, [], []
 
     branching_data, non_branching_data = _split_events_by_type(all_feedback_data)
@@ -1061,6 +1056,17 @@ async def generate_response(
         or getattr(llm_instance, "model", None)
         or "unknown"
     )
+    # Generation config captured for drift-analytics attribution (provider /
+    # params that produced this turn). Read defensively off the client/instance.
+    _gen_config = {
+        "llm_provider": getattr(llm_client, "provider", None),
+        "temperature": getattr(llm_instance, "temperature", None),
+        "top_p": getattr(llm_instance, "top_p", None),
+        "max_tokens": (
+            getattr(llm_instance, "max_tokens", None)
+            or getattr(llm_instance, "max_output_tokens", None)
+        ),
+    }
     _llm_start = datetime.now(timezone.utc)
     logger.info(
         "[generate_response] llm_call_start model=%s timeout=%ss messages=%d",
@@ -1088,6 +1094,7 @@ async def generate_response(
             llm_model=llm_model_name,
             language=language_code or DEFAULT_LANGUAGE_CODE,
             invocation_id=get_invocation_id(),
+            **_gen_config,
         )
     except asyncio.TimeoutError:
         _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
@@ -1106,6 +1113,7 @@ async def generate_response(
             language=language_code or DEFAULT_LANGUAGE_CODE,
             llm_timed_out=True,
             invocation_id=get_invocation_id(),
+            **_gen_config,
         )
         response = AIMessage(content="Sorry, can you say that again?")
     except Exception as e:
@@ -1749,9 +1757,7 @@ async def apply_voice_expressions(
                 _prosody_latency,
                 settings.PROSODY_GENERATION_TIMEOUT,
             )
-            turn_metrics.record(
-                get_room_id(), prosody_ms=int(_prosody_latency * 1000)
-            )
+            turn_metrics.record(get_room_id(), prosody_ms=int(_prosody_latency * 1000))
             enhanced_text = None
         except Exception as e:
             _prosody_latency = (

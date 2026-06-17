@@ -23,10 +23,14 @@ logger = get_logger(__name__)
 # connection technically alive, so the plugin's `_run_connection` just
 # waits forever for events that never arrive — the agent goes silent.
 #
-# The plugin already supports clean reconnection via `_reconnect_event`
-# (see plugin's `_run_connection`: setting the event clears the WS, opens
-# a fresh one, and resumes audio streaming). We just need to fire that
-# event when we detect staleness.
+# Recovery is two parts: (1) fire the plugin's `_reconnect_event` when we
+# detect staleness, and (2) make the stream actually reopen afterwards.
+# NOTE: in livekit-plugins-sarvam 1.3.12, setting `_reconnect_event` does
+# NOT reconnect — `_run_connection` clears the event and `return`s
+# normally, and the outer `_run` retry loop treats that return as success
+# and `break`s, so the stream silently dies. We therefore also patch
+# `_run` (see `_patched_run`) to reopen the WS when the reconnect was
+# watchdog-driven (tracked via `self._force_reconnect`).
 #
 # Tuning:
 #  - STALE_THRESHOLD_S: how long the gap between (last audio chunk sent)
@@ -194,6 +198,7 @@ def _patch_sarvam_stt_url_builder() -> None:
         original_handle_events = sarvam_stt_module.SpeechStream._handle_events
         original_process_audio = sarvam_stt_module.SpeechStream._process_audio
         original_run_connection = sarvam_stt_module.SpeechStream._run_connection
+        original_run = sarvam_stt_module.SpeechStream._run
 
         def _mark_event(self: Any) -> None:
             self._last_sarvam_event_time = time.monotonic()
@@ -257,6 +262,14 @@ def _patch_sarvam_stt_url_builder() -> None:
                         # Re-baseline so we don't re-fire before the new
                         # connection has a chance to produce events.
                         self._last_sarvam_event_time = now
+                        # Mark this as a watchdog-driven reconnect so the
+                        # patched `_run` loop reopens the WS instead of
+                        # treating `_run_connection`'s normal return as a
+                        # clean stream end. (Plugin 1.3.12's `_run_connection`
+                        # returns — not raises — on `_reconnect_event`, and
+                        # `_run` `break`s on that return, so without this flag
+                        # the stream just dies. See header note.)
+                        self._force_reconnect = True
                         try:
                             self._reconnect_event.set()
                         except Exception:
@@ -289,12 +302,33 @@ def _patch_sarvam_stt_url_builder() -> None:
                         "[SARVAM_STT_WATCHDOG] watchdog raised on shutdown"
                     )
 
+        async def _patched_run(self: Any) -> None:
+            # The plugin's `_run` retry loop `break`s when `_run_connection`
+            # returns normally — which is exactly what happens when the
+            # watchdog fires `_reconnect_event` (plugin 1.3.12 clears the
+            # event and `return`s, no exception). That terminates STT for
+            # good. Wrap `_run` so a watchdog-driven reconnect reopens a
+            # fresh connection instead, while genuine stream ends and
+            # connection errors still propagate unchanged.
+            while True:
+                self._force_reconnect = False
+                await original_run(self)
+                if getattr(self, "_closing", False) or not getattr(
+                    self, "_force_reconnect", False
+                ):
+                    break
+                logger.info(
+                    "[SARVAM_STT_WATCHDOG] reopening STT connection after "
+                    "watchdog-forced reconnect"
+                )
+
         sarvam_stt_module.SpeechStream._handle_transcript_data = (
             _patched_handle_transcript_data
         )
         sarvam_stt_module.SpeechStream._handle_events = _patched_handle_events
         sarvam_stt_module.SpeechStream._process_audio = _patched_process_audio
         sarvam_stt_module.SpeechStream._run_connection = _patched_run_connection
+        sarvam_stt_module.SpeechStream._run = _patched_run
         logger.info(
             "Patched SpeechStream with zombie-stream watchdog "
             "(stale_threshold=%.1fs, poll=%.1fs)",

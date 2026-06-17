@@ -55,6 +55,13 @@ class TurnMetricsData(BaseModel):
     scenario_id: Optional[int] = None
     language: Optional[str] = None
     llm_model: Optional[str] = None
+    # Inference provider for llm_model ('openai' | 'gemini' | 'anthropic') and
+    # the generation params used — captured so drift analytics can attribute
+    # behaviour to a specific (provider, model, params) experiment tuple.
+    llm_provider: Optional[str] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    max_tokens: Optional[int] = None
     env: Optional[str] = None
     response_chars: Optional[int] = None
     events_detected: Optional[int] = None

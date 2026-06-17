@@ -31,6 +31,8 @@ class OpenAILLMClient(BaseLLMClient):
             settings.OPENAI_API_KEY
     """
 
+    PROVIDER = "openai"
+
     def __init__(
         self,
         model: str,

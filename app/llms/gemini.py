@@ -32,6 +32,8 @@ class GeminiLLMClient(BaseLLMClient):
             environment variable
     """
 
+    PROVIDER = "gemini"
+
     def __init__(
         self,
         model: str,

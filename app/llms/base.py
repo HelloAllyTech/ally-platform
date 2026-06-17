@@ -27,6 +27,12 @@ class BaseLLMClient(ABC):
         """
         pass
 
+    @property
+    def provider(self) -> str:
+        """Inference provider name (e.g. 'openai' | 'gemini'). Subclasses set
+        the ``PROVIDER`` class attribute; used for drift-analytics attribution."""
+        return getattr(self, "PROVIDER", "unknown")
+
     async def achat(self, messages: List[Any]) -> Any:
         """
         Async chat - invokes the underlying LLM with messages.
