@@ -115,19 +115,22 @@ def create_conversation_handler(
     def _maybe_play_filler() -> None:
         """Play a short back-channel the instant the learner stops speaking.
 
-        Triggered from on_user_state_changed (learner -> not speaking) so it
-        fills the gap immediately, before the agent's reply is generated.
-        allow_interruptions=False so the agent's own reply turn doesn't preempt
-        it before it's heard (with True it gets cut off on normal turns); the
-        short filler finishes well before the ~multi-second reply is ready. Kept
-        out of the transcript (add_to_chat_ctx=False) and excluded from
+        Triggered from on_user_state_changed (learner -> not speaking) to fill
+        the gap before the agent's reply. allow_interruptions=True so the agent's
+        real reply turn takes over cleanly (with False the reply was dropped).
+        Kept out of the transcript (add_to_chat_ctx=False) and excluded from
         response_latency_ms via _filler_in_flight (see on_agent_state_changed).
+
+        NOTE: with the LiveKit AgentSession auto-generating the reply on turn
+        end, an interruptible say() here can be preempted by that reply turn on
+        normal turns — making the filler land reliably WITHOUT dropping the reply
+        needs the session-layer interaction worked out live, not a flag flip.
         """
         if not _filler_phrases or _filler_in_flight[0]:
             return
         try:
             phrase = random.choice(_filler_phrases)
-            session.say(phrase, allow_interruptions=False, add_to_chat_ctx=False)
+            session.say(phrase, allow_interruptions=True, add_to_chat_ctx=False)
             _filler_in_flight[0] = True
             logger.info("[FILLER] played phrase=%r room=%s", phrase, room_id)
         except Exception as e:  # noqa: BLE001 - fillers must never break a session
