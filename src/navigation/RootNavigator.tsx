@@ -25,6 +25,7 @@ import {
   BreathingScreen,
   CallSummaryScreen,
   CaseDetailsScreen,
+  CompleteProfileScreen,
   ListeningScreen,
   ProfileSettingsScreen,
   ReactionsScreen,
@@ -324,6 +325,11 @@ const NavigationContent = ({
             component={CaseDetailsScreen}
           />
           <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
+          <Stack.Screen
+            name={SCREEN_NAMES.COMPLETE_PROFILE}
+            component={CompleteProfileScreen}
+            options={{gestureEnabled: false}}
+          />
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATION_ASSISTANT}
             component={SimulationAssistantScreen}

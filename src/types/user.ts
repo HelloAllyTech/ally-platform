@@ -1,11 +1,16 @@
 export interface User {
   email: string;
   id: number;
+  // Blank for accounts created in bulk by an admin until the user completes
+  // their profile on first login.
   name: string;
   phone: string;
   role: UserRole;
   userId: number;
   profileImageUrl?: string | null;
+  // False while a bulk-created account still needs the user to fill in their
+  // name; drives the first-login Complete Profile gate.
+  profileCompleted?: boolean;
 }
 
 export enum UserRole {

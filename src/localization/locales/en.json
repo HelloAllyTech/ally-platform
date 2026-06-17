@@ -160,6 +160,15 @@
     "description": "Your account has been suspended. Contact your administrator for assistance",
     "goToLogin": "Go to login"
   },
+  "CompleteProfile": {
+    "title": "Complete your profile",
+    "subtitle": "Tell us a little about yourself to get started.",
+    "nameLabel": "Full name",
+    "namePlaceholder": "Enter your full name",
+    "submit": "Continue",
+    "errorTitle": "Couldn't save profile",
+    "errorDescription": "Something went wrong. Please try again."
+  },
   "SplashScreen": {
     "hey": "Hey,",
     "welcome": "Welcome to",

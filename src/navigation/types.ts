@@ -8,6 +8,7 @@ import {Scenario, SessionData} from '@/types/simulations';
 export type RootStackParamList = {
   Splash: undefined;
   SuspendedAccount: undefined;
+  CompleteProfile: undefined;
   Listening:
     | {isMicrophoneMode?: boolean; mode?: 'scribe' | 'dictation'}
     | undefined;

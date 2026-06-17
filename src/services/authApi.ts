@@ -51,6 +51,11 @@ export interface UpdateProfileImageRequest {
   profileImageUrl: string;
 }
 
+export interface CompleteProfileRequest {
+  name: string;
+  phone?: string;
+}
+
 export interface DeleteProfileImageRequest {
   profileImageUrl: string;
 }
@@ -158,6 +163,33 @@ export const authApi = api.injectEndpoints({
         }
       },
     }),
+    completeProfile: builder.mutation<
+      {success: boolean},
+      CompleteProfileRequest
+    >({
+      query: body => ({
+        url: API_ROUTES.USERS.COMPLETE_PROFILE,
+        method: API_METHODS.PATCH,
+        body,
+      }),
+      async onQueryStarted(_, {dispatch, queryFulfilled}) {
+        // Refetch the user so profileCompleted flips and the gate clears.
+        try {
+          await queryFulfilled;
+          dispatch(authApi.util.invalidateTags(['User']));
+          const result = await dispatch(
+            authApi.endpoints.getUser.initiate(undefined, {
+              forceRefetch: true,
+            }),
+          );
+          if ('data' in result && result.data) {
+            dispatch(setUser(result.data));
+          }
+        } catch {
+          // Error handling is done by RTK Query
+        }
+      },
+    }),
     getLogoUrl: builder.query<LogoUrlResponse, void>({
       query: () => API_ROUTES.USERS.LOGO_URL,
     }),
@@ -174,5 +206,6 @@ export const {
   useGetProfileImagePresignedUrlMutation,
   useUpdateProfileImageMutation,
   useDeleteProfileImageMutation,
+  useCompleteProfileMutation,
   useGetLogoUrlQuery,
 } = authApi;
