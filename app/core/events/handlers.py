@@ -100,10 +100,6 @@ def create_conversation_handler(
     # response_latency_ms (the filler must not be mistaken for the real reply).
     _filler_phrases: list[str] = []
     _filler_in_flight: list[bool] = [False]
-    # Armed when the user finishes a turn (a reply is expected). The filler is
-    # played on the agent's next "thinking" transition, then disarmed, so it
-    # fires exactly once per reply and never on the agent's opening line.
-    _filler_armed: list[bool] = [False]
     if session is not None and scenario is not None:
         try:
             from app.core.livekit.fillers import resolve_filler_phrases
@@ -117,17 +113,21 @@ def create_conversation_handler(
         )
 
     def _maybe_play_filler() -> None:
-        """Play a short back-channel to mask pipeline latency (best-effort).
+        """Play a short back-channel the instant the learner stops speaking.
 
-        Kept out of the transcript (add_to_chat_ctx=False) and interruptible so
-        the real reply (or the user resuming) takes over cleanly. Excluded from
+        Triggered from on_user_state_changed (learner -> not speaking) so it
+        fills the gap immediately, before the agent's reply is generated.
+        allow_interruptions=False so the agent's own reply turn doesn't preempt
+        it before it's heard (with True it gets cut off on normal turns); the
+        short filler finishes well before the ~multi-second reply is ready. Kept
+        out of the transcript (add_to_chat_ctx=False) and excluded from
         response_latency_ms via _filler_in_flight (see on_agent_state_changed).
         """
         if not _filler_phrases or _filler_in_flight[0]:
             return
         try:
             phrase = random.choice(_filler_phrases)
-            session.say(phrase, allow_interruptions=True, add_to_chat_ctx=False)
+            session.say(phrase, allow_interruptions=False, add_to_chat_ctx=False)
             _filler_in_flight[0] = True
             logger.info("[FILLER] played phrase=%r room=%s", phrase, room_id)
         except Exception as e:  # noqa: BLE001 - fillers must never break a session
@@ -168,17 +168,6 @@ def create_conversation_handler(
     # ---- state-change handlers ----
 
     def on_agent_state_changed(event: AgentStateChangedEvent):
-        if event.new_state == "thinking":
-            # The agent has committed to generating a reply — the canonical,
-            # pipeline-aligned moment to mask the gap, with the most lead time
-            # before the reply's audio. Fired here (not on user-stop) because the
-            # user-stop trigger raced LiveKit's turn pipeline and got preempted
-            # on normal turns. Armed only by a preceding user turn, so it never
-            # fires on the opening line and fires once per reply.
-            if _filler_armed[0]:
-                _filler_armed[0] = False
-                _maybe_play_filler()
-            return
         if event.new_state == "speaking":
             # The thinking-filler also makes the agent enter "speaking". Do NOT
             # treat it as the real reply: skip latency + transcript bookkeeping
@@ -226,9 +215,8 @@ def create_conversation_handler(
             _user_speaking_start[0] = event.created_at
             # User (re)started speaking — cancel any pending filler accounting so
             # a filler that never reached playout doesn't skip the next real
-            # reply's latency measurement, and disarm the filler.
+            # reply's latency measurement.
             _filler_in_flight[0] = False
-            _filler_armed[0] = False
             logger.debug(f"User started speaking at {event.created_at}")
         else:
             # User left "speaking" — endpointing fired (or interim ended).
@@ -246,9 +234,9 @@ def create_conversation_handler(
                 turn_metrics.note_user_speech_end(room_id, event.created_at)
             except Exception:  # noqa: BLE001 - metrics must never break a turn
                 logger.exception("[turn-metrics] note_user_speech_end failed")
-            # Arm the filler: it plays on the agent's next "thinking" transition
-            # (the reply pipeline), not here — see on_agent_state_changed.
-            _filler_armed[0] = True
+            # Play the filler NOW — the instant the learner stops speaking — to
+            # mask the gap while the agent generates its reply.
+            _maybe_play_filler()
 
     # ---- main conversation handler ----
 
