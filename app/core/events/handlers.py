@@ -100,6 +100,10 @@ def create_conversation_handler(
     # response_latency_ms (the filler must not be mistaken for the real reply).
     _filler_phrases: list[str] = []
     _filler_in_flight: list[bool] = [False]
+    # Armed when the user finishes a turn (a reply is expected). The filler is
+    # played on the agent's next "thinking" transition, then disarmed, so it
+    # fires exactly once per reply and never on the agent's opening line.
+    _filler_armed: list[bool] = [False]
     if session is not None and scenario is not None:
         try:
             from app.core.livekit.fillers import resolve_filler_phrases
@@ -164,6 +168,17 @@ def create_conversation_handler(
     # ---- state-change handlers ----
 
     def on_agent_state_changed(event: AgentStateChangedEvent):
+        if event.new_state == "thinking":
+            # The agent has committed to generating a reply — the canonical,
+            # pipeline-aligned moment to mask the gap, with the most lead time
+            # before the reply's audio. Fired here (not on user-stop) because the
+            # user-stop trigger raced LiveKit's turn pipeline and got preempted
+            # on normal turns. Armed only by a preceding user turn, so it never
+            # fires on the opening line and fires once per reply.
+            if _filler_armed[0]:
+                _filler_armed[0] = False
+                _maybe_play_filler()
+            return
         if event.new_state == "speaking":
             # The thinking-filler also makes the agent enter "speaking". Do NOT
             # treat it as the real reply: skip latency + transcript bookkeeping
@@ -211,8 +226,9 @@ def create_conversation_handler(
             _user_speaking_start[0] = event.created_at
             # User (re)started speaking — cancel any pending filler accounting so
             # a filler that never reached playout doesn't skip the next real
-            # reply's latency measurement.
+            # reply's latency measurement, and disarm the filler.
             _filler_in_flight[0] = False
+            _filler_armed[0] = False
             logger.debug(f"User started speaking at {event.created_at}")
         else:
             # User left "speaking" — endpointing fired (or interim ended).
@@ -230,9 +246,9 @@ def create_conversation_handler(
                 turn_metrics.note_user_speech_end(room_id, event.created_at)
             except Exception:  # noqa: BLE001 - metrics must never break a turn
                 logger.exception("[turn-metrics] note_user_speech_end failed")
-            # Perceived-latency lever: speak a short back-channel now, while the
-            # graph generates the real reply. No-op unless fillers are enabled.
-            _maybe_play_filler()
+            # Arm the filler: it plays on the agent's next "thinking" transition
+            # (the reply pipeline), not here — see on_agent_state_changed.
+            _filler_armed[0] = True
 
     # ---- main conversation handler ----
 
