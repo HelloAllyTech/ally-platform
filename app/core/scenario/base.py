@@ -152,8 +152,18 @@ class PromptData(BaseModel):
             "instant the user stops speaking, to mask turn latency. Default "
             "False (opt-in) so existing scenarios are unchanged. The filler is "
             "excluded from response_latency_ms and from the transcript. When "
-            "enabled, the agent plays purpose-built, language-aware back-channel "
-            "phrases (see app/core/livekit/fillers.py)."
+            "enabled, the agent plays the Studio-configured filler dialogues / "
+            "allowed filler words (see app/core/livekit/fillers.py)."
+        ),
+    )
+    filler_dialogues: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Studio-configured filler dialogues (fillerDialogues) shown under "
+            "the Thinking Filler toggle. When set, these are used verbatim as "
+            "the back-channel phrases (highest priority). Should be short "
+            "phrases in the scenario's language. When empty, the agent falls "
+            "back to allowed_fillers; if neither is set, no filler plays."
         ),
     )
     selected_main_prompt_code: Optional[str] = Field(
@@ -542,6 +552,8 @@ class Scenario(BaseModel):
                     else bool(prompt_data_dict.get("enableProsody"))
                 ),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
+                "filler_dialogues": prompt_data_dict.get("fillerDialogues")
+                or prompt_data_dict.get("filler_dialogues"),
                 "selected_main_prompt_code": prompt_data_dict.get(
                     "selectedMainPromptCode"
                 ),
