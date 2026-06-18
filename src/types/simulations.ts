@@ -423,5 +423,6 @@ export enum TurnState {
   USER_TURN_TO_SPEAK = 'user_turn_to_speak',
   USER_TURN_TO_LISTEN = 'user_turn_to_listen',
   THINKING = 'thinking',
+  PAUSED = 'paused',
   IDLE = 'idle',
 }

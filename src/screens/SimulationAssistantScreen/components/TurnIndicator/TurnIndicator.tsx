@@ -2,8 +2,8 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {TurnState} from '@/types';
 import {colors, fontFamily} from '@/theme';
+import {TurnState} from '@/types';
 
 interface TurnIndicatorProps {
   turnState: TurnState;
@@ -21,6 +21,8 @@ const getLabel = (state: TurnState): string => {
       return 'Your turn to listen';
     case TurnState.THINKING:
       return 'Thinking...';
+    case TurnState.PAUSED:
+      return 'Paused';
     default:
       return '';
   }
