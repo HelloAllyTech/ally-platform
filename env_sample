@@ -76,3 +76,13 @@ EVALUATION_LOGGING_ENABLED=false
 ENABLE_EVENT_DETECTION_OPTIMIZATIONS=true
 
 REPORT_CONCURRENCY_LIMIT=CONCURRENCY_LIMIT_FOR_REPORT_GENERATION
+
+# ---- Pause / resume tuning (optional; defaults applied if unset) ----
+# Max single continuous pause before the session auto-ends (seconds; default 600 = 10 min)
+PAUSE_CAP_SECONDS=600
+# How long before a pause auto-ends to warn the client (seconds; default 30)
+PAUSE_WARNING_LEAD_SECONDS=30
+# Hard ceiling on cumulative paused time per session (seconds; default 1800 = 30 min)
+MAX_TOTAL_PAUSE_SECONDS=1800
+# Seconds past the scenario time limit before the agent authoritatively ends (default 2)
+MAX_DURATION_GRACE_SECONDS=2

@@ -234,6 +234,7 @@ def create_agent_with_adapter(
     event_orchestrator: EventOrchestrator,
     tts_client: Optional[BaseTTSClient] = None,
     score_keeper: Optional[ScoreKeeper] = None,
+    session_clock=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -270,6 +271,11 @@ def create_agent_with_adapter(
     # Add ScoreKeeper if provided
     if score_keeper:
         configurable["score_keeper"] = score_keeper
+
+    # Add pause-aware session clock if provided (drives active-elapsed time and
+    # the paused-state gate read by the graph nodes).
+    if session_clock is not None:
+        configurable["session_clock"] = session_clock
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph

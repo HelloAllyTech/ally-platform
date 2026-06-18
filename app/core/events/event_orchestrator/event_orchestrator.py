@@ -10,7 +10,6 @@ from typing import Dict, List, Optional, Set, Tuple
 from livekit import rtc
 
 from app.core.config import settings
-
 from app.core.constants import DetectionType
 from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_sender import EventSender
@@ -62,8 +61,12 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         agent_joined_at: Optional[datetime] = None,
         is_report_mode: bool = False,
         score_keeper: Optional[ScoreKeeper] = None,
+        session_clock=None,
     ):
         self.is_report_mode = is_report_mode
+        # Pause-aware clock (single source of active-elapsed time). When set,
+        # _get_elapsed_time and the time-event scheduler exclude paused time.
+        self._session_clock = session_clock
         self.events = scenario.events
         self._event_map = {e.event_id: e for e in self.events}
         self.event_registry: Dict[str, EventRegistryEntry] = {}
@@ -234,6 +237,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             default_seconds=60.0,
             agent_graph=resolved_graph,
             thread_id=self.thread_id,
+            session_clock=self._session_clock,
         )
 
     def update(
@@ -684,6 +688,8 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         return 0
 
     def _get_elapsed_time(self) -> float:
-        """Calculates seconds since agent joined."""
+        """Active seconds since agent joined, excluding any paused time."""
+        if self._session_clock is not None:
+            return self._session_clock.elapsed()
         now = datetime.now(timezone.utc)
         return (now - self.agent_joined_at).total_seconds()

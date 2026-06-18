@@ -95,11 +95,9 @@ def _prepare_event_context(
 
     orchestrator = None
     room = None
-    embedding_client = None
     if config and "configurable" in config:
         orchestrator = config["configurable"].get("event_orchestrator")
         room = config["configurable"].get("room")
-        embedding_client = config["configurable"].get("embedding_client")
 
     logger.debug(f"Event Cycle: Time={elapsed_time:.2f}s, Live Score={live_score}")
     return chat_messages, elapsed_time, live_score, orchestrator, room
@@ -495,6 +493,15 @@ async def process_events(
     with subsets of events, as it would cause double-processing, double-scoring,
     and duplicate event sending.
     """
+    # Pause gate: while paused, skip all detection, orchestration, and scoring so
+    # nothing fires on paused time. Turn-taking is already frozen by the worker;
+    # this is the defensive belt-and-suspenders if a turn slips through.
+    if config and "configurable" in config:
+        _clock = config["configurable"].get("session_clock")
+        if _clock is not None and _clock.is_paused:
+            logger.info("[PAUSE] process_events skipped — session paused")
+            return {}
+
     room = None
     if config and "configurable" in config:
         room = config["configurable"].get("room")
@@ -877,6 +884,13 @@ async def detect_behaviors(
     """
     logger.info("Detecting behaviors")
 
+    # Pause gate: skip behavior detection/scoring while the session is paused.
+    if config and "configurable" in config:
+        _clock = config["configurable"].get("session_clock")
+        if _clock is not None and _clock.is_paused:
+            logger.info("[PAUSE] detect_behaviors skipped — session paused")
+            return {"behavior_feedback_data": []}
+
     # Get scenario and score_keeper from config
     scenario = None
     score_keeper: Optional[ScoreKeeper] = None
@@ -1183,6 +1197,13 @@ async def generate_response(
                 )
         except Exception as e:
             logger.warning(f"Failed to log interaction for evaluation: {e}")
+
+    # Stash the just-generated utterance on the shared session clock so a pause
+    # can re-speak it on resume (in-process; same event loop as the worker).
+    if config and "configurable" in config:
+        _clock = config["configurable"].get("session_clock")
+        if _clock is not None:
+            _clock.last_agent_utterance = response.content
 
     return {
         "messages": [AIMessage(content=response.content)],

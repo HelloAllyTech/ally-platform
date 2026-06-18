@@ -1,7 +1,9 @@
 import asyncio
+import json
 import os
 import random
 import sys
+import time
 from typing import Optional, Set
 
 from livekit import agents, rtc
@@ -38,8 +40,13 @@ from app.core.events.handlers import (
 )
 from app.core.logger import get_logger
 from app.core.metrics import turn_metrics
+from app.core.queue.utils import (
+    send_session_paused_message,
+    send_session_resumed_message,
+)
 from app.core.scenario.base import Scenario
 from app.core.scoring.score_keeper import ScoreKeeper
+from app.core.session_clock import SessionClock
 from app.llms import BaseLLMClient
 from app.stt import BaseSTTClient
 from app.tts import BaseTTSClient
@@ -50,6 +57,58 @@ setup_logging(
     devmode=settings.LIVEKIT_LOG_DEV_MODE,
     console=settings.LIVEKIT_LOG_CONSOLE,
 )
+
+# Pause/resume control channel (LiveKit data packets, topic-agnostic; clients
+# branch on the JSON ``type`` field).
+# Pause/resume tuning — resolved from settings (env-overridable; see config.py
+# for defaults). Read once at import; env is fixed per worker process.
+PAUSE_CAP_SECONDS = settings.PAUSE_CAP_SECONDS  # max single continuous pause
+PAUSE_WARNING_LEAD_SECONDS = settings.PAUSE_WARNING_LEAD_SECONDS
+# Hard ceiling on *cumulative* paused time per session — bounds the wall-clock a
+# session can be parked via repeated sub-cap pauses.
+MAX_TOTAL_PAUSE_SECONDS = settings.MAX_TOTAL_PAUSE_SECONDS
+
+# Control-channel message types (kept in one place to avoid typo drift).
+# Client → agent:
+CTRL_PAUSE = "pause"
+CTRL_RESUME = "resume"
+# Agent → client:
+CTRL_PAUSED = "paused"
+CTRL_RESUMED = "resumed"
+CTRL_CAP_WARNING = "cap-warning"
+CTRL_CAP_ENDED = "cap-ended"
+
+
+# The agent is the AUTHORITATIVE enforcer of the scenario time limit: it ends
+# the session when ACTIVE elapsed time (excluding pauses) reaches the limit.
+# The client timer is display + a redundant fallback only. A tiny grace lets
+# the client's on-screen countdown visibly reach zero just before the agent
+# tears down (avoids ending a beat "early" on sub-second clock differences).
+# Env-overridable (see config.py).
+MAX_DURATION_GRACE_SECONDS = settings.MAX_DURATION_GRACE_SECONDS
+
+
+def _now_ms() -> int:
+    """Current epoch time in milliseconds."""
+    return int(time.time() * 1000)
+
+
+def _parse_max_time_seconds(value: Optional[str]) -> Optional[float]:
+    """Parse a scenario time limit ("HH:MM:SS") into seconds.
+
+    Mirrors the clients' parseMaxTimeSec (parts → h:m:s, missing parts = 0) so
+    the server backstop and the client timer agree on the limit. Returns None
+    when absent or non-positive.
+    """
+    if not value:
+        return None
+    try:
+        parts = [int(p) for p in str(value).split(":")]
+    except (ValueError, AttributeError):
+        return None
+    parts = (parts + [0, 0, 0])[:3]
+    total = parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return float(total) if total > 0 else None
 
 
 def _resolve_stt_meta(scenario) -> tuple[str, str]:
@@ -148,6 +207,16 @@ class AgentWorker:
         self.event_orchestrator: Optional[EventOrchestrator] = None
         self.score_keeper: Optional[ScoreKeeper] = None
         self.agent: Optional[Agent] = None
+        # Pause-aware clock (single source of active-elapsed time) and the
+        # asyncio task enforcing the max-pause cap.
+        self.session_clock: Optional[SessionClock] = None
+        self._pause_cap_task: Optional[asyncio.Task] = None
+        # Serializes pause/resume so rapid toggles can't interleave (each fully
+        # applies before the next runs).
+        self._control_lock = asyncio.Lock()
+        # If a pause interrupts the persona mid-utterance, the cut-off line is
+        # captured here so it can be re-spoken on resume.
+        self._interrupted_speech_text: Optional[str] = None
 
         # ========== State Tracking ==========
         self.final_score_sent = False
@@ -189,6 +258,7 @@ class AgentWorker:
         from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
             SemanticSimilarityEvent,
         )
+
         SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
 
         # Parse metadata
@@ -265,6 +335,11 @@ class AgentWorker:
         # Create session (needs clients from configure phase)
         self._create_session()
 
+        # Create the pause-aware session clock from the agent-join timestamp.
+        # Shared (via the graph config) by the orchestrator, the time-event
+        # scheduler, and the graph nodes so they all measure active time.
+        self.session_clock = SessionClock.from_iso(self.joined_iso)
+
         # Create ScoreKeeper first — it is injected into both EventOrchestrator
         # and the agent config so all scoring flows through one instance.
         self.score_keeper = ScoreKeeper()
@@ -283,6 +358,7 @@ class AgentWorker:
             event_orchestrator=self.event_orchestrator,
             tts_client=self.tts_client,
             score_keeper=self.score_keeper,
+            session_clock=self.session_clock,
         )
 
         # Register callbacks
@@ -320,6 +396,7 @@ class AgentWorker:
             termination_callback=termination_handler,
             agent_joined_at=self.joined_iso,
             score_keeper=score_keeper,
+            session_clock=self.session_clock,
         )
 
         # Update termination handler with orchestrator reference
@@ -425,6 +502,13 @@ class AgentWorker:
                     self._room_disconnected_event.set()
                     logger.info("Room disconnected event signaled to entrypoint")
 
+        # Pause/resume control channel: the client publishes reliable data
+        # packets ({"type": "pause"|"resume"}). The handler is sync (LiveKit
+        # requirement) so it schedules the async work as a tracked task.
+        @self.ctx.room.on("data_received")
+        def on_control_data(packet: rtc.DataPacket):
+            self._handle_control_packet(packet)
+
         # Shutdown handler
         original_shutdown_handler = create_shutdown_handler(
             event_orchestrator=self.event_orchestrator,
@@ -483,6 +567,245 @@ class AgentWorker:
                 timeout,
             )
             self.ctx.shutdown("orphaned_no_human")
+
+    # ================================================================
+    # Pause / Resume control
+    # ================================================================
+
+    def _handle_control_packet(self, packet: rtc.DataPacket) -> None:
+        """Parse a client control packet and dispatch pause/resume.
+
+        Runs synchronously (LiveKit handler contract) and schedules the async
+        work as a tracked background task.
+        """
+        try:
+            msg = json.loads(bytes(packet.data).decode("utf-8"))
+        except Exception as e:  # noqa: BLE001 - never let a bad packet crash the room
+            logger.debug("[CONTROL] Ignoring non-JSON data packet: %s", e)
+            return
+
+        msg_type = (msg or {}).get("type")
+        if msg_type == CTRL_PAUSE:
+            coro = self.pause()
+        elif msg_type == CTRL_RESUME:
+            coro = self.resume()
+        else:
+            return  # not a control packet we own
+
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def pause(self) -> None:
+        """Serialized entry point — see _pause_impl."""
+        async with self._control_lock:
+            await self._pause_impl()
+
+    async def _pause_impl(self) -> None:
+        """Freeze the whole simulation: stop listening/speaking, halt the clock,
+        arm the max-pause cap, and notify client + backend."""
+        clock = self.session_clock
+        if clock is None or clock.is_paused:
+            logger.info("[PAUSE] Ignored — no clock or already paused")
+            return
+        if not self.ctx.room.remote_participants:
+            logger.warning("[PAUSE] Ignored — no remote participant in room")
+            return
+
+        logger.info("[PAUSE] Pausing simulation")
+        # Freeze the clock first so any concurrent graph turn sees paused state.
+        clock.pause()
+
+        # Stop listening (no STT/turns) and stop speaking.
+        try:
+            self.session.input.set_audio_enabled(False)
+            self.session.output.set_audio_enabled(False)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[PAUSE] Failed to gate audio I/O: %s", e)
+
+        # Capture the in-flight utterance (if any) BEFORE interrupting so it can
+        # be re-spoken on resume. interrupt() clears current_speech.
+        self._interrupted_speech_text = self._capture_current_speech_text()
+
+        # Cut any in-flight TTS so the persona goes silent immediately.
+        try:
+            await asyncio.wait_for(self.session.interrupt(), timeout=2.0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[PAUSE] interrupt failed: %s", e)
+
+        # Enforce the max continuous pause (auto-end).
+        self._arm_pause_cap_timer()
+
+        # Ack the client and freeze the billing/duration clock on the backend.
+        await self._publish_control({"type": CTRL_PAUSED})
+        await send_session_paused_message(self.ctx.room.name, _now_ms())
+
+    async def resume(self) -> None:
+        """Serialized entry point — see _resume_impl."""
+        async with self._control_lock:
+            await self._resume_impl()
+
+    async def _resume_impl(self) -> None:
+        """Unfreeze the simulation. The persona stays silent and waits for the
+        counselor (no auto reply)."""
+        clock = self.session_clock
+        if clock is None or not clock.is_paused:
+            logger.info("[RESUME] Ignored — not paused")
+            return
+
+        logger.info("[RESUME] Resuming simulation")
+        self._cancel_pause_cap_timer()
+        clock.resume()
+
+        try:
+            self.session.input.set_audio_enabled(True)
+            self.session.output.set_audio_enabled(True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[RESUME] Failed to re-enable audio I/O: %s", e)
+
+        # If the pause cut the persona off mid-utterance, re-speak that line so
+        # the conversation picks up where it left off. allow_interruptions=True
+        # keeps the session normal — the counselor can talk over it. The agent
+        # turn loop is otherwise untouched, so subsequent turns work as usual.
+        if self._interrupted_speech_text:
+            text = self._interrupted_speech_text
+            self._interrupted_speech_text = None
+            try:
+                self.session.say(text, allow_interruptions=True)
+                logger.info("[RESUME] Re-speaking interrupted utterance")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[RESUME] Failed to re-speak utterance: %s", e)
+
+        # Ack the client and report cumulative paused time (source of truth).
+        await self._publish_control({"type": CTRL_RESUMED})
+        await send_session_resumed_message(
+            self.ctx.room.name, _now_ms(), int(clock.paused_offset * 1000)
+        )
+
+    def _capture_current_speech_text(self) -> Optional[str]:
+        """Best-effort extraction of the text the persona is currently speaking.
+
+        Returns the assistant text of the in-flight speech, or None if the agent
+        isn't speaking (so a normal pause re-speaks nothing). Reliable for
+        scripted lines (e.g. the opening statement); best-effort for
+        LLM-generated turns whose text may not be fully materialized yet.
+        """
+        try:
+            speech = getattr(self.session, "current_speech", None)
+            if speech is None or speech.done():
+                return None
+            # Prefer the graph-stashed utterance — reliable for LLM-generated
+            # turns, whose text isn't materialized in chat_items mid-stream.
+            if self.session_clock and self.session_clock.last_agent_utterance:
+                return self.session_clock.last_agent_utterance
+            # Fallback: chat_items (covers scripted say() lines like the opener).
+            parts: list[str] = []
+            for item in getattr(speech, "chat_items", []) or []:
+                if getattr(item, "role", "assistant") != "assistant":
+                    continue
+                content = getattr(item, "text_content", None)
+                if not content:
+                    raw = getattr(item, "content", None)
+                    if isinstance(raw, list):
+                        content = " ".join(str(c) for c in raw if isinstance(c, str))
+                    elif isinstance(raw, str):
+                        content = raw
+                if content and content.strip():
+                    parts.append(content.strip())
+            text = " ".join(parts).strip()
+            return text or None
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[PAUSE] Could not capture in-flight utterance: %s", e)
+            return None
+
+    async def _publish_control(self, payload: dict) -> None:
+        """Publish a control packet to clients (ack / cap warning / cap end)."""
+        try:
+            await self.ctx.room.local_participant.publish_data(
+                json.dumps(payload).encode(), reliable=True
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[CONTROL] Failed to publish %s: %s", payload, e)
+
+    def _arm_pause_cap_timer(self) -> None:
+        """(Re)arm the pause cap for this pause.
+
+        The cap is the smaller of the per-pause limit and the session's
+        *remaining* cumulative-pause budget, so neither a single long pause nor
+        many repeated pauses can hold the room open beyond the bounds.
+        """
+        self._cancel_pause_cap_timer()
+        banked = self.session_clock.paused_offset if self.session_clock else 0.0
+        remaining_total = max(0.0, MAX_TOTAL_PAUSE_SECONDS - banked)
+        cap = min(PAUSE_CAP_SECONDS, remaining_total)
+        task = asyncio.create_task(self._pause_cap_countdown(cap))
+        self._pause_cap_task = task
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    def _cancel_pause_cap_timer(self) -> None:
+        if self._pause_cap_task and not self._pause_cap_task.done():
+            self._pause_cap_task.cancel()
+        self._pause_cap_task = None
+
+    async def _pause_cap_countdown(self, cap_seconds: float) -> None:
+        """Warn the client near the pause cap, then auto-end if still paused.
+
+        ``cap_seconds`` already accounts for the cumulative-pause budget. Uses
+        wall-clock sleep on purpose: the cap bounds *real* paused time so an
+        abandoned/parked session cannot hold a live room indefinitely.
+        """
+        try:
+            warn_at = max(0.0, cap_seconds - PAUSE_WARNING_LEAD_SECONDS)
+            if warn_at > 0:
+                await asyncio.sleep(warn_at)
+                await self._publish_control(
+                    {
+                        "type": CTRL_CAP_WARNING,
+                        "secondsRemaining": int(cap_seconds - warn_at),
+                    }
+                )
+            # Sleep whatever remains until the cap (the full cap when the budget
+            # is already near-exhausted and there was no room to warn).
+            await asyncio.sleep(cap_seconds - warn_at)
+            logger.warning(
+                "[PAUSE] Pause cap reached (%.0fs; cumulative budget %.0fs) — "
+                "auto-ending session",
+                cap_seconds,
+                MAX_TOTAL_PAUSE_SECONDS,
+            )
+            await self._publish_control({"type": CTRL_CAP_ENDED})
+            # Shut down via the normal path (sends final score, frees checkpoint;
+            # backend closes the still-open pause interval on session end).
+            self.ctx.shutdown("pause_cap_exceeded")
+        except asyncio.CancelledError:
+            logger.info("[PAUSE] Cap timer cancelled (session resumed)")
+
+    async def _arm_max_duration_enforcer(self) -> None:
+        """Authoritatively end the session when ACTIVE elapsed time reaches the
+        scenario limit. This is the PRIMARY enforcer (the client timer is just
+        display + a redundant fallback) so a tampered/throttled client cannot
+        extend the session. Uses the pause-aware clock, so paused time is
+        excluded — a pause never eats into the limit.
+        """
+        scn = self.scenario
+        if scn is None or not getattr(scn, "timer_mode", False):
+            return
+        limit = _parse_max_time_seconds(getattr(scn, "max_time_value", None))
+        if not limit or self.session_clock is None:
+            return
+
+        try:
+            await self.session_clock.sleep(limit + MAX_DURATION_GRACE_SECONDS)
+        except asyncio.CancelledError:
+            return
+
+        logger.info(
+            "[MAX_DURATION] Active time reached scenario limit (%.0fs) — "
+            "ending session (authoritative enforcement)",
+            limit,
+        )
+        self.ctx.shutdown("max_duration_exceeded")
 
     async def _await_prosody(self) -> None:
         """Collect the background prosody task and apply defaults to the TTS client."""
@@ -665,6 +988,12 @@ class AgentWorker:
             orphan_task = asyncio.create_task(self._arm_orphan_deadline(timeout=30.0))
             self._background_tasks.add(orphan_task)
             orphan_task.add_done_callback(self._background_tasks.discard)
+
+            # Authoritative server-side enforcement of the scenario time limit
+            # (active time). The client timer is display + redundant fallback.
+            max_dur_task = asyncio.create_task(self._arm_max_duration_enforcer())
+            self._background_tasks.add(max_dur_task)
+            max_dur_task.add_done_callback(self._background_tasks.discard)
         except Exception as e:
             logger.exception(f"[AgentWorker] Failed to start/join room: {e}")
             logger.info(f"[AgentWorker] Phase 3: Failed to start/join room: {e}")
@@ -689,6 +1018,10 @@ class AgentWorker:
         ):
             statement = random.choice(self.scenario.prompt_data.opening_statements)
             logger.info(f"[AgentWorker] Saying opening statement: {statement}")
+            # Stash so a pause mid-opener can re-speak it on resume (the opening
+            # statement is said directly, not via generate_response).
+            if self.session_clock is not None:
+                self.session_clock.last_agent_utterance = statement
             # Best-effort: if the user disconnects during startup the session
             # may already be closing, in which case say() raises
             # "AgentSession is closing, cannot use say()". That must not crash

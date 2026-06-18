@@ -126,6 +126,29 @@ class Settings(BaseSettings):
             "generate_response. On timeout, a safe fallback message is returned."
         ),
     )
+
+    # ---- Pause / resume tuning (overridable via env; defaults shown) ----
+    PAUSE_CAP_SECONDS: float = Field(
+        default=600.0,
+        description="Max single continuous pause (seconds) before the session "
+        "auto-ends. Default 10 min.",
+    )
+    PAUSE_WARNING_LEAD_SECONDS: float = Field(
+        default=30.0,
+        description="How many seconds before a pause auto-ends to warn the " "client.",
+    )
+    MAX_TOTAL_PAUSE_SECONDS: float = Field(
+        default=1800.0,
+        description="Hard ceiling on cumulative paused time per session "
+        "(seconds). Bounds the wall-clock a session can be parked via repeated "
+        "pauses. Default 30 min.",
+    )
+    MAX_DURATION_GRACE_SECONDS: float = Field(
+        default=2.0,
+        description="Seconds past the scenario time limit before the agent "
+        "authoritatively ends the session (lets the client countdown reach "
+        "zero first).",
+    )
     PROSODY_GENERATION_TIMEOUT: float = Field(
         default=3.0,
         description=(

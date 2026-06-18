@@ -48,6 +48,51 @@ def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessa
     )
 
 
+async def send_session_paused_message(room_id: str, at_ms: int) -> None:
+    """Tell Core a session was paused so it can freeze the duration clock.
+
+    Args:
+        room_id: LiveKit room identifier.
+        at_ms: Epoch-millisecond timestamp when the pause began.
+    """
+    message = CoreEventMessageType.create(
+        room_id=room_id, event_data={"id": "session-paused", "atMs": at_ms}
+    )
+    logger.info("Sending session-paused for room=%s at_ms=%s", room_id, at_ms)
+    await send_message_to_queue(message.model_dump_json())
+
+
+async def send_session_resumed_message(
+    room_id: str, at_ms: int, total_paused_ms: int
+) -> None:
+    """Tell Core a session resumed, carrying the authoritative cumulative
+    paused duration so billing/limits exclude paused time.
+
+    ``total_paused_ms`` is the agent's cumulative paused milliseconds (from the
+    SessionClock) — used as the source of truth so a lost/duplicate event cannot
+    corrupt the total.
+
+    Args:
+        room_id: LiveKit room identifier.
+        at_ms: Epoch-millisecond timestamp when the session resumed.
+        total_paused_ms: Cumulative paused milliseconds so far.
+    """
+    message = CoreEventMessageType.create(
+        room_id=room_id,
+        event_data={
+            "id": "session-resumed",
+            "atMs": at_ms,
+            "totalPausedMs": total_paused_ms,
+        },
+    )
+    logger.info(
+        "Sending session-resumed for room=%s total_paused_ms=%s",
+        room_id,
+        total_paused_ms,
+    )
+    await send_message_to_queue(message.model_dump_json())
+
+
 async def finalize_session(
     room_id: str, thread_id: str, event_orchestrator=None, score_keeper=None
 ) -> None:

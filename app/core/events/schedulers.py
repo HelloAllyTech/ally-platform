@@ -7,7 +7,7 @@ including trigger and revoke coroutines for different condition operators.
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Awaitable, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Set
 
 from livekit import rtc
 
@@ -17,6 +17,9 @@ from app.core.events.schemas import EventRegistryEntry
 from app.core.events.utils import get_current_score_from_graph
 from app.core.graph.utils import is_event_eligible
 from app.core.logger import get_logger
+
+if TYPE_CHECKING:
+    from app.core.session_clock import SessionClock
 
 logger = get_logger(__name__)
 
@@ -33,6 +36,16 @@ class TimeEventScheduler:
     def __init__(self):
         # Map of event_id -> asyncio.Task for scheduled time events
         self._time_tasks: Dict[str, asyncio.Task] = {}
+        # Pause-aware clock; when set, timers count down only active (un-paused)
+        # time. Falls back to plain asyncio.sleep when absent (tests/report mode).
+        self._session_clock: Optional["SessionClock"] = None
+
+    async def _sleep(self, seconds: float) -> None:
+        """Sleep for ``seconds`` of active time, honoring pause if a clock is set."""
+        if self._session_clock is not None:
+            await self._session_clock.sleep(seconds)
+        else:
+            await asyncio.sleep(seconds)
 
     async def cancel_all(self) -> int:
         """Cancel all pending time event tasks and return the count cancelled."""
@@ -56,6 +69,7 @@ class TimeEventScheduler:
         default_seconds: float = 60.0,
         agent_graph=None,
         thread_id: Optional[str] = None,
+        session_clock: Optional["SessionClock"] = None,
     ) -> None:
         """
         Start asyncio timers for all TIME-based events.
@@ -88,6 +102,8 @@ class TimeEventScheduler:
             thread_id:
                 Optional thread ID for the current conversation session.
         """
+        self._session_clock = session_clock
+
         logger.info(
             "Starting simplified TIME event schedulers. Total events: %s", len(events)
         )
@@ -284,7 +300,7 @@ class TimeEventScheduler:
         event_id = event.event_id
         try:
             logger.debug("Trigger sleeping for %s s (event=%s)", seconds, event_id)
-            await asyncio.sleep(seconds)
+            await self._sleep(seconds)
 
             # 1. GET SCORE FRESH AFTER SLEEP
             current_score = get_live_score()
@@ -397,7 +413,7 @@ class TimeEventScheduler:
             logger.debug(
                 "Revoke coroutine sleeping for %s seconds (event=%s)", seconds, event_id
             )
-            await asyncio.sleep(seconds)
+            await self._sleep(seconds)
 
             logger.info("Time revoke fired: %s (after %s seconds)", event_id, seconds)
             # Update dict directly

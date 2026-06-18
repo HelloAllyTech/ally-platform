@@ -1038,6 +1038,7 @@ class TestWorker:
                 thread_id,
                 agent_joined_at=None,
                 score_keeper=None,
+                session_clock=None,
             ):
                 registry_init_called["scenario"] = scenario
                 registry_init_called["room"] = room
@@ -1339,6 +1340,7 @@ class TestWorker:
                 thread_id,
                 agent_joined_at=None,
                 score_keeper=None,
+                session_clock=None,
             ):
                 self.termination_callback = termination_callback
                 self.termination_message = "Goodbye"
@@ -1575,6 +1577,7 @@ class TestWorker:
                 thread_id,
                 agent_joined_at=None,
                 score_keeper=None,
+                session_clock=None,
             ):
                 self.termination_callback = termination_callback
                 self.termination_message = None
@@ -1659,3 +1662,26 @@ class TestWorker:
 
         # Opening statement should NOT be said because termination was initiated
         assert len(dummy_session.said) == 0
+
+
+class TestParseMaxTimeSeconds:
+    """_parse_max_time_seconds must mirror the clients' parseMaxTimeSec so the
+    server backstop and the client timer agree on the limit."""
+
+    def test_hms(self):
+        assert worker._parse_max_time_seconds("00:05:00") == 300.0
+
+    def test_full_hours(self):
+        assert worker._parse_max_time_seconds("01:00:00") == 3600.0
+
+    def test_two_parts_matches_client_h_m(self):
+        # Client treats parts[0] as hours; mirror that exactly.
+        assert worker._parse_max_time_seconds("05:00") == 5 * 3600.0
+
+    def test_absent_or_zero_returns_none(self):
+        assert worker._parse_max_time_seconds(None) is None
+        assert worker._parse_max_time_seconds("") is None
+        assert worker._parse_max_time_seconds("00:00:00") is None
+
+    def test_invalid_returns_none(self):
+        assert worker._parse_max_time_seconds("abc") is None

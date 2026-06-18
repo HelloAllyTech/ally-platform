@@ -70,10 +70,16 @@ def serialize_event(
 
 
 def calculate_elapsed_time(config: Optional[RunnableConfig]) -> float:
-    """Calculates seconds since the agent joined,
-    handling timezone and format safety."""
+    """Calculates *active* seconds since the agent joined (excluding paused
+    time), handling timezone and format safety."""
     if not config or "configurable" not in config:
         return 0.0
+
+    # Prefer the pause-aware session clock when present so event eligibility
+    # uses active time, not wall-clock that keeps advancing during a pause.
+    session_clock = config["configurable"].get("session_clock")
+    if session_clock is not None:
+        return session_clock.elapsed()
 
     joined_at_raw = config["configurable"].get("agent_joined_at")
     if not joined_at_raw:

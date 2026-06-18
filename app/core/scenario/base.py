@@ -284,6 +284,16 @@ class Scenario(BaseModel):
         default=None,
         description="Ordered agent states with instructions and dialogues",
     )
+    timer_mode: bool = Field(
+        default=False,
+        alias="timerMode",
+        description="Whether a scenario time limit is enforced.",
+    )
+    max_time_value: Optional[str] = Field(
+        default=None,
+        alias="maxTimeValue",
+        description="Scenario time limit as HH:MM:SS (used when timer_mode is on).",
+    )
 
     model_config = {
         "populate_by_name": True,  # allow both alias and field name on input
@@ -403,6 +413,8 @@ class Scenario(BaseModel):
         return cls(
             scenarioName=normalized["scenarioName"],
             metadata=normalized.get("metadata", {}),
+            timer_mode=bool(raw.get("timerMode", False)),
+            max_time_value=raw.get("maxTimeValue"),
             conversation_started_at=conversation_started_at,
             events=built_events,
             trigger_events=trigger_events,
