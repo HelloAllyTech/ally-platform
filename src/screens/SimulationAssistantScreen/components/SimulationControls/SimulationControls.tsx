@@ -1,7 +1,13 @@
 import React, {useMemo} from 'react';
 import {View} from 'react-native';
 
-import {MicIcon, MicOffIcon, MicOnIcon} from '@/assets/icons';
+import {
+  MicIcon,
+  MicOffIcon,
+  MicOnIcon,
+  PauseWhiteIcon,
+  PlayWhiteIcon,
+} from '@/assets/icons';
 import {CollapsibleButtonGroup} from '@/components';
 import type {ButtonOption} from '@/components/ButtonGroup';
 import {useTranslate} from '@/hooks';
@@ -19,6 +25,8 @@ interface SimulationControlsProps {
   onEndSession: () => void;
   isSimulationInProgress: boolean;
   showFocusButton?: boolean;
+  isPaused?: boolean;
+  onPauseToggle?: () => void;
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -31,6 +39,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
   onEndSession,
   isSimulationInProgress,
   showFocusButton = true,
+  isPaused = false,
+  onPauseToggle,
 }) => {
   const {t} = useTranslate();
 
@@ -41,7 +51,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
         icon: !isMicEnabled ? <MicOffIcon /> : <MicOnIcon />,
         label: t(`SimulationAssistant.${!isMicEnabled ? 'unmute' : 'mute'}`),
         onPress: onMicToggle,
-        disabled: !isSimulationInProgress,
+        // Pause is a superset of mute — disable mic toggle while paused.
+        disabled: !isSimulationInProgress || isPaused,
         variant: !isMicEnabled ? 'active' : 'default',
       },
       ...(showFocusButton
@@ -53,8 +64,22 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
               ),
               label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
               onPress: onFocusModeToggle,
-              disabled: !isSimulationInProgress,
+              disabled: !isSimulationInProgress || isPaused,
               variant: (isFocusMode ? 'active' : 'default') as
+                | 'active'
+                | 'default',
+            },
+          ]
+        : []),
+      ...(onPauseToggle
+        ? [
+            {
+              id: 'pause',
+              icon: isPaused ? <PlayWhiteIcon /> : <PauseWhiteIcon />,
+              label: t(`SimulationAssistant.${isPaused ? 'resume' : 'pause'}`),
+              onPress: onPauseToggle,
+              disabled: !isSimulationInProgress,
+              variant: (isPaused ? 'active' : 'default') as
                 | 'active'
                 | 'default',
             },
@@ -74,6 +99,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
       isFocusMode,
       isSimulationInProgress,
       showFocusButton,
+      isPaused,
+      onPauseToggle,
       t,
       onMicToggle,
       onFocusModeToggle,

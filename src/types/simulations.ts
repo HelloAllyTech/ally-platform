@@ -150,6 +150,8 @@ export interface SimulationTimerProps {
   timeLimit?: number; // seconds; if provided, triggers onWarning and onTimeLimit
   onWarning?: () => void; // fired when timeLimit - elapsed <= WARNING_THRESHOLD_SECONDS
   onTimeLimit?: () => void; // fired when elapsed >= timeLimit
+  isPaused?: boolean; // when true, the elapsed clock holds (paused time isn't counted)
+  pausedOffsetMs?: number; // cumulative completed paused milliseconds to exclude
 }
 
 export interface SimulationEventDetailsMeta {

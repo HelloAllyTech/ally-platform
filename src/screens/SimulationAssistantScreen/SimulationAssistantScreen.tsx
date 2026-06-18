@@ -40,6 +40,7 @@ import {
   // logger,
   parseMaxTimeSec,
   playNotificationSound,
+  stringToUint8,
 } from '@/utils';
 
 import {
@@ -66,6 +67,21 @@ const STRICT_MODE_GUARD_MS = 100;
 // scenarios), transition out of ringing after this grace window so the UI
 // isn't stuck on ringing forever.
 const AGENT_SILENT_GRACE_MS = 1500;
+
+// Pause/resume control-channel message types (single source to avoid typo
+// drift against the agent). Client → agent: PAUSE/RESUME. Agent → client: rest.
+const SIM_CONTROL = {
+  PAUSE: 'pause',
+  RESUME: 'resume',
+  PAUSED: 'paused',
+  RESUMED: 'resumed',
+  CAP_WARNING: 'cap-warning',
+  CAP_ENDED: 'cap-ended',
+} as const;
+
+// If the agent doesn't ack a pause/resume within this window, assume the
+// control packet didn't land and revert the optimistic UI.
+const CONTROL_ACK_TIMEOUT_MS = 2500;
 
 type Props = RootStackScreenProps<'SimulationAssistant'>;
 
@@ -111,6 +127,28 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  // Pause/resume: paused time is excluded from the displayed timer and the
+  // scenario time limit. `pausedOffsetMs` accumulates completed pauses.
+  // NOTE: this is the CLIENT-side clock (drives the scenario time-limit only).
+  // Billing/leaderboard paused-time is tracked authoritatively server-side
+  // (scenario_sessions.totalPausedMs from the agent's SQS events). The two are
+  // intentionally separate — they serve different surfaces.
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [pausedOffsetMs, setPausedOffsetMs] = useState<number>(0);
+  const pauseStartedAtRef = useRef<number | null>(null);
+  // Tracks an in-flight pause/resume awaiting the agent's ack, with a revert.
+  const pendingControlRef = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+    revert: () => void;
+  } | null>(null);
+  // Mirror current state into refs so the room data handler can reconcile the
+  // UI to the agent's authoritative ack without stale closures.
+  const isPausedRef = useRef(isPaused);
+  const isMicEnabledRef = useRef(isMicEnabled);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+    isMicEnabledRef.current = isMicEnabled;
+  });
 
   // Tracks whether we've already transitioned to AGENT_JOINED in this session;
   // prevents the grace timer + active-speakers handler from racing.
@@ -323,6 +361,46 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         return;
       }
 
+      // Pause/resume control acks from the agent. 'paused'/'resumed' confirm the
+      // optimistic UI; 'cap-warning' warns before auto-end; 'cap-ended' is
+      // followed by room teardown (onDisconnected navigates to feedback).
+      const ctrlType = (eventObj as {type?: string}).type;
+      if (ctrlType === SIM_CONTROL.PAUSED || ctrlType === SIM_CONTROL.RESUMED) {
+        // Agent confirmed — cancel the revert timer and treat the ack as
+        // AUTHORITATIVE: reconcile the UI to it (self-heals a late ack that
+        // fired after the optimistic revert, so client/agent can't diverge).
+        if (pendingControlRef.current) {
+          clearTimeout(pendingControlRef.current.timer);
+          pendingControlRef.current = null;
+        }
+        const agentPaused = ctrlType === SIM_CONTROL.PAUSED;
+        if (agentPaused && !isPausedRef.current) {
+          pauseStartedAtRef.current = pauseStartedAtRef.current ?? Date.now();
+          setIsPaused(true);
+          void room.localParticipant
+            .setMicrophoneEnabled(false)
+            .catch(() => {});
+        } else if (!agentPaused && isPausedRef.current) {
+          if (pauseStartedAtRef.current !== null) {
+            const banked = Date.now() - pauseStartedAtRef.current;
+            setPausedOffsetMs(prev => prev + banked);
+            pauseStartedAtRef.current = null;
+          }
+          setIsPaused(false);
+          void room.localParticipant
+            .setMicrophoneEnabled(isMicEnabledRef.current)
+            .catch(() => {});
+        }
+        return;
+      }
+      if (ctrlType === SIM_CONTROL.CAP_WARNING) {
+        setShowEndingSoon(true);
+        return;
+      }
+      if (ctrlType === SIM_CONTROL.CAP_ENDED) {
+        return;
+      }
+
       const feedbackEvent = eventObj as LiveEventPayload;
       if (!feedbackEvent?.data) return;
 
@@ -387,6 +465,16 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
   useEffect(() => attachRoomListeners(), [attachRoomListeners]);
 
+  // Clear any pending control-ack timer on unmount.
+  useEffect(
+    () => () => {
+      if (pendingControlRef.current) {
+        clearTimeout(pendingControlRef.current.timer);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     playNotificationSound(sounds.startSimulation);
   }, []);
@@ -449,6 +537,94 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicEnabled]);
 
+  const setMic = useCallback(
+    async (enabled: boolean) => {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(enabled);
+      } catch {
+        /* best-effort */
+      }
+    },
+    [room],
+  );
+
+  // Send a control packet to the agent. The agent freezes/unfreezes audio +
+  // brain and reports paused time to the backend.
+  const publishControl = useCallback(
+    async (type: typeof SIM_CONTROL.PAUSE | typeof SIM_CONTROL.RESUME) => {
+      try {
+        await room.localParticipant.publishData(
+          stringToUint8(JSON.stringify({type})),
+          {reliable: true},
+        );
+      } catch (error) {
+        showErrorToast(error, 'Errors.toggleMic');
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Arm a revert timer: if the agent doesn't ack within the window, undo the
+  // optimistic UI so the client can't silently diverge from the agent/backend.
+  const armControlAck = useCallback((revert: () => void) => {
+    if (pendingControlRef.current) {
+      clearTimeout(pendingControlRef.current.timer);
+    }
+    const timer = setTimeout(() => {
+      pendingControlRef.current = null;
+      revert();
+      showErrorToast(undefined, 'Errors.pauseControl');
+    }, CONTROL_ACK_TIMEOUT_MS);
+    pendingControlRef.current = {timer, revert};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTogglePause = useCallback(async () => {
+    if (!isPaused) {
+      // Pause: stop publishing the mic (genuinely not recorded — no glow, no
+      // audio leaves the device), freeze the clock locally (drives the scenario
+      // time-limit), and signal the agent.
+      const revert = () => {
+        pauseStartedAtRef.current = null;
+        setIsPaused(false);
+        void setMic(isMicEnabled);
+      };
+      await setMic(false);
+      pauseStartedAtRef.current = Date.now();
+      setIsPaused(true);
+      await publishControl(SIM_CONTROL.PAUSE);
+      armControlAck(revert);
+    } else {
+      // Resume: restore the mic to its pre-pause state, bank the paused
+      // interval, then signal the agent.
+      const pausedAt = pauseStartedAtRef.current;
+      const prevOffset = pausedOffsetMs;
+      const revert = () => {
+        setPausedOffsetMs(prevOffset);
+        pauseStartedAtRef.current = pausedAt ?? Date.now();
+        setIsPaused(true);
+        void setMic(false);
+      };
+      await setMic(isMicEnabled);
+      if (pausedAt !== null) {
+        setPausedOffsetMs(prev => prev + (Date.now() - pausedAt));
+        pauseStartedAtRef.current = null;
+      }
+      setIsPaused(false);
+      setShowEndingSoon(false);
+      await publishControl(SIM_CONTROL.RESUME);
+      armControlAck(revert);
+    }
+  }, [
+    isPaused,
+    isMicEnabled,
+    pausedOffsetMs,
+    setMic,
+    publishControl,
+    armControlAck,
+  ]);
+
   const renderLoader = () => {
     const getLoadingText = () => {
       if (
@@ -487,6 +663,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               timeLimit={maxTimeSec}
               onWarning={() => setShowEndingSoon(true)}
               onTimeLimit={handleDisconnect}
+              isPaused={isPaused}
+              pausedOffsetMs={pausedOffsetMs}
             />
           )}
 
@@ -675,6 +853,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             onEndSession={handleDisconnect}
             isSimulationInProgress={isSimulationInProgress}
             showFocusButton={!isNoneMode}
+            isPaused={isPaused}
+            onPauseToggle={handleTogglePause}
           />
         )}
       </RoomContext.Provider>
