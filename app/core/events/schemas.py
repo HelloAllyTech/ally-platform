@@ -21,6 +21,29 @@ class CoreMessageType(str, Enum):
     EVENT = "event"
     BEHAVIOR_INSTRUCTION = "behavior_instruction"
     TURN_METRICS = "turn_metrics"
+    LLM_USAGE = "llm_usage"
+
+
+class LLMUsageData(BaseModel):
+    """Per-AI-call usage shipped to Core for the AI-cost (by service / model /
+    task) dashboard. `service` selects the billing unit: 'llm' (tokens),
+    'stt' (audio_ms), 'tts' (characters). Core sums the quantities and converts
+    to estimated USD with per-service pricing."""
+
+    service: str = "llm"
+    unit: Optional[str] = None
+    provider: str
+    model: str
+    task: str
+    # LLM quantities.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    # STT billable audio duration (ms) / TTS billable characters.
+    audio_ms: Optional[int] = None
+    characters: Optional[int] = None
+    env: Optional[str] = None
+    scenario_id: Optional[int] = None
 
 
 class TurnMetricsData(BaseModel):
@@ -175,6 +198,9 @@ class CoreEventMessageTypeData(BaseModel):
     turn_metrics: Optional[TurnMetricsData] = Field(
         default=None, description="Per-turn latency metrics"
     )
+    llm_usage: Optional[LLMUsageData] = Field(
+        default=None, description="Per-LLM-call token usage"
+    )
 
 
 class CoreEventMessageType(BaseModel):
@@ -237,6 +263,21 @@ class CoreEventMessageType(BaseModel):
         return cls(
             message_type=CoreMessageType.TURN_METRICS,
             data=CoreEventMessageTypeData(turn_metrics=turn_metrics),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_llm_usage(
+        cls,
+        room_id: str,
+        llm_usage: LLMUsageData,
+    ) -> "CoreEventMessageType":
+        """Create a per-LLM-call token usage message for Core. Wire shape
+        mirrors turn_metrics: data.llm_usage = {...}."""
+        return cls(
+            message_type=CoreMessageType.LLM_USAGE,
+            data=CoreEventMessageTypeData(llm_usage=llm_usage),
             room_id=room_id,
             timestamp=int(time.time()),
         )

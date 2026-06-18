@@ -237,6 +237,13 @@ class Settings(BaseSettings):
             "(always logs if enabled, regardless of multilingual settings)"
         ),
     )
+    LLM_USAGE_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Emit per-turn LLM token-usage events to Core for the "
+            "token-consumption (cost by model & task) dashboard."
+        ),
+    )
 
     # Event processing feature flags
     ENABLE_EVENT_DETECTION_OPTIMIZATIONS: bool = Field(

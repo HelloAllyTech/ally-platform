@@ -1096,6 +1096,23 @@ async def generate_response(
             invocation_id=get_invocation_id(),
             **_gen_config,
         )
+        # Best-effort token-usage emission for the cost-by-model/task dashboard.
+        # Never affects the turn (emitter swallows all errors). Skipped on the
+        # timeout fallback below, where no real usage exists.
+        try:
+            from app.core.llm_usage.emitter import emit_llm_usage
+            from app.core.llm_usage.extract import extract_usage_from_aimessage
+            from app.core.llm_usage.tasks import LLMTask
+
+            emit_llm_usage(
+                room_id=get_room_id(),
+                provider=_gen_config.get("llm_provider"),
+                model=llm_model_name,
+                task=LLMTask.AGENT_TURN.value,
+                usage=extract_usage_from_aimessage(response),
+            )
+        except Exception:
+            pass
     except asyncio.TimeoutError:
         _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
         logger.error(
