@@ -195,6 +195,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   }, [remoteParticipant?.isSpeaking]);
 
   const {remoteTurnState, localTurnState} = useMemo(() => {
+    // While paused, both cards show "Paused" — the underlying speaking/thinking/
+    // your-turn status is frozen and would otherwise be stale and misleading.
+    if (isPaused) {
+      return {
+        remoteTurnState: TurnState.PAUSED,
+        localTurnState: TurnState.PAUSED,
+      };
+    }
+
     const isLocalSpeaking = localParticipant?.isSpeaking ?? false;
     const isThinking = agentTurnStatus === 'thinking';
 
@@ -215,7 +224,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     }
 
     return {remoteTurnState: remote, localTurnState: local};
-  }, [agentTurnStatus, debouncedRemoteSpeaking, localParticipant?.isSpeaking]);
+  }, [
+    isPaused,
+    agentTurnStatus,
+    debouncedRemoteSpeaking,
+    localParticipant?.isSpeaking,
+  ]);
 
   useEffect(() => {
     if (accessToken) {
