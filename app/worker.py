@@ -154,9 +154,12 @@ class AgentWorker:
         self._background_tasks: Set[asyncio.Task] = set()
 
         # Thinking-filler (plays on a separate audio track via
-        # BackgroundAudioPlayer, so it can't race/preempt the real reply).
+        # BackgroundAudioPlayer, so it can't race/preempt the real reply). We
+        # drive playback ourselves on the agent's "thinking" state so we know
+        # which phrase plays and can record it in the transcript.
         self._bg_audio = None
-        self._filler_clip_paths: list[str] = []
+        self._filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
+        self._filler_handle = None
 
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
@@ -449,14 +452,14 @@ class AgentWorker:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
-            if self._filler_clip_paths:
+            if self._filler_clips:
                 try:
                     from app.core.livekit.filler_audio import cleanup_clips
 
-                    cleanup_clips(self._filler_clip_paths)
+                    cleanup_clips([path for _, path in self._filler_clips])
                 except Exception:  # noqa: BLE001
                     pass
-                self._filler_clip_paths = []
+                self._filler_clips = []
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup
@@ -509,10 +512,11 @@ class AgentWorker:
         The filler plays via LiveKit's BackgroundAudioPlayer (its own published
         track), so it can NEVER race or preempt the agent's real reply — unlike
         a session.say() on the shared speech channel. We synthesize the
-        scenario's per-language filler dialogues to audio once and hand them to
-        the player as the ``thinking_sound`` (played while the agent is
-        thinking, stopped when it speaks). Fully best-effort: any failure leaves
-        the session running with no filler.
+        scenario's per-language filler dialogues to audio once, then drive
+        playback ourselves on the agent's "thinking" state (see
+        _on_filler_agent_state) so we know which phrase plays and can record it
+        in the transcript. Fully best-effort: any failure leaves the session
+        running with no filler.
         """
         try:
             from app.core.livekit.fillers import resolve_filler_phrases
@@ -540,33 +544,94 @@ class AgentWorker:
 
             from app.core.livekit.filler_audio import synthesize_filler_clips
 
-            self._filler_clip_paths = await synthesize_filler_clips(
+            self._filler_clips = await synthesize_filler_clips(
                 self.tts_client, phrases
             )
-            if not self._filler_clip_paths:
+            if not self._filler_clips:
                 logger.warning("[FILLER] no clips synthesized; filler disabled")
                 return
-            logger.info(
-                "[FILLER] synthesized %d clip(s)",
-                len(self._filler_clip_paths),
-            )
+            logger.info("[FILLER] synthesized %d clip(s)", len(self._filler_clips))
 
-            from livekit.agents import AudioConfig, BackgroundAudioPlayer
+            from livekit.agents import BackgroundAudioPlayer
 
-            thinking_sound = [AudioConfig(p) for p in self._filler_clip_paths]
-            self._bg_audio = BackgroundAudioPlayer(thinking_sound=thinking_sound)
-            await self._bg_audio.start(
-                room=self.ctx.room, agent_session=self.session
-            )
+            # No thinking_sound: we drive playback on "thinking" ourselves so we
+            # know which phrase is spoken (BackgroundAudioPlayer's auto
+            # thinking_sound picks a clip at random and doesn't expose which) —
+            # required to record the filler in the transcript. Still its own
+            # published track, so it can't race or preempt the reply.
+            self._bg_audio = BackgroundAudioPlayer()
+            await self._bg_audio.start(room=self.ctx.room)
+            self.session.on("agent_state_changed")(self._on_filler_agent_state)
             logger.info(
                 "[FILLER] BackgroundAudioPlayer started with %d clip(s)",
-                len(self._filler_clip_paths),
+                len(self._filler_clips),
             )
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning(
                 "[FILLER] thinking-filler setup failed (continuing without): %s", e
             )
             self._bg_audio = None
+
+    def _on_filler_agent_state(self, ev) -> None:
+        """Play a filler clip while the agent is "thinking" and record the
+        spoken phrase in the transcript; stop it once the agent moves on.
+
+        Best-effort: never raises into the session.
+        """
+        try:
+            if self._bg_audio is None or not self._filler_clips:
+                return
+            if getattr(ev, "new_state", None) == "thinking":
+                # Already playing this turn — don't stack.
+                if self._filler_handle is not None and not self._filler_handle.done():
+                    return
+                import random as _random
+
+                from livekit.agents import AudioConfig
+
+                phrase, path = _random.choice(self._filler_clips)
+                self._filler_handle = self._bg_audio.play(AudioConfig(path))
+                self._emit_filler_transcript(phrase, getattr(ev, "created_at", None))
+                logger.info("[FILLER] playing %r (recorded in transcript)", phrase)
+            elif self._filler_handle is not None and not self._filler_handle.done():
+                # Agent left "thinking" (e.g. started speaking) — stop the filler.
+                self._filler_handle.stop()
+                self._filler_handle = None
+        except Exception as e:  # noqa: BLE001 - filler must never break a session
+            logger.warning("[FILLER] agent-state handler error: %s", e)
+
+    def _emit_filler_transcript(self, phrase: str, created_at) -> None:
+        """Send the spoken filler phrase to Core as a CLIENT transcript line so
+        the transcript reflects what the agent actually said. Fire-and-forget."""
+        try:
+            from app.core.events.base import ChatMessage
+            from app.core.events.handlers import (
+                calculate_start_time,
+                send_event_to_queue,
+            )
+            from app.core.events.schemas import CoreEventMessageType
+
+            start_time = (
+                calculate_start_time(created_at, self.joined_iso)
+                if created_at
+                else None
+            )
+            chat_message = ChatMessage(
+                role="CLIENT",
+                content=phrase,
+                start_time=start_time,
+                end_time=start_time,
+            )
+            core_event = CoreEventMessageType.create(
+                room_id=self.ctx.room.name, chat_message=chat_message
+            )
+            task = asyncio.create_task(
+                send_event_to_queue(core_event.model_dump_json())
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        except Exception as e:  # noqa: BLE001 - filler must never break a turn
+            logger.warning("[FILLER] failed to emit filler transcript: %s", e)
 
     async def start(self):
         """

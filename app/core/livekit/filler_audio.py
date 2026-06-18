@@ -1,11 +1,11 @@
 """Render filler dialogues to audio clips for the BackgroundAudioPlayer.
 
 The thinking-filler plays on a SEPARATE LiveKit audio track
-(BackgroundAudioPlayer.thinking_sound), not the agent's speech channel, so it
-can never race or preempt the real reply. That player needs replayable audio
-sources, so we synthesize the scenario's per-language filler dialogues to temp
-WAV files once at session start (the player re-reads the file on each "thinking"
-transition).
+(BackgroundAudioPlayer), not the agent's speech channel, so it can never race or
+preempt the real reply. The player needs replayable audio sources, so we
+synthesize the scenario's per-language filler dialogues to temp WAV files once
+at session start. We return ``(phrase, wav_path)`` pairs so the worker can pick
+a clip on "thinking", play it, and record the spoken phrase in the transcript.
 
 Everything here is best-effort: any failure yields fewer/zero clips and the
 session continues without a filler — it must never break the agent.
@@ -16,23 +16,27 @@ from __future__ import annotations
 import os
 import tempfile
 import wave
-from typing import List
+from typing import List, Tuple
 
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-async def synthesize_filler_clips(tts_client, phrases: List[str]) -> List[str]:
-    """Synthesize each phrase to a temp WAV file; return the file paths.
+async def synthesize_filler_clips(
+    tts_client, phrases: List[str]
+) -> List[Tuple[str, str]]:
+    """Synthesize each phrase to a temp WAV file.
 
+    Returns a list of ``(phrase, wav_path)`` pairs so the caller knows which
+    phrase each clip says — needed to record the spoken filler in the transcript.
     Uses the session's configured TTS so the filler matches the agent voice.
     Per-phrase failures are skipped (logged), never raised.
     """
-    paths: List[str] = []
+    clips: List[Tuple[str, str]] = []
     tts = getattr(tts_client, "tts_instance", None)
     if tts is None or not phrases:
-        return paths
+        return clips
 
     for phrase in phrases:
         if not phrase or not phrase.strip():
@@ -69,12 +73,12 @@ async def synthesize_filler_clips(tts_client, phrases: List[str]) -> List[str]:
                 wav.setsampwidth(2)  # TTS frames are int16 PCM
                 wav.setframerate(sample_rate)
                 wav.writeframes(b"".join(frames))
-            paths.append(path)
+            clips.append((phrase, path))
             logger.info("[FILLER] synthesized clip phrase=%r -> %s", phrase, path)
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] failed to synthesize %r: %s", phrase, e)
 
-    return paths
+    return clips
 
 
 def cleanup_clips(paths: List[str]) -> None:
