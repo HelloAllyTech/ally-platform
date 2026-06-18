@@ -52,6 +52,70 @@ setup_logging(
 )
 
 
+def _resolve_stt_meta(scenario) -> tuple[str, str]:
+    """(provider, model) for the configured STT, read defensively from the
+    scenario language config. Used only to tag AI-cost usage events."""
+    try:
+        cfg = getattr(getattr(scenario, "language_config", None), "stt_config", None)
+        if isinstance(cfg, dict):
+            provider = cfg.get("provider") or "unknown"
+            inner = cfg.get("config") if isinstance(cfg.get("config"), dict) else cfg
+            model = (inner or {}).get("model") or "unknown"
+            return str(provider), str(model)
+    except Exception:
+        pass
+    return "unknown", "unknown"
+
+
+def _resolve_tts_meta(scenario) -> tuple[str, str]:
+    """(provider, model/voice) for the configured TTS, read defensively from
+    scenario.voice. Used only to tag AI-cost usage events."""
+    try:
+        voice = getattr(scenario, "voice", None)
+        if voice is not None:
+            provider = getattr(voice, "provider", None) or "unknown"
+            cfg = getattr(voice, "config", None)
+            model = (
+                getattr(cfg, "model", None)
+                or getattr(cfg, "model_name", None)
+                or getattr(voice, "name", None)
+                or "unknown"
+            )
+            return str(provider), str(model)
+    except Exception:
+        pass
+    return "unknown", "unknown"
+
+
+def _emit_service_usage(
+    _worker,
+    room: str,
+    *,
+    service: str,
+    provider: str,
+    model: str,
+    task: str,
+    audio_ms: Optional[int] = None,
+    characters: Optional[int] = None,
+) -> None:
+    """Best-effort AI-cost emit from the metrics hook (guarded import so a
+    missing module never breaks the live session)."""
+    try:
+        from app.core.llm_usage.emitter import emit_ai_usage
+
+        emit_ai_usage(
+            room,
+            service=service,
+            provider=provider,
+            model=model,
+            task=task,
+            audio_ms=audio_ms,
+            characters=characters,
+        )
+    except Exception:
+        logger.debug("[ai-cost] emit skipped (best-effort)", exc_info=True)
+
+
 class AgentWorker:
     """
     Manages the full agent lifecycle: configuration → initialization → runtime.
@@ -149,6 +213,12 @@ class AgentWorker:
         # Configure STT and TTS clients - using utility functions
         self.stt_client = configure_stt_client(self.scenario)
         self.tts_client = configure_tts_client(self.scenario)
+
+        # Capture STT/TTS provider+model for token-usage (AI-cost) emission in
+        # the metrics hook. Read defensively off the scenario config; the live
+        # billable metrics (audio duration / characters) come from LiveKit.
+        self._stt_provider, self._stt_model = _resolve_stt_meta(self.scenario)
+        self._tts_provider, self._tts_model = _resolve_tts_meta(self.scenario)
 
         # Configure LLM client
         self.llm_client = configure_llm_client(self.scenario)
@@ -300,6 +370,32 @@ class AgentWorker:
                     if ttfb is not None and ttfb >= 0:
                         turn_metrics.record(
                             metrics_room_name, tts_ttfb_ms=int(ttfb * 1000)
+                        )
+                    # AI-cost: TTS billed per synthesized character.
+                    chars = getattr(metric, "characters_count", None)
+                    if chars:
+                        _emit_service_usage(
+                            self,
+                            metrics_room_name,
+                            service="tts",
+                            provider=getattr(self, "_tts_provider", "unknown"),
+                            model=getattr(self, "_tts_model", "unknown"),
+                            task="agent_tts",
+                            characters=int(chars),
+                        )
+                elif metric_cls == "STTMetrics":
+                    # AI-cost: STT billed per audio minute. audio_duration is the
+                    # pushed-audio length in seconds.
+                    audio_s = getattr(metric, "audio_duration", None)
+                    if audio_s and audio_s > 0:
+                        _emit_service_usage(
+                            self,
+                            metrics_room_name,
+                            service="stt",
+                            provider=getattr(self, "_stt_provider", "unknown"),
+                            model=getattr(self, "_stt_model", "unknown"),
+                            task="agent_stt",
+                            audio_ms=int(audio_s * 1000),
                         )
             except Exception:  # noqa: BLE001 - metrics must never break a session
                 logger.exception("[turn-metrics] metrics_collected hook failed")
