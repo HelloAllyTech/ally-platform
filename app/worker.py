@@ -89,6 +89,11 @@ class AgentWorker:
         self.final_score_sent = False
         self._background_tasks: Set[asyncio.Task] = set()
 
+        # Thinking-filler (plays on a separate audio track via
+        # BackgroundAudioPlayer, so it can't race/preempt the real reply).
+        self._bg_audio = None
+        self._filler_clip_paths: list[str] = []
+
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
         # to entrypoint context
@@ -255,12 +260,7 @@ class AgentWorker:
         """Register room, session, and shutdown callbacks."""
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
-            create_conversation_handler(
-                self.ctx.room.name,
-                self.joined_iso,
-                session=self.session,
-                scenario=self.scenario,
-            )
+            create_conversation_handler(self.ctx.room.name, self.joined_iso)
         )
         self.session.on("conversation_item_added")(conversation_handler)
 
@@ -346,6 +346,21 @@ class AgentWorker:
                 logger.debug(f"Error cleaning up conversation handler: {e}")
             # Drop any in-flight turn-metrics state for this room.
             turn_metrics.discard(self.ctx.room.name)
+            # Tear down the thinking-filler track + delete its temp clips.
+            if self._bg_audio is not None:
+                try:
+                    await self._bg_audio.aclose()
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
+                self._bg_audio = None
+            if self._filler_clip_paths:
+                try:
+                    from app.core.livekit.filler_audio import cleanup_clips
+
+                    cleanup_clips(self._filler_clip_paths)
+                except Exception:  # noqa: BLE001
+                    pass
+                self._filler_clip_paths = []
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup
@@ -392,6 +407,71 @@ class AgentWorker:
         finally:
             self._prosody_task = None
 
+    async def _setup_thinking_filler(self) -> None:
+        """Start the thinking-filler on a separate audio track.
+
+        The filler plays via LiveKit's BackgroundAudioPlayer (its own published
+        track), so it can NEVER race or preempt the agent's real reply — unlike
+        a session.say() on the shared speech channel. We synthesize the
+        scenario's per-language filler dialogues to audio once and hand them to
+        the player as the ``thinking_sound`` (played while the agent is
+        thinking, stopped when it speaks). Fully best-effort: any failure leaves
+        the session running with no filler.
+        """
+        try:
+            from app.core.livekit.fillers import resolve_filler_phrases
+
+            phrases = resolve_filler_phrases(self.scenario)
+            if not phrases:
+                _pd = getattr(self.scenario, "prompt_data", None)
+                _lang = getattr(
+                    getattr(self.scenario, "language_config", None),
+                    "language_code",
+                    None,
+                )
+                logger.info(
+                    "[FILLER] not enabled for this session "
+                    "(global_enabled=%s filler_enabled=%s has_dialogues=%s "
+                    "has_allowed_fillers=%s language=%s) — no filler",
+                    getattr(settings, "FILLER_GLOBALLY_ENABLED", None),
+                    getattr(_pd, "filler_enabled", None),
+                    bool(getattr(_pd, "filler_dialogues", None)),
+                    bool(getattr(_pd, "allowed_fillers", None)),
+                    _lang,
+                )
+                return
+            logger.info("[FILLER] resolved %d phrase(s) for filler", len(phrases))
+
+            from app.core.livekit.filler_audio import synthesize_filler_clips
+
+            self._filler_clip_paths = await synthesize_filler_clips(
+                self.tts_client, phrases
+            )
+            if not self._filler_clip_paths:
+                logger.warning("[FILLER] no clips synthesized; filler disabled")
+                return
+            logger.info(
+                "[FILLER] synthesized %d clip(s)",
+                len(self._filler_clip_paths),
+            )
+
+            from livekit.agents import AudioConfig, BackgroundAudioPlayer
+
+            thinking_sound = [AudioConfig(p) for p in self._filler_clip_paths]
+            self._bg_audio = BackgroundAudioPlayer(thinking_sound=thinking_sound)
+            await self._bg_audio.start(
+                room=self.ctx.room, agent_session=self.session
+            )
+            logger.info(
+                "[FILLER] BackgroundAudioPlayer started with %d clip(s)",
+                len(self._filler_clip_paths),
+            )
+        except Exception as e:  # noqa: BLE001 - filler must never break a session
+            logger.warning(
+                "[FILLER] thinking-filler setup failed (continuing without): %s", e
+            )
+            self._bg_audio = None
+
     async def start(self):
         """
         Connects to room, initializes orchestrator, sets up interruption detection,
@@ -437,6 +517,10 @@ class AgentWorker:
 
         # Collect background prosody task before first speech synthesis call
         await self._await_prosody()
+
+        # Set up the thinking-filler on its own audio track (best-effort; never
+        # blocks or breaks the session).
+        await self._setup_thinking_filler()
 
         if should_say_opening_statement(
             scenario=self.scenario,
