@@ -633,6 +633,12 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001
             logger.warning("[PAUSE] interrupt failed: %s", e)
 
+        # Drop any in-flight turn-latency measurement: a turn spanning a pause
+        # would otherwise finalize on resume with a response_latency_ms that
+        # includes the whole paused wall-clock — a garbage outlier in the
+        # latency analytics. (Counter preserved so turn_index stays unique.)
+        turn_metrics.discard_inflight(self.ctx.room.name)
+
         # Enforce the max continuous pause (auto-end).
         self._arm_pause_cap_timer()
 
@@ -867,9 +873,7 @@ class AgentWorker:
 
             from app.core.livekit.filler_audio import synthesize_filler_clips
 
-            self._filler_clips = await synthesize_filler_clips(
-                self.tts_client, phrases
-            )
+            self._filler_clips = await synthesize_filler_clips(self.tts_client, phrases)
             if not self._filler_clips:
                 logger.warning("[FILLER] no clips synthesized; filler disabled")
                 return

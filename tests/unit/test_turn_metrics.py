@@ -86,3 +86,20 @@ def test_discard_clears_state():
     tm.note_user_speech_end("room-1", 100.0)
     tm.discard("room-1")
     assert tm.finalize("room-1", 100.5) is None
+
+
+def test_discard_inflight_drops_turn_but_keeps_counter():
+    # A turn that spans a pause must not emit an inflated latency on resume,
+    # and the turn counter must keep advancing (turn_index stays unique).
+    tm.note_user_speech_end("room-1", 100.0)  # turn 0
+    tm.record("room-1", llm_response_ms=50)
+    tm.discard_inflight("room-1")  # pause
+    # Resume would finalize here; with the in-flight turn dropped, nothing emits.
+    assert tm.finalize("room-1", 200.0) is None
+    # Next real turn keeps a unique, advancing index and a clean latency.
+    tm.note_user_speech_end("room-1", 300.0)
+    rec = tm.finalize("room-1", 305.0)
+    assert rec is not None
+    assert rec["turn_index"] == 1  # not reset to 0
+    assert rec["response_latency_ms"] == 5000  # no pause inflation
+    assert "llm_response_ms" not in rec  # discarded turn's components gone

@@ -115,3 +115,14 @@ def discard(room_id: str) -> None:
     """Drop any in-flight turn for a room (e.g. on session shutdown)."""
     _turns.pop(room_id, None)
     _turn_counters.pop(room_id, None)
+
+
+def discard_inflight(room_id: str) -> None:
+    """Drop the in-flight turn's accumulated timings but KEEP the turn counter.
+
+    Used on pause: a turn that spans a pause has no clean latency to report
+    (the gap would include the paused wall-clock), so we discard it rather than
+    emit a wildly inflated ``response_latency_ms`` outlier into the latency
+    analytics. The counter is preserved so later turn_index values stay unique.
+    """
+    _turns.pop(room_id, None)
