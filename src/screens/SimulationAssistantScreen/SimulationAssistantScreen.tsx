@@ -690,6 +690,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                   ? scenario?.maxTimeValue
                   : DEFAULT_MAX_TIME_VALUE
               }
+              isPaused={isPaused}
+              pausedOffsetMs={pausedOffsetMs}
             />
           )}
           <>
