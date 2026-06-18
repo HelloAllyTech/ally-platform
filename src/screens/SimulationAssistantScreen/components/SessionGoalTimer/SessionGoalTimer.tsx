@@ -1,4 +1,4 @@
-import {FC, useEffect, useState} from 'react';
+import {FC, useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -9,14 +9,26 @@ import {fontFamily} from '@/theme';
 export interface SessionGoalTimerProps {
   startTime: string | Date;
   maxTimeValue: string; // HH:MM:SS
+  isPaused?: boolean;
+  pausedOffsetMs?: number;
 }
 
 export const SessionGoalTimer: FC<SessionGoalTimerProps> = ({
   startTime,
   maxTimeValue,
+  isPaused = false,
+  pausedOffsetMs = 0,
 }) => {
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const {t} = useTranslation();
+  // Read pause state inside the interval without restarting it; exclude paused
+  // time so "time remaining" doesn't tick down while the session is frozen.
+  const isPausedRef = useRef(isPaused);
+  const pausedOffsetMsRef = useRef(pausedOffsetMs);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+    pausedOffsetMsRef.current = pausedOffsetMs;
+  });
 
   // Convert maxTimeValue (HH:MM:SS) to seconds
   const parseTimeValue = (timeStr: string): number => {
@@ -48,10 +60,13 @@ export const SessionGoalTimer: FC<SessionGoalTimerProps> = ({
     }
 
     const updateTimer = () => {
+      if (isPausedRef.current) return;
       const now = Date.now();
       const start =
         startTime instanceof Date ? startTime.getTime() : Date.parse(startTime);
-      const timeElapsed = Math.floor((now - start) / 1000);
+      const timeElapsed = Math.floor(
+        (now - start - pausedOffsetMsRef.current) / 1000,
+      );
       const remaining = Math.max(0, maxTimeSeconds - timeElapsed);
       setRemainingTime(remaining);
     };
