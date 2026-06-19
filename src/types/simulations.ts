@@ -65,6 +65,7 @@ export interface Scenario {
   experienceMode?: string;
   checklistEvents?: ChecklistItem[];
   showScoreMeter?: boolean;
+  pauseEnabled?: boolean;
   availableLanguages?: LanguageOption[];
 }
 
