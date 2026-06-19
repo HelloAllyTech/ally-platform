@@ -294,6 +294,12 @@ class Scenario(BaseModel):
         alias="maxTimeValue",
         description="Scenario time limit as HH:MM:SS (used when timer_mode is on).",
     )
+    pause_enabled: Optional[bool] = Field(
+        default=None,
+        alias="pauseEnabled",
+        description="Whether pause/resume is allowed. Opt-out: only an explicit "
+        "False disables it (None/True → enabled).",
+    )
 
     model_config = {
         "populate_by_name": True,  # allow both alias and field name on input
@@ -415,6 +421,7 @@ class Scenario(BaseModel):
             metadata=normalized.get("metadata", {}),
             timer_mode=bool(raw.get("timerMode", False)),
             max_time_value=raw.get("maxTimeValue"),
+            pause_enabled=raw.get("pauseEnabled"),
             conversation_started_at=conversation_started_at,
             events=built_events,
             trigger_events=trigger_events,

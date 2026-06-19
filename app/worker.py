@@ -625,6 +625,14 @@ class AgentWorker:
         if not self.ctx.room.remote_participants:
             logger.warning("[PAUSE] Ignored — no remote participant in room")
             return
+        # Defense-in-depth: honor the per-scenario opt-out even if a stale or
+        # tampered client sends a pause packet. Only an explicit False disables.
+        if (
+            self.scenario is not None
+            and getattr(self.scenario, "pause_enabled", None) is False
+        ):
+            logger.warning("[PAUSE] Ignored — pause disabled for this scenario")
+            return
 
         logger.info("[PAUSE] Pausing simulation")
         # Freeze the clock first so any concurrent graph turn sees paused state.
