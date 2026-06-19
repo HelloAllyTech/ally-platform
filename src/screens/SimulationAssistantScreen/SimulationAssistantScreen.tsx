@@ -870,7 +870,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             isSimulationInProgress={isSimulationInProgress}
             showFocusButton={!isNoneMode}
             isPaused={isPaused}
-            onPauseToggle={handleTogglePause}
+            // Opt-out default — only an explicit `false` hides the pause
+            // control (missing/true → shown).
+            onPauseToggle={
+              scenario?.pauseEnabled === false ? undefined : handleTogglePause
+            }
           />
         )}
       </RoomContext.Provider>
