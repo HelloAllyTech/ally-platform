@@ -916,9 +916,14 @@ class AgentWorker:
 
                 from livekit.agents import AudioConfig
 
+                created_at = getattr(ev, "created_at", None)
                 phrase, path = _random.choice(self._filler_clips)
                 self._filler_handle = self._bg_audio.play(AudioConfig(path))
-                self._emit_filler_transcript(phrase, getattr(ev, "created_at", None))
+                self._emit_filler_transcript(phrase, created_at)
+                # response_latency_ms is measured to first audio — the filler
+                # became audible now (before the real reply), so report it.
+                if created_at is not None:
+                    turn_metrics.note_filler_started(self.ctx.room.name, created_at)
                 logger.info("[FILLER] playing %r (recorded in transcript)", phrase)
             elif self._filler_handle is not None and not self._filler_handle.done():
                 # Agent left "thinking" (e.g. started speaking) — stop the filler.

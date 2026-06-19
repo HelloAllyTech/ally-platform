@@ -71,6 +71,20 @@ def note_user_speech_end(room_id: str, user_speech_end_ts: float) -> None:
     _turn_counters[room_id] = turn["turn_index"] + 1
 
 
+def note_filler_started(room_id: str, filler_start_ts: float) -> None:
+    """Record when the thinking-filler first became audible this turn.
+
+    ``response_latency_ms`` is measured to the FIRST audio the learner hears, so
+    when a filler plays (on the agent's "thinking" state, before the real reply)
+    its start time — not the reply's — is the response time. Only the earliest
+    filler in a turn is kept. No-op if there's no in-flight turn yet.
+    """
+    if not room_id:
+        return
+    turn = _turns.setdefault(room_id, {})
+    turn.setdefault("filler_start_ts", filler_start_ts)
+
+
 def record(room_id: str, **fields: Any) -> None:
     """Merge component/framework timings into the in-flight turn.
 
@@ -97,7 +111,17 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     if not turn or "user_speech_end_ts" not in turn:
         return None
 
-    latency_ms = (agent_speech_start_ts - turn["user_speech_end_ts"]) * 1000.0
+    user_end = turn["user_speech_end_ts"]
+    # response_latency_ms = time to the FIRST audio the learner hears. When a
+    # thinking-filler played, it became audible (on "thinking") before the real
+    # reply, so its start is the response time; otherwise use the reply's. Guard
+    # the filler ts to the turn window so a stale/out-of-order value can't skew.
+    first_audio_ts = agent_speech_start_ts
+    filler_start_ts = turn.get("filler_start_ts")
+    if filler_start_ts is not None and user_end <= filler_start_ts < first_audio_ts:
+        first_audio_ts = filler_start_ts
+
+    latency_ms = (first_audio_ts - user_end) * 1000.0
     # Clock skew / out-of-order events can yield a small negative; clamp to 0.
     latency_ms = max(0, round(latency_ms))
 
