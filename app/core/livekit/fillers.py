@@ -40,6 +40,24 @@ def _scenario_language_code(scenario) -> Optional[str]:
     )
 
 
+def is_filler_enabled(scenario) -> bool:
+    """Whether the thinking-filler feature is on for this session.
+
+    This is the gate independent of whether any static phrases are configured:
+    the global kill-switch AND the per-scenario ``filler_enabled`` toggle (the
+    email allowlist is enforced upstream by Core, which strips filler config
+    from the room metadata for non-allowlisted users, so ``filler_enabled``
+    already arrives False for them). Used to decide whether the predictive
+    (LLM-generated) filler layer may run even when no static phrases exist.
+    """
+    if not getattr(settings, "FILLER_GLOBALLY_ENABLED", True):
+        return False
+    prompt_data = getattr(scenario, "prompt_data", None)
+    if prompt_data is None:
+        return False
+    return bool(getattr(prompt_data, "filler_enabled", False))
+
+
 def resolve_filler_phrases(scenario) -> List[str]:
     """Resolve the filler phrases to use for ``scenario``.
 

@@ -200,6 +200,29 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Predictive (LLM-generated) thinking-filler ----
+    # A background job refreshes the filler phrases from the live conversation
+    # every PREDICTIVE_FILLER_INTERVAL_SECONDS, so the agent prefers fresh,
+    # context-aware fillers over the static Studio set. Subordinate to the
+    # thinking-filler gate: it only runs when the filler is enabled for the
+    # session (FILLER_GLOBALLY_ENABLED + prompt_data.filler_enabled). This flag
+    # is the global kill-switch for the predictive layer specifically.
+    PREDICTIVE_FILLER_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for LLM-generated predictive fillers. When "
+            "False, the filler still plays but only from the static Studio set."
+        ),
+    )
+    PREDICTIVE_FILLER_INTERVAL_SECONDS: float = Field(
+        default=10.0,
+        description="How often the background job regenerates predictive fillers.",
+    )
+    PREDICTIVE_FILLER_COUNT: int = Field(
+        default=5,
+        description="How many predictive filler phrases to generate per refresh.",
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(

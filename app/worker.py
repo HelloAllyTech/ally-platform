@@ -229,6 +229,11 @@ class AgentWorker:
         self._bg_audio = None
         self._filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
         self._filler_handle = None
+        # Predictive fillers: LLM-generated, refreshed by a background job from
+        # the live conversation. Preferred over the static set when non-empty;
+        # the static clips above stay as the fallback.
+        self._dynamic_filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
+        self._predictor_task: Optional[asyncio.Task] = None
 
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
@@ -529,6 +534,11 @@ class AgentWorker:
                 logger.debug(f"Error cleaning up conversation handler: {e}")
             # Drop any in-flight turn-metrics state for this room.
             turn_metrics.discard(self.ctx.room.name)
+            # Stop the predictive-filler job before deleting clips so it can't
+            # swap in a new generation after cleanup (it's still awaited by
+            # cleanup_background_tasks in the wrapped shutdown handler).
+            if self._predictor_task is not None and not self._predictor_task.done():
+                self._predictor_task.cancel()
             # Tear down the thinking-filler track + delete its temp clips.
             if self._bg_audio is not None:
                 try:
@@ -536,14 +546,18 @@ class AgentWorker:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
-            if self._filler_clips:
+            if self._filler_clips or self._dynamic_filler_clips:
                 try:
                     from app.core.livekit.filler_audio import cleanup_clips
 
-                    cleanup_clips([path for _, path in self._filler_clips])
+                    cleanup_clips(
+                        [path for _, path in self._filler_clips]
+                        + [path for _, path in self._dynamic_filler_clips]
+                    )
                 except Exception:  # noqa: BLE001
                     pass
                 self._filler_clips = []
+                self._dynamic_filler_clips = []
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup
@@ -848,36 +862,44 @@ class AgentWorker:
         running with no filler.
         """
         try:
-            from app.core.livekit.fillers import resolve_filler_phrases
+            from app.core.livekit.fillers import (
+                is_filler_enabled,
+                resolve_filler_phrases,
+            )
 
-            phrases = resolve_filler_phrases(self.scenario)
-            if not phrases:
+            # Gate: the filler feature must be on for this session. Static
+            # phrases may be empty (a scenario can rely purely on predictive
+            # fillers), so we check the feature flag separately from the phrases.
+            if not is_filler_enabled(self.scenario):
                 _pd = getattr(self.scenario, "prompt_data", None)
-                _lang = getattr(
-                    getattr(self.scenario, "language_config", None),
-                    "language_code",
-                    None,
-                )
                 logger.info(
                     "[FILLER] not enabled for this session "
-                    "(global_enabled=%s filler_enabled=%s has_dialogues=%s "
-                    "has_allowed_fillers=%s language=%s) — no filler",
+                    "(global_enabled=%s filler_enabled=%s) — no filler",
                     getattr(settings, "FILLER_GLOBALLY_ENABLED", None),
                     getattr(_pd, "filler_enabled", None),
-                    bool(getattr(_pd, "filler_dialogues", None)),
-                    bool(getattr(_pd, "allowed_fillers", None)),
-                    _lang,
                 )
                 return
-            logger.info("[FILLER] resolved %d phrase(s) for filler", len(phrases))
 
             from app.core.livekit.filler_audio import synthesize_filler_clips
 
-            self._filler_clips = await synthesize_filler_clips(self.tts_client, phrases)
-            if not self._filler_clips:
-                logger.warning("[FILLER] no clips synthesized; filler disabled")
+            phrases = resolve_filler_phrases(self.scenario)
+            if phrases:
+                logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
+                self._filler_clips = await synthesize_filler_clips(
+                    self.tts_client, phrases
+                )
+                logger.info(
+                    "[FILLER] synthesized %d static clip(s)", len(self._filler_clips)
+                )
+
+            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
+            if not self._filler_clips and not predictive_on:
+                # No static phrases configured and predictive disabled: there is
+                # nothing this session could ever play.
+                logger.info(
+                    "[FILLER] no static phrases and predictive disabled — no filler"
+                )
                 return
-            logger.info("[FILLER] synthesized %d clip(s)", len(self._filler_clips))
 
             from livekit.agents import BackgroundAudioPlayer
 
@@ -890,9 +912,22 @@ class AgentWorker:
             await self._bg_audio.start(room=self.ctx.room)
             self.session.on("agent_state_changed")(self._on_filler_agent_state)
             logger.info(
-                "[FILLER] BackgroundAudioPlayer started with %d clip(s)",
+                "[FILLER] BackgroundAudioPlayer started (static_clips=%d predictive=%s)",
                 len(self._filler_clips),
+                predictive_on,
             )
+
+            # Start the background predictive-filler job (best-effort). It reads
+            # the live conversation every interval and refreshes
+            # self._dynamic_filler_clips, which playback prefers over the static
+            # set. Tracked in _background_tasks so it's cancelled on shutdown.
+            if predictive_on:
+                self._predictor_task = asyncio.create_task(
+                    self._predictive_filler_loop()
+                )
+                self._background_tasks.add(self._predictor_task)
+                self._predictor_task.add_done_callback(self._background_tasks.discard)
+                logger.info("[FILLER] predictive filler loop started")
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning(
                 "[FILLER] thinking-filler setup failed (continuing without): %s", e
@@ -906,7 +941,9 @@ class AgentWorker:
         Best-effort: never raises into the session.
         """
         try:
-            if self._bg_audio is None or not self._filler_clips:
+            # Prefer fresh LLM-generated fillers; fall back to the static set.
+            clips = self._dynamic_filler_clips or self._filler_clips
+            if self._bg_audio is None or not clips:
                 return
             if getattr(ev, "new_state", None) == "thinking":
                 # Already playing this turn — don't stack.
@@ -917,7 +954,7 @@ class AgentWorker:
                 from livekit.agents import AudioConfig
 
                 created_at = getattr(ev, "created_at", None)
-                phrase, path = _random.choice(self._filler_clips)
+                phrase, path = _random.choice(clips)
                 self._filler_handle = self._bg_audio.play(AudioConfig(path))
                 self._emit_filler_transcript(phrase, created_at)
                 # response_latency_ms is measured to first audio — the filler
@@ -964,6 +1001,87 @@ class AgentWorker:
             task.add_done_callback(self._background_tasks.discard)
         except Exception as e:  # noqa: BLE001 - filler must never break a turn
             logger.warning("[FILLER] failed to emit filler transcript: %s", e)
+
+    def _read_conversation_history(self) -> list:
+        """Snapshot the live conversation messages for this room.
+
+        Reads from the LangGraph checkpoint keyed by the room name (the
+        thread_id). Best-effort: returns [] if state isn't available yet.
+        """
+        try:
+            from app.core.graph import agent_graph
+
+            snapshot = agent_graph.get_state(
+                {"configurable": {"thread_id": self.ctx.room.name}}
+            )
+            if snapshot and getattr(snapshot, "values", None):
+                return snapshot.values.get("messages", []) or []
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[FILLER] predictive: could not read history: %s", e)
+        return []
+
+    async def _predictive_filler_loop(self) -> None:
+        """Periodically regenerate predictive fillers from the live conversation.
+
+        Every PREDICTIVE_FILLER_INTERVAL_SECONDS: read the conversation, ask the
+        LLM for fresh short fillers, synthesize them, and atomically replace
+        self._dynamic_filler_clips (deleting the prior generation one cycle later
+        so a clip can't be removed while it's still playing). Skips the LLM/TTS
+        work when no new turns have arrived since the last refresh. Fully
+        best-effort — on any failure it keeps the previous (or static) fillers.
+        """
+        from app.core.livekit.filler_audio import cleanup_clips, synthesize_filler_clips
+        from app.core.livekit.predictive_filler import generate_predictive_fillers
+
+        interval = float(getattr(settings, "PREDICTIVE_FILLER_INTERVAL_SECONDS", 10.0))
+        count = int(getattr(settings, "PREDICTIVE_FILLER_COUNT", 5))
+        last_msg_count = -1
+        # Clips replaced last cycle — deleted one cycle later, after any play
+        # handle referencing them has long finished (fillers play for ~1-2s,
+        # cycles are ~10s apart).
+        pending_cleanup: list[tuple[str, str]] = []
+
+        try:
+            while True:
+                await asyncio.sleep(interval)
+
+                cleanup_clips([p for _, p in pending_cleanup])
+                pending_cleanup = []
+
+                messages = self._read_conversation_history()
+                # Need at least one exchange, and skip if nothing new was said.
+                if len(messages) < 1 or len(messages) == last_msg_count:
+                    continue
+
+                phrases = await generate_predictive_fillers(
+                    self.llm_client, self.scenario, messages, count
+                )
+                if not phrases:
+                    continue
+
+                clips = await synthesize_filler_clips(self.tts_client, phrases)
+                if not clips:
+                    continue
+
+                # Atomic swap (single-threaded event loop): playback picks up the
+                # new clips on the next "thinking". Old clips are cleaned next cycle.
+                pending_cleanup = self._dynamic_filler_clips
+                self._dynamic_filler_clips = clips
+                last_msg_count = len(messages)
+                logger.info(
+                    "[FILLER] predictive: refreshed %d clip(s) from %d message(s)",
+                    len(clips),
+                    len(messages),
+                )
+        except asyncio.CancelledError:
+            pass
+        finally:
+            # Best-effort cleanup of the deferred set on exit; the current
+            # dynamic clips are cleaned in shutdown_with_cleanup.
+            try:
+                cleanup_clips([p for _, p in pending_cleanup])
+            except Exception:  # noqa: BLE001
+                pass
 
     async def start(self):
         """
