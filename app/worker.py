@@ -234,6 +234,10 @@ class AgentWorker:
         # the static clips above stay as the fallback.
         self._dynamic_filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
         self._predictor_task: Optional[asyncio.Task] = None
+        # Recently spoken filler phrases, so we don't repeat the same one on
+        # consecutive turns (random.choice has no memory). Kept short and capped
+        # below the clip count so there's always a candidate to pick.
+        self._recent_filler_phrases: list[str] = []
 
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
@@ -957,12 +961,10 @@ class AgentWorker:
                 # Already playing this turn — don't stack.
                 if self._filler_handle is not None and not self._filler_handle.done():
                     return
-                import random as _random
-
                 from livekit.agents import AudioConfig
 
                 created_at = getattr(ev, "created_at", None)
-                phrase, path = _random.choice(clips)
+                phrase, path = self._pick_filler_clip(clips)
                 self._filler_handle = self._bg_audio.play(AudioConfig(path))
                 self._emit_filler_transcript(phrase, created_at)
                 # response_latency_ms is measured to first audio — the filler
@@ -976,6 +978,29 @@ class AgentWorker:
                 self._filler_handle = None
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
+
+    def _pick_filler_clip(self, clips: list) -> tuple:
+        """Pick a filler clip, avoiding phrases played on recent turns.
+
+        random.choice alone can land on the same phrase back-to-back, which
+        sounds like the agent is stuck. We exclude recently spoken phrases when
+        alternatives exist, and remember the last few (capped below the clip
+        count so there's always a candidate). With a single clip it necessarily
+        repeats. Phrase text is the key, so this also suppresses repeats across
+        predictive regenerations.
+        """
+        import random as _random
+
+        recent = set(self._recent_filler_phrases)
+        candidates = [c for c in clips if c[0] not in recent] or clips
+        choice = _random.choice(candidates)
+
+        # Remember up to (clip_count - 1) recent phrases, max 3, so the exclusion
+        # can never empty the candidate pool.
+        max_remember = max(1, min(len(clips) - 1, 3))
+        self._recent_filler_phrases.append(choice[0])
+        self._recent_filler_phrases = self._recent_filler_phrases[-max_remember:]
+        return choice
 
     def _emit_filler_transcript(self, phrase: str, created_at) -> None:
         """Send the spoken filler phrase to Core as a CLIENT transcript line so
